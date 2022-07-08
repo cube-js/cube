@@ -1,7 +1,11 @@
 use crate::queryplanner::planning::{ClusterSendNode, CubeExtensionPlanner};
-use crate::queryplanner::topk::execute::AggregateTopKExec;
+use crate::queryplanner::topk::execute::{AggregateTopKExec, TopKAggregateFunction};
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn, MIN_TOPK_STREAM_ROWS};
-use arrow::datatypes::DataType;
+use crate::queryplanner::udfs::{
+    aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
+    CubeScalarUDFKind,
+};
+use arrow::datatypes::{DataType, Schema};
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContextState;
 use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan};
@@ -10,7 +14,9 @@ use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 use datafusion::physical_plan::planner::{compute_aggregation_strategy, physical_name};
 use datafusion::physical_plan::sort::{SortExec, SortOptions};
-use datafusion::physical_plan::{ExecutionPlan, PhysicalPlanner};
+use datafusion::physical_plan::udf::create_physical_expr;
+use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, PhysicalPlanner};
+
 use itertools::Itertools;
 use std::cmp::max;
 use std::sync::Arc;
@@ -84,8 +90,9 @@ pub fn materialize_topk(p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> 
                                         let in_field = in_schema.field(p.input_columns[out_i]);
                                         let out_name = out_schema.field(out_i).name();
 
-                                        let f = in_field;
-                                        let mut e = Expr::Column(f.qualified_column());
+                                        //let mut e = Expr::Column(f.qualified_column());
+                                        let mut e =
+                                            p.post_projection[p.input_columns[out_i]].clone();
                                         if out_name != in_field.name() {
                                             e = Expr::Alias(Box::new(e), out_name.clone())
                                         }
@@ -122,6 +129,10 @@ fn aggr_exprs_allow_topk(agg_exprs: &[Expr]) -> bool {
                     return false;
                 }
             }
+            Expr::AggregateUDF { fun, .. } => match aggregate_kind_by_name(&fun.name) {
+                Some(CubeAggregateUDFKind::MergeHll) => {}
+                _ => return false,
+            },
             _ => return false,
         }
     }
@@ -143,6 +154,7 @@ fn aggr_schema_allows_topk(schema: &DFSchema, group_expr_len: usize) -> bool {
             | DataType::Float16
             | DataType::Float32
             | DataType::Float64
+            | DataType::Binary
             | DataType::Int64Decimal(_) => {} // ok, continue.
             _ => return false,
         }
@@ -160,17 +172,28 @@ fn fun_allows_topk(f: AggregateFunction) -> bool {
     }
 }
 
-fn extract_aggregate_fun(e: &Expr) -> Option<AggregateFunction> {
+fn extract_aggregate_fun(e: &Expr) -> Option<TopKAggregateFunction> {
     match e {
-        Expr::AggregateFunction { fun, .. } => Some(fun.clone()),
+        Expr::AggregateFunction { fun, .. } => match fun {
+            AggregateFunction::Sum => Some(TopKAggregateFunction::Sum),
+            AggregateFunction::Min => Some(TopKAggregateFunction::Min),
+            AggregateFunction::Max => Some(TopKAggregateFunction::Max),
+            _ => None,
+        },
+        Expr::AggregateUDF { fun, .. } => match aggregate_kind_by_name(&fun.name) {
+            Some(CubeAggregateUDFKind::MergeHll) => Some(TopKAggregateFunction::Merge),
+            _ => None,
+        },
         _ => None,
     }
 }
 
+#[derive(Debug)]
 struct ColumnProjection<'a> {
     input_columns: Vec<usize>,
     input: &'a Arc<LogicalPlan>,
     schema: &'a DFSchemaRef,
+    post_projection: Vec<Expr>,
 }
 
 fn extract_column_projection(p: &LogicalPlan) -> Option<ColumnProjection> {
@@ -182,11 +205,35 @@ fn extract_column_projection(p: &LogicalPlan) -> Option<ColumnProjection> {
         } => {
             let in_schema = input.schema();
             let mut input_columns = Vec::with_capacity(expr.len());
+            let mut post_projection = Vec::with_capacity(expr.len());
             for e in expr {
                 match e {
                     Expr::Alias(box Expr::Column(c), _) | Expr::Column(c) => {
-                        input_columns.push(field_index(in_schema, c.relation.as_deref(), &c.name)?)
+                        let fi = field_index(in_schema, c.relation.as_deref(), &c.name)?;
+                        input_columns.push(fi);
+                        let in_field = in_schema.field(fi);
+                        post_projection.push(Expr::Column(in_field.qualified_column()));
                     }
+                    Expr::Alias(box Expr::ScalarUDF { fun, args }, _)
+                    | Expr::ScalarUDF { fun, args } => match scalar_kind_by_name(&fun.name) {
+                        Some(CubeScalarUDFKind::HllCardinality) => match &args[0] {
+                            Expr::Column(c) => {
+                                let fi = field_index(in_schema, c.relation.as_deref(), &c.name)?;
+                                input_columns.push(fi);
+                                let in_field = in_schema.field(fi);
+                                post_projection.push(Expr::ScalarUDF {
+                                    fun: Arc::new(
+                                        scalar_udf_by_kind(CubeScalarUDFKind::HllCardinality)
+                                            .descriptor(),
+                                    ),
+                                    args: vec![Expr::Column(in_field.qualified_column())],
+                                });
+                            }
+                            _ => return None,
+                        },
+                        _ => return None,
+                    },
+
                     _ => return None,
                 }
             }
@@ -194,6 +241,7 @@ fn extract_column_projection(p: &LogicalPlan) -> Option<ColumnProjection> {
                 input_columns,
                 input,
                 schema,
+                post_projection,
             })
         }
         _ => None,
@@ -286,6 +334,12 @@ pub fn plan_topk(
 
     let aggregate_schema = aggregate.as_ref().schema();
 
+    let agg_fun = node
+        .aggregate_expr
+        .iter()
+        .map(|e| extract_aggregate_fun(e).unwrap())
+        .collect_vec();
+    //
     // Sort on workers.
     let sort_expr = node
         .order_by
@@ -293,7 +347,11 @@ pub fn plan_topk(
         .map(|c| {
             let i = group_expr_len + c.agg_index;
             PhysicalSortExpr {
-                expr: Arc::new(Column::new(aggregate_schema.field(i).name(), i)),
+                expr: make_sort_expr(
+                    &aggregate_schema,
+                    &agg_fun[c.agg_index],
+                    Arc::new(Column::new(aggregate_schema.field(i).name(), i)),
+                ),
                 options: SortOptions {
                     descending: !c.asc,
                     nulls_first: c.nulls_first,
@@ -313,11 +371,7 @@ pub fn plan_topk(
         /*use_streaming*/ true,
         /*max_batch_rows*/ max(2 * node.limit, MIN_TOPK_STREAM_ROWS),
     )?;
-    let agg_fun = node
-        .aggregate_expr
-        .iter()
-        .map(|e| extract_aggregate_fun(e).unwrap())
-        .collect_vec();
+
     Ok(Arc::new(AggregateTopKExec::new(
         node.limit,
         group_expr_len,
@@ -327,4 +381,20 @@ pub fn plan_topk(
         cluster,
         schema,
     )))
+}
+
+fn make_sort_expr(
+    schema: &Arc<Schema>,
+    fun: &TopKAggregateFunction,
+    col: Arc<dyn PhysicalExpr>,
+) -> Arc<dyn PhysicalExpr> {
+    match fun {
+        TopKAggregateFunction::Merge => create_physical_expr(
+            &scalar_udf_by_kind(CubeScalarUDFKind::HllCardinality).descriptor(),
+            &[col],
+            schema,
+        )
+        .unwrap(),
+        _ => col,
+    }
 }

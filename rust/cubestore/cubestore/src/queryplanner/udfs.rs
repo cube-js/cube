@@ -433,6 +433,6 @@ impl HllMergeAccumulator {
     }
 }
 
-fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
+pub fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
     return Hll::read(&data).map_err(|e| DataFusionError::Execution(e.message));
 }

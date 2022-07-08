@@ -1,4 +1,5 @@
 use crate::queryplanner::topk::SortColumn;
+use crate::queryplanner::udfs::read_sketch;
 use arrow::array::ArrayRef;
 use arrow::compute::SortOptions;
 use arrow::datatypes::SchemaRef;
@@ -8,7 +9,6 @@ use async_trait::async_trait;
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
 
-use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::group_scalar::GroupByScalar;
 use datafusion::physical_plan::hash_aggregate::{
     create_accumulators, create_group_by_values, write_group_result_row, AccumulatorSet,
@@ -30,6 +30,14 @@ use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TopKAggregateFunction {
+    Sum,
+    Min,
+    Max,
+    Merge,
+}
+
 #[derive(Debug)]
 pub struct AggregateTopKExec {
     pub limit: usize,
@@ -43,14 +51,14 @@ pub struct AggregateTopKExec {
 }
 
 /// Third item is the neutral value for the corresponding aggregate function.
-type AggDescr = (AggregateFunction, SortOptions, ScalarValue);
+type AggDescr = (TopKAggregateFunction, SortOptions, ScalarValue);
 
 impl AggregateTopKExec {
     pub fn new(
         limit: usize,
         key_len: usize,
         agg_expr: Vec<Arc<dyn AggregateExpr>>,
-        agg_fun: &[AggregateFunction],
+        agg_fun: &[TopKAggregateFunction],
         order_by: Vec<SortColumn>,
         cluster: Arc<dyn ExecutionPlan>,
         schema: SchemaRef,
@@ -72,7 +80,7 @@ impl AggregateTopKExec {
 
     fn compute_descr(
         agg_expr: &[Arc<dyn AggregateExpr>],
-        agg_fun: &[AggregateFunction],
+        agg_fun: &[TopKAggregateFunction],
         order_by: &[SortColumn],
     ) -> Vec<AggDescr> {
         let mut agg_descr = Vec::with_capacity(agg_expr.len());
@@ -659,7 +667,19 @@ fn cmp_same_types(l: &ScalarValue, r: &ScalarValue, nulls_first: bool, asc: bool
         (ScalarValue::UInt64(Some(l)), ScalarValue::UInt64(Some(r))) => l.cmp(r),
         (ScalarValue::Utf8(Some(l)), ScalarValue::Utf8(Some(r))) => l.cmp(r),
         (ScalarValue::LargeUtf8(Some(l)), ScalarValue::LargeUtf8(Some(r))) => l.cmp(r),
-        (ScalarValue::Binary(Some(l)), ScalarValue::Binary(Some(r))) => l.cmp(r),
+        (ScalarValue::Binary(Some(l)), ScalarValue::Binary(Some(r))) => {
+            let l_card = if l.len() == 0 {
+                0
+            } else {
+                read_sketch(l).unwrap().cardinality()
+            };
+            let r_card = if r.len() == 0 {
+                0
+            } else {
+                read_sketch(r).unwrap().cardinality()
+            };
+            l_card.cmp(&r_card)
+        }
         (ScalarValue::LargeBinary(Some(l)), ScalarValue::LargeBinary(Some(r))) => l.cmp(r),
         (ScalarValue::Date32(Some(l)), ScalarValue::Date32(Some(r))) => l.cmp(r),
         (ScalarValue::Date64(Some(l)), ScalarValue::Date64(Some(r))) => l.cmp(r),
@@ -695,12 +715,12 @@ fn cmp_same_types(l: &ScalarValue, r: &ScalarValue, nulls_first: bool, asc: bool
     }
 }
 
-fn to_neutral_value(s: &mut ScalarValue, f: &AggregateFunction) {
+fn to_neutral_value(s: &mut ScalarValue, f: &TopKAggregateFunction) {
     match f {
-        AggregateFunction::Sum => to_zero(s),
-        AggregateFunction::Min => to_max_value(s),
-        AggregateFunction::Max => to_min_value(s),
-        _ => panic!("unsupported aggregate function"),
+        TopKAggregateFunction::Sum => to_zero(s),
+        TopKAggregateFunction::Min => to_max_value(s),
+        TopKAggregateFunction::Max => to_min_value(s),
+        TopKAggregateFunction::Merge => to_empty_sketch(s),
     }
 }
 
@@ -762,8 +782,16 @@ fn to_min_value(s: &mut ScalarValue) {
     }
 }
 
+fn to_empty_sketch(s: &mut ScalarValue) {
+    match s {
+        ScalarValue::Binary(v) => *v = Some(Vec::new()),
+        _ => panic!("unsupported data type"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
     use arrow::array::{Array, ArrayRef, Int64Array};
     use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
@@ -790,7 +818,7 @@ mod tests {
         let proto = mock_topk(
             2,
             &[DataType::Int64],
-            &[AggregateFunction::Sum],
+            &[TopKAggregateFunction::Sum],
             vec![SortColumn {
                 agg_index: 0,
                 asc: false,
@@ -893,7 +921,7 @@ mod tests {
         let mut proto = mock_topk(
             2,
             &[DataType::Int64],
-            &[AggregateFunction::Sum],
+            &[TopKAggregateFunction::Sum],
             vec![SortColumn {
                 agg_index: 0,
                 asc: false,
@@ -964,7 +992,7 @@ mod tests {
         let mut proto = mock_topk(
             1,
             &[DataType::Int64],
-            &[AggregateFunction::Sum],
+            &[TopKAggregateFunction::Sum],
             vec![SortColumn {
                 agg_index: 0,
                 asc: true,
@@ -1052,7 +1080,7 @@ mod tests {
         let proto = mock_topk(
             10,
             &[DataType::Int64],
-            &[AggregateFunction::Sum, AggregateFunction::Min],
+            &[TopKAggregateFunction::Sum, TopKAggregateFunction::Min],
             vec![
                 SortColumn {
                     agg_index: 0,
@@ -1114,10 +1142,18 @@ mod tests {
         RecordBatch::try_new(schema.clone(), columns).unwrap()
     }
 
+    fn topk_fun_to_fusion_type(topk_fun: &TopKAggregateFunction) -> Option<AggregateFunction> {
+        match topk_fun {
+            TopKAggregateFunction::Sum => Some(AggregateFunction::Sum),
+            TopKAggregateFunction::Max => Some(AggregateFunction::Max),
+            TopKAggregateFunction::Min => Some(AggregateFunction::Min),
+            _ => None,
+        }
+    }
     fn mock_topk(
         limit: usize,
         group_by: &[DataType],
-        aggs: &[AggregateFunction],
+        aggs: &[TopKAggregateFunction],
         order_by: Vec<SortColumn>,
     ) -> Result<AggregateTopKExec, DataFusionError> {
         let key_fields = group_by
@@ -1145,7 +1181,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, f)| Expr::AggregateFunction {
-                fun: f.clone(),
+                fun: topk_fun_to_fusion_type(f).unwrap(),
                 args: vec![Expr::Column(Column::from_name(format!("agg{}", i + 1)))],
                 distinct: false,
             });

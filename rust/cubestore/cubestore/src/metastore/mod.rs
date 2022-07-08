@@ -3310,7 +3310,6 @@ impl MetaStore for RocksMetaStore {
                 .iter()
                 .filter_map(|c| match c.get_column_type() {
                     ColumnType::Bytes => None,
-                    ColumnType::HyperLogLog(_) => None,
                     _ => {
                         if seq_column_index.is_none()
                             || seq_column_index.is_some()
