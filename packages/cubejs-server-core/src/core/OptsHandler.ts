@@ -59,10 +59,9 @@ export class OptsHandler {
   private decoratedFactory = false;
 
   /**
-   * Map to store driverFactory function result type. This map needs to be
-   * removed after dbType deprecation period will be passed.
+   * driverFactory function result type.
    */
-  private driverFactoryType: Map<string, string> = new Map();
+  private driverFactoryType: undefined | 'BaseDriver' | 'DriverConfig';
 
   /**
    * Initialized options.
@@ -109,7 +108,6 @@ export class OptsHandler {
    */
   private assertDriverFactoryResult(
     val: DriverConfig | BaseDriver,
-    ctx: DriverContext,
   ) {
     if (val instanceof BaseDriver) {
       // TODO (buntarb): these assertions should be restored after dbType
@@ -131,21 +129,35 @@ export class OptsHandler {
       //     ),
       //   },
       // );
-      if (!this.driverFactoryType.has(ctx.dataSource)) {
-        this.driverFactoryType.set(ctx.dataSource, 'BaseDriver');
+      if (!this.driverFactoryType) {
+        this.driverFactoryType = 'BaseDriver';
+      } else if (this.driverFactoryType !== 'BaseDriver') {
+        throw new Error(
+          'CreateOptions.driverFactory function must return either ' +
+          'BaseDriver or DriverConfig.'
+        );
       }
       return <BaseDriver>val;
     } else if (
       val && val.type && typeof val.type === 'string'
     ) {
-      if (!this.driverFactoryType.has(ctx.dataSource)) {
-        this.driverFactoryType.set(ctx.dataSource, 'DriverConfig');
+      if (!this.driverFactoryType) {
+        this.driverFactoryType = 'DriverConfig';
+      } else if (this.driverFactoryType !== 'DriverConfig') {
+        throw new Error(
+          'CreateOptions.driverFactory function must return either ' +
+          'BaseDriver or DriverConfig.'
+        );
       }
       return <DriverConfig>val;
     } else {
       throw new Error(
         'Unexpected CreateOptions.driverFactory result value. Must be either ' +
-        `DriverConfig or driver instance: <${typeof val}>${val}`
+        `DriverConfig or driver instance: <${
+          typeof val
+        }>${
+          JSON.stringify(val, undefined, 2)
+        }`
       );
     }
   }
@@ -157,7 +169,9 @@ export class OptsHandler {
     if (typeof val !== 'string') {
       throw new Error(`Unexpected CreateOptions.dbType result type: <${
         typeof val
-      }>${val}`);
+      }>${
+        JSON.stringify(val, undefined, 2)
+      }`);
     }
     return val;
   }
@@ -180,14 +194,20 @@ export class OptsHandler {
     this.decoratedFactory = !driverFactory;
     return async (ctx: DriverContext) => {
       if (!driverFactory) {
-        if (!this.driverFactoryType.has(ctx.dataSource)) {
-          this.driverFactoryType.set(ctx.dataSource, 'DriverConfig');
+        if (!this.driverFactoryType) {
+          this.driverFactoryType = 'DriverConfig';
+        } else if (this.driverFactoryType !== 'DriverConfig') {
+          throw new Error(
+            'CreateOptions.driverFactory function must return either ' +
+            'BaseDriver or DriverConfig.'
+          );
         }
+        // TODO (buntarb): wrapping this call with assertDriverFactoryResult
+        // change assertions sequince and cause a fail of few tests. Review it.
         return this.defaultDriverFactory(ctx);
       } else {
         return this.assertDriverFactoryResult(
           await driverFactory(ctx),
-          ctx,
         );
       }
     };
@@ -204,30 +224,19 @@ export class OptsHandler {
     const { dbType, driverFactory } = opts;
     return async (ctx: DriverContext) => {
       if (!dbType) {
-        // TODO (buntarb): this should be restored after dbType deprecation
-        // period will be passed.
-        // const { type } = <DriverConfig>(await driverFactory(ctx));
-
         let val: undefined | BaseDriver | DriverConfig;
         let type: DatabaseType;
-
-        if (!this.driverFactoryType.has(ctx.dataSource)) {
+        if (!this.driverFactoryType) {
           val = await driverFactory(ctx);
         }
-
-        switch (this.driverFactoryType.get(ctx.dataSource)) {
-          case 'BaseDriver':
-            if (process.env.CUBEJS_DB_TYPE) {
-              type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
-            }
-            break;
-          case 'DriverConfig':
-            type = (<DriverConfig>(val || await driverFactory(ctx))).type;
-            break;
-          default:
-            break;
+        if (
+          this.driverFactoryType === 'BaseDriver' &&
+          process.env.CUBEJS_DB_TYPE
+        ) {
+          type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
+        } else if (this.driverFactoryType === 'DriverConfig') {
+          type = (<DriverConfig>(val || await driverFactory(ctx))).type;
         }
-
         return type;
       } else if (typeof dbType === 'function') {
         return this.assertDbTypeResult(await dbType(ctx));
