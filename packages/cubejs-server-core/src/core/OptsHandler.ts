@@ -177,6 +177,22 @@ export class OptsHandler {
   }
 
   /**
+   * Assert orchestration options.
+   */
+  private asserOrchestratorOptions(opts: OrchestratorOptions) {
+    if (
+      opts.rollupOnlyMode &&
+      this.isApiWorker() &&
+      getEnv('preAggregationsBuilder')
+    ) {
+      throw new Error(
+        'CreateOptions.orchestratorOptions.rollupOnlyMode cannot be trusly ' +
+        'for API instance if CUBEJS_PRE_AGGREGATIONS_BUILDER is set to true'
+      );
+    }
+  }
+
+  /**
    * Default database factory function.
    */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private defaultDriverFactory(ctx: DriverContext): DriverConfig {
@@ -642,6 +658,8 @@ export class OptsHandler {
     context: RequestContext,
     orchestratorOptions: OrchestratorOptions,
   ): OrchestratorInitedOptions {
+    this.asserOrchestratorOptions(orchestratorOptions);
+
     const clone = cloneDeep(orchestratorOptions);
 
     // rollup only mode (querying pre-aggs only)

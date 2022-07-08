@@ -37,6 +37,11 @@ const conf = {
   externalDriverFactory: async () => <BaseDriver>({
     testConnection: async () => undefined,
   }),
+  orchestratorOptions: () => ({
+    redisPoolOptions: {
+      createClient: async () => undefined
+    },
+  }),
 };
 
 describe('OptsHandler class', () => {
@@ -336,32 +341,22 @@ describe('OptsHandler class', () => {
   });
 
   test('must configure/reconfigure contextToDbType', async () => {
-    // TODO (buntarb): find out a way to check contextToExternalDbType reloading
-    // without driver instantiation, which causes the test failing.
-    process.env.CUBEJS_DB_TYPE = 'postgres';
-
     const core = new CubejsServerCoreExposed({
       ...conf,
       dbType: undefined,
       driverFactory: undefined,
     });
 
+    process.env.CUBEJS_DB_TYPE = 'postgres';
     expect(await core.contextToDbType({} as DriverContext)).toEqual('postgres');
-    expect(core.contextToExternalDbType({} as DriverContext)).toBeUndefined();
 
     process.env.CUBEJS_DB_TYPE = 'mysql';
-
     core.reloadEnvVariables();
-
     expect(await core.contextToDbType({} as DriverContext)).toEqual('mysql');
-    expect(core.contextToExternalDbType({} as DriverContext)).toBeUndefined();
 
     process.env.CUBEJS_DB_TYPE = 'postgres';
-
     core.reloadEnvVariables();
-
     expect(await core.contextToDbType({} as DriverContext)).toEqual('postgres');
-    expect(core.contextToExternalDbType({} as DriverContext)).toBeUndefined();
   });
 
   test(
@@ -620,6 +615,7 @@ describe('OptsHandler class', () => {
     'must set preAggregationsOptions.externalRefresh to false and test ' +
     'driver connection for dev server',
     async () => {
+      process.env.NODE_ENV = 'test';
       process.env.CUBEJS_DEV_MODE = 'true';
       const core = new CubejsServerCoreExposed({
         ...conf,
@@ -654,6 +650,7 @@ describe('OptsHandler class', () => {
     'test driver connection for dev server with preAggregationsOptions.' +
     'externalRefresh set to true',
     async () => {
+      process.env.NODE_ENV = 'test';
       process.env.CUBEJS_DEV_MODE = 'true';
       const core = new CubejsServerCoreExposed({
         ...conf,
@@ -692,6 +689,7 @@ describe('OptsHandler class', () => {
     'must set preAggregationsOptions.externalRefresh to false and doesn`t ' +
     'test driver connection for dev server with rollupOnlyMode set to true',
     async () => {
+      process.env.NODE_ENV = 'test';
       process.env.CUBEJS_DEV_MODE = 'true';
       const core = new CubejsServerCoreExposed({
         ...conf,
@@ -728,6 +726,7 @@ describe('OptsHandler class', () => {
     'must set preAggregationsOptions.externalRefresh to false and test ' +
     'driver connection for refresh worker in the production mode',
     async () => {
+      process.env.NODE_ENV = 'production';
       process.env.CUBEJS_DEV_MODE = 'false';
       const core = new CubejsServerCoreExposed({
         ...conf,
@@ -763,6 +762,7 @@ describe('OptsHandler class', () => {
     'driver connection for api worker in the production mode if ' +
     'CUBEJS_PRE_AGGREGATIONS_BUILDER is set',
     async () => {
+      process.env.NODE_ENV = 'production';
       process.env.CUBEJS_DEV_MODE = 'false';
       process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
       const core = new CubejsServerCoreExposed({
@@ -794,11 +794,12 @@ describe('OptsHandler class', () => {
     }
   );
 
-  test.only(
+  test(
     'must set preAggregationsOptions.externalRefresh to true and do not test ' +
     'driver connection for api worker in the production mode if specified in' +
     'preAggregationsOptions.externalRefresh',
     async () => {
+      process.env.NODE_ENV = 'production';
       process.env.CUBEJS_DEV_MODE = 'false';
       process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'true';
       const core = new CubejsServerCoreExposed({
@@ -812,6 +813,9 @@ describe('OptsHandler class', () => {
           database: 'database',
         }),
         orchestratorOptions: () => ({
+          redisPoolOptions: {
+            createClient: async () => undefined
+          },
           preAggregationsOptions: {
             externalRefresh: true,
           },
@@ -835,13 +839,14 @@ describe('OptsHandler class', () => {
     }
   );
 
-  test.only(
+  test(
     'must set preAggregationsOptions.externalRefresh to true and do not test ' +
-    'driver connection for api worker in the production mode if ' +
-    'CUBEJS_PRE_AGGREGATIONS_BUILDER is unset',
+    'driver connection for api worker if CUBEJS_PRE_AGGREGATIONS_BUILDER is unset',
     async () => {
+      process.env.NODE_ENV = 'production';
       process.env.CUBEJS_DEV_MODE = 'false';
       process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
+
       const core = new CubejsServerCoreExposed({
         ...conf,
         apiSecret: '44b87d4309471e5d9d18738450db0e49',
