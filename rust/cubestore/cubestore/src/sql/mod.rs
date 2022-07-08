@@ -87,6 +87,13 @@ pub trait SqlService: DIService + Send + Sync {
     /// Exposed only for tests. Worker plan created as if all partitions are on the same worker.
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
 
+    /// Exposed only for tests. Worker plan created as if all partitions are on the same worker.
+    async fn plan_query_with_context(
+        &self,
+        context: SqlQueryContext,
+        query: &str,
+    ) -> Result<QueryPlans, CubeError>;
+
     async fn upload_temp_file(
         &self,
         context: SqlQueryContext,
@@ -1075,6 +1082,15 @@ impl SqlService for SqlServiceImpl {
     }
 
     async fn plan_query(&self, q: &str) -> Result<QueryPlans, CubeError> {
+        self.plan_query_with_context(SqlQueryContext::default(), q)
+            .await
+    }
+
+    async fn plan_query_with_context(
+        &self,
+        context: SqlQueryContext,
+        q: &str,
+    ) -> Result<QueryPlans, CubeError> {
         let ast = {
             let replaced_quote = q.replace("\\'", "''");
             let mut parser = CubeStoreParser::new(&replaced_quote)?;
@@ -1086,7 +1102,7 @@ impl SqlService for SqlServiceImpl {
                     .query_planner
                     .logical_plan(
                         DFStatement::Statement(Statement::Query(q)),
-                        Arc::new(InlineTables::new()),
+                        context.inline_tables.clone(),
                     )
                     .await?;
                 match logical_plan {

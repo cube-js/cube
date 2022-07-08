@@ -904,10 +904,6 @@ impl ClusterSendExec {
             let mut ordinary_partitions = Vec::new();
             for index in union {
                 match index {
-                    None => ordinary_partitions.push(IdRow::new(
-                        INLINE_PARTITION_ID,
-                        Partition::new(INLINE_PARTITION_ID, None, None, None),
-                    )),
                     Some(index) => {
                         for p in &index.partitions {
                             match p.partition.get_row().multi_partition_id() {
@@ -919,6 +915,10 @@ impl ClusterSendExec {
                             }
                         }
                     }
+                    None => ordinary_partitions.push(IdRow::new(
+                        INLINE_PARTITION_ID,
+                        Partition::new(INLINE_PARTITION_ID, None, None, None),
+                    )),
                 }
             }
             if !ordinary_partitions.is_empty() {

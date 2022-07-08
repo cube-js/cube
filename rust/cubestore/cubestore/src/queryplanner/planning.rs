@@ -459,40 +459,44 @@ impl ChooseIndex<'_> {
     fn choose_table_index(&mut self, mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> {
         match &mut p {
             LogicalPlan::TableScan { source, .. } => {
-                if let Some(table) = source.as_any().downcast_ref::<CubeTableLogical>() {
-                    assert!(
-                        self.next_index < self.chosen_indices.len(),
-                        "inconsistent state"
-                    );
+                match source.as_any().downcast_ref::<CubeTableLogical>() {
+                    Some(table) => {
+                        assert!(
+                            self.next_index < self.chosen_indices.len(),
+                            "inconsistent state"
+                        );
 
-                    assert_eq!(
-                        table.table.table.get_id(),
-                        self.chosen_indices[self.next_index]
-                            .table_path
-                            .table
-                            .get_id()
-                    );
+                        assert_eq!(
+                            table.table.table.get_id(),
+                            self.chosen_indices[self.next_index]
+                                .table_path
+                                .table
+                                .get_id()
+                        );
 
-                    let snapshot = self.chosen_indices[self.next_index].clone();
-                    self.next_index += 1;
+                        let snapshot = self.chosen_indices[self.next_index].clone();
+                        self.next_index += 1;
 
-                    let table_schema = source.schema();
-                    *source = Arc::new(CubeTable::try_new(
-                        snapshot.clone(),
-                        // Filled by workers
-                        HashMap::new(),
-                        Vec::new(),
-                        NoopParquetMetadataCache::new(),
-                    )?);
+                        let table_schema = source.schema();
+                        *source = Arc::new(CubeTable::try_new(
+                            snapshot.clone(),
+                            // Filled by workers
+                            HashMap::new(),
+                            Vec::new(),
+                            NoopParquetMetadataCache::new(),
+                        )?);
 
-                    let index_schema = source.schema();
-                    assert_eq!(table_schema, index_schema);
+                        let index_schema = source.schema();
+                        assert_eq!(table_schema, index_schema);
 
-                    return Ok(
-                        ClusterSendNode::new(Arc::new(p), vec![vec![Some(snapshot)]]).into_plan(),
-                    );
-                } else {
-                    return Ok(ClusterSendNode::new(Arc::new(p), vec![vec![None]]).into_plan());
+                        return Ok(
+                            ClusterSendNode::new(Arc::new(p), vec![vec![Some(snapshot)]])
+                                .into_plan(),
+                        );
+                    }
+                    None => {
+                        return Ok(ClusterSendNode::new(Arc::new(p), vec![vec![None]]).into_plan());
+                    }
                 }
             }
             _ => return Ok(p),

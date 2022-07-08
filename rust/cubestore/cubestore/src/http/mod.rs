@@ -425,7 +425,11 @@ impl HttpMessage {
                             &mut builder,
                             &HttpQueryArgs {
                                 query: Some(query_offset),
-                                inline_tables: Some(inline_tables_offset),
+                                inline_tables: if inline_tables.is_empty() {
+                                    None
+                                } else {
+                                    Some(inline_tables_offset)
+                                },
                                 trace_obj: trace_obj_offset,
                             },
                         )
@@ -627,6 +631,21 @@ mod tests {
 
     #[test]
     fn query_test() {
+        let message = HttpMessage {
+            message_id: 1234,
+            command: HttpCommand::Query {
+                query: "test query".to_string(),
+                inline_tables: vec![],
+                trace_obj: Some("test trace".to_string()),
+            },
+        };
+        let bytes = message.bytes();
+        let output_message = HttpMessage::read(bytes).unwrap();
+        assert_eq!(message, output_message);
+    }
+
+    #[test]
+    fn inline_tables_query_test() {
         let columns = vec![
             Column::new("ID".to_string(), ColumnType::Int, 0),
             Column::new("LastName".to_string(), ColumnType::String, 1),
