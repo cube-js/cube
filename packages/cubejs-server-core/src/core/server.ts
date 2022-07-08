@@ -308,21 +308,6 @@ export class CubejsServerCore {
   }
 
   /**
-   * Reload global variables and updates drivers according to new values.
-   *
-   * Note: currently there is no way to change CubejsServerCore.options,
-   * as so, we are not refreshing CubejsServerCore.options.dbType and
-   * CubejsServerCore.options.driverFactory here. If this will be changed,
-   * we will need to do this in order to update driver.
-   */
-  protected reloadEnvVariables() {
-    this.driver = null;
-    this.options.externalDbType = this.options.externalDbType ||
-      <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
-    this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
-  }
-
-  /**
    * Determines whether current instance is ready to process queries.
    */
   protected isReadyForQueryProcessing(): boolean {
@@ -356,6 +341,21 @@ export class CubejsServerCore {
     }
 
     return [false, 'Instance configured without scheduler refresh timer, refresh scheduler is disabled'];
+  }
+
+  /**
+   * Reload global variables and updates drivers according to new values.
+   *
+   * Note: currently there is no way to change CubejsServerCore.options,
+   * as so, we are not refreshing CubejsServerCore.options.dbType and
+   * CubejsServerCore.options.driverFactory here. If this will be changed,
+   * we will need to do this in order to update driver.
+   */
+  protected reloadEnvVariables() {
+    this.driver = null;
+    this.options.externalDbType = this.options.externalDbType ||
+      <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
+    this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
   }
 
   protected initAgent() {
