@@ -385,7 +385,7 @@ impl LogicalPlanAnalysis {
                 // TODO In case multiple node variant exists ConstantFolding::List will choose one which contains actual constants.
                 Some(ConstantFolding::List(list))
             }
-            LogicalPlanLanguage::AnyExpr(_) | LogicalPlanLanguage::CastExpr(_) => {
+            LogicalPlanLanguage::AnyExpr(_) => {
                 let expr = node_to_expr(
                     enode,
                     &egraph.analysis.cube_context,
@@ -393,6 +393,33 @@ impl LogicalPlanAnalysis {
                     &SingleNodeIndex { egraph },
                 )
                 .ok()?;
+
+                Self::eval_constant_expr(&egraph, &expr)
+            }
+            LogicalPlanLanguage::CastExpr(_) => {
+                let expr = node_to_expr(
+                    enode,
+                    &egraph.analysis.cube_context,
+                    &constant_expr,
+                    &SingleNodeIndex { egraph },
+                )
+                .ok()?;
+
+                // Ignore any string casts as local timestamps casted incorrectly
+                if let Expr::Cast { expr, .. } = &expr {
+                    if let Expr::Literal(ScalarValue::Utf8(_)) = expr.as_ref() {
+                        return None;
+                    }
+                }
+
+                // TODO: Support decimal type in filters and remove it
+                if let Expr::Cast {
+                    data_type: DataType::Decimal(_, _),
+                    ..
+                } = &expr
+                {
+                    return None;
+                }
 
                 Self::eval_constant_expr(&egraph, &expr)
             }

@@ -1695,6 +1695,8 @@ fn format_iso_timestamp(dt: NaiveDateTime) -> String {
             Item::Literal(":"),
             Item::Numeric(Second, Zero),
             Item::Fixed(Fixed::Nanosecond3),
+            // TODO remove when there're no more non rewrite tests
+            Item::Literal("Z"),
         ]
         .iter(),
     )

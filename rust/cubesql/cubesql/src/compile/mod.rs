@@ -3767,7 +3767,7 @@ mod tests {
 
         assert_eq!(
             logical_plan,
-            "Projection: CAST(TimestampNanosecond(0, None) AS Timestamp(Nanosecond, None)) AS COL\
+            "Projection: TimestampNanosecond(0, None) AS COL\
             \n  EmptyRelation",
         );
     }
