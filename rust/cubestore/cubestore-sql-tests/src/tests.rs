@@ -5136,8 +5136,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         .exec_query_with_context(context, "SELECT LastName, Timestamp FROM Foo.Persons UNION ALL SELECT LastName, Timestamp FROM inline.Persons")
         .await
         .unwrap();
-    // TODO(cristipp) inline.Persons rows should be rows [8..12], not rows [0..4] of the result.
-    // Why are we getting the opposite?
+    // TODO(cristipp) inline.Persons rows should be rows [8..12]. We get rows [0..4]. Why?
     assert_eq!(&result.get_rows()[0..4].to_vec(), &partial_rows);
 }
 
