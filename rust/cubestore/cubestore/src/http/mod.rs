@@ -11,7 +11,7 @@ use crate::codegen::http_message_generated::{
 };
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
-use crate::sql::{InlineTables, SqlQueryContext, SqlService};
+use crate::sql::{SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
@@ -354,17 +354,17 @@ impl HttpServer {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct HttpMessage {
     message_id: u32,
     command: HttpCommand,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum HttpCommand {
     Query {
         query: String,
-        inline_tables: Arc<InlineTables>,
+        inline_tables: Vec<(String, Arc<DataFrame>)>,
         trace_obj: Option<String>,
     },
     ResultSet {
@@ -560,7 +560,7 @@ impl HttpMessage {
             command: match http_message.command_type() {
                 crate::codegen::http_message_generated::HttpCommand::HttpQuery => {
                     let query = http_message.command_as_http_query().unwrap();
-                    let mut inline_tables = HashMap::new();
+                    let mut inline_tables = Vec::new();
                     if let Some(query_inline_tables) = query.inline_tables() {
                         for inline_table in query_inline_tables.iter() {
                             let name = inline_table.name().unwrap().to_string();
@@ -596,12 +596,12 @@ impl HttpMessage {
                                     values.map(|values| Row::new(values))
                                 })
                                 .collect::<Result<Vec<_>, CubeError>>()?;
-                            inline_tables.insert(name, Arc::new(DataFrame::new(columns, rows)));
+                            inline_tables.push((name, Arc::new(DataFrame::new(columns, rows))));
                         }
                     };
                     HttpCommand::Query {
                         query: query.query().unwrap().to_string(),
-                        inline_tables: Arc::new(inline_tables),
+                        inline_tables,
                         trace_obj: query.trace_obj().map(|q| q.to_string()),
                     }
                 }
@@ -613,5 +613,67 @@ impl HttpMessage {
                 }
             },
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::http::{HttpCommand, HttpMessage};
+    use crate::metastore::{Column, ColumnType};
+    use crate::sql::timestamp_from_string;
+    use crate::store::DataFrame;
+    use crate::table::{Row, TableValue};
+    use std::sync::Arc;
+
+    #[test]
+    fn query_test() {
+        let columns = vec![
+            Column::new("ID".to_string(), ColumnType::Int, 0),
+            Column::new("LastName".to_string(), ColumnType::String, 1),
+            Column::new("FirstName".to_string(), ColumnType::String, 2),
+            Column::new("Timestamp".to_string(), ColumnType::Timestamp, 3),
+        ];
+        let rows = vec![
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::String("Last 1".to_string()),
+                TableValue::String("First 1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Int(2),
+                TableValue::Null,
+                TableValue::String("First 2".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::String("Last 3".to_string()),
+                TableValue::String("First 3".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::String("Last 4".to_string()),
+                TableValue::String("First 4".to_string()),
+                TableValue::Null,
+            ]),
+        ];
+        let data = Arc::new(DataFrame::new(columns, rows.clone()));
+
+        let message = HttpMessage {
+            message_id: 1234,
+            command: HttpCommand::Query {
+                query: "test query".to_string(),
+                inline_tables: vec![
+                    ("table0".to_string(), data.clone()),
+                    ("table1".to_string(), data.clone()),
+                ],
+                trace_obj: Some("test trace".to_string()),
+            },
+        };
+        let bytes = message.bytes();
+        let output_message = HttpMessage::read(bytes).unwrap();
+        assert_eq!(message, output_message);
     }
 }

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
@@ -5069,7 +5068,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         Column::new("ID".to_string(), ColumnType::Int, 0),
         Column::new("LastName".to_string(), ColumnType::String, 1),
         Column::new("FirstName".to_string(), ColumnType::String, 2),
-        Column::new("Timestamp".to_string(), ColumnType::Timestamp, 2),
+        Column::new("Timestamp".to_string(), ColumnType::Timestamp, 3),
     ];
     let rows = vec![
         Row::new(vec![
@@ -5098,7 +5097,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]),
     ];
     let data = Arc::new(DataFrame::new(columns, rows.clone()));
-    let inline_tables = Arc::new(HashMap::from([("Persons".to_string(), data)]));
+    let inline_tables = vec![("Persons".to_string(), data)];
 
     let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
     let result = service

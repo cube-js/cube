@@ -118,9 +118,9 @@ impl SqlQueryContext {
         res
     }
 
-    pub fn with_inline_tables(&self, inline_tables: Arc<InlineTables>) -> Self {
+    pub fn with_inline_tables(&self, inline_tables: Vec<(String, Arc<DataFrame>)>) -> Self {
         let mut res = self.clone();
-        res.inline_tables = inline_tables.clone();
+        res.inline_tables = Arc::new(HashMap::from_iter(inline_tables.iter().cloned()));
         res
     }
 }
