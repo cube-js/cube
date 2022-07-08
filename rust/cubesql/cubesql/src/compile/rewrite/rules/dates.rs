@@ -297,6 +297,15 @@ impl RewriteRules for DateRules {
                 ),
                 self.transform_interval_binary_expr("?interval"),
             ),
+            transforming_rewrite(
+                "interval-binary-expr-minus",
+                binary_expr("?left", "-", literal_expr("?interval")),
+                udf_expr(
+                    "date_sub",
+                    vec!["?left".to_string(), literal_expr("?interval")],
+                ),
+                self.transform_interval_binary_expr("?interval"),
+            ),
         ]
     }
 }

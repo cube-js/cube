@@ -544,6 +544,21 @@ impl RewriteRules for FilterRules {
                     "?table_name",
                 ),
             ),
+            rewrite(
+                "between-move-interval-beyond-equal-sign",
+                between_expr(
+                    binary_expr(column_expr("?column"), "+", "?interval"),
+                    "?negated",
+                    "?low",
+                    "?high",
+                ),
+                between_expr(
+                    column_expr("?column"),
+                    "?negated",
+                    binary_expr("?low", "-", "?interval"),
+                    binary_expr("?high", "-", "?interval"),
+                ),
+            ),
             // Every expression should be handled by filter cast unwrap replacer otherwise other rules just won't work
             rewrite(
                 "filter-cast-unwrap",
@@ -1051,25 +1066,9 @@ impl FilterRules {
                                     ScalarValue::TimestampNanosecond(_, _)
                                     | ScalarValue::Date32(_)
                                     | ScalarValue::Date64(_) => {
-                                        let array = literal.to_array();
-                                        let timestamp = if let Some(array) =
-                                            array
-                                                .as_any()
-                                                .downcast_ref::<TimestampNanosecondArray>()
+                                        if let Some(timestamp) =
+                                            Self::scalar_to_native_datetime(&literal)
                                         {
-                                            array.value_as_datetime(0)
-                                        } else if let Some(array) =
-                                            array.as_any().downcast_ref::<Date32Array>()
-                                        {
-                                            array.value_as_datetime(0)
-                                        } else if let Some(array) =
-                                            array.as_any().downcast_ref::<Date64Array>()
-                                        {
-                                            array.value_as_datetime(0)
-                                        } else {
-                                            panic!("Unexpected array type: {:?}", array.data_type())
-                                        };
-                                        if let Some(timestamp) = timestamp {
                                             let minus_one = format_iso_timestamp(
                                                 timestamp
                                                     .checked_sub_signed(Duration::milliseconds(1))
@@ -1266,7 +1265,40 @@ impl FilterRules {
             ScalarValue::Int64(Some(value)) => value.to_string(),
             ScalarValue::Boolean(Some(value)) => value.to_string(),
             ScalarValue::Float64(Some(value)) => value.to_string(),
+            ScalarValue::TimestampNanosecond(_, _)
+            | ScalarValue::Date32(_)
+            | ScalarValue::Date64(_) => {
+                if let Some(timestamp) = Self::scalar_to_native_datetime(literal) {
+                    return format_iso_timestamp(timestamp);
+                }
+
+                panic!("Unsupported filter scalar: {:?}", literal);
+            }
             x => panic!("Unsupported filter scalar: {:?}", x),
+        }
+    }
+
+    fn scalar_to_native_datetime(literal: &ScalarValue) -> Option<NaiveDateTime> {
+        match literal {
+            ScalarValue::TimestampNanosecond(_, _)
+            | ScalarValue::Date32(_)
+            | ScalarValue::Date64(_) => {
+                let array = literal.to_array();
+                let timestamp = if let Some(array) =
+                    array.as_any().downcast_ref::<TimestampNanosecondArray>()
+                {
+                    array.value_as_datetime(0)
+                } else if let Some(array) = array.as_any().downcast_ref::<Date32Array>() {
+                    array.value_as_datetime(0)
+                } else if let Some(array) = array.as_any().downcast_ref::<Date64Array>() {
+                    array.value_as_datetime(0)
+                } else {
+                    panic!("Unexpected array type: {:?}", array.data_type())
+                };
+
+                timestamp
+            }
+            _ => panic!("Unsupported filter scalar: {:?}", literal),
         }
     }
 
