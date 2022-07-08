@@ -9860,6 +9860,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn metabase_date_filters() {
+        init_logger();
+
         let now = "now()";
         let cases = vec![
             // last 30 days
