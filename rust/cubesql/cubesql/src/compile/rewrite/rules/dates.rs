@@ -4,7 +4,8 @@ use crate::{
         rewrite::{
             analysis::LogicalPlanAnalysis, binary_expr, cast_expr, column_expr, fun_expr,
             literal_expr, literal_string, negative_expr, rewrite, rewriter::RewriteRules,
-            to_day_interval_expr, udf_expr, LiteralExprValue, LogicalPlanLanguage, transforming_rewrite,
+            to_day_interval_expr, transforming_rewrite, udf_expr, LiteralExprValue,
+            LogicalPlanLanguage,
         },
     },
     var, var_iter,
@@ -278,35 +279,23 @@ impl RewriteRules for DateRules {
                     ],
                 ),
             ),
-            transforming_rewrite("interval-binary-expr", 
-                binary_expr(
-                    "?left",
-                    "+",
-                    literal_expr("?interval"),
-                ), 
+            transforming_rewrite(
+                "interval-binary-expr",
+                binary_expr("?left", "+", literal_expr("?interval")),
                 udf_expr(
                     "date_add",
-                    vec![
-                        "?left".to_string(),
-                        literal_expr("?interval"),
-                    ],
+                    vec!["?left".to_string(), literal_expr("?interval")],
                 ),
-                self.transform_interval_binary_expr("?interval")
+                self.transform_interval_binary_expr("?interval"),
             ),
-            transforming_rewrite("interval-binary-expr-recursive", 
-                binary_expr(
-                    literal_expr("?interval"),
-                    "+",
-                    "?right",
-                ), 
+            transforming_rewrite(
+                "interval-binary-expr-recursive",
+                binary_expr(literal_expr("?interval"), "+", "?right"),
                 udf_expr(
                     "date_add",
-                    vec![
-                        "?right".to_string(),
-                        literal_expr("?interval"),
-                    ],
+                    vec!["?right".to_string(), literal_expr("?interval")],
                 ),
-                self.transform_interval_binary_expr("?interval")
+                self.transform_interval_binary_expr("?interval"),
             ),
         ]
     }
