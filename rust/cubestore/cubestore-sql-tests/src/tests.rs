@@ -5073,26 +5073,26 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
     let rows = vec![
         Row::new(vec![
             TableValue::Null,
-            TableValue::String("Last 1".to_string()),
-            TableValue::String("First 1".to_string()),
+            TableValue::String("last 1".to_string()),
+            TableValue::String("first 1".to_string()),
             TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
         ]),
         Row::new(vec![
             TableValue::Int(2),
             TableValue::Null,
-            TableValue::String("First 2".to_string()),
+            TableValue::String("first 2".to_string()),
             TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
         ]),
         Row::new(vec![
             TableValue::Int(3),
-            TableValue::String("Last 3".to_string()),
-            TableValue::String("First 3".to_string()),
+            TableValue::String("last 3".to_string()),
+            TableValue::String("first 3".to_string()),
             TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
         ]),
         Row::new(vec![
             TableValue::Int(4),
-            TableValue::String("Last 4".to_string()),
-            TableValue::String("First 4".to_string()),
+            TableValue::String("last 4".to_string()),
+            TableValue::String("first 4".to_string()),
             TableValue::Null,
         ]),
     ];
@@ -5106,9 +5106,14 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(result.get_rows(), &rows);
 
-    let partial_rows = vec![
+    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let result = service
+        .exec_query_with_context(context, "SELECT LastName, Timestamp FROM Persons")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &vec![
         Row::new(vec![
-            TableValue::String("Last 1".to_string()),
+            TableValue::String("last 1".to_string()),
             TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
         ]),
         Row::new(vec![
@@ -5116,20 +5121,14 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
             TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
         ]),
         Row::new(vec![
-            TableValue::String("Last 3".to_string()),
+            TableValue::String("last 3".to_string()),
             TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
         ]),
         Row::new(vec![
-            TableValue::String("Last 4".to_string()),
+            TableValue::String("last 4".to_string()),
             TableValue::Null,
         ]),
-    ];
-    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
-    let result = service
-        .exec_query_with_context(context, "SELECT LastName, Timestamp FROM inline.Persons")
-        .await
-        .unwrap();
-    assert_eq!(result.get_rows(), &partial_rows);
+    ]);
 
     let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
     let result = service
@@ -5143,7 +5142,24 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         "#)
         .await
         .unwrap();
-    assert_eq!(&result.get_rows()[0..4].to_vec(), &partial_rows);
+    assert_eq!(result.get_rows()[8..12].to_vec(), vec![
+        Row::new(vec![
+            TableValue::String("last 1".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::String("last 3".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::String("last 4".to_string()),
+            TableValue::Null,
+        ]),
+        Row::new(vec![
+            TableValue::Null,
+            TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+        ]),
+    ]);
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
