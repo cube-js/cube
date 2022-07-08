@@ -22,7 +22,7 @@ dependencies:
   version: "0.1.*"
   repository: file://../cubestore
   condition: global.cubestore.enabled
-- name: redis
-  version: "~11.2"
-  repository: "@bitnami"
-  condition: global.redis.enabled
+#- name: redis
+#  version: "~11.2"
+#  repository: "@bitnami"
+#  condition: global.redis.enabled
