@@ -162,10 +162,7 @@ export class OrchestratorApi {
   }
 
   public async testConnection() {
-    if (
-      this.options.rollupOnlyMode ||
-      this.options.preAggregationsOptions.externalRefresh
-    ) {
+    if (this.options.preAggregationsOptions.externalRefresh) {
       return Promise.all([
         this.testDriverConnection(this.options.externalDriverFactory),
       ]);

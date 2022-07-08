@@ -713,10 +713,10 @@ describe('OptsHandler class', () => {
       expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
       expect(opts.rollupOnlyMode).toBe(true);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
-      expect(async () => {
+      await expect(async () => {
         await oapi.testConnection();
-      }).not.toThrow();
-      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+      }).rejects.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
 
       testDriverConnectionSpy.mockRestore();
     }
