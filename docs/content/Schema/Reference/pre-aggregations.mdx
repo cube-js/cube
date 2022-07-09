@@ -464,7 +464,7 @@ The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
 **must** also be included in the pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
 
-Number of partitions to be built per cube is calculated as [buildRange][self-buidlrange] divided by `partitionGranularity`.
+Number of partitions to be built per cube is calculated as [buildRange][self-buildrange] divided by `partitionGranularity`.
 Number of partitions to be built per cube is multiplied by count of time zones and tenants in case different tenants have different pre-aggregation SQL.
 
 <WarningBox>
