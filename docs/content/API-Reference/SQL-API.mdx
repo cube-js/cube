@@ -6,9 +6,9 @@ menuOrder: 3
 ---
 
 <InfoBox>
-  <b>The SQL API and Extended Support for BI Tools</b> workshop on June 22, 2022.<br/> 
-  You'll have the opportunity to learn the latest on Cube's <a href="https://cube.dev/blog/expanded-bi-support/">SQL API.</a><br /> 
-  Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/sql-api">event page</a> 👈
+  <b>Connecting your Business Intelligence Tools to Cube</b> workshop on July 27, 2022.<br/> 
+  Building on our <a href="https://cube.dev/events/sql-api">SQL API workshop</a>, we'll continue our discussion on making Cube available to your favorite Business Intelligence applications.<br /> 
+  Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/adv-sql-api/">event page</a> 👈
 </InfoBox>
 
 <WarningBox heading={`Migration to Postgres protocol`}>
@@ -23,12 +23,12 @@ The Cube SQL API allows querying Cube via Postgres-compatible SQL. It enables th
 of BI applications, Python notebooks, reverse ETL tools, and other downstream tools on top of
 Cube.
 
-### Supported Tools
+### <--{"id" : "SQL API"}--> Supported Tools
 
 Cube SQL API has been tested with psql CLI, Apache Superset, Tableau Cloud, Tableau Desktop with JDBC driver and PowerBI.
 Please see [this GitHub issue](https://github.com/cube-js/cube.js/issues/3906) for the tools roadmap and to suggest and vote for tools of your interest.
 
-### Cube Cloud
+### <--{"id" : "SQL API"}--> Cube Cloud
 
 The first step to get started with the SQL API in Cube Cloud is to create a
 deployment. You can follow this
@@ -52,7 +52,7 @@ connection credentials.
 Since the Cube SQL API is Postgres-compatible, please make sure to select **Postgres** as
 a database type when connecting from BI tools.
 
-### Self-hosted Cube
+### <--{"id" : "SQL API"}--> Self-hosted Cube
 
 To enable the SQL API, we first need to add a new environment variable:
 
@@ -105,7 +105,7 @@ During this step, the query plan is being rewritten in a way a maximum number of
 Overall, rewriting is a seamless process.
 There're some practical considerations that you should keep in mind while querying, though.
 
-### Cube is a table
+### <--{"id" : "Querying Fundamentals"}--> Cube is a table
 
 In order to simplify interaction with data tools, every cube is represented as a table.
 Measures, dimensions, and segments in this table are columns.
@@ -117,27 +117,27 @@ In order to be valid, query against cube table should be:
 
 Let's discuss some of the supported query types.
 
-### Aggregated vs Non-aggregated queries
+### <--{"id" : "Querying Fundamentals"}--> Aggregated vs Non-aggregated queries
 
 There're two types of queries supported against cube tables: aggregated and non-aggregated.
 Aggregated are those with `GROUP BY` statement, and non-aggregated are those without it.
 Cube Queries issued to your database will always be aggregated, and it doesn't matter if you provide `GROUP BY` in a query or not.
 
-### Filtering
+### <--{"id" : "Querying Fundamentals"}--> Filtering
 
 Cube supports most of simple equality operators like `=`, `<>`, `<`, `<=`, `>`, `>=` as well as `IN` and `LIKE` operators.
 Cube tries to push down all filters into Cube Query.
 In some cases, SQL filters aren't available in Cube and can be done in a post-processing phase.
 Time dimension filters will be converted to time dimension date ranges whenever it's possible.
 
-### Ordering
+### <--{"id" : "Querying Fundamentals"}--> Ordering
 
 Cube tries to push down all `ORDER BY` statements into Cube Query.
 If it can't be done ordering part would be done in a post-processing phase.
 In case there're more than 50k rows in the result set, incorrect results can be received in this case.
 Please use `EXPLAIN` in order to check if it's the case.
 
-### Limit
+### <--{"id" : "Querying Fundamentals"}--> Limit
 
 Limit push down is supported by Cube however, a limit over 50k can't be overridden.
 In future versions, paging and streaming would be used to avoid this limitation.
@@ -209,7 +209,7 @@ cube=> SELECT MEASURE(count), status, DATE_TRUNC('month', createdAt) date FROM O
                     55 | shipped    | 2016-05-01 00:00:00.000000
 ```
 
-### Querying Dimensions
+### <--{"id" : "Examples"}--> Querying Dimensions
 
 Querying dimensions is straightforward, simply add any required fields to the
 `SELECT` clause.
@@ -224,7 +224,7 @@ cube=> SELECT status FROM Orders;
 (3 rows)
 ```
 
-### Querying Measures
+### <--{"id" : "Examples"}--> Querying Measures
 
 Measures can similarly be queried through Cube SQL.
 
@@ -321,7 +321,7 @@ SELECT maxValue FROM Orders
 SELECT MAX(maxValue) FROM Orders
 ```
 
-### Querying Segments
+### <--{"id" : "Examples"}--> Querying Segments
 
 Any segments defined in a schema can also be used in Cube SQL queries. Looking
 at the schema below, we have one segment `isCompleted`:
@@ -371,7 +371,7 @@ module.exports = {
 
 ## Limitations
 
-### Projection
+### <--{"id" : "Limitations"}--> Projection
 
 `SELECT` statements only support the following projections:
 
@@ -393,7 +393,7 @@ SELECT COUNT(*) FROM Orders;
 SELECT COUNT(*) AS order_count FROM Orders;
 ```
 
-### Selection
+### <--{"id" : "Limitations"}--> Selection
 
 Cube SQL supports most conditional checks for the `WHERE` clause.
 
@@ -433,7 +433,7 @@ WHERE name LIKE 'joe'
 WHERE name NOT LIKE 'bloggs'
 ```
 
-### Joins
+### <--{"id" : "Limitations"}--> Joins
 
 SQL API currently does not support joins. We plan to support joins in future
 releases.

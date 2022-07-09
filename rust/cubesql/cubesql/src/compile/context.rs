@@ -109,7 +109,7 @@ impl QueryContext {
                 if i.len() == 2 {
                     Ok(self.find_selection_for_identifier(&i[1].value.to_string(), true))
                 } else {
-                    Err(CompilationError::Unsupported(format!(
+                    Err(CompilationError::unsupported(format!(
                         "Unsupported compound identifier: {:?}",
                         expr
                     )))
@@ -119,7 +119,7 @@ impl QueryContext {
                 Ok(self.find_selection_for_identifier(&i.value.to_string(), true))
             }
             _ => {
-                return Err(CompilationError::Unsupported(format!(
+                return Err(CompilationError::unsupported(format!(
                     "Unable to find selection in selection: {:?}",
                     expr
                 )));
@@ -140,7 +140,7 @@ impl QueryContext {
                 if i.len() == 2 {
                     Ok(self.find_selection_for_identifier(&i[1].value.to_string(), false))
                 } else {
-                    Err(CompilationError::Unsupported(format!(
+                    Err(CompilationError::unsupported(format!(
                         "Unsupported compound identifier: {:?}",
                         expr
                     )))
@@ -150,7 +150,7 @@ impl QueryContext {
                 Ok(self.find_selection_for_identifier(&i.value.to_string(), false))
             }
             _ => {
-                return Err(CompilationError::Unsupported(format!(
+                return Err(CompilationError::unsupported(format!(
                     "Unable to find selection in selection: {:?}",
                     expr
                 )));
@@ -173,21 +173,21 @@ impl QueryContext {
                     if i.len() == 2 {
                         i[1].value.to_string()
                     } else {
-                        return Err(CompilationError::Unsupported(format!(
+                        return Err(CompilationError::unsupported(format!(
                             "Unsupported compound identifier in argument: {:?}",
                             argument
                         )));
                     }
                 }
                 _ => {
-                    return Err(CompilationError::Unsupported(format!(
+                    return Err(CompilationError::unsupported(format!(
                         "type of argument {:?}",
                         argument
                     )))
                 }
             },
             _ => {
-                return Err(CompilationError::Unsupported(format!(
+                return Err(CompilationError::unsupported(format!(
                     "type of argument {:?}",
                     argument
                 )));
@@ -216,7 +216,7 @@ impl QueryContext {
                 [left_arg_fn, right_arg_fn]
             }
             _ => {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "Unable to unpack function: {:?}",
                     f
                 )));
@@ -226,7 +226,7 @@ impl QueryContext {
         let time_dimension_opt = match left_fn {
             ast::FunctionArgExpr::Expr(ast::Expr::Function(f)) => {
                 if !f.name.to_string().to_lowercase().eq("date") {
-                    return Err(CompilationError::User(format!(
+                    return Err(CompilationError::user(format!(
                         "Unable to detect granularity (left side must be date): {:?}",
                         left_fn
                     )));
@@ -237,7 +237,7 @@ impl QueryContext {
                 self.find_dimension_for_identifier(&possible_dimension_name)
             }
             _ => {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "Unable to detect granularity: {:?}",
                     left_fn
                 )));
@@ -263,7 +263,7 @@ impl QueryContext {
             } else if hour_regexp.is_match(&right_as_str) {
                 "hour".to_string()
             } else {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "Unable to detect granularity: {} ({:?})",
                     right_fn.to_string(),
                     right_fn
@@ -272,7 +272,7 @@ impl QueryContext {
 
             Ok(Selection::TimeDimension(time_dimension, granularity))
         } else {
-            Err(CompilationError::Unsupported(format!(
+            Err(CompilationError::unsupported(format!(
                 "Unsupported variation of arguments passed to date_add function: {}",
                 f
             )))
@@ -290,7 +290,7 @@ impl QueryContext {
                 match granularity.as_str() {
                     "second" | "minute" | "hour" | "day" | "week" | "month" | "quarter" | "year" => (),
                     _ => {
-                        return Err(CompilationError::User(format!(
+                        return Err(CompilationError::user(format!(
                             "Unsupported granularity {:?}",
                             granularity
                         )));
@@ -301,19 +301,19 @@ impl QueryContext {
                     if r.is_time() {
                         Ok(Selection::TimeDimension(r, granularity.clone()))
                     } else {
-                        Err(CompilationError::User(format!(
+                        Err(CompilationError::user(format!(
                             "Unable to use non time dimension \"{}\" as a column in date_trunc, please specify time dimension",
                             possible_dimension_name
                         )))
                     }
                 } else {
-                    Err(CompilationError::User(format!(
+                    Err(CompilationError::user(format!(
                         "Unknown dimension '{}' passed as a column in date_trunc",
                         possible_dimension_name
                     )))
                 }
             }
-            _ => Err(CompilationError::User(
+            _ => Err(CompilationError::user(
                 "Unsupported variation of arguments passed to date_trunc function, correct date_trunc(string, column)".to_string()
             )),
         }
@@ -325,7 +325,7 @@ impl QueryContext {
                 date_sub,
             )))] => {
                 if !date_sub.name.to_string().to_lowercase().eq("date_sub") {
-                    return Err(CompilationError::User(format!(
+                    return Err(CompilationError::user(format!(
                         "Unable to detect heuristics: {}",
                         f
                     )));
@@ -346,7 +346,7 @@ impl QueryContext {
                 let granularity = if right_part.eq(&iso_week_test) {
                     "week".to_string()
                 } else if right_part.eq(&week_test) {
-                    return Err(CompilationError::Unsupported(
+                    return Err(CompilationError::unsupported(
                         "date granularity, week is not supported in Cube.js, please use ISOWEEK"
                             .to_string(),
                     ));
@@ -355,7 +355,7 @@ impl QueryContext {
                 } else if right_part.eq(&year_test) {
                     "year".to_string()
                 } else {
-                    return Err(CompilationError::User(format!(
+                    return Err(CompilationError::user(format!(
                         "Unable to detect granularity: {:?}",
                         right_part
                     )));
@@ -367,13 +367,13 @@ impl QueryContext {
                     if r.is_time() {
                         Ok(Selection::TimeDimension(r, granularity))
                     } else {
-                        Err(CompilationError::User(format!(
+                        Err(CompilationError::user(format!(
                             "Unable to use non time dimension '{}' in date manipulations, please specify time dimension",
                             possible_dimension_name
                         )))
                     }
                 } else {
-                    Err(CompilationError::User(format!(
+                    Err(CompilationError::user(format!(
                         "Unknown dimension '{}'",
                         possible_dimension_name
                     )))
@@ -385,13 +385,13 @@ impl QueryContext {
                 if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
                     Ok(Selection::TimeDimension(r, "day".to_string()))
                 } else {
-                    return Err(CompilationError::User(format!(
+                    return Err(CompilationError::user(format!(
                         "Unable to find dimension '{}' from expression: {}",
                         possible_dimension_name, f
                     )));
                 }
             }
-            _ => Err(CompilationError::User(format!(
+            _ => Err(CompilationError::user(format!(
                 "Unsupported variation of arguments passed to date function: {}",
                 f
             ))),
@@ -403,12 +403,12 @@ impl QueryContext {
         f: &ast::Function,
     ) -> CompilationResult<Selection> {
         if f.args.is_empty() {
-            return Err(CompilationError::User(format!(
+            return Err(CompilationError::user(format!(
                 "Unable to use aggregation function '{}()' without arguments",
                 f.name.to_string(),
             )));
         } else if f.args.len() > 1 {
-            return Err(CompilationError::User(format!(
+            return Err(CompilationError::user(format!(
                 "Unable to use aggregation function '{}()' with more then one argument",
                 f.name.to_string(),
             )));
@@ -432,7 +432,7 @@ impl QueryContext {
                     let number = prefix + n;
 
                     if &number != "1" {
-                        return Err(CompilationError::User(format!(
+                        return Err(CompilationError::user(format!(
                             "Unable to use number '{}' as argument to aggregation function",
                             number
                         )));
@@ -446,21 +446,21 @@ impl QueryContext {
                     if i.len() == 2 {
                         i[1].value.to_string()
                     } else {
-                        return Err(CompilationError::Unsupported(format!(
+                        return Err(CompilationError::unsupported(format!(
                             "Unsupported compound identifier in argument: {:?}",
                             argument
                         )));
                     }
                 }
                 _ => {
-                    return Err(CompilationError::Unsupported(format!(
+                    return Err(CompilationError::unsupported(format!(
                         "type of argument {:?}",
                         argument
                     )));
                 }
             },
             _ => {
-                return Err(CompilationError::Unsupported(format!(
+                return Err(CompilationError::unsupported(format!(
                     "type of argument {:?}",
                     argument
                 )));
@@ -485,7 +485,7 @@ impl QueryContext {
                         "count".to_string(),
                     )
                 } else {
-                    return Err(CompilationError::User(format!(
+                    return Err(CompilationError::user(format!(
                         "Unable to find measure with count type: {}",
                         f
                     )));
@@ -504,7 +504,7 @@ impl QueryContext {
             };
 
             if measure_name == "*" {
-                return Err(CompilationError::User(format!(
+                return Err(CompilationError::user(format!(
                     "Unable to use '{}' as argument to aggregation function '{}()' (only COUNT() supported)",
                     measure_name,
                     f.name.to_string(),
@@ -518,7 +518,7 @@ impl QueryContext {
         };
 
         let selection = selection_opt.ok_or_else(|| {
-            CompilationError::User(format!(
+            CompilationError::user(format!(
                 "Unable to find measure with name '{}' which is used as argument to aggregation function '{}()'",
                 measure_name,
                 f.name.to_string(),
@@ -529,7 +529,7 @@ impl QueryContext {
                 if measure.agg_type.is_some()
                     && !measure.is_same_agg_type(&call_agg_type)
                 {
-                    return Err(CompilationError::User(format!(
+                    return Err(CompilationError::user(format!(
                         "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
                         measure.get_real_name(),
                         measure.agg_type.unwrap_or("unknown".to_string()).to_uppercase(),
@@ -542,13 +542,13 @@ impl QueryContext {
                 Ok(Selection::Measure(measure))
             }
             Selection::Dimension(t) | Selection::TimeDimension(t, _) => {
-                Err(CompilationError::User(format!(
+                Err(CompilationError::user(format!(
                     "Dimension '{}' was used with the aggregate function '{}()'. Please use a measure instead",
                     t.get_real_name(),
                     f.name.to_string(),
                 )))
             }
-            Selection::Segment(s) => Err(CompilationError::User(format!(
+            Selection::Segment(s) => Err(CompilationError::user(format!(
                 "Unable to use segment '{}' as measure in aggregation function '{}()'",
                 s.get_real_name(),
                 f.name.to_string(),
@@ -567,13 +567,13 @@ impl QueryContext {
             }) {
                 Ok(Selection::Measure(r.clone()))
             } else {
-                Err(CompilationError::User(format!(
+                Err(CompilationError::user(format!(
                     "Unable to find measure with name '{}' for {}",
                     possible_measure_name, f
                 )))
             }
         } else {
-            Err(CompilationError::User(format!(
+            Err(CompilationError::user(format!(
                 "Unsupported variation of arguments passed to measure function: {}",
                 f
             )))
@@ -588,7 +588,7 @@ impl QueryContext {
             "date" => self.find_selection_for_date_fn(f),
             "measure" => self.find_selection_for_measure_fn(f),
             "sum" | "min" | "max" | "avg" | "count" => self.find_selection_for_aggregation_fn(f),
-            _ => Err(CompilationError::Unsupported(format!(
+            _ => Err(CompilationError::unsupported(format!(
                 "Unsupported function: {}",
                 f
             ))),

@@ -140,6 +140,18 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 }),
             ),
             (
+                Field::new("aggregate_columns", DataType::Utf8, true),
+                Box::new(|tables| {
+                    let aggregates = tables
+                        .iter()
+                        .map(|row| format!("{:?}", row.table.get_row().aggregate_columns()))
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        aggregates.iter().map(|v| v.as_str()).collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
                 Field::new("seq_column_index", DataType::Utf8, true),
                 Box::new(|tables| {
                     let seq_columns = tables

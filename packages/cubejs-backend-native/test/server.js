@@ -43,9 +43,8 @@ const meta_fixture = require('./meta');
 
     native.setupLogger(
       ({ event }) => console.log(event),
+      'trace',
     );
-
-    native.setLogLevel('trace');
 
     const interface = await native.registerInterface({
       // nonce: '12345678910111213141516'.substring(0, 20),

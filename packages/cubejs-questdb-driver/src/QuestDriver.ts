@@ -21,6 +21,7 @@ const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5
 
 export type QuestDriverConfiguration = Partial<PoolConfig> & {
   readOnly?: boolean,
+  maxPoolSize?: number,
 };
 
 export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverConfiguration>
@@ -33,13 +34,22 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     return QuestQuery;
   }
 
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
+
   public constructor(
     config: Partial<Config> = {}
   ) {
     super();
 
     this.pool = new Pool({
-      max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 4,
+      max:
+        process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
+        config.maxPoolSize || 4,
       idleTimeoutMillis: 30_000,
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,
@@ -145,6 +155,10 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
       if (tableName === undefined) {
         return;
       }
+      // Skip system tables.
+      if (tableName.startsWith('sys.')) {
+        return;
+      }
       const columns = await this.tableColumnTypes(tableName);
       metadata[''][tableName] = columns;
     }));
@@ -162,7 +176,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
   }
 
   public async tableColumnTypes(table: string) {
-    const response: any[] = await this.query(`SHOW COLUMNS FROM ${table}`, []);
+    const response: any[] = await this.query(`SHOW COLUMNS FROM '${table}'`, []);
 
     return response.map((row) => ({ name: row.column, type: this.toGenericType(row.type) }));
   }
@@ -182,7 +196,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
     try {
       for (let i = 0; i < tableData.rows.length; i++) {
         await this.query(
-          `INSERT INTO ${table}
+          `INSERT INTO '${table}'
         (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
         VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
           columns.map(c => this.toColumnValue(tableData.rows[i][c.name], c.type))

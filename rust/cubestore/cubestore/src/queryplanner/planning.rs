@@ -25,6 +25,7 @@ use async_trait::async_trait;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContextState;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, Operator, UserDefinedLogicalNode};
+use datafusion::physical_plan::aggregates::AggregateFunction as FusionAggregateFunction;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::planner::ExtensionPlanner;
 use datafusion::physical_plan::{
@@ -37,7 +38,9 @@ use itertools::Itertools;
 use crate::cluster::Cluster;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
-use crate::metastore::{Chunk, Column, IdRow, Index, MetaStore, Partition, Schema};
+use crate::metastore::{
+    AggregateFunction, Chunk, Column, IdRow, Index, IndexType, MetaStore, Partition, Schema,
+};
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
 use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
@@ -90,7 +93,7 @@ pub async fn choose_index_ext(
 ) -> Result<(LogicalPlan, PlanningMeta), DataFusionError> {
     // Prepare information to choose the index.
     let mut collector = CollectConstraints::default();
-    rewrite_plan(p, &None, &mut collector)?;
+    rewrite_plan(p, &ConstraintsContext::default(), &mut collector)?;
 
     // Consult metastore to choose the index.
     // TODO should be single snapshot read to ensure read consistency here
@@ -243,6 +246,7 @@ struct IndexConstraints {
     table: TablePath,
     projection: Option<Vec<usize>>,
     filters: Vec<Expr>,
+    aggregates: Vec<Expr>,
 }
 
 #[derive(Default)]
@@ -250,8 +254,23 @@ struct CollectConstraints {
     constraints: Vec<IndexConstraints>,
 }
 
+#[derive(Default, Clone)]
+struct ConstraintsContext {
+    sort_on: Option<SortColumns>,
+    aggregates: Vec<Expr>,
+}
+
+impl ConstraintsContext {
+    pub fn update_sort_on(&self, sort_on: Option<SortColumns>) -> Self {
+        Self {
+            sort_on,
+            aggregates: self.aggregates.clone(),
+        }
+    }
+}
+
 impl PlanRewriter for CollectConstraints {
-    type Context = Option<SortColumns>;
+    type Context = ConstraintsContext;
 
     fn rewrite(
         &mut self,
@@ -267,10 +286,11 @@ impl PlanRewriter for CollectConstraints {
             } => {
                 let table = source.as_any().downcast_ref::<CubeTableLogical>().unwrap();
                 self.constraints.push(IndexConstraints {
-                    sort_on: c.clone(),
+                    sort_on: c.sort_on.clone(),
                     table: table.table.clone(),
                     projection: projection.clone(),
                     filters: filters.clone(),
+                    aggregates: c.aggregates.clone(),
                 })
             }
             _ => {}
@@ -281,8 +301,8 @@ impl PlanRewriter for CollectConstraints {
     fn enter_node(
         &mut self,
         n: &LogicalPlan,
-        current_sort_on: &Option<SortColumns>,
-    ) -> Option<Option<SortColumns>> {
+        current_context: &Self::Context,
+    ) -> Option<Self::Context> {
         fn column_name(expr: &Expr) -> Option<String> {
             match expr {
                 Expr::Alias(e, _) => column_name(e),
@@ -291,27 +311,36 @@ impl PlanRewriter for CollectConstraints {
             }
         }
         match n {
-            LogicalPlan::Aggregate { group_expr, .. } => {
+            LogicalPlan::Aggregate {
+                group_expr,
+                aggr_expr,
+                ..
+            } => {
                 let sort_on = group_expr.iter().map(column_name).collect::<Vec<_>>();
-                if !sort_on.is_empty() && sort_on.iter().all(|c| c.is_some()) {
-                    Some(Some(SortColumns {
+                let sort_on = if !sort_on.is_empty() && sort_on.iter().all(|c| c.is_some()) {
+                    Some(SortColumns {
                         sort_on: sort_on.into_iter().map(|c| c.unwrap()).collect(),
                         required: false,
-                    }))
+                    })
                 } else {
-                    Some(None)
-                }
+                    None
+                };
+                Some(ConstraintsContext {
+                    sort_on,
+                    aggregates: aggr_expr.to_vec(),
+                })
             }
             LogicalPlan::Filter { predicate, .. } => {
                 let mut sort_on = Vec::new();
                 if single_value_filter_columns(predicate, &mut sort_on) {
                     if !sort_on.is_empty() {
-                        Some(Some(SortColumns {
+                        let sort_on = Some(SortColumns {
                             sort_on: sort_on
                                 .into_iter()
                                 .map(|c| c.name.to_string())
                                 .chain(
-                                    current_sort_on
+                                    current_context
+                                        .sort_on
                                         .as_ref()
                                         .map(|c| c.sort_on.clone())
                                         .unwrap_or_else(|| Vec::new())
@@ -320,9 +349,10 @@ impl PlanRewriter for CollectConstraints {
                                 .unique()
                                 .collect(),
                             required: false,
-                        }))
+                        });
+                        Some(current_context.update_sort_on(sort_on))
                     } else {
-                        Some(current_sort_on.clone())
+                        Some(current_context.clone())
                     }
                 } else {
                     None
@@ -332,21 +362,20 @@ impl PlanRewriter for CollectConstraints {
         }
     }
 
-    fn enter_join_left(
-        &mut self,
-        join: &LogicalPlan,
-        _: &Option<SortColumns>,
-    ) -> Option<Option<SortColumns>> {
+    fn enter_join_left(&mut self, join: &LogicalPlan, _: &Self::Context) -> Option<Self::Context> {
         let join_on;
         if let LogicalPlan::Join { on, .. } = join {
             join_on = on;
         } else {
             panic!("expected join node");
         }
-        Some(Some(SortColumns {
-            sort_on: join_on.iter().map(|(l, _)| l.name.clone()).collect(),
-            required: true,
-        }))
+        Some(ConstraintsContext {
+            sort_on: Some(SortColumns {
+                sort_on: join_on.iter().map(|(l, _)| l.name.clone()).collect(),
+                required: true,
+            }),
+            aggregates: Vec::new(),
+        })
     }
 
     fn enter_join_right(
@@ -360,10 +389,13 @@ impl PlanRewriter for CollectConstraints {
         } else {
             panic!("expected join node");
         }
-        Some(Some(SortColumns {
-            sort_on: join_on.iter().map(|(_, r)| r.name.clone()).collect(),
-            required: true,
-        }))
+        Some(ConstraintsContext {
+            sort_on: Some(SortColumns {
+                sort_on: join_on.iter().map(|(_, r)| r.name.clone()).collect(),
+                required: true,
+            }),
+            aggregates: Vec::new(),
+        })
     }
 }
 
@@ -475,6 +507,75 @@ struct IndexCandidate {
     pub partitioned_index: Option<IndexSnapshot>,
 }
 
+fn check_aggregates_expr(table: &IdRow<Table>, aggregates: &Vec<Expr>) -> bool {
+    let table_aggregates = table.get_row().aggregate_columns();
+
+    for aggr in aggregates.iter() {
+        match aggr {
+            Expr::AggregateFunction { fun, args, .. } => {
+                if args.len() != 1 {
+                    return false;
+                }
+
+                let aggr_fun = match fun {
+                    FusionAggregateFunction::Sum => Some(AggregateFunction::SUM),
+                    FusionAggregateFunction::Max => Some(AggregateFunction::MAX),
+                    FusionAggregateFunction::Min => Some(AggregateFunction::MIN),
+                    _ => None,
+                };
+
+                if aggr_fun.is_none() {
+                    return false;
+                }
+
+                let aggr_fun = aggr_fun.unwrap();
+
+                let col_match = match &args[0] {
+                    Expr::Column(col) => table_aggregates.iter().any(|ta| {
+                        ta.function() == &aggr_fun && ta.column().get_name() == &col.name
+                    }),
+                    _ => false,
+                };
+
+                if !col_match {
+                    return false;
+                }
+            }
+            Expr::AggregateUDF { fun, args } => {
+                if args.len() != 1 {
+                    return false;
+                }
+
+                let aggr_fun = match fun.name.to_uppercase().as_str() {
+                    "MERGE" => Some(AggregateFunction::MERGE),
+                    _ => None,
+                };
+
+                if aggr_fun.is_none() {
+                    return false;
+                }
+
+                let aggr_fun = aggr_fun.unwrap();
+
+                let col_match = match &args[0] {
+                    Expr::Column(col) => table_aggregates.iter().any(|ta| {
+                        ta.function() == &aggr_fun && ta.column().get_name() == &col.name
+                    }),
+                    _ => false,
+                };
+
+                if !col_match {
+                    return false;
+                }
+            }
+            _ => {
+                return false;
+            }
+        };
+    }
+    true
+}
+
 // Picks the index, but not partitions snapshots.
 async fn pick_index(
     c: &IndexConstraints,
@@ -483,6 +584,8 @@ async fn pick_index(
     indices: Vec<IdRow<Index>>,
 ) -> Result<IndexCandidate, DataFusionError> {
     let sort_on = c.sort_on.as_ref().map(|sc| (&sc.sort_on, sc.required));
+
+    let aggr_index_allowed = check_aggregates_expr(&table, &c.aggregates);
 
     let default_index = indices.iter().next().expect("no default index");
     let (index, mut partitioned_index, sort_on) = if let Some(projection_column_indices) =
@@ -499,6 +602,35 @@ async fn pick_index(
         let filtered_by_sort_on = indices.iter().skip(1).filter(|i| {
             if let Some((join_on_columns, required)) = sort_on.as_ref() {
                 if i.get_row().sort_key_size() < (join_on_columns.len() as u64) {
+                    return false;
+                }
+                let all_columns_in_index = match i.get_row().get_type() {
+                    IndexType::Aggregate => {
+                        if aggr_index_allowed {
+                            let projection_check = projection_columns.iter().all(|c| {
+                                i.get_row()
+                                    .get_columns()
+                                    .iter()
+                                    .find(|ic| ic.get_name() == c.get_name())
+                                    .is_some()
+                            });
+                            let filter_check = filter_columns.iter().all(|c| {
+                                i.get_row()
+                                    .get_columns()
+                                    .iter()
+                                    .find(|ic| ic.get_name() == &c.name)
+                                    .is_some()
+                            });
+
+                            projection_check && filter_check
+                        } else {
+                            false
+                        }
+                    }
+                    _ => true,
+                };
+
+                if !all_columns_in_index {
                     return false;
                 }
                 let join_columns_in_index = join_on_columns
@@ -633,29 +765,75 @@ fn optimal_index_by_score<'a, T: Iterator<Item = &'a IdRow<Index>>>(
     projection_columns: &Vec<Column>,
     filter_columns: &HashSet<logical_plan::Column>,
 ) -> Option<&'a IdRow<Index>> {
+    #[derive(PartialEq, Eq, Clone)]
+    struct Score {
+        index_type: IndexType,
+        index_size: u64,
+        filter_score: usize,
+        projection_score: usize,
+    }
+    impl PartialOrd for Score {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+    impl Ord for Score {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            let res = match self.index_type {
+                IndexType::Regular => match other.index_type {
+                    IndexType::Regular => core::cmp::Ordering::Equal,
+                    IndexType::Aggregate => core::cmp::Ordering::Greater,
+                },
+                IndexType::Aggregate => match other.index_type {
+                    IndexType::Regular => core::cmp::Ordering::Less,
+                    IndexType::Aggregate => self.index_size.cmp(&other.index_size),
+                },
+            };
+            match res {
+                core::cmp::Ordering::Equal => {}
+                ord => return ord,
+            }
+            match self.filter_score.cmp(&other.filter_score) {
+                core::cmp::Ordering::Equal => {}
+                ord => return ord,
+            }
+            self.projection_score.cmp(&other.projection_score)
+        }
+    }
+
     indexes
         .filter_map(|i| {
-            let filter_index_positions = CubeTable::project_to_index_positions(
+            let index_size = i.get_row().sort_key_size();
+
+            let filter_score = CubeTable::project_to_index_positions(
                 &filter_columns.iter().map(|c| c.name.to_string()).collect(),
                 &i,
-            );
-            let projected_index_positions = CubeTable::project_to_index_positions(
+            )
+            .into_iter()
+            .fold_options(0, |a, b| a + b);
+
+            let projection_score = CubeTable::project_to_index_positions(
                 &projection_columns
                     .iter()
                     .map(|c| c.get_name().to_string())
                     .collect(),
                 &i,
-            );
-            let res = Some(i).zip(
-                filter_index_positions
-                    .into_iter()
-                    .fold_options(0, |a, b| a + b)
-                    .zip(
-                        projected_index_positions
-                            .into_iter()
-                            .fold_options(0, |a, b| a + b),
-                    ),
-            );
+            )
+            .into_iter()
+            .fold_options(0, |a, b| a + b);
+
+            let index_score = if filter_score.is_some() && projection_score.is_some() {
+                Some(Score {
+                    index_type: i.get_row().get_type(),
+                    index_size,
+                    filter_score: filter_score.unwrap(),
+                    projection_score: projection_score.unwrap(),
+                })
+            } else {
+                None
+            };
+
+            let res = Some(i).zip(index_score);
             res
         })
         .min_by_key(|(_, score)| score.clone())
@@ -748,7 +926,7 @@ impl UserDefinedLogicalNode for ClusterSendNode {
         HashSet::new()
     }
 
-    fn fmt_for_explain(&self, f: &mut Formatter<'a>) -> std::fmt::Result {
+    fn fmt_for_explain<'a>(&self, f: &mut Formatter<'a>) -> std::fmt::Result {
         write!(f, "ClusterSend")
     }
 
@@ -1485,6 +1663,7 @@ pub mod tests {
             None,
             true,
             None,
+            Vec::new(),
             None,
             None,
             None,
@@ -1497,6 +1676,7 @@ pub mod tests {
                 1,
                 None,
                 None,
+                Index::index_type_default(),
             )
             .unwrap(),
         );
@@ -1509,6 +1689,7 @@ pub mod tests {
                     1,
                     None,
                     Some(PARTITIONED_INDEX),
+                    Index::index_type_default(),
                 )
                 .unwrap(),
             );
@@ -1529,6 +1710,7 @@ pub mod tests {
             None,
             true,
             None,
+            Vec::new(),
             None,
             None,
             None,
@@ -1542,6 +1724,7 @@ pub mod tests {
                 2,
                 None,
                 None,
+                Index::index_type_default(),
             )
             .unwrap(),
         );
@@ -1553,6 +1736,7 @@ pub mod tests {
                 2,
                 None,
                 None,
+                Index::index_type_default(),
             )
             .unwrap(),
         );
@@ -1565,6 +1749,7 @@ pub mod tests {
                     1,
                     None,
                     Some(PARTITIONED_INDEX),
+                    Index::index_type_default(),
                 )
                 .unwrap(),
             );
@@ -1578,6 +1763,7 @@ pub mod tests {
             None,
             true,
             None,
+            Vec::new(),
             None,
             None,
             None,
@@ -1636,6 +1822,7 @@ pub mod tests {
                     t.get_columns().len() as u64,
                     None,
                     None,
+                    Index::index_type_default(),
                 )
                 .unwrap(),
             );

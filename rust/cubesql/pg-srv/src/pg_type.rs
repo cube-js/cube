@@ -1,9 +1,17 @@
+//! Meta layer information around pg_type
+
+/// A Postgres type. Similar structure as pg_catalog.pg_type.
+/// <https://www.postgresql.org/docs/14/catalog-pg-type.html>
 #[derive(Debug)]
 pub struct PgType<'a> {
     pub oid: u32,
+    /// Data type name
     pub typname: &'a str,
+    /// The OID of the namespace that contains this type. references pg_namespace.oid
     pub typnamespace: u32,
+    /// Owner of the type. references pg_authid.oid
     pub typowner: u32,
+    /// For a fixed-size type, typlen is the number of bytes in the internal representation of the type. But for a variable-length type, typlen is negative. -1 indicates a “varlena” type (one that has a length word), -2 indicates a null-terminated C string.
     pub typlen: i16,
     pub typbyval: bool,
     pub typtype: &'a str,
@@ -45,11 +53,17 @@ impl<'a> PgType<'a> {
                 | PgTypeId::INT4MULTIRANGE
                 | PgTypeId::INT8MULTIRANGE => "multirange_in".to_string(),
                 PgTypeId::MONEY => "cash_in".to_string(),
+                PgTypeId::PGCLASS | PgTypeId::PGNAMESPACE => "record_in".to_string(),
                 _ => self.typname.to_owned() + "in",
             }
         } else {
             "record_in".to_string()
         }
+    }
+
+    pub fn is_binary_supported(&self) -> bool {
+        // Right now, We assume that all types have binary encoding support
+        true
     }
 }
 
@@ -1228,6 +1242,28 @@ define_pg_types![
         typstorage: "x",
         typbasetype: 1043,
         typreceive: "domain_recv",
+        // TODO: Get from pg_proc
+        typreceive_oid: 0,
+    },
+
+    PGNAMESPACE (12047) {
+        typname: "pg_namespace",
+        typnamespace: 11,
+        typowner: 10,
+        typlen: -1,
+        typbyval: false,
+        typtype: "c",
+        typcategory: "C",
+        typisprefered: false,
+        typisdefined: true,
+        typrelid: 2615,
+        typsubscript: "-",
+        typelem: 0,
+        typarray: 12046,
+        typalign: "d",
+        typstorage: "x",
+        typbasetype: 0,
+        typreceive: "record_recv",
         // TODO: Get from pg_proc
         typreceive_oid: 0,
     },

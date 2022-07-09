@@ -1,3 +1,7 @@
+//! Implementation of PostgreSQL protocol.
+//! Specification for all frontend/backend messages: <https://www.postgresql.org/docs/14/protocol-message-formats.html>
+//! Message Data Types: <https://www.postgresql.org/docs/14/protocol-message-types.html>
+
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -10,41 +14,95 @@ use async_trait::async_trait;
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
-use crate::{buffer, BindValue, PgType, PgTypeId, ProtocolError};
+use crate::{buffer, BindValue, FromProtocolValue, PgType, PgTypeId, ProtocolError};
 
 const DEFAULT_CAPACITY: usize = 64;
 
-pub const SSL_REQUEST_PROTOCOL: u16 = 1234;
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct StartupMessage {
-    pub protocol_version: ProtocolVersion,
+    pub major: u16,
+    pub minor: u16,
     pub parameters: HashMap<String, String>,
 }
 
 impl StartupMessage {
-    pub async fn from(mut buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
-        let major_protocol_version = buffer.read_u16().await?;
-        let minor_protocol_version = buffer.read_u16().await?;
-        let protocol_version = ProtocolVersion::new(major_protocol_version, minor_protocol_version);
+    async fn from(mut buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
+        let major = buffer.read_u16().await?;
+        let minor = buffer.read_u16().await?;
 
         let mut parameters = HashMap::new();
 
-        if major_protocol_version != SSL_REQUEST_PROTOCOL {
-            loop {
-                let name = buffer::read_string(&mut buffer).await?;
-                if name.is_empty() {
-                    break;
-                }
-                let value = buffer::read_string(&mut buffer).await?;
-                parameters.insert(name, value);
+        loop {
+            let name = buffer::read_string(&mut buffer).await?;
+            if name.is_empty() {
+                break;
             }
+            let value = buffer::read_string(&mut buffer).await?;
+            parameters.insert(name, value);
         }
 
         Ok(Self {
-            protocol_version,
+            major,
+            minor,
             parameters,
         })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CancelRequest {
+    pub process_id: u32,
+    pub secret: u32,
+}
+
+impl CancelRequest {
+    async fn from(buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
+        Ok(Self {
+            process_id: buffer.read_u32().await?,
+            secret: buffer.read_u32().await?,
+        })
+    }
+}
+
+pub enum InitialMessage {
+    Startup(StartupMessage),
+    CancelRequest(CancelRequest),
+    SslRequest,
+    Gssenc,
+}
+
+// The value is chosen to contain 1234 in the most significant 16 bits, this code must not be the same as any protocol version number.
+pub const VERSION_MAJOR_SPECIAL: i16 = 1234;
+pub const VERSION_MINOR_CANCEL: i16 = 5678;
+pub const VERSION_MINOR_SSL: i16 = 5679;
+pub const VERSION_MINOR_GSSENC: i16 = 5680;
+
+impl InitialMessage {
+    pub async fn from(buffer: &mut Cursor<Vec<u8>>) -> Result<InitialMessage, ProtocolError> {
+        let major = buffer.read_i16().await?;
+        let minor = buffer.read_i16().await?;
+
+        match major {
+            VERSION_MAJOR_SPECIAL => match minor {
+                VERSION_MINOR_CANCEL => Ok(InitialMessage::CancelRequest(
+                    CancelRequest::from(buffer).await?,
+                )),
+                VERSION_MINOR_SSL => Ok(InitialMessage::SslRequest),
+                VERSION_MINOR_GSSENC => Ok(InitialMessage::Gssenc),
+                _ => Err(ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!(
+                        r#"Unsupported special version in initial message with code "{}""#,
+                        minor
+                    ),
+                )
+                .into()),
+            },
+            _ => {
+                buffer.set_position(0);
+                Ok(InitialMessage::Startup(StartupMessage::from(buffer).await?))
+            }
+        }
     }
 }
 
@@ -53,8 +111,8 @@ impl Serialize for StartupMessage {
 
     fn serialize(&self) -> Option<Vec<u8>> {
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
-        buffer.put_u16(self.protocol_version.major);
-        buffer.put_u16(self.protocol_version.minor);
+        buffer.put_u16(self.major);
+        buffer.put_u16(self.minor);
 
         for (name, value) in &self.parameters {
             buffer::write_string(&mut buffer, &name);
@@ -144,6 +202,14 @@ impl ErrorResponse {
             message,
         }
     }
+
+    pub fn query_canceled() -> Self {
+        Self {
+            severity: ErrorSeverity::Error,
+            code: ErrorCode::QueryCanceled,
+            message: "canceling statement due to user request".to_string(),
+        }
+    }
 }
 
 impl Serialize for ErrorResponse {
@@ -219,6 +285,63 @@ impl Serialize for ReadyForQuery {
     }
 }
 
+pub struct EmptyQuery {}
+
+impl EmptyQuery {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for EmptyQuery {
+    const CODE: u8 = b'I';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        Some(vec![])
+    }
+}
+
+pub struct BackendKeyData {
+    process_id: u32,
+    secret: u32,
+}
+
+impl BackendKeyData {
+    pub fn new(process_id: u32, secret: u32) -> Self {
+        Self { process_id, secret }
+    }
+}
+
+impl Serialize for BackendKeyData {
+    const CODE: u8 = b'K';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        let mut buffer = Vec::with_capacity(4 + 4);
+        buffer.put_u32(self.process_id);
+        buffer.put_u32(self.secret);
+
+        Some(buffer)
+    }
+}
+
+/// (B) Alternative reply for Execute command before completing the execution of a portal (due to reaching a nonzero result-row count)
+#[derive(Debug, PartialEq)]
+pub struct PortalSuspended {}
+
+impl PortalSuspended {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Serialize for PortalSuspended {
+    const CODE: u8 = b's';
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        Some(vec![])
+    }
+}
+
 pub struct ParameterStatus {
     name: String,
     value: String,
@@ -241,6 +364,7 @@ impl Serialize for ParameterStatus {
     }
 }
 
+/// (B) Success reply for Bind command.
 pub struct BindComplete {}
 
 impl BindComplete {
@@ -258,6 +382,7 @@ impl Serialize for BindComplete {
     }
 }
 
+/// (B) Success reply for Close command.
 pub struct CloseComplete {}
 
 impl CloseComplete {
@@ -275,6 +400,8 @@ impl Serialize for CloseComplete {
     }
 }
 
+/// (B) Success reply for Parse command.
+#[derive(Debug)]
 pub struct ParseComplete {}
 
 impl ParseComplete {
@@ -292,10 +419,29 @@ impl Serialize for ParseComplete {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
+pub enum PortalCompletion {
+    Complete(CommandComplete),
+    Suspended(PortalSuspended),
+}
+
+/// It's used to describe client that changes was done.
+/// The command tag. This is usually a single word that identifies which SQL command was completed.
+/// See more variants from sources: <https://github.com/postgres/postgres/blob/REL_14_4/src/include/tcop/cmdtaglist.h#L27>
+#[derive(Debug, PartialEq)]
 pub enum CommandComplete {
     Select(u32),
+    Fetch(u32),
     Plain(String),
+}
+
+impl CommandComplete {
+    pub fn new_selection(is_select: bool, rows: u32) -> Self {
+        match is_select {
+            true => CommandComplete::Select(rows),
+            false => CommandComplete::Fetch(rows),
+        }
+    }
 }
 
 impl Serialize for CommandComplete {
@@ -306,6 +452,9 @@ impl Serialize for CommandComplete {
         match self {
             CommandComplete::Select(rows) => {
                 buffer::write_string(&mut buffer, &format!("SELECT {}", rows))
+            }
+            CommandComplete::Fetch(rows) => {
+                buffer::write_string(&mut buffer, &format!("FETCH {}", rows))
             }
             CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, &tag),
         }
@@ -355,13 +504,17 @@ impl ParameterDescription {
     pub fn new(parameters: Vec<PgTypeId>) -> Self {
         Self { parameters }
     }
+
+    pub fn get(&self, i: usize) -> Option<&PgTypeId> {
+        self.parameters.get(i)
+    }
 }
 
 impl Serialize for ParameterDescription {
     const CODE: u8 = b't';
 
     fn serialize(&self) -> Option<Vec<u8>> {
-        let mut buffer: Vec<u8> = vec![];
+        let mut buffer: Vec<u8> = Vec::with_capacity(6 * self.parameters.len());
         // FIXME!
         let size = i16::try_from(self.parameters.len()).unwrap();
         buffer.put_i16(size);
@@ -414,12 +567,18 @@ impl Serialize for RowDescription {
 #[derive(Debug, Clone)]
 pub struct RowDescriptionField {
     name: String,
-    // TODO: REWORK!
+    /// If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero.
     table_oid: i32,
+    /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
     attribute_number: i16,
+    // The object ID of the field's data type. PgTypeId
     data_type_oid: i32,
+    /// The data type size (see pg_type.typlen). Note that negative values denote variable-width types.
     data_type_size: i16,
+    /// The type modifier (see pg_attribute.atttypmod). The meaning of the modifier is type-specific.
+    /// select attrelid, attname, atttypmod from pg_attribute;
     type_modifier: i32,
+    /// The format code being used for the field. It depends on the client request and binary ecconding for specific type
     format: Format,
 }
 
@@ -427,26 +586,15 @@ impl RowDescriptionField {
     pub fn new(name: String, typ: &PgType, format: Format) -> Self {
         Self {
             name,
+            // TODO: REWORK!
             table_oid: 0,
+            // TODO: REWORK!
             attribute_number: 0,
             data_type_oid: typ.oid as i32,
             data_type_size: typ.typlen,
             type_modifier: -1,
-            format: if format == Format::Binary {
-                // TODO: Introduce new function for PgType that checks for binary support
-                if typ.oid == PgTypeId::INT4 as u32
-                    || typ.oid == PgTypeId::INT2 as u32
-                    || typ.oid == PgTypeId::INT8 as u32
-                    || typ.oid == PgTypeId::BOOL as u32
-                    || typ.oid == PgTypeId::FLOAT4 as u32
-                    || typ.oid == PgTypeId::FLOAT8 as u32
-                    || typ.oid == PgTypeId::TIMESTAMP as u32
-                    || typ.oid == PgTypeId::TIMESTAMPTZ as u32
-                {
-                    Format::Binary
-                } else {
-                    Format::Text
-                }
+            format: if format == Format::Binary && typ.is_binary_supported() {
+                Format::Binary
             } else {
                 Format::Text
             },
@@ -471,7 +619,11 @@ impl Deserialize for PasswordMessage {
     }
 }
 
-/// This command is used for prepared statement creation on the server side
+/// (F) Extended Query. Contains a textual query string, optionally some information about data
+/// types of parameter placeholders, and the name of a destination prepared-statement object
+/// (an empty string selects the unnamed prepared statement)
+///
+/// The response is either ParseComplete or ErrorResponse.
 #[derive(Debug, PartialEq)]
 pub struct Parse {
     /// The name of the prepared statement. Empty string is used for unamed statements
@@ -506,6 +658,7 @@ impl Deserialize for Parse {
     }
 }
 
+/// (F) Extended Query. The Execute message specifies the portal name (empty string denotes the unnamed portal) and a maximum result-row count (zero meaning “fetch all rows”).
 #[derive(Debug, PartialEq)]
 pub struct Execute {
     // The name of the portal to execute (an empty string selects the unnamed portal).
@@ -564,7 +717,7 @@ impl Deserialize for Close {
     }
 }
 
-/// This command is used for prepared statement creation on the server side
+/// (F) Extended Query.
 #[derive(Debug, PartialEq)]
 pub struct Bind {
     /// The name of the destination portal (an empty string selects the unnamed portal).
@@ -580,22 +733,51 @@ pub struct Bind {
 }
 
 impl Bind {
-    pub fn to_bind_values(&self) -> Vec<BindValue> {
-        let mut values = vec![];
+    pub fn to_bind_values(
+        &self,
+        description: &ParameterDescription,
+    ) -> Result<Vec<BindValue>, ProtocolError> {
+        let mut values = Vec::with_capacity(self.parameter_values.len());
 
-        for param_value in &self.parameter_values {
-            values.push(match param_value {
+        for (idx, raw_value) in self.parameter_values.iter().enumerate() {
+            let param_tid = description.get(idx).ok_or::<ProtocolError>({
+                ErrorResponse::error(
+                    ErrorCode::InternalError,
+                    format!("Unknown type for parameter: {}", idx),
+                )
+                .into()
+            })?;
+
+            let param_format = match self.parameter_formats.len() {
+                0 => Format::Text,
+                1 => self.parameter_formats[0],
+                _ => self.parameter_formats[idx],
+            };
+
+            values.push(match raw_value {
                 None => BindValue::Null,
-                Some(raw_value) => {
-                    let decoded = String::from_utf8(raw_value.clone())
-                        .expect("Unable to unpack raw parameter to string");
-
-                    BindValue::String(decoded)
-                }
+                Some(raw_value) => match param_tid {
+                    PgTypeId::TEXT => {
+                        BindValue::String(String::from_protocol(raw_value, param_format)?)
+                    }
+                    PgTypeId::INT8 => {
+                        BindValue::Int64(i64::from_protocol(raw_value, param_format)?)
+                    }
+                    _ => {
+                        return Err(ErrorResponse::error(
+                            ErrorCode::FeatureNotSupported,
+                            format!(
+                                r#"Type "{:?}" is not supported for parameters decoding"#,
+                                param_tid
+                            ),
+                        )
+                        .into())
+                    }
+                },
             })
         }
 
-        values
+        Ok(values)
     }
 }
 
@@ -659,6 +841,7 @@ pub enum DescribeType {
     Portal,
 }
 
+// (F) Extended Query.
 #[derive(Debug, PartialEq)]
 pub struct Describe {
     pub typ: DescribeType,
@@ -712,36 +895,31 @@ pub enum Format {
     Binary,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct ProtocolVersion {
-    pub major: u16,
-    pub minor: u16,
-}
-
-impl ProtocolVersion {
-    pub fn new(major: u16, minor: u16) -> Self {
-        Self { major, minor }
-    }
-}
-
+/// All frontend messages (request which client sends to the server).
 #[derive(Debug, PartialEq)]
 pub enum FrontendMessage {
     PasswordMessage(PasswordMessage),
+    /// Simple Query
     Query(Query),
-    Parse(Parse),
-    Bind(Bind),
-    Describe(Describe),
-    Execute(Execute),
-    Close(Close),
     /// Flush network buffer
     Flush,
     /// Close connection
     Terminate,
-    /// Finish
+    /// Sync primitive in Extended Query for error recovery.
     Sync,
+    /// Extended Query. Create Statement.
+    Parse(Parse),
+    /// Extended Query. Creating Portal from specific Statement by replacing placeholders by real values.
+    Bind(Bind),
+    /// Extended Query. Describe Portal/Statement
+    Describe(Describe),
+    /// Extended Query. Select n rows from existed Portal
+    Execute(Execute),
+    /// Extended Query. Close Portal/Statement
+    Close(Close),
 }
 
-/// https://www.postgresql.org/docs/14/errcodes-appendix.html
+/// <https://www.postgresql.org/docs/14/errcodes-appendix.html>
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum ErrorCode {
@@ -756,16 +934,20 @@ pub enum ErrorCode {
     DataException,
     // Class 25 — Invalid Transaction State
     ActiveSqlTransaction,
+    NoActiveSqlTransaction,
     // 26
     InvalidSqlStatement,
     // 34
     InvalidCursorName,
     // Class 42 — Syntax Error or Access Rule Violation
     DuplicateCursor,
+    SyntaxError,
     // Class 53 — Insufficient Resources
     ConfigurationLimitExceeded,
     // Class 55 — Object Not In Prerequisite State
     ObjectNotInPrerequisiteState,
+    // Class 57 - Operator Intervention
+    QueryCanceled,
     // XX - Internal Error
     InternalError,
 }
@@ -779,11 +961,14 @@ impl Display for ErrorCode {
             Self::InvalidPassword => "28P01",
             Self::DataException => "22000",
             Self::ActiveSqlTransaction => "25001",
+            Self::NoActiveSqlTransaction => "25P01",
             Self::InvalidSqlStatement => "26000",
             Self::InvalidCursorName => "34000",
             Self::DuplicateCursor => "42P03",
+            Self::SyntaxError => "42601",
             Self::ConfigurationLimitExceeded => "53400",
             Self::ObjectNotInPrerequisiteState => "55000",
+            Self::QueryCanceled => "57014",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)
@@ -920,7 +1105,8 @@ mod tests {
             parameters.insert("client_encoding".to_string(), "UTF8".to_string());
 
             StartupMessage {
-                protocol_version: ProtocolVersion { major: 3, minor: 0 },
+                major: 3,
+                minor: 0,
                 parameters,
             }
         };
@@ -1004,7 +1190,7 @@ mod tests {
                         ],
                         result_formats: vec![Format::Text]
                     },
-                )
+                );
             }
             _ => panic!("Wrong message, must be Bind"),
         }
@@ -1035,7 +1221,13 @@ mod tests {
                         parameter_values: vec![Some(vec![116, 101, 115, 116])],
                         result_formats: vec![Format::Binary]
                     },
-                )
+                );
+
+                assert_eq!(
+                    body.to_bind_values(&ParameterDescription::new(vec![PgTypeId::TEXT]))
+                        .unwrap(),
+                    vec![BindValue::String("test".to_string())]
+                );
             }
             _ => panic!("Wrong message, must be Bind"),
         }

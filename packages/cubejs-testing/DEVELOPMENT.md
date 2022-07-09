@@ -53,7 +53,7 @@ $ export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
 $ export BIRDBOX_CYPRESS_BROWSER=chrome
 $ export BIRDBOX_CYPRESS_TARGET=postgresql
 $ export DEBUG=testcontainers
-$ yarn database:minimal
+$ yarn dataset:minimal
 $ yarn cypress:install
 $ yarn cypress:birdbox
 ```

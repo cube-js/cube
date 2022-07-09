@@ -831,6 +831,7 @@ class ApiGateway {
       normalizedTotal.totalQuery = true;
       normalizedTotal.limit = null;
       normalizedTotal.rowLimit = null;
+      normalizedTotal.offset = null;
       const [totalQuery] = await this.getSqlQueriesInternal(
         context,
         [normalizedTotal],
@@ -1159,6 +1160,8 @@ class ApiGateway {
   public handleError({
     e, context, query, res, requestStarted
   }: any) {
+    const { requestId } = context;
+    
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
@@ -1166,7 +1169,7 @@ class ApiGateway {
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.message, stack: e.stack }, { status: e.status });
+      res({ error: e.message, stack: e.stack, requestId }, { status: e.status });
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
@@ -1180,7 +1183,7 @@ class ApiGateway {
         type: 'Orchestrator error',
         query,
         error: e.error,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
       }, context);
       res(e, { status: 400 });
     } else if (e.type === 'UserError') {
@@ -1194,7 +1197,8 @@ class ApiGateway {
         {
           type: e.type,
           error: e.message,
-          stack: e.stack
+          stack: e.stack,
+          requestId
         },
         { status: 400 }
       );
@@ -1205,7 +1209,7 @@ class ApiGateway {
         error: e.stack || e.toString(),
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.toString(), stack: e.stack }, { status: 500 });
+      res({ error: e.toString(), stack: e.stack, requestId }, { status: 500 });
     }
   }
 
@@ -1534,6 +1538,7 @@ class ApiGateway {
         requestId: context.requestId,
         ...(!context.appName ? undefined : { appName: context.appName }),
         ...(!context.protocol ? undefined : { protocol: context.protocol }),
+        ...(!context.apiType ? undefined : { apiType: context.apiType }),
       })
     });
   }

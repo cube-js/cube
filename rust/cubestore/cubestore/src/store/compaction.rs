@@ -2,8 +2,9 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::partition::partition_file_name;
+use crate::metastore::table::AggregateColumn;
 use crate::metastore::{
-    deactivate_table_on_corrupt_data, Chunk, IdRow, MetaStore, Partition, PartitionData,
+    deactivate_table_on_corrupt_data, Chunk, IdRow, IndexType, MetaStore, Partition, PartitionData,
 };
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::store::{ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
@@ -17,7 +18,9 @@ use arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
 use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use chrono::Utc;
 use datafusion::cube_ext;
+use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::{Column, Count, Literal};
 use datafusion::physical_plan::hash_aggregate::{
@@ -34,7 +37,6 @@ use datafusion::scalar::ScalarValue;
 use futures::StreamExt;
 use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
-use num::Integer;
 use parquet::arrow::ArrowWriter;
 use std::cmp::Ordering;
 use std::fs::File;
@@ -46,6 +48,7 @@ use tokio::task::JoinHandle;
 #[async_trait]
 pub trait CompactionService: DIService + Send + Sync {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError>;
+    async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError>;
     /// Split multi-partition that has too many rows. Figures out the keys based on stored data.
     async fn split_multi_partition(&self, multi_partition_id: u64) -> Result<(), CubeError>;
     /// Process partitions that were added concurrently with multi-split.
@@ -113,6 +116,21 @@ impl CompactionService for CompactionServiceImpl {
         let mut size = 0;
         let chunks = all_pending_chunks
             .iter()
+            .filter(|c| {
+                !c.get_row().in_memory()
+                    || c.get_row().get_row_count()
+                        > self.config.compaction_in_memory_chunks_size_limit()
+                    || c.get_row()
+                        .oldest_insert_at()
+                        .map(|m| {
+                            Utc::now().signed_duration_since(m).num_seconds()
+                                > self
+                                    .config
+                                    .compaction_in_memory_chunks_max_lifetime_threshold()
+                                    as i64
+                        })
+                        .unwrap_or(false)
+            })
             .take_while(|c| {
                 if size == 0 {
                     size += c.get_row().get_row_count();
@@ -124,6 +142,11 @@ impl CompactionService for CompactionServiceImpl {
             })
             .map(|c| c.clone())
             .collect::<Vec<_>>();
+
+        if chunks.is_empty() {
+            return Ok(());
+        }
+
         let partition_id = partition.get_id();
         let chunks_row_count = chunks
             .iter()
@@ -272,7 +295,12 @@ impl CompactionService for CompactionServiceImpl {
             .get_table_by_id(index.get_row().table_id())
             .await?;
         let unique_key = table.get_row().unique_key_columns();
-        let records = merge_chunks(key_size, main_table, new, unique_key).await?;
+        let aggregate_columns = match index.get_row().get_type() {
+            IndexType::Regular => None,
+            IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
+        };
+        let records =
+            merge_chunks(key_size, main_table, new, unique_key, aggregate_columns).await?;
         let count_and_min =
             write_to_files(records, total_rows as usize, store, new_local_files2).await?;
 
@@ -381,6 +409,139 @@ impl CompactionService for CompactionServiceImpl {
                         }
                     })
                     .collect::<Result<Vec<_>, CubeError>>()?,
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError> {
+        let (partition, index, table, multi_part) = self
+            .meta_store
+            .get_partition_for_compaction(partition_id)
+            .await?;
+
+        // Test invariants
+        if !partition.get_row().is_active() && !multi_part.is_some() {
+            log::trace!(
+                "Cannot compact inactive partition: {:?}",
+                partition.get_row()
+            );
+            return Ok(());
+        }
+        if let Some(mp) = &multi_part {
+            if mp.get_row().prepared_for_split() {
+                log::debug!(
+                    "Cancelled compaction of {}. It runs concurrently with multi-split",
+                    partition_id
+                );
+                return Ok(());
+            }
+        }
+
+        let compaction_in_memory_chunks_size_limit =
+            self.config.compaction_in_memory_chunks_size_limit();
+
+        let mut size = 0;
+        let mut count = 0;
+        // Get all in_memory and active chunks
+        let chunks = self
+            .meta_store
+            .get_chunks_by_partition(partition_id, false)
+            .await?
+            .into_iter()
+            .filter(|c| {
+                c.get_row().in_memory()
+                    && c.get_row().active()
+                    && c.get_row().get_row_count() <= compaction_in_memory_chunks_size_limit
+                    && c.get_row()
+                        .oldest_insert_at()
+                        .map(|m| {
+                            Utc::now().signed_duration_since(m).num_seconds()
+                                <= self
+                                    .config
+                                    .compaction_in_memory_chunks_max_lifetime_threshold()
+                                    as i64
+                        })
+                        .unwrap_or(true)
+            })
+            .take_while(|c| {
+                if count < 2 {
+                    size += c.get_row().get_row_count();
+                    count += 1;
+                    true
+                } else {
+                    size += c.get_row().get_row_count();
+                    count += 1;
+                    size <= self.config.compaction_in_memory_chunks_total_size_limit()
+                }
+            })
+            .collect::<Vec<_>>();
+        if count < 2 {
+            return Ok(()); //We don't need to compact single chunk
+        }
+        // Prepare merge params
+        let unique_key = table.get_row().unique_key_columns();
+        let num_columns = index.get_row().columns().len();
+        let key_size = index.get_row().sort_key_size() as usize;
+        let schema = Arc::new(arrow_schema(index.get_row()));
+        // Use empty execution plan for main_table, read only from memory chunks
+        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
+        let in_memory_columns =
+            prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, &chunks).await?;
+
+        let aggregate_columns = match index.get_row().get_type() {
+            IndexType::Regular => None,
+            IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
+        };
+
+        // Get merged RecordBatch
+        let batches_stream = merge_chunks(
+            key_size,
+            main_table,
+            in_memory_columns,
+            unique_key,
+            aggregate_columns,
+        )
+        .await?;
+        let batches = collect(batches_stream).await?;
+        let batch = RecordBatch::concat(&schema, &batches).unwrap();
+
+        // Create chunk, writer RecordBatch into memory, swap chunks
+        let old_chunks_ids: Vec<u64> = chunks.iter().map(|c| c.get_id()).collect::<Vec<u64>>();
+        let old_chunks_size: u64 = chunks
+            .iter()
+            .map(|c| c.get_row().get_row_count())
+            .sum::<u64>();
+        let oldest_insert_at = chunks
+            .iter()
+            .filter_map(|c| {
+                Some(
+                    c.get_row()
+                        .oldest_insert_at()
+                        .clone()
+                        .unwrap_or(c.get_row().created_at().clone().unwrap()),
+                )
+            })
+            .min();
+        let new_chunk = self
+            .meta_store
+            .create_chunk(partition_id, old_chunks_size as usize, true)
+            .await?;
+
+        // oldest_insert_at will be used to force compaction
+        let chunk = IdRow::new(
+            new_chunk.get_id(),
+            new_chunk.get_row().set_oldest_insert_at(oldest_insert_at),
+        );
+
+        self.chunk_store
+            .add_memory_chunk(chunk.get_id(), batch)
+            .await?;
+        self.meta_store
+            .swap_chunks(
+                old_chunks_ids,
+                vec![(chunk.get_id(), Some(chunk.get_row().get_row_count()))],
             )
             .await?;
 
@@ -497,6 +658,51 @@ impl CompactionService for CompactionServiceImpl {
         s.split_single_partition(data).await?;
         s.finish(false).await
     }
+}
+
+// TODO: re-use it in the compact function?
+async fn prepare_in_memory_columns(
+    chunk_store: &Arc<dyn ChunkDataStore>,
+    num_columns: usize,
+    key_size: usize,
+    chunks: &Vec<IdRow<Chunk>>,
+) -> Result<Vec<ArrayRef>, CubeError> {
+    let mut data: Vec<RecordBatch> = Vec::new();
+    for chunk in chunks.iter() {
+        for b in chunk_store.get_chunk_columns(chunk.clone()).await? {
+            data.push(b)
+        }
+    }
+
+    let new = cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
+        // Concat rows from all chunks.
+        let mut columns = Vec::with_capacity(num_columns);
+        for i in 0..num_columns {
+            let v =
+                arrow::compute::concat(&data.iter().map(|a| a.column(i).as_ref()).collect_vec())?;
+            columns.push(v);
+        }
+        // Sort rows from all chunks.
+        let mut sort_key = Vec::with_capacity(key_size);
+        for i in 0..key_size {
+            sort_key.push(SortColumn {
+                values: columns[i].clone(),
+                options: Some(SortOptions {
+                    descending: false,
+                    nulls_first: true,
+                }),
+            });
+        }
+        let indices = lexsort_to_indices(&sort_key, None)?;
+        let mut new = Vec::with_capacity(num_columns);
+        for c in columns {
+            new.push(arrow::compute::take(c.as_ref(), &indices, None)?)
+        }
+        Ok(new)
+    })
+    .await??;
+
+    Ok(new)
 }
 
 /// Compute keys that partitions must be split by.
@@ -641,7 +847,7 @@ pub(crate) async fn write_to_files(
     store: ParquetTableStore,
     files: Vec<String>,
 ) -> Result<Vec<(usize, Vec<TableValue>)>, CubeError> {
-    let rows_per_file = (num_rows as usize).div_ceil(&files.len());
+    let rows_per_file = div_ceil(num_rows as usize, files.len());
     let key_size = store.key_size() as usize;
     let partition_split_key_size = store.partition_split_key_size() as usize;
 
@@ -835,11 +1041,13 @@ async fn write_to_files_by_keys(
     Ok(row_counts)
 }
 
+///Builds a `SendableRecordBatchStream` containing the result of merging a persistent chunk `l` with an in-memory chunk `r`
 async fn merge_chunks(
     key_size: usize,
     l: Arc<dyn ExecutionPlan>,
     r: Vec<ArrayRef>,
     unique_key_columns: Option<Vec<&crate::metastore::Column>>,
+    aggregate_columns: Option<Vec<AggregateColumn>>,
 ) -> Result<SendableRecordBatchStream, CubeError> {
     let schema = l.schema();
     let r = RecordBatch::try_new(schema.clone(), r)?;
@@ -856,7 +1064,31 @@ async fn merge_chunks(
     ]);
     let mut res: Arc<dyn ExecutionPlan> = Arc::new(MergeSortExec::try_new(Arc::new(inputs), key)?);
 
-    if let Some(key_columns) = unique_key_columns {
+    if let Some(aggregate_columns) = aggregate_columns {
+        let mut groups = Vec::with_capacity(key_size);
+        let schema = res.schema();
+        for i in 0..key_size {
+            let f = schema.field(i);
+            let col: Arc<dyn PhysicalExpr> = Arc::new(Column::new(f.name().as_str(), i));
+            groups.push((col, f.name().clone()));
+        }
+        let aggregates = aggregate_columns
+            .iter()
+            .map(|aggr_col| aggr_col.aggregate_expr(&res.schema()))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let output_sort_order = (0..key_size).map(|x| x as usize).collect();
+
+        res = Arc::new(HashAggregateExec::try_new(
+            AggregateStrategy::InplaceSorted,
+            Some(output_sort_order),
+            AggregateMode::Final,
+            groups,
+            aggregates,
+            res.clone(),
+            schema,
+        )?);
+    } else if let Some(key_columns) = unique_key_columns {
         res = Arc::new(LastRowByUniqueKeyExec::try_new(
             res.clone(),
             key_columns
@@ -868,7 +1100,7 @@ async fn merge_chunks(
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?,
-        )?)
+        )?);
     }
 
     Ok(res.execute(0).await?)
@@ -877,13 +1109,21 @@ async fn merge_chunks(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cluster::MockCluster;
+    use crate::config::Config;
     use crate::config::MockConfigObj;
-    use crate::metastore::{Column, ColumnType, RocksMetaStore};
+    use crate::metastore::{Column, ColumnType, IndexDef, IndexType, RocksMetaStore};
+    use crate::remotefs::LocalDirRemoteFs;
     use crate::store::MockChunkDataStore;
+    use crate::table::data::rows_to_columns;
     use crate::table::{cmp_same_types, Row, TableValue};
-    use arrow::array::StringArray;
+    use arrow::array::{Int64Array, StringArray};
     use arrow::datatypes::Schema;
     use arrow::record_batch::RecordBatch;
+    use datafusion::physical_plan::collect;
+    use rocksdb::{Options, DB};
+    use std::fs;
+    use std::path::PathBuf;
 
     #[tokio::test]
     async fn compaction() {
@@ -1072,6 +1312,308 @@ mod tests {
         assert_eq!(result, expected);
 
         RocksMetaStore::cleanup_test_metastore("compaction");
+    }
+
+    #[tokio::test]
+    async fn compact_in_memory_chunks() {
+        // arrange
+        let (remote_fs, metastore) =
+            RocksMetaStore::prepare_test_metastore("compact_in_memory_chunks");
+        let config = Config::test("compact_in_memory_chunks");
+        let mut cluster = MockCluster::new();
+        cluster
+            .expect_server_name()
+            .return_const("test".to_string());
+        cluster
+            .expect_node_name_by_partition()
+            .returning(move |_i| "test".to_string());
+        let chunk_store = ChunkStore::new(
+            metastore.clone(),
+            remote_fs.clone(),
+            Arc::new(cluster),
+            config.config_obj(),
+            10,
+        );
+        metastore
+            .create_schema("foo".to_string(), false)
+            .await
+            .unwrap();
+        let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
+        metastore
+            .create_table(
+                "foo".to_string(),
+                "bar".to_string(),
+                cols.clone(),
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        metastore.get_default_index(1).await.unwrap();
+        let partition = metastore.get_partition(1).await.unwrap();
+
+        let rows = (0..5)
+            .map(|i| Row::new(vec![TableValue::String(format!("Foo {}", 4 - i))]))
+            .collect::<Vec<_>>();
+        let data = rows_to_columns(&cols, &rows);
+        let index = metastore
+            .get_index(partition.get_row().get_index_id())
+            .await
+            .unwrap();
+        let schema = Arc::new(arrow_schema(index.get_row()));
+        let batch = RecordBatch::try_new(schema.clone(), data).unwrap();
+        let chunk_first = metastore
+            .create_chunk(partition.get_id(), 5, true)
+            .await
+            .unwrap();
+        let chunk_second = metastore
+            .create_chunk(partition.get_id(), 5, true)
+            .await
+            .unwrap();
+
+        metastore
+            .chunk_uploaded(chunk_first.get_id())
+            .await
+            .unwrap();
+        metastore
+            .chunk_uploaded(chunk_second.get_id())
+            .await
+            .unwrap();
+
+        chunk_store
+            .add_memory_chunk(chunk_first.get_id(), batch.clone())
+            .await
+            .unwrap();
+        chunk_store
+            .add_memory_chunk(chunk_second.get_id(), batch.clone())
+            .await
+            .unwrap();
+
+        // act
+        let compaction_service = CompactionServiceImpl::new(
+            metastore.clone(),
+            chunk_store.clone(),
+            remote_fs,
+            config.config_obj(),
+        );
+        compaction_service
+            .compact_in_memory_chunks(partition.get_id())
+            .await
+            .unwrap();
+
+        // assert
+        let chunks = metastore
+            .get_chunks_by_partition(partition.get_id(), false)
+            .await
+            .unwrap();
+
+        let chunks_row_count = chunks
+            .iter()
+            .map(|c| c.get_row().get_row_count())
+            .sum::<u64>();
+
+        let mut data = Vec::new();
+        for chunk in chunks.iter() {
+            for b in chunk_store.get_chunk_columns(chunk.clone()).await.unwrap() {
+                data.push(b)
+            }
+        }
+
+        let batch = data[0].clone();
+
+        let rows = (0..10)
+            .map(|i| Row::new(TableValue::from_columns(&batch.columns().clone(), i)))
+            .collect::<Vec<_>>();
+
+        let expected = vec![
+            Row::new(vec![TableValue::String("Foo 0".to_string())]),
+            Row::new(vec![TableValue::String("Foo 0".to_string())]),
+            Row::new(vec![TableValue::String("Foo 1".to_string())]),
+            Row::new(vec![TableValue::String("Foo 1".to_string())]),
+            Row::new(vec![TableValue::String("Foo 2".to_string())]),
+            Row::new(vec![TableValue::String("Foo 2".to_string())]),
+            Row::new(vec![TableValue::String("Foo 3".to_string())]),
+            Row::new(vec![TableValue::String("Foo 3".to_string())]),
+            Row::new(vec![TableValue::String("Foo 4".to_string())]),
+            Row::new(vec![TableValue::String("Foo 4".to_string())]),
+        ];
+
+        assert_eq!(1, chunks.len());
+        assert_eq!(10, chunks_row_count);
+        assert_eq!(expected, rows);
+
+        RocksMetaStore::cleanup_test_metastore("compact_in_memory_chunks");
+    }
+
+    #[tokio::test]
+    async fn aggr_index_compaction() {
+        let config = Config::test("create_aggr_chunk_test").update_config(|mut c| {
+            c.compaction_chunks_total_size_threshold = 50;
+            c
+        });
+        let path = "/tmp/test_create_aggr_chunk";
+        let chunk_store_path = path.to_string() + &"_store_chunk".to_string();
+        let chunk_remote_store_path = path.to_string() + &"_remote_store_chunk".to_string();
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+
+        let remote_fs = LocalDirRemoteFs::new(
+            Some(PathBuf::from(chunk_remote_store_path.clone())),
+            PathBuf::from(chunk_store_path.clone()),
+        );
+        let metastore = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+        let chunk_store = ChunkStore::new(
+            metastore.clone(),
+            remote_fs.clone(),
+            Arc::new(MockCluster::new()),
+            config.config_obj(),
+            50,
+        );
+
+        metastore
+            .create_schema("foo".to_string(), false)
+            .await
+            .unwrap();
+
+        let ind = IndexDef {
+            name: "aggr".to_string(),
+            columns: vec!["foo".to_string(), "boo".to_string()],
+            multi_index: None,
+            index_type: IndexType::Aggregate,
+        };
+        let cols = vec![
+            Column::new("foo".to_string(), ColumnType::String, 0),
+            Column::new("boo".to_string(), ColumnType::Int, 1),
+            Column::new("sum_int".to_string(), ColumnType::Int, 2),
+        ];
+        let table = metastore
+            .create_table(
+                "foo".to_string(),
+                "bar".to_string(),
+                cols.clone(),
+                None,
+                None,
+                vec![ind],
+                true,
+                None,
+                Some(vec![("sum".to_string(), "sum_int".to_string())]),
+                None,
+            )
+            .await
+            .unwrap();
+
+        let indices = metastore.get_table_indexes(table.get_id()).await.unwrap();
+
+        let aggr_index = indices
+            .iter()
+            .find(|i| i.get_row().get_name() == "aggr")
+            .unwrap();
+
+        let partition = &metastore
+            .get_active_partitions_by_index_id(aggr_index.get_id())
+            .await
+            .unwrap()[0];
+
+        let data1: Vec<ArrayRef> = vec![
+            Arc::new(StringArray::from(vec![
+                "a".to_string(),
+                "a".to_string(),
+                "b".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+            ])),
+            Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10])),
+            Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5])),
+        ];
+        let data2: Vec<ArrayRef> = vec![
+            Arc::new(StringArray::from(vec![
+                "a".to_string(),
+                "a".to_string(),
+                "b".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "c".to_string(),
+            ])),
+            Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10, 30])),
+            Arc::new(Int64Array::from(vec![10, 20, 30, 40, 50, 60])),
+        ];
+
+        let (chunk, _) = chunk_store
+            .add_chunk_columns(aggr_index.clone(), partition.clone(), data1.clone(), false)
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        metastore.chunk_uploaded(chunk.get_id()).await.unwrap();
+
+        let (chunk, _) = chunk_store
+            .add_chunk_columns(aggr_index.clone(), partition.clone(), data2.clone(), false)
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        metastore.chunk_uploaded(chunk.get_id()).await.unwrap();
+
+        let compaction_service = CompactionServiceImpl::new(
+            metastore.clone(),
+            chunk_store.clone(),
+            remote_fs.clone(),
+            config.config_obj(),
+        );
+        compaction_service
+            .compact(partition.get_id())
+            .await
+            .unwrap();
+
+        let partitions = metastore
+            .get_active_partitions_by_index_id(aggr_index.get_id())
+            .await
+            .unwrap();
+        assert_eq!(partitions.len(), 1);
+        let partition = &partitions[0];
+        assert_eq!(partition.get_row().main_table_row_count(), 6);
+
+        let remote = partition
+            .get_row()
+            .get_full_name(partition.get_id())
+            .unwrap();
+        let local = remote_fs
+            .download_file(&remote, partition.get_row().file_size())
+            .await
+            .unwrap();
+        let reader = Arc::new(
+            ParquetExec::try_from_path(local.as_str(), None, None, ROW_GROUP_SIZE, 1, None)
+                .unwrap(),
+        );
+        let res_data = &collect(reader).await.unwrap()[0];
+
+        let foos = Arc::new(StringArray::from(vec![
+            "a".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "c".to_string(),
+        ]));
+        let boos = Arc::new(Int64Array::from(vec![1, 10, 2, 20, 10, 30]));
+
+        let sums = Arc::new(Int64Array::from(vec![11, 22, 33, 44, 55, 60]));
+        let expected: Vec<ArrayRef> = vec![foos, boos, sums];
+
+        assert_eq!(res_data.columns(), &expected);
+
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(chunk_store_path.clone());
+        let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
     }
 }
 

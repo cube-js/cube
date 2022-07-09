@@ -22,9 +22,9 @@ use tokio::sync::{Mutex, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
-    remote_path: String,
-    updated: DateTime<Utc>,
-    file_size: u64,
+    pub remote_path: String,
+    pub updated: DateTime<Utc>,
+    pub file_size: u64,
 }
 
 impl RemoteFile {
@@ -95,7 +95,7 @@ pub fn ensure_temp_file_is_dropped(path: String) {
 
 #[derive(Debug)]
 pub struct LocalDirRemoteFs {
-    remote_dir_for_debug: Option<PathBuf>,
+    _remote_dir_for_debug: Option<PathBuf>,
     remote_dir: RwLock<Option<PathBuf>>,
     dir: PathBuf,
     dir_delete_mut: Mutex<()>,
@@ -104,7 +104,7 @@ pub struct LocalDirRemoteFs {
 impl LocalDirRemoteFs {
     pub fn new(remote_dir: Option<PathBuf>, dir: PathBuf) -> Arc<LocalDirRemoteFs> {
         Arc::new(LocalDirRemoteFs {
-            remote_dir_for_debug: remote_dir.clone(),
+            _remote_dir_for_debug: remote_dir.clone(),
             remote_dir: RwLock::new(remote_dir),
             dir,
             dir_delete_mut: Mutex::new(()),
@@ -113,7 +113,7 @@ impl LocalDirRemoteFs {
 
     pub fn new_noop(dir: PathBuf) -> Arc<LocalDirRemoteFs> {
         Arc::new(LocalDirRemoteFs {
-            remote_dir_for_debug: None,
+            _remote_dir_for_debug: None,
             remote_dir: RwLock::new(None),
             dir,
             dir_delete_mut: Mutex::new(()),
@@ -284,7 +284,7 @@ impl LocalDirRemoteFs {
         async move { Self::remove_empty_paths(root, path).await }.boxed()
     }
 
-    async fn remove_empty_paths(root: PathBuf, path: PathBuf) -> Result<(), CubeError> {
+    pub async fn remove_empty_paths(root: PathBuf, path: PathBuf) -> Result<(), CubeError> {
         if let Some(parent_path) = path.parent() {
             let mut dir = fs::read_dir(parent_path).await?;
             if dir.next_entry().await?.is_none() {

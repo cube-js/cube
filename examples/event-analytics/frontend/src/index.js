@@ -8,13 +8,12 @@ import ReportsPage from './reports';
 import FunnelsPage from './funnels';
 import AboutPage from './about';
 import * as serviceWorker from './serviceWorker';
-import createExampleWrapper from "cube-example-wrapper";
+import CubeExampleWrapper from "@cube-dev/example-wrapper";
 
-const exampleDescription = {
+const r = new CubeExampleWrapper({
   title: "Event Analytics with Cube.js and Snowplow",
-};
-
-createExampleWrapper(exampleDescription);
+});
+r.render();
 
 const history = createHistory({ basename: process.env.PUBLIC_URL });
 history.listen((location, action) => {

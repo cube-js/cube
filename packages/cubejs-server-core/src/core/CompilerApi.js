@@ -3,6 +3,12 @@ import R from 'ramda';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
 
 export class CompilerApi {
+  /**
+   * Class constructor.
+   * @param {SchemaFileRepository} repository
+   * @param {DbTypeAsyncFn} dbType
+   * @param {*} options
+   */
   constructor(repository, dbType, options) {
     this.repository = repository;
     this.dbType = dbType;
@@ -62,23 +68,23 @@ export class CompilerApi {
 
   async createQueryFactory(compilers) {
     const { cubeEvaluator } = compilers;
+
     const cubeToQueryClass = R.fromPairs(
-      cubeEvaluator.cubeNames().map(cube => {
-        const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
-        const dbType = this.getDbType(dataSource);
-        const dialectClass = this.getDialectClass(dataSource, dbType);
-        return [cube, queryClass(dbType, dialectClass)];
-      })
+      await Promise.all(
+        cubeEvaluator.cubeNames().map(async cube => {
+          const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
+          const dbType = await this.getDbType(dataSource);
+          const dialectClass = this.getDialectClass(dataSource, dbType);
+          return [cube, queryClass(dbType, dialectClass)];
+        })
+      )
     );
     return new QueryFactory(cubeToQueryClass);
   }
 
-  getDbType(dataSource = 'default') {
-    if (typeof this.dbType === 'function') {
-      return this.dbType({ dataSource, });
-    }
-
-    return this.dbType;
+  async getDbType(dataSource = 'default') {
+    const res = await this.dbType({ dataSource, });
+    return res;
   }
 
   getDialectClass(dataSource = 'default', dbType) {
@@ -88,26 +94,26 @@ export class CompilerApi {
   async getSql(query, options = {}) {
     const { includeDebugInfo } = options;
 
-    const dbType = this.getDbType();
+    const dbType = await this.getDbType();
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = this.createQueryByDataSource(compilers, query);
+    let sqlGenerator = await this.createQueryByDataSource(compilers, query);
 
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
     }
 
     const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-
-    if (dataSource !== 'default' && dbType !== this.getDbType(dataSource)) {
+    const _dbType = await this.getDbType(dataSource);
+    if (dataSource !== 'default' && dbType !== _dbType) {
       // TODO consider more efficient way than instantiating query
-      sqlGenerator = this.createQueryByDataSource(
+      sqlGenerator = await this.createQueryByDataSource(
         compilers,
         query,
         dataSource
       );
 
       if (!sqlGenerator) {
-        throw new Error(`Can't find dialect for '${dataSource}' data source: ${this.getDbType(dataSource)}`);
+        throw new Error(`Can't find dialect for '${dataSource}' data source: ${_dbType}`);
       }
     }
 
@@ -148,8 +154,8 @@ export class CompilerApi {
     return cubeEvaluator.scheduledPreAggregations();
   }
 
-  createQueryByDataSource(compilers, query, dataSource) {
-    const dbType = this.getDbType(dataSource);
+  async createQueryByDataSource(compilers, query, dataSource) {
+    const dbType = await this.getDbType(dataSource);
 
     return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
   }

@@ -4,6 +4,7 @@ use log::SetLoggerError;
 use sqlparser::parser::ParserError;
 use std::{
     backtrace::Backtrace,
+    collections::HashMap,
     fmt,
     fmt::{Debug, Formatter},
     num::ParseIntError,
@@ -19,15 +20,15 @@ pub struct CubeError {
 
 #[derive(Debug, Clone)]
 pub enum CubeErrorCauseType {
-    User,
-    Internal,
+    User(Option<HashMap<String, String>>),
+    Internal(Option<HashMap<String, String>>),
 }
 
 impl CubeError {
     pub fn user(message: String) -> CubeError {
         CubeError {
             message,
-            cause: CubeErrorCauseType::User,
+            cause: CubeErrorCauseType::User(None),
             backtrace: Some(Backtrace::capture()),
         }
     }
@@ -35,7 +36,7 @@ impl CubeError {
     pub fn internal(message: String) -> CubeError {
         CubeError {
             message,
-            cause: CubeErrorCauseType::Internal,
+            cause: CubeErrorCauseType::Internal(None),
             backtrace: Some(Backtrace::capture()),
         }
     }
@@ -43,7 +44,7 @@ impl CubeError {
     pub fn internal_with_bt(message: String, backtrace: Option<Backtrace>) -> CubeError {
         CubeError {
             message,
-            cause: CubeErrorCauseType::Internal,
+            cause: CubeErrorCauseType::Internal(None),
             backtrace,
         }
     }
@@ -61,12 +62,22 @@ impl CubeError {
 
 impl fmt::Display for CubeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.cause {
-            CubeErrorCauseType::User => f.write_fmt(format_args!("{}", self.message)),
-            CubeErrorCauseType::Internal => {
-                f.write_fmt(format_args!("{:?}: {}", self.cause, self.message))
+        fn write_fmt(
+            cause: CubeErrorCauseType,
+            message: String,
+            f: &mut Formatter<'_>,
+        ) -> fmt::Result {
+            match &cause {
+                CubeErrorCauseType::User(meta) => {
+                    f.write_fmt(format_args!("{} {:?}", message, meta))
+                }
+                CubeErrorCauseType::Internal(meta) => {
+                    f.write_fmt(format_args!("{:?}: {} {:?}", cause, message, meta))
+                }
             }
         }
+
+        write_fmt(self.cause.clone(), self.message.clone(), f)
     }
 }
 
@@ -102,7 +113,17 @@ impl From<cubeclient::apis::Error<MetaV1Error>> for CubeError {
 
 impl From<crate::compile::CompilationError> for CubeError {
     fn from(v: crate::compile::CompilationError) -> Self {
-        CubeError::internal_with_bt(v.to_string(), v.to_backtrace())
+        let cause = match &v {
+            crate::compile::CompilationError::User(_, meta)
+            | crate::compile::CompilationError::Unsupported(_, meta)
+            | crate::compile::CompilationError::Internal(_, _, meta) => {
+                CubeErrorCauseType::Internal(meta.clone())
+            }
+        };
+        let mut err = CubeError::internal_with_bt(v.to_string(), v.to_backtrace());
+        err.cause = cause;
+
+        err
     }
 }
 
@@ -114,6 +135,12 @@ impl From<std::io::Error> for CubeError {
 
 impl From<ParserError> for CubeError {
     fn from(v: ParserError) -> Self {
+        CubeError::internal(format!("{:?}", v))
+    }
+}
+
+impl From<rust_decimal::Error> for CubeError {
+    fn from(v: rust_decimal::Error) -> Self {
         CubeError::internal(format!("{:?}", v))
     }
 }

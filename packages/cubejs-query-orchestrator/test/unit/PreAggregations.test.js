@@ -126,9 +126,10 @@ describe('PreAggregations', () => {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       () => {},
       {
-        queueOptions: {
-          executionTimeout: 1
-        },
+        queueOptions: () => ({
+          executionTimeout: 1,
+          concurrency: 2,
+        }),
       },
     );
   });
@@ -145,9 +146,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
         },
       );
     });
@@ -172,9 +174,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalDriverFactory: mockExternalDriverFactory,
         },
       );
@@ -199,9 +202,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalDriverFactory: mockExternalDriverFactory,
         },
       );
@@ -226,9 +230,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalRefresh: true,
         },
       );
@@ -257,9 +262,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalDriverFactory: mockExternalDriverFactory,
           externalRefresh: true,
         },
@@ -290,9 +296,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalDriverFactory: async () => {
             const driver = mockExternalDriver;
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1593709044209');
@@ -342,9 +349,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalDriverFactory: async () => {
             const driver = mockExternalDriver;
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209');

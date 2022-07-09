@@ -20,7 +20,7 @@ Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`,
 `quarter` and `year`.
 
 The Cube.js client also accepts an array of queries. By default it will be
-treated as a [Data Blending](/recipes/data-blending) query.
+treated as a Data Blending query type.
 
 ## Query Properties
 
@@ -202,6 +202,36 @@ The opposite operator of `contains`. It supports multiple values.
 {
   member: "Posts.title",
   operator: "notContains",
+  values: ["ruby"]
+}
+```
+
+### <--{"id" : "Filters Operators"}--> startsWith
+
+The `startsWith` filter acts as a case insensitive `LIKE` operator with a wildcard at the beginning. In
+the majority of SQL backends, it uses the `ILIKE` operator with `%` at the start of each value. It supports multiple values.
+
+- Dimension types: `string`.
+
+```js
+{
+  member: "Posts.title",
+  operator: "startsWith",
+  values: ["ruby"]
+}
+```
+
+### <--{"id" : "Filters Operators"}--> endsWith
+
+The `endsWith` filter acts as a case insensitive `LIKE` operator with a wildcard at the end. In
+the majority of SQL backends, it uses the `ILIKE` operator with `%` at the end of each value. It supports multiple values.
+
+- Dimension types: `string`.
+
+```js
+{
+  member: "Posts.title",
+  operator: "endsWith",
   values: ["ruby"]
 }
 ```

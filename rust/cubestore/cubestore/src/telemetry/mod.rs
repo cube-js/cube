@@ -404,11 +404,11 @@ impl ReportingLogger {
 }
 
 impl Log for ReportingLogger {
-    fn enabled(&self, metadata: &Metadata<'a>) -> bool {
+    fn enabled<'a>(&self, metadata: &Metadata<'a>) -> bool {
         self.logger.enabled(metadata)
     }
 
-    fn log(&self, record: &Record<'a>) {
+    fn log<'a>(&self, record: &Record<'a>) {
         if let Level::Error = record.metadata().level() {
             track_event_spawn(
                 "Cube Store Error".to_string(),

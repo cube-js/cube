@@ -3,6 +3,10 @@ title: SQLite
 permalink: /config/databases/sqlite
 ---
 
+<WarningBox>
+  The driver for SQLite is <b>community supported</b>. 
+</WarningBox>
+
 ## Prerequisites
 
 ## Setup

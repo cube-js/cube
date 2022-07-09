@@ -1,3 +1,6 @@
+//! Helpers for reading/writing from/to the connection's socket
+
+use bytes::{BufMut, BytesMut};
 use std::{
     convert::TryFrom,
     io::{Cursor, Error, ErrorKind},
@@ -126,6 +129,7 @@ pub async fn read_format<Reader: AsyncReadExt + Unpin>(
     }
 }
 
+/// Same as the write_message function, but it doesn’t append header for frame (code + size).
 pub async fn write_direct<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     writer: &mut Writer,
     message: Message,
@@ -141,14 +145,12 @@ pub async fn write_direct<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
     Ok(())
 }
 
-pub async fn write_message<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
-    writer: &mut Writer,
+fn message_serialize<Message: Serialize>(
     message: Message,
+    packet_buffer: &mut BytesMut,
 ) -> Result<(), ProtocolError> {
-    let mut packet_buffer = Vec::with_capacity(64);
-
     if message.code() != 0x00 {
-        packet_buffer.push(message.code());
+        packet_buffer.put_u8(message.code());
     }
 
     match message.serialize() {
@@ -164,7 +166,35 @@ pub async fn write_message<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
         }
         _ => (),
     };
-    writer.write_all(&packet_buffer).await?;
+
+    Ok(())
+}
+
+/// Write multiple F messages with frame's headers to the writer.
+pub async fn write_messages<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
+    writer: &mut Writer,
+    messages: Vec<Message>,
+) -> Result<(), ProtocolError> {
+    let mut buffer = BytesMut::with_capacity(64 * messages.len());
+
+    for message in messages {
+        message_serialize(message, &mut buffer)?;
+    }
+
+    writer.write_all(&buffer).await?;
+    writer.flush().await?;
+    Ok(())
+}
+
+/// Write single F message with frame's headers to the writer.
+pub async fn write_message<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
+    writer: &mut Writer,
+    message: Message,
+) -> Result<(), ProtocolError> {
+    let mut buffer = BytesMut::with_capacity(64);
+    message_serialize(message, &mut buffer)?;
+
+    writer.write_all(&buffer).await?;
     writer.flush().await?;
     Ok(())
 }

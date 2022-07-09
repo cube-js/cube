@@ -1,4 +1,4 @@
-use std::{any::type_name, sync::Arc};
+use std::{any::type_name, sync::Arc, thread};
 
 use chrono::{Duration, NaiveDateTime};
 use datafusion::{
@@ -8,7 +8,7 @@ use datafusion::{
             Float64Array, GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeArray,
             IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
             StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
-            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt32Array,
+            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
             UInt32Builder,
         },
         compute::{cast, concat},
@@ -82,6 +82,7 @@ pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
+// It's the same as current_user UDF, but with another host
 pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
@@ -103,7 +104,7 @@ pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> ScalarUDF {
+pub fn create_current_user_udf(state: Arc<SessionState>, name: &str, with_host: bool) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
@@ -120,7 +121,28 @@ pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> Sca
     });
 
     create_udf(
-        "current_user",
+        name,
+        vec![],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_session_user_udf(state: Arc<SessionState>) -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(1);
+        if let Some(user) = &state.user() {
+            builder.append_value(user.clone()).unwrap();
+        } else {
+            builder.append_null()?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "session_user",
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
@@ -186,8 +208,9 @@ macro_rules! downcast_boolean_arr {
             .downcast_ref::<BooleanArray>()
             .ok_or_else(|| {
                 DataFusionError::Internal(format!(
-                    "could not cast {}, to {}",
+                    "could not cast {} from {} to {}",
                     $NAME,
+                    $ARG.data_type(),
                     type_name::<BooleanArray>()
                 ))
             })?
@@ -200,9 +223,10 @@ macro_rules! downcast_primitive_arg {
             .downcast_ref::<PrimitiveArray<$T>>()
             .ok_or_else(|| {
                 DataFusionError::Internal(format!(
-                    "could not cast {} to {}",
+                    "could not cast {} from {} to {}",
                     $NAME,
-                    type_name::<PrimitiveArray<$T>>()
+                    $ARG.data_type(),
+                    type_name::<$T>()
                 ))
             })?
     }};
@@ -214,8 +238,9 @@ macro_rules! downcast_string_arg {
             .downcast_ref::<GenericStringArray<$T>>()
             .ok_or_else(|| {
                 DataFusionError::Internal(format!(
-                    "could not cast {} to {}",
+                    "could not cast {} from {} to {}",
                     $NAME,
+                    $ARG.data_type(),
                     type_name::<GenericStringArray<$T>>()
                 ))
             })?
@@ -225,9 +250,30 @@ macro_rules! downcast_string_arg {
 macro_rules! downcast_list_arg {
     ($ARG:expr, $NAME:expr) => {{
         $ARG.as_any().downcast_ref::<ListArray>().ok_or_else(|| {
-            DataFusionError::Internal(format!("could not cast {} to ArrayList", $NAME))
+            DataFusionError::Internal(format!(
+                "could not cast {} to ArrayList, actual: {}",
+                $NAME,
+                $ARG.data_type()
+            ))
         })?
     }};
+}
+
+type OidType = UInt32Type;
+
+// TODO: Combine with downcast
+fn cast_oid_arg(argument: &ArrayRef, name: &str) -> Result<ArrayRef> {
+    match argument.data_type() {
+        DataType::Int32 | DataType::Int64 => {
+            cast(&argument, &DataType::UInt32).map_err(|err| err.into())
+        }
+        // We use UInt32 for OID
+        DataType::UInt32 => Ok(argument.clone()),
+        dt => Err(DataFusionError::Internal(format!(
+            "Argument {} must be a valid numeric type accepted for oid, actual {}",
+            name, dt,
+        ))),
+    }
 }
 
 // Returns the position of the first occurrence of substring substr in string str.
@@ -948,10 +994,16 @@ pub fn create_date_add_udf() -> ScalarUDF {
 
     ScalarUDF::new(
         "date_add",
-        &Signature::exact(
+        &Signature::one_of(
             vec![
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                DataType::Interval(IntervalUnit::DayTime),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
             ],
             Volatility::Immutable,
         ),
@@ -1156,9 +1208,10 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
 
 pub fn create_format_type_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let oids = args[0].as_any().downcast_ref::<UInt32Array>().unwrap();
+        let tmp = cast_oid_arg(&args[0], "oid")?;
+        let oids = downcast_primitive_arg!(tmp, "oid", OidType);
         // TODO: See pg_attribute.atttypmod
-        let typemods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typemods = downcast_primitive_arg!(args[1], "typemod", Int64Type);
 
         let result = oids
             .iter()
@@ -1249,6 +1302,9 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             PgTypeId::CHARACTERDATA => {
                                 format!("information_schema.character_data{}", typemod_str())
                             }
+                            PgTypeId::PGNAMESPACE => {
+                                format!("pg_namespace{}", typemod_str())
+                            }
                             PgTypeId::SQLIDENTIFIER => {
                                 format!("information_schema.sql_identifier{}", typemod_str())
                             }
@@ -1275,8 +1331,8 @@ pub fn create_format_type_udf() -> ScalarUDF {
 
 pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
-        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
+        let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
         let mut builder = Int64Builder::new(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
@@ -1323,8 +1379,8 @@ pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
 
 pub fn create_pg_numeric_precision_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
-        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
+        let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
         let mut builder = Int64Builder::new(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
@@ -1418,8 +1474,8 @@ pub fn create_pg_truetypmod_udf() -> ScalarUDF {
 
 pub fn create_pg_numeric_scale_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
-        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
+        let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
         let mut builder = Int64Builder::new(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
@@ -1456,7 +1512,7 @@ pub fn create_pg_numeric_scale_udf() -> ScalarUDF {
 
 pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let role_oids = args[0].as_any().downcast_ref::<UInt32Array>().unwrap();
+        let role_oids = downcast_primitive_arg!(args[0], "role_oid", OidType);
 
         let result = role_oids
             .iter()
@@ -1481,7 +1537,7 @@ pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
 
 pub fn create_pg_get_expr_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let inputs = args[0].as_any().downcast_ref::<StringArray>().unwrap();
+        let inputs = downcast_string_arg!(args[0], "input", i32);
 
         let result = inputs
             .iter()
@@ -1511,7 +1567,7 @@ pub fn create_pg_table_is_visible_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
-        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", OidType);
 
         let result = oids_arr
             .iter()
@@ -1537,9 +1593,35 @@ pub fn create_pg_table_is_visible_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_pg_sleep_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let secs_arr = downcast_primitive_arg!(args[0], "secs", Int64Type);
+
+        if !secs_arr.is_null(0) {
+            thread::sleep(core::time::Duration::new(secs_arr.value(0) as u64, 0));
+        }
+
+        let mut result = StringBuilder::new(1);
+        result.append_null()?;
+
+        Ok(Arc::new(result.finish()))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_sleep",
+        &Signature::exact(vec![DataType::Int64], Volatility::Volatile),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_pg_type_is_visible_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", OidType);
 
         let result = oids_arr
             .iter()
@@ -1573,7 +1655,7 @@ pub fn create_pg_type_is_visible_udf() -> ScalarUDF {
 
 pub fn create_pg_get_constraintdef_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", OidType);
         let result = oids_arr
             .iter()
             .map(|oid| match oid {
@@ -1876,6 +1958,47 @@ pub fn create_array_lower_udf() -> ScalarUDF {
             ],
             Volatility::Immutable,
         ),
+        &return_type,
+        &fun,
+    )
+}
+
+/// Returns the OID of the current session's temporary schema, or zero if it has none (because it has not created any temporary tables).
+pub fn create_pg_my_temp_schema() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = Int64Builder::new(1);
+        builder.append_value(0).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "pg_my_temp_schema",
+        &Signature::any(0, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+/// Returns true if the given OID is the OID of another session's temporary schema.
+/// pg_is_other_temp_schema ( oid ) → boolean
+pub fn create_pg_is_other_temp_schema() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let oids = downcast_primitive_arg!(args[0], "oid", Int64Type);
+        let result = oids.iter().map(|_| Some(false)).collect::<BooleanArray>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "pg_is_other_temp_schema",
+        &Signature::exact(vec![DataType::Int64], Volatility::Immutable),
         &return_type,
         &fun,
     )

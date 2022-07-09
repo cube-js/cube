@@ -7,23 +7,24 @@ redirect_from:
   - /connecting-to-the-database
 ---
 
-Choose a database to get started with below:
+Choose a data store to get started with below.
+
+<InfoBox>
+  If you'd like to connect to a data store which is not yet listed on this page,
+  please <a href="https://github.com/cube-js/cube.js/issues">file an issue</a> on GitHub.
+  You can also contribute a driver, see this <a href="https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver">step-by-step guide</a> for guidelines.<br/><br/>
+  
+  <b>A note on driver support:</b><br/>
+  Most of the drivers for data sources on this page are supported either directly by Cube Dev or via individual vendors. The rest are community supported and those drivers will be listed under the <em>Community supported</em> section. 
+</InfoBox>
+
+## Data Warehouses
 
 <Grid imageSize={[56, 56]}>
   <GridItem
-    url="databases/postgres"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/postgres.svg"
-    title="Postgres"
-  />
-  <GridItem
-    url="databases/mysql"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/mysql.svg"
-    title="MySQL"
-  />
-  <GridItem
     url="databases/aws-redshift"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/redshift.svg"
-    title="AWS Redshift"
+    title="Amazon Redshift"
   />
   <GridItem
     url="databases/clickhouse"
@@ -36,65 +37,95 @@ Choose a database to get started with below:
     title="Firebolt"
   />
   <GridItem
-    url="databases/hive-sparksql"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/hive.svg"
-    title="Hive/SparkSQL"
-  />
-  <GridItem
-    url="databases/oracle"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/oracle.svg"
-    title="Oracle"
-  />
-  <GridItem
-    url="databases/mssql"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/mssql.svg"
-    title="MS SQL"
-  />
-  <GridItem
-    url="databases/aws-athena"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/athena.svg"
-    title="AWS Athena"
-  />
-  <GridItem
     url="databases/google-bigquery"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/bigquery.svg"
     title="Google BigQuery"
-  />
-  <GridItem
-    url="databases/mongodb"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/mongodb.svg"
-    title="MongoDB"
   />
   <GridItem
     url="databases/snowflake"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/snowflake.svg"
     title="Snowflake"
   />
+</Grid>
+
+## Query Engines
+
+<Grid imageSize={[56, 56]}>
   <GridItem
-    url="databases/prestodb"
+    url="databases/aws-athena"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/athena.svg"
+    title="Amazon Athena"
+  />
+  <GridItem
+    url="databases/databricks/jdbc"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/databricks.svg"
+    title="Databricks"
+  />
+  <GridItem
+    url="databases/presto"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/presto.svg"
-    title="PrestoDB"
+    title="Presto"
+  />
+</Grid>  
+
+#### Community supported
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="databases/hive-sparksql"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/hive.svg"
+    title="Hive/SparkSQL"
+  />
+</Grid>
+
+## Transactional Databases
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="databases/mssql"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/mssql.svg"
+    title="MS SQL"
   />
   <GridItem
-    url="databases/druid"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/druid.svg"
-    title="Druid"
+    url="databases/mysql"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/mysql.svg"
+    title="MySQL"
   />
   <GridItem
-    url="databases/elasticsearch"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Databases/elasticsearch.svg"
-    title="Elasticsearch"
+    url="databases/postgres"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/postgres.svg"
+    title="Postgres"
   />
+</Grid>
+
+#### Community supported
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="databases/oracle"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/oracle.svg"
+    title="Oracle"
+  />  
   <GridItem
     url="databases/sqlite"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Databases/sqlite.svg"
     title="SQLite"
   />
+</Grid>
+
+## Time Series Databases
+
+<Grid imageSize={[56, 56]}>
   <GridItem
     url="databases/questdb"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/questdb.svg"
     title="QuestDB"
   />
+</Grid>
+
+## Streaming & Real-Time Databases
+
+<Grid imageSize={[56, 56]}>
   <GridItem
     url="databases/materialize"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/materialize.svg"
@@ -102,19 +133,36 @@ Choose a database to get started with below:
   />
 </Grid>
 
-<InfoBox>
+#### Community supported
 
-If you'd like to connect to a database which is not yet supported, you can
-create a Cube.js-compliant driver package. [Here's a step-by-step
-guide][gh-cubejs-driver-guide].
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="databases/druid"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/druid.svg"
+    title="Druid"
+  />
+</Grid>
 
-</InfoBox>
+## NoSQL & Document Databases
+
+#### Community supported
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="databases/elasticsearch"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Databases/elasticsearch.svg"
+    title="Elasticsearch"
+  />
+  <GridItem
+    url="databases/mongodb"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/mongodb.svg"
+    title="MongoDB"
+  />
+</Grid>
 
 ## Multiple Databases
 
 Cube.js supports connection to multiple databases out-of-the-box. Please refer
-to [Multitenancy Guide][link-multitenancy] to learn more.
+to the [multitenancy guide][link-multitenancy] to learn more.
 
 [link-multitenancy]: /multitenancy-setup
-[gh-cubejs-driver-guide]:
-  https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver

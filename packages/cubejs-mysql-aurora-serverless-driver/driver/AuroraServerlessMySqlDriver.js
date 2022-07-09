@@ -8,6 +8,13 @@ const GenericTypeToMySql = {
 };
 
 class AuroraServerlessMySqlDriver extends BaseDriver {
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
   constructor(config) {
     super();
     this.config = {

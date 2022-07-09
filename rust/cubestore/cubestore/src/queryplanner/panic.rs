@@ -42,7 +42,7 @@ impl UserDefinedLogicalNode for PanicWorkerNode {
         vec![]
     }
 
-    fn fmt_for_explain(&self, f: &mut Formatter<'a>) -> std::fmt::Result {
+    fn fmt_for_explain<'a>(&self, f: &mut Formatter<'a>) -> std::fmt::Result {
         write!(f, "Panic")
     }
 

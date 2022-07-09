@@ -6,8 +6,8 @@ FROM rust:1.47-buster as builder
 # /build/arrow/rust/arrow/src/lib.rs:127:1
 # #![feature(specialization)]
 RUN rustup update && \
-    rustup default nightly-2021-07-04 && \
-    rustup component add --toolchain nightly-2021-07-04 rustfmt
+    rustup default nightly-2022-06-22 && \
+    rustup component add --toolchain nightly-2022-06-22 rustfmt
 
 RUN apt update \
 	&& apt upgrade -y \

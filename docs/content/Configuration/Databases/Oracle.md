@@ -3,6 +3,10 @@ title: Oracle
 permalink: /config/databases/oracle
 ---
 
+<WarningBox>
+  The driver for Oracle is <b>community supported</b>. 
+</WarningBox>
+
 ## Prerequisites
 
 - The hostname for the [Oracle][oracle] database server

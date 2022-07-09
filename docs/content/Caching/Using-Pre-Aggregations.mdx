@@ -308,7 +308,7 @@ Cube supports three different strategies for building pre-aggregations. To see
 which strategies your database supports, please refer to its individual page
 from [Connecting to the Database][ref-config-db].
 
-### Simple
+### <--{"id" : "Pre-Aggregation Build Strategies"}--> Simple
 
 When using the simple strategy, Cube will use the source database as a temporary
 staging area for writing pre-aggregations to determine column types. The data is
@@ -331,7 +331,7 @@ or [Export Bucket][self-export-bucket] strategies instead.
   />
 </div>
 
-### Batching
+### <--{"id" : "Pre-Aggregation Build Strategies"}--> Batching
 
 Batching is a more performant strategy where Cube.js sends compressed CSVs for
 Cube Store to ingest.
@@ -349,11 +349,11 @@ The performance scales to the amount of memory available on the Cube.js
 instance. Batching is automatically enabled for any databases that can support
 it.
 
-### Export bucket
+### <--{"id" : "Pre-Aggregation Build Strategies"}--> Export bucket
 
 When dealing with larger pre-aggregations (more than 100k rows), performance can
 be significantly improved by using an export bucket. This allows the source
-database to persist data directly into cloud storage, which is then loaded into
+database to temporarily materialize the data locally, which is then loaded into
 Cube Store in parallel:
 
 <div style="text-align: center">

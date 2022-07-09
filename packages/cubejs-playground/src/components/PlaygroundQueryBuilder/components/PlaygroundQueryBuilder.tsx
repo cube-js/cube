@@ -210,7 +210,7 @@ export function PlaygroundQueryBuilder({
     setChartRendererReady,
     setQueryError,
   } = useChartRendererStateMethods();
-
+  
   const { refreshToken } = useSecurityContext();
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -453,8 +453,9 @@ export function PlaygroundQueryBuilder({
                   <Space style={{ marginLeft: 'auto' }}>
                     {Extra ? (
                       <Extra
-                        queryRequestId={queryRequestId}
-                        queryStatus={queryStatus as QueryStatus}
+                        queryRequestId={queryRequestId || queryError?.response?.requestId}
+                        queryStatus={queryStatus}
+                        error={queryError}
                       />
                     ) : null}
                     {queryStatus ? (

@@ -4,7 +4,7 @@ use crate::{
         rewrite::{
             converter::{is_expr_node, node_to_expr},
             AliasExprAlias, ColumnExprColumn, DimensionName, LiteralExprValue, LogicalPlanLanguage,
-            MeasureName, TableScanSourceTableName, TimeDimensionName,
+            MeasureName, SegmentName, TableScanSourceTableName, TimeDimensionName,
         },
     },
     var_iter, CubeError,
@@ -119,6 +119,16 @@ impl LogicalPlanAnalysis {
                     let dimension_name =
                         var_iter!(egraph[params[0]], DimensionName).next().unwrap();
                     map.push((dimension_name.to_string(), expr));
+                    Some(map)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::Segment(params) => {
+                if let Some(_) = column_name(params[1]) {
+                    let expr = original_expr(params[1])?;
+                    let segment_name = var_iter!(egraph[params[0]], SegmentName).next().unwrap();
+                    map.push((segment_name.to_string(), expr));
                     Some(map)
                 } else {
                     None
@@ -337,7 +347,9 @@ impl LogicalPlanAnalysis {
                 .ok()?;
 
                 if let Expr::ScalarFunction { fun, .. } = &expr {
-                    if fun.volatility() == Volatility::Immutable {
+                    if fun.volatility() == Volatility::Immutable
+                        || fun.volatility() == Volatility::Stable
+                    {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
                         None
@@ -365,6 +377,21 @@ impl LogicalPlanAnalysis {
                     &SingleNodeIndex { egraph },
                 )
                 .ok()?;
+
+                match &expr {
+                    Expr::BinaryExpr { left, right, .. } => match (&**left, &**right) {
+                        (Expr::Literal(ScalarValue::IntervalYearMonth(_)), Expr::Literal(_))
+                        | (Expr::Literal(ScalarValue::IntervalDayTime(_)), Expr::Literal(_))
+                        | (Expr::Literal(ScalarValue::IntervalMonthDayNano(_)), Expr::Literal(_))
+                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalYearMonth(_)))
+                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalDayTime(_)))
+                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalMonthDayNano(_))) => {
+                            return None
+                        }
+                        _ => (),
+                    },
+                    _ => (),
+                }
 
                 Self::eval_constant_expr(&egraph, &expr)
             }
@@ -402,16 +429,18 @@ impl LogicalPlanAnalysis {
     ) -> Option<ScalarValue> {
         let schema = DFSchema::empty();
         let arrow_schema = Arc::new(schema.to_owned().into());
-        let physical_expr = egraph
-            .analysis
-            .planner
-            .create_physical_expr(
-                &expr,
-                &schema,
-                &arrow_schema,
-                &egraph.analysis.cube_context.state,
-            )
-            .expect(&format!("Can't plan expression: {:?}", expr));
+        let physical_expr = match egraph.analysis.planner.create_physical_expr(
+            &expr,
+            &schema,
+            &arrow_schema,
+            &egraph.analysis.cube_context.state,
+        ) {
+            Ok(res) => res,
+            Err(e) => {
+                log::trace!("Can't plan expression: {:?}", e);
+                return None;
+            }
+        };
         let batch = RecordBatch::try_new(
             Arc::new(Schema::new(vec![Field::new(
                 "placeholder",
@@ -421,19 +450,24 @@ impl LogicalPlanAnalysis {
             vec![Arc::new(NullArray::new(1))],
         )
         .unwrap();
-        let value = physical_expr
-            .evaluate(&batch)
-            .expect(&format!("Can't evaluate expression: {:?}", expr));
+        let value = match physical_expr.evaluate(&batch) {
+            Ok(res) => res,
+            Err(e) => {
+                log::trace!("Can't evaluate expression: {:?}", e);
+                return None;
+            }
+        };
         Some(match value {
             ColumnarValue::Scalar(value) => value,
             ColumnarValue::Array(arr) => {
                 if arr.len() == 1 {
                     ScalarValue::try_from_array(&arr, 0).unwrap()
                 } else {
-                    panic!(
+                    log::trace!(
                         "Expected one row but got {} during constant eval",
                         arr.len()
-                    )
+                    );
+                    return None;
                 }
             }
         })
