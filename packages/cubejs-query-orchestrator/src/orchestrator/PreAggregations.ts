@@ -1769,7 +1769,7 @@ export class PreAggregations {
             ),
             { requestId, externalRefresh: this.externalRefresh, buildRangeEnd }
           );
-          return loader.refresh(preAggregation, newVersionEntry, invalidationKeys)(client);
+          return loader.refresh(newVersionEntry, invalidationKeys, client);
         },
         {
           concurrency: 1,
