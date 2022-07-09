@@ -464,6 +464,17 @@ The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
 **must** also be included in the pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
 
+Number of partitions to be built per cube is calculated as [buildRange][self-buidlrange] divided by `partitionGranularity`.
+Number of partitions to be built per cube is multiplied by count of time zones and tenants in case different tenants have different pre-aggregation SQL.
+
+<WarningBox>
+
+Choose the count of partitions wisely as those consume memory and CPU resources.
+As a rule of thumb, you do not want to go over 5,000-10,000 partitions in total to keep partitioning overhead low.
+Too many partitions will most likely cause out of memory.
+
+</WarningBox>
+
 ### <--{"id" : "Parameters"}--> refreshKey
 
 Cube.js can also take care of keeping pre-aggregations up to date with the
@@ -906,6 +917,7 @@ cube(`Orders`, {
 [self-rollup]: #parameters-type-rollup
 [self-rollupjoin]: #parameters-type-rollupjoin
 [self-timedimension]: #time-dimension
+[self-buildrange]: #parameters-build-range-start-and-build-range-end
 [wiki-olap-ops]: https://en.wikipedia.org/wiki/OLAP_cube#Operations
 [wiki-composable-agg-fn]:
   https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions
