@@ -119,15 +119,21 @@ pub struct SqlQueryContext {
 }
 
 impl SqlQueryContext {
-    pub fn with_trace_obj(&self, trace_obj: Option<String>) -> Self {
+    pub fn with_user(&self, user: Option<String>) -> Self {
         let mut res = self.clone();
-        res.trace_obj = trace_obj;
+        res.user = user;
         res
     }
 
     pub fn with_inline_tables(&self, inline_tables: Vec<(String, Arc<DataFrame>)>) -> Self {
         let mut res = self.clone();
         res.inline_tables = Arc::new(HashMap::from_iter(inline_tables.iter().cloned()));
+        res
+    }
+
+    pub fn with_trace_obj(&self, trace_obj: Option<String>) -> Self {
+        let mut res = self.clone();
+        res.trace_obj = trace_obj;
         res
     }
 }

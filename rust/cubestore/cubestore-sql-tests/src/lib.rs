@@ -26,7 +26,11 @@ mod tests;
 #[async_trait]
 pub trait SqlClient: Send + Sync {
     async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError>;
-    async fn exec_query_with_context(&self, context: SqlQueryContext, query: &str) -> Result<Arc<DataFrame>, CubeError>;
+    async fn exec_query_with_context(
+        &self,
+        context: SqlQueryContext,
+        query: &str,
+    ) -> Result<Arc<DataFrame>, CubeError>;
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
 }
 
@@ -44,7 +48,7 @@ pub fn run_sql_tests(
                     name: TestName::DynTestName(format!("cubesql::{}::{}", prefix, name)),
                     ignore: false,
                     should_panic: ShouldPanic::No,
-                    ignore_message: None,  
+                    ignore_message: None,
                     compile_fail: false,
                     no_run: false,
                     test_type: TestType::IntegrationTest,
@@ -67,7 +71,11 @@ impl SqlClient for Arc<dyn SqlService> {
         self.as_ref().exec_query(query).await
     }
 
-    async fn exec_query_with_context(&self, context: SqlQueryContext, query: &str) -> Result<Arc<DataFrame>, CubeError> {
+    async fn exec_query_with_context(
+        &self,
+        context: SqlQueryContext,
+        query: &str,
+    ) -> Result<Arc<DataFrame>, CubeError> {
         self.as_ref().exec_query_with_context(context, query).await
     }
 

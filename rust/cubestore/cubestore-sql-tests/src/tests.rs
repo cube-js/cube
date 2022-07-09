@@ -2,9 +2,10 @@ use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
+use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
-use cubestore::sql::{SqlQueryContext, timestamp_from_string};
+use cubestore::sql::{timestamp_from_string, SqlQueryContext};
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
@@ -22,7 +23,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
-use cubestore::metastore::{Column, ColumnType};
 
 pub type TestFn = Box<
     dyn Fn(Box<dyn SqlClient>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -180,7 +180,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             filter_multiple_in_for_decimal,
         ),
         t("panic_worker", panic_worker),
-        t("planning_filter_index_selection", planning_filter_index_selection),
+        t(
+            "planning_filter_index_selection",
+            planning_filter_index_selection,
+        ),
         t("planning_aggregate_index", planning_aggregate_index),
         t("aggregate_index", aggregate_index),
         t("aggregate_index_hll", aggregate_index_hll),
@@ -4817,7 +4820,9 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
     );
 
     let p = service
-        .plan_query("SELECT a, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders GROUP BY 1")
+        .plan_query(
+            "SELECT a, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders GROUP BY 1",
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -4866,11 +4871,13 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
 async fn aggregate_index(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
-        .exec_query("CREATE TABLE s.Orders(a int, b int, c int, a_sum int, a_max int, a_min int)
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, c int, a_sum int, a_max int, a_min int)
                      AGGREGATIONS(sum(a_sum), max(a_max), min(a_min))
                      INDEX reg_index (a, b) 
                      AGGREGATE INDEX aggr_index (a, b)
-                     ")
+                     ",
+        )
         .await
         .unwrap();
     service
@@ -4881,7 +4888,10 @@ async fn aggregate_index(service: Box<dyn SqlClient>) {
                                                    (2, 30, 200, 100, 100, 100), \
                                                    (1, 10, 400, 20, 40, 40), \
                                                    (2, 20, 410, 20, 30, 30) \
-                                                   ").await.unwrap();
+                                                   ",
+        )
+        .await
+        .unwrap();
 
     let res = service
         .exec_query("SELECT a, b, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
@@ -4891,11 +4901,29 @@ async fn aggregate_index(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&res),
         [
-         [TableValue::Int(1), TableValue::Int(10), TableValue::Int(50), TableValue::Int(40), TableValue::Int(10)],
-         [TableValue::Int(2), TableValue::Int(20), TableValue::Int(30), TableValue::Int(30), TableValue::Int(10)],
-         [TableValue::Int(2), TableValue::Int(30), TableValue::Int(100), TableValue::Int(100), TableValue::Int(100)],
+            [
+                TableValue::Int(1),
+                TableValue::Int(10),
+                TableValue::Int(50),
+                TableValue::Int(40),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(20),
+                TableValue::Int(30),
+                TableValue::Int(30),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(30),
+                TableValue::Int(100),
+                TableValue::Int(100),
+                TableValue::Int(100)
+            ],
         ]
-        );
+    );
 
     let res = service
         .exec_query("SELECT a, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders GROUP BY 1 ORDER BY 1")
@@ -4905,10 +4933,20 @@ async fn aggregate_index(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&res),
         [
-         [TableValue::Int(1), TableValue::Int(50), TableValue::Int(40), TableValue::Int(10)],
-         [TableValue::Int(2), TableValue::Int(130), TableValue::Int(100), TableValue::Int(10)],
+            [
+                TableValue::Int(1),
+                TableValue::Int(50),
+                TableValue::Int(40),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(130),
+                TableValue::Int(100),
+                TableValue::Int(10)
+            ],
         ]
-        );
+    );
 
     let res = service
         .exec_query("SELECT a, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders WHERE b = 20 GROUP BY 1 ORDER BY 1")
@@ -4917,19 +4955,24 @@ async fn aggregate_index(service: Box<dyn SqlClient>) {
 
     assert_eq!(
         to_rows(&res),
-        [
-         [TableValue::Int(2), TableValue::Int(30), TableValue::Int(30), TableValue::Int(10)],
-        ]
-        );
+        [[
+            TableValue::Int(2),
+            TableValue::Int(30),
+            TableValue::Int(30),
+            TableValue::Int(10)
+        ],]
+    );
 }
 
 async fn aggregate_index_hll(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
-        .exec_query("CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
                      AGGREGATIONS(merge(a_hll))
                      AGGREGATE INDEX aggr_index (a, b)
-                     ")
+                     ",
+        )
         .await
         .unwrap();
     service
@@ -4939,7 +4982,10 @@ async fn aggregate_index_hll(service: Box<dyn SqlClient>) {
                                                     (1, 20, X'020C0200C02FF58941D5F0C6'), \
                                                     (1, 10, X'020C0200C02FF58941D5F0C6'), \
                                                     (1, 20, X'020C0200C02FF58941D5F0C6') \
-                                                   ").await.unwrap();
+                                                   ",
+        )
+        .await
+        .unwrap();
 
     let res = service
         .exec_query("SELECT a, b, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
@@ -4948,33 +4994,24 @@ async fn aggregate_index_hll(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&res),
         [
-         [TableValue::Int(1), TableValue::Int(10), TableValue::Int(2)],
-         [TableValue::Int(1), TableValue::Int(20), TableValue::Int(2)],
+            [TableValue::Int(1), TableValue::Int(10), TableValue::Int(2)],
+            [TableValue::Int(1), TableValue::Int(20), TableValue::Int(2)],
         ]
-        );
+    );
 
     let res = service
         .exec_query("SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders WHERE b = 20 GROUP BY 1 ORDER BY 1")
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&res),
-        [
-         [TableValue::Int(1), TableValue::Int(2)],
-        ]
-        );
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(2)],]);
 
     let res = service
-        .exec_query("SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1 ORDER BY 1")
+        .exec_query(
+            "SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1 ORDER BY 1",
+        )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&res),
-        [
-         [TableValue::Int(1), TableValue::Int(2)],
-        ]
-        );
-
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(2)],]);
 }
 
 async fn aggregate_index_errors(service: Box<dyn SqlClient>) {
@@ -4995,33 +5032,40 @@ async fn aggregate_index_errors(service: Box<dyn SqlClient>) {
         .expect_err("Column 'a_hll' in aggregate index 'aggr_index' is in aggregations list for table 'Orders'. Aggregate index columns must be outside of aggregations list.");
 
     service
-        .exec_query("CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
                     AGGREGATIONS (sum(a), sum(b))
-                     ")
+                     ",
+        )
         .await
         .expect_err("Aggregate function SUM not allowed for column type text");
 
     service
-        .exec_query("CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
                     AGGREGATIONS (sum(a), max(b), sum(a_hll))
-                     ")
+                     ",
+        )
         .await
         .expect_err("Aggregate function SUM not allowed for column type hyperloglog");
 
     service
-        .exec_query("CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
                     AGGREGATIONS (max(a_hll))
-                     ")
+                     ",
+        )
         .await
         .expect_err("Aggregate function MAX not allowed for column type hyperloglog");
 
     service
-        .exec_query("CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
                     AGGREGATIONS (merge(a))
-                     ")
+                     ",
+        )
         .await
         .expect_err("Aggregate function MERGE not allowed for column type integer");
-
 }
 
 async fn inline_tables(service: Box<dyn SqlClient>) {
@@ -5038,8 +5082,9 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
 
-    service.exec_query(
-        "INSERT INTO Foo.Persons
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons
         (ID, LastName, FirstName, Timestamp)
         VALUES
         (23, 'LastName 1', 'FirstName 1', '2020-01-01T00:00:00.000Z'),
@@ -5049,20 +5094,25 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         (35, 'LastName 24', 'FirstName 2', '2020-01-01T00:00:00.000Z'),
         (36, 'LastName 23', 'FirstName 2', '2020-01-02T00:00:00.000Z'),
         (37, 'LastName 22', 'FirstName 2', '2020-01-03T00:00:00.000Z'),
-        (38, 'LastName 21', 'FirstName 2', '2020-01-04T00:00:00.000Z')"
-    ).await.unwrap();
+        (38, 'LastName 21', 'FirstName 2', '2020-01-04T00:00:00.000Z')",
+        )
+        .await
+        .unwrap();
 
     let result = service
         .exec_query("SELECT * FROM Foo.Persons")
         .await
         .unwrap();
     assert_eq!(result.get_rows().len(), 8);
-    assert_eq!(result.get_rows()[0], Row::new(vec![
-        TableValue::Int(23),
-        TableValue::String("FirstName 1".to_string()),
-        TableValue::String("LastName 1".to_string()),
-        TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
-    ]));
+    assert_eq!(
+        result.get_rows()[0],
+        Row::new(vec![
+            TableValue::Int(23),
+            TableValue::String("FirstName 1".to_string()),
+            TableValue::String("LastName 1".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+        ])
+    );
 
     let columns = vec![
         Column::new("ID".to_string(), ColumnType::Int, 0),
@@ -5111,55 +5161,64 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         .exec_query_with_context(context, "SELECT LastName, Timestamp FROM Persons")
         .await
         .unwrap();
-    assert_eq!(result.get_rows(), &vec![
-        Row::new(vec![
-            TableValue::String("last 1".to_string()),
-            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
-        ]),
-        Row::new(vec![
-            TableValue::Null,
-            TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
-        ]),
-        Row::new(vec![
-            TableValue::String("last 3".to_string()),
-            TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
-        ]),
-        Row::new(vec![
-            TableValue::String("last 4".to_string()),
-            TableValue::Null,
-        ]),
-    ]);
+    assert_eq!(
+        result.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("last 1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 3".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 4".to_string()),
+                TableValue::Null,
+            ]),
+        ]
+    );
 
     let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
     let result = service
-        .exec_query_with_context(context, r#"
+        .exec_query_with_context(
+            context,
+            r#"
             SELECT *
             FROM (
                 SELECT LastName, Timestamp FROM Foo.Persons
                 UNION ALL SELECT LastName, Timestamp FROM Persons
             )
             ORDER BY LastName
-        "#)
+        "#,
+        )
         .await
         .unwrap();
-    assert_eq!(result.get_rows()[8..12].to_vec(), vec![
-        Row::new(vec![
-            TableValue::String("last 1".to_string()),
-            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
-        ]),
-        Row::new(vec![
-            TableValue::String("last 3".to_string()),
-            TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
-        ]),
-        Row::new(vec![
-            TableValue::String("last 4".to_string()),
-            TableValue::Null,
-        ]),
-        Row::new(vec![
-            TableValue::Null,
-            TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
-        ]),
-    ]);
+    assert_eq!(
+        result.get_rows()[8..12].to_vec(),
+        vec![
+            Row::new(vec![
+                TableValue::String("last 1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 3".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 4".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+        ]
+    );
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
