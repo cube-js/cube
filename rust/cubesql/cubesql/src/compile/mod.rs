@@ -8890,6 +8890,40 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_metabase_substring() -> Result<(), CubeError> {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT
+                    \"source\".\"substring1\" AS \"substring2\",
+                    \"source\".\"count\" AS \"count\"
+                FROM (
+                    SELECT
+                        \"KibanaSampleDataEcommerce\".\"count\" AS \"count\",
+                        SUBSTRING(\"KibanaSampleDataEcommerce\".\"customer_gender\" FROM 1 FOR 1234) AS \"substring1\"
+                    FROM
+                        \"public\".\"KibanaSampleDataEcommerce\"
+                ) AS \"source\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_subquery_with_same_name_excel() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "subquery_with_same_name_excel",
