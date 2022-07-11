@@ -15,7 +15,7 @@ Choose a data store to get started with below.
   You can also contribute a driver, see this <a href="https://github.com/cube-js/cube.js/blob/master/CONTRIBUTING.md#implementing-driver">step-by-step guide</a> for guidelines.<br/><br/>
   
   <b>A note on driver support:</b><br/>
-  Most of the drivers for data sources on this page are supported either directly by Cube Dev or via individual vendors. The rest are community supported and those drivers will be listed under the <em>Community supported</em> section. 
+  Most of the drivers for data sources on this page are supported either directly by Cube Dev or via individual vendors. The rest are community supported and will be highlighted as such in their respective pages. 
 </InfoBox>
 
 ## Data Warehouses
@@ -62,21 +62,16 @@ Choose a data store to get started with below.
     title="Databricks"
   />
   <GridItem
-    url="databases/presto"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/presto.svg"
-    title="Presto"
-  />
-</Grid>  
-
-#### Community supported
-
-<Grid imageSize={[56, 56]}>
-  <GridItem
     url="databases/hive-sparksql"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/hive.svg"
     title="Hive/SparkSQL"
-  />
-</Grid>
+  />  
+  <GridItem
+    url="databases/presto"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/presto.svg"
+    title="Presto"
+  />  
+</Grid>  
 
 ## Transactional Databases
 
@@ -92,25 +87,20 @@ Choose a data store to get started with below.
     title="MySQL"
   />
   <GridItem
+    url="databases/oracle"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/oracle.svg"
+    title="Oracle"
+  />    
+  <GridItem
     url="databases/postgres"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/postgres.svg"
     title="Postgres"
   />
-</Grid>
-
-#### Community supported
-
-<Grid imageSize={[56, 56]}>
-  <GridItem
-    url="databases/oracle"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/oracle.svg"
-    title="Oracle"
-  />  
   <GridItem
     url="databases/sqlite"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Databases/sqlite.svg"
     title="SQLite"
-  />
+  />  
 </Grid>
 
 ## Time Series Databases
@@ -127,25 +117,18 @@ Choose a data store to get started with below.
 
 <Grid imageSize={[56, 56]}>
   <GridItem
+    url="databases/druid"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/druid.svg"
+    title="Druid"
+  />
+  <GridItem
     url="databases/materialize"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/materialize.svg"
     title="Materialize"
   />
 </Grid>
 
-#### Community supported
-
-<Grid imageSize={[56, 56]}>
-  <GridItem
-    url="databases/druid"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/druid.svg"
-    title="Druid"
-  />
-</Grid>
-
 ## NoSQL & Document Databases
-
-#### Community supported
 
 <Grid imageSize={[56, 56]}>
   <GridItem
