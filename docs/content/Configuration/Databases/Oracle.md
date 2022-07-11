@@ -4,7 +4,7 @@ permalink: /config/databases/oracle
 ---
 
 <WarningBox>
-  The driver for Oracle is <b>community supported</b>. 
+  The driver for Oracle is <b>community supported</b> and is <b>not</b> support by Cube or the vendor. 
 </WarningBox>
 
 ## Prerequisites
