@@ -168,10 +168,14 @@ macro_rules! build_column {
         match $field_name {
             MemberField::Member(field_name) => {
                 for row in $response.data.iter() {
-                    let value = row.as_object().unwrap().get(field_name).ok_or(
-                        DataFusionError::Internal(
-                            "Unexpected response from Cube.js, rows are not objects"
-                                .to_string(),
+                    let as_object = row.as_object().ok_or(
+                        DataFusionError::Execution(
+                            format!("Unexpected response from Cube.js, row is not an object, actual: {}", row)
+                        ),
+                    )?;
+                    let value = as_object.get(field_name).ok_or(
+                        DataFusionError::Execution(
+                            format!(r#"Unexpected response from Cube.js, Field "{}" doesn't exist in row"#, field_name)
                         ),
                     )?;
                     match (&value, &mut builder) {
