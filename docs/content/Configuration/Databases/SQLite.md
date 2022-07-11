@@ -4,7 +4,7 @@ permalink: /config/databases/sqlite
 ---
 
 <WarningBox>
-  The driver for SQLite is <b>community supported</b>. 
+  The driver for SQLite is <b>community supported</b> and is <b>not</b> support by Cube or the vendor. 
 </WarningBox>
 
 ## Prerequisites
