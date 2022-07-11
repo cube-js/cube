@@ -3310,6 +3310,7 @@ impl MetaStore for RocksMetaStore {
                 .iter()
                 .filter_map(|c| match c.get_column_type() {
                     ColumnType::Bytes => None,
+                    ColumnType::HyperLogLog(_) => None,
                     _ => {
                         if seq_column_index.is_none()
                             || seq_column_index.is_some()
@@ -5554,6 +5555,11 @@ mod tests {
                 2,
             ));
             columns.push(Column::new("col4".to_string(), ColumnType::Bytes, 3));
+            columns.push(Column::new(
+                "col5".to_string(),
+                ColumnType::HyperLogLog(HllFlavour::Airlift),
+                4,
+            ));
 
             let table1 = meta_store
                 .create_table(
@@ -5601,7 +5607,89 @@ mod tests {
                 "default".to_string(),
                 table1_id,
                 columns.clone(),
-                columns.len() as u64 - 1,
+                columns.len() as u64 - 2,
+                None,
+                None,
+                Index::index_type_default(),
+            )
+            .unwrap();
+            let expected_res = vec![IdRow::new(1, expected_index)];
+            assert_eq!(meta_store.get_table_indexes(1).await.unwrap(), expected_res);
+        }
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+    #[tokio::test]
+    async fn default_index_field_positions_test() {
+        let config = Config::test("default_index_field_positions_test");
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("test-default-index-positions-local");
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join("test-default-index-positions-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                remote_fs,
+                config.config_obj(),
+            );
+
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let mut columns = Vec::new();
+            columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
+            columns.push(Column::new("col2".to_string(), ColumnType::Bytes, 1));
+            columns.push(Column::new(
+                "col3".to_string(),
+                ColumnType::HyperLogLog(HllFlavour::Airlift),
+                2,
+            ));
+            columns.push(Column::new("col4".to_string(), ColumnType::String, 3));
+            columns.push(Column::new(
+                "col5".to_string(),
+                ColumnType::Decimal {
+                    scale: 2,
+                    precision: 18,
+                },
+                4,
+            ));
+
+            let table1 = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "boo".to_string(),
+                    columns.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                )
+                .await
+                .unwrap();
+            let table1_id = table1.id;
+
+            let expected_columns = vec![
+                columns[0].clone(),
+                columns[3].replace_index(1),
+                columns[4].replace_index(2),
+                columns[1].replace_index(3),
+                columns[2].replace_index(4),
+            ];
+
+            let expected_index = Index::try_new(
+                "default".to_string(),
+                table1_id,
+                expected_columns,
+                columns.len() as u64 - 2,
                 None,
                 None,
                 Index::index_type_default(),
