@@ -2535,15 +2535,15 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
            \n    Worker\
            \n      Sort, by: [SUM(hits)@1 desc nulls last]\
            \n        FullInplaceAggregate, sort_order: [0]\
-           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                  Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n                MergeSort, sort_order: [0, 1, 2]\
+           \n                  Scan, index: default:1:[1]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2]\
            \n                    Empty\
-           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                  Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n                MergeSort, sort_order: [0, 1, 2]\
+           \n                  Scan, index: default:2:[2]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2]\
            \n                    Empty"
     );
 }
@@ -2969,6 +2969,30 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
            \n            Scan, index: cb:2:[2], fields: [b, c, amount]\
            \n              Empty"
     );
+
+    let p = service
+        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 and a > 5 and a < 10 GROUP BY 1")
+        .await
+        .unwrap();
+
+
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalInplaceAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+        \n  FinalInplaceAggregate\
+        \n    Worker\
+        \n      PartialInplaceAggregate\
+        \n        Filter\
+        \n          MergeSort\
+        \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [a, b, c, amount]\
+        \n              Empty"
+    );
+
 }
 
 async fn planning_joins(service: Box<dyn SqlClient>) {

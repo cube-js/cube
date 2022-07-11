@@ -415,8 +415,20 @@ fn single_value_filter_columns<'a>(
                     && single_value_filter_columns(right, columns)
             }
             Operator::And => {
-                single_value_filter_columns(left, columns)
-                    && single_value_filter_columns(right, columns)
+                let mut l_part = Vec::new();
+                let l_res = single_value_filter_columns(left, &mut l_part);
+
+                if l_res {
+                    columns.append(&mut l_part);
+                }
+
+                let mut r_part = Vec::new();
+                let r_res = single_value_filter_columns(right, &mut r_part);
+
+                if r_res {
+                    columns.append(&mut r_part);
+                }
+                l_res || r_res
             }
             _ => false,
         },
