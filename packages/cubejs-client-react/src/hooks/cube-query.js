@@ -1,8 +1,8 @@
-import { useContext, useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
 
-import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
+import { useCubeApi } from './cube-api';
 
 export function useCubeQuery(query, options = {}) {
   const mutexRef = useRef({});
@@ -12,7 +12,7 @@ export function useCubeQuery(query, options = {}) {
   const [resultSet, setResultSet] = useState(null);
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState(null);
-  const context = useContext(CubeContext);
+  const cubejsApi = useCubeApi(options.cubejsApi);
 
   let subscribeRequest = null;
 
@@ -20,7 +20,6 @@ export function useCubeQuery(query, options = {}) {
 
   async function fetch() {
     const { resetResultSetOnChange } = options;
-    const cubejsApi = options.cubejsApi || context?.cubejsApi;
 
     if (!cubejsApi) {
       throw new Error('Cube.js API client is not provided');
