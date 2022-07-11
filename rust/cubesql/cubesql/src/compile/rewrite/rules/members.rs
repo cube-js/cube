@@ -782,15 +782,20 @@ impl MemberRules {
 
     pub fn transform_original_expr_date_trunc(
         original_expr_var: &'static str,
+        // Original granularity from date_part/date_trunc
         granularity_var: &'static str,
+        // Var for substr which is used to pass value to Date_Trunc
+        date_trunc_granularity_var: &'static str,
         column_expr_var: &'static str,
         alias_expr_var: Option<&'static str>,
         inner_replacer: bool,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let original_expr_var = var!(original_expr_var);
         let granularity_var = var!(granularity_var);
+        let date_trunc_granularity_var = var!(date_trunc_granularity_var);
         let column_expr_var = var!(column_expr_var);
         let alias_expr_var = alias_expr_var.map(|alias_expr_var| var!(alias_expr_var));
+
         move |egraph, subst| {
             let original_expr_id = subst[original_expr_var];
             let res =
@@ -802,36 +807,52 @@ impl MemberRules {
                         "Original expr wasn't prepared for {:?}",
                         original_expr_id
                     )));
+
             for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
-                match granularity {
+                let date_trunc_granularity = match granularity {
                     ScalarValue::Utf8(Some(granularity)) => {
-                        if let Ok(expr) = res {
-                            // TODO unwrap
-                            let name = expr.name(&DFSchema::empty()).unwrap();
-                            let suffix_alias = format!("{}_{}", name, granularity);
-                            let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                                ColumnExprColumn(Column::from_name(suffix_alias.to_string())),
-                            ));
-                            subst.insert(
-                                column_expr_var,
-                                egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
-                            );
-                            if let Some(alias_expr_var) = alias_expr_var {
-                                subst.insert(
-                                    alias_expr_var,
-                                    egraph.add(LogicalPlanLanguage::AliasExprAlias(
-                                        AliasExprAlias(if inner_replacer {
-                                            suffix_alias.to_string()
-                                        } else {
-                                            name
-                                        }),
-                                    )),
-                                );
+                        if inner_replacer {
+                            match granularity.to_lowercase().as_str() {
+                                "dow" | "doy" => "day".to_string(),
+                                _ => granularity.clone(),
                             }
-                            return true;
+                        } else {
+                            granularity.clone()
                         }
                     }
-                    _ => {}
+                    _ => continue,
+                };
+
+                if let Ok(expr) = res {
+                    // TODO unwrap
+                    let name = expr.name(&DFSchema::empty()).unwrap();
+                    let suffix_alias = format!("{}_{}", name, granularity);
+                    let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                        ColumnExprColumn(Column::from_name(suffix_alias.to_string())),
+                    ));
+                    subst.insert(
+                        column_expr_var,
+                        egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
+                    );
+                    subst.insert(
+                        date_trunc_granularity_var,
+                        egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                            ScalarValue::Utf8(Some(date_trunc_granularity)),
+                        ))),
+                    );
+                    if let Some(alias_expr_var) = alias_expr_var {
+                        subst.insert(
+                            alias_expr_var,
+                            egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                                if inner_replacer {
+                                    suffix_alias.to_string()
+                                } else {
+                                    name
+                                },
+                            ))),
+                        );
+                    }
+                    return true;
                 }
             }
             false
