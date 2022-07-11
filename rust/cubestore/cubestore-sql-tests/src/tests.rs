@@ -132,6 +132,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("topk_query", topk_query),
         t("topk_decimals", topk_decimals),
+        t("planning_topk_having", planning_topk_having),
+        t("planning_topk_hll", planning_topk_hll),
         t("topk_hll", topk_hll),
         t("offset", offset),
         t("having", having),
@@ -3331,6 +3333,81 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
         to_rows(&r),
         rows(&[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))])
     );
+}
+
+async fn planning_topk_having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+        .await
+        .unwrap();
+    // A typical top-k query.
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 10\
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    println!("plan: {}", pp_phys_plan(p.worker.as_ref()));
+}
+async fn planning_topk_hll(service: Box<dyn SqlClient>) {
+
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    // A typical top-k query.
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3\
+         \n    ClusterSend, partitions: [[2], [1]]"
+        );
+    println!("plan: {}", pp_phys_plan(p.worker.as_ref()));
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3\
+         \n    Worker\
+         \n      Sort\
+         \n        FullInplaceAggregate\
+         \n          MergeSort\
+         \n            Union\
+         \n              MergeSort\
+         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                  Empty\
+         \n              MergeSort\
+         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                  Empty"
+        );
 }
 
 async fn topk_hll(service: Box<dyn SqlClient>) {
