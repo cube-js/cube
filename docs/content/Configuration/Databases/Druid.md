@@ -4,7 +4,7 @@ permalink: /config/databases/druid
 ---
 
 <WarningBox>
-  The driver for Druid is <b>community supported</b>. 
+  The driver for Druid is <b>community supported</b> and is <b>not</b> support by Cube or the vendor. 
 </WarningBox>
 
 ## Prerequisites
