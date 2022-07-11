@@ -4,10 +4,10 @@ use crate::{
         rewrite::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
-            cast_expr, column_expr, cube_scan, fun_expr, inner_aggregate_split_replacer,
-            literal_expr, literal_string, original_expr_name, outer_aggregate_split_replacer,
-            outer_projection_split_replacer, projection, projection_expr,
-            projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
+            binary_expr, cast_expr, column_expr, cube_scan, fun_expr,
+            inner_aggregate_split_replacer, literal_expr, literal_string, original_expr_name,
+            outer_aggregate_split_replacer, outer_projection_split_replacer, projection,
+            projection_expr, projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
             rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
             AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn, CubeScanTableName,
             InnerAggregateSplitReplacerCube, LogicalPlanLanguage, OuterAggregateSplitReplacerCube,
@@ -400,13 +400,18 @@ impl RewriteRules for SplitRules {
                 alias_expr(
                     fun_expr(
                         "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
+                        vec![
+                            literal_expr("?date_trunc_granularity"),
+                            column_expr("?column"),
+                        ],
                     ),
                     "?alias",
                 ),
                 MemberRules::transform_original_expr_date_trunc(
                     "?expr",
                     "?granularity",
+                    // It will returns new granularity for DateTrunc
+                    "?date_trunc_granularity",
                     "?alias_column",
                     Some("?alias"),
                     true,
@@ -431,6 +436,7 @@ impl RewriteRules for SplitRules {
                 ),
                 MemberRules::transform_original_expr_date_trunc(
                     "?expr",
+                    "?granularity",
                     "?granularity",
                     "?alias_column",
                     Some("?alias"),
@@ -559,6 +565,39 @@ impl RewriteRules for SplitRules {
                 alias_expr("?arg", "?alias"),
                 self.transform_min_max_dimension(
                     "?cube", "?fun", "?arg", "?column", "?alias", false,
+                ),
+            ),
+            // ?expr + ?literal_exrp
+            rewrite(
+                "split-push-down-binary-plus-inner-replacer",
+                inner_aggregate_split_replacer(
+                    binary_expr("?expr", "+", literal_expr("?right")),
+                    "?cube",
+                ),
+                inner_aggregate_split_replacer("?expr", "?cube"),
+            ),
+            rewrite(
+                "split-push-down-binary-plus-outer-replacer",
+                outer_projection_split_replacer(
+                    binary_expr("?expr", "+", literal_expr("?right")),
+                    "?cube",
+                ),
+                binary_expr(
+                    outer_projection_split_replacer("?expr", "?cube"),
+                    "+",
+                    literal_expr("?right"),
+                ),
+            ),
+            rewrite(
+                "split-push-down-binary-plus-outer-aggr-replacer",
+                outer_aggregate_split_replacer(
+                    binary_expr("?expr", "+", literal_expr("?right")),
+                    "?cube",
+                ),
+                binary_expr(
+                    outer_aggregate_split_replacer("?expr", "?cube"),
+                    "+",
+                    literal_expr("?right"),
                 ),
             ),
             // Cast
