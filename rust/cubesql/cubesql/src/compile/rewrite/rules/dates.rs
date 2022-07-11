@@ -280,7 +280,7 @@ impl RewriteRules for DateRules {
                 ),
             ),
             transforming_rewrite(
-                "interval-binary-expr",
+                "binary-expr-interval-right",
                 binary_expr("?left", "+", literal_expr("?interval")),
                 udf_expr(
                     "date_add",
@@ -289,7 +289,7 @@ impl RewriteRules for DateRules {
                 self.transform_interval_binary_expr("?interval"),
             ),
             transforming_rewrite(
-                "interval-binary-expr-recursive",
+                "binary-expr-interval-left",
                 binary_expr(literal_expr("?interval"), "+", "?right"),
                 udf_expr(
                     "date_add",
