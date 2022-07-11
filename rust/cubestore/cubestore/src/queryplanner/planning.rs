@@ -284,14 +284,15 @@ impl PlanRewriter for CollectConstraints {
                 source,
                 ..
             } => {
-                let table = source.as_any().downcast_ref::<CubeTableLogical>().unwrap();
-                self.constraints.push(IndexConstraints {
-                    sort_on: c.sort_on.clone(),
-                    table: table.table.clone(),
-                    projection: projection.clone(),
-                    filters: filters.clone(),
-                    aggregates: c.aggregates.clone(),
-                })
+                if let Some(table) = source.as_any().downcast_ref::<CubeTableLogical>() {
+                    self.constraints.push(IndexConstraints {
+                        sort_on: c.sort_on.clone(),
+                        table: table.table.clone(),
+                        projection: projection.clone(),
+                        filters: filters.clone(),
+                        aggregates: c.aggregates.clone(),
+                    })
+                };
             }
             _ => {}
         }
@@ -415,8 +416,20 @@ fn single_value_filter_columns<'a>(
                     && single_value_filter_columns(right, columns)
             }
             Operator::And => {
-                single_value_filter_columns(left, columns)
-                    && single_value_filter_columns(right, columns)
+                let mut l_part = Vec::new();
+                let l_res = single_value_filter_columns(left, &mut l_part);
+
+                if l_res {
+                    columns.append(&mut l_part);
+                }
+
+                let mut r_part = Vec::new();
+                let r_res = single_value_filter_columns(right, &mut r_part);
+
+                if r_res {
+                    columns.append(&mut r_part);
+                }
+                l_res || r_res
             }
             _ => false,
         },
@@ -458,43 +471,45 @@ impl ChooseIndex<'_> {
     fn choose_table_index(&mut self, mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> {
         match &mut p {
             LogicalPlan::TableScan { source, .. } => {
-                assert!(
-                    self.next_index < self.chosen_indices.len(),
-                    "inconsistent state"
-                );
-                let table = &source
-                    .as_any()
-                    .downcast_ref::<CubeTableLogical>()
-                    .unwrap()
-                    .table;
-                assert_eq!(
-                    table.table.get_id(),
-                    self.chosen_indices[self.next_index]
-                        .table_path
-                        .table
-                        .get_id()
-                );
+                match source.as_any().downcast_ref::<CubeTableLogical>() {
+                    Some(table) => {
+                        assert!(
+                            self.next_index < self.chosen_indices.len(),
+                            "inconsistent state"
+                        );
 
-                let snapshot = self.chosen_indices[self.next_index].clone();
-                self.next_index += 1;
+                        assert_eq!(
+                            table.table.table.get_id(),
+                            self.chosen_indices[self.next_index]
+                                .table_path
+                                .table
+                                .get_id()
+                        );
 
-                let table_schema = source.schema();
-                *source = Arc::new(CubeTable::try_new(
-                    snapshot.clone(),
-                    // Filled by workers
-                    HashMap::new(),
-                    Vec::new(),
-                    NoopParquetMetadataCache::new(),
-                )?);
+                        let snapshot = self.chosen_indices[self.next_index].clone();
+                        self.next_index += 1;
 
-                let index_schema = source.schema();
-                assert_eq!(table_schema, index_schema);
+                        let table_schema = source.schema();
+                        *source = Arc::new(CubeTable::try_new(
+                            snapshot.clone(),
+                            // Filled by workers
+                            HashMap::new(),
+                            Vec::new(),
+                            NoopParquetMetadataCache::new(),
+                        )?);
 
-                return Ok(ClusterSendNode {
-                    input: Arc::new(p),
-                    snapshots: vec![vec![snapshot]],
+                        let index_schema = source.schema();
+                        assert_eq!(table_schema, index_schema);
+
+                        return Ok(
+                            ClusterSendNode::new(Arc::new(p), vec![vec![Some(snapshot)]])
+                                .into_plan(),
+                        );
+                    }
+                    None => {
+                        return Ok(ClusterSendNode::new(Arc::new(p), vec![vec![None]]).into_plan());
+                    }
                 }
-                .into_plan());
             }
             _ => return Ok(p),
         }
@@ -891,13 +906,20 @@ fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
     arrow::datatypes::Schema::new(schema_fields)
 }
 
+// None snapshot denotes an inline table and its associated fake partition.
+pub type Snapshots = Vec<Vec<Option<IndexSnapshot>>>;
+
 #[derive(Debug, Clone)]
 pub struct ClusterSendNode {
     pub input: Arc<LogicalPlan>,
-    pub snapshots: Vec<Vec<IndexSnapshot>>,
+    pub snapshots: Snapshots,
 }
 
 impl ClusterSendNode {
+    pub fn new(input: Arc<LogicalPlan>, snapshots: Snapshots) -> Self {
+        ClusterSendNode { input, snapshots }
+    }
+
     pub fn into_plan(self) -> LogicalPlan {
         LogicalPlan::Extension {
             node: Arc::new(self),
@@ -970,8 +992,8 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 return Ok(p);
             }
             snapshots = send.snapshots.clone();
-            // Code after 'match' will wrap `p` in ClusterSend.
             *input = send.input.clone();
+            return Ok(ClusterSendNode::new(Arc::new(p), snapshots).into_plan());
         }
         LogicalPlan::Union { inputs, .. } => {
             // Handle UNION over constants, e.g. inline data series.
@@ -989,10 +1011,10 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                     ));
                 }
                 union_snapshots.extend(send.snapshots.concat());
-                // Code after 'match' will wrap `p` in ClusterSend.
                 *i = send.input.as_ref().clone();
             }
             snapshots = vec![union_snapshots];
+            return Ok(ClusterSendNode::new(Arc::new(p), snapshots).into_plan());
         }
         LogicalPlan::Join { left, right, .. } => {
             let lsend;
@@ -1014,9 +1036,9 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 .chain(rsend.snapshots.iter())
                 .cloned()
                 .collect();
-            // Code after 'match' will wrap `p` in ClusterSend.
             *left = lsend.input.clone();
             *right = rsend.input.clone();
+            return Ok(ClusterSendNode::new(Arc::new(p), snapshots).into_plan());
         }
         LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
             return Err(DataFusionError::Internal(
@@ -1024,12 +1046,6 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             ))
         }
     }
-
-    Ok(ClusterSendNode {
-        input: Arc::new(p),
-        snapshots,
-    }
-    .into_plan())
 }
 
 pub struct CubeExtensionPlanner {
@@ -1074,7 +1090,7 @@ impl CubeExtensionPlanner {
     pub fn plan_cluster_send(
         &self,
         input: Arc<dyn ExecutionPlan>,
-        snapshots: &Vec<Vec<IndexSnapshot>>,
+        snapshots: &Snapshots,
         schema: SchemaRef,
         use_streaming: bool,
         max_batch_rows: usize,
@@ -1663,8 +1679,8 @@ pub mod tests {
             None,
             true,
             None,
-            Vec::new(),
             None,
+            Vec::new(),
             None,
             None,
         ));
@@ -1710,8 +1726,8 @@ pub mod tests {
             None,
             true,
             None,
-            Vec::new(),
             None,
+            Vec::new(),
             None,
             None,
         ));
@@ -1763,8 +1779,8 @@ pub mod tests {
             None,
             true,
             None,
-            Vec::new(),
             None,
+            Vec::new(),
             None,
             None,
         ));

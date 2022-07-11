@@ -921,7 +921,6 @@ export class PreAggregationLoader {
     client: DriverInterface,
     newVersionEntry: VersionEntry,
     saveCancelFn,
-    preAggregation,
     invalidationKeys
   ) {
     const { tableData, queryOptions } = await this.downloadPreAggregation(client, newVersionEntry, saveCancelFn, invalidationKeys);
@@ -1316,7 +1315,6 @@ export class PreAggregationPartitionRangeLoader {
           this.partitionPreAggregationDescription(range),
           this.preAggregationsTablesToTempTables,
           this.loadCache,
-          // TODO(cristipp) Update RefreshScheduler buildRangeEnd handling, which may have a different PreAggregationLoader codepath.
           PreAggregationPartitionRangeLoader.dateRangeIncludesTimestamp(range, buildRangeEnd)
             ? { ...this.options, buildRangeEnd }
             : this.options,

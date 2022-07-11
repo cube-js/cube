@@ -8890,6 +8890,182 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_metabase_substring() -> Result<(), CubeError> {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT
+                    \"source\".\"substring1\" AS \"substring2\",
+                    \"source\".\"count\" AS \"count\"
+                FROM (
+                    SELECT
+                        \"KibanaSampleDataEcommerce\".\"count\" AS \"count\",
+                        SUBSTRING(\"KibanaSampleDataEcommerce\".\"customer_gender\" FROM 1 FOR 1234) AS \"substring1\"
+                    FROM
+                        \"public\".\"KibanaSampleDataEcommerce\"
+                ) AS \"source\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_metabase_doy() -> Result<(), CubeError> {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT
+                \"source\".\"order_date\" AS \"order_date\",
+                \"source\".\"count\" AS \"count\"
+            FROM
+                (
+                    SELECT
+                        (
+                            CAST(
+                                extract(
+                                    doy
+                                    from
+                                        \"public\".\"KibanaSampleDataEcommerce\".\"order_date\"
+                                ) AS integer
+                            )
+                        ) AS \"order_date\",
+                        count(*) AS \"count\"
+                    FROM
+                        \"public\".\"KibanaSampleDataEcommerce\"
+                    GROUP BY CAST(
+                        extract(
+                            doy
+                            from
+                                \"public\".\"KibanaSampleDataEcommerce\".\"order_date\"
+                        ) AS integer
+                    )
+                    ORDER BY CAST(
+                        extract(
+                            doy
+                            from
+                                \"public\".\"KibanaSampleDataEcommerce\".\"order_date\"
+                        ) AS integer
+                    ) ASC
+                ) \"source\"
+            WHERE
+                \"source\".\"count\" IS NOT NULL
+            ORDER BY
+                \"source\".\"count\" ASC
+            LIMIT
+                100"
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("day".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_metabase_dow() -> Result<(), CubeError> {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT
+                \"source\".\"order_date\" AS \"order_date\",
+                \"source\".\"count\" AS \"count\"
+            FROM
+                (
+                    SELECT
+                        (
+                            CAST(
+                                extract(
+                                    dow
+                                    from
+                                        \"public\".\"KibanaSampleDataEcommerce\".\"order_date\"
+                                ) AS integer
+                            ) + 1
+                        ) AS \"order_date\",
+                        count(*) AS \"count\"
+                    FROM
+                        \"public\".\"KibanaSampleDataEcommerce\"
+                    GROUP BY (
+                        CAST(
+                            extract(
+                                dow
+                                from
+                                    \"public\".\"KibanaSampleDataEcommerce\".\"order_date\"
+                            ) AS integer
+                        ) + 1
+                    )
+                    ORDER BY (
+                        CAST(
+                            extract(
+                                dow
+                                from
+                                    \"public\".\"KibanaSampleDataEcommerce\".\"order_date\"
+                            ) AS integer
+                        ) + 1
+                    ) ASC
+                ) \"source\"
+            WHERE
+                \"source\".\"count\" IS NOT NULL
+            ORDER BY
+                \"source\".\"count\" ASC
+            LIMIT
+                100"
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("day".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_subquery_with_same_name_excel() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "subquery_with_same_name_excel",

@@ -5,7 +5,7 @@ pub use execute::AggregateTopKExec;
 pub use plan::materialize_topk;
 pub use plan::plan_topk;
 
-use crate::queryplanner::serialized_plan::IndexSnapshot;
+use crate::queryplanner::planning::Snapshots;
 use arrow::compute::SortOptions;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
 use itertools::Itertools;
@@ -29,7 +29,7 @@ pub struct ClusterAggregateTopK {
     pub aggregate_expr: Vec<Expr>,
     pub order_by: Vec<SortColumn>,
     pub schema: DFSchemaRef,
-    pub snapshots: Vec<Vec<IndexSnapshot>>,
+    pub snapshots: Snapshots,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

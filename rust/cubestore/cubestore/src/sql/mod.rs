@@ -87,6 +87,13 @@ pub trait SqlService: DIService + Send + Sync {
     /// Exposed only for tests. Worker plan created as if all partitions are on the same worker.
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
 
+    /// Exposed only for tests. Worker plan created as if all partitions are on the same worker.
+    async fn plan_query_with_context(
+        &self,
+        context: SqlQueryContext,
+        query: &str,
+    ) -> Result<QueryPlans, CubeError>;
+
     async fn upload_temp_file(
         &self,
         context: SqlQueryContext,
@@ -102,13 +109,28 @@ pub struct QueryPlans {
     pub worker: Arc<dyn ExecutionPlan>,
 }
 
+pub type InlineTables = HashMap<String, Arc<DataFrame>>;
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
+    pub inline_tables: Arc<InlineTables>,
     pub trace_obj: Option<String>,
 }
 
 impl SqlQueryContext {
+    pub fn with_user(&self, user: Option<String>) -> Self {
+        let mut res = self.clone();
+        res.user = user;
+        res
+    }
+
+    pub fn with_inline_tables(&self, inline_tables: Vec<(String, Arc<DataFrame>)>) -> Self {
+        let mut res = self.clone();
+        res.inline_tables = Arc::new(HashMap::from_iter(inline_tables.iter().cloned()));
+        res
+    }
+
     pub fn with_trace_obj(&self, trace_obj: Option<String>) -> Self {
         let mut res = self.clone();
         res.trace_obj = trace_obj;
@@ -497,7 +519,10 @@ impl SqlServiceImpl {
         // TODO: metastore snapshot must be consistent wrt the dumped data.
         let logical_plan = self
             .query_planner
-            .logical_plan(DFStatement::Statement(Statement::Query(q)))
+            .logical_plan(
+                DFStatement::Statement(Statement::Query(q)),
+                Arc::new(InlineTables::new()),
+            )
             .await?;
 
         let mut dump_dir = PathBuf::from(&self.remote_fs.local_path().await);
@@ -566,7 +591,10 @@ impl SqlServiceImpl {
 
         let query_plan = self
             .query_planner
-            .logical_plan(DFStatement::Statement(statement))
+            .logical_plan(
+                DFStatement::Statement(statement),
+                Arc::new(InlineTables::new()),
+            )
             .await?;
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
@@ -811,18 +839,16 @@ impl SqlService for SqlServiceImpl {
                 let build_range_end = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "build_range_end")
-                    .map_or(Result::Ok(None), |option| {
-                        match &option.value {
-                            Value::SingleQuotedString(build_range_end) => {
-                                let ts = timestamp_from_string(build_range_end)?;
-                                let utc = Utc.timestamp_nanos(ts.get_time_stamp());
-                                Result::Ok(Some(utc))
-                            }
-                            _ => Result::Err(CubeError::user(format!(
-                                "Bad build_range_end {}",
-                                option.value
-                            ))),
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(build_range_end) => {
+                            let ts = timestamp_from_string(build_range_end)?;
+                            let utc = Utc.timestamp_nanos(ts.get_time_stamp());
+                            Result::Ok(Some(utc))
                         }
+                        _ => Result::Err(CubeError::user(format!(
+                            "Bad build_range_end {}",
+                            option.value
+                        ))),
                     })?;
 
                 let res = self
@@ -1015,7 +1041,10 @@ impl SqlService for SqlServiceImpl {
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
                     .query_planner
-                    .logical_plan(DFStatement::Statement(Statement::Query(q)))
+                    .logical_plan(
+                        DFStatement::Statement(Statement::Query(q)),
+                        context.inline_tables.clone(),
+                    )
                     .await?;
                 // TODO distribute and combine
                 let res = match logical_plan {
@@ -1077,6 +1106,15 @@ impl SqlService for SqlServiceImpl {
     }
 
     async fn plan_query(&self, q: &str) -> Result<QueryPlans, CubeError> {
+        self.plan_query_with_context(SqlQueryContext::default(), q)
+            .await
+    }
+
+    async fn plan_query_with_context(
+        &self,
+        context: SqlQueryContext,
+        q: &str,
+    ) -> Result<QueryPlans, CubeError> {
         let ast = {
             let replaced_quote = q.replace("\\'", "''");
             let mut parser = CubeStoreParser::new(&replaced_quote)?;
@@ -1086,7 +1124,10 @@ impl SqlService for SqlServiceImpl {
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
                     .query_planner
-                    .logical_plan(DFStatement::Statement(Statement::Query(q)))
+                    .logical_plan(
+                        DFStatement::Statement(Statement::Query(q)),
+                        context.inline_tables.clone(),
+                    )
                     .await?;
                 match logical_plan {
                     QueryPlan::Select(router_plan, _) => {

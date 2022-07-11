@@ -20,7 +20,7 @@ use crate::metastore::{
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::table::{Row, TableValue};
 use crate::CubeError;
-use arrow::datatypes::Schema;
+use arrow::datatypes::{Schema, SchemaRef};
 use std::{
     fs::File,
     io::{BufReader, BufWriter, Write},
@@ -61,6 +61,15 @@ impl DataFrame {
 
     pub fn len(&self) -> usize {
         self.data.len()
+    }
+
+    pub fn get_schema(&self) -> SchemaRef {
+        Arc::new(Schema::new(
+            self.columns
+                .iter()
+                .map(|c| c.clone().into())
+                .collect::<Vec<_>>(),
+        ))
     }
 
     pub fn get_columns(&self) -> &Vec<Column> {
@@ -594,6 +603,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -675,6 +685,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -773,6 +784,7 @@ mod tests {
                     None,
                     vec![ind],
                     true,
+                    None,
                     None,
                     Some(vec![("sum".to_string(), "sum_int".to_string())]),
                     None,
