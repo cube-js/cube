@@ -1,0 +1,80 @@
+@import 'variables';
+
+@mixin create-grid($cols) {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat($cols, 1fr);
+  grid-template-rows: auto;
+  grid-row-gap: 1.25rem;
+  grid-column-gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+:global {
+  .grid__col-3 {
+    @include create-grid(3);
+
+    @media screen and (max-width: $bp-xl) {
+      @include create-grid(2);
+    }
+
+    @media screen and (max-width: $bp-lg) {
+      @include create-grid(1);
+    }
+  }
+
+  .grid__col-2 {
+    @include create-grid(2);
+
+    @media screen and (max-width: $bp-lg) {
+      @include create-grid(1);
+    }
+  }
+
+  .grid-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    border: 1px solid #ECECF0;
+    border-radius: 4px;
+    box-sizing: border-box;
+    box-shadow: none;
+    transition: all .2s ease;
+    cursor: pointer;
+
+    &:hover {
+      position: relative;
+      top: -3px;
+      box-shadow: 0px 2px 10px rgba(177, 183, 197, 0.2);
+    }
+
+    a {
+      border: none;
+
+      img {
+        // @TODO I'm sorry future me
+        box-shadow: none !important;
+        border: none !important;
+        max-height: 160px;
+      }
+    }
+  }
+
+  .grid-item-image {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+  }
+
+  .grid-item-title {
+    font-family: $header-font;
+    font-weight: bold;
+    line-height: 32px;
+    font-size: 19px;
+    letter-spacing: 0.02em;
+    color: $brand-color;
+    text-align: center;
+  }
+}
+
