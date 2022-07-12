@@ -833,7 +833,6 @@ export class PreAggregationLoader {
     client: DriverInterface,
     newVersionEntry,
     saveCancelFn: SaveCancelFn,
-    preAggregation,
     invalidationKeys
   ) {
     const [loadSql, params] =
@@ -1280,7 +1279,7 @@ export class PreAggregationPartitionRangeLoader {
     }];
   }
 
-  private partitionPreAggregationDescription(range: QueryDateRange): PreAggregationDescription {
+  private partitionPreAggregationDescription(range: QueryDateRange, loadRange: QueryDateRange): PreAggregationDescription {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
@@ -1289,9 +1288,9 @@ export class PreAggregationPartitionRangeLoader {
       ...this.preAggregation,
       tableName: partitionTableName,
       loadSql: this.preAggregation.loadSql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.loadSql, range, partitionTableName),
+        this.replacePartitionSqlAndParams(this.preAggregation.loadSql, loadRange, partitionTableName),
       sql: this.preAggregation.sql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.sql, range, partitionTableName),
+        this.replacePartitionSqlAndParams(this.preAggregation.sql, loadRange, partitionTableName),
       invalidateKeyQueries: (this.preAggregation.invalidateKeyQueries || [])
         .map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName)),
       indexesSql: (this.preAggregation.indexesSql || [])
@@ -1306,19 +1305,24 @@ export class PreAggregationPartitionRangeLoader {
       const { buildRange, partitionRanges } = await this.partitionRanges();
       const partitionLoaders = partitionRanges.map(range => {
         const [_, buildRangeEnd] = buildRange;
-        return new PreAggregationLoader(
+        let loadRange = range;
+        let { options } = this;
+        if (PreAggregationPartitionRangeLoader.dateRangeIncludesTimestamp(range, buildRangeEnd)) {
+          loadRange = [loadRange[0], buildRangeEnd];
+          options = { ...options, buildRangeEnd };
+        }
+        const loader = new PreAggregationLoader(
           this.redisPrefix,
           this.driverFactory,
           this.logger,
           this.queryCache,
           this.preAggregations,
-          this.partitionPreAggregationDescription(range),
+          this.partitionPreAggregationDescription(range, loadRange),
           this.preAggregationsTablesToTempTables,
           this.loadCache,
-          PreAggregationPartitionRangeLoader.dateRangeIncludesTimestamp(range, buildRangeEnd)
-            ? { ...this.options, buildRangeEnd }
-            : this.options,
+          options,
         );
+        return loader;
       });
       const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
@@ -1334,19 +1338,15 @@ export class PreAggregationPartitionRangeLoader {
           this.logger,
           this.queryCache,
           this.preAggregations,
-          this.partitionPreAggregationDescription(lambdaRange),
+          this.partitionPreAggregationDescription(lambdaRange, lambdaRange),
           this.preAggregationsTablesToTempTables,
           this.loadCache,
           this.options
         );
         const lambdaResult = await lambdaLoader.loadLambdaTable();
 
-        const firstTableTargetNames = allTableTargetNames.slice(0, allTableTargetNames.length - 1);
-        const lastTableTargetName = lastLoadResult.targetTableName;
-
         const unionTargetTableName = [
-          ...firstTableTargetNames.map(name => `SELECT * FROM ${name}`),
-          `SELECT * FROM ${lastTableTargetName} WHERE ${this.preAggregation.lambdaTimeDimensionColumn} < to_timestamp('${lambdaRange[0]}')`,
+          ...allTableTargetNames.map(name => `SELECT * FROM ${name}`),
           `SELECT * FROM ${lambdaResult.targetTableName}`,
         ].join(' UNION ALL ');
         return {
@@ -1384,7 +1384,7 @@ export class PreAggregationPartitionRangeLoader {
   public async partitionPreAggregations(): Promise<PreAggregationDescription[]> {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
       const { partitionRanges } = await this.partitionRanges();
-      return partitionRanges.map(range => this.partitionPreAggregationDescription(range));
+      return partitionRanges.map(range => this.partitionPreAggregationDescription(range, range));
     } else {
       return [this.preAggregation];
     }

@@ -41,6 +41,9 @@ cube(`Orders`, {
             timeDimension: completedAt,
             granularity: `day`,
             partitionGranularity: `month`,
+            buildRangeStart: {
+                sql: `SELECT DATE('2020-02-7')`,
+            },
             buildRangeEnd: {
                 sql: `SELECT DATE('2020-06-7')`,
             },
