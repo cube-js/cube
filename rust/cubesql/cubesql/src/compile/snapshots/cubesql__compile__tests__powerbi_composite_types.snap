@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"/*** Load field definitions for (free-standing) composite types ***/\n                SELECT typ.oid, att.attname, att.atttypid\n                FROM pg_type AS typ\n                JOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)\n                JOIN pg_class AS cls ON (cls.oid = typ.typrelid)\n                JOIN pg_attribute AS att ON (att.attrelid = typ.typrelid)\n                WHERE\n                    (typ.typtype = 'c' AND cls.relkind='c') AND\n                attnum > 0 AND     /* Don't load system attributes */\n                NOT attisdropped\n                ORDER BY typ.oid, att.attnum\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----+---------+----------+
+| oid | attname | atttypid |
++-----+---------+----------+
++-----+---------+----------+

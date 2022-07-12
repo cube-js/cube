@@ -468,6 +468,8 @@ export default {
           ...m,
           member: memberName && this.meta.resolveMember(memberName, memberTypes),
           operators: memberName && this.meta.filterOperatorsForMember(memberName, memberTypes),
+          and: resolveMembers(this.meta, m.and),
+          or: resolveMembers(this.meta, m.or),
           index,
         };
       });

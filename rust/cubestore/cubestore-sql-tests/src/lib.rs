@@ -43,7 +43,7 @@ pub fn run_sql_tests(
                     name: TestName::DynTestName(format!("cubesql::{}::{}", prefix, name)),
                     ignore: false,
                     should_panic: ShouldPanic::No,
-                    allow_fail: false,
+                    ignore_message: None,  
                     compile_fail: false,
                     no_run: false,
                     test_type: TestType::IntegrationTest,

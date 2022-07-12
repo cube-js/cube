@@ -832,6 +832,19 @@ impl JobRunner {
                     Self::fail_job_row_key(job)
                 }
             }
+            JobType::InMemoryChunksCompaction => {
+                if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
+                    let compaction_service = self.compaction_service.clone();
+                    let partition_id = *partition_id;
+                    Ok(cube_ext::spawn(async move {
+                        compaction_service
+                            .compact_in_memory_chunks(partition_id)
+                            .await
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
             JobType::MultiPartitionSplit => {
                 if let RowKey::Table(TableId::MultiPartitions, id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
@@ -1648,7 +1661,7 @@ fn is_self_reference(name: &str) -> bool {
 
 /// Picks a worker by opaque id for any distributing work in a cluster.
 /// Ids usually come from multi-partitions of the metastore.
-pub fn pick_worker_by_ids(
+pub fn pick_worker_by_ids<'a>(
     config: &'a dyn ConfigObj,
     ids: impl IntoIterator<Item = u64>,
 ) -> &'a str {
@@ -1667,7 +1680,7 @@ pub fn pick_worker_by_ids(
 /// Same as [pick_worker_by_ids], but uses ranges of partitions. This is a hack
 /// to keep the same node for partitions produced by compaction that merged
 /// chunks into the main table of a single partition.
-pub fn pick_worker_by_partitions(
+pub fn pick_worker_by_partitions<'a>(
     config: &'a dyn ConfigObj,
     partitions: impl IntoIterator<Item = &'a IdRow<Partition>>,
 ) -> &'a str {

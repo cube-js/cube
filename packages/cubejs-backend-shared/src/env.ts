@@ -115,10 +115,12 @@ const variables: Record<string, (...args: any) => any> = {
     // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
+  preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
     .asString(),
+  concurrency: () => get('CUBEJS_CONCURRENCY').asInt(),
   // It's only excepted for CI, nothing else.
   internalExceptions: () => get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
     .default('false')
@@ -150,6 +152,8 @@ const variables: Record<string, (...args: any) => any> = {
     .asEnum(supported),
   dbExportBucket: () => get('CUBEJS_DB_EXPORT_BUCKET')
     .asString(),
+  dbExportBucketMountDir: () => get('CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR')
+    .asString(),
   // Export bucket options for AWS S3
   dbExportBucketAwsKey: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY')
     .asString(),
@@ -173,6 +177,9 @@ const variables: Record<string, (...args: any) => any> = {
   // Export bucket options for Azure
   dbExportBucketAzureKey:
     () => get('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY').asString(),
+  // Redshift Driver
+  dbExportBucketRedshiftArn: () => get('CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN')
+    .asString(),
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),
@@ -300,6 +307,9 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   agentFlushInterval: () => get('CUBEJS_AGENT_FLUSH_INTERVAL')
     .default(1000)
+    .asInt(),
+  agentMaxSockets: () => get('CUBEJS_AGENT_MAX_SOCKETS')
+    .default(100)
     .asInt(),
   instanceId: () => get('CUBEJS_INSTANCE_ID')
     .asString(),

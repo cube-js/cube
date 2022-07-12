@@ -1,20 +1,23 @@
 use crate::{
     compile::{
-        engine::{df::scan::CubeScanNode, provider::CubeContext},
+        engine::{
+            df::scan::{CubeScanNode, MemberField},
+            provider::CubeContext,
+        },
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, BetweenExprNegated,
-            BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliases, CubeScanLimit,
-            CubeScanTableName, DimensionName, EmptyRelationProduceOneRow, FilterMemberMember,
-            FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated, JoinJoinConstraint,
-            JoinJoinType, JoinLeftOn, JoinRightOn, LimitN, LiteralExprValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
-            OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun, ScalarUDFExprFun,
-            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
-            SortExprAsc, SortExprNullsFirst, TableScanLimit, TableScanProjection,
-            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
-            WindowFunctionExprFun, WindowFunctionExprWindowFrame,
+            AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
+            BetweenExprNegated, BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliases,
+            CubeScanLimit, CubeScanTableName, DimensionName, EmptyRelationProduceOneRow,
+            FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated,
+            JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn, LimitN, LiteralExprValue,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
+            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
+            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
+            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
+            TableScanLimit, TableScanProjection, TableScanSourceTableName, TableScanTableName,
+            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
     sql::auth_service::AuthContext,
@@ -33,10 +36,12 @@ use datafusion::{
         LogicalPlanBuilder, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
+    scalar::ScalarValue,
     sql::planner::ContextProvider,
 };
 use egg::{EGraph, Id, RecExpr};
 use itertools::Itertools;
+use serde_json::json;
 use std::{collections::HashMap, ops::Index, sync::Arc};
 
 macro_rules! add_data_node {
@@ -131,6 +136,13 @@ impl LogicalPlanToLanguageConverter {
             Expr::Literal(value) => {
                 let value = add_data_node!(self, value, LiteralExprValue);
                 self.graph.add(LogicalPlanLanguage::LiteralExpr([value]))
+            }
+            Expr::AnyExpr { left, op, right } => {
+                let left = self.add_expr(left)?;
+                let op = add_data_node!(self, op, AnyExprOp);
+                let right = self.add_expr(right)?;
+                self.graph
+                    .add(LogicalPlanLanguage::AnyExpr([left, op, right]))
             }
             Expr::BinaryExpr { left, op, right } => {
                 let left = self.add_expr(left)?;
@@ -563,6 +575,7 @@ pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
         LogicalPlanLanguage::ScalarVariableExpr(_) => true,
         LogicalPlanLanguage::LiteralExpr(_) => true,
         LogicalPlanLanguage::BinaryExpr(_) => true,
+        LogicalPlanLanguage::AnyExpr(_) => true,
         LogicalPlanLanguage::NotExpr(_) => true,
         LogicalPlanLanguage::IsNotNullExpr(_) => true,
         LogicalPlanLanguage::IsNullExpr(_) => true,
@@ -614,6 +627,12 @@ pub fn node_to_expr(
         LogicalPlanLanguage::LiteralExpr(params) => {
             let value = match_data_node!(node_by_id, params[0], LiteralExprValue);
             Expr::Literal(value)
+        }
+        LogicalPlanLanguage::AnyExpr(params) => {
+            let left = Box::new(to_expr(params[0].clone())?);
+            let op = match_data_node!(node_by_id, params[1], AnyExprOp);
+            let right = Box::new(to_expr(params[2].clone())?);
+            Expr::AnyExpr { left, op, right }
         }
         LogicalPlanLanguage::BinaryExpr(params) => {
             let left = Box::new(to_expr(params[0].clone())?);
@@ -1066,7 +1085,7 @@ impl LanguageToLogicalPlanConverter {
                                             // TODO actually nullable. Just to fit tests
                                             false,
                                         ),
-                                        measure.to_string(),
+                                        MemberField::Member(measure.to_string()),
                                     ));
                                 }
                                 LogicalPlanLanguage::TimeDimension(params) => {
@@ -1105,7 +1124,10 @@ impl LanguageToLogicalPlanConverter {
                                                 // TODO actually nullable. Just to fit tests
                                                 false,
                                             ),
-                                            format!("{}.{}", dimension, granularity),
+                                            MemberField::Member(format!(
+                                                "{}.{}",
+                                                dimension, granularity
+                                            )),
                                         ));
                                     }
                                 }
@@ -1131,7 +1153,36 @@ impl LanguageToLogicalPlanConverter {
                                             // TODO actually nullable. Just to fit tests
                                             false,
                                         ),
-                                        dimension,
+                                        MemberField::Member(dimension),
+                                    ));
+                                }
+                                LogicalPlanLanguage::Segment(params) => {
+                                    let expr = self.to_expr(params[1])?;
+                                    fields.push((
+                                        DFField::new(
+                                            Some(&table_name),
+                                            // TODO empty schema
+                                            &expr_name(&expr)?,
+                                            DataType::Boolean,
+                                            // TODO actually nullable. Just to fit tests
+                                            false,
+                                        ),
+                                        MemberField::Literal(ScalarValue::Boolean(None)),
+                                    ));
+                                }
+                                LogicalPlanLanguage::LiteralMember(params) => {
+                                    let value =
+                                        match_data_node!(node_by_id, params[0], LiteralMemberValue);
+                                    let expr = self.to_expr(params[1])?;
+                                    fields.push((
+                                        DFField::new(
+                                            Some(&table_name),
+                                            &expr_name(&expr)?,
+                                            value.get_datatype(),
+                                            // TODO actually nullable. Just to fit tests
+                                            false,
+                                        ),
+                                        MemberField::Literal(value),
                                     ));
                                 }
                                 LogicalPlanLanguage::MemberError(params) => {
@@ -1147,6 +1198,7 @@ impl LanguageToLogicalPlanConverter {
                             match_list_node!(node_by_id, cube_scan_params[2], CubeScanFilters);
 
                         fn to_filter(
+                            query_time_dimensions: &mut Vec<V1LoadRequestQueryTimeDimension>,
                             filters: Vec<LogicalPlanLanguage>,
                             node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
                         ) -> Result<(Vec<V1LoadRequestQueryFilterItem>, Vec<String>), CubeError>
@@ -1163,7 +1215,8 @@ impl LanguageToLogicalPlanConverter {
                                         );
                                         let op =
                                             match_data_node!(node_by_id, params[1], FilterOpOp);
-                                        let (filters, segments) = to_filter(filters, node_by_id)?;
+                                        let (filters, segments) =
+                                            to_filter(query_time_dimensions, filters, node_by_id)?;
                                         match op.as_str() {
                                             "and" => {
                                                 result.push(V1LoadRequestQueryFilterItem {
@@ -1215,17 +1268,40 @@ impl LanguageToLogicalPlanConverter {
                                             params[2],
                                             FilterMemberValues
                                         );
-                                        result.push(V1LoadRequestQueryFilterItem {
-                                            member: Some(member),
-                                            operator: Some(op),
-                                            values: if !values.is_empty() {
-                                                Some(values)
-                                            } else {
-                                                None
-                                            },
-                                            or: None,
-                                            and: None,
-                                        });
+                                        if op == "inDateRange" {
+                                            let existing_time_dimension = query_time_dimensions
+                                                .iter_mut()
+                                                .find_map(|mut td| {
+                                                    if td.dimension == member
+                                                        && td.date_range.is_none()
+                                                    {
+                                                        td.date_range = Some(json!(values));
+                                                        Some(td)
+                                                    } else {
+                                                        None
+                                                    }
+                                                });
+                                            if existing_time_dimension.is_none() {
+                                                let dimension = V1LoadRequestQueryTimeDimension {
+                                                    dimension: member.to_string(),
+                                                    granularity: None,
+                                                    date_range: Some(json!(values)),
+                                                };
+                                                query_time_dimensions.push(dimension);
+                                            }
+                                        } else {
+                                            result.push(V1LoadRequestQueryFilterItem {
+                                                member: Some(member),
+                                                operator: Some(op),
+                                                values: if !values.is_empty() {
+                                                    Some(values)
+                                                } else {
+                                                    None
+                                                },
+                                                or: None,
+                                                and: None,
+                                            });
+                                        }
                                     }
                                     LogicalPlanLanguage::SegmentMember(params) => {
                                         let member = match_data_node!(
@@ -1241,7 +1317,8 @@ impl LanguageToLogicalPlanConverter {
                             Ok((result, segments_result))
                         }
 
-                        let (filters, segments) = to_filter(filters, node_by_id)?;
+                        let (filters, segments) =
+                            to_filter(&mut query_time_dimensions, filters, node_by_id)?;
 
                         query.filters = if filters.len() > 0 {
                             Some(filters)
@@ -1266,10 +1343,7 @@ impl LanguageToLogicalPlanConverter {
                             ])
                         }
 
-                        if query_measures.len() == 0
-                            && query_dimensions.len() == 0
-                            && query_time_dimensions.len() == 0
-                        {
+                        if fields.len() == 0 {
                             return Err(CubeError::internal(
                                 "Can't detect Cube query and it may be not supported yet"
                                     .to_string(),
@@ -1297,7 +1371,7 @@ impl LanguageToLogicalPlanConverter {
                         };
                         query.limit =
                             match_data_node!(node_by_id, cube_scan_params[4], CubeScanLimit)
-                                .map(|n| n as i32);
+                                .map(|n| if n > 50000 { 50000 } else { n as i32 });
 
                         let aliases =
                             match_data_node!(node_by_id, cube_scan_params[6], CubeScanAliases);
@@ -1326,7 +1400,7 @@ impl LanguageToLogicalPlanConverter {
                             fields = new_fields;
                         }
 
-                        let member_fields = fields.iter().map(|(_, m)| m.to_string()).collect();
+                        let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
                         Arc::new(CubeScanNode::new(
                             Arc::new(DFSchema::new_with_metadata(
                                 fields.into_iter().map(|(f, _)| f).collect(),
@@ -1349,24 +1423,6 @@ impl LanguageToLogicalPlanConverter {
                     .collect::<Result<Vec<_>, _>>()?;
 
                 let schema = inputs[0].schema().as_ref().clone();
-
-                // TODO: temp solution. RM after DF union. is fixed
-                let inputs: Vec<LogicalPlan> = inputs
-                    .iter()
-                    .enumerate()
-                    .map(|(i, input)| {
-                        if i == 0 || schema == *input.schema().as_ref() {
-                            input.clone()
-                        } else {
-                            LogicalPlan::Projection(Projection {
-                                expr: input.expressions(),
-                                input: Arc::new(input.clone()),
-                                schema: Arc::new(schema.clone()),
-                                alias: None,
-                            })
-                        }
-                    })
-                    .collect::<Vec<LogicalPlan>>();
 
                 let alias = match_data_node!(node_by_id, params[1], UnionAlias);
 

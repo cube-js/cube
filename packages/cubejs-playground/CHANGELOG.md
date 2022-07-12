@@ -3,6 +3,75 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.31](https://github.com/cube-js/cube.js/compare/v0.30.30...v0.30.31) (2022-07-07)
+
+
+### Bug Fixes
+
+* **playground:** member search ([#4850](https://github.com/cube-js/cube.js/issues/4850)) ([c110ca5](https://github.com/cube-js/cube.js/commit/c110ca5c517d7f513442ad17bba9d62477877fd9))
+
+
+
+
+
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.30.29](https://github.com/cube-js/cube.js/compare/v0.30.28...v0.30.29) (2022-07-01)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.30.16](https://github.com/cube-js/cube.js/compare/v0.30.15...v0.30.16) (2022-06-08)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.30.7](https://github.com/cube-js/cube.js/compare/v0.30.6...v0.30.7) (2022-05-26)
+
+
+### Bug Fixes
+
+* **playground:** query validation ([2052895](https://github.com/cube-js/cube.js/commit/205289549c964eba01e76fdadca86c4e8117e967))
+
+
+
+
+
+## [0.30.5](https://github.com/cube-js/cube.js/compare/v0.30.4...v0.30.5) (2022-05-23)
+
+
+### Features
+
+* **packages:** add Firebolt driver ([#4546](https://github.com/cube-js/cube.js/issues/4546)) ([9789d95](https://github.com/cube-js/cube.js/commit/9789d954064893ba2e3265127be5b734bf1f6db5))
+
+
+
+
+
+## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
+
+
+### Bug Fixes
+
+* **playground:** refresh stale tokens ([#4551](https://github.com/cube-js/cube.js/issues/4551)) ([80ce87d](https://github.com/cube-js/cube.js/commit/80ce87da7fdcbe44aa26605ee33b9cfbb3cbfb24))
+* **playground:** Remove all time time dimension without granularity ([#4564](https://github.com/cube-js/cube.js/issues/4564)) ([054f488](https://github.com/cube-js/cube.js/commit/054f488ce6b8bfa103cd435f99178ca1f2fa38c7))
+
+
+
+
+
 # [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
 
 **Note:** Version bump only for package @cubejs-client/playground

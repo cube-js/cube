@@ -41,6 +41,7 @@ import ScrollSpyH2 from '../components/Headers/ScrollSpyH2';
 import ScrollSpyH3 from '../components/Headers/ScrollSpyH3';
 import MyH2 from '../components/Headers/MyH2';
 import MyH3 from '../components/Headers/MyH3';
+import { ParameterTable } from '../components/ReferenceDocs/ParameterTable';
 
 const MyH4: React.FC<{ children: string }> = ({ children }) => {
   return (<h4 id={kebabCase(children)} name={kebabCase(children)}>{children}</h4>);
@@ -57,6 +58,7 @@ const components = {
   GitHubCodeBlock,
   CubeQueryResultSet,
   GitHubFolderLink,
+  ParameterTable,
   h2: ScrollSpyH2,
   h3: ScrollSpyH3,
   h4: MyH4,
@@ -169,7 +171,7 @@ class DocTemplate extends Component<Props, State> {
     const rawNodes = ReactHtmlParser(stringElement);
     const sectionTags: Section[] = [
       {
-        id: 'top',
+        id: kebabCase(title),
         type: 'h1',
         className: styles.topSection,
         nodes: [
@@ -183,8 +185,8 @@ class DocTemplate extends Component<Props, State> {
       },
     ];
 
-    let currentParentID: string;
-    let currentID = 'top';
+    let currentParentID = kebabCase(title);
+    let currentID: string;
 
     rawNodes.forEach((item) => {
       let linkedHTag;
@@ -239,19 +241,15 @@ class DocTemplate extends Component<Props, State> {
           [styles.postClearSection]: isPreviousSectionClearable,
         });
 
-        // anchors like 'h2-h3'
+        currentID = kebabCase(item.props.children[0]);
+
         if (item.type === 'h2') {
           prevSection.className = cx(prevSection.className, {
             [styles.lastSection]: true,
             [styles.clearSection]: isPreviousSectionClearable,
           });
 
-          currentID = kebabCase(item.props.children[0]);
           currentParentID = currentID;
-        } else if (!!currentParentID) {
-          currentID = kebabCase(item.props.children[0]);
-        } else {
-          currentID = kebabCase(item.props.children[0]);
         }
 
         sectionTags.push({
@@ -302,7 +300,7 @@ class DocTemplate extends Component<Props, State> {
         <Helmet title={`${frontmatter.title} | Cube Docs`} />
         <div className={styles.docContentWrapper}>
           <div className={styles.docContent}>
-            <h1 name="top">{frontmatter.title}</h1>
+            <h1 id={kebabCase(frontmatter.title)}>{frontmatter.title}</h1>
             <MDX {...this.props} />
             {!isDisableFeedbackBlock && (
               <FeedbackBlock page={frontmatter.permalink} />

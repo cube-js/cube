@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use crate::tests::mysql::MySqlIntegrationTestSuite;
-use cubesql::telemetry::ReportingLogger;
+use cubesql::telemetry::{LocalReporter, ReportingLogger};
 use log::Level;
 use simple_logger::SimpleLogger;
 use tests::{
@@ -39,9 +39,16 @@ fn main() {
     let logger = SimpleLogger::new()
         .with_level(Level::Error.to_level_filter())
         .with_module_level("cubeclient", log_level.to_level_filter())
-        .with_module_level("cubesql", log_level.to_level_filter());
+        .with_module_level("cubesql", log_level.to_level_filter())
+        .with_module_level("datafusion", Level::Warn.to_level_filter())
+        .with_module_level("pg_srv", Level::Warn.to_level_filter());
 
-    ReportingLogger::init(Box::new(logger), log_level.to_level_filter()).unwrap();
+    ReportingLogger::init(
+        Box::new(logger),
+        Box::new(LocalReporter::new()),
+        log_level.to_level_filter(),
+    )
+    .unwrap();
 
     rt.block_on(async {
         let mut runner = TestsRunner::new();

@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+
+### Bug Fixes
+
+* **client-react:** useIsMounted hook compatible with React 18 StrictMode ([#4740](https://github.com/cube-js/cube.js/issues/4740)) ([aa7d3a4](https://github.com/cube-js/cube.js/commit/aa7d3a4788d38027f59c77bd567270a98a43b689))
+
+
+
+
+
+## [0.30.29](https://github.com/cube-js/cube.js/compare/v0.30.28...v0.30.29) (2022-07-01)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
+
+
+### Bug Fixes
+
+* **playground:** Remove all time time dimension without granularity ([#4564](https://github.com/cube-js/cube.js/issues/4564)) ([054f488](https://github.com/cube-js/cube.js/commit/054f488ce6b8bfa103cd435f99178ca1f2fa38c7))
+
+
+
+
+
 # [0.30.0](https://github.com/cube-js/cube.js/compare/v0.29.57...v0.30.0) (2022-05-11)
 
 **Note:** Version bump only for package @cubejs-client/react

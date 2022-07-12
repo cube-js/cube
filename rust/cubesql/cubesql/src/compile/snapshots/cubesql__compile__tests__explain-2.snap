@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 5809
 expression: "execute_query(\"EXPLAIN VERBOSE SELECT 1+1;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +-------------------------------------------------------+--------------------------------------+
@@ -25,7 +24,6 @@ expression: "execute_query(\"EXPLAIN VERBOSE SELECT 1+1;\".to_string(),\n       
 | physical_plan after aggregate_statistics              | SAME TEXT AS ABOVE                   |
 | physical_plan after hash_build_probe_order            | SAME TEXT AS ABOVE                   |
 | physical_plan after coalesce_batches                  | SAME TEXT AS ABOVE                   |
-| physical_plan after repartition                       | SAME TEXT AS ABOVE                   |
 | physical_plan after add_merge_exec                    | SAME TEXT AS ABOVE                   |
 | physical_plan                                         | ProjectionExec: expr=[2 as Int64(2)] |
 |                                                       |   EmptyExec: produce_one_row=true    |

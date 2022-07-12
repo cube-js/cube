@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 8267
+expression: "execute_query(\"SELECT typinput='array_in'::regproc as is_array, typtype, typname, pg_type.oid\n                FROM pg_catalog.pg_type\n                LEFT JOIN (\n                    select\n                        ns.oid as nspoid,\n                        ns.nspname,\n                        r.r\n                    from pg_namespace as ns\n                    join (\n                        select\n                            s.r,\n                            (current_schemas(false))[s.r] as nspname\n                        from generate_series(1, array_upper(current_schemas(false), 1)) as s(r)\n                    ) as r\n                    using ( nspname )\n                ) as sp\n                ON sp.nspoid = typnamespace\n                /* I've changed oid = to oid IN to verify is_array column */\n                WHERE pg_type.oid IN (25, 1016)\n                ORDER BY sp.r, pg_type.oid DESC;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------+---------+---------+------+
+| is_array | typtype | typname | oid  |
++----------+---------+---------+------+
+| true     | b       | _int8   | 1016 |
+| false    | b       | text    | 25   |
++----------+---------+---------+------+

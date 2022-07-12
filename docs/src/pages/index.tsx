@@ -29,13 +29,13 @@ class IndexPage extends Component<Props> {
       <div className={styles.docContent}>
         <Helmet title="Main | Cube Docs" />
         <h1>Documentation</h1>
-
-        <InfoBox>
-          <b>Building Data Applications with Cube</b> workshop on May 18, 2022.<br/>
-          Learn all about building a modern data app with Cube.<br />
-          <a href="https://us02web.zoom.us/webinar/register/WN_DUeCHp5fRESAXsV_A1C_eg">Register for the workshop now</a> or see the agenda at the <a href="https://cube.dev/events/building-data-app/">event page</a>. 👈
-        </InfoBox>
         
+        <InfoBox>
+          <b>Connecting your Business Intelligence Tools to Cube</b> workshop on July 27, 2022.<br/> 
+          Building on our <a href="https://cube.dev/events/sql-api">SQL API workshop</a>, we'll continue our discussion on making Cube available to your favorite Business Intelligence applications.<br /> 
+          Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/adv-sql-api/">event page</a> 👈
+        </InfoBox>
+
         <Row>
           <Col span={24}>
             <p>

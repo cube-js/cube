@@ -77,8 +77,12 @@ If you have any questions or need help - [please join our Slack community](https
 You are also welcome to join our **monthly community calls** where we discuss community news, Cube Dev team's plans, backlogs, use cases, etc. If you miss the call, the recordings will also be available after the meeting. 
 * When: Second Wednesday of each month at [9am Pacific Time](https://www.thetimezoneconverter.com/?t=09:00&tz=PT%20%28Pacific%20Time%29).  
 * Meeting link: https://us02web.zoom.us/j/86717042169?pwd=VlBEd2VVK01DNDVVbU1EUXd5ajhsdz09
-* Meeting [agenda/notes](https://www.notion.so/Notes-from-monthly-community-meetings-f394e5c131cb4bd1bc64ed850b0186d8). 
-* Recordings will be posted on the [Community Playlist](https://www.youtube.com/playlist?list=PLtdXl_QTQjpb1dHZCM09qKTsgvgqjSvc9 ). 
+* [Meeting page](https://cube.dev/community-call/). 
+* Recordings will be posted on the [Community Call Playlist](https://www.youtube.com/playlist?list=PLtdXl_QTQjpb1dHZCM09qKTsgvgqjSvc9). 
+
+### Our quarterly roadmap
+
+We publish our open source roadmap every quarter and discuss them during our [monthly community calls](https://cube.dev/community-call/). You can find our roadmap under [projects in our Cube.js repository](https://github.com/cube-js/cube.js/projects?query=is%3Aopen+sort%3Aupdated-desc). 
 
 ### Contributing
 

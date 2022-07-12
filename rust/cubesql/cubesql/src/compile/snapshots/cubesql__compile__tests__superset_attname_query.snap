@@ -1,8 +1,8 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 5903
 expression: "execute_query(r#\"SELECT a.attname\n                FROM pg_attribute a JOIN (\n                SELECT unnest(ix.indkey) attnum,\n                generate_subscripts(ix.indkey, 1) ord\n                FROM pg_index ix\n                WHERE ix.indrelid = 13449 AND ix.indisprimary\n                ) k ON a.attnum=k.attnum\n                WHERE a.attrelid = 13449\n                ORDER BY k.ord\n                \"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
-++
-++
-++
++---------+
+| attname |
++---------+
++---------+

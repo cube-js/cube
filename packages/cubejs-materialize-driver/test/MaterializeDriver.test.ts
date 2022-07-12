@@ -68,6 +68,28 @@ describe('MaterializeDriver', () => {
     ]);
   });
 
+  test('schema detection', async () => {
+    await Promise.all([
+      driver.query('CREATE TABLE A (a INT, b BIGINT, c TEXT, d DOUBLE, e FLOAT);', []),
+      driver.query('CREATE VIEW V AS SELECT * FROM mz_views;', []),
+      driver.query('CREATE MATERIALIZED VIEW MV AS SELECT * FROM mz_views;', []),
+    ]);
+
+    const tablesSchemaData = await driver.tablesSchema();
+    const { public: publicSchema } = tablesSchemaData;
+    const { a, v, mv } = publicSchema;
+
+    expect(a).toEqual([
+      { name: 'c', type: 'text', attributes: [] },
+      { name: 'b', type: 'bigint', attributes: [] },
+      { name: 'a', type: 'integer', attributes: [] },
+      { name: 'd', type: 'double precision', attributes: [] },
+      { name: 'e', type: 'double precision', attributes: [] }
+    ]);
+    expect(mv).toBeDefined();
+    expect(v).toBeUndefined();
+  });
+
   test('stream', async () => {
     await driver.uploadTable(
       'test.streaming_test',

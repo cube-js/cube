@@ -3,7 +3,7 @@
 exports[`questdb query measure: query 1`] = `
 Array [
   Object {
-    "Orders.totalAmount": "114",
+    "Orders.totalAmount": "1700",
   },
 ]
 `;

@@ -3,6 +3,100 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.28](https://github.com/cube-js/cube.js/compare/v0.30.27...v0.30.28) (2022-06-27)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.27](https://github.com/cube-js/cube.js/compare/v0.30.26...v0.30.27) (2022-06-24)
+
+
+### Features
+
+* **cubestore:** Aggregating index ([#4379](https://github.com/cube-js/cube.js/issues/4379)) ([a0bd36c](https://github.com/cube-js/cube.js/commit/a0bd36c0898f66da907f3c04c439fc31826777a0)), closes [#4599](https://github.com/cube-js/cube.js/issues/4599) [#4728](https://github.com/cube-js/cube.js/issues/4728)
+
+
+
+
+
+## [0.30.25](https://github.com/cube-js/cube.js/compare/v0.30.24...v0.30.25) (2022-06-16)
+
+
+### Features
+
+* **cubestore:** Compaction in-memory chunks  ([#4701](https://github.com/cube-js/cube.js/issues/4701)) ([7c11e37](https://github.com/cube-js/cube.js/commit/7c11e379146a6bd3614452dbf12eb544f6c658a4))
+
+
+
+
+
+## [0.30.20](https://github.com/cube-js/cube.js/compare/v0.30.19...v0.30.20) (2022-06-11)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.8](https://github.com/cube-js/cube.js/compare/v0.30.7...v0.30.8) (2022-05-30)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.7](https://github.com/cube-js/cube.js/compare/v0.30.6...v0.30.7) (2022-05-26)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.6](https://github.com/cube-js/cube.js/compare/v0.30.5...v0.30.6) (2022-05-24)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.5](https://github.com/cube-js/cube.js/compare/v0.30.4...v0.30.5) (2022-05-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
+
+
+### Bug Fixes
+
+* **cubestore:** Prevent deleting a schema that contains tables ([2824fb2](https://github.com/cube-js/cube.js/commit/2824fb20f68401394b05e7e7bc085a669fd39f69))
+
+
+### Features
+
+* **cubestore:** Adds minio s3 region env to cubestore cloud storage ([#4539](https://github.com/cube-js/cube.js/issues/4539)) Thanks [@olejeglejeg](https://github.com/olejeglejeg)! ([739d79c](https://github.com/cube-js/cube.js/commit/739d79caeced2377164809251a3ef69bf79edddc))
+
+
+
+
+
 ## [0.30.1](https://github.com/cube-js/cube.js/compare/v0.30.0...v0.30.1) (2022-05-14)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

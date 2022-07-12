@@ -2,12 +2,12 @@ use crate::{
     compile::{
         engine::provider::CubeContext,
         rewrite::{
-            analysis::LogicalPlanAnalysis, column_name_to_member_name, cube_scan, cube_scan_order,
+            analysis::LogicalPlanAnalysis, column_name_to_member_vec, cube_scan, cube_scan_order,
             cube_scan_order_empty_tail, expr_column_name, order, order_replacer,
             referenced_columns, rewrite, rewriter::RewriteRules, sort, sort_exp,
-            sort_exp_empty_tail, sort_expr, transforming_rewrite, LogicalPlanLanguage, OrderAsc,
-            OrderMember, OrderReplacerColumnNameToMember, OrderReplacerCube, SortExprAsc,
-            TableScanSourceTableName,
+            sort_exp_empty_tail, sort_expr, transforming_rewrite, CubeScanTableName,
+            LogicalPlanLanguage, OrderAsc, OrderMember, OrderReplacerColumnNameToMember,
+            OrderReplacerCube, SortExprAsc,
         },
     },
     var, var_iter,
@@ -49,13 +49,7 @@ impl RewriteRules for OrderRules {
                     "?table_name",
                     "?split",
                 ),
-                self.push_down_sort(
-                    "?source_table_name",
-                    "?expr",
-                    "?members",
-                    "?aliases",
-                    "?cube",
-                ),
+                self.push_down_sort("?table_name", "?expr", "?members", "?aliases", "?cube"),
             ),
             transforming_rewrite(
                 "order-replacer",
@@ -110,7 +104,7 @@ impl OrderRules {
         let aliases_var = var!(aliases_var);
         let cube_var = var!(cube_var);
         move |egraph, subst| {
-            for table_name in var_iter!(egraph[subst[table_name_var]], TableScanSourceTableName) {
+            for table_name in var_iter!(egraph[subst[table_name_var]], CubeScanTableName) {
                 if let Some(referenced_expr) =
                     &egraph.index(subst[sort_exp_var]).data.referenced_expr
                 {
@@ -121,20 +115,18 @@ impl OrderRules {
                         .clone()
                     {
                         let column_name_to_member_name =
-                            column_name_to_member_name(member_name_to_expr, table_name.to_string());
+                            column_name_to_member_vec(member_name_to_expr, table_name.to_string());
                         let referenced_columns =
                             referenced_columns(referenced_expr.clone(), table_name.to_string());
                         let table_name = table_name.to_string();
                         if referenced_columns
                             .iter()
-                            .all(|c| column_name_to_member_name.contains_key(c))
+                            .all(|c| column_name_to_member_name.iter().any(|(cn, _)| cn == c))
                         {
                             subst.insert(
                                 aliases_var,
                                 egraph.add(LogicalPlanLanguage::OrderReplacerColumnNameToMember(
-                                    OrderReplacerColumnNameToMember(
-                                        column_name_to_member_name.into_iter().collect(),
-                                    ),
+                                    OrderReplacerColumnNameToMember(column_name_to_member_name),
                                 )),
                             );
 

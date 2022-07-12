@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 7372
 expression: "execute_query(\"\n                SELECT t.oid, information_schema._pg_datetime_precision(t.oid, 3) p\n                FROM pg_catalog.pg_type t\n                ORDER BY t.oid ASC;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+------+
@@ -27,6 +28,8 @@ expression: "execute_query(\"\n                SELECT t.oid, information_schema.
 | 1016  | NULL |
 | 1021  | NULL |
 | 1022  | NULL |
+| 1033  | NULL |
+| 1034  | NULL |
 | 1042  | NULL |
 | 1043  | NULL |
 | 1082  | 0    |
@@ -53,6 +56,7 @@ expression: "execute_query(\"\n                SELECT t.oid, information_schema.
 | 4533  | NULL |
 | 4535  | NULL |
 | 4536  | NULL |
+| 12047 | NULL |
 | 13408 | NULL |
 | 13410 | NULL |
 | 18001 | NULL |

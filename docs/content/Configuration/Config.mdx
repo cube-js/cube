@@ -30,7 +30,7 @@ interface CubejsConfiguration {
   basePath: string;
   webSocketsBasePath: string;
   logger: (msg: string, params: object) => any;
-  driverFactory: (context: DriverContext) => BaseDriver | Promise<BaseDriver>;
+  driverFactory: (context: DriverContext) => DriverConfig | BaseDriver | Promise<BaseDriver>;
   contextToAppId: (context: RequestContext) => string;
   contextToOrchestratorId: (context: RequestContext) => string;
   repositoryFactory: (context: RequestContext) => SchemaFileRepository;
@@ -117,6 +117,13 @@ interface FileContent {
 
 ### <--{"id" : "Options Reference"}--> dbType
 
+<WarningBox>
+
+Since v0.30.30 `dbType` usage is discouraged and substituted with a unified [driverFactory][self-driver-factory] implementation that returns `DriverConfig` object.
+Please consider defining [driverFactory][self-driver-factory] that returns `DriverConfig` object instead.
+
+</WarningBox>
+
 Either `String` or `Function` could be passed. Providing a `Function` allows to
 dynamically select a database type depending on the user's context. It is
 usually used in [Multitenancy Setup][ref-multitenancy].
@@ -160,8 +167,20 @@ Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
 [Multitenancy Applications][ref-multitenancy].
 
-Called once per [`dataSource`][ref-schema-ref-datasource]. Can return a
-`Promise` which resolves to a driver.
+Called once per [`dataSource`][ref-schema-ref-datasource]. 
+Can return a `Promise` which resolves to a `DriverConfig`.
+`DriverConfig` consists of a `type` field corresponding to database type and options passed to a driver constructor.
+
+```javascript
+module.exports = {
+  driverFactory: ({ dataSource }) => ({
+    type: 'postgres',
+    database: dataSource
+  })
+};
+```
+
+Drivers can also be instantiated directly in case custom driver implementations are used.
 
 ```javascript
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
@@ -169,6 +188,7 @@ const PostgresDriver = require('@cubejs-backend/postgres-driver');
 module.exports = {
   driverFactory: ({ dataSource }) =>
     new PostgresDriver({ database: dataSource }),
+  dbType: ({ dataSource }) => 'postgres',
 };
 ```
 
@@ -277,16 +297,12 @@ mode][ref-development-mode] it ignores validation.
 
 Called on each request from Cube SQL API.
 
-Also, you can use empty `checkAuth` function to disable built-in security. See
-an example below.
-
 For example, you can use `checkSqlAuth` to validate username and password.
 
 ```javascript
 module.exports = {
   checkSqlAuth: (req, username) => {
-    const userInfo = await getUserFromLDAP(username);
-    if (userInfo) {
+    if (username === 'fooUser') {
         return {
             password: 'mypassword',
             securityContext: {},
@@ -734,6 +750,7 @@ the additional transpiler for check duplicates.
 [self-opts-req-ctx]: #request-context
 [self-opts-checkauth]: #check-auth
 [self-opts-ctx-to-appid]: #context-to-app-id
+[self-driver-factory]: #driver-factory
 [ref-schema-ref-datasource]: /schema/reference/cube#data-source
 [self-opts-sched-refresh-ctxs]: #scheduled-refresh-contexts
 [self-opts-sched-refresh-tz]: #scheduled-refresh-time-zones

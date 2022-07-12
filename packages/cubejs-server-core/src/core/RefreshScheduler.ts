@@ -104,7 +104,7 @@ export class RefreshScheduler {
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
     const compilers = await compilerApi.getCompilers();
-    const query = compilerApi.createQueryByDataSource(compilers, queryingOptions);
+    const query = await compilerApi.createQueryByDataSource(compilers, queryingOptions);
     if (preAggregation.preAggregation.partitionGranularity || preAggregation.preAggregation.type === 'rollup') {
       return { ...queryingOptions, ...preAggregation.references };
     } else if (preAggregation.preAggregation.type === 'originalSql') {
@@ -134,6 +134,35 @@ export class RefreshScheduler {
     }
   }
 
+  /**
+   * Evaluate and returns minimal QueryQueue concurrency value.
+   */
+  protected getSchedulerConcurrency(
+    core: CubejsServerCore,
+    context: RequestContext,
+  ): null | number {
+    const preaggsQueues = core
+      .getOrchestratorApi(context)
+      .getQueryOrchestrator()
+      .getPreAggregations()
+      .getQueues();
+
+    let concurrency: null | number;
+
+    if (Object.keys(preaggsQueues).length === 0) {
+      // first execution - no queues
+      concurrency = null;
+    } else {
+      // further executions - queues ready
+      const concurrencies: number[] = [];
+      Object.keys(preaggsQueues).forEach((name) => {
+        concurrencies.push(preaggsQueues[name].concurrency);
+      });
+      concurrency = Math.min(...concurrencies);
+    }
+    return concurrency;
+  }
+
   public async runScheduledRefresh(ctx: RequestContext | null, options: Readonly<ScheduledRefreshOptions>) {
     const context: RequestContext = {
       authInfo: null,
@@ -142,11 +171,16 @@ export class RefreshScheduler {
       requestId: `scheduler-${ctx && ctx.requestId || uuidv4()}`,
     };
 
+    const concurrency =
+      options.concurrency ||
+      this.getSchedulerConcurrency(this.serverCore, context) ||
+      1;
+
     const queryingOptions: ScheduledRefreshQueryingOptions = {
       timezones: [options.timezone || 'UTC'],
       ...options,
-      concurrency: options.concurrency || 1,
-      workerIndices: options.workerIndices || R.range(0, options.concurrency || 1),
+      concurrency,
+      workerIndices: options.workerIndices || R.range(0, concurrency),
       contextSymbols: {
         securityContext: context.securityContext,
       },
@@ -167,6 +201,7 @@ export class RefreshScheduler {
           this.refreshPreAggregations(context, compilerApi, queryingOptions)
         ]);
       }
+      await this.forceReconcile(context, compilerApi);
       return {
         finished: true
       };
@@ -186,13 +221,32 @@ export class RefreshScheduler {
     return { finished: false };
   }
 
+  /**
+   * Force reconcile queue logic to be executed.
+   */
+  protected async forceReconcile(
+    context: RequestContext,
+    compilerApi: CompilerApi,
+  ) {
+    const compilers = await compilerApi.getCompilers();
+    const { cubeEvaluator } = compilers;
+    const processed = [];
+    await Promise.all(cubeEvaluator.cubeNames().map(async (name) => {
+      const ds = cubeEvaluator.cubeFromPath(name).dataSource ?? 'default';
+      if (processed.indexOf(ds) === -1) {
+        processed.push(ds);
+        await this.serverCore.getOrchestratorApi(context).forceReconcile(ds);
+      }
+    }));
+  }
+
   protected async refreshCubesRefreshKey(
     context: RequestContext,
     compilerApi: CompilerApi,
     queryingOptions: ScheduledRefreshQueryingOptions
   ) {
     const compilers = await compilerApi.getCompilers();
-    const queryForEvaluation = compilerApi.createQueryByDataSource(compilers, {});
+    const queryForEvaluation = await compilerApi.createQueryByDataSource(compilers, {});
 
     await Promise.all(queryForEvaluation.cubeEvaluator.cubeNames().map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
@@ -224,7 +278,7 @@ export class RefreshScheduler {
           renewQuery: true,
           requestId: context.requestId,
           scheduledRefresh: true,
-          loadRefreshKeysOnly: true
+          loadRefreshKeysOnly: true,
         });
       }));
     }));

@@ -351,13 +351,11 @@ span.group-header {
 }
 
 .menuWrapperHack {
-
-  margin-top: -40px;
   padding-top: 56px !important;
-
+  margin-top: -40px;
   @media screen and (max-width: 767px) {
-    margin-top: -118px;
-    padding-top: 118px !important;
+    padding-top: 70px !important;
+    margin-top: 0;
   }
 }
 
@@ -662,7 +660,8 @@ span.group-header {
 .header {
   background: #fff;
   padding: 0 1rem;
-  position: fixed;
+  position: sticky;
+  top: 0;
   z-index: 1;
   width: 100%;
   filter: drop-shadow(0px 0px 15px rgba(67, 67, 107, 0.1));
@@ -743,8 +742,6 @@ span.group-header {
 }
 
 .contentColumn {
-  margin-top: 64px;
-
   @media screen and (max-width: 767px) {
     overflow-x: hidden;
 

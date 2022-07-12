@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, Button, Spin } from 'antd';
-import { useQuery } from '@apollo/react-hooks';
+import { useQuery } from '@apollo/client';
 import { withRouter } from 'react-router-dom';
 import ExploreQueryBuilder from '../components/QueryBuilder/ExploreQueryBuilder';
 import { GET_DASHBOARD_ITEM } from '../graphql/queries';

@@ -198,7 +198,8 @@ impl MySqlIntegrationTestSuite {
 #[async_trait]
 impl AsyncTestSuite for MySqlIntegrationTestSuite {
     async fn after_all(&mut self) -> RunResult<()> {
-        todo!()
+        // TODO: Close SQL API?
+        Ok(())
     }
 
     async fn run(&mut self) -> RunResult<()> {

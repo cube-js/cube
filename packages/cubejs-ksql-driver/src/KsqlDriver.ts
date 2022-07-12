@@ -33,6 +33,7 @@ type KsqlShowStreamsResponse = {
 
 type KsqlField = {
   name: string;
+  type?: 'KEY';
   schema: {
     type: string;
   };
@@ -43,10 +44,18 @@ type KsqlDescribeResponse = {
     name: string;
     fields: KsqlField[];
     type: 'STREAM' | 'TABLE';
+    windowType: 'SESSION' | 'HOPPING' | 'TUMBLING'
   }
 };
 
 export class KsqlDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
+
   protected readonly config: KsqlDriverOptions;
 
   protected readonly dropTableMutex: Mutex = new Mutex();
@@ -147,7 +156,22 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public async tableColumnTypes(table: string) {
     const describe = await this.query<KsqlDescribeResponse>(`DESCRIBE ${this.quoteIdentifier(this.tableDashName(table))}`);
-    return describe.sourceDescription.fields.map(c => ({ name: c.name, type: this.toGenericType(c.schema.type) }));
+
+    let { fields } = describe.sourceDescription;
+    if (describe.sourceDescription.windowType) {
+      const fieldsUnderGroupBy = describe.sourceDescription.fields.filter(c => c.type === 'KEY');
+      const fieldsRest = describe.sourceDescription.fields.filter(c => c.type !== 'KEY');
+      fields = [
+        ...fieldsUnderGroupBy,
+        ...[
+          { name: 'WINDOWSTART', schema: { type: 'INTEGER' } },
+          { name: 'WINDOWEND', schema: { type: 'INTEGER' } },
+        ] as KsqlField[],
+        ...fieldsRest
+      ];
+    }
+
+    return fields.map(c => ({ name: c.name, type: this.toGenericType(c.schema.type) }));
   }
 
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
@@ -155,8 +179,22 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   }
 
   public async downloadTable(table: string, options: any): Promise<any> {
+    return this.getStreamingTableData(this.tableDashName(table));
+  }
+
+  public async downloadQueryResults(query: string, params: any, options: any) {
+    const table = KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(query);
+    if (!table) {
+      throw new Error('Unable to detect a source table for ksql download query. In order to query ksql use "SELECT * FROM <TABLE>"');
+    }
+
+    return this.getStreamingTableData(table);
+  }
+
+  private async getStreamingTableData(streamingTable: string) {
     return {
-      streamingTable: this.tableDashName(table),
+      types: await this.tableColumnTypes(streamingTable),
+      streamingTable,
       streamingSource: {
         name: this.config.streamingSourceName || 'default',
         type: 'ksql',

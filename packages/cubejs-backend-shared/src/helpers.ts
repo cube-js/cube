@@ -1,6 +1,6 @@
 import spawn from 'cross-spawn';
 import { Readable } from 'stream';
-import shell from "shelljs";
+import shell from 'shelljs';
 
 export function getRealType(value: any): string {
   if (value === null) {

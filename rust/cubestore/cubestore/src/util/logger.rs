@@ -50,11 +50,11 @@ impl<Logger: Log> ContextLogger<Logger> {
 }
 
 impl<Logger: Log> Log for ContextLogger<Logger> {
-    fn enabled(&self, metadata: &Metadata<'a>) -> bool {
+    fn enabled<'a>(&self, metadata: &Metadata<'a>) -> bool {
         self.inner.enabled(metadata)
     }
 
-    fn log(&self, record: &Record<'a>) {
+    fn log<'a>(&self, record: &Record<'a>) {
         if !self.enabled(record.metadata()) {
             // Assume inner logger is not interested.
             return;

@@ -91,7 +91,7 @@ impl UserDefinedLogicalNode for ClusterAggregateTopK {
             .collect_vec()
     }
 
-    fn fmt_for_explain(&self, f: &mut Formatter<'a>) -> std::fmt::Result {
+    fn fmt_for_explain<'a>(&self, f: &mut Formatter<'a>) -> std::fmt::Result {
         write!(
             f,
             "ClusterAggregateTopK, limit = {}, groupBy = {:?}, aggr = {:?}, sortBy = {:?}",

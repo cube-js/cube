@@ -1,20 +1,20 @@
 use crate::{
-    arrow::{
-        array::NullArray,
-        datatypes::{DataType, Field, Schema},
-    },
     compile::{
         engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr},
             AliasExprAlias, ColumnExprColumn, DimensionName, LiteralExprValue, LogicalPlanLanguage,
-            MeasureName, TableScanSourceTableName, TimeDimensionName,
+            MeasureName, SegmentName, TableScanSourceTableName, TimeDimensionName,
         },
     },
     var_iter, CubeError,
 };
 use datafusion::{
-    arrow::record_batch::RecordBatch,
+    arrow::{
+        array::NullArray,
+        datatypes::{DataType, Field, Schema},
+        record_batch::RecordBatch,
+    },
     logical_plan::{Column, DFSchema, Expr},
     physical_plan::{
         functions::Volatility, planner::DefaultPhysicalPlanner, ColumnarValue, PhysicalPlanner,
@@ -124,6 +124,16 @@ impl LogicalPlanAnalysis {
                     None
                 }
             }
+            LogicalPlanLanguage::Segment(params) => {
+                if let Some(_) = column_name(params[1]) {
+                    let expr = original_expr(params[1])?;
+                    let segment_name = var_iter!(egraph[params[0]], SegmentName).next().unwrap();
+                    map.push((segment_name.to_string(), expr));
+                    Some(map)
+                } else {
+                    None
+                }
+            }
             LogicalPlanLanguage::TimeDimension(params) => {
                 if let Some(_) = column_name(params[3]) {
                     let expr = original_expr(params[3])?;
@@ -205,6 +215,11 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::AnyExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                push_referenced_columns(params[2], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::BinaryExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[2], &mut vec)?;
@@ -234,15 +249,18 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::CaseExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                push_referenced_columns(params[1], &mut vec)?;
+                push_referenced_columns(params[2], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::ScalarFunctionExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
-            LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
-                for p in params.iter() {
-                    vec.extend(referenced_columns(*p)?.into_iter());
-                }
-
+            LogicalPlanLanguage::AggregateFunctionExpr(params) => {
+                push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
             LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
@@ -255,7 +273,14 @@ impl LogicalPlanAnalysis {
                     None
                 }
             }
-            LogicalPlanLanguage::SortExp(params) => {
+            LogicalPlanLanguage::SortExp(params)
+            | LogicalPlanLanguage::AggregateGroupExpr(params)
+            | LogicalPlanLanguage::AggregateAggrExpr(params)
+            | LogicalPlanLanguage::CaseExprWhenThenExpr(params)
+            | LogicalPlanLanguage::CaseExprElseExpr(params)
+            | LogicalPlanLanguage::CaseExprExpr(params)
+            | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
+            | LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
                 for p in params.iter() {
                     vec.extend(referenced_columns(*p)?.into_iter());
                 }
@@ -322,7 +347,9 @@ impl LogicalPlanAnalysis {
                 .ok()?;
 
                 if let Expr::ScalarFunction { fun, .. } = &expr {
-                    if fun.volatility() == Volatility::Immutable {
+                    if fun.volatility() == Volatility::Immutable
+                        || fun.volatility() == Volatility::Stable
+                    {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
                         None
@@ -330,6 +357,17 @@ impl LogicalPlanAnalysis {
                 } else {
                     panic!("Expected ScalarFunctionExpr but got: {:?}", expr);
                 }
+            }
+            LogicalPlanLanguage::AnyExpr(_) => {
+                let expr = node_to_expr(
+                    enode,
+                    &egraph.analysis.cube_context,
+                    &constant_expr,
+                    &SingleNodeIndex { egraph },
+                )
+                .ok()?;
+
+                Self::eval_constant_expr(&egraph, &expr)
             }
             LogicalPlanLanguage::BinaryExpr(_) => {
                 let expr = node_to_expr(
@@ -339,6 +377,21 @@ impl LogicalPlanAnalysis {
                     &SingleNodeIndex { egraph },
                 )
                 .ok()?;
+
+                match &expr {
+                    Expr::BinaryExpr { left, right, .. } => match (&**left, &**right) {
+                        (Expr::Literal(ScalarValue::IntervalYearMonth(_)), Expr::Literal(_))
+                        | (Expr::Literal(ScalarValue::IntervalDayTime(_)), Expr::Literal(_))
+                        | (Expr::Literal(ScalarValue::IntervalMonthDayNano(_)), Expr::Literal(_))
+                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalYearMonth(_)))
+                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalDayTime(_)))
+                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalMonthDayNano(_))) => {
+                            return None
+                        }
+                        _ => (),
+                    },
+                    _ => (),
+                }
 
                 Self::eval_constant_expr(&egraph, &expr)
             }
@@ -376,16 +429,18 @@ impl LogicalPlanAnalysis {
     ) -> Option<ScalarValue> {
         let schema = DFSchema::empty();
         let arrow_schema = Arc::new(schema.to_owned().into());
-        let physical_expr = egraph
-            .analysis
-            .planner
-            .create_physical_expr(
-                &expr,
-                &schema,
-                &arrow_schema,
-                &egraph.analysis.cube_context.state,
-            )
-            .expect(&format!("Can't plan expression: {:?}", expr));
+        let physical_expr = match egraph.analysis.planner.create_physical_expr(
+            &expr,
+            &schema,
+            &arrow_schema,
+            &egraph.analysis.cube_context.state,
+        ) {
+            Ok(res) => res,
+            Err(e) => {
+                log::trace!("Can't plan expression: {:?}", e);
+                return None;
+            }
+        };
         let batch = RecordBatch::try_new(
             Arc::new(Schema::new(vec![Field::new(
                 "placeholder",
@@ -395,19 +450,24 @@ impl LogicalPlanAnalysis {
             vec![Arc::new(NullArray::new(1))],
         )
         .unwrap();
-        let value = physical_expr
-            .evaluate(&batch)
-            .expect(&format!("Can't evaluate expression: {:?}", expr));
+        let value = match physical_expr.evaluate(&batch) {
+            Ok(res) => res,
+            Err(e) => {
+                log::trace!("Can't evaluate expression: {:?}", e);
+                return None;
+            }
+        };
         Some(match value {
             ColumnarValue::Scalar(value) => value,
             ColumnarValue::Array(arr) => {
                 if arr.len() == 1 {
                     ScalarValue::try_from_array(&arr, 0).unwrap()
                 } else {
-                    panic!(
+                    log::trace!(
                         "Expected one row but got {} during constant eval",
                         arr.len()
-                    )
+                    );
+                    return None;
                 }
             }
         })

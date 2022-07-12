@@ -7,9 +7,9 @@ redirect_from:
 ---
 
 <InfoBox>
-  <b>Building Data Applications with Cube</b> workshop on May 18, 2022.<br/>
-  Learn all about building a modern data app with Cube.<br />
-  <a href="https://us02web.zoom.us/webinar/register/WN_DUeCHp5fRESAXsV_A1C_eg">Register for the workshop now</a> or see the agenda at the <a href="https://cube.dev/events/building-data-app/">event page</a>. 👈
+  <b>Connecting your Business Intelligence Tools to Cube</b> workshop on July 27, 2022.<br/> 
+  Building on our <a href="https://cube.dev/events/sql-api">SQL API workshop</a>, we'll continue our discussion on making Cube available to your favorite Business Intelligence applications.<br /> 
+  Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/adv-sql-api/">event page</a> 👈
 </InfoBox>
 
 Below you can find tutorials to help you get started with Cube.js.
@@ -85,3 +85,5 @@ Have a look at some demo applications you can build with Cube.js:
 | :--------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
 | [Hacktoberfest 2020](https://hacktoberfest.cube.dev) | [Hacktoberfest 2020 in insights and statistics](https://dev.to/igorlukanin/hacktoberfest-2020-in-insights-and-statistics-3m57) |
 | [Slack Vibe](https://slack-vibe-demo.cube.dev)       | [Slack Vibe, the Open Source Analytics for Slack](https://dev.to/cubejs/slack-vibe-the-open-source-analytics-for-slack-2khl)   |
+
+Cube integrates with all kinds of [data sources](https://cube.dev/docs/config/databases) and data [visualization tools](https://cube.dev/docs/config/downstream). You can [find](https://cube.dev/for) more easy-step guides to get started with Cube.

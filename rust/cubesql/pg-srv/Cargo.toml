@@ -8,13 +8,21 @@ description = "Library for emulating a PostgreSQL server"
 documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
+[features]
+with-chrono = ["chrono"]
+default = ["with-chrono"]
+
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
 async-trait = "0.1.36"
 log = "=0.4.11"
 bytes = "0.5.4"
+byteorder = "1.4.3"
 thiserror = "1.0"
 anyhow = "1.0"
+chrono = { version = "0.4.16", package = "chrono", default-features = false, features = [
+    "clock",
+], optional = true }
 
 [dev-dependencies]
 hex = "0.4.3"

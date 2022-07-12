@@ -92,7 +92,7 @@ Chart.propTypes = {
   options: PropTypes.object
 }
 
-Chart.defaultprops = {
+Chart.defaultProps = {
   title: null
 }
 

@@ -4,19 +4,24 @@ use async_trait::async_trait;
 use comfy_table::{Cell as TableCell, Table};
 use cubesql::config::Config;
 use futures::{pin_mut, TryStreamExt};
-use portpicker::pick_unused_port;
+use portpicker::{pick_unused_port, Port};
 use rust_decimal::prelude::*;
 use tokio::time::sleep;
 
 use super::utils::escape_snapshot_name;
-use chrono::{DateTime, NaiveDateTime, Utc};
-use tokio_postgres::{NoTls, Row};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use datafusion::assert_contains;
+use pg_interval::Interval;
+use pg_srv::{PgType, PgTypeId};
+use tokio::join;
+use tokio_postgres::{error::SqlState, Client, NoTls, Row, SimpleQueryMessage};
 
 use super::basic::{AsyncTestConstructorResult, AsyncTestSuite, RunResult};
 
 #[derive(Debug)]
 pub struct PostgresIntegrationTestSuite {
     client: tokio_postgres::Client,
+    port: Port,
     // connection: tokio_postgres::Connection<Socket, NoTlsStream>,
 }
 
@@ -42,7 +47,7 @@ impl PostgresIntegrationTestSuite {
             );
         };
 
-        let random_port = pick_unused_port().expect("No ports free");
+        let port = pick_unused_port().expect("No ports free");
         // let random_port = 5555;
         // let random_port = 5432;
 
@@ -53,7 +58,7 @@ impl PostgresIntegrationTestSuite {
             let config = config.update_config(|mut c| {
                 // disable MySQL
                 c.bind_address = None;
-                c.postgres_bind_address = Some(format!("0.0.0.0:{}", random_port));
+                c.postgres_bind_address = Some(format!("0.0.0.0:{}", port));
 
                 c
             });
@@ -64,12 +69,14 @@ impl PostgresIntegrationTestSuite {
 
         sleep(Duration::from_millis(1 * 1000)).await;
 
+        let client = PostgresIntegrationTestSuite::create_client(port).await;
+
+        AsyncTestConstructorResult::Sucess(Box::new(PostgresIntegrationTestSuite { client, port }))
+    }
+
+    async fn create_client(port: Port) -> Client {
         let (client, connection) = tokio_postgres::connect(
-            format!(
-                "host=127.0.0.1 port={} user=test password=test",
-                random_port
-            )
-            .as_str(),
+            format!("host=127.0.0.1 port={} user=test password=test", port).as_str(),
             NoTls,
         )
         .await
@@ -83,12 +90,20 @@ impl PostgresIntegrationTestSuite {
             }
         });
 
-        AsyncTestConstructorResult::Sucess(Box::new(PostgresIntegrationTestSuite { client }))
+        client
     }
 
-    async fn print_query_result<'a>(&self, res: Vec<Row>) -> String {
+    async fn print_query_result<'a>(
+        &self,
+        res: Vec<Row>,
+        with_description: bool,
+        with_rows: bool,
+    ) -> String {
         let mut table = Table::new();
         table.load_preset("||--+-++|    ++++++");
+
+        let mut description_done = false;
+        let mut description: Vec<String> = Vec::new();
 
         let mut header = vec![];
 
@@ -104,82 +119,192 @@ impl PostgresIntegrationTestSuite {
             let mut values: Vec<String> = Vec::new();
 
             for (idx, column) in row.columns().into_iter().enumerate() {
-                match column.type_().oid() {
-                    20 => {
-                        let value: i64 = row.get(idx);
-                        values.push(value.to_string());
+                if !description_done {
+                    description.push(format!(
+                        "{} type: {} ({})",
+                        column.name(),
+                        column.type_().oid(),
+                        PgType::get_by_tid(
+                            PgTypeId::from_oid(column.type_().oid())
+                                .expect(&format!("Unknown oid {}", column.type_().oid()))
+                        )
+                        .typname,
+                    ));
+                }
+
+                // We dont need data when with_rows = false, but it's useful for testing that data type is correct
+                match PgTypeId::from_oid(column.type_().oid())
+                    .expect(&format!("Unknown type oid: {}", column.type_().oid()))
+                {
+                    PgTypeId::INT8 => {
+                        let value: Option<i64> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
-                    23 => {
-                        let value: i32 = row.get(idx);
-                        values.push(value.to_string());
+                    PgTypeId::INT2 => {
+                        let value: Option<i16> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
-                    25 => {
+                    PgTypeId::INT4 => {
+                        let value: Option<i32> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
+                    }
+                    PgTypeId::TEXT => {
                         let value: Option<String> = row.get(idx);
-                        values.push(value.unwrap_or("NULL".to_string()));
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
-                    16 => {
-                        let value: bool = row.get(idx);
-                        values.push(value.to_string());
+                    PgTypeId::BOOL => {
+                        let value: Option<bool> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
-                    701 => {
-                        let value: f64 = row.get(idx);
-                        values.push(value.to_string());
+                    PgTypeId::FLOAT4 => {
+                        let value: Option<f32> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
-                    // timestamp
-                    1114 => {
-                        let value: NaiveDateTime = row.get(idx);
-                        values.push(value.to_string());
+                    PgTypeId::FLOAT8 => {
+                        let value: Option<f64> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
-                    // timestamptz
-                    1184 => {
-                        let value: DateTime<Utc> = row.get(idx);
-                        values.push(value.to_string());
+                    PgTypeId::DATE => {
+                        let value: Option<NaiveDate> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
-                    // _int4
-                    1007 => {
-                        let value: Vec<i32> = row.get(idx);
-                        values.push(
-                            value
-                                .into_iter()
-                                .map(|v| v.to_string())
-                                .collect::<Vec<String>>()
-                                .join(",")
-                                .to_string(),
-                        );
+                    PgTypeId::INTERVAL => {
+                        let value: Option<Interval> = row.get(idx);
+                        values.push(value.map(|v| v.to_postgres()).unwrap_or("NULL".to_string()));
                     }
-                    // _int8
-                    1016 => {
-                        let value: Vec<i64> = row.get(idx);
-                        values.push(
-                            value
-                                .into_iter()
-                                .map(|v| v.to_string())
-                                .collect::<Vec<String>>()
-                                .join(",")
-                                .to_string(),
-                        );
+                    PgTypeId::TIMESTAMP => {
+                        let value: Option<NaiveDateTime> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
-                    // _text
-                    1009 => {
-                        let value: Vec<String> = row.get(idx);
-                        values.push(value.join(",").to_string());
+                    PgTypeId::TIMESTAMPTZ => {
+                        let value: Option<DateTime<Utc>> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
-                    // numeric
-                    1700 => {
-                        let value: Decimal = row.get(idx);
-                        values.push(value.to_string());
+                    PgTypeId::NUMERIC => {
+                        let value: Option<Decimal> = row.get(idx);
+                        values.push(value.map(|v| v.to_string()).unwrap_or("NULL".to_string()));
                     }
-                    oid => unimplemented!("Unsupported pg_type: {}", oid),
+                    PgTypeId::ARRAYINT4 => {
+                        let value: Option<Vec<i32>> = row.get(idx);
+                        if let Some(v) = value {
+                            values.push(
+                                v.into_iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<String>>()
+                                    .join(",")
+                                    .to_string(),
+                            );
+                        } else {
+                            values.push("NULL".to_string())
+                        }
+                    }
+                    PgTypeId::ARRAYINT8 => {
+                        let value: Option<Vec<i64>> = row.get(idx);
+                        if let Some(v) = value {
+                            values.push(
+                                v.into_iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<String>>()
+                                    .join(",")
+                                    .to_string(),
+                            );
+                        } else {
+                            values.push("NULL".to_string())
+                        }
+                    }
+                    PgTypeId::ARRAYFLOAT8 => {
+                        let value: Option<Vec<f64>> = row.get(idx);
+                        if let Some(v) = value {
+                            values.push(
+                                v.into_iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<String>>()
+                                    .join(",")
+                                    .to_string(),
+                            );
+                        } else {
+                            values.push("NULL".to_string())
+                        }
+                    }
+                    PgTypeId::ARRAYTEXT => {
+                        let value: Option<Vec<String>> = row.get(idx);
+                        if let Some(v) = value {
+                            values.push(
+                                v.into_iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<String>>()
+                                    .join(",")
+                                    .to_string(),
+                            );
+                        } else {
+                            values.push("NULL".to_string())
+                        }
+                    }
+                    tid => unimplemented!("Unsupported pg_type: {:?}({})", tid, tid.to_type().oid),
                 }
             }
 
+            description_done = true;
             table.add_row(values);
         }
 
-        table.trim_fmt()
+        if with_description {
+            if with_rows {
+                description.join("\r\n").to_string() + "\r\n" + &table.trim_fmt()
+            } else {
+                description.join("\r\n").to_string()
+            }
+        } else {
+            if !with_rows {
+                panic!("Superstrange test, which doesnt print rows and description!");
+            }
+
+            table.trim_fmt()
+        }
+    }
+
+    async fn test_cancel(&self) -> RunResult<()> {
+        let cancel_token = self.client.cancel_token();
+        let cancel = async move {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+
+            cancel_token.cancel_query(NoTls).await
+        };
+
+        // testing_blocking tables will neven finish. It's a special testing table
+        let sleep = self
+            .client
+            .batch_execute("SELECT * FROM information_schema.testing_blocking");
+
+        match join!(sleep, cancel) {
+            (Err(ref e), Ok(())) if e.code() == Some(&SqlState::QUERY_CANCELED) => {}
+            t => panic!("unexpected return {:?}", t),
+        };
+
+        Ok(())
     }
 
     async fn test_snapshot_execute_query(
+        &self,
+        query: String,
+        snapshot_name: Option<String>,
+        with_description: bool,
+    ) -> RunResult<()> {
+        print!("test {} .. ", query);
+
+        let res = self.client.query(&query, &[]).await.unwrap();
+        insta::assert_snapshot!(
+            snapshot_name.unwrap_or(escape_snapshot_name(query)),
+            self.print_query_result(res, with_description, true).await
+        );
+        println!("ok");
+
+        Ok(())
+    }
+
+    // This method returns only description instead of full data snapshot
+    // It's useful for detecting type changes
+    async fn test_snapshot_description_execute_query(
         &self,
         query: String,
         snapshot_name: Option<String>,
@@ -189,7 +314,7 @@ impl PostgresIntegrationTestSuite {
         let res = self.client.query(&query, &[]).await.unwrap();
         insta::assert_snapshot!(
             snapshot_name.unwrap_or(escape_snapshot_name(query)),
-            self.print_query_result(res).await
+            self.print_query_result(res, true, false).await
         );
 
         println!("ok");
@@ -211,17 +336,56 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
+    async fn test_simple_query<AssertFn>(
+        &self,
+        query: String,
+        f: AssertFn,
+    ) -> Result<(), tokio_postgres::Error>
+    where
+        AssertFn: FnOnce(Vec<SimpleQueryMessage>) -> (),
+    {
+        print!("test {} .. ", query);
+
+        let res = self.client.simple_query(&query).await?;
+        f(res);
+
+        println!("ok");
+
+        Ok(())
+    }
+
     async fn test_prepare(&self) -> RunResult<()> {
+        // Unknown variables will be detected as TEXT
+        // LIMIT has a typehint for i64
         let stmt = self
             .client
-            .prepare("SELECT $1 as t1, $2 as t2")
+            .prepare("SELECT $1 as t1, $2 as t2 LIMIT $3")
             .await
             .unwrap();
 
         self.client
-            .query(&stmt, &[&"test1", &"test2"])
+            .query(&stmt, &[&"test1", &"test2", &0_i64])
             .await
             .unwrap();
+
+        Ok(())
+    }
+
+    async fn test_extended_error(&self) -> RunResult<()> {
+        let actual_err = if let Err(err) = self
+            .client
+            .prepare("SELECT * FROM unknown_cube_will_lead_to_an_error")
+            .await
+        {
+            err
+        } else {
+            panic!("Must be an error")
+        };
+
+        assert_contains!(
+            actual_err.to_string(),
+            "Error during planning: Table or CTE with name 'unknown_cube_will_lead_to_an_error'"
+        );
 
         Ok(())
     }
@@ -274,40 +438,290 @@ impl PostgresIntegrationTestSuite {
 
         Ok(())
     }
+
+    async fn test_portal_pagination(&self) -> RunResult<()> {
+        let mut client = PostgresIntegrationTestSuite::create_client(self.port).await;
+
+        let stmt = client
+            .prepare("SELECT generate_series(1, 100)")
+            .await
+            .unwrap();
+
+        let transaction = client.transaction().await.unwrap();
+
+        let portal = transaction.bind(&stmt, &[]).await.unwrap();
+        let r1 = transaction.query_portal(&portal, 25).await?;
+        assert_eq!(r1.len(), 25);
+
+        let r2 = transaction.query_portal(&portal, 50).await?;
+        assert_eq!(r2.len(), 50);
+
+        let r3 = transaction.query_portal(&portal, 75).await?;
+        assert_eq!(r3.len(), 25);
+
+        transaction.commit().await?;
+
+        Ok(())
+    }
+
+    async fn test_simple_cursors(&self) -> RunResult<()> {
+        self.test_simple_query(
+            r#"declare test_cursor_generate_series cursor with hold for SELECT generate_series(1, 100);"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 1);
+            }
+        ).await?;
+
+        self.test_simple_query(
+            r#"fetch 1 in test_cursor_generate_series; fetch 10 in test_cursor_generate_series;"#
+                .to_string(),
+            |messages| {
+                // Row | Selection - 2
+                // Row 1 | .. | Row 10 | Selection - 11
+                assert_eq!(messages.len(), 13);
+
+                if let SimpleQueryMessage::Row(row) = &messages[0] {
+                    assert_eq!(row.get(0), Some("1"));
+                } else {
+                    panic!("Must be Row command, 0")
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[1] {
+                    assert_eq!(rows, 1_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 1")
+                }
+
+                if let SimpleQueryMessage::Row(row) = &messages[2] {
+                    assert_eq!(row.get(0), Some("2"));
+                } else {
+                    panic!("Must be Row command, 2")
+                }
+
+                if let SimpleQueryMessage::Row(row) = &messages[11] {
+                    assert_eq!(row.get(0), Some("11"));
+                } else {
+                    panic!("Must be Row command, 11")
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[12] {
+                    assert_eq!(rows, 10_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 12")
+                }
+            },
+        )
+        .await?;
+
+        // Read till finish
+        self.test_simple_query(
+            r#"fetch 1000 in test_cursor_generate_series;"#.to_string(),
+            |messages| {
+                // fetch 1
+                // fetch 10
+                // 100 - 11 = 89
+                assert_eq!(messages.len(), 89 + 1);
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[89] {
+                    assert_eq!(rows, 89_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 89")
+                }
+            },
+        )
+        .await?;
+
+        // Portal for Cursor was finished.
+        self.test_simple_query(
+            r#"fetch 1000 in test_cursor_generate_series; fetch 10 in test_cursor_generate_series;"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 2);
+            }
+        ).await?;
+
+        Ok(())
+    }
+
+    // Tableau Desktop uses it
+    async fn test_simple_cursors_without_hold(&self) -> RunResult<()> {
+        // without hold is default behaviour
+        self.test_simple_query(
+            r#"begin; declare test_without_hold cursor for SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+        .await?;
+
+        self.test_simple_query(
+            r#"fetch 5 in test_without_hold; commit;"#.to_string(),
+            |_| {},
+        )
+        .await?;
+
+        // Assert that cursor was closed
+        let err = self
+            .test_simple_query(r#"fetch 5 in test_without_hold;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"test_without_hold\" does not exist"
+        );
+
+        Ok(())
+    }
+
+    // Tableau Desktop uses it
+    async fn test_simple_cursors_close_specific(&self) -> RunResult<()> {
+        // without hold is default behaviour
+        self.test_simple_query(
+            r#"DECLARE test_with_hold CURSOR WITH HOLD FOR SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+        .await?;
+
+        self.test_simple_query(r#"FETCH 5 IN test_with_hold;"#.to_string(), |_| {})
+            .await?;
+
+        self.test_simple_query(r#"CLOSE test_with_hold;"#.to_string(), |_| {})
+            .await?;
+
+        // Assert that cursor was closed
+        let err = self
+            .test_simple_query(r#"fetch 5 in test_with_hold;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"test_with_hold\" does not exist"
+        );
+
+        Ok(())
+    }
+
+    // Tableau Desktop uses it
+    async fn test_simple_cursors_close_all(&self) -> RunResult<()> {
+        // without hold is default behaviour
+        self.test_simple_query(
+            r#"DECLARE cursor_1 CURSOR WITH HOLD for SELECT generate_series(1, 100); DECLARE cursor_2 CURSOR WITH HOLD for SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+            .await?;
+
+        self.test_simple_query(
+            r#"FETCH 5 IN cursor_1; FETCH 5 IN cursor_2;"#.to_string(),
+            |_| {},
+        )
+        .await?;
+
+        self.test_simple_query(r#"CLOSE ALL;"#.to_string(), |_| {})
+            .await?;
+
+        // Assert that cursor1 was closed
+        let err = self
+            .test_simple_query(r#"FETCH 5 IN cursor_1;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"cursor_1\" does not exist"
+        );
+
+        // Assert that cursor2 was closed
+        let err = self
+            .test_simple_query(r#"FETCH 5 IN cursor_2;"#.to_string(), |_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: cursor \"cursor_2\" does not exist"
+        );
+
+        Ok(())
+    }
 }
 
 #[async_trait]
 impl AsyncTestSuite for PostgresIntegrationTestSuite {
     async fn after_all(&mut self) -> RunResult<()> {
-        todo!()
+        // TODO: Close SQL API?
+        Ok(())
     }
 
     async fn run(&mut self) -> RunResult<()> {
+        self.test_cancel().await?;
         self.test_prepare().await?;
+        self.test_extended_error().await?;
         self.test_prepare_empty_query().await?;
         self.test_stream_all().await?;
         self.test_stream_single().await?;
+        self.test_portal_pagination().await?;
+        self.test_simple_cursors().await?;
+        self.test_simple_cursors_without_hold().await?;
+        self.test_simple_cursors_close_specific().await?;
+        self.test_simple_cursors_close_all().await?;
         self.test_snapshot_execute_query(
             "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
             None,
+            false,
         )
         .await?;
+
+        // PostgreSQL doesn't support unsigned integers in the protocol, it's a constraint only
         self.test_snapshot_execute_query(
             r#"SELECT
                 NULL,
+                1.234::float as f32,
+                1.234::double as f64,
+                1::smallint as i16,
+                CAST(1 as SMALLINT UNSIGNED) as u16,
+                1::integer as i32,
+                CAST(1 as INTEGER UNSIGNED) as u32,
+                1::bigint as i64,
+                CAST(1 as BIGINT UNSIGNED) as u64,
                 true as bool_true,
                 false as bool_false,
-                'test',
-                1.0,
-                1,
+                'test' as str,
+                CAST(1.25 as DECIMAL(15, 0)) as d0,
+                CAST(1.25 as DECIMAL(15, 2)) as d2,
+                CAST(1.25 as DECIMAL(15, 5)) as d5,
+                CAST(1.25 as DECIMAL(15, 10)) as d10,
+                CAST('2022-04-25 16:25:01.164774 +00:00' as timestamp)::date as date,
+                '2022-04-25 16:25:01.164774 +00:00'::timestamp as tsmp,
+                interval '13 month' as interval_year_month,
+                interval '1 hour 30 minutes' as interval_day_time,
+                interval '13 month 1 day 1 hour 30 minutes' as interval_month_day_nano,
                 ARRAY['test1', 'test2'] as str_arr,
-                ARRAY[1,2,3] as int8_arr,
-                '2022-04-25 16:25:01.164774 +00:00'::timestamp as tsmp
+                ARRAY[1,2,3] as i64_arr,
+                ARRAY[1.2,2.3,3.4] as f64_arr
             "#
             .to_string(),
             Some("pg_test_types".to_string()),
+            true,
         )
         .await?;
+
+        let system_tables_do_review = vec![
+            "pg_catalog.pg_type",
+            "pg_catalog.pg_proc",
+            "pg_catalog.pg_tables",
+            "pg_catalog.pg_class",
+            "information_schema.tables",
+            "information_schema.columns",
+        ];
+
+        for tbl_name in system_tables_do_review {
+            self.test_snapshot_description_execute_query(
+                format!("SELECT * FROM {}", tbl_name),
+                Some(format!("system_{}", tbl_name)),
+            )
+            .await?;
+        }
+
         self.test_snapshot_execute_query(
             r#"
                 SELECT CAST(TRUNC(EXTRACT(QUARTER FROM "Orders"."completedAt")) AS INTEGER) AS q,
@@ -318,6 +732,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
             "#
             .to_string(),
             Some("datepart_quarter".to_string()),
+            false,
         )
         .await?;
 
@@ -338,6 +753,46 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
                         .collect::<Vec<u32>>(),
                     vec![1184, 1114]
                 );
+            },
+        )
+        .await?;
+
+        self.test_simple_query(r#"SET DateStyle = 'ISO'"#.to_string(), |messages| {
+            assert_eq!(messages.len(), 1);
+
+            // SET
+            if let SimpleQueryMessage::Row(_) = messages[0] {
+                panic!("Must be CommandComplete command, (SET is used)")
+            }
+        })
+        .await?;
+
+        // Tableau Desktop
+        self.test_simple_query(
+            r#"SET DateStyle = 'ISO';SET extra_float_digits = 2;show transaction_isolation"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 4);
+
+                // SET
+                if let SimpleQueryMessage::Row(_) = messages[0] {
+                    panic!("Must be CommandComplete command, 1")
+                }
+
+                // SET
+                if let SimpleQueryMessage::Row(_) = messages[1] {
+                    panic!("Must be CommandComplete command, 2")
+                }
+
+                // SELECT
+                if let SimpleQueryMessage::CommandComplete(_) = messages[2] {
+                    panic!("Must be Row command, 3")
+                }
+
+                // DATA
+                if let SimpleQueryMessage::Row(_) = messages[3] {
+                    panic!("Must be CommandComplete command, 4")
+                }
             },
         )
         .await?;

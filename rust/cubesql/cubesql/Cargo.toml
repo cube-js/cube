@@ -9,25 +9,27 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "5ee92140f026524639ed3675942af62b45dc2913", default-features = false, features = ["unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "b50fb0e64c7926a40ddf8af7765aa1ed52881b60", default-features = false, features = ["unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "81217ce0dccc446d3d2f42582717b9e8fe960113" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "9cd679244cadad4a6b9032a1ddb4f03c7a87c410" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
-tokio = { version = "1.0", features = ["full", "rt"] }
+tokio = { version = "1.0", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
 itertools = "0.10.2"
 serde_derive = "^1.0"
 serde_json = "^1.0"
 bytes = "0.5.4"
-futures = "0.3.5"
+futures = "0.3.21"
 rand = "0.8.3"
 smallvec = "1.7.0"
 byteorder = "1.3.4"
 log = "=0.4.11"
+rust_decimal = { version = "1.25", features = ["c-repr", "db-postgres"]}
+postgres-types = "0.2.3"
 # Locked, because starting from 1.15 this crate switch from chrono to time
 # which panic with Could not determine the UTC offset on this system.
 # It's a problem with determing local_offset_at for local-offset feature
@@ -38,7 +40,7 @@ regex = "1.5"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 msql-srv = { git = 'https://github.com/cube-js/msql-srv', rev = '76ea0132564959c41ea13f25511fbd84acd06464' }
 bincode = "1.3.1"
-chrono = "0.4.15"
+chrono = "0.4.16"
 chrono-tz = "0.6"
 mockall = "0.8.1"
 reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-features = false }
@@ -49,14 +51,18 @@ comfy-table = "4.1.1"
 bitflags = "1.3.2"
 egg = "0.7.1"
 paste = "1.0.6"
+csv = "1.1.6"
+tracing = { version = "0.1.35", features = ["async-await"] }
+console-subscriber = "0.1.6"
 
 [dev-dependencies]
 pretty_assertions = "1.0.0"
 insta = "1.12"
 mysql_async = "0.29"
 portpicker = "0.1.1"
-tokio-postgres = { version = "0.7.5", features = ["with-chrono-0_4"] }
+tokio-postgres = { version = "0.7.6", features = ["with-chrono-0_4", "runtime"] }
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
+pg_interval = "0.4.1"
 
 [[test]]
 name = "e2e"

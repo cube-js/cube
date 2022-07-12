@@ -294,7 +294,7 @@ class BaseQuery {
   get dataSource() {
     const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
-      throw new UserError(`To join across data sources use rollupJoin with Cube Store. Note: this is an experimental feature for different data source types. Found data sources: ${dataSources.join(', ')}`);
+      throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
     return dataSources[0];
   }
@@ -2185,6 +2185,10 @@ class BaseQuery {
       },
       { inputProps: { collectOriginalSqlPreAggregations: [] }, cache: this.queryCache }
     );
+  }
+
+  preAggregationReadOnly(cube, preAggregation) {
+    return false;
   }
 
   // eslint-disable-next-line consistent-return

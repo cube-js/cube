@@ -251,7 +251,7 @@ services:
 
 Cube Store makes use of a separate storage layer for storing metadata as well as
 for persisting pre-aggregations as Parquet files. Cube Store can use both AWS S3
-and Google Cloud, or if desired, a local path on the server.
+and Google Cloud, or if desired, a local path on the server if all nodes of a cluster run on a single machine.
 
 A simplified example using AWS S3 might look like:
 

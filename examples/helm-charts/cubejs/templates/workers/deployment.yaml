@@ -23,7 +23,15 @@ spec:
       labels:
         app.kubernetes.io/component: workers
         {{- include "cubejs.selectorLabels" . | nindent 8 }}
+      {{- if .Values.commonAnnotations }}
+      annotations:
+      {{- toYaml .Values.commonAnnotations | nindent 8 }}
+      {{- end }}
     spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: cube
           {{- if .Values.image.tag }}

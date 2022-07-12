@@ -385,6 +385,8 @@ macro_rules! variant_field_struct {
                 Operator::Or => "OR",
                 Operator::Like => "LIKE",
                 Operator::NotLike => "NOT_LIKE",
+                Operator::ILike => "ILIKE",
+                Operator::NotILike => "NOT_ILIKE",
                 Operator::RegexMatch => "~",
                 Operator::RegexIMatch => "~*",
                 Operator::RegexNotMatch => "!~",
@@ -393,6 +395,7 @@ macro_rules! variant_field_struct {
                 Operator::IsNotDistinctFrom => "IS_NOT_DISTINCT_FROM",
                 Operator::BitwiseAnd => "&",
                 Operator::BitwiseOr => "|",
+                Operator::StringConcat => "||",
             }
         );
     };

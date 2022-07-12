@@ -22,13 +22,15 @@ use tokio::{
 use crate::{
     compile::{convert_sql_to_cube_query, parser::parse_sql_to_statement},
     config::processing_loop::ProcessingLoop,
+    telemetry::{ContextLogger, SessionLogger},
+    CubeErrorCauseType,
 };
 
 use crate::{
     sql::{
         dataframe::{self, batch_to_dataframe},
         session::DatabaseProtocol,
-        statement::{StatementParamsBinder, StatementParamsFinder},
+        statement::{MySQLStatementParamsFinder, MysqlStatementParamsBinder},
         AuthContext, ColumnFlags, ColumnType, QueryResponse, Session, SessionManager, StatusFlags,
     },
     CubeError,
@@ -58,6 +60,7 @@ struct MySqlConnection {
     statements: Arc<RwLock<PreparedStatements>>,
     // Shared
     session: Arc<Session>,
+    logger: Arc<dyn ContextLogger>,
 }
 
 impl Drop for MySqlConnection {
@@ -82,7 +85,13 @@ impl MySqlConnection {
     ) -> Result<(), io::Error> {
         match self.execute_query(query).await {
             Err(e) => {
-                error!("Error during processing MySQL {}: {}", query, e.to_string());
+                let (message, props) = match &e.cause {
+                    CubeErrorCauseType::Internal(meta) | CubeErrorCauseType::User(meta) => {
+                        (e.message.clone(), meta.clone())
+                    }
+                };
+
+                self.logger.error(message.as_str(), props);
 
                 if let Some(bt) = e.backtrace() {
                     trace!("{}", bt);
@@ -120,7 +129,10 @@ impl MySqlConnection {
                             dataframe::TableValue::Boolean(s) => {
                                 rw.write_col(if *s == true { 1_u8 } else { 0_u8 })?
                             }
+                            dataframe::TableValue::Float32(s) => rw.write_col(s)?,
                             dataframe::TableValue::Float64(s) => rw.write_col(s)?,
+                            dataframe::TableValue::Int16(s) => rw.write_col(s)?,
+                            dataframe::TableValue::Int32(s) => rw.write_col(s)?,
                             dataframe::TableValue::Int64(s) => rw.write_col(s)?,
                             dataframe::TableValue::Null => rw.write_col(Option::<String>::None)?,
                             dt => unimplemented!("Not supported type for MySQL: {:?}", dt),
@@ -205,7 +217,7 @@ impl MySqlConnection {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone())?;
+            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone()).await?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status, _) => {
                     return Ok(QueryResponse::Ok(status));
@@ -219,7 +231,7 @@ impl MySqlConnection {
                         &plan,
                     );
                     let batches = df.collect().await?;
-                    let response =  batch_to_dataframe(&batches)?;
+                    let response = batch_to_dataframe(&df.schema().into(), &batches)?;
 
                     return Ok(QueryResponse::ResultSet(status, Box::new(response)))
                 }
@@ -273,16 +285,17 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
                 }
             };
 
-        let stmt_prepare = StatementParamsFinder::new();
+        let stmt_prepare = MySQLStatementParamsFinder::new();
         let paramaters: Vec<Column> = stmt_prepare
             .find(&mut statement)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?
             .into_iter()
             .map(|p| p.into())
             .collect();
 
         let mut state = self.statements.write().await;
         if state.statements.len()
-            > self
+            >= self
                 .session
                 .server
                 .configuration
@@ -357,8 +370,10 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             values_to_bind.push(bind_value);
         }
 
-        let binder = StatementParamsBinder::new(values_to_bind);
-        binder.bind(&mut statement);
+        let binder = MysqlStatementParamsBinder::new(values_to_bind);
+        binder
+            .bind(&mut statement)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
 
         self.handle_query(statement.to_string().as_str(), results)
             .await
@@ -407,7 +422,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             .await
             .map_err(|e| {
                 if e.message != *"Incorrect user name or password" {
-                    error!("Error during authentication MySQL connection: {}", e);
+                    log::error!("Error during authentication MySQL connection: {}", e);
                 };
 
                 io::Error::new(io::ErrorKind::Other, e.to_string())
@@ -503,17 +518,23 @@ impl ProcessingLoop for MySqlServer {
                 socket.peer_addr().unwrap().to_string(),
             );
 
+            let logger = Arc::new(SessionLogger::new(session.state.clone()));
+
             tokio::spawn(async move {
                 if let Err(e) = AsyncMysqlIntermediary::run_on(
                     MySqlConnection {
                         session,
                         statements: Arc::new(RwLock::new(PreparedStatements::new())),
+                        logger: logger.clone(),
                     },
                     socket,
                 )
                 .await
                 {
-                    error!("Error during processing MySQL connection: {}", e);
+                    logger.error(
+                        format!("Error during processing MySQL connection: {}", e).as_str(),
+                        None,
+                    );
                     if let Some(bt) = e.backtrace() {
                         trace!("{}", bt.to_string());
                     } else {

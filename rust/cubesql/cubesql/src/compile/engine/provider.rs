@@ -1,15 +1,22 @@
-use std::sync::Arc;
+use std::{any::Any, collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
+use cubeclient::models::V1CubeMeta;
 use datafusion::{
-    datasource,
+    arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
+    datasource::{self, TableProvider},
+    error::DataFusionError,
     execution::context::SessionState as DFSessionState,
-    physical_plan::{udaf::AggregateUDF, udf::ScalarUDF},
+    logical_plan::Expr,
+    physical_plan::{udaf::AggregateUDF, udf::ScalarUDF, udtf::TableUDF, ExecutionPlan},
     sql::planner::ContextProvider,
 };
 
 use crate::{
     compile::MetaContext,
-    sql::{session::DatabaseProtocol, SessionManager, SessionState},
+    sql::{session::DatabaseProtocol, ColumnType, SessionManager, SessionState},
+    transport::V1CubeMetaExt,
+    CubeError,
 };
 
 use super::information_schema::mysql::{
@@ -27,35 +34,22 @@ use super::information_schema::mysql::{
 use super::information_schema::postgres::{
     character_sets::InfoSchemaCharacterSetsProvider as PostgresSchemaCharacterSetsProvider,
     columns::InfoSchemaColumnsProvider as PostgresSchemaColumnsProvider,
+    constraint_column_usage::InfoSchemaConstraintColumnUsageProvider as PostgresSchemaConstraintColumnUsageProvider,
     key_column_usage::InfoSchemaKeyColumnUsageProvider as PostgresSchemaKeyColumnUsageProvider,
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
-    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider, PgCatalogAttrdefProvider,
-    PgCatalogAttributeProvider, PgCatalogClassProvider, PgCatalogConstraintProvider,
-    PgCatalogDependProvider, PgCatalogDescriptionProvider, PgCatalogEnumProvider,
-    PgCatalogIndexProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
-    PgCatalogRangeProvider, PgCatalogSettingsProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider,
+    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
+    views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider,
+    InfoSchemaRoleColumnGrantsProvider as PostgresInfoSchemaRoleColumnGrantsProvider,
+    InfoSchemaRoleTableGrantsProvider as PostgresInfoSchemaRoleTableGrantsProvider,
+    InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
+    PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
+    PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
+    PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogIndexProvider,
+    PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
+    PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSettingsProvider,
+    PgCatalogStatActivityProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
 };
-
-use crate::{
-    compile::engine::information_schema::postgres::{
-        testing_dataset::InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
-    },
-    sql::ColumnType,
-    transport::V1CubeMetaExt,
-    CubeError,
-};
-use async_trait::async_trait;
-use cubeclient::models::V1CubeMeta;
-use datafusion::{
-    arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
-    datasource::TableProvider,
-    error::DataFusionError,
-    logical_plan::Expr,
-    physical_plan::ExecutionPlan,
-};
-use std::any::Any;
 
 #[derive(Clone)]
 pub struct CubeContext {
@@ -90,6 +84,14 @@ impl CubeContext {
             .protocol
             .table_name_by_table_provider(table_provider)
     }
+
+    pub fn get_function<T>(&self, name: &str, udfs: &HashMap<String, Arc<T>>) -> Option<Arc<T>> {
+        if name.starts_with("pg_catalog.") {
+            return udfs.get(&format!("{}", &name[11..name.len()])).cloned();
+        }
+
+        udfs.get(name).cloned()
+    }
 }
 
 impl ContextProvider for CubeContext {
@@ -101,29 +103,15 @@ impl ContextProvider for CubeContext {
     }
 
     fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
-        // DF started to use Fn normalize_ident to handle all identifiers, let's cast to lowercase
-        self.state
-            .scalar_functions
-            .get(&name.to_ascii_lowercase())
-            .cloned()
+        self.get_function(name, &self.state.scalar_functions)
     }
 
     fn get_aggregate_meta(&self, name: &str) -> Option<Arc<AggregateUDF>> {
-        // DF started to use Fn normalize_ident to handle all identifiers, let's cast to lowercase
-        self.state
-            .aggregate_functions
-            .get(&name.to_ascii_lowercase())
-            .cloned()
+        self.get_function(name, &self.state.aggregate_functions)
     }
 
-    fn get_table_function_meta(
-        &self,
-        name: &str,
-    ) -> Option<Arc<datafusion::physical_plan::udtf::TableUDF>> {
-        self.state
-            .table_functions
-            .get(&name.to_ascii_lowercase())
-            .cloned()
+    fn get_table_function_meta(&self, name: &str) -> Option<Arc<TableUDF>> {
+        self.get_function(name, &self.state.table_functions)
     }
 
     fn get_variable_type(&self, _variable_names: &[String]) -> Option<DataType> {
@@ -287,6 +275,10 @@ impl DatabaseProtocol {
             "information_schema.referential_constraints".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaTableConstraintsProvider>() {
             "information_schema.table_constraints".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresInfoSchemaRoleTableGrantsProvider>() {
+            "information_schema.role_table_grants".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresInfoSchemaRoleColumnGrantsProvider>() {
+            "information_schema.role_column_grants".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
             "pg_catalog.pg_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTypeProvider>() {
@@ -317,8 +309,22 @@ impl DatabaseProtocol {
             "pg_catalog.pg_am".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogEnumProvider>() {
             "pg_catalog.pg_enum".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogMatviewsProvider>() {
+            "pg_catalog.pg_matviews".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogDatabaseProvider>() {
+            "pg_catalog.pg_database".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogRolesProvider>() {
+            "pg_catalog.pg_roles".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogStatActivityProvider>() {
+            "pg_catalog.pg_stat_activity".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
+            "information_schema.constraint_column_usage".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaViewsProvider>() {
+            "information_schema.views".to_string()
         } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
             "information_schema.testing_dataset".to_string()
+        } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingBlockingProvider>() {
+            "information_schema.testing_blocking".to_string()
         } else {
             return Err(CubeError::internal(format!(
                 "Unknown table provider with schema: {:?}",
@@ -398,11 +404,32 @@ impl DatabaseProtocol {
                 "referential_constraints" => {
                     return Some(Arc::new(PostgresSchemaReferentialConstraintsProvider::new()))
                 }
+                "role_table_grants" => {
+                    return Some(Arc::new(PostgresInfoSchemaRoleTableGrantsProvider::new(
+                        context.session_state.user().unwrap_or("test".to_string()),
+                        &context.meta.cubes,
+                    )))
+                }
+                "role_column_grants" => {
+                    return Some(Arc::new(PostgresInfoSchemaRoleColumnGrantsProvider::new(
+                        context.session_state.user().unwrap_or("test".to_string()),
+                        &context.meta.cubes,
+                    )))
+                }
                 "table_constraints" => {
                     return Some(Arc::new(PostgresSchemaTableConstraintsProvider::new()))
                 }
+                "constraint_column_usage" => {
+                    return Some(Arc::new(PostgresSchemaConstraintColumnUsageProvider::new()))
+                }
+                "views" => return Some(Arc::new(PostgresSchemaViewsProvider::new())),
+                #[cfg(debug_assertions)]
                 "testing_dataset" => {
                     return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
+                }
+                #[cfg(debug_assertions)]
+                "testing_blocking" => {
+                    return Some(Arc::new(InfoSchemaTestingBlockingProvider::new()))
                 }
                 _ => return None,
             },
@@ -428,10 +455,7 @@ impl DatabaseProtocol {
                 "pg_proc" => return Some(Arc::new(PgCatalogProcProvider::new())),
                 "pg_settings" => {
                     return Some(Arc::new(PgCatalogSettingsProvider::new(
-                        context
-                            .sessions
-                            .server
-                            .all_variables(context.session_state.protocol.clone()),
+                        context.session_state.all_variables(),
                     )))
                 }
                 "pg_description" => return Some(Arc::new(PgCatalogDescriptionProvider::new())),
@@ -439,6 +463,22 @@ impl DatabaseProtocol {
                 "pg_depend" => return Some(Arc::new(PgCatalogDependProvider::new())),
                 "pg_am" => return Some(Arc::new(PgCatalogAmProvider::new())),
                 "pg_enum" => return Some(Arc::new(PgCatalogEnumProvider::new())),
+                "pg_matviews" => return Some(Arc::new(PgCatalogMatviewsProvider::new())),
+                "pg_database" => {
+                    return Some(Arc::new(PgCatalogDatabaseProvider::new(
+                        &context.session_state.database().unwrap_or("db".to_string()),
+                    )))
+                }
+                "pg_roles" => {
+                    return Some(Arc::new(PgCatalogRolesProvider::new(
+                        &context.session_state.user().unwrap_or("test".to_string()),
+                    )))
+                }
+                "pg_stat_activity" => {
+                    return Some(Arc::new(PgCatalogStatActivityProvider::new(
+                        context.sessions.clone(),
+                    )))
+                }
                 _ => return None,
             },
             _ => return None,
@@ -483,6 +523,14 @@ impl TableProvider for CubeTableProvider {
                     Field::new(
                         c.get_name(),
                         match c.get_column_type() {
+                            ColumnType::Date(large) => {
+                                if large {
+                                    DataType::Date64
+                                } else {
+                                    DataType::Date32
+                                }
+                            }
+                            ColumnType::Interval(unit) => DataType::Interval(unit),
                             ColumnType::String => DataType::Utf8,
                             ColumnType::VarStr => DataType::Utf8,
                             ColumnType::Boolean => DataType::Boolean,
@@ -491,6 +539,7 @@ impl TableProvider for CubeTableProvider {
                             ColumnType::Int32 => DataType::Int64,
                             ColumnType::Int64 => DataType::Int64,
                             ColumnType::Blob => DataType::Utf8,
+                            ColumnType::Decimal(p, s) => DataType::Decimal(p, s),
                             ColumnType::List(field) => DataType::List(field.clone()),
                             ColumnType::Timestamp => {
                                 DataType::Timestamp(TimeUnit::Millisecond, None)
