@@ -285,7 +285,9 @@ impl Rewriter {
             let rules = Self::rewrite_rules(cube_context.clone());
             let runner = Self::rewrite_runner(cube_context.clone(), egraph);
             let runner = runner.run(rules.iter());
-            log::debug!("Iterations: {:?}", runner.iterations);
+            if !IterInfo::egraph_debug_enabled() {
+                log::debug!("Iterations: {:?}", runner.iterations);
+            }
             let stop_reason = &runner.iterations[runner.iterations.len() - 1].stop_reason;
             let stop_reason = match stop_reason {
                 None => Some("timeout reached".to_string()),

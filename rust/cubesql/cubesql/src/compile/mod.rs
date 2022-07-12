@@ -3767,7 +3767,7 @@ mod tests {
 
         assert_eq!(
             logical_plan,
-            "Projection: CAST(TimestampNanosecond(0, None) AS Timestamp(Nanosecond, None)) AS COL\
+            "Projection: TimestampNanosecond(0, None) AS COL\
             \n  EmptyRelation",
         );
     }
@@ -9856,5 +9856,79 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }
         )
+    }
+
+    #[tokio::test]
+    async fn metabase_date_filters() {
+        init_logger();
+
+        let now = "str_to_date('2022-01-01 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')";
+        let cases = vec![
+            // last 30 days
+            [
+                format!("CAST(({} + (INTERVAL '-30 day')) AS date)", now),
+                format!("CAST({} AS date)", now),
+                "2021-12-02T00:00:00.000Z".to_string(),
+                "2021-12-31T23:59:59.999Z".to_string(),
+            ],
+            // last 30 weeks
+            [
+                format!("(CAST(date_trunc('week', (({} + (INTERVAL '-30 week')) + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
+                format!("(CAST(date_trunc('week', ({} + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
+                "2021-05-30T00:00:00.000Z".to_string(),
+                "2021-12-25T23:59:59.999Z".to_string(),
+            ],
+            // last 30 quarters
+            [
+                format!("date_trunc('quarter', ({} + (INTERVAL '-90 month')))", now),
+                format!("date_trunc('quarter', {})", now),
+                "2014-07-01T00:00:00.000Z".to_string(),
+                "2021-12-31T23:59:59.999Z".to_string(),
+            ],
+            // this year
+            [
+                format!("date_trunc('year', {})", now),
+                format!("date_trunc('year', ({} + (INTERVAL '1 year')))", now),
+                "2022-01-01T00:00:00.000Z".to_string(),
+                "2021-12-31T23:59:59.999Z".to_string(),
+            ],
+            // next 2 years including current
+            [
+                format!("date_trunc('year', {})", now),
+                format!("date_trunc('year', ({} + (INTERVAL '3 year')))", now),
+                "2022-01-01T00:00:00.000Z".to_string(),
+                "2023-12-31T23:59:59.999Z".to_string(),
+            ],
+        ];
+        for [lte, gt, from, to] in cases {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT count FROM (SELECT count FROM KibanaSampleDataEcommerce
+                    WHERE (order_date >= {} AND order_date < {})) source",
+                    lte, gt
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: None,
+                        date_range: Some(json!(vec![from, to])),
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            )
+        }
     }
 }
