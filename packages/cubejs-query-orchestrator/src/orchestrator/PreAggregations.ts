@@ -11,7 +11,6 @@ import {
   BUILD_RANGE_START_LOCAL,
   BUILD_RANGE_END_LOCAL,
   utcToLocalTimeZone,
-  snapTimestamp
 } from '@cubejs-backend/shared';
 
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
@@ -1395,10 +1394,6 @@ export class PreAggregationPartitionRangeLoader {
     if (!buildRange[0] || !buildRange[1]) {
       return { buildRange, partitionRanges: [] };
     }
-    buildRange = [
-      PreAggregationPartitionRangeLoader.snapTimestamp(this.preAggregation, buildRange[0]),
-      PreAggregationPartitionRangeLoader.snapTimestamp(this.preAggregation, buildRange[1]),
-    ];
     let dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
       buildRange,
       this.preAggregation.matchedTimeDimensionDateRange,
@@ -1508,10 +1503,6 @@ export class PreAggregationPartitionRangeLoader {
 
   public static inDbTimeZone(preAggregationDescription: any, timestamp: string): string {
     return inDbTimeZone(preAggregationDescription.timezone, preAggregationDescription.timestampFormat, timestamp);
-  }
-
-  public static snapTimestamp(preAggregation: PreAggregationDescription, timestamp: string) {
-    return snapTimestamp(preAggregation.granularity, PreAggregationPartitionRangeLoader.inDbTimeZone(preAggregation, timestamp));
   }
 
   public static extractDate(data: any): string {
