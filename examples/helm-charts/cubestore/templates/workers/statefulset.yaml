@@ -101,6 +101,14 @@ spec:
       affinity:
         {{- toYaml .Values.workers.affinity | nindent 8 }}
       {{- end }}
+      {{- if .Values.workers.tolerations }}
+      tolerations:
+        {{- toYaml .Values.workers.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workers.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.workers.nodeSelector | nindent 8 }}
+      {{- end }}
       {{- if .Values.workers.spreadConstraints }}
       topologySpreadConstraints:
         {{- toYaml .Values.workers.spreadConstraints | nindent 8 }}

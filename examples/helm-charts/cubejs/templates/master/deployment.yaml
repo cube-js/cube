@@ -89,6 +89,14 @@ spec:
       affinity:
         {{- toYaml .Values.master.affinity | nindent 8 }}
       {{- end }}
+      {{- if .Values.master.tolerations }}
+      tolerations:
+        {{- toYaml .Values.master.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.master.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.master.nodeSelector | nindent 8 }}
+      {{- end }}
       {{- if .Values.master.spreadConstraints }}
       topologySpreadConstraints:
         {{- toYaml .Values.master.spreadConstraints | nindent 8 }}
