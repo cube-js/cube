@@ -149,6 +149,7 @@ class ApiGateway {
     const userMiddlewares: RequestHandler[] = [
       this.checkAuthMiddleware,
       this.requestContextMiddleware,
+      this.logNetworkUsage,
       this.requestLoggerMiddleware
     ];
 
@@ -175,8 +176,6 @@ class ApiGateway {
         graphiql: getEnv('nodeEnv') !== 'production' ? { headerEditorEnabled: true } : false,
       })(req, res);
     });
-
-    app.use(this.logNetworkUsage);
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
