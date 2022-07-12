@@ -49,13 +49,15 @@ export class CubeSymbols {
     let segments;
     const cubeObject = Object.assign({
       allDefinitions(type) {
-        let superDefinitions = {};
-
         if (cubeDefinition.extends) {
-          superDefinitions = super.allDefinitions(type);
+          return {
+            ...super.allDefinitions(type),
+            ...cubeDefinition[type]
+          };
+        } else {
+          // TODO We probably do not need this shallow copy
+          return { ...cubeDefinition[type] };
         }
-
-        return Object.assign({}, superDefinitions, cubeDefinition[type]);
       },
       get measures() {
         if (!measures) {
