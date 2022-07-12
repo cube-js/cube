@@ -9930,5 +9930,41 @@ ORDER BY \"COUNT(count)\" DESC"
                 }
             )
         }
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT \"source\".\"count\" AS \"count\" 
+            FROM (
+                    SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" FROM \"public\".\"KibanaSampleDataEcommerce\"
+                    WHERE \"public\".\"KibanaSampleDataEcommerce\".\"order_date\" 
+                    BETWEEN timestamp with time zone '2022-06-13 12:30:00.000Z' 
+                    AND timestamp with time zone '2022-06-29 12:30:00.000Z'
+            ) 
+            \"source\""
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2022-06-13 12:30:00.000Z".to_string(),
+                        "2022-06-29 12:30:00.000Z".to_string()
+                    ]))
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        )
     }
 }

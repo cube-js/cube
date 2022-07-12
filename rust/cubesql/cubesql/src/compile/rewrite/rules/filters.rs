@@ -617,6 +617,21 @@ impl RewriteRules for FilterRules {
                     filter_cast_unwrap_replacer("?else"),
                 ),
             ),
+            rewrite(
+                "filter-cast-unwrap-between-push-down",
+                filter_cast_unwrap_replacer(between_expr(
+                    column_expr("?column"),
+                    "?negated",
+                    "?low",
+                    "?high",
+                )),
+                between_expr(
+                    column_expr("?column"),
+                    "?negated",
+                    filter_cast_unwrap_replacer("?low"),
+                    filter_cast_unwrap_replacer("?high"),
+                ),
+            ),
             filter_unwrap_cast_push_down("CaseExprExpr"),
             filter_unwrap_cast_push_down_tail("CaseExprExpr"),
             filter_unwrap_cast_push_down("CaseExprWhenThenExpr"),
@@ -1391,7 +1406,7 @@ impl FilterRules {
                 members_var,
                 table_name_var,
             ) {
-                if let Some(_) = cube.lookup_dimension(&member_name) {
+                if let Some(_) = cube.lookup_dimension_by_member_name(&member_name) {
                     for negated in var_iter!(egraph[subst[negated_var]], BetweenExprNegated) {
                         let negated = *negated;
                         if let Some(ConstantFolding::Scalar(low)) =
