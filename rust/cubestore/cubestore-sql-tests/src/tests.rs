@@ -3477,7 +3477,6 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
         .unwrap();
     let mut show_hints = PPOptions::default();
     show_hints.show_filters = true;
-    println!("plan: {}", pp_phys_plan_ext(p.worker.as_ref(), &show_hints));
     assert_eq!(
         pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
         "Projection, [url, SUM(Data.hits)@1:hits, CARDINALITY(MERGE(Data.uhits)@2):uhits]\
