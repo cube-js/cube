@@ -131,6 +131,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             planning_join_with_partitioned_index,
         ),
         t("topk_query", topk_query),
+        t("topk_having", topk_having),
         t("topk_decimals", topk_decimals),
         t("planning_topk_having", planning_topk_having),
         t("planning_topk_hll", planning_topk_hll),
@@ -3297,6 +3298,90 @@ async fn topk_query(service: Box<dyn SqlClient>) {
     assert_eq!(to_rows(&r), rows(&[("a", 1), ("e", 35), ("d", 40)]));
 }
 
+async fn topk_having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80)")
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) < 100 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("y", 80), ("b", 52), ("c", 48)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING MIN(`hits`) >= 3 AND SUM(`hits`) < 100 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("y", 80), ("c", 48), ("d", 44)]));
+    
+    service
+        .exec_query("CREATE TABLE s.Data21(url text, hits int, hits_2 int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data21(url, hits, hits_2) VALUES  ('b', 5, 2), ('d', 3, 4), ('c', 4, 1),  ('e', 2, 10)")
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data22(url text, hits int, hits_2 int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data22(url, hits, hits_2) VALUES ('b', 50, 3), ('c', 45, 12), ('d', 40, 10), ('e', 35, 5)")
+            .await
+            .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data21 \
+                               UNION ALL \
+                               SELECT * FROM s.Data22) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING MAX(`hits_2`) < 11 \
+                         ORDER BY 2 DESC \
+                         LIMIT 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("b", 55), ("d", 43)]));
+
+}
+
 async fn topk_decimals(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -3338,14 +3423,13 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
 async fn planning_topk_having(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
-        .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+        .exec_query("CREATE TABLE s.Data1(url text, hits int, uhits HLL_POSTGRES)")
         .await
         .unwrap();
     service
-        .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+        .exec_query("CREATE TABLE s.Data2(url text, hits int, uhits HLL_POSTGRES)")
         .await
         .unwrap();
-    // A typical top-k query.
     let p = service
         .plan_query(
             "SELECT `url` `url`, SUM(`hits`) `hits` \
@@ -3359,7 +3443,57 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    println!("plan: {}", pp_phys_plan(p.worker.as_ref()));
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, SUM(Data.hits)@1:hits]\
+        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10\
+        \n    Worker\
+        \n      Sort\
+        \n        FullInplaceAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              MergeSort\
+        \n                Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n                  Empty\
+        \n              MergeSort\
+        \n                Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n                  Empty"
+        );
+
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits`, CARDINALITY(MERGE(`uhits`)) `uhits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 10 AND CARDINALITY(MERGE(`uhits`)) > 5 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    println!("plan: {}", pp_phys_plan_ext(p.worker.as_ref(), &show_hints));
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, SUM(Data.hits)@1:hits, CARDINALITY(MERGE(Data.uhits)@2):uhits]\
+        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10 AND CAST(CARDINALITY(MERGE(Data.uhits)@2) AS Int64) > 5\
+        \n    Worker\
+        \n      Sort\
+        \n        FullInplaceAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              MergeSort\
+        \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+        \n                  Empty\
+        \n              MergeSort\
+        \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+        \n                  Empty"
+        );
 }
 async fn planning_topk_hll(service: Box<dyn SqlClient>) {
 
@@ -3385,17 +3519,44 @@ async fn planning_topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        pp_phys_plan(p.router.as_ref()),
-        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
-         \n  AggregateTopK, limit: 3\
-         \n    ClusterSend, partitions: [[2], [1]]"
-        );
-    println!("plan: {}", pp_phys_plan(p.worker.as_ref()));
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
     assert_eq!(
         pp_phys_plan(p.worker.as_ref()),
         "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
          \n  AggregateTopK, limit: 3\
+         \n    Worker\
+         \n      Sort\
+         \n        FullInplaceAggregate\
+         \n          MergeSort\
+         \n            Union\
+         \n              MergeSort\
+         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                  Empty\
+         \n              MergeSort\
+         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                  Empty"
+        );
+
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) > 20 and cardinality(merge(hits)) < 40\
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3, having: CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) > 20 AND CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) < 40\
          \n    Worker\
          \n      Sort\
          \n        FullInplaceAggregate\
@@ -3458,6 +3619,41 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&r),
         rows(&[("d", 10383), ("b", 9722), ("c", 171)])
+    ); 
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) < 10000
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("b", 9722), ("c", 171), ("h", 164)])
+    ); 
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) < 170 and cardinality(merge(hits)) > 160
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("h", 164)])
     ); 
 
 }

@@ -32,7 +32,8 @@ pub fn materialize_topk(p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> 
                 expr: sort_expr,
                 input: sort_input,
             } => {
-                let projection = extract_column_projection(&sort_input);
+                let projection = extract_projection_and_having(&sort_input);
+
                 let aggregate = projection.as_ref().map(|p| p.input).unwrap_or(sort_input);
                 match aggregate.as_ref() {
                     LogicalPlan::Aggregate {
@@ -78,6 +79,9 @@ pub fn materialize_topk(p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> 
                                         group_expr: group_expr.clone(),
                                         aggregate_expr: aggr_expr.clone(),
                                         order_by: sort_columns,
+                                        having_expr: projection
+                                            .as_ref()
+                                            .map_or(None, |p| p.having_expr.clone()),
                                         schema: aggregate_schema.clone(),
                                         snapshots: cs.snapshots.clone(),
                                     }),
@@ -194,9 +198,17 @@ struct ColumnProjection<'a> {
     input: &'a Arc<LogicalPlan>,
     schema: &'a DFSchemaRef,
     post_projection: Vec<Expr>,
+    having_expr: Option<Expr>,
 }
 
-fn extract_column_projection(p: &LogicalPlan) -> Option<ColumnProjection> {
+fn extract_having(p: &Arc<LogicalPlan>) -> (Option<Expr>, &Arc<LogicalPlan>) {
+    match p.as_ref() {
+        LogicalPlan::Filter { predicate, input } => (Some(predicate.clone()), input),
+        _ => (None, p),
+    }
+}
+
+fn extract_projection_and_having(p: &LogicalPlan) -> Option<ColumnProjection> {
     match p {
         LogicalPlan::Projection {
             expr,
@@ -237,11 +249,13 @@ fn extract_column_projection(p: &LogicalPlan) -> Option<ColumnProjection> {
                     _ => return None,
                 }
             }
+            let (having_expr, input) = extract_having(input);
             Some(ColumnProjection {
                 input_columns,
                 input,
                 schema,
                 post_projection,
+                having_expr,
             })
         }
         _ => None,
@@ -372,12 +386,19 @@ pub fn plan_topk(
         /*max_batch_rows*/ max(2 * node.limit, MIN_TOPK_STREAM_ROWS),
     )?;
 
+    let having = if let Some(predicate) = &node.having_expr {
+        Some(planner.create_physical_expr(predicate, &node.schema, &schema, ctx)?)
+    } else {
+        None
+    };
+
     Ok(Arc::new(AggregateTopKExec::new(
         node.limit,
         group_expr_len,
         initial_aggregate_expr,
         &agg_fun,
         node.order_by.clone(),
+        having,
         cluster,
         schema,
     )))
