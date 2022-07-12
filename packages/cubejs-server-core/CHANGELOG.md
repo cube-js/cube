@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.34](https://github.com/cube-js/cube.js/compare/v0.30.33...v0.30.34) (2022-07-12)
+
+
+### Bug Fixes
+
+* **server-core:** driverFactory result type checking ([6913a49](https://github.com/cube-js/cube.js/commit/6913a49005ae1e88a8e184be5cbf9f8d9f4e6930))
+
+
+### Features
+
+* **server-core:** pre-aggregations building by API instances only if CUBEJS_PRE_AGGREGATIONS_BUILDER is set ([a203513](https://github.com/cube-js/cube.js/commit/a203513666bb36c7f45e25fdf24908bf6d44ac3d))
+
+
+
+
+
 ## [0.30.33](https://github.com/cube-js/cube.js/compare/v0.30.32...v0.30.33) (2022-07-07)
 
 

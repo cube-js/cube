@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.34](https://github.com/cube-js/cube.js/compare/v0.30.33...v0.30.34) (2022-07-12)
+
+
+### Features
+
+* **cubesql:** Metabase - BETWEEN filters support ([#4852](https://github.com/cube-js/cube.js/issues/4852)) ([b191120](https://github.com/cube-js/cube.js/commit/b19112079f0f9a51d6703e37afaa121d09ce31e4))
+* **cubesql:** Metabase - filters with relative dates support ([#4851](https://github.com/cube-js/cube.js/issues/4851)) ([423be2f](https://github.com/cube-js/cube.js/commit/423be2f33d40ccd5681c47201586ac93944ac9dd))
+* **cubesql:** Support Extract(DAY/DOW), Binary (?expr + ?literal_expr) for rewriting (Metabase) ([#4887](https://github.com/cube-js/cube.js/issues/4887)) ([2565705](https://github.com/cube-js/cube.js/commit/2565705fcff6a3d3dc4ff5ac2dcd819d8ad040db))
+* **cubesql:** Support Substring for rewriting (Metabase) ([#4881](https://github.com/cube-js/cube.js/issues/4881)) ([8fadebd](https://github.com/cube-js/cube.js/commit/8fadebd7670e9f461a16e51e5114812933722ddd))
+
+
+
+
+
 ## [0.30.32](https://github.com/cube-js/cube.js/compare/v0.30.31...v0.30.32) (2022-07-07)
 
 

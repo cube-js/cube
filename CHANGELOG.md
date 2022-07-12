@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.34](https://github.com/cube-js/cube.js/compare/v0.30.33...v0.30.34) (2022-07-12)
+
+
+### Bug Fixes
+
+* **api-gateway:** Sending "Incoming network usage" event after context resolver ([#4896](https://github.com/cube-js/cube.js/issues/4896)) ([eecf776](https://github.com/cube-js/cube.js/commit/eecf776c2b9f959b4601143d92a7921b70709a95))
+* Cache allDefinitions Object.assign invocations to optimize highly dynamic schema SQL execution ([#4894](https://github.com/cube-js/cube.js/issues/4894)) ([ad3fea8](https://github.com/cube-js/cube.js/commit/ad3fea8610aaee7aae33623821a2aa3a3416a62a))
+* **cubestore:** Elaborate on can't be listed after upload error ([bd1ec69](https://github.com/cube-js/cube.js/commit/bd1ec6930bf3de3173208e0416ab8c35f2d47a76))
+* **cubestore:** Fix index selection in case of AND in conditions ([a0e03ab](https://github.com/cube-js/cube.js/commit/a0e03abe698cdd9db09653824f80ee688feca6d5))
+* **cubestore:** removing HLL columns from indexes ([#4884](https://github.com/cube-js/cube.js/issues/4884)) ([e7df6e8](https://github.com/cube-js/cube.js/commit/e7df6e882868979d7ccaa71ea1904b6d636ca206))
+* **server-core:** driverFactory result type checking ([6913a49](https://github.com/cube-js/cube.js/commit/6913a49005ae1e88a8e184be5cbf9f8d9f4e6930))
+
+
+### Features
+
+* **cubesql:** Metabase - BETWEEN filters support ([#4852](https://github.com/cube-js/cube.js/issues/4852)) ([b191120](https://github.com/cube-js/cube.js/commit/b19112079f0f9a51d6703e37afaa121d09ce31e4))
+* **cubesql:** Metabase - filters with relative dates support ([#4851](https://github.com/cube-js/cube.js/issues/4851)) ([423be2f](https://github.com/cube-js/cube.js/commit/423be2f33d40ccd5681c47201586ac93944ac9dd))
+* **cubesql:** Support Extract(DAY/DOW), Binary (?expr + ?literal_expr) for rewriting (Metabase) ([#4887](https://github.com/cube-js/cube.js/issues/4887)) ([2565705](https://github.com/cube-js/cube.js/commit/2565705fcff6a3d3dc4ff5ac2dcd819d8ad040db))
+* **cubesql:** Support Substring for rewriting (Metabase) ([#4881](https://github.com/cube-js/cube.js/issues/4881)) ([8fadebd](https://github.com/cube-js/cube.js/commit/8fadebd7670e9f461a16e51e5114812933722ddd))
+* **server-core:** pre-aggregations building by API instances only if CUBEJS_PRE_AGGREGATIONS_BUILDER is set ([a203513](https://github.com/cube-js/cube.js/commit/a203513666bb36c7f45e25fdf24908bf6d44ac3d))
+
+
+
+
+
 ## [0.30.33](https://github.com/cube-js/cube.js/compare/v0.30.32...v0.30.33) (2022-07-07)
 
 

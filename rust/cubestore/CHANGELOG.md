@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.34](https://github.com/cube-js/cube.js/compare/v0.30.33...v0.30.34) (2022-07-12)
+
+
+### Bug Fixes
+
+* **cubestore:** Elaborate on can't be listed after upload error ([bd1ec69](https://github.com/cube-js/cube.js/commit/bd1ec6930bf3de3173208e0416ab8c35f2d47a76))
+* **cubestore:** Fix index selection in case of AND in conditions ([a0e03ab](https://github.com/cube-js/cube.js/commit/a0e03abe698cdd9db09653824f80ee688feca6d5))
+* **cubestore:** removing HLL columns from indexes ([#4884](https://github.com/cube-js/cube.js/issues/4884)) ([e7df6e8](https://github.com/cube-js/cube.js/commit/e7df6e882868979d7ccaa71ea1904b6d636ca206))
+
+
+
+
+
 ## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
