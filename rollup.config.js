@@ -5,11 +5,11 @@ import alias from '@rollup/plugin-alias';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 
 const extensions = ['.js', '.jsx', '.ts', '.tsx'];
+const resolvePlugin = resolve({
+  extensions,
+  mainFields: ['browser', 'module', 'main'],
+});
 const basePlugins = [
-  resolve({
-    extensions,
-    mainFields: ['browser', 'module', 'main'],
-  }),
   commonjs({
     include: '**/node_modules/**',
   }),
@@ -47,6 +47,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
   const baseUmdConfig = {
     ...(umdConfig || baseConfig),
     plugins: [
+      resolvePlugin,
       ...basePlugins,
       alias({
         entries: {
@@ -84,6 +85,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       ...baseConfig,
       plugins: [
         peerDepsExternal(),
+        resolvePlugin,
         ...basePlugins,
       ],
       output: [
