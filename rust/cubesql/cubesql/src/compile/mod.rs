@@ -9928,7 +9928,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     offset: None,
                     filters: None
                 }
-            )
+            );
         }
 
         let logical_plan = convert_select_to_query_plan(
@@ -9965,6 +9965,68 @@ ORDER BY \"COUNT(count)\" DESC"
                 offset: None,
                 filters: None
             }
-        )
+        );
+
+        let cases = vec![
+            // prev 5 days starting 4 weeks ago
+            [
+                "(INTERVAL '4 week')".to_string(),
+                format!("CAST(({} + (INTERVAL '-5 day')) AS date)", now),
+                format!("CAST({} AS date)", now),
+                "2021-11-29T00:00:00.000Z".to_string(),
+                "2021-12-04T00:00:00.000Z".to_string(),
+            ],
+            // prev 5 weeks starting 4 weeks ago
+            [
+                "(INTERVAL '4 week')".to_string(),
+                format!("(CAST(date_trunc('week', (({} + (INTERVAL '-5 week')) + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
+                format!("(CAST(date_trunc('week', ({} + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
+                "2021-10-24T00:00:00.000Z".to_string(),
+                "2021-11-28T00:00:00.000Z".to_string(),
+            ],
+            // prev 5 months starting 4 months ago
+            [
+                "(INTERVAL '4 month')".to_string(),
+                format!("date_trunc('month', ({} + (INTERVAL '-5 month')))", now),
+                format!("date_trunc('month', {})", now),
+                "2021-04-03T00:00:00.000Z".to_string(),
+                "2021-09-03T00:00:00.000Z".to_string(),
+            ],
+        ];
+
+        for [interval, lowest, highest, from, to] in cases {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT \"source\".\"count\" AS \"count\" 
+                    FROM (
+                        SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" FROM \"public\".\"KibanaSampleDataEcommerce\"
+                        WHERE (\"public\".\"KibanaSampleDataEcommerce\".\"order_date\" + {}) BETWEEN {} AND {}
+                    ) 
+                    \"source\"",
+                    interval, lowest, highest
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: None,
+                        date_range: Some(json!(vec![from, to])),
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            );
+        }
     }
 }
