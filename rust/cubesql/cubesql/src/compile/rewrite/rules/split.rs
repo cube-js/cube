@@ -9,15 +9,20 @@ use crate::{
             outer_aggregate_split_replacer, outer_projection_split_replacer, projection,
             projection_expr, projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
             rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
-            AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn, CubeScanTableName,
-            InnerAggregateSplitReplacerCube, LogicalPlanLanguage, OuterAggregateSplitReplacerCube,
-            OuterProjectionSplitReplacerCube, ProjectionAlias, TableScanSourceTableName,
+            AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, ColumnExprColumn,
+            CubeScanTableName, InnerAggregateSplitReplacerCube, LiteralExprValue,
+            LogicalPlanLanguage, OuterAggregateSplitReplacerCube, OuterProjectionSplitReplacerCube,
+            ProjectionAlias, TableScanSourceTableName,
         },
     },
     transport::V1CubeMetaExt,
     var, var_iter,
 };
-use datafusion::{logical_plan::Column, physical_plan::aggregates::AggregateFunction};
+use datafusion::{
+    logical_plan::{Column, Operator},
+    physical_plan::aggregates::AggregateFunction,
+    scalar::ScalarValue,
+};
 use egg::{EGraph, Rewrite, Subst};
 use std::sync::Arc;
 
@@ -567,37 +572,48 @@ impl RewriteRules for SplitRules {
                     "?cube", "?fun", "?arg", "?column", "?alias", false,
                 ),
             ),
-            // ?expr + ?literal_exrp
-            rewrite(
-                "split-push-down-binary-plus-inner-replacer",
+            // ?expr ?op literal_expr("?right")
+            transforming_rewrite(
+                "split-push-down-binary-inner-replacer",
                 inner_aggregate_split_replacer(
-                    binary_expr("?expr", "+", literal_expr("?right")),
+                    binary_expr("?expr", "?original_op", literal_expr("?original_literal")),
                     "?cube",
                 ),
                 inner_aggregate_split_replacer("?expr", "?cube"),
+                self.split_binary("?original_op", "?original_literal", None),
             ),
-            rewrite(
-                "split-push-down-binary-plus-outer-replacer",
+            transforming_rewrite(
+                "split-push-down-binary-outer-replacer",
                 outer_projection_split_replacer(
-                    binary_expr("?expr", "+", literal_expr("?right")),
+                    binary_expr("?expr", "?original_op", literal_expr("?original_literal")),
                     "?cube",
                 ),
                 binary_expr(
                     outer_projection_split_replacer("?expr", "?cube"),
-                    "+",
-                    literal_expr("?right"),
+                    "?op",
+                    literal_expr("?literal"),
+                ),
+                self.split_binary(
+                    "?original_op",
+                    "?original_literal",
+                    Some(("?op", "?literal")),
                 ),
             ),
-            rewrite(
-                "split-push-down-binary-plus-outer-aggr-replacer",
+            transforming_rewrite(
+                "split-push-down-binary-outer-aggr-replacer",
                 outer_aggregate_split_replacer(
-                    binary_expr("?expr", "+", literal_expr("?right")),
+                    binary_expr("?expr", "?original_op", literal_expr("?original_literal")),
                     "?cube",
                 ),
                 binary_expr(
                     outer_aggregate_split_replacer("?expr", "?cube"),
-                    "+",
-                    literal_expr("?right"),
+                    "?op",
+                    literal_expr("?literal"),
+                ),
+                self.split_binary(
+                    "?original_op",
+                    "?original_literal",
+                    Some(("?op", "?literal")),
                 ),
             ),
             // Cast
@@ -887,6 +903,69 @@ impl SplitRules {
                     return true;
                 }
             }
+            false
+        }
+    }
+
+    fn split_binary(
+        &self,
+        binary_op_var: &'static str,
+        literal_expr_var: &'static str,
+        return_vars: Option<(&'static str, &'static str)>,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let binary_op_var = var!(binary_op_var);
+        let literal_expr_var = var!(literal_expr_var);
+
+        move |egraph, subst| {
+            for operator in var_iter!(egraph[subst[binary_op_var]], BinaryExprOp).cloned() {
+                let check_is_zero = match operator {
+                    Operator::Plus | Operator::Minus | Operator::Divide => false,
+                    Operator::Multiply => true,
+                    _ => continue,
+                };
+
+                for scalar in var_iter!(egraph[subst[literal_expr_var]], LiteralExprValue).cloned()
+                {
+                    // This match is re-used to verify literal_expr type
+                    let is_zero = match scalar {
+                        ScalarValue::UInt64(Some(v)) => v == 0,
+                        ScalarValue::UInt32(Some(v)) => v == 0,
+                        ScalarValue::UInt16(Some(v)) => v == 0,
+                        ScalarValue::UInt8(Some(v)) => v == 0,
+                        ScalarValue::Int64(Some(v)) => v == 0,
+                        ScalarValue::Int32(Some(v)) => v == 0,
+                        ScalarValue::Int16(Some(v)) => v == 0,
+                        ScalarValue::Int8(Some(v)) => v == 0,
+                        ScalarValue::Float32(Some(v)) => v == 0.0,
+                        ScalarValue::Float64(Some(v)) => v == 0.0,
+                        _ => continue,
+                    };
+
+                    if check_is_zero && is_zero {
+                        continue;
+                    }
+
+                    if let Some((return_binary_op_var, return_literal_expr_var)) = return_vars {
+                        let return_binary_op_var = var!(return_binary_op_var);
+                        let return_literal_expr_var = var!(return_literal_expr_var);
+
+                        subst.insert(
+                            return_binary_op_var,
+                            egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(operator))),
+                        );
+
+                        subst.insert(
+                            return_literal_expr_var,
+                            egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                                scalar,
+                            ))),
+                        );
+                    }
+
+                    return true;
+                }
+            }
+
             false
         }
     }

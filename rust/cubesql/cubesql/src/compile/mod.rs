@@ -9097,6 +9097,45 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_binary_expr_projection_split() -> Result<(), CubeError> {
+        let operators = ["+", "-", "*", "/"];
+
+        for operator in operators {
+            let query_plan = convert_select_to_query_plan(
+                format!("SELECT
+                    (
+                        CAST(
+                             \"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" AS integer
+                        ) {} 100
+                    ) AS \"taxful_total_price\"
+                FROM
+                    \"public\".\"KibanaSampleDataEcommerce\"", operator),
+                DatabaseProtocol::PostgreSQL,
+            )
+                .await;
+
+            let logical_plan = query_plan.as_logical_plan();
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    segments: Some(vec![]),
+                    dimensions: Some(vec![
+                        "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                    ]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                }
+            );
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_metabase_dow() -> Result<(), CubeError> {
         let query_plan = convert_select_to_query_plan(
             "SELECT
