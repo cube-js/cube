@@ -51,30 +51,8 @@
 
     a {
       border: none;
-
-      img {
-        // @TODO I'm sorry future me
-        box-shadow: none !important;
-        border: none !important;
-        max-height: 160px;
-      }
+      width: 100%;
     }
-  }
-
-  .grid-item-image {
-    display: flex;
-    flex: 1;
-    justify-content: center;
-  }
-
-  .grid-item-title {
-    font-family: $header-font;
-    font-weight: bold;
-    line-height: 32px;
-    font-size: 19px;
-    letter-spacing: 0.02em;
-    color: $brand-color;
-    text-align: center;
   }
 }
 

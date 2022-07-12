@@ -2,17 +2,19 @@ import React from 'react';
 
 import { GridContext, GridProps } from './Grid';
 
-export type GridItemProps = {
-  imageUrl: string;
+export type HomeGridItemProps = {
+  description: string;
+  image: string;
   title: string;
   url: string;
 };
 
-export const GridItem = ({
-  imageUrl,
+export const HomeGridItem = ({
+  description,
+  image,
   title,
   url,
-}: GridItemProps) => {
+}: HomeGridItemProps) => {
   return (
     <GridContext.Consumer>
       {(value) => {
@@ -22,16 +24,19 @@ export const GridItem = ({
         return (
           <div className="grid-item">
             <a href={url}>
-              <div className="card">
+              <div className="card card--home">
                 <div className="card__image">
                   <img
-                    src={imageUrl}
+                    src={image}
                     alt={title}
                     width={width}
                     height={height}
                   />
                 </div>
-                <div className="card__title">{title}</div>
+                <div className="card__text card__text--right">
+                  <div className="card__title">{title}</div>
+                  <div className="card__description">{description}</div>
+                </div>
               </div>
             </a>
           </div>
