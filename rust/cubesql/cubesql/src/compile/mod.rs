@@ -10593,8 +10593,8 @@ ORDER BY \"COUNT(count)\" DESC"
         );
     }
 
-    #[test]
-    fn datastudio_date_aggregations() {
+    #[tokio::test]
+    async fn datastudio_date_aggregations() {
         let supported_granularities = vec![
             // date
             [
@@ -10631,10 +10631,11 @@ ORDER BY \"COUNT(count)\" DESC"
             // iso week / iso year / day of year
             ["DATE_TRUNC('SECOND', \"order_date\")", "second"],
             // month, day
-            [
-                "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
-                "day",
-            ],
+            // TODO: support TO_CHAR aggregation
+            // [
+            //     "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
+            //     "second",
+            // ],
             // date, hour, minute
             [
                 "DATE_TRUNC('MINUTE', DATE_TRUNC('SECOND', \"order_date\"))",
@@ -10665,6 +10666,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 ),
                 DatabaseProtocol::PostgreSQL,
             )
+            .await
             .as_logical_plan();
 
             assert_eq!(
@@ -10676,6 +10678,44 @@ ORDER BY \"COUNT(count)\" DESC"
                     time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                         dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                         granularity: Some(expected_granularity.to_string()),
+                        date_range: None,
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn test_extract_date_trunc_week() {
+        let supported_granularities = vec![
+            "EXTRACT(WEEK FROM DATE_TRUNC('MONTH', \"order_date\"))::integer",
+            "EXTRACT(MONTH FROM DATE_TRUNC('WEEK', \"order_date\"))::integer",
+        ];
+
+        for expr in supported_granularities {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT {} AS \"qt_u3dj8wr1vc\" FROM KibanaSampleDataEcommerce GROUP BY \"qt_u3dj8wr1vc\"",
+                    expr
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("day".to_string()),
                         date_range: None,
                     }]),
                     order: None,

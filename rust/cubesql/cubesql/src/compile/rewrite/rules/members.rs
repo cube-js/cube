@@ -780,10 +780,12 @@ impl MemberRules {
         }
     }
 
-    pub fn transform_original_expr_date_trunc(
+    pub fn transform_original_expr_nested_date_trunc(
         original_expr_var: &'static str,
         // Original granularity from date_part/date_trunc
-        granularity_var: &'static str,
+        outer_granularity_var: &'static str,
+        // Original nested granularity from date_trunc
+        inner_granularity_var: &'static str,
         // Var for substr which is used to pass value to Date_Trunc
         date_trunc_granularity_var: &'static str,
         column_expr_var: &'static str,
@@ -791,7 +793,8 @@ impl MemberRules {
         inner_replacer: bool,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let original_expr_var = var!(original_expr_var);
-        let granularity_var = var!(granularity_var);
+        let outer_granularity_var = var!(outer_granularity_var);
+        let inner_granularity_var = var!(inner_granularity_var);
         let date_trunc_granularity_var = var!(date_trunc_granularity_var);
         let column_expr_var = var!(column_expr_var);
         let alias_expr_var = alias_expr_var.map(|alias_expr_var| var!(alias_expr_var));
@@ -807,20 +810,25 @@ impl MemberRules {
                         "Original expr wasn't prepared for {:?}",
                         original_expr_id
                     )));
-            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
-                let date_trunc_granularity = match granularity {
-                    ScalarValue::Utf8(Some(granularity)) => {
-                        if inner_replacer {
-                            match granularity.to_lowercase().as_str() {
-                                "dow" | "doy" => "day".to_string(),
-                                _ => granularity.clone(),
-                            }
-                        } else {
-                            granularity.clone()
-                        }
-                    }
-                    _ => continue,
+
+            for granularity in var_iter!(egraph[subst[outer_granularity_var]], LiteralExprValue) {
+                let outer_granularity = match Self::parse_granularity(granularity, inner_replacer) {
+                    Some(granularity) => granularity,
+                    None => continue,
                 };
+                let inner_granularity = if outer_granularity_var == inner_granularity_var {
+                    outer_granularity.clone()
+                } else {
+                    var_iter!(egraph[subst[inner_granularity_var]], LiteralExprValue)
+                        .find_map(|g| Self::parse_granularity(g, inner_replacer))
+                        .unwrap_or(outer_granularity.clone())
+                };
+
+                let date_trunc_granularity =
+                    match Self::get_least_granularity(&outer_granularity, &inner_granularity) {
+                        Some(granularity) => granularity,
+                        None => continue,
+                    };
 
                 if let Ok(expr) = res {
                     // TODO unwrap
@@ -856,6 +864,27 @@ impl MemberRules {
             }
             false
         }
+    }
+
+    pub fn transform_original_expr_date_trunc(
+        original_expr_var: &'static str,
+        // Original granularity from date_part/date_trunc
+        granularity_var: &'static str,
+        // Var for substr which is used to pass value to Date_Trunc
+        date_trunc_granularity_var: &'static str,
+        column_expr_var: &'static str,
+        alias_expr_var: Option<&'static str>,
+        inner_replacer: bool,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        Self::transform_original_expr_nested_date_trunc(
+            original_expr_var,
+            granularity_var,
+            granularity_var,
+            date_trunc_granularity_var,
+            column_expr_var,
+            alias_expr_var,
+            inner_replacer,
+        )
     }
 
     fn push_down_projection(
@@ -1660,6 +1689,41 @@ impl MemberRules {
     pub fn default_count_measure_name() -> String {
         "count".to_string()
     }
+
+    fn get_least_granularity(
+        first_granularity: &String,
+        second_granularity: &String,
+    ) -> Option<String> {
+        if first_granularity == second_granularity {
+            return Some(first_granularity.clone());
+        }
+
+        match (
+            CubeTimeGranularity::from_str(first_granularity),
+            CubeTimeGranularity::from_str(second_granularity),
+        ) {
+            (Some(first), Some(second)) => {
+                Some(CubeTimeGranularity::larger_of_two(first, second).to_str())
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_granularity(granularity: &ScalarValue, to_normalize: bool) -> Option<String> {
+        match granularity {
+            ScalarValue::Utf8(Some(granularity)) => {
+                if to_normalize {
+                    match granularity.to_lowercase().as_str() {
+                        "dow" | "doy" => Some("day".to_string()),
+                        _ => Some(granularity.clone()),
+                    }
+                } else {
+                    Some(granularity.clone())
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 pub fn add_member_error(
@@ -1679,4 +1743,64 @@ pub fn add_member_error(
         member_error,
         member_priority,
     ]))
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+enum CubeTimeGranularity {
+    Second = 0,
+    Minute,
+    Hour,
+    Day,
+    Week,
+    Month,
+    Quarter,
+    Year,
+}
+
+impl CubeTimeGranularity {
+    fn from_str(str: &String) -> Option<CubeTimeGranularity> {
+        match str.to_lowercase().as_str() {
+            "year" => Some(CubeTimeGranularity::Year),
+            "quarter" => Some(CubeTimeGranularity::Quarter),
+            "month" => Some(CubeTimeGranularity::Month),
+            "week" => Some(CubeTimeGranularity::Week),
+            "day" => Some(CubeTimeGranularity::Day),
+            "hour" => Some(CubeTimeGranularity::Hour),
+            "minute" => Some(CubeTimeGranularity::Minute),
+            "second" => Some(CubeTimeGranularity::Second),
+            _ => None,
+        }
+    }
+
+    fn to_str(&self) -> String {
+        match &self {
+            CubeTimeGranularity::Year => "year".to_string(),
+            CubeTimeGranularity::Quarter => "quarter".to_string(),
+            CubeTimeGranularity::Month => "month".to_string(),
+            CubeTimeGranularity::Week => "week".to_string(),
+            CubeTimeGranularity::Day => "day".to_string(),
+            CubeTimeGranularity::Hour => "hour".to_string(),
+            CubeTimeGranularity::Minute => "minute".to_string(),
+            CubeTimeGranularity::Second => "second".to_string(),
+        }
+    }
+
+    fn larger_of_two(
+        first_granularity: CubeTimeGranularity,
+        second_granularity: CubeTimeGranularity,
+    ) -> CubeTimeGranularity {
+        if first_granularity == second_granularity {
+            first_granularity
+        } else if first_granularity == CubeTimeGranularity::Week
+            || second_granularity == CubeTimeGranularity::Week
+        {
+            CubeTimeGranularity::Day
+        } else {
+            if first_granularity as i32 > second_granularity as i32 {
+                first_granularity
+            } else {
+                second_granularity
+            }
+        }
+    }
 }

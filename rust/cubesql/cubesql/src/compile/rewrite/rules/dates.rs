@@ -305,6 +305,7 @@ impl RewriteRules for DateRules {
                     vec!["?left".to_string(), literal_expr("?interval")],
                 ),
                 self.transform_interval_binary_expr("?interval"),
+            ),
             rewrite(
                 "datastudio-dates",
                 fun_expr(
