@@ -4,13 +4,15 @@
   "license": "MIT",
   "scripts": {
     "dev": "parcel index.html",
-    "build": "parcel build index.html"
+    "build": "parcel build index.html",
+    "preview": "netlify deploy",
+    "deploy": "netlify deploy --prod"
   },
   "devDependencies": {
     "parcel": "^2.6.2",
     "process": "^0.11.10"
   },
   "dependencies": {
-    "cube-example-wrapper": "^1.0.26"
+    "@cube-dev/example-wrapper": "^1.1.1"
   }
 }

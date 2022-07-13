@@ -5,7 +5,7 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { clientWithCubeCloud } from "./ApolloClient/clientWithCubeCloud";
 import { ApolloProvider } from '@apollo/client';
-import createExampleWrapper from "cube-example-wrapper";
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
 const exampleDescription = {
   title: "Chart.js Metrics Dashboard",

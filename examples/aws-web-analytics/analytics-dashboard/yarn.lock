@@ -1243,10 +1243,10 @@
   resolved "https://registry.npmjs.org/@csstools/normalize.css/-/normalize.css-10.1.0.tgz"
   integrity sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==
 
-"@cube-dev/example-wrapper@^1.0.0":
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/@cube-dev/example-wrapper/-/example-wrapper-1.0.0.tgz#bc6e7e48722591cd600ee87dac7f08d849aca44b"
-  integrity sha512-Hry8HkIHSzhGd7pxJgyfFb5z9yQACksDrh7JYMDfrilJWS2HsXS9bTiJjTDINfc78QGps117/e9jFJpF0ZqkjQ==
+"@cube-dev/example-wrapper@^1.1.1":
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/@cube-dev/example-wrapper/-/example-wrapper-1.1.1.tgz#3a129a17243c01ed80fdc6099a2f962847bc2525"
+  integrity sha512-4buw1iuh8906FQPEp4rk79BhnPeoxRXUqrCAWLyUkTITXEdo6By0qXlL1cmG7GBchdTiyTMwbnW3ji2Kic+TtQ==
   dependencies:
     "@cubejs-client/core" "^0.29.33"
     cubedev-tracking "^1.1.0"
