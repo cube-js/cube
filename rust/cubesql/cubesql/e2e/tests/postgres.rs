@@ -643,6 +643,20 @@ impl PostgresIntegrationTestSuite {
 
         Ok(())
     }
+
+    // Hightouch uses it
+    async fn test_simple_query_prepare(&self) -> RunResult<()> {
+        self.test_simple_query("PREPARE simple_query AS SELECT 1".to_string(), |_| {})
+            .await?;
+
+        self.test_simple_query(
+            "PREPARE simple_query_parens AS (SELECT 1)".to_string(),
+            |_| {},
+        )
+        .await?;
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -664,6 +678,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_simple_cursors_without_hold().await?;
         self.test_simple_cursors_close_specific().await?;
         self.test_simple_cursors_close_all().await?;
+        self.test_simple_query_prepare().await?;
         self.test_snapshot_execute_query(
             "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
             None,
