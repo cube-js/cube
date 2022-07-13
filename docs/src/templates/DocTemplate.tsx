@@ -297,7 +297,10 @@ class DocTemplate extends Component<Props, State> {
 
     return (
       <div>
-        <Helmet title={`${frontmatter.title} | Cube Docs`} />
+        <Helmet>
+          <title>{`${frontmatter.title} | Cube Docs`}</title>
+          <meta name="description" content={`${frontmatter.title} | Documentation for working with Cube, the open-source analytics framework`}></meta>
+        </Helmet>
         <div className={styles.docContentWrapper}>
           <div className={styles.docContent}>
             <h1 id={kebabCase(frontmatter.title)}>{frontmatter.title}</h1>
