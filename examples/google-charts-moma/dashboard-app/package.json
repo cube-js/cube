@@ -4,10 +4,12 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
-    "cube-example-wrapper": "^1.0.26"
+    "@cube-dev/example-wrapper": "^1.1.1"
   },
   "scripts": {
-    "build": "browserify wrapper.js -o wrapper.build.js"
+    "build": "browserify wrapper.js -o wrapper.build.js",
+    "preview": "netlify deploy --dir .",
+    "deploy": "netlify deploy --prod"
   },
   "devDependencies": {
     "browserify": "^17.0.0"

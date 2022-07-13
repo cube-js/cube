@@ -470,3 +470,167 @@ jobs:
           EXAMPLE_SLUG: auth0
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_AUTH0 }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  bigquery-public-datasets:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/bigquery-public-datasets/*,examples/bigquery-public-datasets/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: bigquery-public-datasets
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  google-charts-moma:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/google-charts-moma/*,examples/google-charts-moma/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: google-charts-moma
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  deepnote:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/deepnote/*,examples/deepnote/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: deepnote
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_FRONTEND_SUBDIRECTORY: './'
+
+  graphql-api-metrics-dashboard:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/graphql-api-metrics-dashboard/*,examples/graphql-api-metrics-dashboard/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: graphql-api-metrics-dashboard
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_FRONTEND_SUBDIRECTORY: './'
+
+  multi-tenant-analytics:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/multi-tenant-analytics/*,examples/multi-tenant-analytics/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: multi-tenant-analytics
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  react-pivot-table:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-pivot-table/*,examples/react-pivot-table/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: react-pivot-table
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  slack-vibe:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/slack-vibe/*,examples/slack-vibe/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: slack-vibe
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_FRONTEND_SUBDIRECTORY: 'frontend'
