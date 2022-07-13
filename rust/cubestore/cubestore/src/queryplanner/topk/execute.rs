@@ -1,4 +1,5 @@
 use crate::queryplanner::topk::SortColumn;
+use crate::queryplanner::udfs::read_sketch;
 use arrow::array::ArrayRef;
 use arrow::compute::SortOptions;
 use arrow::datatypes::SchemaRef;
@@ -8,15 +9,18 @@ use async_trait::async_trait;
 use datafusion::cube_ext;
 use datafusion::error::DataFusionError;
 
-use datafusion::physical_plan::aggregates::AggregateFunction;
+use datafusion::physical_plan::common::collect;
+use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::group_scalar::GroupByScalar;
 use datafusion::physical_plan::hash_aggregate::{
     create_accumulators, create_group_by_values, write_group_result_row, AccumulatorSet,
     AggregateMode,
 };
+use datafusion::physical_plan::limit::GlobalLimitExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::{
-    AggregateExpr, ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
+    AggregateExpr, ExecutionPlan, OptimizerHints, Partitioning, PhysicalExpr,
+    SendableRecordBatchStream,
 };
 use datafusion::scalar::ScalarValue;
 use flatbuffers::bitflags::_core::cmp::Ordering;
@@ -30,6 +34,14 @@ use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TopKAggregateFunction {
+    Sum,
+    Min,
+    Max,
+    Merge,
+}
+
 #[derive(Debug)]
 pub struct AggregateTopKExec {
     pub limit: usize,
@@ -37,21 +49,23 @@ pub struct AggregateTopKExec {
     pub agg_expr: Vec<Arc<dyn AggregateExpr>>,
     pub agg_descr: Vec<AggDescr>,
     pub order_by: Vec<SortColumn>,
+    pub having: Option<Arc<dyn PhysicalExpr>>,
     /// Always an instance of ClusterSendExec or WorkerExec.
     pub cluster: Arc<dyn ExecutionPlan>,
     pub schema: SchemaRef,
 }
 
 /// Third item is the neutral value for the corresponding aggregate function.
-type AggDescr = (AggregateFunction, SortOptions, ScalarValue);
+type AggDescr = (TopKAggregateFunction, SortOptions, ScalarValue);
 
 impl AggregateTopKExec {
     pub fn new(
         limit: usize,
         key_len: usize,
         agg_expr: Vec<Arc<dyn AggregateExpr>>,
-        agg_fun: &[AggregateFunction],
+        agg_fun: &[TopKAggregateFunction],
         order_by: Vec<SortColumn>,
+        having: Option<Arc<dyn PhysicalExpr>>,
         cluster: Arc<dyn ExecutionPlan>,
         schema: SchemaRef,
     ) -> AggregateTopKExec {
@@ -65,6 +79,7 @@ impl AggregateTopKExec {
             agg_expr,
             agg_descr,
             order_by,
+            having,
             cluster,
             schema,
         }
@@ -72,7 +87,7 @@ impl AggregateTopKExec {
 
     fn compute_descr(
         agg_expr: &[Arc<dyn AggregateExpr>],
-        agg_fun: &[AggregateFunction],
+        agg_fun: &[TopKAggregateFunction],
         order_by: &[SortColumn],
     ) -> Vec<AggDescr> {
         let mut agg_descr = Vec::with_capacity(agg_expr.len());
@@ -134,6 +149,7 @@ impl ExecutionPlan for AggregateTopKExec {
             agg_expr: self.agg_expr.clone(),
             agg_descr: self.agg_descr.clone(),
             order_by: self.order_by.clone(),
+            having: self.having.clone(),
             cluster,
             schema: self.schema.clone(),
         }))
@@ -173,9 +189,11 @@ impl ExecutionPlan for AggregateTopKExec {
             nodes,
             self.key_len,
             &self.order_by,
+            &self.having,
             &self.agg_expr,
             &self.agg_descr,
             &mut buffer,
+            self.schema(),
         )?;
         let mut wanted_nodes = vec![true; nodes];
         let mut batches = Vec::with_capacity(nodes);
@@ -192,7 +210,7 @@ impl ExecutionPlan for AggregateTopKExec {
                 batches.push(batch);
             }
 
-            if state.update(&mut batches)? {
+            if state.update(&mut batches).await? {
                 batches.clear();
                 break 'processing;
             }
@@ -200,7 +218,7 @@ impl ExecutionPlan for AggregateTopKExec {
             batches.clear();
         }
 
-        let batch = state.finish(self.schema())?;
+        let batch = state.finish().await?;
         let schema = batch.schema();
         // TODO: don't clone batch.
         MemoryExec::try_new(&vec![vec![batch]], schema, None)?
@@ -218,6 +236,7 @@ struct TopKState<'a> {
     buffer: &'a TopKBuffer,
     key_len: usize,
     order_by: &'a [SortColumn],
+    having: &'a Option<Arc<dyn PhysicalExpr>>,
     agg_expr: &'a Vec<Arc<dyn AggregateExpr>>,
     agg_descr: &'a [AggDescr],
     /// Holds the maximum value seen in each node, used to estimate unseen scores.
@@ -227,6 +246,9 @@ struct TopKState<'a> {
     groups: HashSet<GroupKey<'a>>,
     /// Final output.
     top: Vec<usize>,
+    schema: SchemaRef,
+    /// Result Batch
+    result: RecordBatch,
 }
 
 struct Group {
@@ -315,15 +337,18 @@ impl TopKState<'_> {
         num_nodes: usize,
         key_len: usize,
         order_by: &'a [SortColumn],
+        having: &'a Option<Arc<dyn PhysicalExpr>>,
         agg_expr: &'a Vec<Arc<dyn AggregateExpr>>,
         agg_descr: &'a [AggDescr],
         buffer: &'a mut TopKBuffer,
+        schema: SchemaRef,
     ) -> Result<TopKState<'a>, DataFusionError> {
         Ok(TopKState {
             limit,
             buffer,
             key_len,
             order_by,
+            having,
             agg_expr,
             agg_descr,
             finished_nodes: vec![false; num_nodes],
@@ -332,6 +357,8 @@ impl TopKState<'_> {
             sorted: BTreeSet::new(),
             groups: HashSet::new(),
             top: Vec::new(),
+            schema: schema.clone(),
+            result: RecordBatch::new_empty(schema),
         })
     }
 
@@ -354,7 +381,10 @@ impl TopKState<'_> {
         }
     }
 
-    pub fn update(&mut self, batches: &mut [Option<RecordBatch>]) -> Result<bool, DataFusionError> {
+    pub async fn update(
+        &mut self,
+        batches: &mut [Option<RecordBatch>],
+    ) -> Result<bool, DataFusionError> {
         let num_nodes = batches.len();
         assert_eq!(num_nodes, self.finished_nodes.len());
 
@@ -475,7 +505,7 @@ impl TopKState<'_> {
 
                 pop_top_counter -= 1;
                 if pop_top_counter == 0 {
-                    if self.pop_top_elements()? {
+                    if self.pop_top_elements().await? {
                         return Ok(true);
                     }
                     pop_top_counter = self.limit;
@@ -491,13 +521,13 @@ impl TopKState<'_> {
             }
         }
 
-        self.pop_top_elements()
+        self.pop_top_elements().await
     }
 
     /// Moves groups with known top scores into the [top].
     /// Returns true iff [top] contains the correct answer to the top-k query.
-    fn pop_top_elements(&mut self) -> Result<bool, DataFusionError> {
-        while self.top.len() < self.limit && !self.sorted.is_empty() {
+    async fn pop_top_elements(&mut self) -> Result<bool, DataFusionError> {
+        while self.result.num_rows() < self.limit && !self.sorted.is_empty() {
             let mut candidate = self.sorted.pop_first().unwrap();
             while !candidate.estimate_correct {
                 // The estimate might be stale. Update and re-insert.
@@ -523,42 +553,83 @@ impl TopKState<'_> {
                 }
             }
             self.top.push(candidate.index);
+            if self.top.len() == self.limit {
+                self.push_top_to_result().await?;
+            }
         }
-        return Ok(self.top.len() == self.limit || self.finished_nodes.iter().all(|f| *f));
+
+        return Ok(self.result.num_rows() == self.limit || self.finished_nodes.iter().all(|f| *f));
     }
 
-    fn finish(self, schema: SchemaRef) -> Result<RecordBatch, DataFusionError> {
-        log::trace!(
-            "aggregate top-k processed {} groups to return {} rows",
-            self.top.len() + self.sorted.len(),
-            self.limit
-        );
+    ///Push groups from [top] into [result] butch, applying having filter if required and clears
+    ///[top] vector
+    async fn push_top_to_result(&mut self) -> Result<(), DataFusionError> {
+        if self.top.is_empty() {
+            return Ok(());
+        }
+
         let mut key_columns = Vec::with_capacity(self.key_len);
         let mut value_columns = Vec::with_capacity(self.agg_expr.len());
 
-        let mut data = self.buffer.lock().unwrap();
-        for group in self.top {
-            let g = &mut data[group];
-            write_group_result_row(
-                AggregateMode::Final,
-                &g.group_key,
-                &g.accumulators,
-                &schema.fields()[..self.key_len],
-                &mut key_columns,
-                &mut value_columns,
-            )?
-        }
+        let columns = {
+            let mut data = self.buffer.lock().unwrap();
+            for group in self.top.iter() {
+                let g = &mut data[*group];
+                write_group_result_row(
+                    AggregateMode::Final,
+                    &g.group_key,
+                    &g.accumulators,
+                    &self.schema.fields()[..self.key_len],
+                    &mut key_columns,
+                    &mut value_columns,
+                )?
+            }
 
-        let columns = key_columns
-            .into_iter()
-            .chain(value_columns)
-            .map(|mut c| c.finish())
-            .collect_vec();
-        if columns.is_empty() {
-            Ok(RecordBatch::new_empty(schema))
-        } else {
-            Ok(RecordBatch::try_new(schema, columns)?)
+            key_columns
+                .into_iter()
+                .chain(value_columns)
+                .map(|mut c| c.finish())
+                .collect_vec()
+        };
+        if !columns.is_empty() {
+            let new_batch = RecordBatch::try_new(self.schema.clone(), columns)?;
+            let new_batch = if let Some(having) = self.having {
+                let schema = new_batch.schema();
+                let filter_exec = Arc::new(FilterExec::try_new(
+                    having.clone(),
+                    Arc::new(MemoryExec::try_new(
+                        &vec![vec![new_batch]],
+                        schema.clone(),
+                        None,
+                    )?),
+                )?);
+                let batches_stream =
+                    GlobalLimitExec::new(filter_exec, self.limit - self.result.num_rows())
+                        .execute(0)
+                        .await?;
+
+                let batches = collect(batches_stream).await?;
+                RecordBatch::concat(&schema, &batches)?
+            } else {
+                new_batch
+            };
+            let mut tmp = RecordBatch::new_empty(self.schema.clone());
+            std::mem::swap(&mut self.result, &mut tmp);
+            self.result = RecordBatch::concat(&self.schema, &vec![tmp, new_batch])?;
         }
+        self.top.clear();
+        Ok(())
+    }
+
+    async fn finish(mut self) -> Result<RecordBatch, DataFusionError> {
+        log::trace!(
+            "aggregate top-k processed {} groups to return {} rows",
+            self.result.num_rows() + self.top.len() + self.sorted.len(),
+            self.limit
+        );
+        self.push_top_to_result().await?;
+
+        Ok(self.result)
     }
 
     /// Returns true iff the estimate matches the correct score.
@@ -659,7 +730,19 @@ fn cmp_same_types(l: &ScalarValue, r: &ScalarValue, nulls_first: bool, asc: bool
         (ScalarValue::UInt64(Some(l)), ScalarValue::UInt64(Some(r))) => l.cmp(r),
         (ScalarValue::Utf8(Some(l)), ScalarValue::Utf8(Some(r))) => l.cmp(r),
         (ScalarValue::LargeUtf8(Some(l)), ScalarValue::LargeUtf8(Some(r))) => l.cmp(r),
-        (ScalarValue::Binary(Some(l)), ScalarValue::Binary(Some(r))) => l.cmp(r),
+        (ScalarValue::Binary(Some(l)), ScalarValue::Binary(Some(r))) => {
+            let l_card = if l.len() == 0 {
+                0
+            } else {
+                read_sketch(l).unwrap().cardinality()
+            };
+            let r_card = if r.len() == 0 {
+                0
+            } else {
+                read_sketch(r).unwrap().cardinality()
+            };
+            l_card.cmp(&r_card)
+        }
         (ScalarValue::LargeBinary(Some(l)), ScalarValue::LargeBinary(Some(r))) => l.cmp(r),
         (ScalarValue::Date32(Some(l)), ScalarValue::Date32(Some(r))) => l.cmp(r),
         (ScalarValue::Date64(Some(l)), ScalarValue::Date64(Some(r))) => l.cmp(r),
@@ -695,12 +778,12 @@ fn cmp_same_types(l: &ScalarValue, r: &ScalarValue, nulls_first: bool, asc: bool
     }
 }
 
-fn to_neutral_value(s: &mut ScalarValue, f: &AggregateFunction) {
+fn to_neutral_value(s: &mut ScalarValue, f: &TopKAggregateFunction) {
     match f {
-        AggregateFunction::Sum => to_zero(s),
-        AggregateFunction::Min => to_max_value(s),
-        AggregateFunction::Max => to_min_value(s),
-        _ => panic!("unsupported aggregate function"),
+        TopKAggregateFunction::Sum => to_zero(s),
+        TopKAggregateFunction::Min => to_max_value(s),
+        TopKAggregateFunction::Max => to_min_value(s),
+        TopKAggregateFunction::Merge => to_empty_sketch(s),
     }
 }
 
@@ -762,8 +845,16 @@ fn to_min_value(s: &mut ScalarValue) {
     }
 }
 
+fn to_empty_sketch(s: &mut ScalarValue) {
+    match s {
+        ScalarValue::Binary(v) => *v = Some(Vec::new()),
+        _ => panic!("unsupported data type"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
     use arrow::array::{Array, ArrayRef, Int64Array};
     use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
@@ -790,7 +881,7 @@ mod tests {
         let proto = mock_topk(
             2,
             &[DataType::Int64],
-            &[AggregateFunction::Sum],
+            &[TopKAggregateFunction::Sum],
             vec![SortColumn {
                 agg_index: 0,
                 asc: false,
@@ -893,7 +984,7 @@ mod tests {
         let mut proto = mock_topk(
             2,
             &[DataType::Int64],
-            &[AggregateFunction::Sum],
+            &[TopKAggregateFunction::Sum],
             vec![SortColumn {
                 agg_index: 0,
                 asc: false,
@@ -964,7 +1055,7 @@ mod tests {
         let mut proto = mock_topk(
             1,
             &[DataType::Int64],
-            &[AggregateFunction::Sum],
+            &[TopKAggregateFunction::Sum],
             vec![SortColumn {
                 agg_index: 0,
                 asc: true,
@@ -1052,7 +1143,7 @@ mod tests {
         let proto = mock_topk(
             10,
             &[DataType::Int64],
-            &[AggregateFunction::Sum, AggregateFunction::Min],
+            &[TopKAggregateFunction::Sum, TopKAggregateFunction::Min],
             vec![
                 SortColumn {
                     agg_index: 0,
@@ -1114,10 +1205,18 @@ mod tests {
         RecordBatch::try_new(schema.clone(), columns).unwrap()
     }
 
+    fn topk_fun_to_fusion_type(topk_fun: &TopKAggregateFunction) -> Option<AggregateFunction> {
+        match topk_fun {
+            TopKAggregateFunction::Sum => Some(AggregateFunction::Sum),
+            TopKAggregateFunction::Max => Some(AggregateFunction::Max),
+            TopKAggregateFunction::Min => Some(AggregateFunction::Min),
+            _ => None,
+        }
+    }
     fn mock_topk(
         limit: usize,
         group_by: &[DataType],
-        aggs: &[AggregateFunction],
+        aggs: &[TopKAggregateFunction],
         order_by: Vec<SortColumn>,
     ) -> Result<AggregateTopKExec, DataFusionError> {
         let key_fields = group_by
@@ -1145,7 +1244,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, f)| Expr::AggregateFunction {
-                fun: f.clone(),
+                fun: topk_fun_to_fusion_type(f).unwrap(),
                 args: vec![Expr::Column(Column::from_name(format!("agg{}", i + 1)))],
                 distinct: false,
             });
@@ -1178,6 +1277,7 @@ mod tests {
             physical_agg_exprs,
             aggs,
             order_by,
+            None,
             Arc::new(EmptyExec::new(false, input_schema.to_schema_ref())),
             output_schema,
         ))

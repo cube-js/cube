@@ -196,6 +196,11 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                 pp_sort_columns(topk.group_expr.len(), &topk.order_by)
                             );
                         }
+                        if self.opts.show_filters {
+                            if let Some(having) = &topk.having_expr {
+                                self.output += &format!(", having: {:?}", having)
+                            }
+                        }
                     } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
                         self.output += &format!("PanicWorker")
                     } else {
@@ -382,6 +387,11 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     ", sortBy: {}",
                     pp_sort_columns(topk.key_len, &topk.order_by)
                 );
+            }
+            if o.show_filters {
+                if let Some(having) = &topk.having {
+                    *out += &format!(", having: {}", having);
+                }
             }
         } else if let Some(_) = a.downcast_ref::<PanicWorkerExec>() {
             *out += "PanicWorker";
