@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@cube-dev/example-wrapper": "^1.1.1",
     "@cubejs-client/core": "^0.19.31",
     "@cubejs-client/react": "^0.19.31",
     "@material-ui/core": "^4.10.2",
@@ -12,7 +13,6 @@
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",
     "antd": "^4.3.4",
-    "cube-example-wrapper": "^1.0.26",
     "fontsource-roboto": "^2.1.4",
     "prop-types": "^15.7.2",
     "react": "^16.13.1",

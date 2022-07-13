@@ -6,20 +6,18 @@ import DashboardPage from './pages/DashboardPage';
 import DataTablePage from './pages/DataTablePage';
 import UsersPage from './pages/UsersPage';
 
-import createExampleWrapper from 'cube-example-wrapper'
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
 const exampleDescription = {
   title: "Material UI Dashboard",
-  text: `
-  <p>This live demo shows a Material UI dashboard created with React and Cube.</p>
-  <p>
-    Follow the <a href="https://material-ui-dashboard.cube.dev/">tutorial</a> or explore 
-    the <a href="https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard">source code</a>
-    to learn more.
-  </p>
-  `
-}
-createExampleWrapper(exampleDescription)
+  text: `<p>This live demo shows a Material UI dashboard created with React and Cube.</p>
+    <p>
+      Follow the <a href="https://material-ui-dashboard.cube.dev/">tutorial</a> or explore 
+      the <a href="https://github.com/cube-js/cube.js/tree/master/examples/material-ui-dashboard">source code</a>
+      to learn more.
+    </p>`
+};
+createExampleWrapper(exampleDescription);
 
 ReactDOM.render(
   <React.StrictMode>

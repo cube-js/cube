@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@ant-design/icons": "^4.2.1",
+    "@cube-dev/example-wrapper": "^1.1.1",
     "@cubejs-client/core": "^0.19.37",
     "@cubejs-client/react": "^0.19.37",
     "@testing-library/jest-dom": "^4.2.4",
@@ -11,7 +12,6 @@
     "@testing-library/user-event": "^7.1.2",
     "antd": "^4.3.1",
     "axios": "^0.19.2",
-    "cube-example-wrapper": "^1.0.26",
     "deck.gl": "^8.1.9",
     "less": "^3.11.3",
     "less-loader": "^6.1.1",

@@ -4,14 +4,11 @@ import "./index.less";
 import App from "./App";
 import * as serviceWorker from "./serviceWorker";
 import { HashRouter as Router, Route } from "react-router-dom";
-import CubeExampleWrapper from "@cube-dev/example-wrapper";
+import createExampleWrapper from "@cube-dev/example-wrapper";
 import ExplorePage from "./pages/ExplorePage";
 import DashboardPage from "./pages/DashboardPage";
 
-const r = new CubeExampleWrapper({
-  title: "React Dashboard",
-});
-r.render();
+createExampleWrapper({ title: "React Dashboard" });
 
 ReactDOM.render(
   <Router>

@@ -4,7 +4,7 @@ import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
 import { AppModule } from './app/app.module';
 import { environment } from './environments/environment';
 
-import createExampleWrapper from "cube-example-wrapper"
+import createExampleWrapper from "@cube-dev/example-wrapper";
 const exampleDescription = {
   title: "Angular Dashboard with Material",
   text: `
@@ -15,7 +15,7 @@ const exampleDescription = {
   </p>`
 }
 
-createExampleWrapper(exampleDescription)
+createExampleWrapper(exampleDescription);
 
 if (environment.production) {
   enableProdMode();

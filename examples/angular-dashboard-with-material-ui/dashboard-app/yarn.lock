@@ -1148,6 +1148,14 @@
     "@babel/helper-validator-identifier" "^7.16.7"
     to-fast-properties "^2.0.0"
 
+"@cube-dev/example-wrapper@^1.1.1":
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/@cube-dev/example-wrapper/-/example-wrapper-1.1.1.tgz#3a129a17243c01ed80fdc6099a2f962847bc2525"
+  integrity sha512-4buw1iuh8906FQPEp4rk79BhnPeoxRXUqrCAWLyUkTITXEdo6By0qXlL1cmG7GBchdTiyTMwbnW3ji2Kic+TtQ==
+  dependencies:
+    "@cubejs-client/core" "^0.29.33"
+    cubedev-tracking "^1.1.0"
+
 "@cubejs-client/core@^0.21.1":
   version "0.21.1"
   resolved "https://registry.yarnpkg.com/@cubejs-client/core/-/core-0.21.1.tgz#5bbdd1224aefa4b405e1f8b766504a4224aa4840"
@@ -3210,14 +3218,6 @@ csso@^4.0.2:
   integrity sha512-wvlcdIbf6pwKEk7vHj8/Bkc0B4ylXZruLvOgs9doS5eOsOpuodOV2zJChSpkp+pRpYQLQMeF04nr3Z68Sta9jA==
   dependencies:
     css-tree "^1.1.2"
-
-cube-example-wrapper@^1.0.26:
-  version "1.0.26"
-  resolved "https://registry.yarnpkg.com/cube-example-wrapper/-/cube-example-wrapper-1.0.26.tgz#f3082cb65bad2ccf09988f8b04ca3a4c9f817cca"
-  integrity sha512-iz1TUPgnw7Fkb61+L26VdLmpl0Gf9EsS/4NgQ17he5lqp2lB8IfxA2RacUgJqi8cq4kVPACGyeGol+uj/uQWIg==
-  dependencies:
-    "@cubejs-client/core" "^0.29.33"
-    cubedev-tracking "^1.1.0"
 
 cubedev-tracking@^1.1.0:
   version "1.1.0"
