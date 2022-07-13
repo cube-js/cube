@@ -27,7 +27,10 @@ class IndexPage extends Component<Props> {
   render() {
     return (
       <div className={styles.docContent}>
-        <Helmet title="Main | Cube Docs" />
+        <Helmet>
+          <title>Main | Cube Docs</title>
+          <meta name="description" content={"Main | Documentation for working with Cube, the open-source analytics framework"}></meta>
+        </Helmet>
         <h1>Documentation</h1>
         
         <InfoBox>
