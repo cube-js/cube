@@ -11,13 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import {
-  LAMBDA_RANGE_END,
-  LAMBDA_RANGE_START,
-  LAMBDA_TABLE_NAME,
-  inDbTimeZone,
-  QueryAlias
-} from '@cubejs-backend/shared';
+import { inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -2190,16 +2184,6 @@ class BaseQuery {
         throw new UserError(`Unknown pre-aggregation type '${preAggregation.type}' in '${cube}'`);
       },
       { inputProps: { collectOriginalSqlPreAggregations: [] }, cache: this.queryCache }
-    );
-  }
-
-  lambdaTimeDimensionColumn(cube, preAggregation) {
-    if (!preAggregation.lambdaView) {
-      return undefined;
-    }
-    return this.cacheValue(
-      ['lambdaTimeDimensionColumn', cube, JSON.stringify(preAggregation)],
-      () => this.externalQuery().timeDimensions[0].aliasName(),
     );
   }
 

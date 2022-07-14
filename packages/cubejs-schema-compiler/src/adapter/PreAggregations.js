@@ -155,7 +155,6 @@ export class PreAggregations {
       preAggregationsSchema: this.query.preAggregationSchema(),
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
-      lambdaTimeDimensionColumn: this.query.lambdaTimeDimensionColumn(cube, preAggregation),
       uniqueKeyColumns,
       dataSource: queryForSqlEvaluation.dataSource,
       granularity: preAggregation.granularity,

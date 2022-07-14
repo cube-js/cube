@@ -20,10 +20,23 @@ import { Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
-import { BaseDriver, DownloadTableData, StreamOptions, UnloadOptions } from '../driver';
+import {
+  BaseDriver,
+  DownloadTableData, DownloadTableMemoryData,
+  InlineTable,
+  Rows,
+  StreamOptions,
+  UnloadOptions
+} from '../driver';
 import { QueryQueue } from './QueryQueue';
 import { DriverInterface } from '../driver/driver.interface';
 import { LargeStreamWarning } from './StreamObjectsCounter';
+
+/// A timestamp far in the future, so all rows past buildRangeEnd are selected as lambda rows.
+export const LAMBDA_RANGE_END = '3000-01-01T00:00:00.000Z';
+
+/// Name of the inline table containing the lambda rows.
+export const LAMBDA_TABLE_PREFIX = 'lambda';
 
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
@@ -133,7 +146,6 @@ export type PreAggregationDescription = {
   invalidateKeyQueries: QueryWithParams[];
   sql: QueryWithParams;
   loadSql: QueryWithParams;
-  lambdaTimeDimensionColumn: string;
   tableName: string;
   matchedTimeDimensionDateRange: QueryDateRange;
   granularity: string;
@@ -401,6 +413,7 @@ type LoadPreAggregationResult = {
   refreshKeyValues: any[];
   lastUpdatedAt: number;
   buildRangeEnd?: string;
+  inlineTable?: InlineTable;
 };
 
 export class PreAggregationLoader {
@@ -540,51 +553,20 @@ export class PreAggregationLoader {
    * @see loadPreAggregationWithKeys
    * @see refreshImplStreamExternalStrategy
    */
-  public async loadLambdaTable(): Promise<LoadPreAggregationResult> {
-    const client = await this.driverFactory();
-    const lambdaSchema = this.useLambdaSchema(this.preAggregation.preAggregationsSchema);
-    const invalidationKeys = await this.getInvalidationKeyValues();
-    const contentVersion = this.contentVersion(invalidationKeys);
-    const structureVersion = getStructureVersion(this.preAggregation);
-    const newVersionEntry: VersionEntry = {
-      table_name: this.useLambdaSchema(this.preAggregation.tableName),
-      structure_version: structureVersion,
-      content_version: contentVersion,
-      last_updated_at: nowTimestamp(client),
-      naming_version: 2,
-    };
-    const targetTableName = this.targetTableName(newVersionEntry);
-
-    await cancelCombinator(
-      async saveCancelFn => {
-        const { tableData, queryOptions } = await this.downloadPreAggregation(client, newVersionEntry, saveCancelFn, invalidationKeys);
-        try {
-          const externalDriver: DriverInterface = await this.externalDriverFactory();
-          await externalDriver.createSchemaIfNotExists(lambdaSchema);
-          this.logger('Uploading lambda table', queryOptions);
-          await saveCancelFn(
-            externalDriver.uploadTableWithIndexes(
-              targetTableName, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry, queryOptions), this.preAggregation.uniqueKeyColumns, queryOptions
-            )
-          ).catch((error: any) => {
-            this.logger('Uploading lambda table error', { ...queryOptions, error: error?.stack || error?.message });
-            throw error;
-          });
-          this.logger('Uploading lambda table completed', queryOptions);
-        } finally {
-          if (tableData.release) {
-            await tableData.release();
-          }
-        }
-      }
+  public async downloadLambdaTable(): Promise<DownloadTableMemoryData> {
+    const queue = await this.queryCache.getQueue(this.preAggregation.dataSource);
+    const [sql, params] = this.preAggregation.sql;
+    return queue.executeInQueue(
+      'query',
+      [],
+      {
+        query: sql,
+        values: params,
+        forceBuild: true,
+        useDownload: true,
+      },
+      this.priority(10),
     );
-
-    return {
-      targetTableName,
-      refreshKeyValues: [],
-      lastUpdatedAt: newVersionEntry.last_updated_at,
-      buildRangeEnd: undefined,
-    };
   }
 
   protected async loadPreAggregationWithKeys(): Promise<LoadPreAggregationResult> {
@@ -779,9 +761,10 @@ export class PreAggregationLoader {
       [this.preAggregation.loadSql, invalidationKeys];
   }
 
-  /// Promotes a schema/table name to lambda schema by prefixing the name with `lambda_`.
+  /// Promotes a schema.table name to lambda.table name.
   protected useLambdaSchema(name: string) {
-    return `lambda_${name}`;
+    const [_, table] = name.split('.', 2);
+    return `lambda.${table}`;
   }
 
   protected targetTableName(versionEntry): string {
@@ -1327,10 +1310,8 @@ export class PreAggregationPartitionRangeLoader {
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
 
       const lastLoadResult = loadResults[loadResults.length - 1];
-      const lambdaRangeStart = lastLoadResult.buildRangeEnd;
-      if (this.preAggregation.lambdaView && lambdaRangeStart) {
-        const lambdaRangeEnd = '3000-01-01T00:00:00.000Z';
-        const lambdaRange: QueryDateRange = [lambdaRangeStart, lambdaRangeEnd];
+      if (this.preAggregation.lambdaView && lastLoadResult.buildRangeEnd) {
+        const lambdaRange: QueryDateRange = [lastLoadResult.buildRangeEnd, LAMBDA_RANGE_END];
         const lambdaLoader = new PreAggregationLoader(
           this.redisPrefix,
           this.driverFactory,
@@ -1342,17 +1323,23 @@ export class PreAggregationPartitionRangeLoader {
           this.loadCache,
           this.options
         );
-        const lambdaResult = await lambdaLoader.loadLambdaTable();
+        const lambdaTable = await lambdaLoader.downloadLambdaTable();
+        const inlineTable: InlineTable = {
+          name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
+          columns: lambdaTable.types,
+          rows: lambdaTable.rows,
+        };
 
         const unionTargetTableName = [
           ...allTableTargetNames.map(name => `SELECT * FROM ${name}`),
-          `SELECT * FROM ${lambdaResult.targetTableName}`,
+          `SELECT * FROM ${inlineTable.name}`,
         ].join(' UNION ALL ');
         return {
           targetTableName: `(${unionTargetTableName})`,
           refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
           lastUpdatedAt: Date.now(),
           buildRangeEnd: undefined,
+          inlineTable,
         };
       }
 
@@ -1390,7 +1377,7 @@ export class PreAggregationPartitionRangeLoader {
   }
 
   private async partitionRanges(): Promise<PartitionRanges> {
-    let buildRange = await this.loadBuildRange();
+    const buildRange = await this.loadBuildRange();
     if (!buildRange[0] || !buildRange[1]) {
       return { buildRange, partitionRanges: [] };
     }

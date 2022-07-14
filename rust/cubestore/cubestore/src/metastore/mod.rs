@@ -407,6 +407,7 @@ impl ColumnType {
             match s {
                 "text" => Ok(ColumnType::String),
                 "int" => Ok(ColumnType::Int),
+                "bigint" => Ok(ColumnType::Int),
                 "bytes" => Ok(ColumnType::Bytes),
                 "hyperloglog" => Ok(ColumnType::HyperLogLog(HllFlavour::Airlift)),
                 "hyperloglogpp" => Ok(ColumnType::HyperLogLog(HllFlavour::ZetaSketch)),

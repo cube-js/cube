@@ -8,7 +8,7 @@ import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { BaseDriver } from '../driver';
+import { BaseDriver, InlineTables } from '../driver';
 import { PreAggregationDescription } from './PreAggregations';
 
 type QueryOptions = {
@@ -95,8 +95,9 @@ export class QueryCache {
       .replacePreAggregationTableNames(
         queryAndParams, preAggregationsTablesToTempTables
       );
-
     const query = replacePreAggregationTableNames(queryBody.query);
+    const inlineTables = preAggregationsTablesToTempTables.flatMap(([_, preAggregation]) => [preAggregation.inlineTable] ?? []);
+
     let queuePriority = 10;
     if (Number.isInteger(queryBody.queuePriority)) {
       // eslint-disable-next-line prefer-destructuring
@@ -117,7 +118,8 @@ export class QueryCache {
           cacheKey: [query, values],
           external: queryBody.external,
           requestId: queryBody.requestId,
-          dataSource: queryBody.dataSource
+          dataSource: queryBody.dataSource,
+          inlineTables,
         }),
       };
     }
@@ -211,22 +213,23 @@ export class QueryCache {
   }
 
   public async queryWithRetryAndRelease(query, values, {
-    priority, cacheKey, external, requestId, dataSource
+    priority, cacheKey, external, requestId, dataSource, inlineTables,
   }: {
     priority?: number,
     cacheKey: object,
     external: boolean
     requestId?: string,
-    dataSource: string
+    dataSource: string,
+    inlineTables?: InlineTables,
   }) {
     const queue = external
       ? this.getExternalQueue()
       : await this.getQueue(dataSource);
     return queue.executeInQueue('query', cacheKey, {
-      queryKey: cacheKey, query, values, requestId
+      queryKey: cacheKey, query, values, requestId, inlineTables,
     }, priority, {
       stageQueryKey: cacheKey,
-      requestId
+      requestId,
     });
   }
 
@@ -239,7 +242,11 @@ export class QueryCache {
           this.logger('Executing SQL', {
             ...q
           });
-          return client.query(q.query, q.values, q);
+          if (q.useDownload) {
+            return client.downloadQueryResults(q.query, q.values, q);
+          } else {
+            return client.query(q.query, q.values, q);
+          }
         },
         {
           logger: this.logger,

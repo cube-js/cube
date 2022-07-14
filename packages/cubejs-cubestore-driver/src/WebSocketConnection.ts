@@ -1,6 +1,15 @@
 import WebSocket from 'ws';
 import { flatbuffers } from 'flatbuffers';
-import { HttpCommand, HttpError, HttpMessage, HttpQuery, HttpResultSet } from '../codegen/HttpMessage';
+import {
+  HttpColumnValue,
+  HttpCommand,
+  HttpError,
+  HttpMessage,
+  HttpQuery,
+  HttpResultSet, HttpRow,
+  HttpTable
+} from '../codegen/HttpMessage';
+import {InlineTables} from "@cubejs-backend/query-orchestrator";
 
 export class WebSocketConnection {
   protected messageCounter: number;
@@ -145,17 +154,66 @@ export class WebSocketConnection {
     });
   }
 
-  public async query(query: string, queryTracingObj?: any): Promise<any[]> {
+  public async query(query: string, queryTracingObj0?: any): Promise<any[]> {
+    const { inlineTables, ...queryTracingObj } = queryTracingObj0;
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
     let traceObjOffset: number | null = null;
     if (queryTracingObj) {
       traceObjOffset = builder.createString(JSON.stringify(queryTracingObj));
     }
+    let inlineTablesOffset: number | null = null;
+    if (inlineTables && inlineTables.length > 0) {
+      const inlineTableOffsets: number[] = [];
+      for (const table of inlineTables) {
+        console.log('TTT', table.name, table.columns);
+        const nameOffset = builder.createString(table.name);
+        const columnOffsets: number[] = [];
+        for (const column of table.columns) {
+          const columnOffset = builder.createString(column.name);
+          columnOffsets.push(columnOffset);
+        }
+        const columnsOffset = HttpTable.createColumnsVector(builder, columnOffsets);
+        const typeOffsets: number[] = [];
+        for (const column of table.columns) {
+          const typeOffset = builder.createString(column.type);
+          typeOffsets.push(typeOffset);
+        }
+        const typesOffset = HttpTable.createColumnsVector(builder, typeOffsets);
+        const rowOffsets: number[] = [];
+        for (const row of table.rows) {
+          const valueOffsets: number[] = [];
+          for (const column of table.columns) {
+            const stringOffset = builder.createString(row[column.name].toString());
+            HttpColumnValue.startHttpColumnValue(builder);
+            HttpColumnValue.addStringValue(builder, stringOffset);
+            const valueOffset = HttpColumnValue.endHttpColumnValue(builder);
+            valueOffsets.push(valueOffset);
+          }
+          const valuesOffset = HttpRow.createValuesVector(builder, valueOffsets);
+          HttpRow.startHttpRow(builder);
+          HttpRow.addValues(builder, valuesOffset);
+          const rowOffset = HttpRow.endHttpRow(builder);
+          rowOffsets.push(rowOffset);
+        }
+        const rowsOffset = HttpTable.createRowsVector(builder, rowOffsets);
+        HttpTable.startHttpTable(builder);
+        HttpTable.addName(builder, nameOffset);
+        HttpTable.addColumns(builder, columnsOffset);
+        HttpTable.addTypes(builder, typesOffset);
+        HttpTable.addRows(builder, rowsOffset);
+        const inlineTableOffset = HttpTable.endHttpTable(builder);
+        inlineTableOffsets.push(inlineTableOffset);
+      }
+      inlineTablesOffset = HttpQuery.createInlineTablesVector(builder, inlineTableOffsets);
+    }
     HttpQuery.startHttpQuery(builder);
     HttpQuery.addQuery(builder, queryOffset);
     if (traceObjOffset) {
       HttpQuery.addTraceObj(builder, traceObjOffset);
+    }
+    if (inlineTablesOffset) {
+      HttpQuery.addInlineTables(builder, inlineTablesOffset);
     }
     const httpQueryOffset = HttpQuery.endHttpQuery(builder);
     const messageId = this.messageCounter++;

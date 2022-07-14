@@ -263,6 +263,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     const result = await this.queryResponse(query, values);
+    console.log('DDD', this.mapFields(result.fields));
     return result.rows;
   }
 
