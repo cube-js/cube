@@ -25,10 +25,7 @@ use pg_srv::{
     protocol::{ErrorCode, ErrorResponse, Format, InitialMessage, PortalCompletion},
     PgType, PgTypeId, ProtocolError,
 };
-use sqlparser::{
-    ast,
-    ast::{CloseCursor, FetchDirection, Statement, Value},
-};
+use sqlparser::ast::{self, CloseCursor, FetchDirection, Query, SetExpr, Statement, Value};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 use tokio_util::sync::CancellationToken;
 
@@ -729,70 +726,78 @@ impl AsyncPostgresShim {
     }
 
     pub async fn parse(&mut self, parse: protocol::Parse) -> Result<(), ConnectionError> {
-        let prepared = if parse.query.trim() == "" {
-            None
+        if parse.query.trim() == "" {
+            self.statements.insert(parse.name, None);
         } else {
             let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL)?;
-
-            if self.statements.len()
-                >= self
-                    .session
-                    .server
-                    .configuration
-                    .connection_max_prepared_statements
-            {
-                return Err(ConnectionError::Protocol(
-                    protocol::ErrorResponse::error(
-                        protocol::ErrorCode::ConfigurationLimitExceeded,
-                        format!(
-                            "Unable to allocate a new prepared statement: max allocation reached, actual: {}, max: {}",
-                            self.statements.len(),
-                            self.session.server.configuration.connection_max_prepared_statements),
-                    )
-                        .into(),
-                ));
-            }
-
-            let stmt_finder = PostgresStatementParamsFinder::new();
-            let parameters: Vec<PgTypeId> = stmt_finder
-                .find(&query)?
-                .into_iter()
-                .map(|param| param.coltype.to_pg_tid())
-                .collect();
-
-            let meta = self
-                .session
-                .server
-                .transport
-                .meta(self.auth_context()?)
-                .await?;
-
-            let stmt_replacer = StatementPlaceholderReplacer::new();
-            let hacked_query = stmt_replacer.replace(&query)?;
-
-            let plan =
-                convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).await?;
-
-            let description = if let Some(description) = plan.to_row_description(Format::Text)? {
-                if description.len() > 0 {
-                    Some(description)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            Some(PreparedStatement {
-                query,
-                parameters: protocol::ParameterDescription::new(parameters),
-                description,
-            })
-        };
-
-        self.statements.insert(parse.name, prepared);
+            self.prepare_statement(parse.name, query).await?;
+        }
 
         self.write(protocol::ParseComplete::new()).await?;
+
+        Ok(())
+    }
+
+    pub async fn prepare_statement(
+        &mut self,
+        name: String,
+        query: Statement,
+    ) -> Result<(), ConnectionError> {
+        if self.statements.len()
+            >= self
+                .session
+                .server
+                .configuration
+                .connection_max_prepared_statements
+        {
+            return Err(ConnectionError::Protocol(
+                protocol::ErrorResponse::error(
+                    protocol::ErrorCode::ConfigurationLimitExceeded,
+                    format!(
+                        "Unable to allocate a new prepared statement: max allocation reached, actual: {}, max: {}",
+                        self.statements.len(),
+                        self.session.server.configuration.connection_max_prepared_statements),
+                )
+                    .into(),
+            ));
+        }
+
+        let stmt_finder = PostgresStatementParamsFinder::new();
+        let parameters: Vec<PgTypeId> = stmt_finder
+            .find(&query)?
+            .into_iter()
+            .map(|param| param.coltype.to_pg_tid())
+            .collect();
+
+        let meta = self
+            .session
+            .server
+            .transport
+            .meta(self.auth_context()?)
+            .await?;
+
+        let stmt_replacer = StatementPlaceholderReplacer::new();
+        let hacked_query = stmt_replacer.replace(&query)?;
+
+        let plan =
+            convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).await?;
+
+        let description = if let Some(description) = plan.to_row_description(Format::Text)? {
+            if description.len() > 0 {
+                Some(description)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let pstmt = PreparedStatement {
+            query,
+            parameters: protocol::ParameterDescription::new(parameters),
+            description,
+        };
+        self.statements.insert(name, Some(pstmt));
 
         Ok(())
     }
@@ -1154,6 +1159,37 @@ impl AsyncPostgresShim {
                         }
                     }
                 }?;
+
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
+            }
+            Statement::Prepare {
+                name, statement, ..
+            } => {
+                // Ensure the statement isn't wrapped in extra parens
+                let statement = match *statement.clone() {
+                    Statement::Query(outer_query) => match *outer_query {
+                        Query {
+                            with: None,
+                            body: SetExpr::Query(inner_query),
+                            order_by,
+                            limit: None,
+                            offset: None,
+                            fetch: None,
+                            lock: None,
+                        } if order_by.is_empty() => Statement::Query(inner_query),
+                        _ => *statement,
+                    },
+                    _ => *statement,
+                };
+
+                self.prepare_statement(name.value, statement).await?;
+
+                let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Prepare);
 
                 self.write_portal(
                     &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
