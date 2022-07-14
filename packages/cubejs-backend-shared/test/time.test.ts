@@ -1,4 +1,4 @@
-import {snapTimestamp, timeSeries} from '../src';
+import { timeSeries } from '../src';
 
 describe('timeSeries', () => {
   it('day', () => {
