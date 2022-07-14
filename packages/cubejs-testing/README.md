@@ -7,7 +7,7 @@
 
 # Cube.js Testing
 
-Internal package for testing.
+Internal package for testing!
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
