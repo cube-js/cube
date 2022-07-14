@@ -1,0 +1,112 @@
+---
+title: Connecting to Retool
+permalink: /config/downstream/retool
+---
+
+[Retool](https://retool.com/) is the fast way to build internal tools. It lets you visually design apps that interface with any database or API. You can connect a Cube deployment to Retool using Cube’s [REST API](https://cube.dev/docs/rest-api).
+
+Here's a short video guide on how to connect Retool to Cube.
+
+<LoomVideo url="https://www.loom.com/embed/e0f5584068a44df0981372ceac85a21f" />
+
+## Use REST API in Cube
+
+> Don't have a Cube project yet? [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
+
+### Cube Cloud
+
+Click the "How to connect" link on the Overview page, navigate to the REST API tab. You will see your connection credentials, the REST API URL and the authorization token:
+
+<div style="text-align: center">
+  <img
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/appsmith-1.png"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+### Self-hosted Cube
+
+For a Cube instance publicly available at a specific `HOST`, the REST API URL would be `HOST/cubejs-api/v1`. Please refer to the [REST API page](https://cube.dev/docs/rest-api) for details.
+
+You will also need to generate a JSON Web Token that would be used to authenticate requests to Cube.
+
+Please check the [Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt) to learn how to generate a token. We suggest generating a long-lived JWT that won't expire soon.
+
+## Create a new resource in Retool
+
+Create a new "REST API" resource in Retool.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/8a07d9ac-f33b-4aa1-8089-515694e56a63/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Next, copy and paste Cube's REST API URL and the Authorization token.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/fdab9eaa-737b-4ef9-9e08-ad15aaa2fe29/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Create a POST request in Retool 
+
+Get your Cube query in the JSON [query format](https://cube.dev/docs/query-format) ready. You can copy it from Cube’s Playground or compose manually:
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/d2104545-cba1-4b63-84ab-d9d0a7051d7f/"
+    style="border: none"
+    width="50%"
+  />
+</div>
+
+Create a POST request, paste the JSON query in the **Body**. Make sure to add a `query` parameter for your JSON query.
+
+Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget to add the `/load` endpoint to the end of the data source API.
+
+Next, hit Run.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/59b0b8a3-9efe-49d6-a2ed-4027524b8965/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Display the data in Retool
+
+Retool has an amazing feature where you can drag and drop UI components into the dashboard. You can use this to add a tables, bar charts, and much more.
+
+Because the name of the Retool query in the example is `OrdersByMonth`, using the data binding curly brackets will populate the charts with data from the REST API.
+
+```
+{{ OrdersByMonth.data.data }}
+```
+
+Reference the name of the query in your Retool charts.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/1b5e577a-3a1f-40b3-9a3d-b535b2cbaa8d/"
+    style="border: none"
+    width="50%"
+  />
+</div>
+
+Get nicely rendered charts.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/0bb0b430-29f5-407b-8be1-7bc197359927/"
+    style="border: none"
+    width="80%"
+  />
+</div>
