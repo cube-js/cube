@@ -141,14 +141,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(
-    table: string,
-    columns: Column[],
-    tableData: any,
-    indexesSql: IndexesSQL,
-    uniqueKeyColumns?: string[],
-    queryTracingObj?: any,
-  ) {
+  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[], queryTracingObj?: any) {
     const indexes =
       indexesSql.map((s: any) => s.sql[0].replace(/^CREATE INDEX (.*?) ON (.*?) \((.*)$/, 'INDEX $1 ($3')).join(' ');
 

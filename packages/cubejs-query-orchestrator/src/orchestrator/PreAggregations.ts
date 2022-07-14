@@ -303,10 +303,9 @@ class PreAggregationLoadCache {
   }
 
   private async calculateVersionEntries(preAggregation): Promise<VersionEntriesObj> {
-    const tables = await this.getTablesQuery(preAggregation);
     let versionEntries = tablesToVersionEntries(
       preAggregation.preAggregationsSchema,
-      tables
+      await this.getTablesQuery(preAggregation)
     );
     // It presumes strong consistency guarantees for external pre-aggregation tables ingestion
     if (!preAggregation.external) {
@@ -509,8 +508,8 @@ export class PreAggregationLoader {
         return {
           targetTableName: this.targetTableName(versionEntryByStructureVersion),
           refreshKeyValues: [],
-          buildRangeEnd: versionEntryByStructureVersion.build_range_end,
           lastUpdatedAt: versionEntryByStructureVersion.last_updated_at,
+          buildRangeEnd: versionEntryByStructureVersion.build_range_end,
         };
       }
 
@@ -759,12 +758,6 @@ export class PreAggregationLoader {
     return this.preAggregation.indexesSql && this.preAggregation.indexesSql.length ?
       [this.preAggregation.loadSql, this.preAggregation.indexesSql, invalidationKeys] :
       [this.preAggregation.loadSql, invalidationKeys];
-  }
-
-  /// Promotes a schema.table name to lambda.table name.
-  protected useLambdaSchema(name: string) {
-    const [_, table] = name.split('.', 2);
-    return `lambda.${table}`;
   }
 
   protected targetTableName(versionEntry): string {
