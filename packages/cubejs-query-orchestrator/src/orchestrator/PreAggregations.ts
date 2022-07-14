@@ -547,10 +547,7 @@ export class PreAggregationLoader {
   }
 
   /**
-   * Downloads lambda tables from the source DB and uploads them as temp tables into CubeStore.
-   *
-   * @see loadPreAggregationWithKeys
-   * @see refreshImplStreamExternalStrategy
+   * Downloads a lambda tables from the source DB.
    */
   public async downloadLambdaTable(): Promise<DownloadTableMemoryData> {
     const queue = await this.queryCache.getQueue(this.preAggregation.dataSource);
