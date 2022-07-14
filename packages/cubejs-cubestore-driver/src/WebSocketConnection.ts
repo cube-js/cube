@@ -166,7 +166,6 @@ export class WebSocketConnection {
     if (inlineTables && inlineTables.length > 0) {
       const inlineTableOffsets: number[] = [];
       for (const table of inlineTables) {
-        console.log('TTT', table.name, table.columns);
         const nameOffset = builder.createString(table.name);
         const columnOffsets: number[] = [];
         for (const column of table.columns) {
