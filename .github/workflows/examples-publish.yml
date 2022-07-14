@@ -419,7 +419,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: vue-query-builder
-          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_VUE_QUERY_BUILDER }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
@@ -492,6 +492,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: bigquery-public-datasets
+          EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   google-charts-moma:
@@ -516,6 +517,7 @@ jobs:
         env:
           EXAMPLE_SLUG: google-charts-moma
           EXAMPLE_CUBE_SKIP: 1
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: public/
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   deepnote:
@@ -540,6 +542,7 @@ jobs:
         env:
           EXAMPLE_SLUG: deepnote
           EXAMPLE_CUBE_SKIP: 1
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           EXAMPLE_FRONTEND_SUBDIRECTORY: './'
 
@@ -589,6 +592,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: multi-tenant-analytics
+          EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   react-pivot-table:
@@ -612,6 +616,7 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: react-pivot-table
+          EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
   slack-vibe:

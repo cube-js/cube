@@ -1,2 +1,2 @@
 [build]
-  publish = "./"
+  publish = "public/"
