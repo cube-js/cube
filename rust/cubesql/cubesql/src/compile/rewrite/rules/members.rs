@@ -824,11 +824,13 @@ impl MemberRules {
                         .unwrap_or(outer_granularity.clone())
                 };
 
-                let date_trunc_granularity =
-                    match Self::get_least_granularity(&outer_granularity, &inner_granularity) {
-                        Some(granularity) => granularity,
-                        None => continue,
-                    };
+                let date_trunc_granularity = match Self::get_larger_granularity_of_two(
+                    &outer_granularity,
+                    &inner_granularity,
+                ) {
+                    Some(granularity) => granularity,
+                    None => continue,
+                };
 
                 if let Ok(expr) = res {
                     // TODO unwrap
@@ -1690,7 +1692,7 @@ impl MemberRules {
         "count".to_string()
     }
 
-    fn get_least_granularity(
+    fn get_larger_granularity_of_two(
         first_granularity: &String,
         second_granularity: &String,
     ) -> Option<String> {
