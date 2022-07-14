@@ -29,7 +29,6 @@ const App = ({ children }) => {
     isAuthenticated,
     loginWithRedirect,
     getAccessTokenWithPopup,
-    user
   } = useAuth0();
 
   // Force to work only for logged in users bye checking isAuthenticated
