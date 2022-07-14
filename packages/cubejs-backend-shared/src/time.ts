@@ -50,6 +50,10 @@ export const FROM_PARTITION_RANGE = '__FROM_PARTITION_RANGE';
 
 export const TO_PARTITION_RANGE = '__TO_PARTITION_RANGE';
 
+export const BUILD_RANGE_START_LOCAL = '__BUILD_RANGE_START_LOCAL';
+
+export const BUILD_RANGE_END_LOCAL = '__BUILD_RANGE_END_LOCAL';
+
 export const inDbTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
   if (timestamp.length === 23) {
     const zone = moment.tz.zone(timezone);
