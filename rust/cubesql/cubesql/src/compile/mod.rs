@@ -10368,4 +10368,99 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         );
     }
+
+    #[tokio::test]
+    async fn metabase_between_numbers_filters() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+                "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" 
+                FROM \"public\".\"KibanaSampleDataEcommerce\" 
+                WHERE \"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" BETWEEN 1 AND 2
+                LIMIT 10"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                        operator: Some("gte".to_string()),
+                        values: Some(vec!["1".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                        operator: Some("lte".to_string()),
+                        values: Some(vec!["2".to_string()]),
+                        or: None,
+                        and: None,
+                    }
+                ]),
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" 
+            FROM \"public\".\"KibanaSampleDataEcommerce\" 
+            WHERE \"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" NOT BETWEEN 1 AND 2
+            LIMIT 10"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                            ),
+                            operator: Some("lt".to_string()),
+                            values: Some(vec!["1".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                            ),
+                            operator: Some("gt".to_string()),
+                            values: Some(vec!["2".to_string()]),
+                            or: None,
+                            and: None,
+                        })
+                    ]),
+                    and: None,
+                },]),
+            }
+        );
+    }
 }
