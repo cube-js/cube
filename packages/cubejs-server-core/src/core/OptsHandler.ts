@@ -466,9 +466,9 @@ export class OptsHandler {
         parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
       preAggregationsSchema:
         getEnv('preAggregationsSchema') ||
-        this.isDevMode()
+        (this.isDevMode()
           ? 'dev_pre_aggregations'
-          : 'prod_pre_aggregations',
+          : 'prod_pre_aggregations'),
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
       sqlCache: true,
