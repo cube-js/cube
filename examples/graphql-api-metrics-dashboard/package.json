@@ -4,12 +4,12 @@
   "private": true,
   "dependencies": {
     "@apollo/client": "^3.5.6",
+    "@cube-dev/example-wrapper": "^1.1.3",
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^13.3.0",
     "@testing-library/user-event": "^14.2.1",
     "apollo-link-http": "^1.5.17",
     "chart.js": "^3.6.2",
-    "cube-example-wrapper": "^1.0.26",
     "graphql": "^16.1.0",
     "graphql-tag": "^2.12.6",
     "react": "^18.2.0",
@@ -22,7 +22,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "preview": "netlify deploy",
+    "deploy": "netlify deploy --prod"
   },
   "eslintConfig": {
     "extends": [

@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { HashRouter as Router, Route } from 'react-router-dom';
 import ExplorePage from './pages/ExplorePage';
 import DashboardPage from './pages/DashboardPage';
-import createExampleWrapper from "cube-example-wrapper";
+import createExampleWrapper from "@cube-dev/example-wrapper";
 import App from './App';
 
 createExampleWrapper({
