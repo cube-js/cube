@@ -52,6 +52,7 @@ describe('lambda', () => {
         }
       ],
       order: {
+        'Orders.status': 'asc',
         'Orders.completedAt': 'desc',
       },
       limit: 3
@@ -66,14 +67,14 @@ describe('lambda', () => {
           'Orders.status': 'completed',
         },
         {
-          'Orders.completedAt': '2020-12-31T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
-          'Orders.count': '6',
-          'Orders.status': 'processing',
-        },
-        {
           'Orders.completedAt': '2020-12-30T00:00:00.000',
           'Orders.completedAt.day': '2020-12-30T00:00:00.000',
+          'Orders.count': '2',
+          'Orders.status': 'completed',
+        },
+        {
+          'Orders.completedAt': '2020-12-29T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-29T00:00:00.000',
           'Orders.count': '2',
           'Orders.status': 'completed',
         },

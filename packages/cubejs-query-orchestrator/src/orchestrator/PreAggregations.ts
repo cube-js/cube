@@ -303,10 +303,9 @@ class PreAggregationLoadCache {
   }
 
   private async calculateVersionEntries(preAggregation): Promise<VersionEntriesObj> {
-    let versionEntries = tablesToVersionEntries(
-      preAggregation.preAggregationsSchema,
-      await this.getTablesQuery(preAggregation)
-    );
+    const tables = await this.getTablesQuery(preAggregation);
+    console.log('TTT', tables);
+    let versionEntries = tablesToVersionEntries(preAggregation.preAggregationsSchema, tables);
     // It presumes strong consistency guarantees for external pre-aggregation tables ingestion
     if (!preAggregation.external) {
       // eslint-disable-next-line

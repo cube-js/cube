@@ -806,7 +806,6 @@ impl SqlService for SqlServiceImpl {
                 unique_key,
                 partitioned_index,
             } => {
-                println!("CCC {:?}", columns);
                 let nv = &name.0;
                 if nv.len() != 2 {
                     return Err(CubeError::user(format!(
