@@ -58,11 +58,11 @@ use self::{
             create_pg_get_constraintdef_udf, create_pg_get_expr_udf, create_pg_get_userbyid_udf,
             create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
-            create_pg_table_is_visible_udf, create_pg_truetypid_udf, create_pg_truetypmod_udf,
-            create_pg_type_is_visible_udf, create_quarter_udf, create_second_udf,
-            create_session_user_udf, create_str_to_date_udf, create_time_format_udf,
-            create_timediff_udf, create_to_char_udf, create_ucase_udf, create_unnest_udtf,
-            create_user_udf, create_version_udf, create_year_udf,
+            create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
+            create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
+            create_quarter_udf, create_second_udf, create_session_user_udf, create_str_to_date_udf,
+            create_time_format_udf, create_timediff_udf, create_to_char_udf, create_ucase_udf,
+            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -2485,6 +2485,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_my_temp_schema());
         ctx.register_udf(create_pg_is_other_temp_schema());
         ctx.register_udf(create_has_schema_privilege_udf(self.state.clone()));
+        ctx.register_udf(create_pg_total_relation_size_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -8043,6 +8044,27 @@ ORDER BY \"COUNT(count)\" DESC"
                     has_schema_privilege('ovr', nspname, 'USAGE') usage
                 FROM pg_namespace
                 ORDER BY nspname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pg_total_relation_size() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_total_relation_size",
+            execute_query(
+                "SELECT
+                    oid,
+                    relname,
+                    pg_total_relation_size(oid) relsize
+                FROM pg_class
+                ORDER BY oid ASC
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
