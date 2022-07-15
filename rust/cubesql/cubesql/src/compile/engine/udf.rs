@@ -2375,3 +2375,29 @@ pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
         &fun,
     )
 }
+
+pub fn create_pg_total_relation_size_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let relids = downcast_primitive_arg!(args[0], "relid", OidType);
+
+        // 8192 is the lowest size for a table that has at least one column
+        // TODO: check if the requested table actually exists
+        let result = relids
+            .iter()
+            .map(|relid| relid.map(|_| 8192))
+            .collect::<PrimitiveArray<Int64Type>>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "pg_total_relation_size",
+        &Signature::exact(vec![DataType::UInt32], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
