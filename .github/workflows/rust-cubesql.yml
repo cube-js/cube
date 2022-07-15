@@ -183,7 +183,7 @@ jobs:
     strategy:
       matrix:
         node-version: [12.x, 14.x, 16.x, 17.x]
-        os-version: [windows-2019, macos-11]
+        os-version: [windows-2022, macos-11]
       fail-fast: false
 
     steps:
