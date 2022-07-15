@@ -5,7 +5,8 @@ import App from "./App";
 import { HashRouter as Router, Route } from "react-router-dom";
 import DashboardPage from "./pages/DashboardPage";
 
-import createExampleWrapper from "cube-example-wrapper";
+import createExampleWrapper from "@cube-dev/example-wrapper";
+
 const exampleDescription = {
   title: "Drill Downs",
   text: `
@@ -13,9 +14,9 @@ const exampleDescription = {
     <p>You can use it to dive deeper into data tables.</p> 
     <p>Read the <a href="https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs">story</a> or explore the <a href="https://github.com/cube-js/cube.js/tree/master/examples/drill-downs">source code</a> to learn more.</p>
   `
-}
+};
 
-createExampleWrapper(exampleDescription)
+createExampleWrapper(exampleDescription);
 
 ReactDOM.render(
   <React.StrictMode>

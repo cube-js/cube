@@ -2,12 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import App from './App';
 
-import createExampleWrapper from 'cube-example-wrapper'
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
 createExampleWrapper({
     title: "Pre-Aggregations",
-    text: `
-    <p>
+    text: `<p>
         This live demo shows 
         a <a href="https://cube.dev/docs/caching#pre-aggregations">pre-aggregations</a>
         with <a href="https://cube.dev/docs/caching/using-pre-aggregations#pre-aggregations-storage">Cube Store</a>.
@@ -18,9 +17,7 @@ createExampleWrapper({
         or explore 
         the <a href="https://github.com/cube-js/cube.js/tree/master/examples/external-rollups">source code</a> 
         to learn more.
-    </p>
-    `
-})
-
+    </p>`
+});
 
 ReactDOM.render(<App />, document.getElementById('root'));

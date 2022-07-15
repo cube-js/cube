@@ -1,20 +1,20 @@
 use std::{any::type_name, sync::Arc, thread};
 
-use chrono::{Duration, NaiveDateTime};
+use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeArray,
-            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
-            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
-            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
-            UInt32Builder,
+            Float64Array, GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeBuilder,
+            ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
+            StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
+            TimestampNanosecondArray, TimestampSecondArray, UInt32Builder,
         },
         compute::{cast, concat},
         datatypes::{
-            DataType, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType, IntervalUnit,
-            TimeUnit, TimestampNanosecondType, UInt32Type, UInt64Type,
+            DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType,
+            IntervalUnit, IntervalYearMonthType, TimeUnit, TimestampNanosecondType, UInt32Type,
+            UInt64Type,
         },
     },
     error::{DataFusionError, Result},
@@ -939,54 +939,47 @@ pub fn create_second_udf() -> ScalarUDF {
     )
 }
 
-pub fn create_date_sub_udf() -> ScalarUDF {
-    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
-
-    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
-
-    ScalarUDF::new(
-        "date_sub",
-        &Signature::exact(
-            vec![
-                DataType::Timestamp(TimeUnit::Millisecond, None),
-                DataType::Interval(IntervalUnit::DayTime),
-            ],
-            Volatility::Immutable,
-        ),
-        &return_type,
-        &fun,
-    )
+macro_rules! date_math_udf {
+    ($ARGS: expr, $FIRST_ARG_TYPE: ident, $SECOND_ARG_TYPE: ident, $FUN: ident, $IS_ADD: expr) => {{
+        let timestamps = downcast_primitive_arg!(&$ARGS[0], "datetime", $FIRST_ARG_TYPE);
+        let intervals = downcast_primitive_arg!(&$ARGS[1], "interval", $SECOND_ARG_TYPE);
+        let mut builder = TimestampNanosecondArray::builder(timestamps.len());
+        for i in 0..timestamps.len() {
+            if timestamps.is_null(i) {
+                builder.append_null()?;
+            } else {
+                let timestamp = timestamps.value_as_datetime(i).unwrap();
+                let interval = intervals.value(i).into();
+                builder.append_value($FUN(timestamp, interval, $IS_ADD)?.timestamp_nanos())?;
+            }
+        }
+        return Ok(Arc::new(builder.finish()));
+    }};
 }
 
 pub fn create_date_add_udf() -> ScalarUDF {
-    let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let timestamps = args[0]
-            .as_any()
-            .downcast_ref::<TimestampNanosecondArray>()
-            .unwrap();
-        let intervals = args[1]
-            .as_any()
-            .downcast_ref::<IntervalDayTimeArray>()
-            .unwrap();
-        let mut builder = TimestampNanosecondArray::builder(timestamps.len());
-        for i in 0..timestamps.len() {
-            let timestamp = timestamps.value(i);
-            let interval = intervals.value(i);
-            let interval_days = interval >> 32;
-            let interval_millis = interval & 0xffffffff;
-            let timestamp = NaiveDateTime::from_timestamp(
-                timestamp / 1000000000,
-                (timestamp % 1000000000) as u32,
-            );
-            let timestamp = timestamp
-                .checked_add_signed(Duration::days(interval_days))
-                .unwrap();
-            let timestamp = timestamp
-                .checked_add_signed(Duration::milliseconds(interval_millis))
-                .unwrap();
-            builder.append_value(timestamp.timestamp_nanos())?;
+    let fun = make_scalar_function(move |args: &[ArrayRef]| match &args[1].data_type() {
+        DataType::Interval(IntervalUnit::DayTime) => {
+            date_math_udf!(
+                args,
+                TimestampNanosecondType,
+                IntervalDayTimeType,
+                date_addsub_day_time,
+                true
+            )
         }
-        Ok(Arc::new(builder.finish()))
+        DataType::Interval(IntervalUnit::YearMonth) => {
+            date_math_udf!(
+                args,
+                TimestampNanosecondType,
+                IntervalYearMonthType,
+                date_addsub_year_month,
+                true
+            )
+        }
+        _ => Err(DataFusionError::Execution(format!(
+            "unsupported interval type"
+        ))),
     });
 
     let return_type: ReturnTypeFunction =
@@ -1004,12 +997,163 @@ pub fn create_date_add_udf() -> ScalarUDF {
                     DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
                     DataType::Interval(IntervalUnit::DayTime),
                 ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
             ],
             Volatility::Immutable,
         ),
         &return_type,
         &fun,
     )
+}
+
+pub fn create_date_sub_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        match (&args[0].data_type(), &args[1].data_type()) {
+            (DataType::Timestamp(..), DataType::Interval(IntervalUnit::DayTime)) => {
+                date_math_udf!(
+                    args,
+                    TimestampNanosecondType,
+                    IntervalDayTimeType,
+                    date_addsub_day_time,
+                    false
+                )
+            }
+            (DataType::Timestamp(..), DataType::Interval(IntervalUnit::YearMonth)) => {
+                date_math_udf!(
+                    args,
+                    TimestampNanosecondType,
+                    IntervalYearMonthType,
+                    date_addsub_year_month,
+                    false
+                )
+            }
+            (DataType::Date32, DataType::Interval(IntervalUnit::DayTime)) => {
+                date_math_udf!(
+                    args,
+                    Date32Type,
+                    IntervalDayTimeType,
+                    date_addsub_day_time,
+                    false
+                )
+            }
+            (DataType::Date32, DataType::Interval(IntervalUnit::YearMonth)) => {
+                date_math_udf!(
+                    args,
+                    Date32Type,
+                    IntervalYearMonthType,
+                    date_addsub_year_month,
+                    false
+                )
+            }
+            _ => Err(DataFusionError::Execution(format!(
+                "unsupported interval type"
+            ))),
+        }
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+
+    ScalarUDF::new(
+        "date_sub",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Date32,
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Date32,
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+fn date_addsub_year_month(t: NaiveDateTime, i: i32, is_add: bool) -> Result<NaiveDateTime> {
+    let i = match is_add {
+        true => i,
+        false => -i,
+    };
+
+    let mut year = t.year();
+    // Note month is numbered 0..11 in this function.
+    let mut month = t.month() as i32 - 1;
+
+    year += i / 12;
+    month += i % 12;
+
+    if month < 0 {
+        year -= 1;
+        month += 12;
+    }
+    debug_assert!(0 <= month);
+    year += month / 12;
+    month = month % 12;
+
+    match change_ym(t, year, 1 + month as u32) {
+        Some(t) => return Ok(t),
+        None => {
+            return Err(DataFusionError::Execution(format!(
+                "Failed to set date to ({}-{})",
+                year,
+                1 + month
+            )))
+        }
+    };
+}
+
+fn date_addsub_day_time(t: NaiveDateTime, interval: i64, is_add: bool) -> Result<NaiveDateTime> {
+    let i = match is_add {
+        true => interval,
+        false => -interval,
+    };
+
+    let days: i64 = i.signum() * (i.abs() >> 32);
+    let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
+    return Ok(t + Duration::days(days) + Duration::milliseconds(millis));
+}
+
+fn change_ym(t: NaiveDateTime, y: i32, m: u32) -> Option<NaiveDateTime> {
+    debug_assert!(1 <= m && m <= 12);
+    let mut d = t.day();
+    d = d.min(last_day_of_month(y, m));
+    t.with_day(1)?.with_year(y)?.with_month(m)?.with_day(d)
+}
+
+fn last_day_of_month(y: i32, m: u32) -> u32 {
+    debug_assert!(1 <= m && m <= 12);
+    if m == 12 {
+        return 31;
+    }
+    NaiveDate::from_ymd(y, m + 1, 1).pred().day()
 }
 
 fn postgres_datetime_format_to_iso(format: String) -> String {

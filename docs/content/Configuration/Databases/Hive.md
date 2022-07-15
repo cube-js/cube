@@ -4,7 +4,7 @@ permalink: /config/databases/hive-sparksql
 ---
 
 <WarningBox>
-  The driver for Hive/SparkSQL is <b>community supported</b>. 
+  The driver for Hive/SparkSQL is <a href="../databases#driver-support">community-supported</a> and is not supported by Cube or the vendor. 
 </WarningBox>
 
 ## Prerequisites

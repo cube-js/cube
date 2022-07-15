@@ -2,12 +2,14 @@ use crate::{
     compile::{
         engine::provider::CubeContext,
         rewrite::{
-            analysis::LogicalPlanAnalysis, between_expr, binary_expr, case_expr, case_expr_var_arg,
-            cast_expr, column_expr, cube_scan, cube_scan_filters, cube_scan_members,
-            dimension_expr, expr_column_name, filter, filter_cast_unwrap_replacer, filter_member,
-            filter_op, filter_op_filters, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
-            is_not_null_expr, is_null_expr, limit, literal_expr, literal_string, measure_expr,
-            member_name_by_alias, not_expr, projection, rewrite, rewriter::RewriteRules,
+            analysis::{ConstantFolding, LogicalPlanAnalysis},
+            between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, column_expr,
+            cube_scan, cube_scan_filters, cube_scan_members, dimension_expr, expr_column_name,
+            filter, filter_cast_unwrap_replacer, filter_member, filter_op, filter_op_filters,
+            filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
+            is_null_expr, limit, literal_expr, literal_string, measure_expr, member_name_by_alias,
+            not_expr, projection, rewrite,
+            rewriter::RewriteRules,
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_rewrite,
             BetweenExprNegated, BinaryExprOp, ColumnExprColumn, CubeScanLimit, CubeScanTableName,
@@ -21,9 +23,17 @@ use crate::{
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
     var, var_iter,
 };
-use chrono::{SecondsFormat, TimeZone, Utc};
+use chrono::{
+    format::{
+        Fixed, Item,
+        Numeric::{Day, Hour, Minute, Month, Second, Year},
+        Pad::Zero,
+    },
+    Duration, NaiveDateTime,
+};
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
+    arrow::array::{Date32Array, Date64Array, TimestampNanosecondArray},
     logical_plan::{Column, Expr, Operator},
     scalar::ScalarValue,
 };
@@ -534,6 +544,21 @@ impl RewriteRules for FilterRules {
                     "?table_name",
                 ),
             ),
+            rewrite(
+                "between-move-interval-beyond-equal-sign",
+                between_expr(
+                    binary_expr(column_expr("?column"), "+", "?interval"),
+                    "?negated",
+                    "?low",
+                    "?high",
+                ),
+                between_expr(
+                    column_expr("?column"),
+                    "?negated",
+                    binary_expr("?low", "-", "?interval"),
+                    binary_expr("?high", "-", "?interval"),
+                ),
+            ),
             // Every expression should be handled by filter cast unwrap replacer otherwise other rules just won't work
             rewrite(
                 "filter-cast-unwrap",
@@ -605,6 +630,21 @@ impl RewriteRules for FilterRules {
                     filter_cast_unwrap_replacer("?expr"),
                     filter_cast_unwrap_replacer("?when_then"),
                     filter_cast_unwrap_replacer("?else"),
+                ),
+            ),
+            rewrite(
+                "filter-cast-unwrap-between-push-down",
+                filter_cast_unwrap_replacer(between_expr(
+                    column_expr("?column"),
+                    "?negated",
+                    "?low",
+                    "?high",
+                )),
+                between_expr(
+                    column_expr("?column"),
+                    "?negated",
+                    filter_cast_unwrap_replacer("?low"),
+                    filter_cast_unwrap_replacer("?high"),
                 ),
             ),
             filter_unwrap_cast_push_down("CaseExprExpr"),
@@ -1023,22 +1063,31 @@ impl FilterRules {
                                     ScalarValue::Int64(Some(value)) => value.to_string(),
                                     ScalarValue::Boolean(Some(value)) => value.to_string(),
                                     ScalarValue::Float64(Some(value)) => value.to_string(),
-                                    ScalarValue::TimestampNanosecond(Some(value), _) => {
-                                        let minus_one = Utc
-                                            .timestamp_nanos(*value - 1000)
-                                            .to_rfc3339_opts(SecondsFormat::Millis, true);
-                                        let value = Utc
-                                            .timestamp_nanos(*value)
-                                            .to_rfc3339_opts(SecondsFormat::Millis, true);
+                                    ScalarValue::TimestampNanosecond(_, _)
+                                    | ScalarValue::Date32(_)
+                                    | ScalarValue::Date64(_) => {
+                                        if let Some(timestamp) =
+                                            Self::scalar_to_native_datetime(&literal)
+                                        {
+                                            let minus_one = format_iso_timestamp(
+                                                timestamp
+                                                    .checked_sub_signed(Duration::milliseconds(1))
+                                                    .unwrap(),
+                                            );
+                                            let value = format_iso_timestamp(timestamp);
 
-                                        match expr_op {
-                                            Operator::Lt => minus_one,
-                                            Operator::LtEq => minus_one,
-                                            Operator::Gt => value,
-                                            Operator::GtEq => value,
-                                            _ => {
-                                                continue;
+                                            match expr_op {
+                                                Operator::Lt => minus_one,
+                                                Operator::LtEq => minus_one,
+                                                Operator::Gt => value,
+                                                Operator::GtEq => value,
+                                                _ => {
+                                                    continue;
+                                                }
                                             }
+                                        } else {
+                                            log::trace!("Can't get timestamp for {:?}", literal);
+                                            continue;
                                         }
                                     }
                                     x => panic!("Unsupported filter scalar: {:?}", x),
@@ -1216,7 +1265,40 @@ impl FilterRules {
             ScalarValue::Int64(Some(value)) => value.to_string(),
             ScalarValue::Boolean(Some(value)) => value.to_string(),
             ScalarValue::Float64(Some(value)) => value.to_string(),
+            ScalarValue::TimestampNanosecond(_, _)
+            | ScalarValue::Date32(_)
+            | ScalarValue::Date64(_) => {
+                if let Some(timestamp) = Self::scalar_to_native_datetime(literal) {
+                    return format_iso_timestamp(timestamp);
+                }
+
+                panic!("Unsupported filter scalar: {:?}", literal);
+            }
             x => panic!("Unsupported filter scalar: {:?}", x),
+        }
+    }
+
+    fn scalar_to_native_datetime(literal: &ScalarValue) -> Option<NaiveDateTime> {
+        match literal {
+            ScalarValue::TimestampNanosecond(_, _)
+            | ScalarValue::Date32(_)
+            | ScalarValue::Date64(_) => {
+                let array = literal.to_array();
+                let timestamp = if let Some(array) =
+                    array.as_any().downcast_ref::<TimestampNanosecondArray>()
+                {
+                    array.value_as_datetime(0)
+                } else if let Some(array) = array.as_any().downcast_ref::<Date32Array>() {
+                    array.value_as_datetime(0)
+                } else if let Some(array) = array.as_any().downcast_ref::<Date64Array>() {
+                    array.value_as_datetime(0)
+                } else {
+                    panic!("Unexpected array type: {:?}", array.data_type())
+                };
+
+                timestamp
+            }
+            _ => panic!("Unsupported filter scalar: {:?}", literal),
         }
     }
 
@@ -1356,11 +1438,15 @@ impl FilterRules {
                 members_var,
                 table_name_var,
             ) {
-                if let Some(_) = cube.lookup_dimension(&member_name) {
+                if let Some(_) = cube.lookup_dimension_by_member_name(&member_name) {
                     for negated in var_iter!(egraph[subst[negated_var]], BetweenExprNegated) {
                         let negated = *negated;
-                        if let Some(low) = &egraph[subst[low_var]].data.constant {
-                            if let Some(high) = &egraph[subst[high_var]].data.constant {
+                        if let Some(ConstantFolding::Scalar(low)) =
+                            &egraph[subst[low_var]].data.constant
+                        {
+                            if let Some(ConstantFolding::Scalar(high)) =
+                                &egraph[subst[high_var]].data.constant
+                            {
                                 let values = vec![
                                     FilterRules::scalar_to_value(&low),
                                     FilterRules::scalar_to_value(&high),
@@ -1639,4 +1725,27 @@ fn filter_unwrap_cast_push_down_tail(
         filter_cast_unwrap_replacer(node_type.to_string()),
         node_type.to_string(),
     )
+}
+
+fn format_iso_timestamp(dt: NaiveDateTime) -> String {
+    dt.format_with_items(
+        [
+            Item::Numeric(Year, Zero),
+            Item::Literal("-"),
+            Item::Numeric(Month, Zero),
+            Item::Literal("-"),
+            Item::Numeric(Day, Zero),
+            Item::Literal("T"),
+            Item::Numeric(Hour, Zero),
+            Item::Literal(":"),
+            Item::Numeric(Minute, Zero),
+            Item::Literal(":"),
+            Item::Numeric(Second, Zero),
+            Item::Fixed(Fixed::Nanosecond3),
+            // TODO remove when there're no more non rewrite tests
+            Item::Literal("Z"),
+        ]
+        .iter(),
+    )
+    .to_string()
 }

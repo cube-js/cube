@@ -1,0 +1,134 @@
+---
+title: Connecting to Bubble
+permalink: /config/downstream/bubble
+---
+
+[Bubble](https://bubble.io/) is one of the oldest and most comprehensive low-code app-building platforms on the market.
+You can connect a Cube deployment to Retool using Cube’s [REST API](https://cube.dev/docs/rest-api).
+
+Here's a short video guide on how to connect Bubble to Cube.
+
+<LoomVideo url="https://www.loom.com/embed/554bee2daa7e42529b8eb4d0494e6674" />
+
+## Use REST API in Cube
+
+> Don't have a Cube project yet? [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
+
+### Cube Cloud
+
+Click the "How to connect" link on the Overview page, navigate to the REST API tab. You will see your connection credentials, the REST API URL and the authorization token:
+
+<div style="text-align: center">
+  <img
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/appsmith-1.png"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+### Self-hosted Cube
+
+For a Cube instance publicly available at a specific `HOST`, the REST API URL would be `HOST/cubejs-api/v1`. Please refer to the [REST API page](https://cube.dev/docs/rest-api) for details.
+
+You will also need to generate a JSON Web Token that would be used to authenticate requests to Cube.
+
+Please check the [Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt) to learn how to generate a token. We suggest generating a long-lived JWT that won't expire soon.
+
+## Add an API connector plugin to your Bubble app
+
+Navigate to the plugins. Select and install the API connector plugin.
+
+## Create a new API in Bubble
+
+Click "Add another API".
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/a2e85b6e-b321-40d8-ba56-2dc4b7d7f50b/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Next, set the "Authentication" as "Private key in header", and copy and paste Cube's Authorization token.
+Additionally, make sure to add a shared header for all calls by setting `content-type` to `application/json`.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/8bf3d936-1886-4bc0-b6c4-10bb76adb21f/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Create a POST request in Bubble
+
+Click "Add another call".
+
+Copy and paste the Cube REST API, including the `/load` path, in the API field. Make sure to select "Use as: Action", and use the `JSON` "data type" and "body type". 
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/5f857c2f-ba88-40a9-9112-b4368a19b608/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Get your Cube query in the JSON [query format](https://cube.dev/docs/query-format) ready. You can copy it from Cube’s Playground or compose manually:
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/d2104545-cba1-4b63-84ab-d9d0a7051d7f/"
+    style="border: none"
+    width="50%"
+  />
+</div>
+
+Paste the JSON query in the **Body**. Make sure to add a `query` parameter for your JSON query.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/4e86bc38-56bb-44bc-b99d-6b55bb963761/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Next, hit "Initialize / Reinitialize call".
+
+## Create a workflow in Bubble
+
+First, add a "Page is loaded" event. Add an action that uses the API connector plugin. Next, add another action to set the state of an element. Select the index element, and create a new custom state. In this example I named the custom state `OrdersByMonth` and selected the `data` field of the API response. Make sure to toggle the "This state is a list" checkbox as well. While setting the state's value you will need to select "Result of step 1" and the `data` field.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/9f7a98e2-6ba8-463b-bbee-059fd29da4ab/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Display the data in Bubble
+
+Bubble has an amazing feature where you can drag and drop UI components into the design dashboard.
+
+Once you added a chart, you configure the data points. More specifically, the series categories and series data. For the series categories and series data you need to select the `index` and `OrdersByMonth` state followed by the data point you want to use in order to populate the chart.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/c2684ea0-5cad-4fee-9496-e9bc745ea68c/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Once you open the "Preview" you'll see your nicely rendered charts.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/1e1790fc-a5ed-4921-b1f1-7cd326ea6932/"
+    style="border: none"
+    width="80%"
+  />
+</div>

@@ -95,6 +95,7 @@ impl StatusFlags {
 #[derive(Debug, Clone)]
 pub enum CommandCompletion {
     Begin,
+    Prepare,
     Commit,
     Use,
     Rollback,
@@ -111,6 +112,7 @@ impl CommandCompletion {
         match self {
             // IDENTIFIER ONLY
             CommandCompletion::Begin => CommandComplete::Plain("BEGIN".to_string()),
+            CommandCompletion::Prepare => CommandComplete::Plain("PREPARE".to_string()),
             CommandCompletion::Commit => CommandComplete::Plain("COMMIT".to_string()),
             CommandCompletion::Rollback => CommandComplete::Plain("ROLLBACK".to_string()),
             CommandCompletion::Set => CommandComplete::Plain("SET".to_string()),

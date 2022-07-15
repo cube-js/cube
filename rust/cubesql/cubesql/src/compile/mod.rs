@@ -3767,7 +3767,7 @@ mod tests {
 
         assert_eq!(
             logical_plan,
-            "Projection: CAST(TimestampNanosecond(0, None) AS Timestamp(Nanosecond, None)) AS COL\
+            "Projection: TimestampNanosecond(0, None) AS COL\
             \n  EmptyRelation",
         );
     }
@@ -5590,6 +5590,110 @@ ORDER BY \"COUNT(count)\" DESC"
                 _ => panic!("Must be DateLiteral"),
             };
         }
+    }
+
+    #[tokio::test]
+    async fn test_date_add_sub_postgres() {
+        async fn check_fun(name: &str, t: &str, i: &str, expected: &str) {
+            assert_eq!(
+                execute_query(
+                    format!(
+                        "SELECT {}(Str_to_date('{}', '%Y-%m-%d %H:%i:%s'), INTERVAL '{}') as result",
+                        name, t, i
+                    ),
+                    DatabaseProtocol::PostgreSQL
+                )
+                .await
+                .unwrap(),
+                format!(
+                    "+-------------------------+\n\
+                | result                  |\n\
+                +-------------------------+\n\
+                | {} |\n\
+                +-------------------------+",
+                    expected
+                )
+            );
+        }
+
+        async fn check_adds_to(t: &str, i: &str, expected: &str) {
+            check_fun("DATE_ADD", t, i, expected).await
+        }
+
+        async fn check_subs_to(t: &str, i: &str, expected: &str) {
+            check_fun("DATE_SUB", t, i, expected).await
+        }
+
+        check_adds_to("2021-01-01 00:00:00", "1 second", "2021-01-01T00:00:01.000").await;
+        check_adds_to("2021-01-01 00:00:00", "1 minute", "2021-01-01T00:01:00.000").await;
+        check_adds_to("2021-01-01 00:00:00", "1 hour", "2021-01-01T01:00:00.000").await;
+        check_adds_to("2021-01-01 00:00:00", "1 day", "2021-01-02T00:00:00.000").await;
+        check_adds_to(
+            "2021-01-01 00:00:00",
+            "-1 second",
+            "2020-12-31T23:59:59.000",
+        )
+        .await;
+        check_adds_to(
+            "2021-01-01 00:00:00",
+            "-1 minute",
+            "2020-12-31T23:59:00.000",
+        )
+        .await;
+        check_adds_to("2021-01-01 00:00:00", "-1 hour", "2020-12-31T23:00:00.000").await;
+        check_adds_to("2021-01-01 00:00:00", "-1 day", "2020-12-31T00:00:00.000").await;
+
+        check_adds_to(
+            "2021-01-01 00:00:00",
+            "1 day 1 hour 1 minute 1 second",
+            "2021-01-02T01:01:01.000",
+        )
+        .await;
+        check_subs_to(
+            "2021-01-02 01:01:01",
+            "1 day 1 hour 1 minute 1 second",
+            "2021-01-01T00:00:00.000",
+        )
+        .await;
+
+        check_adds_to("2021-01-01 00:00:00", "1 month", "2021-02-01T00:00:00.000").await;
+
+        check_adds_to("2021-01-01 00:00:00", "1 year", "2022-01-01T00:00:00.000").await;
+        check_subs_to("2022-01-01 00:00:00", "1 year", "2021-01-01T00:00:00.000").await;
+
+        check_adds_to("2021-01-01 00:00:00", "13 month", "2022-02-01T00:00:00.000").await;
+        check_subs_to("2022-02-01 00:00:00", "13 month", "2021-01-01T00:00:00.000").await;
+
+        check_adds_to("2021-01-01 23:59:00", "1 minute", "2021-01-02T00:00:00.000").await;
+        check_subs_to("2021-01-02 00:00:00", "1 minute", "2021-01-01T23:59:00.000").await;
+
+        check_adds_to("2021-12-01 00:00:00", "1 month", "2022-01-01T00:00:00.000").await;
+        check_subs_to("2022-01-01 00:00:00", "1 month", "2021-12-01T00:00:00.000").await;
+
+        check_adds_to("2021-12-31 00:00:00", "1 day", "2022-01-01T00:00:00.000").await;
+        check_subs_to("2022-01-01 00:00:00", "1 day", "2021-12-31T00:00:00.000").await;
+
+        // Feb 29 on leap and non-leap years.
+        check_adds_to("2020-02-29 00:00:00", "1 day", "2020-03-01T00:00:00.000").await;
+        check_subs_to("2020-03-01 00:00:00", "1 day", "2020-02-29T00:00:00.000").await;
+
+        check_adds_to("2020-02-28 00:00:00", "1 day", "2020-02-29T00:00:00.000").await;
+        check_subs_to("2020-02-29 00:00:00", "1 day", "2020-02-28T00:00:00.000").await;
+
+        check_adds_to("2021-02-28 00:00:00", "1 day", "2021-03-01T00:00:00.000").await;
+        check_subs_to("2021-03-01 00:00:00", "1 day", "2021-02-28T00:00:00.000").await;
+
+        check_adds_to("2020-02-29 00:00:00", "1 year", "2021-02-28T00:00:00.000").await;
+        check_subs_to("2020-02-29 00:00:00", "1 year", "2019-02-28T00:00:00.000").await;
+
+        check_adds_to("2020-01-30 00:00:00", "1 month", "2020-02-29T00:00:00.000").await;
+        check_subs_to("2020-03-30 00:00:00", "1 month", "2020-02-29T00:00:00.000").await;
+
+        check_adds_to("2020-01-29 00:00:00", "1 month", "2020-02-29T00:00:00.000").await;
+        check_subs_to("2020-03-29 00:00:00", "1 month", "2020-02-29T00:00:00.000").await;
+
+        check_adds_to("2021-01-29 00:00:00", "1 month", "2021-02-28T00:00:00.000").await;
+        check_subs_to("2021-03-29 00:00:00", "1 month", "2021-02-28T00:00:00.000").await;
     }
 
     #[tokio::test]
@@ -9856,5 +9960,177 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }
         )
+    }
+
+    #[tokio::test]
+    async fn metabase_date_filters() {
+        init_logger();
+
+        let now = "str_to_date('2022-01-01 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')";
+        let cases = vec![
+            // last 30 days
+            [
+                format!("CAST(({} + (INTERVAL '-30 day')) AS date)", now),
+                format!("CAST({} AS date)", now),
+                "2021-12-02T00:00:00.000Z".to_string(),
+                "2021-12-31T23:59:59.999Z".to_string(),
+            ],
+            // last 30 weeks
+            [
+                format!("(CAST(date_trunc('week', (({} + (INTERVAL '-30 week')) + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
+                format!("(CAST(date_trunc('week', ({} + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
+                "2021-05-30T00:00:00.000Z".to_string(),
+                "2021-12-25T23:59:59.999Z".to_string(),
+            ],
+            // last 30 quarters
+            [
+                format!("date_trunc('quarter', ({} + (INTERVAL '-90 month')))", now),
+                format!("date_trunc('quarter', {})", now),
+                "2014-07-01T00:00:00.000Z".to_string(),
+                "2021-12-31T23:59:59.999Z".to_string(),
+            ],
+            // this year
+            [
+                format!("date_trunc('year', {})", now),
+                format!("date_trunc('year', ({} + (INTERVAL '1 year')))", now),
+                "2022-01-01T00:00:00.000Z".to_string(),
+                "2022-12-31T23:59:59.999Z".to_string(),
+            ],
+            // next 2 years including current
+            [
+                format!("date_trunc('year', {})", now),
+                format!("date_trunc('year', ({} + (INTERVAL '3 year')))", now),
+                "2022-01-01T00:00:00.000Z".to_string(),
+                "2024-12-31T23:59:59.999Z".to_string(),
+            ],
+        ];
+        for [lte, gt, from, to] in cases {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT count FROM (SELECT count FROM KibanaSampleDataEcommerce
+                    WHERE (order_date >= {} AND order_date < {})) source",
+                    lte, gt
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: None,
+                        date_range: Some(json!(vec![from, to])),
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            );
+        }
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT \"source\".\"count\" AS \"count\" 
+            FROM (
+                    SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" FROM \"public\".\"KibanaSampleDataEcommerce\"
+                    WHERE \"public\".\"KibanaSampleDataEcommerce\".\"order_date\" 
+                    BETWEEN timestamp with time zone '2022-06-13 12:30:00.000Z' 
+                    AND timestamp with time zone '2022-06-29 12:30:00.000Z'
+            ) 
+            \"source\""
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2022-06-13 12:30:00.000Z".to_string(),
+                        "2022-06-29 12:30:00.000Z".to_string()
+                    ]))
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        );
+
+        let cases = vec![
+            // prev 5 days starting 4 weeks ago
+            [
+                "(INTERVAL '4 week')".to_string(),
+                format!("CAST(({} + (INTERVAL '-5 day')) AS date)", now),
+                format!("CAST({} AS date)", now),
+                "2021-11-29T00:00:00.000Z".to_string(),
+                "2021-12-04T00:00:00.000Z".to_string(),
+            ],
+            // prev 5 weeks starting 4 weeks ago
+            [
+                "(INTERVAL '4 week')".to_string(),
+                format!("(CAST(date_trunc('week', (({} + (INTERVAL '-5 week')) + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
+                format!("(CAST(date_trunc('week', ({} + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
+                "2021-10-24T00:00:00.000Z".to_string(),
+                "2021-11-28T00:00:00.000Z".to_string(),
+            ],
+            // prev 5 months starting 4 months ago
+            [
+                "(INTERVAL '4 month')".to_string(),
+                format!("date_trunc('month', ({} + (INTERVAL '-5 month')))", now),
+                format!("date_trunc('month', {})", now),
+                "2021-04-01T00:00:00.000Z".to_string(),
+                "2021-09-01T00:00:00.000Z".to_string(),
+            ],
+        ];
+
+        for [interval, lowest, highest, from, to] in cases {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT \"source\".\"count\" AS \"count\" 
+                    FROM (
+                        SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" FROM \"public\".\"KibanaSampleDataEcommerce\"
+                        WHERE (\"public\".\"KibanaSampleDataEcommerce\".\"order_date\" + {}) BETWEEN {} AND {}
+                    ) 
+                    \"source\"",
+                    interval, lowest, highest
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: None,
+                        date_range: Some(json!(vec![from, to])),
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            );
+        }
     }
 }

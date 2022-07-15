@@ -133,7 +133,11 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             planning_join_with_partitioned_index,
         ),
         t("topk_query", topk_query),
+        t("topk_having", topk_having),
         t("topk_decimals", topk_decimals),
+        t("planning_topk_having", planning_topk_having),
+        t("planning_topk_hll", planning_topk_hll),
+        t("topk_hll", topk_hll),
         t("offset", offset),
         t("having", having),
         t("rolling_window_join", rolling_window_join),
@@ -3325,6 +3329,90 @@ async fn topk_query(service: Box<dyn SqlClient>) {
     assert_eq!(to_rows(&r), rows(&[("a", 1), ("e", 35), ("d", 40)]));
 }
 
+async fn topk_having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80)")
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) < 100 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("y", 80), ("b", 52), ("c", 48)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING MIN(`hits`) >= 3 AND SUM(`hits`) < 100 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("y", 80), ("c", 48), ("d", 44)]));
+    
+    service
+        .exec_query("CREATE TABLE s.Data21(url text, hits int, hits_2 int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data21(url, hits, hits_2) VALUES  ('b', 5, 2), ('d', 3, 4), ('c', 4, 1),  ('e', 2, 10)")
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data22(url text, hits int, hits_2 int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data22(url, hits, hits_2) VALUES ('b', 50, 3), ('c', 45, 12), ('d', 40, 10), ('e', 35, 5)")
+            .await
+            .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data21 \
+                               UNION ALL \
+                               SELECT * FROM s.Data22) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING MAX(`hits_2`) < 11 \
+                         ORDER BY 2 DESC \
+                         LIMIT 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("b", 55), ("d", 43)]));
+
+}
+
 async fn topk_decimals(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -3361,6 +3449,243 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
         to_rows(&r),
         rows(&[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))])
     );
+}
+
+async fn planning_topk_having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits int, uhits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits int, uhits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 10\
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, SUM(Data.hits)@1:hits]\
+        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10\
+        \n    Worker\
+        \n      Sort\
+        \n        FullInplaceAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              MergeSort\
+        \n                Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n                  Empty\
+        \n              MergeSort\
+        \n                Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n                  Empty"
+        );
+
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits`, CARDINALITY(MERGE(`uhits`)) `uhits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 10 AND CARDINALITY(MERGE(`uhits`)) > 5 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, SUM(Data.hits)@1:hits, CARDINALITY(MERGE(Data.uhits)@2):uhits]\
+        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10 AND CAST(CARDINALITY(MERGE(Data.uhits)@2) AS Int64) > 5\
+        \n    Worker\
+        \n      Sort\
+        \n        FullInplaceAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              MergeSort\
+        \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+        \n                  Empty\
+        \n              MergeSort\
+        \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+        \n                  Empty"
+        );
+}
+async fn planning_topk_hll(service: Box<dyn SqlClient>) {
+
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    // A typical top-k query.
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3\
+         \n    Worker\
+         \n      Sort\
+         \n        FullInplaceAggregate\
+         \n          MergeSort\
+         \n            Union\
+         \n              MergeSort\
+         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                  Empty\
+         \n              MergeSort\
+         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                  Empty"
+        );
+
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) > 20 and cardinality(merge(hits)) < 40\
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3, having: CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) > 20 AND CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) < 40\
+         \n    Worker\
+         \n      Sort\
+         \n        FullInplaceAggregate\
+         \n          MergeSort\
+         \n            Union\
+         \n              MergeSort\
+         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                  Empty\
+         \n              MergeSort\
+         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                  Empty"
+        );
+}
+
+async fn topk_hll(service: Box<dyn SqlClient>) {
+    let hlls = vec![
+        "X'118b7f'",
+        "X'128b7fee22c470691a8134'",
+        "X'138b7f04a10642078507c308e309230a420ac10c2510a2114511611363138116811848188218a119411a821ae11f0122e223a125a126632685276327a328e2296129e52b812fe23081320132c133e335a53641368236a23721374237e1382138e13a813c243e6140e341854304434148a24a034f8150c1520152e254e155a1564157e158e35ac25b265b615c615fc1620166a368226a416a626c016c816d677163728275817a637a817ac37b617c247c427d677f6180e18101826382e1846184e18541858287e1880189218a418b818bc38e018ea290a19244938295e4988198c299e29b239b419c419ce49da1a1e1a321a381a4c1aa61acc2ae01b0a1b101b142b161b443b801bd02bd61bf61c263c4a3c501c7a1caa1cb03cd03cf03cf42d123d4c3d662d744d901dd01df81e001e0a2e641e7e3edc1f0a2f1c1f203f484f5c4f763fc84fdc1fe02fea1'",
+        "X'148b7f21083288a4320a12086719c65108c1088422884511063388232904418c8520484184862886528c65198832106328c83114e6214831108518d03208851948511884188441908119083388661842818c43190c320ce4210a50948221083084a421c8328c632104221c4120d01284e20902318ca5214641942319101294641906228483184e128c43188e308882204a538c8328903288642102220c64094631086330c832106320c46118443886329062118a230c63108a320c23204a11852419c6528c85210a318c6308c41088842086308ce7110a418864190650884210ca631064108642a1022186518c8509862109020a0a4318671144150842400e5090631a0811848320c821888120c81114a220880290622906310d0220c83090a118c433106128c221902210cc23106029044114841104409862190c43188111063104c310c6728c8618c62290441102310c23214440882438ca2110a32908548c432110329462188a43946328842114640944320884190c928c442084228863318a2190a318c6618ca3114651886618c44190c5108e2110612144319062284641908428882314862106419883310421988619ca420cc511442104633888218c4428465288651910730c81118821088218c6418c45108452106519ce410d841904218863308622086211483198c710c83104a328c620906218864118623086418c8711423094632186420c4620c41104620a441108e40882628c6311c212046428c8319021104672888428ca320c431984418c4209043084451886510c641108310c4c20c66188472146310ca71084820c621946218c8228822190e2410861904411c27288621144328c6440c6311063190813086228ca710c2218c4718865188c2114850888608864404a3194e22882310ce53088619ca31904519503188e1118c4214cb2948110c6119c2818c843108520c43188c5204821186528c871908311086214c630c4218c8418cc3298a31888210c63110a121042198622886531082098c419c4210c6210c8338c25294610944518c442104610884104424206310c8311462288873102308c2440c451082228824310440982220c4240c622084310c642850118c641148430d0128c8228c2120c221884428863208c21a0a4190a4404c21186548865204633906308ca32086211c8319ce22146520c6120803318a518c840084519461208c21908538cc428c2110844384e40906320c44014a3204e62042408c8328c632146318c812004310c41318e3208a5308a511827104a4188c51048421446090a7088631102231484104473084318c41210860906919083190652906129c4628c45310652848221443114420084500865184a618c81198c32906418c63190e320c231882728484184671888309465188a320c83208632144318c6331c642988108c61218812144328d022844021022184a31908328c6218c2328c4528cc541428190641046418c84108443146230c6419483214232184411863290a210824318c220868194631106618c43188821048230c4128c6310c0330462094241106330c42188c321043118863046438823110a041464108e3190e4209a11902439c43188631104321008090441106218c6419064294a229463594622244320cc71184510902924421908218c62308641044328ca328882111012884120ca52882428c62184442086718c4221c8211082208a321023115270086218c4218c6528ce400482310a520c43104a520c44210811884118c4310864198263942331822'",
+    ];
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data1(url, hits) VALUES ('a', {}), ('b', {}), ('c', {}), ('d', {}), ('k', {}) ",
+                hlls[0], hlls[1], hlls[2], hlls[3], hlls[0]
+            ))
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data2(url, hits) VALUES ('b', {}), ('c', {}), ('e', {}), ('d', {}), ('h', {})",
+                hlls[3], hlls[2], hlls[1], hlls[2], hlls[2]
+                )
+                )
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("d", 10383), ("b", 9722), ("c", 171)])
+    ); 
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) < 10000
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("b", 9722), ("c", 171), ("h", 164)])
+    ); 
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) < 170 and cardinality(merge(hits)) > 160
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("h", 164)])
+    ); 
+
 }
 
 async fn offset(service: Box<dyn SqlClient>) {

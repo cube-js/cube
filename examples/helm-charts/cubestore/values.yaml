@@ -212,6 +212,14 @@ router:
   ##
   customReadinessProbe: {}
 
+  ## Tolerations for pod assignment
+  ##
+  tolerations: {}
+
+  ## Node selector for pod assignment
+  ##
+  nodeSelector: {}
+
 workers:
   ## Number of workers to deploy
   ##
@@ -253,3 +261,11 @@ workers:
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
   ##
   resources: {}
+
+  ## Tolerations for pod assignment
+  ##
+  tolerations: {}
+
+  ## Node selector for pod assignment
+  ##
+  nodeSelector: {}

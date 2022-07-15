@@ -499,6 +499,14 @@ master:
   ##
   customReadinessProbe: {}
 
+  ## Tolerations for pod assignment
+  ##
+  tolerations: {}
+
+  ## Node selector for pod assignment
+  ##
+  nodeSelector: {}
+
 workers:
   workersCount: 1
 
@@ -546,6 +554,15 @@ workers:
   ## Custom readinessProbe that overrides the default one
   ##
   customReadinessProbe: {}
+
+
+  ## Tolerations for pod assignment
+  ##
+  tolerations: {}
+
+  ## Node selector for pod assignment
+  ##
+  nodeSelector: {}
 
 ## Configure the ingress resource that allows you to access the
 ## Cubejs installation. Set up the URL

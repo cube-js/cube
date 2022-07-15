@@ -1,0 +1,146 @@
+---
+title: Connecting to Budibase
+permalink: /config/downstream/budibase
+---
+
+Budibase is a low-code app-building platform that helps developers create responsive web applications with access methods to databases, APIs, and much more. You can connect a Cube deployment to Budibase using Cube's [REST API](https://cube.dev/docs/rest-api).
+
+Here's a short video guide on how to connect Budibase to Cube.
+
+<LoomVideo url="https://www.loom.com/embed/c83e665fa1c947d89f3e304e5b5b81b4" />
+
+## Use REST API in Cube
+
+> Don't have a Cube project yet? [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
+
+### Cube Cloud
+
+Click the "How to connect" link on the Overview page, navigate to the REST API tab. You will see your connection credentials, the REST API URL and the authorization token:
+
+<div style="text-align: center">
+  <img
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/appsmith-1.png"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+### Self-hosted Cube
+
+For a Cube instance publicly available at a specific `HOST`, the REST API URL would be `HOST/cubejs-api/v1`. Please refer to the [REST API page](https://cube.dev/docs/rest-api) for details.
+
+You will also need to generate a JSON Web Token that would be used to authenticate requests to Cube.
+
+Please check the [Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt) to learn how to generate a token. We suggest generating a long-lived JWT that won't expire soon.
+
+## Create a new data source in Budibase
+
+Create a new "REST API" data source in Budibase.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/381542a0-3d74-4ad6-9f3a-599be5d369f4/"
+    style="border: none"
+    width="60%"
+  />
+</div>
+
+Next, add a "Authorization" header for the REST API. Copy and paste Cube's Authorization token.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/30f74134-1fd4-4d0c-af63-81f6e6aaebb5/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Add a query in Budibase
+
+Click "+ Add Query".
+
+Copy and paste the Cube REST API, including the `/load` path, in the API field. Make sure to select "POST" as the request.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/55fbd232-9eb4-4b5b-a15b-611da4381e7f/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Get your Cube query in the JSON [query format](https://cube.dev/docs/query-format) ready. You can copy it from Cube's Playground or compose manually:
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/d2104545-cba1-4b63-84ab-d9d0a7051d7f/"
+    style="border: none"
+    width="50%"
+  />
+</div>
+
+Paste the JSON query in the **Body** as "raw(JSON)". Make sure to add a `query` parameter for your JSON query.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/5d937df8-6b5f-4b45-ac20-6abcbbb5449a/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Edit the **Transform** to return the data of the request.
+
+```
+return data.data
+```
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/cda3e40a-ee99-4243-8a67-54e80d749270/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+You can also give the query a name. In this sample it's called `OrdersByMonth`.
+
+Lastly, click the "save" button and hit "send" to test the API and get a response back.
+
+## Create a data provider in Budibase
+
+Move to the **Design** section and open the **Components**.
+
+First, add a Data Provider. Select the query from above. In this sample it's called `OrdersByMonth`.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/a882ca72-0b75-4a2a-87a0-8a8c0036dc96/"
+    style="border: none"
+    width="40%"
+  />
+</div>
+
+## Display the data in Budibase
+
+Add a chart into the data provider. Next, configure the data provider for the chart. Make sure it's set to the data provider you just created.
+
+Then, you set the "label column" and "data columns". In this sample you can set `Orders.createdAt` as the label column and `Orders.count` as the data columns.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/2f0ef897-13eb-4dc2-8869-e847618df4d9/"
+    style="border: none"
+    width="40%"
+  />
+</div>
+
+You'll see a nicely rendered chart show up.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/ee32dd7c-65ad-43cd-982c-1f3e5e50d057/"
+    style="border: none"
+    width="80%"
+  />
+</div>

@@ -10,7 +10,7 @@ point.
 
 </WarningBox>
 
-You can connect to Cube from Power BI, interactive data visualization software product developed by Microsof, using the [Cube SQL
+You can connect to Cube from Power BI, interactive data visualization software product developed by Microsoft, using the [Cube SQL
 API][ref-sql-api].
 
 ## Enable Cube SQL API

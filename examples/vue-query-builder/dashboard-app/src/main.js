@@ -4,7 +4,7 @@ import VueChartkick from 'vue-chartkick';
 import VueRouter from 'vue-router';
 import VueApollo from 'vue-apollo';
 import cubejs from '@cubejs-client/core';
-import createExampleWrapper from "cube-example-wrapper";
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
 import App from './App.vue';
 import vuetify from './plugins/vuetify';

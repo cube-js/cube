@@ -101,7 +101,7 @@ const renderChart = Component => ({
   resultSet,
   error,
   pivotConfig
-}) => resultSet && <Component resultSet={resultSet} pivotConfig={pivotConfig} /> || error && error.toString() || <Spin />;
+}) => resultSet && (<Component resultSet={resultSet} pivotConfig={pivotConfig} /> || (error && error.toString()) || <Spin />);
 
 const ChartRenderer = ({
   vizState

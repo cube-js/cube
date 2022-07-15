@@ -44,32 +44,46 @@ export class CubeSymbols {
   }
 
   createCube(cubeDefinition) {
+    let measures;
+    let dimensions;
+    let segments;
     const cubeObject = Object.assign({
       allDefinitions(type) {
-        let superDefinitions = {};
-
         if (cubeDefinition.extends) {
-          superDefinitions = super.allDefinitions(type);
+          return {
+            ...super.allDefinitions(type),
+            ...cubeDefinition[type]
+          };
+        } else {
+          // TODO We probably do not need this shallow copy
+          return { ...cubeDefinition[type] };
         }
-
-        return Object.assign({}, superDefinitions, cubeDefinition[type]);
       },
       get measures() {
-        return this.allDefinitions('measures');
+        if (!measures) {
+          measures = this.allDefinitions('measures');
+        }
+        return measures;
       },
       set measures(v) {
         // Dont allow to modify
       },
 
       get dimensions() {
-        return this.allDefinitions('dimensions');
+        if (!dimensions) {
+          dimensions = this.allDefinitions('dimensions');
+        }
+        return dimensions;
       },
       set dimensions(v) {
         // Dont allow to modify
       },
 
       get segments() {
-        return this.allDefinitions('segments');
+        if (!segments) {
+          segments = this.allDefinitions('segments');
+        }
+        return segments;
       },
       set segments(v) {
         // Dont allow to modify

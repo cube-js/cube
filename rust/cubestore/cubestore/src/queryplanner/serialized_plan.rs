@@ -200,6 +200,7 @@ pub enum SerializedLogicalPlan {
         group_expr: Vec<SerializedExpr>,
         aggregate_expr: Vec<SerializedExpr>,
         sort_columns: Vec<SortColumn>,
+        having_expr: Option<SerializedExpr>,
         schema: DFSchemaRef,
         snapshots: Snapshots,
     },
@@ -384,6 +385,7 @@ impl SerializedLogicalPlan {
                 group_expr,
                 aggregate_expr,
                 sort_columns,
+                having_expr,
                 schema,
                 snapshots,
             } => ClusterAggregateTopK {
@@ -392,6 +394,7 @@ impl SerializedLogicalPlan {
                 group_expr: group_expr.iter().map(|e| e.expr()).collect(),
                 aggregate_expr: aggregate_expr.iter().map(|e| e.expr()).collect(),
                 order_by: sort_columns.clone(),
+                having_expr: having_expr.as_ref().map(|e| e.expr()),
                 schema: schema.clone(),
                 snapshots: snapshots.clone(),
             }
@@ -906,6 +909,7 @@ impl SerializedPlan {
                             .map(|e| Self::serialized_expr(e))
                             .collect(),
                         sort_columns: topk.order_by.clone(),
+                        having_expr: topk.having_expr.as_ref().map(|e| Self::serialized_expr(&e)),
                         schema: topk.schema.clone(),
                         snapshots: topk.snapshots.clone(),
                     }
