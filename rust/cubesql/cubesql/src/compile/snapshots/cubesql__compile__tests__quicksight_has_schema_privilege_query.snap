@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT nspname AS schema_name\n                FROM pg_namespace\n                WHERE\n                    (\n                        has_schema_privilege('ovr', nspname, 'USAGE') = TRUE OR\n                        has_schema_privilege('ovr', nspname, 'CREATE') = TRUE\n                    ) AND\n                    nspname NOT IN ('pg_catalog', 'information_schema') AND\n                    nspname NOT LIKE 'pg_toast%' AND\n                    nspname NOT LIKE 'pg_temp_%'\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------+
+| schema_name |
++-------------+
+| public      |
++-------------+
