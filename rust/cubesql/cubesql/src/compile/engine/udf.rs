@@ -2312,3 +2312,66 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
         &fun,
     )
 }
+
+pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        let users = downcast_string_arg!(args[0], "user", i32);
+        let schemas = downcast_string_arg!(args[1], "schema", i32);
+        let privileges = downcast_string_arg!(args[2], "privilege", i32);
+
+        let result = izip!(users, schemas, privileges)
+            .map(|args| {
+                Ok(match args {
+                    (Some(user), Some(schema), Some(privilege)) => {
+                        if let Some(session_user) = state.user() {
+                            if user != session_user {
+                                return Err(DataFusionError::Execution(format!(
+                                    "role \"{}\" does not exist",
+                                    user
+                                )));
+                            }
+                        }
+
+                        match schema {
+                            "public" | "pg_catalog" | "information_schema" => (),
+                            _ => {
+                                return Err(DataFusionError::Execution(format!(
+                                    "schema \"{}\" does not exist",
+                                    schema
+                                )))
+                            }
+                        };
+
+                        match privilege {
+                            "CREATE" => Some(false),
+                            "USAGE" => Some(true),
+                            _ => {
+                                return Err(DataFusionError::Execution(format!(
+                                    "unrecognized privilege type: \"{}\"",
+                                    privilege
+                                )))
+                            }
+                        }
+                    }
+                    _ => None,
+                })
+            })
+            .collect::<Result<BooleanArray>>();
+
+        Ok(Arc::new(result?))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "has_schema_privilege",
+        &Signature::exact(
+            vec![DataType::Utf8, DataType::Utf8, DataType::Utf8],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
