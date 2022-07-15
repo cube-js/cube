@@ -665,4 +665,5 @@ jobs:
         run: .github/actions/deploy-example.sh
         env:
           EXAMPLE_SLUG: multitenancy-workshop
+          EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
