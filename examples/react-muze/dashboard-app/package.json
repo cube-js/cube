@@ -6,7 +6,7 @@
     "@ant-design/icons": "^4.3.0",
     "@chartshq/muze": "^2.0.0",
     "@chartshq/react-muze": "^1.0.1",
-    "@cube-dev/example-wrapper": "^1.1.4",
+"@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/core": "^0.24.0",
     "@cubejs-client/react": "^0.24.0",
     "@react-hook/resize-observer": "^1.1.0",

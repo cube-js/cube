@@ -4,7 +4,7 @@
   "private": true,
   "homepage": ".",
   "dependencies": {
-    "@cube-dev/example-wrapper": "^1.1.4",
+"@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/core": "^0.2.0",
     "@cubejs-client/react": "^0.1.4",
     "antd": "^3.11.2",

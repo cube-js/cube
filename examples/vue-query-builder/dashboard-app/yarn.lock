@@ -923,10 +923,10 @@
     "@babel/helper-validator-identifier" "^7.18.6"
     to-fast-properties "^2.0.0"
 
-"@cube-dev/example-wrapper@^1.1.1":
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/@cube-dev/example-wrapper/-/example-wrapper-1.1.1.tgz#3a129a17243c01ed80fdc6099a2f962847bc2525"
-  integrity sha512-4buw1iuh8906FQPEp4rk79BhnPeoxRXUqrCAWLyUkTITXEdo6By0qXlL1cmG7GBchdTiyTMwbnW3ji2Kic+TtQ==
+"@cube-dev/example-wrapper@^1.1.9":
+  version "1.1.9"
+  resolved "https://registry.yarnpkg.com/@cube-dev/example-wrapper/-/example-wrapper-1.1.9.tgz#4820c64315712ccf591788bb51e7a739cabf51f4"
+  integrity sha512-E49SWTLWx1H2S/2fN5+hkiUZKGZuTpaxkqajohzLH8ibbECocYmbr+jK6WhLMpH89CAZr9QaWv92egSCZOSafw==
   dependencies:
     "@cubejs-client/core" "^0.29.33"
     cubedev-tracking "^1.1.0"

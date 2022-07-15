@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@cube-dev/example-wrapper": "^1.1.4",
+"@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/core": "^0.2.6",
     "@cubejs-client/react": "^0.2.6",
     "@material-ui/core": "^3.9.2",

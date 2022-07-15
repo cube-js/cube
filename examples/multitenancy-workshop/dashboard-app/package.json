@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@cube-dev/example-wrapper": "^1.1.1",
+"@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/react": "^0.28.45",
     "@nivo/core": "^0.74.0",
     "@nivo/line": "^0.74.0",

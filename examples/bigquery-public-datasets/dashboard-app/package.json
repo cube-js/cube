@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@cube-dev/example-wrapper": "^1.1.4",
+"@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/core": "^0.19.31",
     "@cubejs-client/react": "^0.19.31",
     "@testing-library/jest-dom": "^4.2.4",
