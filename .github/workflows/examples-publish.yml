@@ -667,3 +667,53 @@ jobs:
           EXAMPLE_SLUG: multitenancy-workshop
           EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+  
+  aws-web-analytics:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/aws-web-analytics/*,examples/aws-web-analytics/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: aws-web-analytics
+          EXAMPLE_CUBE_SKIP: 1
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_FRONTEND_SUBDIRECTORY: 'analytics-dashboard'
+  
+  event-analytics:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/event-analytics/*,examples/event-analytics/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: event-analytics
+          EXAMPLE_CUBE_SKIP: 1
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_FRONTEND_SUBDIRECTORY: 'frontend'
