@@ -363,33 +363,33 @@ CUBEJS_REDIS_PASSWORD.
 {{- if .Values.database.ssl.enabled }}
 - name: CUBEJS_DB_SSL
   value: "true"
-{{- if .Value.database.ssl.rejectUnAuthorized }}
+{{- if .Values.database.ssl.rejectUnAuthorized }}
 - name: CUBEJS_DB_SSL_REJECT_UNAUTHORIZED
-  value: {{ .Value.database.ssl.rejectUnAuthorized | quote }}
+  value: {{ .Values.database.ssl.rejectUnAuthorized | quote }}
 {{- end }}
-{{- if .Value.database.ssl.ca }}
+{{- if .Values.database.ssl.ca }}
 - name: CUBEJS_DB_SSL_CA
-  value: {{ .Value.database.ssl.ca | quote }}
+  value: {{ .Values.database.ssl.ca | quote }}
 {{- end }}
-{{- if .Value.database.ssl.cert }}
+{{- if .Values.database.ssl.cert }}
 - name: CUBEJS_DB_SSL_CERT
-  value: {{ .Value.database.ssl.cert | quote }}
+  value: {{ .Values.database.ssl.cert | quote }}
 {{- end }}
-{{- if .Value.database.ssl.key }}
+{{- if .Values.database.ssl.key }}
 - name: CUBEJS_DB_SSL_KEY
-  value: {{ .Value.database.ssl.key | quote }}
+  value: {{ .Values.database.ssl.key | quote }}
 {{- end }}
-{{- if .Value.database.ssl.ciphers }}
+{{- if .Values.database.ssl.ciphers }}
 - name: CUBEJS_DB_SSL_CIPHERS
-  value: {{ .Value.database.ssl.ciphers | quote }}
+  value: {{ .Values.database.ssl.ciphers | quote }}
 {{- end }}
-{{- if .Value.database.ssl.serverName }}
+{{- if .Values.database.ssl.serverName }}
 - name: CUBEJS_DB_SSL_SERVERNAME
-  value: {{ .Value.database.ssl.serverName | quote }}
+  value: {{ .Values.database.ssl.serverName | quote }}
 {{- end }}
-{{- if .Value.database.ssl.passPhrase }}
+{{- if .Values.database.ssl.passPhrase }}
 - name: CUBEJS_DB_SSL_PASSPHRASE
-  value: {{ .Value.database.ssl.passPhrase | quote }}
+  value: {{ .Values.database.ssl.passPhrase | quote }}
 {{- end }}
 {{- end }}
 {{- /*
