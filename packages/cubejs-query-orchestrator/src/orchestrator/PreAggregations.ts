@@ -416,7 +416,7 @@ type LoadPreAggregationResult = {
   refreshKeyValues: any[];
   lastUpdatedAt: number;
   buildRangeEnd?: string;
-  inlineTable?: InlineTable;
+  lambdaTable?: InlineTable;
 };
 
 export class PreAggregationLoader {
@@ -553,10 +553,10 @@ export class PreAggregationLoader {
   /**
    * Downloads the lambda table from the source DB.
    */
-  public async downloadLambdaTable(): Promise<DownloadTableMemoryData> {
+  public async downloadLambdaTable(): Promise<InlineTable> {
     const queue = await this.queryCache.getQueue(this.preAggregation.dataSource);
     const [sql, params] = this.preAggregation.sql;
-    return queue.executeInQueue(
+    const table = await queue.executeInQueue(
       'query',
       [],
       {
@@ -567,6 +567,11 @@ export class PreAggregationLoader {
       },
       this.priority(10),
     );
+    return {
+      name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
+      columns: table.types,
+      rows: table.rows,
+    };
   }
 
   protected async loadPreAggregationWithKeys(): Promise<LoadPreAggregationResult> {
@@ -1315,22 +1320,17 @@ export class PreAggregationPartitionRangeLoader {
           this.options
         );
         const lambdaTable = await lambdaLoader.downloadLambdaTable();
-        const inlineTable: InlineTable = {
-          name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
-          columns: lambdaTable.types,
-          rows: lambdaTable.rows,
-        };
 
         const unionTargetTableName = [
           ...allTableTargetNames.map(name => `SELECT * FROM ${name}`),
-          `SELECT * FROM ${inlineTable.name}`,
+          `SELECT * FROM ${lambdaTable.name}`,
         ].join(' UNION ALL ');
         return {
           targetTableName: `(${unionTargetTableName})`,
           refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
           lastUpdatedAt: Date.now(),
           buildRangeEnd: undefined,
-          inlineTable,
+          lambdaTable,
         };
       }
 
