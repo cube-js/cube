@@ -13,8 +13,5 @@ export class CrateQuery extends PostgresQuery {
   // to implement after merge
   countDistinctApprox(sql) {
     throw new UserError('Not implemented yet');
-
-    // discuss with @cristipp
-    //return `hyperloglog_distinct(${sql})`;
   }
 }
