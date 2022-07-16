@@ -8,12 +8,6 @@ cube(`Orders`, {
                 { sql: `${CUBE}.completed_at >= DATE('2019-08-01')` },
             ],
         },
-        count2: {
-            type: `count`,
-            filters: [
-                { sql: `${CUBE}.completed_at >= DATE('2019-08-01')` },
-            ],
-        },
     },
 
     dimensions: {
