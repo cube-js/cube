@@ -156,34 +156,32 @@ export type PreAggregationDescription = {
   lambdaView: boolean;
 };
 
-function tablesToVersionEntries(schema, tables: TableCacheEntry[]): VersionEntry[] {
-  return R.sortBy(
-    table => -table.last_updated_at,
-    tables.map(table => {
-      const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
+const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
+  table => -table.last_updated_at,
+  tables.map(table => {
+    const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
 
-      if (!match) {
-        return null;
-      }
+    if (!match) {
+      return null;
+    }
 
-      const entity: any = {
-        table_name: `${schema}.${match[1]}`,
-        content_version: match[2],
-        structure_version: match[3],
-        build_range_end: table.build_range_end,
-      };
+    const entity: any = {
+      table_name: `${schema}.${match[1]}`,
+      content_version: match[2],
+      structure_version: match[3],
+      build_range_end: table.build_range_end,
+    };
 
-      if (match[4].length < 13) {
-        entity.last_updated_at = decodeTimeStamp(match[4]);
-        entity.naming_version = 2;
-      } else {
-        entity.last_updated_at = parseInt(match[4], 10);
-      }
+    if (match[4].length < 13) {
+      entity.last_updated_at = decodeTimeStamp(match[4]);
+      entity.naming_version = 2;
+    } else {
+      entity.last_updated_at = parseInt(match[4], 10);
+    }
 
-      return entity;
-    }).filter(R.identity)
-  );
-}
+    return entity;
+  }).filter(R.identity)
+);
 
 type PreAggregationLoadCacheOptions = {
   requestId?: string,
@@ -286,9 +284,8 @@ class PreAggregationLoadCache {
       await this.driverFactory();
     if (this.tablePrefixes && client.getPrefixTablesQuery && this.preAggregations.options.skipExternalCacheAndQueue) {
       return client.getPrefixTablesQuery(preAggregation.preAggregationsSchema, this.tablePrefixes);
-    } else {
-      return client.getTablesQuery(preAggregation.preAggregationsSchema);
     }
+    return client.getTablesQuery(preAggregation.preAggregationsSchema);
   }
 
   public tablesRedisKey(preAggregation: PreAggregationDescription) {
@@ -310,8 +307,10 @@ class PreAggregationLoadCache {
   }
 
   private async calculateVersionEntries(preAggregation): Promise<VersionEntriesObj> {
-    const tables = await this.getTablesQuery(preAggregation);
-    let versionEntries = tablesToVersionEntries(preAggregation.preAggregationsSchema, tables);
+    let versionEntries = tablesToVersionEntries(
+      preAggregation.preAggregationsSchema,
+      await this.getTablesQuery(preAggregation)
+    );
     // It presumes strong consistency guarantees for external pre-aggregation tables ingestion
     if (!preAggregation.external) {
       // eslint-disable-next-line
@@ -552,7 +551,7 @@ export class PreAggregationLoader {
   }
 
   /**
-   * Downloads a lambda tables from the source DB.
+   * Downloads the lambda table from the source DB.
    */
   public async downloadLambdaTable(): Promise<DownloadTableMemoryData> {
     const queue = await this.queryCache.getQueue(this.preAggregation.dataSource);
@@ -1164,9 +1163,7 @@ export class PreAggregationPartitionRangeLoader {
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
     const [query, values, queryOptions]: QueryTuple = rangeQuery;
 
-    const renewalKey = partitionRange ? await this.getInvalidationKeyValues(partitionRange) : null;
-
-    const result = await this.queryCache.cacheQueryResult(
+    return this.queryCache.cacheQueryResult(
       query,
       values,
       QueryCache.queryCacheKey({ query, values }),
@@ -1180,10 +1177,9 @@ export class PreAggregationPartitionRangeLoader {
         dataSource: this.dataSource,
         useInMemory: true,
         external: queryOptions?.external,
-        renewalKey,
+        renewalKey: partitionRange ? await this.getInvalidationKeyValues(partitionRange) : null,
       }
     );
-    return result;
   }
 
   protected getInvalidationKeyValues(range) {
@@ -1256,7 +1252,8 @@ export class PreAggregationPartitionRangeLoader {
     }];
   }
 
-  private partitionPreAggregationDescription(range: QueryDateRange, loadRange: QueryDateRange): PreAggregationDescription {
+  private partitionPreAggregationDescription(range: QueryDateRange, loadRange?: QueryDateRange): PreAggregationDescription {
+    loadRange = loadRange ?? range;
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
@@ -1288,7 +1285,7 @@ export class PreAggregationPartitionRangeLoader {
           loadRange = [loadRange[0], buildRangeEnd];
           options = { ...options, buildRangeEnd };
         }
-        const loader = new PreAggregationLoader(
+        return new PreAggregationLoader(
           this.redisPrefix,
           this.driverFactory,
           this.logger,
@@ -1299,7 +1296,6 @@ export class PreAggregationPartitionRangeLoader {
           this.loadCache,
           options,
         );
-        return loader;
       });
       const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
@@ -1313,7 +1309,7 @@ export class PreAggregationPartitionRangeLoader {
           this.logger,
           this.queryCache,
           this.preAggregations,
-          this.partitionPreAggregationDescription(lambdaRange, lambdaRange),
+          this.partitionPreAggregationDescription(lambdaRange),
           this.preAggregationsTablesToTempTables,
           this.loadCache,
           this.options
