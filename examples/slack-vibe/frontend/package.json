@@ -5,7 +5,7 @@
   "dependencies": {
     "@amcharts/amcharts4": "^4.10.17",
     "@amcharts/amcharts4-geodata": "^4.1.17",
-    "@cube-dev/example-wrapper": "^1.1.4",
+"@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/core": "^0.26.94",
     "moment": "^2.27.0",
     "moment-timezone": "^0.5.33",

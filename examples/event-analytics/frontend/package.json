@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@cube-dev/example-wrapper": "^1.1.4",
+"@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/core": "^0.2.6",
     "@cubejs-client/react": "^0.2.6",
     "@material-ui/core": "^3.9.2",
@@ -26,7 +26,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "preview": "netlify deploy",
+    "deploy": "netlify deploy --prod"
   },
   "eslintConfig": {
     "extends": "react-app"

@@ -6,7 +6,7 @@
     "@ant-design/compatible": "^1.0.4",
     "@ant-design/icons": "^4.2.1",
     "@apollo/react-hooks": "^3.1.5",
-    "@cube-dev/example-wrapper": "^1.1.4",
+"@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/core": "^0.19.47",
     "@cubejs-client/react": "^0.19.47",
     "@cubejs-client/ws-transport": "^0.19.43",

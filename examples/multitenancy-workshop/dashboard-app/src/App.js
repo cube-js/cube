@@ -38,6 +38,7 @@ function App() {
       .then(() => setStatus(true))
       .catch(() => setStatus(false));
   }, [
+    cubejsApi,
     merchant.token,
     apiUrl,
   ]);
@@ -57,6 +58,7 @@ function App() {
       .then(data => setOrdersData(data.tablePivot()))
       .catch(() => setStatus(false));
   }, [
+    cubejsApi,
     merchant.token,
     apiUrl,
   ]);
@@ -73,6 +75,7 @@ function App() {
       .catch(() => {
       });
   }, [
+    cubejsApi,
     merchant.token,
     apiUrl,
   ]);

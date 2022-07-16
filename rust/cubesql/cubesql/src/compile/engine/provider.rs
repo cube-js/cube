@@ -48,7 +48,8 @@ use super::information_schema::postgres::{
     PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogIndexProvider,
     PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
     PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSettingsProvider,
-    PgCatalogStatActivityProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogStatActivityProvider, PgCatalogStatioUserTablesProvider, PgCatalogTableProvider,
+    PgCatalogTypeProvider,
 };
 
 #[derive(Clone)]
@@ -317,6 +318,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_roles".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogStatActivityProvider>() {
             "pg_catalog.pg_stat_activity".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogStatioUserTablesProvider>() {
+            "pg_catalog.pg_statio_user_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
             "information_schema.constraint_column_usage".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaViewsProvider>() {
@@ -477,6 +480,11 @@ impl DatabaseProtocol {
                 "pg_stat_activity" => {
                     return Some(Arc::new(PgCatalogStatActivityProvider::new(
                         context.sessions.clone(),
+                    )))
+                }
+                "pg_statio_user_tables" => {
+                    return Some(Arc::new(PgCatalogStatioUserTablesProvider::new(
+                        &context.meta.tables,
                     )))
                 }
                 _ => return None,

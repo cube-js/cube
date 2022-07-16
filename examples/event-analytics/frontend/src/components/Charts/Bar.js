@@ -40,7 +40,7 @@ const customShape = (shape, resultSet) => {
   return null
 }
 
-export default ({ resultSet, label, margin, shape }) => {
+const BarComponent = ({ resultSet, label, margin, shape }) => {
   return (
   <ResponsiveContainer>
     <BarChart margin={margin} data={format("x", resultSet.chartPivot(), resolveFormat(resultSet))}>
@@ -55,4 +55,6 @@ export default ({ resultSet, label, margin, shape }) => {
     </BarChart>
   </ResponsiveContainer>
   )
-}
+};
+
+export default BarComponent;

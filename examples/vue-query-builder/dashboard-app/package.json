@@ -10,7 +10,7 @@
     "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist"
   },
   "dependencies": {
-    "@cube-dev/example-wrapper": "^1.1.1",
+    "@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/core": "^0.26.70",
     "@cubejs-client/vue": "^0.26.70",
     "apollo-boost": "^0.4.9",
