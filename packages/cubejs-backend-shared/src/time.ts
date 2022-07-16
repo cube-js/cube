@@ -38,14 +38,6 @@ export const timeSeries = (granularity: string, dateRange: QueryDateRange): Quer
   return TIME_SERIES[granularity](range);
 };
 
-export const snapTimestamp = (granularity: string, timestamp: string): string => {
-  const range = moment.range(<any>timestamp, <any>timestamp);
-  if (!(granularity in TIME_SERIES)) {
-    throw new Error(`Unhandled granularity '${granularity}`);
-  }
-  return TIME_SERIES[granularity](range)[0][0];
-};
-
 export const FROM_PARTITION_RANGE = '__FROM_PARTITION_RANGE';
 
 export const TO_PARTITION_RANGE = '__TO_PARTITION_RANGE';
