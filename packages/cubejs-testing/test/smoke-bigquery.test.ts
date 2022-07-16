@@ -18,7 +18,7 @@ describe('bigquery', () => {
         ...DEFAULT_CONFIG,
       },
       {
-        schemaDir: 'smoke/schema',
+        schemaDir: 'postgresql/schema',
       }
     );
     client = cubejs(async () => 'test', {
