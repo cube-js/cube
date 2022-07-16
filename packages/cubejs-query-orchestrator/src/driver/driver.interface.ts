@@ -16,7 +16,7 @@ export interface InlineTable {
   columns: TableStructure
   rows: Rows
 }
-export type InlineTables = InlineTables[];
+export type InlineTables = InlineTable[];
 
 // It's more easy to use this interface with optional method release as a base interface instead of type assertion
 export interface DownloadTableBase {
