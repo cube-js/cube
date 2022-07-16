@@ -1,4 +1,4 @@
-FROM node:14.18.2-buster-slim as base
+FROM node:14.18.2-buster-slim AS base
 
 ARG IMAGE_VERSION=dev
 
