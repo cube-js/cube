@@ -20,12 +20,6 @@ cube(`OrdersPA`, {
           columns: [CUBE.status],
         },
       },
-      // buildRangeStart: {
-      //   sql: `SELECT DATE('2020-01-01')`
-      // },
-      // buildRangeEnd: {
-      //   sql: `SELECT DATE('2020-01-02')`
-      // },
       refreshKey: {
         every: `1 hour`,
       }
