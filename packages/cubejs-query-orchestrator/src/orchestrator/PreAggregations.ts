@@ -284,8 +284,9 @@ class PreAggregationLoadCache {
       await this.driverFactory();
     if (this.tablePrefixes && client.getPrefixTablesQuery && this.preAggregations.options.skipExternalCacheAndQueue) {
       return client.getPrefixTablesQuery(preAggregation.preAggregationsSchema, this.tablePrefixes);
+    } else {
+      return client.getTablesQuery(preAggregation.preAggregationsSchema);
     }
-    return client.getTablesQuery(preAggregation.preAggregationsSchema);
   }
 
   public tablesRedisKey(preAggregation: PreAggregationDescription) {
@@ -304,7 +305,6 @@ class PreAggregationLoadCache {
 
   private async calculateVersionEntries(preAggregation): Promise<VersionEntriesObj> {
     const tables = await this.getTablesQuery(preAggregation);
-    console.log('TTT', tables);
     let versionEntries = tablesToVersionEntries(preAggregation.preAggregationsSchema, tables);
     // It presumes strong consistency guarantees for external pre-aggregation tables ingestion
     if (!preAggregation.external) {
