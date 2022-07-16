@@ -1,4 +1,4 @@
-import createExampleWrapper from "cube-example-wrapper";
+import createExampleWrapper from "@cube-dev/example-wrapper";
 import React from 'react';
 import ReactDOM from 'react-dom';
 import cubejs from '@cubejs-client/core';

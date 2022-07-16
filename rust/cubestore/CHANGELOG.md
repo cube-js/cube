@@ -3,6 +3,73 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.35](https://github.com/cube-js/cube.js/compare/v0.30.34...v0.30.35) (2022-07-14)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.34](https://github.com/cube-js/cube.js/compare/v0.30.33...v0.30.34) (2022-07-12)
+
+
+### Bug Fixes
+
+* **cubestore:** Elaborate on can't be listed after upload error ([bd1ec69](https://github.com/cube-js/cube.js/commit/bd1ec6930bf3de3173208e0416ab8c35f2d47a76))
+* **cubestore:** Fix index selection in case of AND in conditions ([a0e03ab](https://github.com/cube-js/cube.js/commit/a0e03abe698cdd9db09653824f80ee688feca6d5))
+* **cubestore:** removing HLL columns from indexes ([#4884](https://github.com/cube-js/cube.js/issues/4884)) ([e7df6e8](https://github.com/cube-js/cube.js/commit/e7df6e882868979d7ccaa71ea1904b6d636ca206))
+
+
+
+
+
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.28](https://github.com/cube-js/cube.js/compare/v0.30.27...v0.30.28) (2022-06-27)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.27](https://github.com/cube-js/cube.js/compare/v0.30.26...v0.30.27) (2022-06-24)
+
+
+### Features
+
+* **cubestore:** Aggregating index ([#4379](https://github.com/cube-js/cube.js/issues/4379)) ([a0bd36c](https://github.com/cube-js/cube.js/commit/a0bd36c0898f66da907f3c04c439fc31826777a0)), closes [#4599](https://github.com/cube-js/cube.js/issues/4599) [#4728](https://github.com/cube-js/cube.js/issues/4728)
+
+
+
+
+
+## [0.30.25](https://github.com/cube-js/cube.js/compare/v0.30.24...v0.30.25) (2022-06-16)
+
+
+### Features
+
+* **cubestore:** Compaction in-memory chunks  ([#4701](https://github.com/cube-js/cube.js/issues/4701)) ([7c11e37](https://github.com/cube-js/cube.js/commit/7c11e379146a6bd3614452dbf12eb544f6c658a4))
+
+
+
+
+
+## [0.30.20](https://github.com/cube-js/cube.js/compare/v0.30.19...v0.30.20) (2022-06-11)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
 ## [0.30.8](https://github.com/cube-js/cube.js/compare/v0.30.7...v0.30.8) (2022-05-30)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

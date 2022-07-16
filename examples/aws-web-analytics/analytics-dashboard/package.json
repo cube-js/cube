@@ -4,12 +4,12 @@
   "private": true,
   "homepage": ".",
   "dependencies": {
+"@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/core": "^0.2.0",
     "@cubejs-client/react": "^0.1.4",
     "antd": "^3.11.2",
     "bizcharts": "^3.4.1",
     "component-cookie": "^1.1.4",
-    "cube-example-wrapper": "^1.0.26",
     "moment": "^2.22.2",
     "prismjs": "^1.23.0",
     "react": "^16.6.3",
@@ -23,7 +23,9 @@
     "start": "cross-env SKIP_PREFLIGHT_CHECK=true react-scripts start",
     "build": "cross-env SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "preview": "netlify deploy",
+    "deploy": "netlify deploy --prod"
   },
   "eslintConfig": {
     "extends": "react-app"

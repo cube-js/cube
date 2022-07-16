@@ -1,5 +1,5 @@
 use crate::config::processing_loop::ProcessingLoop;
-use crate::sql::{SqlQueryContext, SqlService};
+use crate::sql::{InlineTables, SqlQueryContext, SqlService};
 use crate::table::TableValue;
 use crate::util::time_span::warn_long;
 use crate::{metastore, CubeError};
@@ -60,6 +60,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             .exec_query_with_context(
                 SqlQueryContext {
                     user: self.user.clone(),
+                    inline_tables: Arc::new(InlineTables::new()),
                     trace_obj: None,
                 },
                 query,

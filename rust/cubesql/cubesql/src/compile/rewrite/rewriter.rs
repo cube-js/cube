@@ -16,9 +16,9 @@ use crate::{
     CubeError,
 };
 use datafusion::{logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner};
-use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner};
+use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner, StopReason};
 use itertools::Itertools;
-use std::{env, ffi::OsStr, fs, io::Write, sync::Arc};
+use std::{env, ffi::OsStr, fs, io::Write, sync::Arc, time::Duration};
 
 pub struct Rewriter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
@@ -172,7 +172,7 @@ impl IterDebugInfo {
         I: IntoIterator<Item = S>,
     {
         use std::process::{Command, Stdio};
-        let mut child = Command::new("dot")
+        let mut child = Command::new(env::var("CUBESQL_DOT_PATH").unwrap_or("dot".to_string()))
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
@@ -247,83 +247,129 @@ impl Rewriter {
         }
     }
 
-    pub fn rewrite_runner(&self) -> CubeRunner {
+    pub fn rewrite_runner(
+        cube_context: Arc<CubeContext>,
+        egraph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    ) -> CubeRunner {
         CubeRunner::new(LogicalPlanAnalysis::new(
-            self.cube_context.clone(),
+            cube_context,
             Arc::new(DefaultPhysicalPlanner::default()),
         ))
-        .with_iter_limit(100)
-        .with_node_limit(10000)
-        .with_egraph(self.graph.clone())
+        // TODO move config to injector
+        .with_iter_limit(
+            env::var("CUBESQL_REWRITE_MAX_ITERATIONS")
+                .map(|v| v.parse::<usize>().unwrap())
+                .unwrap_or(300),
+        )
+        .with_node_limit(
+            env::var("CUBESQL_REWRITE_MAX_NODES")
+                .map(|v| v.parse::<usize>().unwrap())
+                .unwrap_or(10000),
+        )
+        .with_time_limit(Duration::from_secs(
+            env::var("CUBESQL_REWRITE_TIMEOUT")
+                .map(|v| v.parse::<u64>().unwrap())
+                .unwrap_or(15),
+        ))
+        .with_egraph(egraph)
     }
 
-    pub fn find_best_plan(
+    pub async fn find_best_plan(
         &mut self,
         root: Id,
         auth_context: Arc<AuthContext>,
     ) -> Result<LogicalPlan, CubeError> {
-        let runner = self.rewrite_runner();
-        let rules = self.rewrite_rules();
-        let runner = runner.run(rules.iter());
-        log::debug!("Iterations: {:?}", runner.iterations);
-        if IterInfo::egraph_debug_enabled() {
-            let _ = fs::remove_dir_all("egraph-debug");
-            let _ = fs::create_dir_all("egraph-debug");
-            let mut nodes = csv::Writer::from_path("egraph-debug/nodes.csv")
-                .map_err(|e| CubeError::internal(e.to_string()))?;
-            let mut edges = csv::Writer::from_path("egraph-debug/edges.csv")
-                .map_err(|e| CubeError::internal(e.to_string()))?;
-            nodes
-                .write_record(&["Id", "Label", "Cluster", "Timeset"])
-                .map_err(|e| CubeError::internal(e.to_string()))?;
-            edges
-                .write_record(&["Source", "Target", "Type", "Timeset"])
-                .map_err(|e| CubeError::internal(e.to_string()))?;
-            for i in runner.iterations {
-                i.data.debug_info.as_ref().unwrap().export_svg()?;
-                for node in i
-                    .data
-                    .debug_info
-                    .as_ref()
-                    .unwrap()
-                    .formatted_nodes_csv
-                    .iter()
-                {
-                    nodes
-                        .write_record(node)
-                        .map_err(|e| CubeError::internal(e.to_string()))?;
+        let cube_context = self.cube_context.clone();
+        let egraph = self.graph.clone();
+        tokio::task::spawn_blocking(move || {
+            let rules = Self::rewrite_rules(cube_context.clone());
+            let runner = Self::rewrite_runner(cube_context.clone(), egraph);
+            let runner = runner.run(rules.iter());
+            if !IterInfo::egraph_debug_enabled() {
+                log::debug!("Iterations: {:?}", runner.iterations);
+            }
+            let stop_reason = &runner.iterations[runner.iterations.len() - 1].stop_reason;
+            let stop_reason = match stop_reason {
+                None => Some("timeout reached".to_string()),
+                Some(StopReason::Saturated) => None,
+                Some(StopReason::NodeLimit(limit)) => {
+                    Some(format!("{} AST node limit reached", limit))
                 }
-                for edge in i
-                    .data
-                    .debug_info
-                    .as_ref()
-                    .unwrap()
-                    .formatted_edges_csv
-                    .iter()
-                {
-                    edges
-                        .write_record(edge)
-                        .map_err(|e| CubeError::internal(e.to_string()))?;
+                Some(StopReason::IterationLimit(limit)) => {
+                    Some(format!("{} iteration limit reached", limit))
+                }
+                Some(StopReason::Other(other)) => Some(other.to_string()),
+                Some(StopReason::TimeLimit(seconds)) => {
+                    Some(format!("{} seconds timeout reached", seconds))
+                }
+            };
+            if let Some(stop_reason) = stop_reason {
+                return Err(CubeError::user(format!(
+                    "Can't find rewrite due to {}",
+                    stop_reason
+                )));
+            }
+            if IterInfo::egraph_debug_enabled() {
+                let _ = fs::remove_dir_all("egraph-debug");
+                let _ = fs::create_dir_all("egraph-debug");
+                let mut nodes = csv::Writer::from_path("egraph-debug/nodes.csv")
+                    .map_err(|e| CubeError::internal(e.to_string()))?;
+                let mut edges = csv::Writer::from_path("egraph-debug/edges.csv")
+                    .map_err(|e| CubeError::internal(e.to_string()))?;
+                nodes
+                    .write_record(&["Id", "Label", "Cluster", "Timeset"])
+                    .map_err(|e| CubeError::internal(e.to_string()))?;
+                edges
+                    .write_record(&["Source", "Target", "Type", "Timeset"])
+                    .map_err(|e| CubeError::internal(e.to_string()))?;
+                for i in runner.iterations {
+                    i.data.debug_info.as_ref().unwrap().export_svg()?;
+                    for node in i
+                        .data
+                        .debug_info
+                        .as_ref()
+                        .unwrap()
+                        .formatted_nodes_csv
+                        .iter()
+                    {
+                        nodes
+                            .write_record(node)
+                            .map_err(|e| CubeError::internal(e.to_string()))?;
+                    }
+                    for edge in i
+                        .data
+                        .debug_info
+                        .as_ref()
+                        .unwrap()
+                        .formatted_edges_csv
+                        .iter()
+                    {
+                        edges
+                            .write_record(edge)
+                            .map_err(|e| CubeError::internal(e.to_string()))?;
+                    }
                 }
             }
-        }
-        let extractor = Extractor::new(&runner.egraph, BestCubePlan);
-        let (_, best) = extractor.find_best(root);
-        let new_root = Id::from(best.as_ref().len() - 1);
-        log::debug!("Best: {:?}", best);
-        self.graph = runner.egraph.clone();
-        let converter =
-            LanguageToLogicalPlanConverter::new(best, self.cube_context.clone(), auth_context);
-        converter.to_logical_plan(new_root)
+            let extractor = Extractor::new(&runner.egraph, BestCubePlan);
+            let (_, best) = extractor.find_best(root);
+            let new_root = Id::from(best.as_ref().len() - 1);
+            log::debug!("Best: {:?}", best);
+            let converter =
+                LanguageToLogicalPlanConverter::new(best, cube_context.clone(), auth_context);
+            Ok(converter.to_logical_plan(new_root))
+        })
+        .await??
     }
 
-    pub fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    pub fn rewrite_rules(
+        cube_context: Arc<CubeContext>,
+    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
         let rules: Vec<Box<dyn RewriteRules>> = vec![
-            Box::new(MemberRules::new(self.cube_context.clone())),
-            Box::new(FilterRules::new(self.cube_context.clone())),
-            Box::new(DateRules::new(self.cube_context.clone())),
-            Box::new(OrderRules::new(self.cube_context.clone())),
-            Box::new(SplitRules::new(self.cube_context.clone())),
+            Box::new(MemberRules::new(cube_context.clone())),
+            Box::new(FilterRules::new(cube_context.clone())),
+            Box::new(DateRules::new(cube_context.clone())),
+            Box::new(OrderRules::new(cube_context.clone())),
+            Box::new(SplitRules::new(cube_context.clone())),
         ];
         let mut rewrites = Vec::new();
         for r in rules {

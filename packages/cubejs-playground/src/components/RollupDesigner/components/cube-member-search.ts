@@ -1,18 +1,16 @@
 import { AvailableMembers } from '@cubejs-client/react';
 import FlexSearch from 'flexsearch';
 import { useEffect, useRef, useState } from 'react';
-
-import { useDeepMemo } from '../../../hooks/deep-memo';
+import { useDeepEffect } from '../../../hooks';
 import { getNameMemberPairs } from '../../../shared/helpers';
 
 export function useCubeMemberSearch(memberTypeCubeMap: AvailableMembers) {
-  const flexSearch = useRef(FlexSearch.create<string>({ encode: 'advanced' }));
-  const index = flexSearch.current;
+  const index = useRef(new FlexSearch.Index({ tokenize: 'forward' })).current;
 
   const [keys, setFilteredKeys] = useState<string[]>([]);
   const [search, setSearch] = useState<string>('');
 
-  const indexedMembers = useDeepMemo(() => {
+  useDeepEffect(() => {
     const nameMemberPairs = getNameMemberPairs([
       ...memberTypeCubeMap.measures,
       ...memberTypeCubeMap.dimensions,
@@ -21,8 +19,6 @@ export function useCubeMemberSearch(memberTypeCubeMap: AvailableMembers) {
     ]);
 
     nameMemberPairs.forEach(([name, { title }]) => index.add(<any>name, title));
-
-    return Object.fromEntries(nameMemberPairs);
   }, [memberTypeCubeMap]);
 
   useEffect(() => {
@@ -35,7 +31,7 @@ export function useCubeMemberSearch(memberTypeCubeMap: AvailableMembers) {
         return;
       }
 
-      setFilteredKeys(results);
+      setFilteredKeys(results as string[]);
     })();
 
     return () => {

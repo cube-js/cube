@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.29](https://github.com/cube-js/cube.js/compare/v0.30.28...v0.30.29) (2022-07-01)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.30.27](https://github.com/cube-js/cube.js/compare/v0.30.26...v0.30.27) (2022-06-24)
+
+
+### Bug Fixes
+
+* **client-vue:** Fix boolean operator in filter without using builderProps ([#4782](https://github.com/cube-js/cube.js/issues/4782)) ([904171e](https://github.com/cube-js/cube.js/commit/904171ee85185f1ba1fcf812ba58ae6bc11b8407))
+
+
+
+
+
 ## [0.30.4](https://github.com/cube-js/cube.js/compare/v0.30.3...v0.30.4) (2022-05-20)
 
 **Note:** Version bump only for package @cubejs-client/vue

@@ -171,7 +171,7 @@ const AboutPage = ({ classes }) => (
         <Card>
           <CardHeader title="Visualize Results" />
           <CardContent>
-              <iframe src="https://codesandbox.io/embed/pkj4pk0x1j?fontsize=12&hidenavigation=1" style={{width: "100%", height: 1000, border: 0, borderRadius: "4px", overflow: "hidden"}} sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"></iframe>
+              <iframe title="Results" src="https://codesandbox.io/embed/pkj4pk0x1j?fontsize=12&hidenavigation=1" style={{width: "100%", height: 1000, border: 0, borderRadius: "4px", overflow: "hidden"}} sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"></iframe>
           </CardContent>
         </Card>
       </Grid>

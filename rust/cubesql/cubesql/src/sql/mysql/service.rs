@@ -23,13 +23,14 @@ use crate::{
     compile::{convert_sql_to_cube_query, parser::parse_sql_to_statement},
     config::processing_loop::ProcessingLoop,
     telemetry::{ContextLogger, SessionLogger},
+    CubeErrorCauseType,
 };
 
 use crate::{
     sql::{
         dataframe::{self, batch_to_dataframe},
         session::DatabaseProtocol,
-        statement::{StatementParamsBinder, StatementParamsFinder},
+        statement::{MySQLStatementParamsFinder, MysqlStatementParamsBinder},
         AuthContext, ColumnFlags, ColumnType, QueryResponse, Session, SessionManager, StatusFlags,
     },
     CubeError,
@@ -84,9 +85,13 @@ impl MySqlConnection {
     ) -> Result<(), io::Error> {
         match self.execute_query(query).await {
             Err(e) => {
-                self.logger.error(
-                    format!("Error during processing MySQL {}: {}", query, e.to_string()).as_str(),
-                );
+                let (message, props) = match &e.cause {
+                    CubeErrorCauseType::Internal(meta) | CubeErrorCauseType::User(meta) => {
+                        (e.message.clone(), meta.clone())
+                    }
+                };
+
+                self.logger.error(message.as_str(), props);
 
                 if let Some(bt) = e.backtrace() {
                     trace!("{}", bt);
@@ -212,7 +217,7 @@ impl MySqlConnection {
                 .meta(self.auth_context()?)
                 .await?;
 
-            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone(), self.logger.clone())?;
+            let plan = convert_sql_to_cube_query(&query, meta, self.session.clone()).await?;
             match plan {
                 crate::compile::QueryPlan::MetaOk(status, _) => {
                     return Ok(QueryResponse::Ok(status));
@@ -226,7 +231,7 @@ impl MySqlConnection {
                         &plan,
                     );
                     let batches = df.collect().await?;
-                    let response =  batch_to_dataframe(&batches)?;
+                    let response = batch_to_dataframe(&df.schema().into(), &batches)?;
 
                     return Ok(QueryResponse::ResultSet(status, Box::new(response)))
                 }
@@ -280,9 +285,10 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
                 }
             };
 
-        let stmt_prepare = StatementParamsFinder::new();
+        let stmt_prepare = MySQLStatementParamsFinder::new();
         let paramaters: Vec<Column> = stmt_prepare
             .find(&mut statement)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?
             .into_iter()
             .map(|p| p.into())
             .collect();
@@ -364,8 +370,10 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             values_to_bind.push(bind_value);
         }
 
-        let binder = StatementParamsBinder::new(values_to_bind);
-        binder.bind(&mut statement);
+        let binder = MysqlStatementParamsBinder::new(values_to_bind);
+        binder
+            .bind(&mut statement)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
 
         self.handle_query(statement.to_string().as_str(), results)
             .await
@@ -414,9 +422,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             .await
             .map_err(|e| {
                 if e.message != *"Incorrect user name or password" {
-                    self.logger.error(
-                        format!("Error during authentication MySQL connection: {}", e).as_str(),
-                    );
+                    log::error!("Error during authentication MySQL connection: {}", e);
                 };
 
                 io::Error::new(io::ErrorKind::Other, e.to_string())
@@ -525,8 +531,10 @@ impl ProcessingLoop for MySqlServer {
                 )
                 .await
                 {
-                    logger
-                        .error(format!("Error during processing MySQL connection: {}", e).as_str());
+                    logger.error(
+                        format!("Error during processing MySQL connection: {}", e).as_str(),
+                        None,
+                    );
                     if let Some(bt) = e.backtrace() {
                         trace!("{}", bt.to_string());
                     } else {

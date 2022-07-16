@@ -171,7 +171,7 @@ class DocTemplate extends Component<Props, State> {
     const rawNodes = ReactHtmlParser(stringElement);
     const sectionTags: Section[] = [
       {
-        id: 'top',
+        id: kebabCase(title),
         type: 'h1',
         className: styles.topSection,
         nodes: [
@@ -185,8 +185,8 @@ class DocTemplate extends Component<Props, State> {
       },
     ];
 
-    let currentParentID: string;
-    let currentID = 'top';
+    let currentParentID = kebabCase(title);
+    let currentID: string;
 
     rawNodes.forEach((item) => {
       let linkedHTag;
@@ -241,19 +241,15 @@ class DocTemplate extends Component<Props, State> {
           [styles.postClearSection]: isPreviousSectionClearable,
         });
 
-        // anchors like 'h2-h3'
+        currentID = kebabCase(item.props.children[0]);
+
         if (item.type === 'h2') {
           prevSection.className = cx(prevSection.className, {
             [styles.lastSection]: true,
             [styles.clearSection]: isPreviousSectionClearable,
           });
 
-          currentID = kebabCase(item.props.children[0]);
           currentParentID = currentID;
-        } else if (!!currentParentID) {
-          currentID = kebabCase(item.props.children[0]);
-        } else {
-          currentID = kebabCase(item.props.children[0]);
         }
 
         sectionTags.push({
@@ -301,10 +297,13 @@ class DocTemplate extends Component<Props, State> {
 
     return (
       <div>
-        <Helmet title={`${frontmatter.title} | Cube Docs`} />
+        <Helmet>
+          <title>{`${frontmatter.title} | Cube Docs`}</title>
+          <meta name="description" content={`${frontmatter.title} | Documentation for working with Cube, the open-source analytics framework`}></meta>
+        </Helmet>
         <div className={styles.docContentWrapper}>
           <div className={styles.docContent}>
-            <h1 name="top">{frontmatter.title}</h1>
+            <h1 id={kebabCase(frontmatter.title)}>{frontmatter.title}</h1>
             <MDX {...this.props} />
             {!isDisableFeedbackBlock && (
               <FeedbackBlock page={frontmatter.permalink} />

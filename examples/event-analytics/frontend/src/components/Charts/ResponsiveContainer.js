@@ -6,8 +6,10 @@ import {
   RECHARTS_RESPONSIVE_WIDTH
 } from './helpers.js';
 
-export default ({ children }) => (
+const ResponsiveContainerComponent = ({ children }) => (
   <ResponsiveContainer width={RECHARTS_RESPONSIVE_WIDTH} height={DASHBOARD_CHART_MIN_HEIGHT}>
     { children }
   </ResponsiveContainer>
-)
+);
+
+export default ResponsiveContainerComponent;

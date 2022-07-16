@@ -29,6 +29,10 @@ spec:
       {{- toYaml .Values.commonAnnotations | nindent 8 }}
       {{- end }}
     spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: cubestore
           {{- if .Values.image.tag }}
@@ -96,6 +100,14 @@ spec:
       {{- if .Values.workers.affinity }}
       affinity:
         {{- toYaml .Values.workers.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workers.tolerations }}
+      tolerations:
+        {{- toYaml .Values.workers.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workers.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.workers.nodeSelector | nindent 8 }}
       {{- end }}
       {{- if .Values.workers.spreadConstraints }}
       topologySpreadConstraints:

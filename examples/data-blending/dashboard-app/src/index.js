@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
 
-import createExampleWrapper from 'cube-example-wrapper'
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
 const exampleDescription={
   title: "Data Blending",
@@ -20,9 +20,9 @@ const exampleDescription={
       to learn more.
     </p>
   `
-}
+};
 
-createExampleWrapper(exampleDescription)
+createExampleWrapper(exampleDescription);
 
 ReactDOM.render(
   <React.StrictMode>

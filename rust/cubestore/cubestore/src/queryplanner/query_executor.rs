@@ -10,6 +10,7 @@ use crate::queryplanner::planning::get_worker_plan;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::store::DataFrame;
+use crate::table::data::rows_to_columns;
 use crate::table::parquet::CubestoreParquetMetadataCache;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::{app_metrics, CubeError};
@@ -257,6 +258,7 @@ impl QueryExecutor for QueryExecutorImpl {
             plan_to_move,
         ))
     }
+
     async fn pp_worker_plan(
         &self,
         plan: SerializedPlan,
@@ -823,6 +825,29 @@ impl ExecutionPlan for CubeTableExec {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct InlineTableProvider {
+    data: Arc<DataFrame>,
+}
+
+impl InlineTableProvider {
+    pub fn new(data: Arc<DataFrame>) -> InlineTableProvider {
+        InlineTableProvider { data }
+    }
+
+    pub fn get_data(self: &Self) -> Arc<DataFrame> {
+        self.data.clone()
+    }
+}
+
+impl Debug for InlineTableProvider {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InlineTable").finish()
+    }
+}
+
+pub const INLINE_PARTITION_ID: u64 = 0xffffffff;
+
 pub struct ClusterSendExec {
     schema: SchemaRef,
     pub partitions: Vec<(
@@ -841,7 +866,7 @@ impl ClusterSendExec {
         schema: SchemaRef,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
-        union_snapshots: &[Vec<IndexSnapshot>],
+        union_snapshots: &[Vec<Option<IndexSnapshot>>],
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
     ) -> Self {
@@ -862,7 +887,7 @@ impl ClusterSendExec {
 
     pub(crate) fn distribute_to_workers(
         config: &dyn ConfigObj,
-        snapshots: &[Vec<IndexSnapshot>],
+        snapshots: &[Vec<Option<IndexSnapshot>>],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Vec<(String, Vec<(u64, RowRange)>)> {
         let partitions = Self::logical_partitions(snapshots, tree);
@@ -870,7 +895,7 @@ impl ClusterSendExec {
     }
 
     fn logical_partitions(
-        snapshots: &[Vec<IndexSnapshot>],
+        snapshots: &[Vec<Option<IndexSnapshot>>],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Vec<Vec<IdRow<Partition>>> {
         let mut to_multiply = Vec::new();
@@ -878,14 +903,22 @@ impl ClusterSendExec {
         for union in snapshots.iter() {
             let mut ordinary_partitions = Vec::new();
             for index in union {
-                for p in &index.partitions {
-                    match p.partition.get_row().multi_partition_id() {
-                        Some(id) => multi_partitions
-                            .entry(id)
-                            .or_default()
-                            .push(p.partition.clone()),
-                        None => ordinary_partitions.push(p.partition.clone()),
+                match index {
+                    Some(index) => {
+                        for p in &index.partitions {
+                            match p.partition.get_row().multi_partition_id() {
+                                Some(id) => multi_partitions
+                                    .entry(id)
+                                    .or_default()
+                                    .push(p.partition.clone()),
+                                None => ordinary_partitions.push(p.partition.clone()),
+                            }
+                        }
                     }
+                    None => ordinary_partitions.push(IdRow::new(
+                        INLINE_PARTITION_ID,
+                        Partition::new(INLINE_PARTITION_ID, None, None, None),
+                    )),
                 }
             }
             if !ordinary_partitions.is_empty() {
@@ -1140,6 +1173,55 @@ impl TableProvider for CubeTable {
     }
 }
 
+impl TableProvider for InlineTableProvider {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> SchemaRef {
+        self.data.get_schema()
+    }
+
+    fn scan(
+        &self,
+        projection: &Option<Vec<usize>>,
+        batch_size: usize,
+        _filters: &[Expr],
+        _limit: Option<usize>, // TODO: propagate limit
+    ) -> DFResult<Arc<dyn ExecutionPlan>> {
+        let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;
+        let schema = self.data.get_schema();
+        let projected_schema = if let Some(p) = projection {
+            Arc::new(Schema::new(
+                p.iter().map(|i| schema.field(*i).clone()).collect(),
+            ))
+        } else {
+            schema
+        };
+        let projection = (*projection).clone();
+        Ok(Arc::new(MemoryExec::try_new(
+            &vec![batches],
+            projected_schema,
+            projection,
+        )?))
+    }
+
+    fn statistics(&self) -> Statistics {
+        Statistics {
+            num_rows: None,
+            total_byte_size: None,
+            column_statistics: None,
+        }
+    }
+
+    fn supports_filter_pushdown(
+        &self,
+        _filter: &Expr,
+    ) -> Result<TableProviderFilterPushDown, DataFusionError> {
+        return Ok(TableProviderFilterPushDown::Unsupported);
+    }
+}
+
 macro_rules! convert_array_cast_native {
     ($V: expr, (Vec<u8>)) => {{
         $V.to_vec()
@@ -1342,6 +1424,21 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
     }
 }
 
+pub fn dataframe_to_batches(
+    data: &DataFrame,
+    batch_size: usize,
+) -> Result<Vec<RecordBatch>, CubeError> {
+    let mut batches = vec![];
+    let mut b = 0;
+    while b < data.len() {
+        let rows = &data.get_rows()[b..min(b + batch_size, data.len())];
+        let batch = rows_to_columns(&data.get_columns(), rows);
+        batches.push(RecordBatch::try_new(data.get_schema(), batch)?);
+        b += batch_size;
+    }
+    Ok(batches)
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SerializedRecordBatchStream {
     #[serde(with = "serde_bytes")] // serde_bytes makes serialization efficient.
@@ -1382,6 +1479,7 @@ impl SerializedRecordBatchStream {
         Ok(batch)
     }
 }
+
 /// Note: copy of the function in 'datafusion/src/datasource/parquet.rs'.
 ///
 /// Combines an array of filter expressions into a single filter expression

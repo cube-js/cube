@@ -92,6 +92,17 @@ impl InfoSchemaTableDef for SystemIndexesTableDef {
                     ))
                 }),
             ),
+            (
+                Field::new("index_type", DataType::Utf8, false),
+                Box::new(|indexes| {
+                    Arc::new(StringArray::from(
+                        indexes
+                            .iter()
+                            .map(|row| format!("{:?}", row.get_row().get_type()))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
         ]
     }
 }

@@ -14,7 +14,7 @@ const drawerWidth = 240;
 const styles = theme => ({
   root: {
     display: 'flex',
-    backgroundColor: theme.palette.grey[50]
+    backgroundColor: theme.palette.grey[100]
   },
   toolbar: {
     paddingRight: 24,

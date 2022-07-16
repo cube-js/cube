@@ -1,11 +1,11 @@
 import React, { useEffect } from "react";
-import "./App.css";
+import cubejs from '@cubejs-client/core';
+import { CubeProvider } from '@cubejs-client/react';
+import WebSocketTransport from '@cubejs-client/ws-transport';
 import { Layout } from "antd";
-import cubejs from "@cubejs-client/core";
-import { CubeProvider } from "@cubejs-client/react";
 import Header from "./components/Header";
-import WebSocketTransport from "@cubejs-client/ws-transport";
 import tracker from "./tracker";
+import "./App.css";
 
 const cubejsApi = cubejs({
   transport: new WebSocketTransport({
@@ -15,11 +15,7 @@ const cubejsApi = cubejs({
 });
 
 const AppLayout = ({ children }) => (
-  <Layout
-    style={{
-      height: "100%"
-    }}
-  >
+  <Layout style={{ height: "100%" }}>
     <Header />
     <Layout.Content>{children}</Layout.Content>
   </Layout>
@@ -27,6 +23,7 @@ const AppLayout = ({ children }) => (
 
 const App = ({ children }) => {
   useEffect(() => tracker.pageview(), []);
+  
   return (
     <CubeProvider cubejsApi={cubejsApi}>
       <AppLayout>{children}</AppLayout>

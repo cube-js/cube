@@ -28,6 +28,13 @@ const FireboltTypeToGeneric: Record<string, string> = {
 const COMPLEX_TYPE = /(nullable|array)\((.+)\)/;
 
 export class FireboltDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 5;
+  }
+
   private config: FireboltDriverConfiguration;
 
   private firebolt;

@@ -2,9 +2,10 @@ use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
+use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
-use cubestore::sql::timestamp_from_string;
+use cubestore::sql::{timestamp_from_string, SqlQueryContext};
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
@@ -19,6 +20,7 @@ use std::io::Write;
 use std::panic::RefUnwindSafe;
 use std::path::Path;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
 
@@ -131,7 +133,11 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             planning_join_with_partitioned_index,
         ),
         t("topk_query", topk_query),
+        t("topk_having", topk_having),
         t("topk_decimals", topk_decimals),
+        t("planning_topk_having", planning_topk_having),
+        t("planning_topk_hll", planning_topk_hll),
+        t("topk_hll", topk_hll),
         t("offset", offset),
         t("having", having),
         t("rolling_window_join", rolling_window_join),
@@ -178,7 +184,15 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             filter_multiple_in_for_decimal,
         ),
         t("panic_worker", panic_worker),
-        t("planning_filter_index_selection", planning_filter_index_selection),
+        t(
+            "planning_filter_index_selection",
+            planning_filter_index_selection,
+        ),
+        t("planning_aggregate_index", planning_aggregate_index),
+        t("aggregate_index", aggregate_index),
+        t("aggregate_index_hll", aggregate_index_hll),
+        t("aggregate_index_errors", aggregate_index_errors),
+        t("inline_tables", inline_tables),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -2531,15 +2545,15 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
            \n    Worker\
            \n      Sort, by: [SUM(hits)@1 desc nulls last]\
            \n        FullInplaceAggregate, sort_order: [0]\
-           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                  Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n                MergeSort, sort_order: [0, 1, 2]\
+           \n                  Scan, index: default:1:[1]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2]\
            \n                    Empty\
-           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                  Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n                MergeSort, sort_order: [0, 1, 2]\
+           \n                  Scan, index: default:2:[2]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2]\
            \n                    Empty"
     );
 }
@@ -2965,6 +2979,30 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
            \n            Scan, index: cb:2:[2], fields: [b, c, amount]\
            \n              Empty"
     );
+
+    let p = service
+        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 and a > 5 and a < 10 GROUP BY 1")
+        .await
+        .unwrap();
+
+
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalInplaceAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+        \n  FinalInplaceAggregate\
+        \n    Worker\
+        \n      PartialInplaceAggregate\
+        \n        Filter\
+        \n          MergeSort\
+        \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [a, b, c, amount]\
+        \n              Empty"
+    );
+
 }
 
 async fn planning_joins(service: Box<dyn SqlClient>) {
@@ -3290,6 +3328,90 @@ async fn topk_query(service: Box<dyn SqlClient>) {
     assert_eq!(to_rows(&r), rows(&[("a", 1), ("e", 35), ("d", 40)]));
 }
 
+async fn topk_having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80)")
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) < 100 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("y", 80), ("b", 52), ("c", 48)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING MIN(`hits`) >= 3 AND SUM(`hits`) < 100 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("y", 80), ("c", 48), ("d", 44)]));
+    
+    service
+        .exec_query("CREATE TABLE s.Data21(url text, hits int, hits_2 int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data21(url, hits, hits_2) VALUES  ('b', 5, 2), ('d', 3, 4), ('c', 4, 1),  ('e', 2, 10)")
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data22(url text, hits int, hits_2 int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data22(url, hits, hits_2) VALUES ('b', 50, 3), ('c', 45, 12), ('d', 40, 10), ('e', 35, 5)")
+            .await
+            .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data21 \
+                               UNION ALL \
+                               SELECT * FROM s.Data22) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING MAX(`hits_2`) < 11 \
+                         ORDER BY 2 DESC \
+                         LIMIT 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("b", 55), ("d", 43)]));
+
+}
+
 async fn topk_decimals(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -3326,6 +3448,243 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
         to_rows(&r),
         rows(&[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))])
     );
+}
+
+async fn planning_topk_having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits int, uhits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits int, uhits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 10\
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, SUM(Data.hits)@1:hits]\
+        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10\
+        \n    Worker\
+        \n      Sort\
+        \n        FullInplaceAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              MergeSort\
+        \n                Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n                  Empty\
+        \n              MergeSort\
+        \n                Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n                  Empty"
+        );
+
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits`, CARDINALITY(MERGE(`uhits`)) `uhits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 10 AND CARDINALITY(MERGE(`uhits`)) > 5 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, SUM(Data.hits)@1:hits, CARDINALITY(MERGE(Data.uhits)@2):uhits]\
+        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10 AND CAST(CARDINALITY(MERGE(Data.uhits)@2) AS Int64) > 5\
+        \n    Worker\
+        \n      Sort\
+        \n        FullInplaceAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              MergeSort\
+        \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+        \n                  Empty\
+        \n              MergeSort\
+        \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+        \n                  Empty"
+        );
+}
+async fn planning_topk_hll(service: Box<dyn SqlClient>) {
+
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    // A typical top-k query.
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3\
+         \n    Worker\
+         \n      Sort\
+         \n        FullInplaceAggregate\
+         \n          MergeSort\
+         \n            Union\
+         \n              MergeSort\
+         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                  Empty\
+         \n              MergeSort\
+         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                  Empty"
+        );
+
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) > 20 and cardinality(merge(hits)) < 40\
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3, having: CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) > 20 AND CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) < 40\
+         \n    Worker\
+         \n      Sort\
+         \n        FullInplaceAggregate\
+         \n          MergeSort\
+         \n            Union\
+         \n              MergeSort\
+         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                  Empty\
+         \n              MergeSort\
+         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                  Empty"
+        );
+}
+
+async fn topk_hll(service: Box<dyn SqlClient>) {
+    let hlls = vec![
+        "X'118b7f'",
+        "X'128b7fee22c470691a8134'",
+        "X'138b7f04a10642078507c308e309230a420ac10c2510a2114511611363138116811848188218a119411a821ae11f0122e223a125a126632685276327a328e2296129e52b812fe23081320132c133e335a53641368236a23721374237e1382138e13a813c243e6140e341854304434148a24a034f8150c1520152e254e155a1564157e158e35ac25b265b615c615fc1620166a368226a416a626c016c816d677163728275817a637a817ac37b617c247c427d677f6180e18101826382e1846184e18541858287e1880189218a418b818bc38e018ea290a19244938295e4988198c299e29b239b419c419ce49da1a1e1a321a381a4c1aa61acc2ae01b0a1b101b142b161b443b801bd02bd61bf61c263c4a3c501c7a1caa1cb03cd03cf03cf42d123d4c3d662d744d901dd01df81e001e0a2e641e7e3edc1f0a2f1c1f203f484f5c4f763fc84fdc1fe02fea1'",
+        "X'148b7f21083288a4320a12086719c65108c1088422884511063388232904418c8520484184862886528c65198832106328c83114e6214831108518d03208851948511884188441908119083388661842818c43190c320ce4210a50948221083084a421c8328c632104221c4120d01284e20902318ca5214641942319101294641906228483184e128c43188e308882204a538c8328903288642102220c64094631086330c832106320c46118443886329062118a230c63108a320c23204a11852419c6528c85210a318c6308c41088842086308ce7110a418864190650884210ca631064108642a1022186518c8509862109020a0a4318671144150842400e5090631a0811848320c821888120c81114a220880290622906310d0220c83090a118c433106128c221902210cc23106029044114841104409862190c43188111063104c310c6728c8618c62290441102310c23214440882438ca2110a32908548c432110329462188a43946328842114640944320884190c928c442084228863318a2190a318c6618ca3114651886618c44190c5108e2110612144319062284641908428882314862106419883310421988619ca420cc511442104633888218c4428465288651910730c81118821088218c6418c45108452106519ce410d841904218863308622086211483198c710c83104a328c620906218864118623086418c8711423094632186420c4620c41104620a441108e40882628c6311c212046428c8319021104672888428ca320c431984418c4209043084451886510c641108310c4c20c66188472146310ca71084820c621946218c8228822190e2410861904411c27288621144328c6440c6311063190813086228ca710c2218c4718865188c2114850888608864404a3194e22882310ce53088619ca31904519503188e1118c4214cb2948110c6119c2818c843108520c43188c5204821186528c871908311086214c630c4218c8418cc3298a31888210c63110a121042198622886531082098c419c4210c6210c8338c25294610944518c442104610884104424206310c8311462288873102308c2440c451082228824310440982220c4240c622084310c642850118c641148430d0128c8228c2120c221884428863208c21a0a4190a4404c21186548865204633906308ca32086211c8319ce22146520c6120803318a518c840084519461208c21908538cc428c2110844384e40906320c44014a3204e62042408c8328c632146318c812004310c41318e3208a5308a511827104a4188c51048421446090a7088631102231484104473084318c41210860906919083190652906129c4628c45310652848221443114420084500865184a618c81198c32906418c63190e320c231882728484184671888309465188a320c83208632144318c6331c642988108c61218812144328d022844021022184a31908328c6218c2328c4528cc541428190641046418c84108443146230c6419483214232184411863290a210824318c220868194631106618c43188821048230c4128c6310c0330462094241106330c42188c321043118863046438823110a041464108e3190e4209a11902439c43188631104321008090441106218c6419064294a229463594622244320cc71184510902924421908218c62308641044328ca328882111012884120ca52882428c62184442086718c4221c8211082208a321023115270086218c4218c6528ce400482310a520c43104a520c44210811884118c4310864198263942331822'",
+    ];
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data1(url, hits) VALUES ('a', {}), ('b', {}), ('c', {}), ('d', {}), ('k', {}) ",
+                hlls[0], hlls[1], hlls[2], hlls[3], hlls[0]
+            ))
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data2(url, hits) VALUES ('b', {}), ('c', {}), ('e', {}), ('d', {}), ('h', {})",
+                hlls[3], hlls[2], hlls[1], hlls[2], hlls[2]
+                )
+                )
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("d", 10383), ("b", 9722), ("c", 171)])
+    ); 
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) < 10000
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("b", 9722), ("c", 171), ("h", 164)])
+    ); 
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) < 170 and cardinality(merge(hits)) > 160
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("h", 164)])
+    ); 
+
 }
 
 async fn offset(service: Box<dyn SqlClient>) {
@@ -4729,6 +5088,11 @@ async fn divide_by_zero(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn panic_worker(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("SYS PANIC WORKER").await;
+    assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
+}
+
 async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -4747,9 +5111,463 @@ async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
     assert_eq!(to_rows(&r), rows(&[(2)]));
 }
 
-async fn panic_worker(service: Box<dyn SqlClient>) {
-    let r = service.exec_query("SYS PANIC WORKER").await;
-    assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
+async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, c int, a_sum int, a_max int, a_min int, a_merge HYPERLOGLOG)
+                     AGGREGATIONS(sum(a_sum), max(a_max), min(a_min), merge(a_merge))
+                     INDEX reg_index (a, b) 
+                     AGGREGATE INDEX aggr_index (a, b)
+                     ")
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query("SELECT a, b, sum(a_sum) FROM s.Orders GROUP BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, b, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders GROUP BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum), MAX(s.Orders.a_max)@3:MAX(a_max), MIN(s.Orders.a_min)@4:MIN(a_min), MERGE(s.Orders.a_merge)@5:MERGE(a_merge)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: *\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, b, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders WHERE c = 1 GROUP BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum), MAX(s.Orders.a_max)@3:MAX(a_max), MIN(s.Orders.a_min)@4:MIN(a_min), MERGE(s.Orders.a_merge)@5:MERGE(a_merge)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: default:3:[3]:sort_on[a, b, c], fields: *\
+         \n              Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT a, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders GROUP BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, SUM(s.Orders.a_sum)@1:SUM(a_sum), MAX(s.Orders.a_max)@2:MAX(a_max), MIN(s.Orders.a_min)@3:MIN(a_min), MERGE(s.Orders.a_merge)@4:MERGE(a_merge)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: aggr_index:2:[2]:sort_on[a], fields: [a, a_sum, a_max, a_min, a_merge]\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, avg(a_sum) FROM s.Orders GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, AVG(s.Orders.a_sum)@1:AVG(a_sum)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: reg_index:1:[1]:sort_on[a], fields: [a, a_sum]\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, sum(a_sum) FROM s.Orders WHERE b = 1 GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, SUM(s.Orders.a_sum)@1:SUM(a_sum)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
+         \n              Empty"
+    );
+}
+
+async fn aggregate_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, c int, a_sum int, a_max int, a_min int)
+                     AGGREGATIONS(sum(a_sum), max(a_max), min(a_min))
+                     INDEX reg_index (a, b) 
+                     AGGREGATE INDEX aggr_index (a, b)
+                     ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Orders (a, b, c, a_sum, a_max, a_min) VALUES (1, 10, 100, 10, 10, 10), \
+                                                   (2, 20, 200, 10, 10, 10), \
+                                                   (1, 10, 300, 20, 20, 20), \
+                                                   (2, 30, 200, 100, 100, 100), \
+                                                   (1, 10, 400, 20, 40, 40), \
+                                                   (2, 20, 410, 20, 30, 30) \
+                                                   ",
+        )
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT a, b, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::Int(1),
+                TableValue::Int(10),
+                TableValue::Int(50),
+                TableValue::Int(40),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(20),
+                TableValue::Int(30),
+                TableValue::Int(30),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(30),
+                TableValue::Int(100),
+                TableValue::Int(100),
+                TableValue::Int(100)
+            ],
+        ]
+    );
+
+    let res = service
+        .exec_query("SELECT a, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders GROUP BY 1 ORDER BY 1")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::Int(1),
+                TableValue::Int(50),
+                TableValue::Int(40),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(130),
+                TableValue::Int(100),
+                TableValue::Int(10)
+            ],
+        ]
+    );
+
+    let res = service
+        .exec_query("SELECT a, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders WHERE b = 20 GROUP BY 1 ORDER BY 1")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&res),
+        [[
+            TableValue::Int(2),
+            TableValue::Int(30),
+            TableValue::Int(30),
+            TableValue::Int(10)
+        ],]
+    );
+}
+
+async fn aggregate_index_hll(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
+                     AGGREGATIONS(merge(a_hll))
+                     AGGREGATE INDEX aggr_index (a, b)
+                     ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Orders (a, b, a_hll) VALUES \
+                                                    (1, 10, X'020C0200C02FF58941D5F0C6'), \
+                                                    (1, 20, X'020C0200C02FF58941D5F0C6'), \
+                                                    (1, 10, X'020C0200C02FF58941D5F0C6'), \
+                                                    (1, 20, X'020C0200C02FF58941D5F0C6') \
+                                                   ",
+        )
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT a, b, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        [
+            [TableValue::Int(1), TableValue::Int(10), TableValue::Int(2)],
+            [TableValue::Int(1), TableValue::Int(20), TableValue::Int(2)],
+        ]
+    );
+
+    let res = service
+        .exec_query("SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders WHERE b = 20 GROUP BY 1 ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(2)],]);
+
+    let res = service
+        .exec_query(
+            "SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1 ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(2)],]);
+}
+
+async fn aggregate_index_errors(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
+                     AGGREGATE INDEX aggr_index (a, b, a_hll)
+                     ")
+        .await
+        .expect_err("Can't create aggregate index for table 'Orders' because aggregate columns (`AGGREGATIONS`) not specified for the table");
+
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
+                     AGGREGATIONS(merge(a_hll))
+                     AGGREGATE INDEX aggr_index (a, b, a_hll)
+                     ")
+        .await
+        .expect_err("Column 'a_hll' in aggregate index 'aggr_index' is in aggregations list for table 'Orders'. Aggregate index columns must be outside of aggregations list.");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (sum(a), sum(b))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function SUM not allowed for column type text");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (sum(a), max(b), sum(a_hll))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function SUM not allowed for column type hyperloglog");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (max(a_hll))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function MAX not allowed for column type hyperloglog");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (merge(a))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function MERGE not allowed for column type integer");
+}
+
+async fn inline_tables(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    let _ = service
+        .exec_query(
+            "CREATE TABLE Foo.Persons (
+                ID int,
+                FirstName varchar(255),
+                LastName varchar(255),
+                Timestamp timestamp
+            )",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons
+        (ID, LastName, FirstName, Timestamp)
+        VALUES
+        (23, 'LastName 1', 'FirstName 1', '2020-01-01T00:00:00.000Z'),
+        (24, 'LastName 3', 'FirstName 1', '2020-01-02T00:00:00.000Z'),
+        (25, 'LastName 4', 'FirstName 1', '2020-01-03T00:00:00.000Z'),
+        (26, 'LastName 5', 'FirstName 1', '2020-01-04T00:00:00.000Z'),
+        (35, 'LastName 24', 'FirstName 2', '2020-01-01T00:00:00.000Z'),
+        (36, 'LastName 23', 'FirstName 2', '2020-01-02T00:00:00.000Z'),
+        (37, 'LastName 22', 'FirstName 2', '2020-01-03T00:00:00.000Z'),
+        (38, 'LastName 21', 'FirstName 2', '2020-01-04T00:00:00.000Z')",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT * FROM Foo.Persons")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows().len(), 8);
+    assert_eq!(
+        result.get_rows()[0],
+        Row::new(vec![
+            TableValue::Int(23),
+            TableValue::String("FirstName 1".to_string()),
+            TableValue::String("LastName 1".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+        ])
+    );
+
+    let columns = vec![
+        Column::new("ID".to_string(), ColumnType::Int, 0),
+        Column::new("LastName".to_string(), ColumnType::String, 1),
+        Column::new("FirstName".to_string(), ColumnType::String, 2),
+        Column::new("Timestamp".to_string(), ColumnType::Timestamp, 3),
+    ];
+    let rows = vec![
+        Row::new(vec![
+            TableValue::Null,
+            TableValue::String("last 1".to_string()),
+            TableValue::String("first 1".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(2),
+            TableValue::Null,
+            TableValue::String("first 2".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(3),
+            TableValue::String("last 3".to_string()),
+            TableValue::String("first 3".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(4),
+            TableValue::String("last 4".to_string()),
+            TableValue::String("first 4".to_string()),
+            TableValue::Null,
+        ]),
+    ];
+    let data = Arc::new(DataFrame::new(columns, rows.clone()));
+    let inline_tables = vec![("Persons".to_string(), data)];
+
+    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let result = service
+        .exec_query_with_context(context, "SELECT * FROM Persons")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &rows);
+
+    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let result = service
+        .exec_query_with_context(context, "SELECT LastName, Timestamp FROM Persons")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("last 1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 3".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 4".to_string()),
+                TableValue::Null,
+            ]),
+        ]
+    );
+
+    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let result = service
+        .exec_query_with_context(
+            context,
+            r#"
+            SELECT *
+            FROM (
+                SELECT LastName, Timestamp FROM Foo.Persons
+                UNION ALL SELECT LastName, Timestamp FROM Persons
+            )
+            ORDER BY LastName
+        "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows()[8..12].to_vec(),
+        vec![
+            Row::new(vec![
+                TableValue::String("last 1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 3".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 4".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+        ]
+    );
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

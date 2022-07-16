@@ -3,6 +3,150 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.34](https://github.com/cube-js/cube.js/compare/v0.30.33...v0.30.34) (2022-07-12)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
+
+
+### Features
+
+* centralized concurrency setting ([#4735](https://github.com/cube-js/cube.js/issues/4735)) ([1c897a1](https://github.com/cube-js/cube.js/commit/1c897a13c62049e23d26009351622b2a93c0a745))
+
+
+
+
+
+## [0.30.28](https://github.com/cube-js/cube.js/compare/v0.30.27...v0.30.28) (2022-06-27)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.25](https://github.com/cube-js/cube.js/compare/v0.30.24...v0.30.25) (2022-06-16)
+
+
+### Bug Fixes
+
+* **databricks-jdbc:** communication link failure ([9c3577d](https://github.com/cube-js/cube.js/commit/9c3577d4935d355b4de79c3d84771e591ada8ec2))
+
+
+
+
+
+## [0.30.24](https://github.com/cube-js/cube.js/compare/v0.30.23...v0.30.24) (2022-06-14)
+
+
+### Features
+
+* **databricks-jdbc-driver:** Export bucket mount dir setting ([483d094](https://github.com/cube-js/cube.js/commit/483d0947401687d0c492a6f98f63bc915d648428))
+
+
+
+
+
+## [0.30.23](https://github.com/cube-js/cube.js/compare/v0.30.22...v0.30.23) (2022-06-14)
+
+
+### Features
+
+* **databricks-jdbc:** jdbc implementation of the export bucket feature ([d534e67](https://github.com/cube-js/cube.js/commit/d534e670a4568b905b55d0f5504d5c836d5841b2))
+
+
+
+
+
+## [0.30.22](https://github.com/cube-js/cube.js/compare/v0.30.21...v0.30.22) (2022-06-14)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/databricks-jdbc-driver:** Missing prefix during blob listing ([0ffea61](https://github.com/cube-js/cube.js/commit/0ffea61a8d3de5afe2cbee351d359d262669024c))
+
+
+
+
+
+## [0.30.21](https://github.com/cube-js/cube.js/compare/v0.30.20...v0.30.21) (2022-06-13)
+
+
+### Features
+
+* **databricks-jdbc:** improving performance ([1ef4504](https://github.com/cube-js/cube.js/commit/1ef45040f912d7f81b76a0495ddfa5db28ad9067))
+
+
+
+
+
+## [0.30.20](https://github.com/cube-js/cube.js/compare/v0.30.19...v0.30.20) (2022-06-11)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.16](https://github.com/cube-js/cube.js/compare/v0.30.15...v0.30.16) (2022-06-08)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.15](https://github.com/cube-js/cube.js/compare/v0.30.14...v0.30.15) (2022-06-06)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.14](https://github.com/cube-js/cube.js/compare/v0.30.13...v0.30.14) (2022-06-06)
+
+
+### Bug Fixes
+
+* **databricks-jdbc:** concurrency improvements ([e7857f0](https://github.com/cube-js/cube.js/commit/e7857f0231db15c81a9eb52669318d51774a1fdb))
+
+
+
+
+
+## [0.30.13](https://github.com/cube-js/cube.js/compare/v0.30.12...v0.30.13) (2022-06-05)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.12](https://github.com/cube-js/cube.js/compare/v0.30.11...v0.30.12) (2022-06-03)
+
+
+### Features
+
+* **databricks-jdbc:** export bucket for azure via databricks api v2.0 ([3d6b8c6](https://github.com/cube-js/cube.js/commit/3d6b8c6e14ccaa784ed07bf13adcd72f948526a8))
+
+
+
+
+
+## [0.30.11](https://github.com/cube-js/cube.js/compare/v0.30.10...v0.30.11) (2022-06-03)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
 ## [0.30.8](https://github.com/cube-js/cube.js/compare/v0.30.7...v0.30.8) (2022-05-30)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

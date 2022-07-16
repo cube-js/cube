@@ -23,6 +23,8 @@ multi-stage process:
    raw data.
 
 Pre-aggregations can be defined in the `preAggregations` available on each cube.
+A more in-depth diagram detailing how pre-aggregations are selected can be
+[found here][ref-caching-preaggs-selecting-preaggs].
 
 ## Naming
 
@@ -156,18 +158,30 @@ version.
 
 </WarningBox>
 
-Cube.js is capable of performing joins between separate pre-aggregations,
-thereby avoiding excessive queries to the source database.
+Cube is capable of performing joins between pre-aggregations from different
+[data sources][ref-schema-ref-cube-datasource] to avoid making excessive queries
+to them.
+
+<WarningBox>
+
+Currently pre-aggregations of type `rollupJoin` do not support background
+refreshing. Setting [`scheduledRefresh`](#parameters-scheduled-refresh) to
+`true` will result in an error.
+
+</WarningBox>
 
 In the following example, we have a `Users` cube with a `usersRollup`
 pre-aggregation, and an `Orders` cube with an `ordersRollup` pre-aggregation,
-and an `ordersWithUsersRollup` pre-aggregation. Note the type of
-`ordersWithUsersRollup` is `rollupJoin`, and that this pre-aggregation has a
-special property `rollups` which is an array containing references to both
-"source" rollups.
+and an `ordersWithUsersRollup` pre-aggregation. Note the following:
+
+- Both cubes have different values for `dataSource`.
+- The type of `ordersWithUsersRollup` is `rollupJoin`.
+- This pre-aggregation has a special property `rollups` which is an array
+  containing references to both "source" rollups.
 
 ```javascript
 cube(`Users`, {
+  dataSource: 'postgres',
   sql: `SELECT * FROM public.users`,
 
   preAggregations: {
@@ -197,6 +211,7 @@ cube(`Users`, {
 });
 
 cube('Orders', {
+  dataSource: 'mssql',
   sql: `SELECT * FROM orders`,
 
   preAggregations: {
@@ -251,6 +266,29 @@ cube('Orders', {
   },
 });
 ```
+
+<InfoBox>
+
+`rollupJoin` is not required to join cubes from the same data source; instead
+include the foreign cube's dimensions/measures in the rollup definition
+directly:
+
+```javascript
+cube('Orders', {
+  sql: `SELECT * FROM orders`,
+
+  preAggregations: {
+    ordersRollup: {
+      measures: [CUBE.count],
+      dimensions: [Users.name, CUBE.status],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+    },
+  },
+});
+```
+
+</InfoBox>
 
 ### <--{"id" : "Parameters"}--> measures
 
@@ -364,8 +402,9 @@ cube('Orders', {
 });
 ```
 
-The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. This
-property is required when using [`timeDimension`][self-timedimension].
+The value can be one of `second`, `minute`, `hour`, `day`, `week`, `month`,
+`quarter` or `year`. This property is required when using
+[`timeDimension`][self-timedimension].
 
 ### <--{"id" : "Parameters"}--> segments
 
@@ -424,6 +463,17 @@ The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
 [`timeDimension`][self-timedimension] and [`granularity`][self-granularity]
 **must** also be included in the pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
+
+Number of partitions to be built per cube is calculated as [buildRange][self-buildrange] divided by `partitionGranularity`.
+Number of partitions to be built per cube is multiplied by count of time zones and tenants in case different tenants have different pre-aggregation SQL.
+
+<WarningBox>
+
+Choose the count of partitions wisely as those consume memory and CPU resources.
+As a rule of thumb, you do not want to go over 5,000-10,000 partitions in total to keep partitioning overhead low.
+Too many partitions will most likely cause out of memory.
+
+</WarningBox>
 
 ### <--{"id" : "Parameters"}--> refreshKey
 
@@ -554,10 +604,18 @@ partition as determined by the pre-aggregation's `partitionGranularity`.
 
 The `incremental: true` flag generates a special `refreshKey` SQL query which
 triggers a refresh for partitions where the end date lies within the
-`updateWindow` from the current time. In the example below, it will refresh
-today's and the last 7 days of partitions once a day. Partitions before the
-`7 day` interval **will not** be refreshed once they are built unless the rollup
-SQL is changed.
+`updateWindow` from the current time.
+
+<WarningBox>
+
+Because incremental refreshes generate their own SQL, you **must not** use the
+[`sql`](#parameters-refresh-key-sql) property here.
+
+</WarningBox>
+
+In the example below, it will refresh today's and the last 7 days of partitions
+once a day. Partitions before the `7 day` interval **will not** be refreshed
+once they are built unless the rollup SQL is changed.
 
 ```javascript
 cube(`Orders`, {
@@ -583,6 +641,31 @@ cube(`Orders`, {
 
 This property is required when using [`incremental`][self-incremental]
 refreshes.
+
+### allowNonStrictDateRangeMatch
+
+The `allowNonStrictDateRangeMatch` property can be used to allow queries to
+match this pre-aggregation when using non-strict date ranges. This is useful
+when using a visualization tools such as [Apache
+Superset][ref-config-downstream-superset] that use loose date ranges by default.
+
+```javascript
+cube(`Orders`, {
+  sql: `SELECT * FROM orders`,
+
+  ...,
+
+  preAggregations: {
+    main: {
+      measure: [CUBE.count],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+      partitionGranularity: `day`,
+      allowNonStrictDateRangeMatch: true,
+    },
+  },
+});
+```
 
 ### <--{"id" : "Parameters"}--> useOriginalSqlPreAggregations
 
@@ -676,8 +759,8 @@ cube(`Orders`, {
 ### <--{"id" : "Parameters"}--> buildRangeStart and buildRangeEnd
 
 The build range defines what partitions should be built by a scheduled refresh.
-Scheduled refreshes will **never** look beyond this range. By default, the build
-range is defined as the minimum and maximum values possible for the
+Data will **never** be queried beyond this range. By default, the build range is
+defined as the minimum and maximum values possible for the
 [`timeDimension`][self-timedimension] used in the rollup.
 
 <InfoBox>
@@ -774,6 +857,14 @@ cube(`Orders`, {
 });
 ```
 
+To maximize performance, you can introduce an index per query, so the set of dimensions used in the query is the same as in the index.
+There's no need to define measure columns in the index.
+Index column order is the sort order of all data within an index.
+Under the hood Cube Store will create table dataset copy and will sort it according to index specification.
+Cube Store works best when you define all your `equals` filter dimensions first and all dimensions from `GROUP BY` last.
+For range filter columns like `contains`, `>`, `<`, `>=`, `<=` with high selectivity, typically less than 5% of records keep those columns before `GROUP BY` dimensions.
+Otherwise, for low selectivity range filters, consider putting these columns after `GROUP BY` dimensions.
+
 For `originalSql` pre-aggregations, the original column names as strings can be
 used:
 
@@ -799,8 +890,11 @@ cube(`Orders`, {
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]:
   /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries
+[ref-caching-preaggs-selecting-preaggs]:
+  /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
 [ref-caching-using-preaggs-internal]:
   /caching/using-pre-aggregations#pre-aggregations-storage
+[ref-config-downstream-superset]: /config/downstream/superset
 [ref-config-driverfactory]: /config/#driver-factory
 [ref-cube-refreshkey]: /schema/reference/cube#refresh-key
 [ref-production-checklist-refresh]:
@@ -808,6 +902,7 @@ cube(`Orders`, {
 [ref-recipe-funnels]: /recipes/funnels
 [ref-sqlalias]: /schema/reference/cube#sql-alias
 [ref-schema-cube-naming]: /schema/reference/cube#naming
+[ref-schema-ref-cube-datasource]: /schema/reference/cube#parameters-data-source
 [ref-schema-dimensions]: /schema/reference/dimensions
 [ref-schema-measures]: /schema/reference/measures
 [ref-schema-segments]: /schema/reference/segments
@@ -822,6 +917,7 @@ cube(`Orders`, {
 [self-rollup]: #parameters-type-rollup
 [self-rollupjoin]: #parameters-type-rollupjoin
 [self-timedimension]: #time-dimension
+[self-buildrange]: #parameters-build-range-start-and-build-range-end
 [wiki-olap-ops]: https://en.wikipedia.org/wiki/OLAP_cube#Operations
 [wiki-composable-agg-fn]:
   https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions

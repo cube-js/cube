@@ -2,6 +2,7 @@
 source: cubesql/src/compile/mod.rs
 expression: "execute_query(\"\n                SELECT\n                    nspname as Schema,\n                    cl.relname as Table,\n                    clr.relname as RefTableName,\n                    conname as Name,\n                    conkey as ColumnIndexes,\n                    confkey as ColumnRefIndexes\n                FROM pg_constraint\n                INNER JOIN pg_namespace ON connamespace = pg_namespace.oid\n                INNER JOIN pg_class cl ON conrelid = cl.oid\n                INNER JOIN pg_class clr ON confrelid = clr.oid\n                WHERE\n                    contype = 'f' AND\n                    conname like E'sample\\\\_fkey' AND\n                    nspname like E'public' AND\n                    cl.relname like E'KibanaSampleDataEcommerce'\n                order by 1\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
-++
-++
-++
++--------+-------+--------------+------+---------------+------------------+
+| Schema | Table | RefTableName | Name | ColumnIndexes | ColumnRefIndexes |
++--------+-------+--------------+------+---------------+------------------+
++--------+-------+--------------+------+---------------+------------------+

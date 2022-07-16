@@ -337,32 +337,44 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations }: { reposit
     dbType: 'postgres',
     apiSecret: 'foo',
   });
-  const compilerApi = new CompilerApi(repository, 'postgres', {
-    compileContext: {
-      useOriginalSqlPreAggregations,
-    },
-    logger: (msg, params) => {
-      console.log(msg, params);
-    },
-  });
+  const compilerApi = new CompilerApi(
+    repository,
+    async () => 'postgres',
+    {
+      compileContext: {
+        useOriginalSqlPreAggregations,
+      },
+      logger: (msg, params) => {
+        console.log(msg, params);
+      },
+    }
+  );
 
   const mockDriver = new MockDriver();
 
-  const orchestratorApi = new OrchestratorApi(() => mockDriver, (msg, params) => console.log(msg, params), {
-    contextToDbType(): DatabaseType {
-      return 'postgres';
-    },
-    contextToExternalDbType(): DatabaseType {
-      return 'cubestore';
-    },
-    continueWaitTimeout: 0.1,
-    preAggregationsOptions: {
-      queueOptions: {
-        executionTimeout: 2,
+  const orchestratorApi = new OrchestratorApi(
+    () => mockDriver,
+    (msg, params) => console.log(msg, params),
+    {
+      contextToDbType: async () => 'postgres',
+      contextToExternalDbType(): DatabaseType {
+        return 'cubestore';
       },
-    },
-    redisPrefix: `TEST_${testCounter++}`,
-  });
+      continueWaitTimeout: 0.1,
+      queryCacheOptions: {
+        queueOptions: () => ({
+          concurrency: 2,
+        }),
+      },
+      preAggregationsOptions: {
+        queueOptions: () => ({
+          executionTimeout: 2,
+          concurrency: 2,
+        }),
+      },
+      redisPrefix: `TEST_${testCounter++}`,
+    }
+  );
 
   jest.spyOn(serverCore, 'getCompilerApi').mockImplementation(() => compilerApi);
   jest.spyOn(serverCore, 'getOrchestratorApi').mockImplementation(() => <any>orchestratorApi);
@@ -470,7 +482,7 @@ describe('Refresh Scheduler', () => {
           throwErrors: true,
         });
       } catch (e) {
-        if (e.error !== 'Continue wait') {
+        if ((<{ error: string }>e).error !== 'Continue wait') {
           throw e;
         } else {
           // eslint-disable-next-line no-continue
@@ -541,7 +553,7 @@ describe('Refresh Scheduler', () => {
           }],
         );
       } catch (e) {
-        if (e.error !== 'Continue wait') {
+        if ((<{ error: string }>e).error !== 'Continue wait') {
           throw e;
         } else {
           // eslint-disable-next-line no-continue
@@ -771,6 +783,7 @@ describe('Refresh Scheduler', () => {
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
     for (let i = 0; i < 1000; i++) {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const refreshResult = await refreshScheduler.runScheduledRefresh(ctx, {
           concurrency: 1,
           workerIndices: [0],
@@ -778,7 +791,7 @@ describe('Refresh Scheduler', () => {
         });
         break;
       } catch (e) {
-        if (e.error !== 'Continue wait') {
+        if ((<{ error: string }>e).error !== 'Continue wait') {
           throw e;
         } else {
           // eslint-disable-next-line no-continue

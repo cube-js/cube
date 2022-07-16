@@ -5,7 +5,7 @@ import App from "./App";
 import { HashRouter as Router, Route } from "react-router-dom";
 import DashboardPage from "./pages/DashboardPage";
 
-import createExampleWrapper from 'cube-example-wrapper'
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
 const exampleDescription = {
   title: "D3 Dashboard",
@@ -15,13 +15,13 @@ const exampleDescription = {
       Follow 
       the <a href="https://d3-dashboard.cube.dev/">tutorial</a>
       or explore 
-      the <a href="https://github.com/cube-js/cube.js/tree/master/guides/d3-dashboard">source code</a>
+      the <a href="https://github.com/cube-js/cube.js/tree/master/examples/d3-dashboard">source code</a>
       to learn more.
     </p>
   `
 };
 
-createExampleWrapper(exampleDescription)
+createExampleWrapper(exampleDescription);
 
 ReactDOM.render(
   <Router>

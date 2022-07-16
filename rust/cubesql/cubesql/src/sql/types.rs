@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use datafusion::arrow::datatypes::{DataType, Field};
+use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit};
 use msql_srv::{
     ColumnFlags as MysqlColumnFlags, ColumnType as MysqlColumnType, StatusFlags as MysqlStatusFlags,
 };
@@ -15,7 +15,12 @@ pub enum ColumnType {
     Int32,
     Int64,
     Blob,
+    // true = Date32
+    // false = Date64
+    Date(bool),
+    Interval(IntervalUnit),
     Timestamp,
+    Decimal(usize, usize),
     List(Box<Field>),
 }
 
@@ -40,8 +45,11 @@ impl ColumnType {
             ColumnType::Int8 => PgTypeId::INT2,
             ColumnType::Int32 => PgTypeId::INT4,
             ColumnType::String | ColumnType::VarStr => PgTypeId::TEXT,
+            ColumnType::Interval(_) => PgTypeId::INTERVAL,
+            ColumnType::Date(_) => PgTypeId::DATE,
             ColumnType::Timestamp => PgTypeId::TIMESTAMP,
             ColumnType::Double => PgTypeId::NUMERIC,
+            ColumnType::Decimal(_, _) => PgTypeId::NUMERIC,
             ColumnType::List(field) => match field.data_type() {
                 DataType::Binary => PgTypeId::ARRAYBYTEA,
                 DataType::Boolean => PgTypeId::ARRAYBOOL,
@@ -87,12 +95,15 @@ impl StatusFlags {
 #[derive(Debug, Clone)]
 pub enum CommandCompletion {
     Begin,
+    Prepare,
     Commit,
     Use,
     Rollback,
     Set,
     Select(u32),
     DeclareCursor,
+    CloseCursor,
+    CloseCursorAll,
     Discard(String),
 }
 
@@ -101,12 +112,17 @@ impl CommandCompletion {
         match self {
             // IDENTIFIER ONLY
             CommandCompletion::Begin => CommandComplete::Plain("BEGIN".to_string()),
+            CommandCompletion::Prepare => CommandComplete::Plain("PREPARE".to_string()),
             CommandCompletion::Commit => CommandComplete::Plain("COMMIT".to_string()),
             CommandCompletion::Rollback => CommandComplete::Plain("ROLLBACK".to_string()),
             CommandCompletion::Set => CommandComplete::Plain("SET".to_string()),
             CommandCompletion::Use => CommandComplete::Plain("USE".to_string()),
             CommandCompletion::DeclareCursor => {
                 CommandComplete::Plain("DECLARE CURSOR".to_string())
+            }
+            CommandCompletion::CloseCursor => CommandComplete::Plain("CLOSE CURSOR".to_string()),
+            CommandCompletion::CloseCursorAll => {
+                CommandComplete::Plain("CLOSE CURSOR ALL".to_string())
             }
             CommandCompletion::Discard(tp) => CommandComplete::Plain(format!("DISCARD {}", tp)),
             // ROWS COUNT

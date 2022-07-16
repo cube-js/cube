@@ -11,10 +11,6 @@ const Dev: React.FC<Props> = (props) => (
     <meta charSet="utf-8" />
     <meta httpEquiv="x-ua-compatible" content="ie=edge" />
     {props.headComponents}
-    <meta
-      name="description"
-      content="Documentation for working with Cube.js, the open-source analytics framework."
-    />
 
     <meta
       name="viewport"
@@ -32,10 +28,6 @@ const Prod: React.FC<Props> = (props) => (
     <meta charSet="utf-8" />
     <meta httpEquiv="x-ua-compatible" content="ie=edge" />
     {props.headComponents}
-    <meta
-      name="description"
-      content="Documentation for working with Cube.js, the open-source analytics framework."
-    />
 
     <meta
       name="viewport"

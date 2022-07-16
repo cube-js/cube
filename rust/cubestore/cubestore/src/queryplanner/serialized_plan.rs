@@ -1,8 +1,8 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
-use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta};
-use crate::queryplanner::query_executor::CubeTable;
+use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta, Snapshots};
+use crate::queryplanner::query_executor::{CubeTable, InlineTableProvider};
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{
@@ -192,7 +192,7 @@ pub enum SerializedLogicalPlan {
     },
     ClusterSend {
         input: Arc<SerializedLogicalPlan>,
-        snapshots: Vec<Vec<IndexSnapshot>>,
+        snapshots: Snapshots,
     },
     ClusterAggregateTopK {
         limit: usize,
@@ -200,8 +200,9 @@ pub enum SerializedLogicalPlan {
         group_expr: Vec<SerializedExpr>,
         aggregate_expr: Vec<SerializedExpr>,
         sort_columns: Vec<SortColumn>,
+        having_expr: Option<SerializedExpr>,
         schema: DFSchemaRef,
-        snapshots: Vec<Vec<IndexSnapshot>>,
+        snapshots: Snapshots,
     },
     CrossJoin {
         left: Arc<SerializedLogicalPlan>,
@@ -313,6 +314,7 @@ impl SerializedLogicalPlan {
                         worker_context.chunk_id_to_record_batches.clone(),
                         worker_context.parquet_metadata_cache.clone(),
                     )),
+                    SerializedTableSource::InlineTable(v) => Arc::new(v.clone()),
                 },
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),
@@ -383,6 +385,7 @@ impl SerializedLogicalPlan {
                 group_expr,
                 aggregate_expr,
                 sort_columns,
+                having_expr,
                 schema,
                 snapshots,
             } => ClusterAggregateTopK {
@@ -391,6 +394,7 @@ impl SerializedLogicalPlan {
                 group_expr: group_expr.iter().map(|e| e.expr()).collect(),
                 aggregate_expr: aggregate_expr.iter().map(|e| e.expr()).collect(),
                 order_by: sort_columns.clone(),
+                having_expr: having_expr.as_ref().map(|e| e.expr()),
                 schema: schema.clone(),
                 snapshots: snapshots.clone(),
             }
@@ -645,6 +649,7 @@ impl SerializedExpr {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum SerializedTableSource {
     CubeTable(CubeTable),
+    InlineTable(InlineTableProvider),
 }
 
 impl SerializedPlan {
@@ -829,6 +834,10 @@ impl SerializedPlan {
                 table_name: table_name.clone(),
                 source: if let Some(cube_table) = source.as_any().downcast_ref::<CubeTable>() {
                     SerializedTableSource::CubeTable(cube_table.clone())
+                } else if let Some(inline_table) =
+                    source.as_any().downcast_ref::<InlineTableProvider>()
+                {
+                    SerializedTableSource::InlineTable(inline_table.clone())
                 } else {
                     panic!("Unexpected table source");
                 },
@@ -900,6 +909,7 @@ impl SerializedPlan {
                             .map(|e| Self::serialized_expr(e))
                             .collect(),
                         sort_columns: topk.order_by.clone(),
+                        having_expr: topk.having_expr.as_ref().map(|e| Self::serialized_expr(&e)),
                         schema: topk.schema.clone(),
                         snapshots: topk.snapshots.clone(),
                     }

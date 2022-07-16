@@ -385,6 +385,8 @@ macro_rules! variant_field_struct {
                 Operator::Or => "OR",
                 Operator::Like => "LIKE",
                 Operator::NotLike => "NOT_LIKE",
+                Operator::ILike => "ILIKE",
+                Operator::NotILike => "NOT_ILIKE",
                 Operator::RegexMatch => "~",
                 Operator::RegexIMatch => "~*",
                 Operator::RegexNotMatch => "!~",
@@ -520,13 +522,24 @@ macro_rules! variant_field_struct {
 
             impl core::hash::Hash for [<$variant $var_field:camel>] {
                 fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-                    std::mem::discriminant(&self.0).hash(state);
+                    self.0.hash(state);
                 }
             }
 
             impl core::cmp::PartialEq for [<$variant $var_field:camel>] {
                 fn eq(&self, other: &[<$variant $var_field:camel>]) -> bool {
-                    self.0 == other.0
+                    // TODO Datafusion has incorrect Timestamp comparison without timezone involved
+                    match &self.0 {
+                        ScalarValue::TimestampNanosecond(_, self_tz) => {
+                            match &other.0 {
+                                ScalarValue::TimestampNanosecond(_, other_tz) => {
+                                    self_tz == other_tz && self.0 == other.0
+                                }
+                                _ => self.0 == other.0
+                            }
+                        }
+                        _ => self.0 == other.0
+                    }
                 }
             }
 

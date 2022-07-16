@@ -27,15 +27,18 @@ class IndexPage extends Component<Props> {
   render() {
     return (
       <div className={styles.docContent}>
-        <Helmet title="Main | Cube Docs" />
+        <Helmet>
+          <title>Main | Cube Docs</title>
+          <meta name="description" content={"Main | Documentation for working with Cube, the open-source analytics framework"}></meta>
+        </Helmet>
         <h1>Documentation</h1>
         
         <InfoBox>
-          <b>The SQL API and Extended Support for BI Tools</b> workshop on June 22, 2022.<br/> 
-          You'll have the opportunity to learn the latest on Cube's <a href="https://cube.dev/blog/expanded-bi-support/">SQL API.</a><br /> 
-          Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/sql-api">event page</a> 👈
+          <b>Connecting your Business Intelligence Tools to Cube</b> workshop on July 27, 2022.<br/> 
+          Building on our <a href="https://cube.dev/events/sql-api">SQL API workshop</a>, we'll continue our discussion on making Cube available to your favorite Business Intelligence applications.<br /> 
+          Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/adv-sql-api/">event page</a> 👈
         </InfoBox>
-        
+
         <Row>
           <Col span={24}>
             <p>

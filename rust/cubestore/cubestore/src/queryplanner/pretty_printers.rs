@@ -1,5 +1,7 @@
 //! Presentation of query plans for use in tests.
 
+use bigdecimal::ToPrimitive;
+
 use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::{LogicalPlan, PlanVisitor};
 use datafusion::physical_plan::filter::FilterExec;
@@ -19,7 +21,9 @@ use itertools::{repeat_n, Itertools};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, WorkerExec};
-use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, CubeTableExec};
+use crate::queryplanner::query_executor::{
+    ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider,
+};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
@@ -170,7 +174,14 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                             "ClusterSend, indices: {:?}",
                             cs.snapshots
                                 .iter()
-                                .map(|is| is.iter().map(|i| i.index.get_id()).collect_vec())
+                                .map(|is| is
+                                    .iter()
+                                    .map(|i| i.clone().map_or(-1, |i| i
+                                        .index
+                                        .get_id()
+                                        .to_i64()
+                                        .map_or(-2, |i| i)))
+                                    .collect_vec())
                                 .collect_vec()
                         )
                     } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>()
@@ -184,6 +195,11 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                 ", sortBy: {}",
                                 pp_sort_columns(topk.group_expr.len(), &topk.order_by)
                             );
+                        }
+                        if self.opts.show_filters {
+                            if let Some(having) = &topk.having_expr {
+                                self.output += &format!(", having: {:?}", having)
+                            }
                         }
                     } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
                         self.output += &format!("PanicWorker")
@@ -229,6 +245,8 @@ fn pp_source(t: &dyn TableProvider) -> String {
         "CubeTableLogical".to_string()
     } else if let Some(t) = t.as_any().downcast_ref::<CubeTable>() {
         format!("CubeTable(index: {})", pp_index(t.index_snapshot()))
+    } else if let Some(t) = t.as_any().downcast_ref::<InlineTableProvider>() {
+        format!("InlineTableProvider(data: {} rows)", t.get_data().len())
     } else {
         panic!("unknown table provider");
     }
@@ -369,6 +387,11 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     ", sortBy: {}",
                     pp_sort_columns(topk.key_len, &topk.order_by)
                 );
+            }
+            if o.show_filters {
+                if let Some(having) = &topk.having {
+                    *out += &format!(", having: {}", having);
+                }
             }
         } else if let Some(_) = a.downcast_ref::<PanicWorkerExec>() {
             *out += "PanicWorker";

@@ -1,5 +1,5 @@
 use crate::{sql::SessionState, CubeError};
-use log::{Level, LevelFilter, Log, Metadata, Record};
+use log::{Level, LevelFilter, Log};
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -34,10 +34,7 @@ impl LogReporter for LocalReporter {
         false
     }
 }
-pub struct ReportingLogger {
-    logger: Box<dyn Log>,
-    need_to_report: bool,
-}
+pub struct ReportingLogger {}
 
 impl ReportingLogger {
     pub fn init(
@@ -45,49 +42,20 @@ impl ReportingLogger {
         reporter: Box<dyn LogReporter>,
         max_level: LevelFilter,
     ) -> Result<(), CubeError> {
-        let reporting_logger = Self {
-            logger,
-            need_to_report: reporter.is_active(),
-        };
-
         let mut guard = REPORTER
             .write()
             .expect("failed to unlock REPORTER for writing");
         *guard = reporter;
 
-        log::set_boxed_logger(Box::new(reporting_logger))?;
+        log::set_boxed_logger(logger)?;
         log::set_max_level(max_level);
 
         Ok(())
     }
 }
 
-impl Log for ReportingLogger {
-    fn enabled<'a>(&self, metadata: &Metadata<'a>) -> bool {
-        self.logger.enabled(metadata)
-    }
-
-    fn log<'a>(&self, record: &Record<'a>) {
-        match (record.metadata().level(), self.need_to_report) {
-            // reporting errors only
-            (Level::Error, true) => {
-                report(
-                    "Cube SQL Error".to_string(),
-                    HashMap::from([("error".to_string(), format!("{}", record.args()))]),
-                    Level::Error,
-                );
-            }
-            _ => self.logger.log(record),
-        }
-    }
-
-    fn flush(&self) {
-        self.logger.flush()
-    }
-}
-
 pub trait ContextLogger: Send + Sync + Debug {
-    fn error(&self, message: &str);
+    fn error(&self, message: &str, props: Option<HashMap<String, String>>);
 }
 
 #[derive(Debug)]
@@ -110,19 +78,17 @@ impl SessionLogger {
         meta_fields.insert("protocol".to_string(), protocol);
         meta_fields.insert("apiType".to_string(), "sql".to_string());
 
-        if report(target.to_string(), meta_fields.clone(), level) == false {
+        if !report(target.to_string(), meta_fields.clone(), level) {
             log::log!(target: target, level, "{:?}", meta_fields);
         }
     }
 }
 
 impl ContextLogger for SessionLogger {
-    fn error(&self, message: &str) {
-        self.log(
-            "Cube SQL Error",
-            HashMap::from([("error".to_string(), message.to_string())]),
-            Level::Error,
-        );
+    fn error(&self, message: &str, props: Option<HashMap<String, String>>) {
+        let mut properties = HashMap::from([("error".to_string(), message.to_string())]);
+        properties.extend(props.unwrap_or_default());
+        self.log("Cube SQL Error", properties, Level::Error);
     }
 }
 

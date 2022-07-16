@@ -4,7 +4,7 @@ import WindowTitle from '../components/WindowTitle';
 import FunnelsExplorer from './FunnelsExplorer';
 
 
-const FunnelsPage = ({ }) => (
+const FunnelsPage = () => (
   <>
     <WindowTitle title="Funnels" />
     <FunnelsExplorer />

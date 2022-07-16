@@ -40,7 +40,7 @@ const dataKey = (resultSet) => {
   return ""
 }
 
-export default ({ resultSet }) => {
+const PieComponent = ({ resultSet }) => {
   return (
   <ResponsiveContainer>
     <PieChart>
@@ -62,4 +62,6 @@ export default ({ resultSet }) => {
     </PieChart>
   </ResponsiveContainer>
   )
-}
+};
+
+export default PieComponent;

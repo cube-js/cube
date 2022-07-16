@@ -86,7 +86,7 @@ https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/READM
 
 #### Development
 
-Cube.js is written in a mixture of plain JavaScript and Typescript. TypeScript is preferred for new code.
+Cube.js is written in a mixture of plain JavaScript and TypeScript. TypeScript is preferred for new code.
 
 > Attention: Cube.js uses TypeScript configured in incremental mode, which uses cache to speed up compilation,  
 > but in some cases, you can run into a problem with a not recompiled file. To fix it, we recommend running `$ yarn clean` and `$ yarn tsc`.

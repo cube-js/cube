@@ -8,7 +8,7 @@ describe('FireboltDriver', () => {
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
-    tests = new DriverTests(new FireboltDriver({}));
+    tests = new DriverTests(new FireboltDriver({}), { expectStringFields: true });
   });
 
   afterAll(async () => {

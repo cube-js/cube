@@ -26,6 +26,10 @@ spec:
       {{- toYaml .Values.commonAnnotations | nindent 8 }}
       {{- end }}
     spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: cube
           {{- if .Values.image.tag }}
@@ -84,6 +88,14 @@ spec:
       {{- if .Values.master.affinity }}
       affinity:
         {{- toYaml .Values.master.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.master.tolerations }}
+      tolerations:
+        {{- toYaml .Values.master.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.master.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.master.nodeSelector | nindent 8 }}
       {{- end }}
       {{- if .Values.master.spreadConstraints }}
       topologySpreadConstraints:

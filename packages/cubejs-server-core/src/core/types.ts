@@ -1,3 +1,4 @@
+import { Required } from '@cubejs-backend/shared';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
@@ -27,7 +28,7 @@ export interface QueryCacheOptions {
 }
 
 export interface PreAggregationsOptions {
-  queueOptions?: QueueOptions;
+  queueOptions?: QueueOptions | ((dataSource: string) => QueueOptions);
   externalRefresh?: boolean;
 }
 
@@ -36,6 +37,34 @@ export interface OrchestratorOptions {
   redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
+  rollupOnlyMode?: boolean;
+}
+
+export interface QueueInitedOptions {
+  concurrency: number;
+  continueWaitTimeout?: number;
+  executionTimeout?: number;
+  orphanedTimeout?: number;
+  heartBeatInterval?: number;
+}
+
+export interface QueryInitedOptions {
+  queueOptions: (dataSource: string) => Promise<QueueInitedOptions>;
+  refreshKeyRenewalThreshold?: number;
+  backgroundRenew?: boolean;
+  externalQueueOptions?: QueueOptions;
+}
+
+export interface AggsInitedOptions {
+  queueOptions?: (dataSource: string) => Promise<QueueInitedOptions>;
+  externalRefresh?: boolean;
+}
+
+export interface OrchestratorInitedOptions {
+  queryCacheOptions: QueryInitedOptions;
+  preAggregationsOptions: AggsInitedOptions;
+  redisPrefix?: string;
+  redisPoolOptions?: RedisPoolOptions;
   rollupOnlyMode?: boolean;
 }
 
@@ -88,8 +117,23 @@ export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOpt
 export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 
 // internal
-export type DbTypeFn = (context: DriverContext) => DatabaseType;
-export type DriverFactoryFn = (context: DriverContext) => Promise<BaseDriver> | BaseDriver;
+export type DriverOptions = {
+  maxPoolSize?: number,
+};
+export type DriverConfig = {
+  type: DatabaseType,
+} & DriverOptions;
+
+export type DbTypeFn = (context: DriverContext) =>
+  DatabaseType | Promise<DatabaseType>;
+export type DriverFactoryFn = (context: DriverContext) =>
+  Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
+
+export type DbTypeAsyncFn = (context: DriverContext) =>
+  Promise<DatabaseType>;
+export type DriverFactoryAsyncFn = (context: DriverContext) =>
+  Promise<BaseDriver | DriverConfig>;
+
 export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
 
 // external
@@ -146,6 +190,26 @@ export interface CreateOptions {
   serverless?: boolean;
   allowNodeRequire?: boolean;
 }
+
+export interface DriverDecoratedOptions extends CreateOptions {
+  dbType: DbTypeAsyncFn;
+  driverFactory: DriverFactoryAsyncFn;
+}
+
+export type ServerCoreInitializedOptions = Required<
+  DriverDecoratedOptions,
+  'dbType' |
+  'apiSecret' |
+  'devServer' |
+  'telemetry' |
+  'dashboardAppPath' |
+  'dashboardAppPort' |
+  'driverFactory' |
+  'dialectFactory' |
+  'externalDriverFactory' |
+  'externalDialectFactory' |
+  'scheduledRefreshContexts'
+>;
 
 export type SystemOptions = {
   isCubeConfigEmpty: boolean;

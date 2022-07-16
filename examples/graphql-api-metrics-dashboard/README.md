@@ -1,5 +1,5 @@
-# GraphQL API Metrics Dashboard Example
+# Chart.js Metrics Dashboard
 
-A dashboard app built with Cube's GraphQL API, Postgres, Chart.js, and react-chartjs-2.
+This live demo shows a metrics dashboard built with Cube's GraphQL API, PostgreSQL as a database, Chart.js and react-chartjs-2 for data visualization, and Cube.
 
-You can find a live demo [here](https://graphql-postgres-metrics-dashboard.netlify.app/).
+Follow the [tutorial](https://cube.dev/blog/graphql-postgres-metrics-dashboard-with-cube) or check out a live demo [here](https://graphql-postgres-metrics-dashboard.netlify.app/).

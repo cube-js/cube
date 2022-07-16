@@ -34,6 +34,12 @@ The semantics of `INNER JOIN` can be achieved with additional filtering. For
 example, a simple check of whether the column value `IS NOT NULL` by using [set
 filter][ref-restapi-query-filter-op-set] satisfies this requirement.
 
+There's also no way to define `FULL OUTER JOIN` and `RIGHT OUTER JOIN` for the sake of join modeling simplicity.
+To get `RIGHT OUTER JOIN` semantics just define join [from other side of relationship][ref-schema-fundamentals-join-dir].
+The `FULL OUTER JOIN` can be built inside cube [sql][ref-schema-cube-sql] parameter.
+Quite frequently, `FULL OUTER JOIN` is used to solve [Data Blending][ref-schema-data-blenging] or similar problems.
+In that case, it's best practice to have a separate cube for such an operation.
+
 ## Naming
 
 The name of a join should match the [name of the external
@@ -304,4 +310,7 @@ members.
 [ref-schema-cube-naming]: /schema/reference/cube#naming
 [ref-schema-fundamentals-join-dir]:
   /schema/fundamentals/joins#directions-of-joins
+[ref-schema-cube-sql]:
+  /schema/reference/cube#parameters-sql
+[ref-schema-data-blenging]: /schema/advanced/data-blending#data-blending
 [wiki-djikstra-alg]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm

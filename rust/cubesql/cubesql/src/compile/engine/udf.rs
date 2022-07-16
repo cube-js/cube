@@ -1,21 +1,20 @@
-use std::{any::type_name, sync::Arc};
+use std::{any::type_name, sync::Arc, thread};
 
-use chrono::{Duration, NaiveDateTime};
+use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeArray,
-            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
-            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
-            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt32Array,
-            UInt32Builder,
+            Float64Array, GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeBuilder,
+            ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
+            StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
+            TimestampNanosecondArray, TimestampSecondArray, UInt32Builder,
         },
         compute::{cast, concat},
         datatypes::{
-            DataType, Field, Float64Type, Int16Type, Int32Type, Int64Type, Int8Type,
-            IntervalDayTimeType, IntervalUnit, TimeUnit, TimestampNanosecondType, UInt16Type,
-            UInt32Type, UInt64Type, UInt8Type,
+            DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType,
+            IntervalUnit, IntervalYearMonthType, TimeUnit, TimestampNanosecondType, UInt32Type,
+            UInt64Type,
         },
     },
     error::{DataFusionError, Result},
@@ -37,13 +36,15 @@ use pg_srv::PgTypeId;
 
 use crate::{
     compile::engine::df::{
-        coerce::{if_coercion, is_numeric, least_coercion},
+        coerce::{if_coercion, least_coercion},
         columar::if_then_else,
     },
     sql::SessionState,
 };
 
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
+pub type ScalarFunctionImplementation =
+    Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync>;
 
 pub fn create_version_udf(v: String) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
@@ -81,6 +82,7 @@ pub fn create_db_udf(name: String, state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
+// It's the same as current_user UDF, but with another host
 pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
@@ -102,7 +104,7 @@ pub fn create_user_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
-pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> ScalarUDF {
+pub fn create_current_user_udf(state: Arc<SessionState>, name: &str, with_host: bool) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
         let mut builder = StringBuilder::new(1);
         if let Some(user) = &state.user() {
@@ -119,7 +121,28 @@ pub fn create_current_user_udf(state: Arc<SessionState>, with_host: bool) -> Sca
     });
 
     create_udf(
-        "current_user",
+        name,
+        vec![],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_session_user_udf(state: Arc<SessionState>) -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(1);
+        if let Some(user) = &state.user() {
+            builder.append_value(user.clone()).unwrap();
+        } else {
+            builder.append_null()?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "session_user",
         vec![],
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
@@ -185,8 +208,9 @@ macro_rules! downcast_boolean_arr {
             .downcast_ref::<BooleanArray>()
             .ok_or_else(|| {
                 DataFusionError::Internal(format!(
-                    "could not cast {}, to {}",
+                    "could not cast {} from {} to {}",
                     $NAME,
+                    $ARG.data_type(),
                     type_name::<BooleanArray>()
                 ))
             })?
@@ -199,9 +223,10 @@ macro_rules! downcast_primitive_arg {
             .downcast_ref::<PrimitiveArray<$T>>()
             .ok_or_else(|| {
                 DataFusionError::Internal(format!(
-                    "could not cast {} to {}",
+                    "could not cast {} from {} to {}",
                     $NAME,
-                    type_name::<PrimitiveArray<$T>>()
+                    $ARG.data_type(),
+                    type_name::<$T>()
                 ))
             })?
     }};
@@ -213,8 +238,9 @@ macro_rules! downcast_string_arg {
             .downcast_ref::<GenericStringArray<$T>>()
             .ok_or_else(|| {
                 DataFusionError::Internal(format!(
-                    "could not cast {} to {}",
+                    "could not cast {} from {} to {}",
                     $NAME,
+                    $ARG.data_type(),
                     type_name::<GenericStringArray<$T>>()
                 ))
             })?
@@ -224,9 +250,30 @@ macro_rules! downcast_string_arg {
 macro_rules! downcast_list_arg {
     ($ARG:expr, $NAME:expr) => {{
         $ARG.as_any().downcast_ref::<ListArray>().ok_or_else(|| {
-            DataFusionError::Internal(format!("could not cast {} to ArrayList", $NAME))
+            DataFusionError::Internal(format!(
+                "could not cast {} to ArrayList, actual: {}",
+                $NAME,
+                $ARG.data_type()
+            ))
         })?
     }};
+}
+
+type OidType = UInt32Type;
+
+// TODO: Combine with downcast
+fn cast_oid_arg(argument: &ArrayRef, name: &str) -> Result<ArrayRef> {
+    match argument.data_type() {
+        DataType::Int32 | DataType::Int64 => {
+            cast(&argument, &DataType::UInt32).map_err(|err| err.into())
+        }
+        // We use UInt32 for OID
+        DataType::UInt32 => Ok(argument.clone()),
+        dt => Err(DataFusionError::Internal(format!(
+            "Argument {} must be a valid numeric type accepted for oid, actual {}",
+            name, dt,
+        ))),
+    }
 }
 
 // Returns the position of the first occurrence of substring substr in string str.
@@ -892,17 +939,72 @@ pub fn create_second_udf() -> ScalarUDF {
     )
 }
 
-pub fn create_date_sub_udf() -> ScalarUDF {
-    let fun = make_scalar_function(move |_args: &[ArrayRef]| todo!("Not implemented"));
+macro_rules! date_math_udf {
+    ($ARGS: expr, $FIRST_ARG_TYPE: ident, $SECOND_ARG_TYPE: ident, $FUN: ident, $IS_ADD: expr) => {{
+        let timestamps = downcast_primitive_arg!(&$ARGS[0], "datetime", $FIRST_ARG_TYPE);
+        let intervals = downcast_primitive_arg!(&$ARGS[1], "interval", $SECOND_ARG_TYPE);
+        let mut builder = TimestampNanosecondArray::builder(timestamps.len());
+        for i in 0..timestamps.len() {
+            if timestamps.is_null(i) {
+                builder.append_null()?;
+            } else {
+                let timestamp = timestamps.value_as_datetime(i).unwrap();
+                let interval = intervals.value(i).into();
+                builder.append_value($FUN(timestamp, interval, $IS_ADD)?.timestamp_nanos())?;
+            }
+        }
+        return Ok(Arc::new(builder.finish()));
+    }};
+}
 
-    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+pub fn create_date_add_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| match &args[1].data_type() {
+        DataType::Interval(IntervalUnit::DayTime) => {
+            date_math_udf!(
+                args,
+                TimestampNanosecondType,
+                IntervalDayTimeType,
+                date_addsub_day_time,
+                true
+            )
+        }
+        DataType::Interval(IntervalUnit::YearMonth) => {
+            date_math_udf!(
+                args,
+                TimestampNanosecondType,
+                IntervalYearMonthType,
+                date_addsub_year_month,
+                true
+            )
+        }
+        _ => Err(DataFusionError::Execution(format!(
+            "unsupported interval type"
+        ))),
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
 
     ScalarUDF::new(
-        "date_sub",
-        &Signature::exact(
+        "date_add",
+        &Signature::one_of(
             vec![
-                DataType::Timestamp(TimeUnit::Millisecond, None),
-                DataType::Interval(IntervalUnit::DayTime),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
             ],
             Volatility::Immutable,
         ),
@@ -911,52 +1013,147 @@ pub fn create_date_sub_udf() -> ScalarUDF {
     )
 }
 
-pub fn create_date_add_udf() -> ScalarUDF {
+pub fn create_date_sub_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let timestamps = args[0]
-            .as_any()
-            .downcast_ref::<TimestampNanosecondArray>()
-            .unwrap();
-        let intervals = args[1]
-            .as_any()
-            .downcast_ref::<IntervalDayTimeArray>()
-            .unwrap();
-        let mut builder = TimestampNanosecondArray::builder(timestamps.len());
-        for i in 0..timestamps.len() {
-            let timestamp = timestamps.value(i);
-            let interval = intervals.value(i);
-            let interval_days = interval >> 32;
-            let interval_millis = interval & 0xffffffff;
-            let timestamp = NaiveDateTime::from_timestamp(
-                timestamp / 1000000000,
-                (timestamp % 1000000000) as u32,
-            );
-            let timestamp = timestamp
-                .checked_add_signed(Duration::days(interval_days))
-                .unwrap();
-            let timestamp = timestamp
-                .checked_add_signed(Duration::milliseconds(interval_millis))
-                .unwrap();
-            builder.append_value(timestamp.timestamp_nanos())?;
+        match (&args[0].data_type(), &args[1].data_type()) {
+            (DataType::Timestamp(..), DataType::Interval(IntervalUnit::DayTime)) => {
+                date_math_udf!(
+                    args,
+                    TimestampNanosecondType,
+                    IntervalDayTimeType,
+                    date_addsub_day_time,
+                    false
+                )
+            }
+            (DataType::Timestamp(..), DataType::Interval(IntervalUnit::YearMonth)) => {
+                date_math_udf!(
+                    args,
+                    TimestampNanosecondType,
+                    IntervalYearMonthType,
+                    date_addsub_year_month,
+                    false
+                )
+            }
+            (DataType::Date32, DataType::Interval(IntervalUnit::DayTime)) => {
+                date_math_udf!(
+                    args,
+                    Date32Type,
+                    IntervalDayTimeType,
+                    date_addsub_day_time,
+                    false
+                )
+            }
+            (DataType::Date32, DataType::Interval(IntervalUnit::YearMonth)) => {
+                date_math_udf!(
+                    args,
+                    Date32Type,
+                    IntervalYearMonthType,
+                    date_addsub_year_month,
+                    false
+                )
+            }
+            _ => Err(DataFusionError::Execution(format!(
+                "unsupported interval type"
+            ))),
         }
-        Ok(Arc::new(builder.finish()))
     });
 
     let return_type: ReturnTypeFunction =
         Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
 
     ScalarUDF::new(
-        "date_add",
-        &Signature::exact(
+        "date_sub",
+        &Signature::one_of(
             vec![
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                DataType::Interval(IntervalUnit::DayTime),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Date32,
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Date32,
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
             ],
             Volatility::Immutable,
         ),
         &return_type,
         &fun,
     )
+}
+
+fn date_addsub_year_month(t: NaiveDateTime, i: i32, is_add: bool) -> Result<NaiveDateTime> {
+    let i = match is_add {
+        true => i,
+        false => -i,
+    };
+
+    let mut year = t.year();
+    // Note month is numbered 0..11 in this function.
+    let mut month = t.month() as i32 - 1;
+
+    year += i / 12;
+    month += i % 12;
+
+    if month < 0 {
+        year -= 1;
+        month += 12;
+    }
+    debug_assert!(0 <= month);
+    year += month / 12;
+    month = month % 12;
+
+    match change_ym(t, year, 1 + month as u32) {
+        Some(t) => return Ok(t),
+        None => {
+            return Err(DataFusionError::Execution(format!(
+                "Failed to set date to ({}-{})",
+                year,
+                1 + month
+            )))
+        }
+    };
+}
+
+fn date_addsub_day_time(t: NaiveDateTime, interval: i64, is_add: bool) -> Result<NaiveDateTime> {
+    let i = match is_add {
+        true => interval,
+        false => -interval,
+    };
+
+    let days: i64 = i.signum() * (i.abs() >> 32);
+    let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
+    return Ok(t + Duration::days(days) + Duration::milliseconds(millis));
+}
+
+fn change_ym(t: NaiveDateTime, y: i32, m: u32) -> Option<NaiveDateTime> {
+    debug_assert!(1 <= m && m <= 12);
+    let mut d = t.day();
+    d = d.min(last_day_of_month(y, m));
+    t.with_day(1)?.with_year(y)?.with_month(m)?.with_day(d)
+}
+
+fn last_day_of_month(y: i32, m: u32) -> u32 {
+    debug_assert!(1 <= m && m <= 12);
+    if m == 12 {
+        return 31;
+    }
+    NaiveDate::from_ymd(y, m + 1, 1).pred().day()
 }
 
 fn postgres_datetime_format_to_iso(format: String) -> String {
@@ -1155,9 +1352,10 @@ pub fn create_current_schemas_udf() -> ScalarUDF {
 
 pub fn create_format_type_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let oids = args[0].as_any().downcast_ref::<UInt32Array>().unwrap();
+        let tmp = cast_oid_arg(&args[0], "oid")?;
+        let oids = downcast_primitive_arg!(tmp, "oid", OidType);
         // TODO: See pg_attribute.atttypmod
-        let typemods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typemods = downcast_primitive_arg!(args[1], "typemod", Int64Type);
 
         let result = oids
             .iter()
@@ -1248,6 +1446,9 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             PgTypeId::CHARACTERDATA => {
                                 format!("information_schema.character_data{}", typemod_str())
                             }
+                            PgTypeId::PGNAMESPACE => {
+                                format!("pg_namespace{}", typemod_str())
+                            }
                             PgTypeId::SQLIDENTIFIER => {
                                 format!("information_schema.sql_identifier{}", typemod_str())
                             }
@@ -1274,8 +1475,8 @@ pub fn create_format_type_udf() -> ScalarUDF {
 
 pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
-        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
+        let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
         let mut builder = Int64Builder::new(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
@@ -1322,8 +1523,8 @@ pub fn create_pg_datetime_precision_udf() -> ScalarUDF {
 
 pub fn create_pg_numeric_precision_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
-        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
+        let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
         let mut builder = Int64Builder::new(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
@@ -1417,8 +1618,8 @@ pub fn create_pg_truetypmod_udf() -> ScalarUDF {
 
 pub fn create_pg_numeric_scale_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let typids = args[0].as_any().downcast_ref::<Int64Array>().unwrap();
-        let typmods = args[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        let typids = downcast_primitive_arg!(args[0], "typid", Int64Type);
+        let typmods = downcast_primitive_arg!(args[1], "typmod", Int64Type);
         let mut builder = Int64Builder::new(typids.len());
         for i in 0..typids.len() {
             let typid = typids.value(i);
@@ -1455,7 +1656,7 @@ pub fn create_pg_numeric_scale_udf() -> ScalarUDF {
 
 pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let role_oids = args[0].as_any().downcast_ref::<UInt32Array>().unwrap();
+        let role_oids = downcast_primitive_arg!(args[0], "role_oid", OidType);
 
         let result = role_oids
             .iter()
@@ -1480,7 +1681,7 @@ pub fn create_pg_get_userbyid_udf(state: Arc<SessionState>) -> ScalarUDF {
 
 pub fn create_pg_get_expr_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let inputs = args[0].as_any().downcast_ref::<StringArray>().unwrap();
+        let inputs = downcast_string_arg!(args[0], "input", i32);
 
         let result = inputs
             .iter()
@@ -1510,7 +1711,7 @@ pub fn create_pg_table_is_visible_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
-        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", OidType);
 
         let result = oids_arr
             .iter()
@@ -1536,9 +1737,35 @@ pub fn create_pg_table_is_visible_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_pg_sleep_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let secs_arr = downcast_primitive_arg!(args[0], "secs", Int64Type);
+
+        if !secs_arr.is_null(0) {
+            thread::sleep(core::time::Duration::new(secs_arr.value(0) as u64, 0));
+        }
+
+        let mut result = StringBuilder::new(1);
+        result.append_null()?;
+
+        Ok(Arc::new(result.finish()))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_sleep",
+        &Signature::exact(vec![DataType::Int64], Volatility::Volatile),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_pg_type_is_visible_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", OidType);
 
         let result = oids_arr
             .iter()
@@ -1572,7 +1799,7 @@ pub fn create_pg_type_is_visible_udf() -> ScalarUDF {
 
 pub fn create_pg_get_constraintdef_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        let oids_arr = downcast_primitive_arg!(args[0], "oid", UInt32Type);
+        let oids_arr = downcast_primitive_arg!(args[0], "oid", OidType);
         let result = oids_arr
             .iter()
             .map(|oid| match oid {
@@ -1757,6 +1984,7 @@ pub fn create_unnest_udtf() -> TableUDF {
     )
 }
 
+#[allow(unused_macros)]
 macro_rules! impl_array_list_fn_iter {
     ($INPUT:expr, $INPUT_DT:ty, $FN:ident) => {{
         let mut builder = PrimitiveBuilder::<$INPUT_DT>::new($INPUT.len());
@@ -1783,21 +2011,12 @@ macro_rules! impl_array_list_fn_iter {
     }};
 }
 
-/// array_lower ( anyarray, integer ) → integer
-pub fn create_array_lower_udf() -> ScalarUDF {
-    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
+    make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() >= 1);
 
-        let input_arr_list_dt = match args[0].data_type() {
-            DataType::List(field) => match field.data_type() {
-                dt if is_numeric(dt) => field.data_type(),
-                other => {
-                    return Err(DataFusionError::Execution(format!(
-                        "anyarray argument must be a List of numeric values, actual: List<{}>",
-                        other
-                    )));
-                }
-            },
+        match args[0].data_type() {
+            DataType::List(_) => {}
             other => {
                 return Err(DataFusionError::Execution(format!(
                     "anyarray argument must be a List of numeric values, actual: {}",
@@ -1807,33 +2026,58 @@ pub fn create_array_lower_udf() -> ScalarUDF {
         };
 
         let input_arr = downcast_list_arg!(args[0], "anyarray");
-        if args.len() == 2 {
-            return Err(DataFusionError::NotImplemented(format!(
-                "bound argument is not supported right now"
-            )));
+        let dims = if args.len() == 2 {
+            Some(downcast_primitive_arg!(args[1], "dim", Int64Type))
+        } else {
+            None
         };
 
-        match input_arr_list_dt {
-            DataType::Int8 => impl_array_list_fn_iter!(input_arr, Int8Type, min),
-            DataType::Int16 => impl_array_list_fn_iter!(input_arr, Int16Type, min),
-            DataType::Int32 => impl_array_list_fn_iter!(input_arr, Int32Type, min),
-            DataType::Int64 => impl_array_list_fn_iter!(input_arr, Int64Type, min),
-            DataType::UInt8 => impl_array_list_fn_iter!(input_arr, UInt8Type, min),
-            DataType::UInt16 => impl_array_list_fn_iter!(input_arr, UInt16Type, min),
-            DataType::UInt32 => impl_array_list_fn_iter!(input_arr, UInt32Type, min),
-            DataType::UInt64 => impl_array_list_fn_iter!(input_arr, UInt64Type, min),
-            // TODO: the trait `Ord` is not implemented for `half::binary16::f16`
-            // DataType::Float16 => impl_array_list_fn_iter!(input_arr, Float16Type, min),
-            // DataType::Float32 => impl_array_list_fn_iter!(input_arr, Float32Type, min),
-            // DataType::Float64 => impl_array_list_fn_iter!(input_arr, Float64Type, min),
-            dt => {
+        let mut builder = Int64Builder::new(input_arr.len());
+
+        for (idx, element) in input_arr.iter().enumerate() {
+            let element_dim = if let Some(d) = dims {
+                if d.is_null(idx) {
+                    -1
+                } else {
+                    d.value(idx)
+                }
+            } else {
+                1
+            };
+
+            if element_dim > 1 {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unable to extract lower element from the List of {}",
-                    dt
-                )))
+                    "argument dim > 1 is not supported right now, actual: {}",
+                    element_dim
+                )));
+            } else if element_dim < 1 {
+                builder.append_null()?;
+            } else {
+                match element {
+                    None => builder.append_null()?,
+                    Some(arr) => {
+                        if arr.len() == 0 {
+                            builder.append_null()?
+                        } else if upper {
+                            builder.append_value(arr.len() as i64)?
+                        } else {
+                            // PostgreSQL allows to define array with n-based arrays,
+                            // e.g. '[-7:-5]={1,2,3}'::int[], but it's not possible in the DF
+                            builder.append_value(1)?
+                        }
+                    }
+                }
             }
         }
-    });
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    })
+}
+
+/// returns lower bound of the requested array dimension
+/// array_lower ( anyarray, integer ) → integer
+pub fn create_array_lower_udf() -> ScalarUDF {
+    let fun = create_array_lower_upper_fun(false);
 
     let return_type: ReturnTypeFunction = Arc::new(move |args| {
         assert!(args.len() >= 1);
@@ -1863,57 +2107,51 @@ pub fn create_array_lower_udf() -> ScalarUDF {
     )
 }
 
+/// Returns the OID of the current session's temporary schema, or zero if it has none (because it has not created any temporary tables).
+pub fn create_pg_my_temp_schema() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        let mut builder = Int64Builder::new(1);
+        builder.append_value(0).unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "pg_my_temp_schema",
+        &Signature::any(0, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+/// Returns true if the given OID is the OID of another session's temporary schema.
+/// pg_is_other_temp_schema ( oid ) → boolean
+pub fn create_pg_is_other_temp_schema() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let oids = downcast_primitive_arg!(args[0], "oid", Int64Type);
+        let result = oids.iter().map(|_| Some(false)).collect::<BooleanArray>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "pg_is_other_temp_schema",
+        &Signature::exact(vec![DataType::Int64], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+/// returns upper bound of the requested array dimension
 /// array_lower ( anyarray, integer ) → integer
 pub fn create_array_upper_udf() -> ScalarUDF {
-    let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() >= 1);
-
-        let input_arr_list_dt = match args[0].data_type() {
-            DataType::List(field) => match field.data_type() {
-                dt if is_numeric(dt) => field.data_type(),
-                other => {
-                    return Err(DataFusionError::Execution(format!(
-                        "anyarray argument must be a List of numeric values, actual: List<{}>",
-                        other
-                    )));
-                }
-            },
-            other => {
-                return Err(DataFusionError::Execution(format!(
-                    "anyarray argument must be a List of numeric values, actual: {}",
-                    other
-                )));
-            }
-        };
-
-        let input_arr = downcast_list_arg!(args[0], "anyarray");
-        if args.len() == 2 {
-            return Err(DataFusionError::NotImplemented(format!(
-                "bound argument is not supported right now"
-            )));
-        };
-
-        match input_arr_list_dt {
-            DataType::Int8 => impl_array_list_fn_iter!(input_arr, Int8Type, max),
-            DataType::Int16 => impl_array_list_fn_iter!(input_arr, Int16Type, max),
-            DataType::Int32 => impl_array_list_fn_iter!(input_arr, Int32Type, max),
-            DataType::Int64 => impl_array_list_fn_iter!(input_arr, Int64Type, max),
-            DataType::UInt8 => impl_array_list_fn_iter!(input_arr, UInt8Type, max),
-            DataType::UInt16 => impl_array_list_fn_iter!(input_arr, UInt16Type, max),
-            DataType::UInt32 => impl_array_list_fn_iter!(input_arr, UInt32Type, max),
-            DataType::UInt64 => impl_array_list_fn_iter!(input_arr, UInt64Type, max),
-            // TODO: the trait `Ord` is not implemented for `half::binary16::f16`
-            // DataType::Float16 => impl_array_list_fn_iter!(input_arr, Float16Type, max),
-            // DataType::Float32 => impl_array_list_fn_iter!(input_arr, Float32Type, max),
-            // DataType::Float64 => impl_array_list_fn_iter!(input_arr, Float64Type, max),
-            dt => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unable to extract lower element from the List of {}",
-                    dt
-                )))
-            }
-        }
-    });
+    let fun = create_array_lower_upper_fun(true);
 
     let return_type: ReturnTypeFunction = Arc::new(move |args| {
         assert!(args.len() >= 1);
@@ -2068,6 +2306,69 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
                 DataType::Int64,
                 true,
             )))],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        let users = downcast_string_arg!(args[0], "user", i32);
+        let schemas = downcast_string_arg!(args[1], "schema", i32);
+        let privileges = downcast_string_arg!(args[2], "privilege", i32);
+
+        let result = izip!(users, schemas, privileges)
+            .map(|args| {
+                Ok(match args {
+                    (Some(user), Some(schema), Some(privilege)) => {
+                        if let Some(session_user) = state.user() {
+                            if user != session_user {
+                                return Err(DataFusionError::Execution(format!(
+                                    "role \"{}\" does not exist",
+                                    user
+                                )));
+                            }
+                        }
+
+                        match schema {
+                            "public" | "pg_catalog" | "information_schema" => (),
+                            _ => {
+                                return Err(DataFusionError::Execution(format!(
+                                    "schema \"{}\" does not exist",
+                                    schema
+                                )))
+                            }
+                        };
+
+                        match privilege {
+                            "CREATE" => Some(false),
+                            "USAGE" => Some(true),
+                            _ => {
+                                return Err(DataFusionError::Execution(format!(
+                                    "unrecognized privilege type: \"{}\"",
+                                    privilege
+                                )))
+                            }
+                        }
+                    }
+                    _ => None,
+                })
+            })
+            .collect::<Result<BooleanArray>>();
+
+        Ok(Arc::new(result?))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "has_schema_privilege",
+        &Signature::exact(
+            vec![DataType::Utf8, DataType::Utf8, DataType::Utf8],
             Volatility::Immutable,
         ),
         &return_type,

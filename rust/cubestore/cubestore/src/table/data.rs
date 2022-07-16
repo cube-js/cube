@@ -24,7 +24,7 @@ pub enum TableValueR<'a> {
 }
 
 impl TableValueR<'_> {
-    pub fn from_heap_allocated(v: &'a TableValue) -> TableValueR<'a> {
+    pub fn from_heap_allocated<'a>(v: &'a TableValue) -> TableValueR<'a> {
         match v {
             TableValue::Null => TableValueR::Null,
             TableValue::String(s) => TableValueR::String(&s),
@@ -261,7 +261,7 @@ macro_rules! assert_eq_columns {
     }};
 }
 
-pub fn display_rows(cols: &'a [ArrayRef]) -> impl fmt::Display + 'a {
+pub fn display_rows<'a>(cols: &'a [ArrayRef]) -> impl fmt::Display + 'a {
     pub struct D<'a>(&'a [ArrayRef]);
     impl fmt::Display for D<'_> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
