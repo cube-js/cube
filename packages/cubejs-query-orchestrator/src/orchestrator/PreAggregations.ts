@@ -156,32 +156,34 @@ export type PreAggregationDescription = {
   lambdaView: boolean;
 };
 
-const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
-  table => -table.last_updated_at,
-  tables.map(table => {
-    const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
+function tablesToVersionEntries(schema, tables: TableCacheEntry[]): VersionEntry[] {
+  return R.sortBy(
+    table => -table.last_updated_at,
+    tables.map(table => {
+      const match = (table.table_name || table.TABLE_NAME).match(/(.+)_(.+)_(.+)_(.+)/);
 
-    if (!match) {
-      return null;
-    }
+      if (!match) {
+        return null;
+      }
 
-    const entity: any = {
-      table_name: `${schema}.${match[1]}`,
-      content_version: match[2],
-      structure_version: match[3],
-      build_range_end: table.build_range_end,
-    };
+      const entity: any = {
+        table_name: `${schema}.${match[1]}`,
+        content_version: match[2],
+        structure_version: match[3],
+        build_range_end: table.build_range_end,
+      };
 
-    if (match[4].length < 13) {
-      entity.last_updated_at = decodeTimeStamp(match[4]);
-      entity.naming_version = 2;
-    } else {
-      entity.last_updated_at = parseInt(match[4], 10);
-    }
+      if (match[4].length < 13) {
+        entity.last_updated_at = decodeTimeStamp(match[4]);
+        entity.naming_version = 2;
+      } else {
+        entity.last_updated_at = parseInt(match[4], 10);
+      }
 
-    return entity;
-  }).filter(R.identity)
-);
+      return entity;
+    }).filter(R.identity)
+  );
+}
 
 type PreAggregationLoadCacheOptions = {
   requestId?: string,
@@ -296,9 +298,13 @@ class PreAggregationLoadCache {
   protected async getTablesQuery(preAggregation) {
     const redisKey = this.tablesRedisKey(preAggregation);
     if (!this.tables[redisKey]) {
-      this.tables[redisKey] = this.preAggregations.options.skipExternalCacheAndQueue && preAggregation.external ?
+      const tables = this.preAggregations.options.skipExternalCacheAndQueue && preAggregation.external ?
         await this.fetchTablesNoCache(preAggregation) :
         await this.tablesFromCache(preAggregation);
+      if (tables === undefined) {
+        throw new Error('Pre-aggregation tables are undefined.');
+      }
+      this.tables[redisKey] = tables;
     }
     return this.tables[redisKey];
   }
