@@ -4,6 +4,7 @@ import { UserError } from '../compiler/UserError';
 
 export class PreAggregations {
   constructor(query, historyQueries, cubeLatticeCache) {
+    console.log("here !!!");
     this.query = query;
     this.historyQueries = historyQueries;
     this.cubeLatticeCache = cubeLatticeCache;
