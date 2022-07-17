@@ -28,15 +28,6 @@ Using Windows? Remember to use [PowerShell][link-powershell] or
 In a new folder for your project, run the following command:
 
 ```bash
-docker run -p 4000:4000 \
-  -v ${PWD}:/cube/conf \
-  -e CUBEJS_DEV_MODE=true \
-  cubejs/cube
-```
-
-Consider exposing `3000` port if you're planing to work with dashboard app:
-
-```bash
 docker run -p 4000:4000 -p 3000:3000 \
   -v ${PWD}:/cube/conf \
   -e CUBEJS_DEV_MODE=true \
