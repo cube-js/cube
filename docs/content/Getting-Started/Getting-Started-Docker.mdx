@@ -34,6 +34,15 @@ docker run -p 4000:4000 \
   cubejs/cube
 ```
 
+Consider exposing `3000` port if you're planing to work with dashboard app:
+
+```bash
+docker run -p 4000:4000 -p 3000:3000 \
+  -v ${PWD}:/cube/conf \
+  -e CUBEJS_DEV_MODE=true \
+  cubejs/cube
+```
+
 ## 2. Open Developer Playground
 
 <InfoBox>
