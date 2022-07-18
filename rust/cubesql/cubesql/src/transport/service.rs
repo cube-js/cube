@@ -4,12 +4,43 @@ use cubeclient::{
     models::{V1LoadRequest, V1LoadRequestQuery, V1LoadResponse},
 };
 
-use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use serde_derive::*;
+use std::{fmt::Debug, sync::Arc, time::Duration};
 use tokio::{sync::RwLock as RwLockAsync, time::Instant};
 
 use crate::{compile::MetaContext, sql::AuthContext, CubeError};
 
-pub type TransportServiceMetaFields = Option<HashMap<String, String>>;
+#[derive(Debug, Clone, Serialize)]
+pub struct LoadRequestMeta {
+    protocol: String,
+    #[serde(rename = "apiType")]
+    api_type: String,
+    #[serde(rename = "appName")]
+    app_name: Option<String>,
+    // Optional fields
+    #[serde(rename = "changeUser", skip_serializing_if = "Option::is_none")]
+    change_user: Option<String>,
+}
+
+impl LoadRequestMeta {
+    #[must_use]
+    pub fn new(protocol: String, api_type: String, app_name: Option<String>) -> Self {
+        Self {
+            protocol,
+            api_type,
+            app_name,
+            change_user: None,
+        }
+    }
+
+    pub fn change_user(&self) -> Option<String> {
+        self.change_user.clone()
+    }
+
+    pub fn set_change_user(&mut self, change_user: Option<String>) {
+        self.change_user = change_user;
+    }
+}
 
 #[async_trait]
 pub trait TransportService: Send + Sync + Debug {
@@ -21,7 +52,7 @@ pub trait TransportService: Send + Sync + Debug {
         &self,
         query: V1LoadRequestQuery,
         ctx: Arc<AuthContext>,
-        meta_fields: TransportServiceMetaFields,
+        meta_fields: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError>;
 }
 
@@ -95,8 +126,15 @@ impl TransportService for HttpTransport {
         &self,
         query: V1LoadRequestQuery,
         ctx: Arc<AuthContext>,
-        _meta_fields: TransportServiceMetaFields,
+        meta: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError> {
+        if meta.change_user().is_some() {
+            return Err(CubeError::internal(
+                "Changing security context (__user) is not supported in the standalone mode"
+                    .to_string(),
+            ));
+        }
+
         // TODO: support meta_fields for HTTP
         let request = V1LoadRequest {
             query: Some(query),

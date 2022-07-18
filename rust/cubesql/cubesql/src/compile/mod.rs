@@ -81,8 +81,8 @@ use crate::{
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
     transport::{
-        df_data_type_by_column_type, TransportServiceMetaFields, V1CubeMetaDimensionExt,
-        V1CubeMetaExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt,
+        df_data_type_by_column_type, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt,
+        V1CubeMetaSegmentExt,
     },
     CubeError, CubeErrorCauseType,
 };
@@ -1675,6 +1675,7 @@ impl QueryPlanner {
                     query.request,
                     // @todo Remove after split!
                     Arc::new(self.state.auth_context().unwrap()),
+                    self.state.get_load_request_meta(),
                 )),
             });
             let logical_plan = LogicalPlan::Projection(Projection {
@@ -2385,7 +2386,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn create_execution_ctx(&self) -> DFSessionContext {
         let query_planner = Arc::new(CubeQueryPlanner::new(
             self.session_manager.server.transport.clone(),
-            self.planner_meta_fields(),
+            self.state.get_load_request_meta(),
         ));
         let mut ctx = DFSessionContext::with_state(
             default_session_builder(
@@ -2581,20 +2582,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
             ctx,
         ))
     }
-
-    fn planner_meta_fields(&self) -> TransportServiceMetaFields {
-        // TODO: application_name for mysql
-        let mut meta_fields = HashMap::new();
-        if let Some(var) = self.state.all_variables().get("application_name") {
-            meta_fields.insert("appName".to_string(), var.value.to_string());
-        }
-
-        let protocol = self.state.protocol.to_string();
-        meta_fields.insert("protocol".to_string(), protocol);
-        meta_fields.insert("apiType".to_string(), "sql".to_string());
-
-        Some(meta_fields)
-    }
 }
 
 pub async fn convert_statement_to_cube_query(
@@ -2760,7 +2747,7 @@ mod tests {
             dataframe::batch_to_dataframe, server_manager::ServerConfiguration, types::StatusFlags,
             AuthContext, AuthenticateResponse, ServerManager, SqlAuthService,
         },
-        transport::TransportService,
+        transport::{LoadRequestMeta, TransportService},
     };
     use datafusion::logical_plan::PlanVisitor;
     use log::Level;
@@ -2938,7 +2925,7 @@ mod tests {
                 &self,
                 _query: V1LoadRequestQuery,
                 _ctx: Arc<AuthContext>,
-                _meta_fields: TransportServiceMetaFields,
+                _meta_fields: LoadRequestMeta,
             ) -> Result<V1LoadResponse, CubeError> {
                 panic!("It's a fake transport");
             }
@@ -3081,6 +3068,81 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![DataType::Float64, DataType::Float64, DataType::Float64]
         );
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_filter() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher'"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(cube_scan.meta.change_user(), Some("gopher".to_string()));
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_filter_and() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' AND customer_gender = 'male'".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(cube_scan.meta.change_user(), Some("gopher".to_string()));
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["male".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_filter_or() {
+        // OR is not allowed for __user
+        let query =
+            convert_sql_to_cube_query(
+                &"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' OR customer_gender = 'male'".to_string(),
+                get_test_tenant_ctx(),
+                get_test_session(DatabaseProtocol::PostgreSQL)
+            ).await;
+
+        // TODO: We need to propagate error to result, to assert message
+        query.unwrap_err();
     }
 
     #[tokio::test]

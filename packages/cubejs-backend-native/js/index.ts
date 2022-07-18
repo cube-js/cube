@@ -1,25 +1,38 @@
 import fs from 'fs';
 import path from 'path';
 
-export interface Request {
+export interface BaseMeta {
+    // postgres or mysql
+    protocol: string,
+    // always sql
+    apiType: string,
+    // Application name, for example Metabase
+    appName?: string,
+}
+
+export interface LoadRequestMeta extends BaseMeta {
+    // Security Context switching
+    changeUser?: string,
+}
+
+export interface Request<Meta> {
     id: string,
-    meta: any,
+    meta: Meta,
 }
 
 export interface CheckAuthPayload {
-    request: Request,
+    request: Request<undefined>,
     user: string|null
 }
 
 export interface LoadPayload {
-    request: Request,
+    request: Request<LoadRequestMeta>,
     user: string,
     query: any,
-    meta?: Map<string, string>,
 }
 
 export interface MetaPayload {
-    request: Request,
+    request: Request<undefined>,
     user: string|null
 }
 

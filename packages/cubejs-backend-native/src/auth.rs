@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use cubesql::{
     di_service,
     sql::{AuthContext, AuthenticateResponse, SqlAuthService},
-    transport::TransportServiceMetaFields,
+    transport::LoadRequestMeta,
     CubeError,
 };
 use log::trace;
@@ -32,7 +32,7 @@ impl NodeBridgeAuthService {
 #[derive(Debug, Serialize)]
 pub struct TransportRequest {
     pub id: String,
-    pub meta: TransportServiceMetaFields,
+    pub meta: Option<LoadRequestMeta>,
 }
 
 #[derive(Debug, Serialize)]

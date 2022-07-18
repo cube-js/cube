@@ -346,6 +346,7 @@ const variables: Record<string, (...args: any) => any> = {
   },
   sqlUser: () => get('CUBEJS_SQL_USER').asString(),
   sqlPassword: () => get('CUBEJS_SQL_PASSWORD').asString(),
+  sqlSuperUser: () => get('CUBEJS_SQL_SUPER_USER').asString(),
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('true')
