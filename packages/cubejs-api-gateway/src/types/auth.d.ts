@@ -22,7 +22,7 @@ interface JWTOptions {
   jwkDefaultExpire?: number,
   jwkUrl?: ((payload: any) => string) | string,
   jwkRefetchWindow?: number,
-  
+
   // JWT options
   key?: string,
   algorithms?: string[],
@@ -47,6 +47,7 @@ type CheckAuthFn =
  */
 type CheckSQLAuthSuccessResponse = {
   password: string | null,
+  superuser?: boolean,
   securityContext?: any
 };
 
@@ -60,10 +61,20 @@ type CheckSQLAuthFn =
     Promise<CheckSQLAuthSuccessResponse> |
     CheckSQLAuthSuccessResponse;
 
+/**
+ * Function that should provide changing of security context (__user field) for SQL. This function returns boolean which
+ * explains to SQL APi that it's possible to change current user to user.
+ */
+type CanSwitchSQLUserFn =
+  (current: string, user: string) =>
+    Promise<boolean> |
+    boolean;
+
 export {
   CheckAuthInternalOptions,
   JWTOptions,
   CheckAuthFn,
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
+  CanSwitchSQLUserFn,
 };

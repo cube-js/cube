@@ -1,16 +1,24 @@
-import { setupLogger, registerInterface, SqlInterfaceInstance, Request as NativeRequest } from '@cubejs-backend/native';
+import {
+  setupLogger,
+  registerInterface,
+  SqlInterfaceInstance,
+  Request as NativeRequest,
+  LoadRequestMeta,
+} from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
 import type { ApiGateway } from './gateway';
-import type { CheckSQLAuthFn, ExtendedRequestContext } from './interfaces';
+import type { CheckSQLAuthFn, ExtendedRequestContext, CanSwitchSQLUserFn } from './interfaces';
 
 export type SQLServerOptions = {
   checkSqlAuth?: CheckSQLAuthFn,
+  canSwitchSqlUser?: CanSwitchSQLUserFn,
   sqlPort?: number,
   pgSqlPort?: number,
   sqlNonce?: string,
   sqlUser?: string,
+  sqlSuperUser?: string,
   sqlPassword?: string,
 };
 
@@ -33,6 +41,9 @@ export class SQLServer {
 
     const checkSqlAuth: CheckSQLAuthFn = (options.checkSqlAuth && this.wrapCheckSqlAuthFn(options.checkSqlAuth))
       || this.createDefaultCheckSqlAuthFn(options);
+
+    const canSwitchSqlUser: CanSwitchSQLUserFn = options.canSwitchSqlUser
+      || this.createDefaultCanSwitchSqlUserFn(options);
 
     this.sqlInterfaceInstance = await registerInterface({
       port: options.sqlPort,
@@ -67,8 +78,21 @@ export class SQLServer {
       },
       load: async ({ request, user, query }) => {
         // @todo Store security context in native
-        const { securityContext } = await checkSqlAuth(request, user);
-        const context = await this.contextByNativeReq(request, securityContext, request.id);
+        let current = await checkSqlAuth(request, user);
+
+        if (request.meta.changeUser && request.meta.changeUser !== user) {
+          const canSwitch = current.superuser || await canSwitchSqlUser(user, request.meta.changeUser);
+          if (canSwitch) {
+            // TODO: Cache?
+            current = await checkSqlAuth(request, request.meta.changeUser);
+          } else {
+            throw new Error(
+              `You cannot change security context via __user from ${user} to ${request.meta.changeUser}, because it's not allowed.`
+            );
+          }
+        }
+
+        const context = await this.contextByNativeReq(request, current.securityContext, request.id);
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
@@ -105,6 +129,18 @@ export class SQLServer {
     };
   }
 
+  protected createDefaultCanSwitchSqlUserFn(options: SQLServerOptions): CanSwitchSQLUserFn {
+    const superUser = options.sqlSuperUser || getEnv('sqlSuperUser');
+
+    return async (current: string, _user: string) => {
+      if (superUser) {
+        return current === superUser;
+      }
+
+      return false;
+    };
+  }
+
   protected createDefaultCheckSqlAuthFn(options: SQLServerOptions): CheckSQLAuthFn {
     let allowedUser: string | null = options.sqlUser || getEnv('sqlUser');
     let allowedPassword: string | null = options.sqlPassword || getEnv('sqlPassword');
@@ -129,7 +165,7 @@ export class SQLServer {
 
     return async (req, user) => {
       if (allowedUser && user !== allowedUser) {
-        throw new Error('Incorrect user name or password');
+        throw new Error(`Incorrect user name "${user}" or password`);
       }
 
       return {
@@ -139,7 +175,7 @@ export class SQLServer {
     };
   }
 
-  protected async contextByNativeReq(req: NativeRequest, securityContext, requestId: string): Promise<ExtendedRequestContext> {
+  protected async contextByNativeReq(req: NativeRequest<LoadRequestMeta>, securityContext, requestId: string): Promise<ExtendedRequestContext> {
     const context = await this.apiGateway.contextByReq(<any> req, securityContext, requestId);
 
     return {

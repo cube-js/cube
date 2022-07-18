@@ -4,8 +4,11 @@ use rand::Rng;
 use std::sync::{Arc, RwLock as RwLockSync};
 use tokio_util::sync::CancellationToken;
 
-use crate::sql::database_variables::{
-    mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
+use crate::{
+    sql::database_variables::{
+        mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
+    },
+    transport::LoadRequestMeta,
 };
 
 use super::{
@@ -332,6 +335,20 @@ impl SessionState {
 
             *guard = Some(current_variables);
         }
+    }
+
+    pub fn get_load_request_meta(&self) -> LoadRequestMeta {
+        let application_name = if let Some(var) = self.all_variables().get("application_name") {
+            Some(var.value.to_string())
+        } else {
+            None
+        };
+
+        LoadRequestMeta::new(
+            self.protocol.to_string(),
+            "sql".to_string(),
+            application_name,
+        )
     }
 }
 

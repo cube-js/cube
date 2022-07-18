@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use datafusion::{
@@ -8,20 +8,17 @@ use datafusion::{
     physical_plan::{planner::DefaultPhysicalPlanner, ExecutionPlan, PhysicalPlanner},
 };
 
-use crate::transport::TransportService;
+use crate::transport::{LoadRequestMeta, TransportService};
 
 use super::scan::CubeScanExtensionPlanner;
 
 pub struct CubeQueryPlanner {
     pub transport: Arc<dyn TransportService>,
-    pub meta_fields: Option<HashMap<String, String>>,
+    pub meta_fields: LoadRequestMeta,
 }
 
 impl CubeQueryPlanner {
-    pub fn new(
-        transport: Arc<dyn TransportService>,
-        meta_fields: Option<HashMap<String, String>>,
-    ) -> Self {
+    pub fn new(transport: Arc<dyn TransportService>, meta_fields: LoadRequestMeta) -> Self {
         Self {
             transport,
             meta_fields,
@@ -41,7 +38,6 @@ impl QueryPlanner for CubeQueryPlanner {
         let physical_planner = DefaultPhysicalPlanner::with_extension_planners(vec![Arc::new(
             CubeScanExtensionPlanner {
                 transport: self.transport.clone(),
-                meta_fields: self.meta_fields.clone(),
             },
         )]);
         // Delegate most work of physical planning to the default physical planner

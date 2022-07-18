@@ -1,6 +1,5 @@
 use std::{
     any::Any,
-    collections::HashMap,
     fmt,
     sync::Arc,
     task::{Context, Poll},
@@ -28,7 +27,7 @@ use log::warn;
 
 use crate::{
     sql::AuthContext,
-    transport::{TransportService, TransportServiceMetaFields},
+    transport::{LoadRequestMeta, TransportService},
 };
 use chrono::{TimeZone, Utc};
 use datafusion::{
@@ -50,6 +49,7 @@ pub struct CubeScanNode {
     pub member_fields: Vec<MemberField>,
     pub request: V1LoadRequestQuery,
     pub auth_context: Arc<AuthContext>,
+    pub meta: LoadRequestMeta,
 }
 
 impl CubeScanNode {
@@ -58,12 +58,14 @@ impl CubeScanNode {
         member_fields: Vec<MemberField>,
         request: V1LoadRequestQuery,
         auth_context: Arc<AuthContext>,
+        meta: LoadRequestMeta,
     ) -> Self {
         Self {
             schema,
             member_fields,
             request,
             auth_context,
+            meta,
         }
     }
 }
@@ -106,6 +108,7 @@ impl UserDefinedLogicalNode for CubeScanNode {
             member_fields: self.member_fields.clone(),
             request: self.request.clone(),
             auth_context: self.auth_context.clone(),
+            meta: self.meta.clone(),
         })
     }
 }
@@ -114,7 +117,6 @@ impl UserDefinedLogicalNode for CubeScanNode {
 //  the logical plan node.
 pub struct CubeScanExtensionPlanner {
     pub transport: Arc<dyn TransportService>,
-    pub meta_fields: Option<HashMap<String, String>>,
 }
 
 impl ExtensionPlanner for CubeScanExtensionPlanner {
@@ -139,7 +141,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     transport: self.transport.clone(),
                     request: scan_node.request.clone(),
                     auth_context: scan_node.auth_context.clone(),
-                    meta_fields: self.meta_fields.clone(),
+                    meta: scan_node.meta.clone(),
                 }))
             } else {
                 None
@@ -158,7 +160,7 @@ struct CubeScanExecutionPlan {
     // Shared references which will be injected by extension planner
     transport: Arc<dyn TransportService>,
     // Fields passing to cube (for now using to pass app_name and protocol for telemetry)
-    meta_fields: TransportServiceMetaFields,
+    meta: LoadRequestMeta,
 }
 
 macro_rules! build_column {
@@ -428,7 +430,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                 .load(
                     self.request.clone(),
                     self.auth_context.clone(),
-                    self.meta_fields.clone(),
+                    self.meta.clone(),
                 )
                 .await;
 
@@ -519,7 +521,7 @@ impl RecordBatchStream for CubeScanMemoryStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{compile::MetaContext, CubeError};
+    use crate::{compile::MetaContext, sql::session::DatabaseProtocol, CubeError};
     use cubeclient::models::V1LoadResponse;
     use datafusion::{
         arrow::{
@@ -534,6 +536,14 @@ mod tests {
         scalar::ScalarValue,
     };
     use std::{collections::HashMap, result::Result};
+
+    fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
+        LoadRequestMeta::new(
+            protocol.to_string(),
+            "sql".to_string(),
+            Some("SQL API Unit Testing".to_string()),
+        )
+    }
 
     fn get_test_transport() -> Arc<dyn TransportService> {
         #[derive(Debug)]
@@ -551,7 +561,7 @@ mod tests {
                 &self,
                 _query: V1LoadRequestQuery,
                 _ctx: Arc<AuthContext>,
-                _meta_fields: Option<HashMap<String, String>>,
+                _meta_fields: LoadRequestMeta,
             ) -> Result<V1LoadResponse, CubeError> {
                 let response = r#"
                     {
@@ -633,7 +643,7 @@ mod tests {
                 base_path: "base_path".to_string(),
             }),
             transport: get_test_transport(),
-            meta_fields: None,
+            meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),
         };
 
         let runtime = Arc::new(
