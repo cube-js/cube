@@ -10286,4 +10286,86 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn metabase_contains_str_filters() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+                "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\"
+                FROM \"public\".\"KibanaSampleDataEcommerce\"
+                WHERE (lower(\"public\".\"KibanaSampleDataEcommerce\".\"customer_gender\") like '%female%')
+                LIMIT 10"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("contains".to_string()),
+                    values: Some(vec!["female".to_string()]),
+                    or: None,
+                    and: None,
+                },]),
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\"
+            FROM \"public\".\"KibanaSampleDataEcommerce\"
+            WHERE (NOT (lower(\"public\".\"KibanaSampleDataEcommerce\".\"customer_gender\") like '%female%') OR \"public\".\"KibanaSampleDataEcommerce\".\"customer_gender\" IS NULL)
+            LIMIT 10"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notContains".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notSet".to_string()),
+                            values: None,
+                            or: None,
+                            and: None,
+                        })
+                    ]),
+                    and: None,
+                },]),
+            }
+        );
+    }
 }

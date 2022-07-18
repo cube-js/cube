@@ -451,6 +451,21 @@ impl RewriteRules for FilterRules {
                     "or",
                 ),
             ),
+            rewrite(
+                "filter-replacer-lower-str",
+                filter_replacer(
+                    binary_expr(fun_expr("Lower", vec!["?lower_param"]), "?op", "?right"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                filter_replacer(
+                    binary_expr("?lower_param", "?op", "?right"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+            ),
             // TODO define zero
             rewrite(
                 "filter-str-pos-to-like",
@@ -558,6 +573,11 @@ impl RewriteRules for FilterRules {
                     binary_expr("?low", "-", "?interval"),
                     binary_expr("?high", "-", "?interval"),
                 ),
+            ),
+            rewrite(
+                "not-expt-like-to-expr-not-like",
+                not_expr(binary_expr("?left", "LIKE", "?right")),
+                binary_expr("?left", "NOT_LIKE", "?right"),
             ),
             // Every expression should be handled by filter cast unwrap replacer otherwise other rules just won't work
             rewrite(
@@ -1045,7 +1065,7 @@ impl FilterRules {
 
                                 let value = match literal {
                                     ScalarValue::Utf8(Some(value)) => {
-                                        if op == "contains" {
+                                        if op == "contains" || op == "notContains" {
                                             if value.starts_with("%") && value.ends_with("%") {
                                                 let without_wildcard =
                                                     value[1..value.len() - 1].to_string();
