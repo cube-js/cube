@@ -1446,6 +1446,7 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             PgTypeId::CHARACTERDATA => {
                                 format!("information_schema.character_data{}", typemod_str())
                             }
+                            PgTypeId::PGCONSTRAINT => format!("pg_constraint{}", typemod_str()),
                             PgTypeId::PGNAMESPACE => {
                                 format!("pg_namespace{}", typemod_str())
                             }

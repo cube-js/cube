@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 7335
 expression: "execute_query(\"\n                SELECT\n                    t.oid,\n                    t.typname,\n                    format_type(t.oid, 20) ft20,\n                    format_type(t.oid, 5) ft5,\n                    format_type(t.oid, 4) ft4,\n                    format_type(t.oid, 0) ft0,\n                    format_type(t.oid, -1) ftneg,\n                    format_type(t.oid, NULL::bigint) ftnull\n                FROM pg_catalog.pg_type t\n                ORDER BY t.oid ASC\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+----------------------------+---------------------------------------+--------------------------------------+--------------------------------------+--------------------------------------+-----------------------------------+-----------------------------------+
@@ -56,6 +55,7 @@ expression: "execute_query(\"\n                SELECT\n                    t.oid
 | 4533  | tsmultirange               | tsmultirange(20)                      | tsmultirange(5)                      | tsmultirange(4)                      | tsmultirange(0)                      | tsmultirange                      | tsmultirange                      |
 | 4535  | datemultirange             | datemultirange(20)                    | datemultirange(5)                    | datemultirange(4)                    | datemultirange(0)                    | datemultirange                    | datemultirange                    |
 | 4536  | int8multirange             | int8multirange(20)                    | int8multirange(5)                    | int8multirange(4)                    | int8multirange(0)                    | int8multirange                    | int8multirange                    |
+| 12003 | pg_constraint              | pg_constraint(20)                     | pg_constraint(5)                     | pg_constraint(4)                     | pg_constraint(0)                     | pg_constraint                     | pg_constraint                     |
 | 12047 | pg_namespace               | pg_namespace(20)                      | pg_namespace(5)                      | pg_namespace(4)                      | pg_namespace(0)                      | pg_namespace                      | pg_namespace                      |
 | 13408 | character_data             | information_schema.character_data(20) | information_schema.character_data(5) | information_schema.character_data(4) | information_schema.character_data(0) | information_schema.character_data | information_schema.character_data |
 | 13410 | sql_identifier             | information_schema.sql_identifier(20) | information_schema.sql_identifier(5) | information_schema.sql_identifier(4) | information_schema.sql_identifier(0) | information_schema.sql_identifier | information_schema.sql_identifier |

@@ -9822,6 +9822,88 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_quicksight_pktable_cat_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_pktable_cat_query",
+            execute_query(
+                "
+                SELECT
+                    NULL::text AS PKTABLE_CAT,
+                    pkn.nspname AS PKTABLE_SCHEM,
+                    pkc.relname AS PKTABLE_NAME,
+                    pka.attname AS PKCOLUMN_NAME,
+                    NULL::text AS FKTABLE_CAT,
+                    fkn.nspname AS FKTABLE_SCHEM,
+                    fkc.relname AS FKTABLE_NAME,
+                    fka.attname AS FKCOLUMN_NAME,
+                    pos.n AS KEY_SEQ,
+                    CASE con.confupdtype
+                        WHEN 'c' THEN 0
+                        WHEN 'n' THEN 2
+                        WHEN 'd' THEN 4
+                        WHEN 'r' THEN 1
+                        WHEN 'a' THEN 3
+                        ELSE NULL
+                    END AS UPDATE_RULE,
+                    CASE con.confdeltype
+                        WHEN 'c' THEN 0
+                        WHEN 'n' THEN 2
+                        WHEN 'd' THEN 4
+                        WHEN 'r' THEN 1
+                        WHEN 'a' THEN 3
+                        ELSE NULL
+                    END AS DELETE_RULE,
+                    con.conname AS FK_NAME,
+                    pkic.relname AS PK_NAME,
+                    CASE
+                        WHEN con.condeferrable AND con.condeferred THEN 5
+                        WHEN con.condeferrable THEN 6
+                        ELSE 7
+                    END AS DEFERRABILITY
+                FROM
+                    pg_catalog.pg_namespace pkn,
+                    pg_catalog.pg_class pkc,
+                    pg_catalog.pg_attribute pka,
+                    pg_catalog.pg_namespace fkn,
+                    pg_catalog.pg_class fkc,
+                    pg_catalog.pg_attribute fka,
+                    pg_catalog.pg_constraint con,
+                    pg_catalog.generate_series(1, 32) pos(n),
+                    pg_catalog.pg_depend dep,
+                    pg_catalog.pg_class pkic
+                WHERE
+                    pkn.oid = pkc.relnamespace AND
+                    pkc.oid = pka.attrelid AND
+                    pka.attnum = con.confkey[pos.n] AND
+                    con.confrelid = pkc.oid AND
+                    fkn.oid = fkc.relnamespace AND
+                    fkc.oid = fka.attrelid AND
+                    fka.attnum = con.conkey[pos.n] AND
+                    con.conrelid = fkc.oid AND
+                    con.contype = 'f' AND
+                    con.oid = dep.objid AND
+                    pkic.oid = dep.refobjid AND
+                    pkic.relkind = 'i' AND
+                    dep.classid = 'pg_constraint'::regclass::oid AND
+                    dep.refclassid = 'pg_class'::regclass::oid AND
+                    fkn.nspname = 'public' AND
+                    fkc.relname = 'TABLENAME'
+                ORDER BY
+                    pkn.nspname,
+                    pkc.relname,
+                    con.conname,
+                    pos.n
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "cast_decimal_default_precision",
