@@ -51,6 +51,13 @@ describe('lambda', () => {
           granularity: 'day'
         }
       ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'equals',
+          values: ['shipped']
+        }
+      ],
       order: {
         'Orders.status': 'asc',
         'Orders.completedAt': 'desc',
@@ -61,22 +68,22 @@ describe('lambda', () => {
     expect(response.rawData()).toEqual(
       [
         {
-          'Orders.completedAt': '2020-12-31T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
-          'Orders.count': '2',
-          'Orders.status': 'completed',
-        },
-        {
           'Orders.completedAt': '2020-12-30T00:00:00.000',
           'Orders.completedAt.day': '2020-12-30T00:00:00.000',
           'Orders.count': '2',
-          'Orders.status': 'completed',
+          'Orders.status': 'shipped',
         },
         {
-          'Orders.completedAt': '2020-12-29T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-29T00:00:00.000',
+          'Orders.completedAt': '2020-12-27T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-27T00:00:00.000',
           'Orders.count': '2',
-          'Orders.status': 'completed',
+          'Orders.status': 'shipped',
+        },
+        {
+          'Orders.completedAt': '2020-12-26T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-26T00:00:00.000',
+          'Orders.count': '1',
+          'Orders.status': 'shipped',
         },
       ]
     );

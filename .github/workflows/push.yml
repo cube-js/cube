@@ -369,6 +369,7 @@ jobs:
           yarn run smoke:materialize
           yarn run smoke:questdb
           yarn run smoke:multidb
+          yarn run smoke:lambda
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
