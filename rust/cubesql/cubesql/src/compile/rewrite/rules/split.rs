@@ -616,6 +616,20 @@ impl RewriteRules for SplitRules {
                     Some(("?op", "?literal")),
                 ),
             ),
+            // Floor
+            rewrite(
+                "split-push-down-floor-inner-aggr-replacer",
+                inner_aggregate_split_replacer(fun_expr("Floor", vec!["?expr"]), "?cube"),
+                inner_aggregate_split_replacer("?expr", "?cube"),
+            ),
+            rewrite(
+                "split-push-down-floor-outer-aggr-replacer",
+                outer_aggregate_split_replacer(fun_expr("Floor", vec!["?expr"]), "?cube"),
+                fun_expr(
+                    "Floor",
+                    vec![outer_projection_split_replacer("?expr", "?cube")],
+                ),
+            ),
             // Cast
             rewrite(
                 "split-push-down-cast-inner-replacer",
