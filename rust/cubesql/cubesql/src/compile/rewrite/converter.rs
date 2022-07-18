@@ -1082,8 +1082,7 @@ impl LanguageToLogicalPlanConverter {
                                             Some(&table_name),
                                             &expr_name(&expr)?,
                                             data_type,
-                                            // TODO actually nullable. Just to fit tests
-                                            false,
+                                            true,
                                         ),
                                         MemberField::Member(measure.to_string()),
                                     ));
@@ -1121,8 +1120,7 @@ impl LanguageToLogicalPlanConverter {
                                                 // TODO empty schema
                                                 &expr_name(&expr)?,
                                                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                                                // TODO actually nullable. Just to fit tests
-                                                false,
+                                                true,
                                             ),
                                             MemberField::Member(format!(
                                                 "{}.{}",
@@ -1150,8 +1148,7 @@ impl LanguageToLogicalPlanConverter {
                                             // TODO empty schema
                                             &expr_name(&expr)?,
                                             data_type,
-                                            // TODO actually nullable. Just to fit tests
-                                            false,
+                                            true,
                                         ),
                                         MemberField::Member(dimension),
                                     ));
@@ -1164,8 +1161,7 @@ impl LanguageToLogicalPlanConverter {
                                             // TODO empty schema
                                             &expr_name(&expr)?,
                                             DataType::Boolean,
-                                            // TODO actually nullable. Just to fit tests
-                                            false,
+                                            true,
                                         ),
                                         MemberField::Literal(ScalarValue::Boolean(None)),
                                     ));
@@ -1179,8 +1175,7 @@ impl LanguageToLogicalPlanConverter {
                                             Some(&table_name),
                                             &expr_name(&expr)?,
                                             value.get_datatype(),
-                                            // TODO actually nullable. Just to fit tests
-                                            false,
+                                            true,
                                         ),
                                         MemberField::Literal(value),
                                     ));
