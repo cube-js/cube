@@ -203,6 +203,27 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                     ))
                 }),
             ),
+            (
+                Field::new(
+                    "build_range_end",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Box::new(|tables| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        tables
+                            .iter()
+                            .map(|row| {
+                                row.table
+                                    .get_row()
+                                    .build_range_end()
+                                    .as_ref()
+                                    .map(|t| t.timestamp_nanos())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
         ]
     }
 }

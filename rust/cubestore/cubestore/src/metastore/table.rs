@@ -120,6 +120,8 @@ pub struct Table {
     #[serde(default)]
     created_at: Option<DateTime<Utc>>,
     #[serde(default)]
+    build_range_end: Option<DateTime<Utc>>,
+    #[serde(default)]
     unique_key_column_indices: Option<Vec<u64>>,
     #[serde(default)]
     aggregate_column_indices: Vec<AggregateColumnIndex>,
@@ -154,6 +156,7 @@ impl Table {
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         is_ready: bool,
+        build_range_end: Option<DateTime<Utc>>,
         unique_key_column_indices: Option<Vec<u64>>,
         aggregate_column_indices: Vec<AggregateColumnIndex>,
         seq_column_index: Option<u64>,
@@ -169,6 +172,7 @@ impl Table {
             has_data: false,
             is_ready,
             created_at: Some(Utc::now()),
+            build_range_end,
             unique_key_column_indices,
             aggregate_column_indices,
             seq_column_index,
@@ -254,6 +258,10 @@ impl Table {
 
     pub fn created_at(&self) -> &Option<DateTime<Utc>> {
         &self.created_at
+    }
+
+    pub fn build_range_end(&self) -> &Option<DateTime<Utc>> {
+        &self.build_range_end
     }
 
     pub fn unique_key_columns(&self) -> Option<Vec<&Column>> {
