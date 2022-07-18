@@ -31,6 +31,12 @@ jobs:
           toolchain: nightly-2022-03-08
           override: true
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubesql
+          # default key
+          key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Lint CubeSQL
         run: cd rust/cubesql/cubesql && cargo fmt --all -- --check
       - name: Lint Native
@@ -64,11 +70,11 @@ jobs:
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
           sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-      - name: Install tarpaulin@0.20.0
-        uses: actions-rs/cargo@v1
+      - name: Install tarpaulin@0.20.1
+        uses: baptiste0928/cargo-install@v1
         with:
-          command: install
-          args: cargo-tarpaulin --version 0.20.0
+          crate: cargo-tarpaulin
+          version: "0.20.1"
       - name: Unit tests (Rewrite Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
