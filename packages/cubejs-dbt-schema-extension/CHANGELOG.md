@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.36](https://github.com/cube-js/cube.js/compare/v0.30.35...v0.30.36) (2022-07-18)
+
+**Note:** Version bump only for package @cubejs-backend/dbt-schema-extension
+
+
+
+
+
 ## [0.30.34](https://github.com/cube-js/cube.js/compare/v0.30.33...v0.30.34) (2022-07-12)
 
 **Note:** Version bump only for package @cubejs-backend/dbt-schema-extension
