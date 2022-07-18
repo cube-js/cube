@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.36](https://github.com/cube-js/cube.js/compare/v0.30.35...v0.30.36) (2022-07-18)
+
+
+### Features
+
+* **cubesql:** Metabase - support between numbers queries ([#4916](https://github.com/cube-js/cube.js/issues/4916)) ([52a34fd](https://github.com/cube-js/cube.js/commit/52a34fd563aed43448908e9c5efb3fd55d82de74))
+* **cubesql:** Metabase - support Summarize's Bins ([#4926](https://github.com/cube-js/cube.js/issues/4926)) ([8fcdf1a](https://github.com/cube-js/cube.js/commit/8fcdf1a0d1730dbab2871ed6acb99d5added8df1))
+* **cubesql:** Metabase string contains / not contains filters ([#4922](https://github.com/cube-js/cube.js/issues/4922)) ([e5abc09](https://github.com/cube-js/cube.js/commit/e5abc09747c5b7d1855b373236b8c682ce278710))
+* **cubesql:** Support `has_schema_privilege` UDF ([7ba3148](https://github.com/cube-js/cube.js/commit/7ba3148532568da23934e60abf5919f0e85c8956))
+* **cubesql:** Support `pg_catalog.pg_statio_user_tables` meta table ([a4d9050](https://github.com/cube-js/cube.js/commit/a4d9050f02b14a04374520256dabee29e5a4c226))
+* **cubesql:** Support `pg_total_relation_size` UDF ([cfca8ee](https://github.com/cube-js/cube.js/commit/cfca8eeec3bd83ba343dbeadfb2ad063d8058ec7))
+* **cubesql:** Support minus, multiply, division for binary expression in projection ([#4899](https://github.com/cube-js/cube.js/issues/4899)) ([1fc653b](https://github.com/cube-js/cube.js/commit/1fc653bd6cd83d6d023b51cf4141f9649e6b00da))
+
+
+
+
+
 ## [0.30.35](https://github.com/cube-js/cube.js/compare/v0.30.34...v0.30.35) (2022-07-14)
 
 

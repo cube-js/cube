@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 7681
 expression: "execute_query(\"\n                SELECT t.oid, t.typname, n.nspname, pg_catalog.pg_type_is_visible(t.oid) is_visible\n                FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n\n                WHERE t.typnamespace = n.oid\n                ORDER BY t.oid ASC;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+----------------------------+--------------------+------------+
@@ -56,6 +55,7 @@ expression: "execute_query(\"\n                SELECT t.oid, t.typname, n.nspnam
 | 4533  | tsmultirange               | pg_catalog         | true       |
 | 4535  | datemultirange             | pg_catalog         | true       |
 | 4536  | int8multirange             | pg_catalog         | true       |
+| 12003 | pg_constraint              | pg_catalog         | true       |
 | 12047 | pg_namespace               | pg_catalog         | true       |
 | 13408 | character_data             | information_schema | false      |
 | 13410 | sql_identifier             | information_schema | false      |

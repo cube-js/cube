@@ -58,11 +58,11 @@ use self::{
             create_pg_get_constraintdef_udf, create_pg_get_expr_udf, create_pg_get_userbyid_udf,
             create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
-            create_pg_table_is_visible_udf, create_pg_truetypid_udf, create_pg_truetypmod_udf,
-            create_pg_type_is_visible_udf, create_quarter_udf, create_second_udf,
-            create_session_user_udf, create_str_to_date_udf, create_time_format_udf,
-            create_timediff_udf, create_to_char_udf, create_ucase_udf, create_unnest_udtf,
-            create_user_udf, create_version_udf, create_year_udf,
+            create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
+            create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
+            create_quarter_udf, create_second_udf, create_session_user_udf, create_str_to_date_udf,
+            create_time_format_udf, create_timediff_udf, create_to_char_udf, create_ucase_udf,
+            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -2485,6 +2485,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_my_temp_schema());
         ctx.register_udf(create_pg_is_other_temp_schema());
         ctx.register_udf(create_has_schema_privilege_udf(self.state.clone()));
+        ctx.register_udf(create_pg_total_relation_size_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -8054,6 +8055,27 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_pg_total_relation_size() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_total_relation_size",
+            execute_query(
+                "SELECT
+                    oid,
+                    relname,
+                    pg_total_relation_size(oid) relsize
+                FROM pg_class
+                ORDER BY oid ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_discard_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "discard_postgres_all",
@@ -9800,6 +9822,88 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_quicksight_pktable_cat_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_pktable_cat_query",
+            execute_query(
+                "
+                SELECT
+                    NULL::text AS PKTABLE_CAT,
+                    pkn.nspname AS PKTABLE_SCHEM,
+                    pkc.relname AS PKTABLE_NAME,
+                    pka.attname AS PKCOLUMN_NAME,
+                    NULL::text AS FKTABLE_CAT,
+                    fkn.nspname AS FKTABLE_SCHEM,
+                    fkc.relname AS FKTABLE_NAME,
+                    fka.attname AS FKCOLUMN_NAME,
+                    pos.n AS KEY_SEQ,
+                    CASE con.confupdtype
+                        WHEN 'c' THEN 0
+                        WHEN 'n' THEN 2
+                        WHEN 'd' THEN 4
+                        WHEN 'r' THEN 1
+                        WHEN 'a' THEN 3
+                        ELSE NULL
+                    END AS UPDATE_RULE,
+                    CASE con.confdeltype
+                        WHEN 'c' THEN 0
+                        WHEN 'n' THEN 2
+                        WHEN 'd' THEN 4
+                        WHEN 'r' THEN 1
+                        WHEN 'a' THEN 3
+                        ELSE NULL
+                    END AS DELETE_RULE,
+                    con.conname AS FK_NAME,
+                    pkic.relname AS PK_NAME,
+                    CASE
+                        WHEN con.condeferrable AND con.condeferred THEN 5
+                        WHEN con.condeferrable THEN 6
+                        ELSE 7
+                    END AS DEFERRABILITY
+                FROM
+                    pg_catalog.pg_namespace pkn,
+                    pg_catalog.pg_class pkc,
+                    pg_catalog.pg_attribute pka,
+                    pg_catalog.pg_namespace fkn,
+                    pg_catalog.pg_class fkc,
+                    pg_catalog.pg_attribute fka,
+                    pg_catalog.pg_constraint con,
+                    pg_catalog.generate_series(1, 32) pos(n),
+                    pg_catalog.pg_depend dep,
+                    pg_catalog.pg_class pkic
+                WHERE
+                    pkn.oid = pkc.relnamespace AND
+                    pkc.oid = pka.attrelid AND
+                    pka.attnum = con.confkey[pos.n] AND
+                    con.confrelid = pkc.oid AND
+                    fkn.oid = fkc.relnamespace AND
+                    fkc.oid = fka.attrelid AND
+                    fka.attnum = con.conkey[pos.n] AND
+                    con.conrelid = fkc.oid AND
+                    con.contype = 'f' AND
+                    con.oid = dep.objid AND
+                    pkic.oid = dep.refobjid AND
+                    pkic.relkind = 'i' AND
+                    dep.classid = 'pg_constraint'::regclass::oid AND
+                    dep.refclassid = 'pg_class'::regclass::oid AND
+                    fkn.nspname = 'public' AND
+                    fkc.relname = 'TABLENAME'
+                ORDER BY
+                    pkn.nspname,
+                    pkc.relname,
+                    con.conname,
+                    pos.n
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "cast_decimal_default_precision",
@@ -10234,5 +10338,211 @@ ORDER BY \"COUNT(count)\" DESC"
                 }
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_metabase_bins() {
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT ((floor(((\"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" - 1.1) / 0.025)) * 0.025) + 1.1) AS \"taxful_total_price\", count(*) AS \"count\"
+            FROM \"public\".\"KibanaSampleDataEcommerce\"
+            GROUP BY ((floor(((\"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" - 1.1) / 0.025)) * 0.025) + 1.1)
+            ORDER BY ((floor(((\"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" - 1.1) / 0.025)) * 0.025) + 1.1) ASC;
+            ".to_string(), 
+            DatabaseProtocol::PostgreSQL
+        ).await.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn metabase_contains_str_filters() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+                "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\"
+                FROM \"public\".\"KibanaSampleDataEcommerce\"
+                WHERE (lower(\"public\".\"KibanaSampleDataEcommerce\".\"customer_gender\") like '%female%')
+                LIMIT 10"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("contains".to_string()),
+                    values: Some(vec!["female".to_string()]),
+                    or: None,
+                    and: None,
+                },]),
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\"
+            FROM \"public\".\"KibanaSampleDataEcommerce\"
+            WHERE (NOT (lower(\"public\".\"KibanaSampleDataEcommerce\".\"customer_gender\") like '%female%') OR \"public\".\"KibanaSampleDataEcommerce\".\"customer_gender\" IS NULL)
+            LIMIT 10"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notContains".to_string()),
+                            values: Some(vec!["female".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notSet".to_string()),
+                            values: None,
+                            or: None,
+                            and: None,
+                        })
+                    ]),
+                    and: None,
+                },]),
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn metabase_between_numbers_filters() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+                "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" 
+                FROM \"public\".\"KibanaSampleDataEcommerce\" 
+                WHERE \"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" BETWEEN 1 AND 2
+                LIMIT 10"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                        operator: Some("gte".to_string()),
+                        values: Some(vec!["1".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                        operator: Some("lte".to_string()),
+                        values: Some(vec!["2".to_string()]),
+                        or: None,
+                        and: None,
+                    }
+                ]),
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" 
+            FROM \"public\".\"KibanaSampleDataEcommerce\" 
+            WHERE \"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" NOT BETWEEN 1 AND 2
+            LIMIT 10"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                            ),
+                            operator: Some("lt".to_string()),
+                            values: Some(vec!["1".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                            ),
+                            operator: Some("gt".to_string()),
+                            values: Some(vec!["2".to_string()]),
+                            or: None,
+                            and: None,
+                        })
+                    ]),
+                    and: None,
+                },]),
+            }
+        );
     }
 }

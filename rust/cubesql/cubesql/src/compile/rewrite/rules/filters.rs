@@ -398,7 +398,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer("?expr", "?cube", "?members", "?table_name"),
             ),
             transforming_rewrite(
-                "filter-replacer-between",
+                "filter-replacer-between-dates",
                 filter_replacer(
                     between_expr(column_expr("?column"), "?negated", "?low", "?high"),
                     "?cube",
@@ -406,7 +406,7 @@ impl RewriteRules for FilterRules {
                     "?table_name",
                 ),
                 filter_member("?filter_member", "?filter_op", "?filter_values"),
-                self.transform_between(
+                self.transform_between_dates(
                     "?column",
                     "?negated",
                     "?low",
@@ -417,6 +417,60 @@ impl RewriteRules for FilterRules {
                     "?filter_member",
                     "?filter_op",
                     "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-replacer-between-numbers",
+                filter_replacer(
+                    between_expr(column_expr("?column"), "?negated", "?low", "?high"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(column_expr("?column"), ">=", "?low"),
+                        "AND",
+                        binary_expr(column_expr("?column"), "<=", "?high"),
+                    ),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                self.transform_between_numbers(
+                    "?column",
+                    "?negated",
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                    false,
+                ),
+            ),
+            transforming_rewrite(
+                "filter-replacer-not-between-numbers",
+                filter_replacer(
+                    between_expr(column_expr("?column"), "?negated", "?low", "?high"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(column_expr("?column"), "<", "?low"),
+                        "OR",
+                        binary_expr(column_expr("?column"), ">", "?high"),
+                    ),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                self.transform_between_numbers(
+                    "?column",
+                    "?negated",
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                    true,
                 ),
             ),
             rewrite(
@@ -449,6 +503,21 @@ impl RewriteRules for FilterRules {
                         filter_replacer("?right", "?cube", "?members", "?table_name"),
                     ),
                     "or",
+                ),
+            ),
+            rewrite(
+                "filter-replacer-lower-str",
+                filter_replacer(
+                    binary_expr(fun_expr("Lower", vec!["?lower_param"]), "?op", "?right"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                filter_replacer(
+                    binary_expr("?lower_param", "?op", "?right"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
                 ),
             ),
             // TODO define zero
@@ -558,6 +627,11 @@ impl RewriteRules for FilterRules {
                     binary_expr("?low", "-", "?interval"),
                     binary_expr("?high", "-", "?interval"),
                 ),
+            ),
+            rewrite(
+                "not-expt-like-to-expr-not-like",
+                not_expr(binary_expr("?left", "LIKE", "?right")),
+                binary_expr("?left", "NOT_LIKE", "?right"),
             ),
             // Every expression should be handled by filter cast unwrap replacer otherwise other rules just won't work
             rewrite(
@@ -1045,7 +1119,7 @@ impl FilterRules {
 
                                 let value = match literal {
                                     ScalarValue::Utf8(Some(value)) => {
-                                        if op == "contains" {
+                                        if op == "contains" || op == "notContains" {
                                             if value.starts_with("%") && value.ends_with("%") {
                                                 let without_wildcard =
                                                     value[1..value.len() - 1].to_string();
@@ -1404,7 +1478,7 @@ impl FilterRules {
         None
     }
 
-    fn transform_between(
+    fn transform_between_dates(
         &self,
         column_var: &'static str,
         negated_var: &'static str,
@@ -1447,6 +1521,10 @@ impl FilterRules {
                             if let Some(ConstantFolding::Scalar(high)) =
                                 &egraph[subst[high_var]].data.constant
                             {
+                                match cube.member_type(&member_name) {
+                                    Some(MemberType::Time) => (),
+                                    _ => continue,
+                                }
                                 let values = vec![
                                     FilterRules::scalar_to_value(&low),
                                     FilterRules::scalar_to_value(&high),
@@ -1479,6 +1557,45 @@ impl FilterRules {
 
                                 return true;
                             }
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_between_numbers(
+        &self,
+        column_var: &'static str,
+        negated_var: &'static str,
+        cube_var: &'static str,
+        members_var: &'static str,
+        table_name_var: &'static str,
+        is_negated: bool,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = var!(column_var);
+        let negated_var = var!(negated_var);
+        let cube_var = var!(cube_var);
+        let members_var = var!(members_var);
+        let table_name_var = var!(table_name_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            if let Some((member_name, cube)) = Self::filter_member_name(
+                egraph,
+                subst,
+                &meta_context,
+                cube_var,
+                column_var,
+                members_var,
+                table_name_var,
+            ) {
+                if let Some(_) = cube.lookup_dimension_by_member_name(&member_name) {
+                    for negated in var_iter!(egraph[subst[negated_var]], BetweenExprNegated) {
+                        match cube.member_type(&member_name) {
+                            Some(MemberType::Number) if &is_negated == negated => return true,
+                            _ => continue,
                         }
                     }
                 }
