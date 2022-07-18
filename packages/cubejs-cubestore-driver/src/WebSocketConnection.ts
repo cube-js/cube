@@ -9,7 +9,6 @@ import {
   HttpResultSet, HttpRow,
   HttpTable
 } from '../codegen/HttpMessage';
-import {InlineTables} from "@cubejs-backend/query-orchestrator";
 
 export class WebSocketConnection {
   protected messageCounter: number;
