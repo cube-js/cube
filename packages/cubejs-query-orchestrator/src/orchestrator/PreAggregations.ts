@@ -1323,7 +1323,7 @@ export class PreAggregationPartitionRangeLoader {
 
         const unionTargetTableName = [
           ...allTableTargetNames.map(name => `SELECT * FROM ${name}`),
-          `SELECT * FROM ${lambdaTable.name}`,
+          // `SELECT * FROM ${lambdaTable.name}`,
         ].join(' UNION ALL ');
         return {
           targetTableName: `(${unionTargetTableName})`,
@@ -1609,6 +1609,7 @@ export class PreAggregations {
           requestId: queryBody.requestId,
           metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
+          fullSql: queryBody.fullSql,
           externalRefresh: this.externalRefresh
         }
       );

@@ -15,6 +15,9 @@
         "values": ["shipped"]
       }
     ],
+    "order": {
+      "Orders.completedAt": "desc"
+    },
     "limit": 3
   }
 ]

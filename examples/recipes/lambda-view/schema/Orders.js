@@ -30,8 +30,9 @@ cube(`Orders`, {
 
     preAggregations: {
         ordersByCompletedAt: {
-            lambdaView: true,
+            // lambdaView: true,
             measures: [count],
+            dimensions: [status],
             timeDimension: completedAt,
             granularity: `day`,
             partitionGranularity: `month`,

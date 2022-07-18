@@ -96,7 +96,7 @@ export class QueryCache {
         queryAndParams, preAggregationsTablesToTempTables
       );
     const query = replacePreAggregationTableNames(queryBody.query);
-    const inlineTables = preAggregationsTablesToTempTables.flatMap(([_, preAggregation]) => [preAggregation.lambdaTable] ?? []);
+    const inlineTables = preAggregationsTablesToTempTables.flatMap(([_, preAggregation]) => (preAggregation.lambdaTable ? [preAggregation.lambdaTable] : []));
 
     let queuePriority = 10;
     if (Number.isInteger(queryBody.queuePriority)) {

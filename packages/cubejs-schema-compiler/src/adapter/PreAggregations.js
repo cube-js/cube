@@ -14,7 +14,7 @@ export class PreAggregations {
    * @return {unknown[]}
    */
   preAggregationsDescription() {
-    const preAggregations = [this.preAggregationsDescriptionLocal()].concat(
+    const preAggregations = [this.  preAggregationsDescriptionLocal()].concat(
       this.query.subQueryDimensions.map(d => this.query.subQueryDescription(d).subQuery)
         .map(q => q.preAggregations.preAggregationsDescription())
     );

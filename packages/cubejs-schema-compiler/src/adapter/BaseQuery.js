@@ -553,6 +553,23 @@ class BaseQuery {
     );
   }
 
+  /**
+   * Returns an array of SQL query strings for the query, ignoring pre-aggregations.
+   * @returns {Array<string>}
+   */
+  buildFullSqlAndParams() {
+    return this.compilers.compiler.withQuery(
+      this,
+      () => this.cacheValue(
+        ['buildFullSqlAndParams'],
+        () => this.paramAllocator.buildSqlAndParams(
+          this.fullKeyQueryAggregate()
+        ),
+        { cache: this.queryCache }
+      )
+    );
+  }
+
   externalQuery() {
     const ExternalQuery = this.externalQueryClass;
     return new ExternalQuery(this.compilers, {
