@@ -124,6 +124,7 @@ impl RewriteRules for SplitRules {
                     "?projection_alias",
                 ),
             ),
+            // TODO: reaggregate rule requires aliases for all exprs in projection
             transforming_rewrite(
                 "split-reaggregate-projection",
                 projection(
@@ -141,7 +142,7 @@ impl RewriteRules for SplitRules {
                     "?alias",
                 ),
                 projection(
-                    "?new_expr",
+                    "?outer_expr",
                     aggregate(
                         projection(
                             inner_aggregate_split_replacer("?expr", "?inner_aggregate_cube"),
@@ -155,7 +156,7 @@ impl RewriteRules for SplitRules {
                                 "?aliases",
                                 "CubeScanSplit:true",
                             ),
-                            "?projection_alias",
+                            "?inner_projection_alias",
                         ),
                         group_expr_split_replacer("?expr", "?group_expr_cube"),
                         group_aggregate_split_replacer("?expr", "?group_aggregate_cube"),
@@ -168,8 +169,8 @@ impl RewriteRules for SplitRules {
                     "?inner_aggregate_cube",
                     "?group_expr_cube",
                     "?group_aggregate_cube",
-                    "?new_expr",
-                    "?projection_alias",
+                    "?outer_expr",
+                    "?inner_projection_alias",
                 ),
             ),
             transforming_rewrite(
@@ -463,52 +464,6 @@ impl RewriteRules for SplitRules {
                 // To validate & de-aliasing granularity
                 self.split_date_trunc("?granularity", "?rewritten_granularity"),
             ),
-            transforming_chain_rewrite(
-                "split-push-down-date-trunc-outer-aggr-replacer",
-                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
-                vec![(
-                    "?expr",
-                    fun_expr(
-                        "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
-                    ),
-                )],
-                "?alias".to_string(),
-                self.transform_original_expr_alias(
-                    |egraph, id| {
-                        var_iter!(egraph[id], OuterAggregateSplitReplacerAliasToCube)
-                            .cloned()
-                            .collect()
-                    },
-                    "?expr",
-                    "?column",
-                    "?alias_to_cube",
-                    "?alias",
-                ),
-            ),
-            transforming_chain_rewrite(
-                "split-push-down-date-trunc-outer-replacer",
-                outer_projection_split_replacer("?expr", "?alias_to_cube"),
-                vec![(
-                    "?expr",
-                    fun_expr(
-                        "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
-                    ),
-                )],
-                "?alias".to_string(),
-                self.transform_original_expr_alias(
-                    |egraph, id| {
-                        var_iter!(egraph[id], OuterProjectionSplitReplacerAliasToCube)
-                            .cloned()
-                            .collect()
-                    },
-                    "?expr",
-                    "?column",
-                    "?alias_to_cube",
-                    "?alias",
-                ),
-            ),
             // Date part
             transforming_chain_rewrite(
                 "split-push-down-date-part-inner-replacer",
@@ -538,32 +493,6 @@ impl RewriteRules for SplitRules {
                     "?alias_column",
                     Some("?alias"),
                     true,
-                ),
-            ),
-            transforming_chain_rewrite(
-                "split-push-down-date-part-outer-aggr-replacer",
-                outer_aggregate_split_replacer(
-                    fun_expr(
-                        "DatePart",
-                        vec![literal_expr("?granularity"), "?expr".to_string()],
-                    ),
-                    "?cube",
-                ),
-                vec![("?expr", column_expr("?column"))],
-                fun_expr(
-                    "DatePart",
-                    vec![
-                        literal_expr("?granularity"),
-                        alias_expr("?alias_column", "?alias"),
-                    ],
-                ),
-                MemberRules::transform_original_expr_date_trunc(
-                    "?expr",
-                    "?granularity",
-                    "?granularity",
-                    "?alias_column",
-                    Some("?alias"),
-                    false,
                 ),
             ),
             // DatePart ("?expr", DateTrunc)
@@ -760,11 +689,7 @@ impl RewriteRules for SplitRules {
                     ),
                     "?outer_alias",
                 ),
-                self.transform_original_expr_to_alias_and_column(
-                    "?expr",
-                    "?outer_alias",
-                    "?outer_column",
-                ),
+                self.transform_original_expr_to_alias_and_column("?expr", "?outer_alias", None),
             ),
             // (DATEDIFF(day, DATE '1970-01-01', "ta_1"."createdAt") + 3) % 7) + 1)
             transforming_chain_rewrite(
@@ -806,7 +731,7 @@ impl RewriteRules for SplitRules {
                 self.transform_original_expr_to_alias_and_column(
                     "?expr",
                     "?outer_alias",
-                    "?outer_column",
+                    Some("?outer_column"),
                 ),
             ),
             // (DATEDIFF(day, DATEADD(month, CAST(((EXTRACT(MONTH FROM "ta_1"."createdAt") - 1) * -1) AS int), CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."createdAt") * 100) + EXTRACT(MONTH FROM "ta_1"."createdAt")) * 100) + 1) AS varchar) AS date)), "ta_1"."createdAt")
@@ -893,11 +818,7 @@ impl RewriteRules for SplitRules {
                     ),
                     "?outer_alias",
                 ),
-                self.transform_original_expr_to_alias_and_column(
-                    "?expr",
-                    "?outer_alias",
-                    "?outer_column",
-                ),
+                self.transform_original_expr_to_alias_and_column("?expr", "?outer_alias", None),
             ),
             // (DATEDIFF(day, DATEADD(month, CAST(((EXTRACT(MONTH FROM "ta_1"."createdAt") - 1) * -1) AS int), CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."createdAt") * 100) + EXTRACT(MONTH FROM "ta_1"."createdAt")) * 100) + 1) AS varchar) AS date)), "ta_1"."createdAt")
             transforming_chain_rewrite(
@@ -986,7 +907,421 @@ impl RewriteRules for SplitRules {
                 self.transform_original_expr_to_alias_and_column(
                     "?expr",
                     "?outer_alias",
-                    "?outer_column",
+                    Some("?outer_column"),
+                ),
+            ),
+            // Skyvia Day (Date) to DateTrunc
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-day-to-date-trunc-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        cast_expr_explicit(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_string("day"), column_expr("?column")],
+                            ),
+                            ArrowDataType::Date32,
+                        ),
+                        ArrowDataType::Utf8,
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("day"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column("?expr", "?alias", None),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-day-to-date-trunc-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        cast_expr_explicit(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_string("day"), column_expr("?column")],
+                            ),
+                            ArrowDataType::Date32,
+                        ),
+                        ArrowDataType::Utf8,
+                    ),
+                )],
+                alias_expr(
+                    cast_expr_explicit(
+                        cast_expr_explicit(column_expr("?outer_column"), ArrowDataType::Date32),
+                        ArrowDataType::Utf8,
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-day-to-date-trunc-outer-replacer",
+                outer_projection_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        cast_expr_explicit(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_string("day"), column_expr("?column")],
+                            ),
+                            ArrowDataType::Date32,
+                        ),
+                        ArrowDataType::Utf8,
+                    ),
+                )],
+                alias_expr(
+                    cast_expr_explicit(
+                        cast_expr_explicit(column_expr("?outer_column"), ArrowDataType::Date32),
+                        ArrowDataType::Utf8,
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            // Skyvia Month to DateTrunc
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-month-to-date-trunc-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("YEAR"), column_expr("?column")],
+                                ),
+                                ArrowDataType::Utf8,
+                            ),
+                            "||",
+                            literal_string(","),
+                        ),
+                        "||",
+                        fun_expr(
+                            "Lpad",
+                            vec![
+                                cast_expr_explicit(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![literal_string("MONTH"), column_expr("?column")],
+                                    ),
+                                    ArrowDataType::Utf8,
+                                ),
+                                literal_number(2),
+                                literal_string("0"),
+                            ],
+                        ),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("month"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column("?expr", "?alias", None),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-month-to-date-trunc-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("YEAR"), column_expr("?column")],
+                                ),
+                                ArrowDataType::Utf8,
+                            ),
+                            "||",
+                            literal_string(","),
+                        ),
+                        "||",
+                        fun_expr(
+                            "Lpad",
+                            vec![
+                                cast_expr_explicit(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![literal_string("MONTH"), column_expr("?column")],
+                                    ),
+                                    ArrowDataType::Utf8,
+                                ),
+                                literal_number(2),
+                                literal_string("0"),
+                            ],
+                        ),
+                    ),
+                )],
+                alias_expr(
+                    udf_expr(
+                        "to_char",
+                        vec![column_expr("?outer_column"), literal_string("YYYY,MM")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-month-to-date-trunc-outer-replacer",
+                outer_projection_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("YEAR"), column_expr("?column")],
+                                ),
+                                ArrowDataType::Utf8,
+                            ),
+                            "||",
+                            literal_string(","),
+                        ),
+                        "||",
+                        fun_expr(
+                            "Lpad",
+                            vec![
+                                cast_expr_explicit(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![literal_string("MONTH"), column_expr("?column")],
+                                    ),
+                                    ArrowDataType::Utf8,
+                                ),
+                                literal_number(2),
+                                literal_string("0"),
+                            ],
+                        ),
+                    ),
+                )],
+                alias_expr(
+                    udf_expr(
+                        "to_char",
+                        vec![column_expr("?outer_column"), literal_string("YYYY,MM")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            // Skyvia Quarter to DateTrunc
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-quarter-to-date-trunc-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("YEAR"), column_expr("?column")],
+                                ),
+                                ArrowDataType::Utf8,
+                            ),
+                            "||",
+                            literal_string(","),
+                        ),
+                        "||",
+                        cast_expr_explicit(
+                            fun_expr(
+                                "DatePart",
+                                vec![literal_string("QUARTER"), column_expr("?column")],
+                            ),
+                            ArrowDataType::Utf8,
+                        ),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("quarter"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column("?expr", "?alias", None),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-quarter-to-date-trunc-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("YEAR"), column_expr("?column")],
+                                ),
+                                ArrowDataType::Utf8,
+                            ),
+                            "||",
+                            literal_string(","),
+                        ),
+                        "||",
+                        cast_expr_explicit(
+                            fun_expr(
+                                "DatePart",
+                                vec![literal_string("QUARTER"), column_expr("?column")],
+                            ),
+                            ArrowDataType::Utf8,
+                        ),
+                    ),
+                )],
+                alias_expr(
+                    udf_expr(
+                        "to_char",
+                        vec![column_expr("?outer_column"), literal_string("YYYY,Q")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-quarter-to-date-trunc-outer-replacer",
+                outer_projection_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("YEAR"), column_expr("?column")],
+                                ),
+                                ArrowDataType::Utf8,
+                            ),
+                            "||",
+                            literal_string(","),
+                        ),
+                        "||",
+                        cast_expr_explicit(
+                            fun_expr(
+                                "DatePart",
+                                vec![literal_string("QUARTER"), column_expr("?column")],
+                            ),
+                            ArrowDataType::Utf8,
+                        ),
+                    ),
+                )],
+                alias_expr(
+                    udf_expr(
+                        "to_char",
+                        vec![column_expr("?outer_column"), literal_string("YYYY,Q")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            // Skyvia Year to DatePart
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-year-to-date-trunc-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        fun_expr(
+                            "DatePart",
+                            vec![literal_string("YEAR"), column_expr("?column")],
+                        ),
+                        ArrowDataType::Utf8,
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("year"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column("?expr", "?alias", None),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-year-to-date-trunc-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        fun_expr(
+                            "DatePart",
+                            vec![literal_string("YEAR"), column_expr("?column")],
+                        ),
+                        ArrowDataType::Utf8,
+                    ),
+                )],
+                alias_expr(
+                    udf_expr(
+                        "to_char",
+                        vec![column_expr("?outer_column"), literal_string("YYYY")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-skyvia-year-to-date-trunc-outer-replacer",
+                outer_projection_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        fun_expr(
+                            "DatePart",
+                            vec![literal_string("YEAR"), column_expr("?column")],
+                        ),
+                        ArrowDataType::Utf8,
+                    ),
+                )],
+                alias_expr(
+                    udf_expr(
+                        "to_char",
+                        vec![column_expr("?outer_column"), literal_string("YYYY")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
                 ),
             ),
             //
@@ -1323,36 +1658,6 @@ impl RewriteRules for SplitRules {
                 ),
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
-            rewrite(
-                "split-push-down-substr-outer-replacer",
-                outer_projection_split_replacer(
-                    fun_expr("Substr", vec!["?expr", "?from", "?to"]),
-                    "?cube",
-                ),
-                fun_expr(
-                    "Substr",
-                    vec![
-                        outer_projection_split_replacer("?expr", "?cube"),
-                        "?from".to_string(),
-                        "?to".to_string(),
-                    ],
-                ),
-            ),
-            rewrite(
-                "split-push-down-substr-outer-aggr-replacer",
-                outer_aggregate_split_replacer(
-                    fun_expr("Substr", vec!["?expr", "?from", "?to"]),
-                    "?cube",
-                ),
-                fun_expr(
-                    "Substr",
-                    vec![
-                        outer_aggregate_split_replacer("?expr", "?cube"),
-                        "?from".to_string(),
-                        "?to".to_string(),
-                    ],
-                ),
-            ),
             // Alias
             rewrite(
                 "split-push-down-alias-inner-replacer",
@@ -1429,47 +1734,11 @@ impl RewriteRules for SplitRules {
                 ),
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
-            rewrite(
-                "split-push-down-to-char-outer-aggr-replacer",
-                outer_aggregate_split_replacer(
-                    udf_expr(
-                        "to_char",
-                        vec!["?expr".to_string(), literal_expr("?format")],
-                    ),
-                    "?cube",
-                ),
-                udf_expr(
-                    "to_char",
-                    vec![
-                        outer_aggregate_split_replacer("?expr", "?cube"),
-                        literal_expr("?format"),
-                    ],
-                ),
-            ),
             // CharacterLength
             rewrite(
                 "split-push-down-char-length-inner-replacer",
                 inner_aggregate_split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube"),
                 inner_aggregate_split_replacer("?expr", "?cube"),
-            ),
-            rewrite(
-                "split-push-down-char-length-outer-replacer",
-                outer_projection_split_replacer(
-                    fun_expr("CharacterLength", vec!["?expr"]),
-                    "?cube",
-                ),
-                fun_expr(
-                    "CharacterLength",
-                    vec![outer_projection_split_replacer("?expr", "?cube")],
-                ),
-            ),
-            rewrite(
-                "split-push-down-char-length-outer-aggr-replacer",
-                outer_aggregate_split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube"),
-                fun_expr(
-                    "CharacterLength",
-                    vec![outer_aggregate_split_replacer("?expr", "?cube")],
-                ),
             ),
             // IS NULL, IS NOT NULL
             rewrite(
@@ -1478,29 +1747,9 @@ impl RewriteRules for SplitRules {
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             rewrite(
-                "split-push-down-is-null-outer-replacer",
-                outer_projection_split_replacer(is_null_expr("?expr"), "?cube"),
-                is_null_expr(outer_projection_split_replacer("?expr", "?cube")),
-            ),
-            rewrite(
-                "split-push-down-is-null-outer-aggr-replacer",
-                outer_aggregate_split_replacer(is_null_expr("?expr"), "?cube"),
-                is_null_expr(outer_aggregate_split_replacer("?expr", "?cube")),
-            ),
-            rewrite(
                 "split-push-down-is-not-null-inner-replacer",
                 inner_aggregate_split_replacer(is_not_null_expr("?expr"), "?cube"),
                 inner_aggregate_split_replacer("?expr", "?cube"),
-            ),
-            rewrite(
-                "split-push-down-is-not-null-outer-replacer",
-                outer_projection_split_replacer(is_not_null_expr("?expr"), "?cube"),
-                is_not_null_expr(outer_projection_split_replacer("?expr", "?cube")),
-            ),
-            rewrite(
-                "split-push-down-is-not-null-outer-aggr-replacer",
-                outer_aggregate_split_replacer(is_not_null_expr("?expr"), "?cube"),
-                is_not_null_expr(outer_aggregate_split_replacer("?expr", "?cube")),
             ),
             // push up event_notification
             rewrite(
@@ -1726,67 +1975,213 @@ impl RewriteRules for SplitRules {
             ),
         ];
 
-        rules.append(&mut self.outer_aggr_group_expr_aggr_combinator_rewrite(
-            "split-push-down-column-replacer",
-            |split_replacer| split_replacer(column_expr("?column"), "?cube"),
-            |_| vec![],
-            |_| column_expr("?column"),
-            |_, _| true,
-            true,
-            true,
-        ));
-        rules.append(&mut self.outer_aggr_group_expr_aggr_combinator_rewrite(
-            "split-push-down-date-part-replacer",
-            |split_replacer| {
-                split_replacer(
+        // Combinator rules
+        // Column
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-column-replacer",
+                |split_replacer| split_replacer(column_expr("?column"), "?cube"),
+                |_| vec![],
+                |_| column_expr("?column"),
+                |_, _| true,
+                false,
+                true,
+                true,
+                None,
+            )
+            .into_iter(),
+        );
+        // DateTrunc
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-date-trunc-replacer",
+                |split_replacer| split_replacer("?expr", "?cube"),
+                |_| {
+                    vec![(
+                        "?expr",
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                    )]
+                },
+                |_| "?alias".to_string(),
+                self.transform_original_expr_alias(
+                    |egraph, id| {
+                        var_iter!(egraph[id], OuterAggregateSplitReplacerAliasToCube)
+                            .cloned()
+                            .chain(
+                                var_iter!(egraph[id], OuterProjectionSplitReplacerAliasToCube)
+                                    .cloned(),
+                            )
+                            .chain(
+                                var_iter!(egraph[id], GroupExprSplitReplacerAliasToCube).cloned(),
+                            )
+                            .chain(
+                                var_iter!(egraph[id], GroupAggregateSplitReplacerAliasToCube)
+                                    .cloned(),
+                            )
+                            .collect()
+                    },
+                    "?expr",
+                    "?column",
+                    "?cube",
+                    "?alias",
+                ),
+                true,
+                true,
+                true,
+                None,
+            )
+            .into_iter(),
+        );
+        // DatePart
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-date-part-replacer",
+                |split_replacer| {
+                    split_replacer(
+                        fun_expr(
+                            "DatePart",
+                            vec![literal_expr("?granularity"), "?expr".to_string()],
+                        ),
+                        "?cube",
+                    )
+                },
+                |_| vec![("?expr", column_expr("?column"))],
+                |_| {
                     fun_expr(
                         "DatePart",
-                        vec![literal_expr("?granularity"), "?expr".to_string()],
-                    ),
-                    "?cube",
-                )
-            },
-            |_| vec![("?expr", column_expr("?column"))],
-            |_| {
-                fun_expr(
-                    "DatePart",
-                    vec![
-                        literal_expr("?granularity"),
-                        alias_expr("?alias_column", "?alias"),
-                    ],
-                )
-            },
-            MemberRules::transform_original_expr_date_trunc(
-                "?expr",
-                "?granularity",
-                "?granularity",
-                "?alias_column",
-                Some("?alias"),
+                        vec![
+                            literal_expr("?granularity"),
+                            alias_expr("?alias_column", "?alias"),
+                        ],
+                    )
+                },
+                MemberRules::transform_original_expr_date_trunc(
+                    "?expr",
+                    "?granularity",
+                    "?granularity",
+                    "?alias_column",
+                    Some("?alias"),
+                    false,
+                ),
                 false,
-            ),
-            true,
-            true,
-        ));
-        rules.append(&mut self.outer_aggr_group_expr_aggr_combinator_rewrite(
-            "split-push-down-substr-replacer",
-            |split_replacer| {
-                split_replacer(fun_expr("Substr", vec!["?expr", "?from", "?to"]), "?cube")
-            },
-            |_| vec![("?expr", column_expr("?column"))],
-            |split_replacer| {
-                fun_expr(
-                    "Substr",
-                    vec![
-                        split_replacer("?expr".to_string(), "?cube"),
-                        "?from".to_string(),
-                        "?to".to_string(),
-                    ],
-                )
-            },
-            |_, _| true,
-            true,
-            true,
-        ));
+                true,
+                true,
+                None,
+            )
+            .into_iter(),
+        );
+        // Substr
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-substr-replacer",
+                |split_replacer| {
+                    split_replacer(fun_expr("Substr", vec!["?expr", "?from", "?to"]), "?cube")
+                },
+                |_| vec![],
+                |split_replacer| {
+                    fun_expr(
+                        "Substr",
+                        vec![
+                            split_replacer("?expr".to_string(), "?cube"),
+                            "?from".to_string(),
+                            "?to".to_string(),
+                        ],
+                    )
+                },
+                |_, _| true,
+                false,
+                false,
+                true,
+                Some(vec![("?expr", column_expr("?column"))]),
+            )
+            .into_iter(),
+        );
+        // CharacterLength
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-char-length-replacer",
+                |split_replacer| {
+                    split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube")
+                },
+                |_| vec![],
+                |split_replacer| {
+                    fun_expr(
+                        "CharacterLength",
+                        vec![split_replacer("?expr".to_string(), "?cube")],
+                    )
+                },
+                |_, _| true,
+                false,
+                false,
+                true,
+                Some(vec![("?expr", column_expr("?column"))]),
+            )
+            .into_iter(),
+        );
+        // to_char
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-to-char-replacer",
+                |split_replacer| {
+                    split_replacer(
+                        udf_expr(
+                            "to_char",
+                            vec!["?expr".to_string(), literal_expr("?format")],
+                        ),
+                        "?cube",
+                    )
+                },
+                |_| vec![],
+                |split_replacer| {
+                    udf_expr(
+                        "to_char",
+                        vec![
+                            split_replacer("?expr".to_string(), "?cube"),
+                            literal_expr("?format"),
+                        ],
+                    )
+                },
+                |_, _| true,
+                false,
+                false,
+                true,
+                Some(vec![("?expr", column_expr("?column"))]),
+            )
+            .into_iter(),
+        );
+        // IS NULL
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-is-null-replacer",
+                |split_replacer| split_replacer(is_null_expr("?expr"), "?cube"),
+                |_| vec![],
+                |split_replacer| is_null_expr(split_replacer("?expr".to_string(), "?cube")),
+                |_, _| true,
+                false,
+                true,
+                true,
+                Some(vec![("?expr", column_expr("?column"))]),
+            )
+            .into_iter(),
+        );
+        // IS NOT NULL
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-is-not-null-replacer",
+                |split_replacer| split_replacer(is_not_null_expr("?expr"), "?cube"),
+                |_| vec![],
+                |split_replacer| is_not_null_expr(split_replacer("?expr".to_string(), "?cube")),
+                |_, _| true,
+                false,
+                true,
+                true,
+                Some(vec![("?expr", column_expr("?column"))]),
+            )
+            .into_iter(),
+        );
 
         rules
     }
@@ -1803,15 +2198,23 @@ impl SplitRules {
     ///
     /// Subst prerequisites:
     /// - `?cube` is a required subst for split replacer `alias_to_cube` parameter;
-    /// - `?column` subst must appear in either searcher or chain;
+    /// - `?column` subst must appear in either searcher or chain if `unwrap_agg_chain` is none,
+    ///   and in `unwrap_agg_chain` itself otherwise;
     /// - `?output_fun` and `?distinct` are reserved, do not use in any of the parameters.
     ///
     /// For searcher, chain, and applier, the only parameter for closure is a split replacer generator function.
     /// For instance, in `|split_replacer| split_replacer("?expr", "?cube")` closure,
     /// `split_replacer` will be replaced with the correct replacer for the respective rule.
     ///
-    /// The latter two parameters, `is_measure` and `is_dimension`, are two flags to enable
+    /// The first boolean parameter, `outer_projection`, determines whether an `outer-projection` rewrite
+    /// should be generated in addition to `outer-aggr`.
+    ///
+    /// The two parameters `is_measure` and `is_dimension` are two flags to enable
     /// the generation of measure-related and dimension-related rules respectively.
+    ///
+    /// The last parameter `unwrap_agg_chain` is used to find a column in an expresssion
+    /// in order for that column to be extracted and used with `agg_fun_expr`. This is only applicable
+    /// if `is_measure` is true.
     pub fn outer_aggr_group_expr_aggr_combinator_rewrite<'a, M, C, A, T, D: Display, DD: Display>(
         &self,
         base_name: &str,
@@ -1819,8 +2222,10 @@ impl SplitRules {
         chain: C,
         applier: A,
         transform_fn: T,
+        outer_projection: bool,
         is_measure: bool,
         is_dimension: bool,
+        unwrap_agg_chain: Option<Vec<(&'a str, String)>>,
     ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>
     where
         M: Fn(fn(D, DD) -> String) -> String,
@@ -1829,7 +2234,7 @@ impl SplitRules {
         T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
             + Sync
             + Send
-            + Copy
+            + Clone
             + 'static,
     {
         let mut rules = vec![transforming_chain_rewrite(
@@ -1837,59 +2242,140 @@ impl SplitRules {
             main_searcher(outer_aggregate_split_replacer),
             chain(outer_aggregate_split_replacer),
             applier(outer_aggregate_split_replacer),
-            transform_fn,
+            transform_fn.clone(),
         )];
 
+        if outer_projection {
+            rules.extend(
+                vec![transforming_chain_rewrite(
+                    &format!("{}-outer-projection", base_name),
+                    main_searcher(outer_projection_split_replacer),
+                    chain(outer_projection_split_replacer),
+                    applier(outer_projection_split_replacer),
+                    transform_fn.clone(),
+                )]
+                .into_iter(),
+            );
+        }
+
+        let unwrap_expr = unwrap_agg_chain.is_some();
+        let column_subst = if unwrap_expr { None } else { Some("?column") };
+
         if is_measure {
-            rules.append(&mut vec![
-                // Group expr -- skip measures
-                transforming_chain_rewrite(
-                    &format!("{}-group-expr-measure", base_name),
-                    main_searcher(group_expr_split_replacer),
-                    chain(group_expr_split_replacer),
-                    aggr_group_expr_empty_tail(),
-                    self.transform_group_expr_measure("?cube", "?column"),
-                ),
-                // Group aggr -- keep & wrap measures
-                transforming_chain_rewrite(
-                    &format!("{}-group-aggr-measure", base_name),
-                    main_searcher(group_aggregate_split_replacer),
-                    chain(group_aggregate_split_replacer),
-                    agg_fun_expr(
-                        "?output_fun",
-                        vec![applier(group_aggregate_split_replacer)],
-                        "?distinct",
+            rules.extend(
+                vec![
+                    // Group expr -- skip measures
+                    transforming_chain_rewrite(
+                        &format!("{}-group-expr-measure", base_name),
+                        main_searcher(group_expr_split_replacer),
+                        chain(group_expr_split_replacer),
+                        if unwrap_expr {
+                            applier(group_expr_split_replacer)
+                        } else {
+                            aggr_group_expr_empty_tail()
+                        },
+                        self.transform_group_expr_measure(
+                            "?cube",
+                            column_subst,
+                            transform_fn.clone(),
+                        ),
                     ),
-                    self.transform_group_aggregate_measure(
-                        "?cube",
-                        "?column",
-                        "?output_fun",
-                        "?distinct",
-                        transform_fn,
+                    // Group aggr -- keep & wrap measures
+                    transforming_chain_rewrite(
+                        &format!("{}-group-aggr-measure", base_name),
+                        main_searcher(group_aggregate_split_replacer),
+                        chain(group_aggregate_split_replacer),
+                        if unwrap_expr {
+                            applier(group_aggregate_split_replacer)
+                        } else {
+                            agg_fun_expr(
+                                "?output_fun",
+                                vec![applier(group_aggregate_split_replacer)],
+                                "?distinct",
+                            )
+                        },
+                        self.transform_group_aggregate_measure(
+                            "?cube",
+                            column_subst,
+                            if unwrap_expr {
+                                None
+                            } else {
+                                Some("?output_fun")
+                            },
+                            if unwrap_expr { None } else { Some("?distinct") },
+                            transform_fn.clone(),
+                        ),
                     ),
-                ),
-            ]);
+                ]
+                .into_iter(),
+            );
+
+            if let Some(unwrap_agg_chain) = unwrap_agg_chain {
+                rules.extend(
+                    vec![
+                        rewrite(
+                            &format!("{}-unwrap-group-expr-empty-tail", base_name),
+                            applier(|_, _| aggr_group_expr_empty_tail()),
+                            aggr_group_expr_empty_tail(),
+                        ),
+                        transforming_chain_rewrite(
+                            &format!("{}-unwrap-group-aggr-agg-fun", base_name),
+                            applier(|expr, _| agg_fun_expr("?output_fun", vec![expr], "?distinct")),
+                            unwrap_agg_chain,
+                            agg_fun_expr("?output_fun", vec![column_expr("?column")], "?distinct"),
+                            |_, _| true,
+                        ),
+                    ]
+                    .into_iter(),
+                );
+            }
         }
 
         if is_dimension {
-            rules.append(&mut vec![
-                // Group expr -- keep dimensions
-                transforming_chain_rewrite(
-                    &format!("{}-group-expr-dimension", base_name),
-                    main_searcher(group_expr_split_replacer),
-                    chain(group_expr_split_replacer),
-                    applier(group_expr_split_replacer),
-                    self.transform_group_expr_dimension("?cube", "?column", transform_fn),
-                ),
-                // Group aggr -- skip dimensions
-                transforming_chain_rewrite(
-                    &format!("{}-group-aggr-dimension", base_name),
-                    main_searcher(group_aggregate_split_replacer),
-                    chain(group_aggregate_split_replacer),
-                    aggr_aggr_expr_empty_tail(),
-                    self.transform_group_aggregate_dimension("?cube", "?column"),
-                ),
-            ]);
+            rules.extend(
+                vec![
+                    // Group expr -- keep dimensions
+                    transforming_chain_rewrite(
+                        &format!("{}-group-expr-dimension", base_name),
+                        main_searcher(group_expr_split_replacer),
+                        chain(group_expr_split_replacer),
+                        applier(group_expr_split_replacer),
+                        self.transform_group_expr_dimension(
+                            "?cube",
+                            column_subst,
+                            transform_fn.clone(),
+                        ),
+                    ),
+                    // Group aggr -- skip dimensions
+                    transforming_chain_rewrite(
+                        &format!("{}-group-aggr-dimension", base_name),
+                        main_searcher(group_aggregate_split_replacer),
+                        chain(group_aggregate_split_replacer),
+                        if unwrap_expr {
+                            applier(group_aggregate_split_replacer)
+                        } else {
+                            aggr_aggr_expr_empty_tail()
+                        },
+                        self.transform_group_aggregate_dimension(
+                            "?cube",
+                            column_subst,
+                            transform_fn,
+                        ),
+                    ),
+                ]
+                .into_iter(),
+            );
+
+            if unwrap_expr {
+                rules.extend(
+                    vec![rewrite(
+                        &format!("{}-unwrap-group-aggr-empty-tail", base_name),
+                        applier(|_, _| aggr_aggr_expr_empty_tail()),
+                        aggr_aggr_expr_empty_tail(),
+                    )]
+                    .into_iter(),
+                );
+            }
         }
 
         rules
@@ -1899,11 +2385,12 @@ impl SplitRules {
         &self,
         original_expr_var: &'static str,
         out_alias_expr_var: &'static str,
-        out_column_expr_var: &'static str,
+        out_column_expr_var: Option<&'static str>,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let original_expr_var = var!(original_expr_var);
         let out_alias_expr_var = var!(out_alias_expr_var);
-        let out_column_expr_var = var!(out_column_expr_var);
+        let out_column_expr_var =
+            out_column_expr_var.map(|out_column_expr_var| var!(out_column_expr_var));
 
         move |egraph, subst| {
             let original_expr_id = subst[original_expr_var];
@@ -1927,12 +2414,14 @@ impl SplitRules {
                     egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(name))),
                 );
 
-                subst.insert(
-                    out_column_expr_var,
-                    egraph.add(LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(
-                        column,
-                    ))),
-                );
+                if let Some(out_column_expr_var) = out_column_expr_var {
+                    subst.insert(
+                        out_column_expr_var,
+                        egraph.add(LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(
+                            column,
+                        ))),
+                    );
+                }
 
                 return true;
             }
@@ -1951,7 +2440,8 @@ impl SplitRules {
         column_var: &'static str,
         alias_to_cube_var: &'static str,
         alias_expr_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool + Clone
+    {
         let original_expr_var = var!(original_expr_var);
         let column_var = var!(column_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -2122,154 +2612,188 @@ impl SplitRules {
         }
     }
 
-    fn transform_group_expr_measure(
+    fn transform_group_expr_measure<T>(
         &self,
         alias_to_cube_var: &'static str,
-        column_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        column_var: Option<&'static str>,
+        original_transform_fn: T,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+    where
+        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    {
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let column_var = var!(column_var);
+        let column_var = column_var.map(|column_var| var!(column_var));
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                GroupExprSplitReplacerAliasToCube
-            )
-            .cloned()
-            {
-                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
-                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
-                        if cube.lookup_measure(&column.name).is_some() {
-                            return true;
+            if let Some(column_var) = column_var {
+                for alias_to_cube in var_iter!(
+                    egraph[subst[alias_to_cube_var]],
+                    GroupExprSplitReplacerAliasToCube
+                )
+                .cloned()
+                {
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                            if cube.lookup_measure(&column.name).is_some() {
+                                return true;
+                            }
                         }
                     }
                 }
+
+                return false;
             }
 
-            false
+            original_transform_fn(egraph, subst)
         }
     }
 
     fn transform_group_expr_dimension<T>(
         &self,
         alias_to_cube_var: &'static str,
-        column_var: &'static str,
+        column_var: Option<&'static str>,
         original_transform_fn: T,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
     where
         T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
     {
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let column_var = var!(column_var);
+        let column_var = column_var.map(|column_var| var!(column_var));
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
             if !original_transform_fn(egraph, subst) {
                 return false;
             }
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                GroupExprSplitReplacerAliasToCube
-            )
-            .cloned()
-            {
-                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
-                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
-                        if cube.lookup_dimension(&column.name).is_some() {
-                            return true;
+
+            if let Some(column_var) = column_var {
+                for alias_to_cube in var_iter!(
+                    egraph[subst[alias_to_cube_var]],
+                    GroupExprSplitReplacerAliasToCube
+                )
+                .cloned()
+                {
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                            if cube.lookup_dimension(&column.name).is_some()
+                                || column.name == "__user"
+                            {
+                                return true;
+                            }
                         }
                     }
                 }
+
+                return false;
             }
-            false
+
+            true
         }
     }
 
     fn transform_group_aggregate_measure<T>(
         &self,
         alias_to_cube_var: &'static str,
-        column_var: &'static str,
-        output_fun_var: &'static str,
-        distinct_var: &'static str,
+        column_var: Option<&'static str>,
+        output_fun_var: Option<&'static str>,
+        distinct_var: Option<&'static str>,
         original_transform_fn: T,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
     where
         T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
     {
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let column_var = var!(column_var);
-        let output_fun_var = var!(output_fun_var);
-        let distinct_var = var!(distinct_var);
+        let column_var = column_var.map(|column_var| var!(column_var));
+        let output_fun_var = output_fun_var.map(|output_fun_var| var!(output_fun_var));
+        let distinct_var = distinct_var.map(|distinct_var| var!(distinct_var));
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
             if !original_transform_fn(egraph, subst) {
                 return false;
             }
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                GroupAggregateSplitReplacerAliasToCube
-            )
-            .cloned()
-            {
-                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
-                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
-                        if let Some(measure) = cube.lookup_measure(&column.name) {
-                            if measure.agg_type.is_none() {
-                                continue;
-                            }
 
-                            let output_fun = match measure.agg_type.as_ref().unwrap().as_str() {
-                                "count" => AggregateFunction::Sum,
-                                "sum" => AggregateFunction::Sum,
-                                "min" => AggregateFunction::Min,
-                                "max" => AggregateFunction::Max,
-                                _ => continue,
-                            };
-                            subst.insert(
-                                output_fun_var,
-                                egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
-                                    AggregateFunctionExprFun(output_fun),
-                                )),
-                            );
-                            subst.insert(
-                                distinct_var,
-                                egraph.add(LogicalPlanLanguage::AggregateFunctionExprDistinct(
-                                    AggregateFunctionExprDistinct(false),
-                                )),
-                            );
-                            return true;
+            if let (Some(column_var), Some(output_fun_var), Some(distinct_var)) =
+                (column_var, output_fun_var, distinct_var)
+            {
+                for alias_to_cube in var_iter!(
+                    egraph[subst[alias_to_cube_var]],
+                    GroupAggregateSplitReplacerAliasToCube
+                )
+                .cloned()
+                {
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                            if let Some(measure) = cube.lookup_measure(&column.name) {
+                                if measure.agg_type.is_none() {
+                                    continue;
+                                }
+
+                                let output_fun = match measure.agg_type.as_ref().unwrap().as_str() {
+                                    "count" => AggregateFunction::Sum,
+                                    "sum" => AggregateFunction::Sum,
+                                    "min" => AggregateFunction::Min,
+                                    "max" => AggregateFunction::Max,
+                                    _ => continue,
+                                };
+                                subst.insert(
+                                    output_fun_var,
+                                    egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
+                                        AggregateFunctionExprFun(output_fun),
+                                    )),
+                                );
+                                subst.insert(
+                                    distinct_var,
+                                    egraph.add(LogicalPlanLanguage::AggregateFunctionExprDistinct(
+                                        AggregateFunctionExprDistinct(false),
+                                    )),
+                                );
+                                return true;
+                            }
                         }
                     }
                 }
+
+                return false;
             }
-            false
+
+            true
         }
     }
 
-    fn transform_group_aggregate_dimension(
+    fn transform_group_aggregate_dimension<T>(
         &self,
         alias_to_cube_var: &'static str,
-        column_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        column_var: Option<&'static str>,
+        original_transform_fn: T,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+    where
+        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    {
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let column_var = var!(column_var);
+        let column_var = column_var.map(|column_var| var!(column_var));
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
-            for alias_to_cube in var_iter!(
-                egraph[subst[alias_to_cube_var]],
-                GroupAggregateSplitReplacerAliasToCube
-            )
-            .cloned()
-            {
-                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
-                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
-                        if cube.lookup_dimension(&column.name).is_some() {
-                            return true;
+            if let Some(column_var) = column_var {
+                for alias_to_cube in var_iter!(
+                    egraph[subst[alias_to_cube_var]],
+                    GroupAggregateSplitReplacerAliasToCube
+                )
+                .cloned()
+                {
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                            if cube.lookup_dimension(&column.name).is_some()
+                                || column.name == "__user"
+                            {
+                                return true;
+                            }
                         }
                     }
                 }
+
+                return false;
             }
 
-            false
+            original_transform_fn(egraph, subst)
         }
     }
 
@@ -2281,7 +2805,7 @@ impl SplitRules {
         group_expr_cube_var: &'static str,
         group_aggregate_cube_var: &'static str,
         new_expr_var: &'static str,
-        projection_alias_var: &'static str,
+        inner_projection_alias_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let projection_expr_var = var!(projection_expr_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -2289,7 +2813,7 @@ impl SplitRules {
         let group_expr_cube_var = var!(group_expr_cube_var);
         let group_aggregate_cube_var = var!(group_aggregate_cube_var);
         let new_expr_var = var!(new_expr_var);
-        let projection_alias_var = var!(projection_alias_var);
+        let inner_projection_alias_var = var!(inner_projection_alias_var);
         move |egraph, subst| {
             if let Some(expr_to_alias) =
                 &egraph.index(subst[projection_expr_var]).data.expr_to_alias
@@ -2320,7 +2844,7 @@ impl SplitRules {
                     subst.insert(new_expr_var, projection_expr);
 
                     subst.insert(
-                        projection_alias_var,
+                        inner_projection_alias_var,
                         // Do not put alias on inner projection so table name from cube scan can be reused
                         egraph.add(LogicalPlanLanguage::ProjectionAlias(ProjectionAlias(None))),
                     );
