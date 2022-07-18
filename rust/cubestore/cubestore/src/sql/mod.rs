@@ -1773,6 +1773,7 @@ mod tests {
                 TableValue::String("true".to_string()),
                 TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
