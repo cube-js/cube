@@ -1,0 +1,80 @@
+---
+title: Connecting to Deepnote
+permalink: /config/downstream/deepnote
+---
+
+You can connect to Cube from Deepnote, a new kind of data notebook that's built for collaboration and is Jupyter compatible, using the [Cube SQL API][ref-sql-api].
+
+## Enable Cube SQL API
+
+<InfoBox>
+
+Don't have a Cube project yet? [Learn how to get started
+here][ref-getting-started].
+
+</InfoBox>
+
+### Cube Cloud
+
+Click **Deploy SQL API** and then the **How to connect your BI tool** link on the Overview page of your Cube deployment.
+Navigate to the **BIs and Visualization Tools** tab. You should see the screen like the one below with
+your connection credentials:
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/78a4b90c-da5a-4d1f-9775-59ce6e7baad0/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+### Self-hosted Cube
+
+You need to set the following environment variables to enable the Cube SQL API.
+These credentials will be required to connect to Cube from Apache Superset
+later.
+
+```dotenv
+CUBEJS_PG_SQL_PORT=5432
+CUBE_SQL_USERNAME=myusername
+CUBE_SQL_PASSWORD=mypassword
+```
+## Connecting from Deepnote
+
+Deepnote connects to Cube as to a Postgres database.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/7e11daae-f956-47ed-8183-7805a6e7757c/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions are columns.
+
+You can write SQL in Deepnote that will be executed in Cube. Learn more about Cube SQL
+syntax on the [reference page][ref-sql-api].
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/0d8b4090-ae23-4c3e-939d-c8080be9191c/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+You can also create a visualization of the executed SQL query.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/9267b047-4631-442a-b968-a3b7a3d94cb7/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+[ref-getting-started]: /cloud/getting-started
+[ref-sql-api]: /backend/sql

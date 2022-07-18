@@ -1,0 +1,89 @@
+---
+title: Connecting to Observable
+permalink: /config/downstream/observable
+---
+
+You can connect to Cube from Observable, a new kind of collaborative data notebook that's built to uncover new insights, answer more questions, and make better decisions, using the [Cube SQL API][ref-sql-api].
+
+## Enable Cube SQL API
+
+<InfoBox>
+
+Don't have a Cube project yet? [Learn how to get started here][ref-getting-started].
+
+</InfoBox>
+
+### Cube Cloud
+
+Click **Deploy SQL API** and then the **How to connect your BI tool** link on the Overview page of your Cube deployment.
+Navigate to the **BIs and Visualization Tools** tab. You should see the screen like the one below with
+your connection credentials:
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/78a4b90c-da5a-4d1f-9775-59ce6e7baad0/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+### Self-hosted Cube
+
+You need to set the following environment variables to enable the Cube SQL API.
+These credentials will be required to connect to Cube from Apache Superset
+later.
+
+```dotenv
+CUBEJS_PG_SQL_PORT=5432
+CUBE_SQL_USERNAME=myusername
+CUBE_SQL_PASSWORD=mypassword
+```
+## Connecting from Observable
+
+Observable connects to Cube as to a Postgres database.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/2f0577f5-4717-4001-bfef-050827c5a415/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions are columns.
+
+Make sure to add a database to your notebook, and select **Database query** when adding a new block.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/83b5f0ec-4134-413a-aaa0-2794d9bc34ed/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+You can write SQL in Observable that will be executed in Cube. Learn more about Cube SQL
+syntax on the [reference page][ref-sql-api].
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/5a4705c2-d675-4a50-b193-847b95177fb5/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+You can also create a visualization of the executed SQL query.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/a61ec062-b6c7-4c33-be10-bf1cd5826a77/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+[ref-getting-started]: /cloud/getting-started
+[ref-sql-api]: /backend/sql
