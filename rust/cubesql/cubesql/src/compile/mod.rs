@@ -12293,7 +12293,7 @@ ORDER BY \"COUNT(count)\" DESC"
 
         let logical_plan = convert_select_to_query_plan(
             r#"
-            SELECT char_length("ta_1"."customer_gender")
+            SELECT char_length("ta_1"."customer_gender") "cl"
             FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1";
             "#
             .to_string(),
@@ -13234,5 +13234,91 @@ ORDER BY \"COUNT(count)\" DESC"
                 }]),
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_date_granularity_skyvia() {
+        let supported_granularities = vec![
+            // Day
+            ["CAST(DATE_TRUNC('day', t.\"order_date\")::date AS varchar)", "day"],
+            // Day of Month
+            ["EXTRACT(DAY FROM t.\"order_date\")", "day"],
+            // Month
+            ["EXTRACT(YEAR FROM t.\"order_date\")::varchar || ',' || LPAD(EXTRACT(MONTH FROM t.\"order_date\")::varchar, 2, '0')", "month"],
+            // Month of Year
+            ["EXTRACT(MONTH FROM t.\"order_date\")", "month"],
+            // Quarter
+            ["EXTRACT(YEAR FROM t.\"order_date\")::varchar || ',' || EXTRACT(QUARTER FROM t.\"order_date\")::varchar", "quarter"],
+            // Quarter of Year
+            ["EXTRACT(QUARTER FROM t.\"order_date\")", "quarter"],
+            // Year
+            ["CAST(EXTRACT(YEAR FROM t.\"order_date\") AS varchar)", "year"],
+        ];
+
+        for [expr, expected_granularity] in &supported_granularities {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT {} AS expr1 FROM public.\"KibanaSampleDataEcommerce\" AS t",
+                    expr
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(expected_granularity.to_string()),
+                        date_range: None,
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            )
+        }
+
+        for [expr, expected_granularity] in supported_granularities {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "
+                    SELECT
+                        {} AS expr1,
+                        SUM(t.\"count\") AS expr2
+                    FROM public.\"KibanaSampleDataEcommerce\" AS t
+                    GROUP BY {}
+                    ",
+                    expr, expr
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(expected_granularity.to_string()),
+                        date_range: None,
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            )
+        }
     }
 }
