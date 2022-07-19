@@ -32,9 +32,6 @@ import { QueryQueue } from './QueryQueue';
 import { DriverInterface } from '../driver/driver.interface';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 
-/// A timestamp far in the future, so all rows past buildRangeEnd are selected as lambda rows.
-export const LAMBDA_RANGE_END = '3000-01-01T00:00:00.000Z';
-
 /// Name of the inline table containing the lambda rows.
 export const LAMBDA_TABLE_PREFIX = 'lambda';
 
@@ -548,30 +545,6 @@ export class PreAggregationLoader {
         refreshKeyValues: await this.getInvalidationKeyValues()
       };
     }
-  }
-
-  /**
-   * Downloads the lambda table from the source DB.
-   */
-  public async downloadLambdaTable(): Promise<InlineTable> {
-    const queue = await this.queryCache.getQueue(this.preAggregation.dataSource);
-    const [sql, params] = this.preAggregation.sql;
-    const table = await queue.executeInQueue(
-      'query',
-      [],
-      {
-        query: sql,
-        values: params,
-        forceBuild: true,
-        useDownload: true,
-      },
-      this.priority(10),
-    );
-    return {
-      name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
-      columns: table.types,
-      rows: table.rows,
-    };
   }
 
   protected async loadPreAggregationWithKeys(): Promise<LoadPreAggregationResult> {
@@ -1146,6 +1119,8 @@ export class PreAggregationPartitionRangeLoader {
 
   protected requestId: string;
 
+  protected lambdaSql: QueryWithParams;
+
   protected dataSource: string;
 
   public constructor(
@@ -1162,6 +1137,7 @@ export class PreAggregationPartitionRangeLoader {
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
+    this.lambdaSql = options.lambdaSql;
     this.dataSource = preAggregation.dataSource;
   }
 
@@ -1306,24 +1282,12 @@ export class PreAggregationPartitionRangeLoader {
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
 
       const lastLoadResult = loadResults[loadResults.length - 1];
-      if (this.preAggregation.lambdaView && lastLoadResult.buildRangeEnd) {
-        const lambdaRange: QueryDateRange = [lastLoadResult.buildRangeEnd, LAMBDA_RANGE_END];
-        const lambdaLoader = new PreAggregationLoader(
-          this.redisPrefix,
-          this.driverFactory,
-          this.logger,
-          this.queryCache,
-          this.preAggregations,
-          this.partitionPreAggregationDescription(lambdaRange),
-          this.preAggregationsTablesToTempTables,
-          this.loadCache,
-          this.options
-        );
-        const lambdaTable = await lambdaLoader.downloadLambdaTable();
+      if (this.lambdaSql && lastLoadResult.buildRangeEnd) {
+        const lambdaTable = await this.downloadLambdaTable(lastLoadResult.buildRangeEnd);
 
         const unionTargetTableName = [
           ...allTableTargetNames.map(name => `SELECT * FROM ${name}`),
-          // `SELECT * FROM ${lambdaTable.name}`,
+          `SELECT * FROM ${lambdaTable.name}`,
         ].join(' UNION ALL ');
         return {
           targetTableName: `(${unionTargetTableName})`,
@@ -1356,6 +1320,31 @@ export class PreAggregationPartitionRangeLoader {
         this.options
       ).loadPreAggregation();
     }
+  }
+
+  /**
+   * Downloads the lambda table from the source DB.
+   */
+  private async downloadLambdaTable(from: string): Promise<InlineTable> {
+    const queue = await this.queryCache.getQueue(this.preAggregation.dataSource);
+    const [query, params] = this.lambdaSql;
+    const values = params.map((p) => (p === FROM_PARTITION_RANGE ? from : p));
+    const table = await queue.executeInQueue(
+      'query',
+      [],
+      {
+        query,
+        values,
+        forceBuild: true,
+        useDownload: true,
+      },
+      this.priority(10),
+    );
+    return {
+      name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
+      columns: table.types,
+      rows: table.rows,
+    };
   }
 
   public async partitionPreAggregations(): Promise<PreAggregationDescription[]> {
@@ -1609,12 +1598,13 @@ export class PreAggregations {
           requestId: queryBody.requestId,
           metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
-          fullSql: queryBody.fullSql,
+          lambdaSql: queryBody.lambda && queryBody.lambda.preAggregationId === p.preAggregationId ? queryBody.lambda.sql : undefined,
           externalRefresh: this.externalRefresh
         }
       );
 
-      const preAggregationPromise = () => loader.loadPreAggregations().then(async loadResult => {
+      const preAggregationPromise = async () => {
+        const loadResult = await loader.loadPreAggregations();
         const usedPreAggregation = {
           ...loadResult,
           type: p.type,
@@ -1626,7 +1616,7 @@ export class PreAggregations {
         }
 
         return [p.tableName, usedPreAggregation];
-      });
+      };
 
       return preAggregationPromise().then(res => preAggregationsTablesToTempTables.concat([res]));
     }).reduce((promise, fn) => promise.then(fn), Promise.resolve([]));

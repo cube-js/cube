@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
+import {FROM_PARTITION_RANGE, inDbTimeZone, QueryAlias} from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -557,17 +557,38 @@ class BaseQuery {
    * Returns an array of SQL query strings for the query, ignoring pre-aggregations.
    * @returns {Array<string>}
    */
-  buildFullSqlAndParams() {
-    return this.compilers.compiler.withQuery(
-      this,
-      () => this.cacheValue(
-        ['buildFullSqlAndParams'],
-        () => this.paramAllocator.buildSqlAndParams(
-          this.fullKeyQueryAggregate()
-        ),
-        { cache: this.queryCache }
-      )
-    );
+  buildLambdaSqlAndParams() {
+    const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
+    if (!preAggForQuery) {
+      return {
+        preAggregationId: undefined
+      };
+    } else {
+      const QueryClass = this.constructor;
+      const lambdaQuery = new QueryClass(
+        this.compilers,
+        {
+          ...this.options,
+          filters: [
+            ...this.options.filters ?? [],
+            this.options.timeDimensions.length > 0
+              ? {
+                member: this.options.timeDimensions[0].dimension,
+                operator: 'afterDate',
+                values: [FROM_PARTITION_RANGE]
+              }
+              : [],
+          ],
+          order: [],
+          rowLimit: undefined,
+          preAggregationQuery: true,
+        }
+      );
+      return {
+        preAggregationId: `${preAggForQuery.cube}.${preAggForQuery.preAggregationName}`,
+        sql: lambdaQuery.buildSqlAndParams(),
+      };
+    }
   }
 
   externalQuery() {
