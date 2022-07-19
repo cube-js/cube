@@ -554,15 +554,14 @@ class BaseQuery {
   }
 
   /**
-   * Returns an array of SQL query strings for the query, ignoring pre-aggregations.
-   * @returns {Array<string>}
+   * Returns a dictionary mapping each preagregation to its corresponding query fragment.
+   * TODO(cristipp) Currently limited to the top query preaggregation.
+   * @returns {Record<string, Array<string>>}
    */
   buildLambdaSqlAndParams() {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
-    if (!preAggForQuery) {
-      return {
-        preAggregationId: undefined
-      };
+    if (!(preAggForQuery && preAggForQuery.preAggregation.lambdaView)) {
+      return {};
     } else {
       const QueryClass = this.constructor;
       const lambdaQuery = new QueryClass(
@@ -585,8 +584,7 @@ class BaseQuery {
         }
       );
       return {
-        preAggregationId: `${preAggForQuery.cube}.${preAggForQuery.preAggregationName}`,
-        sql: lambdaQuery.buildSqlAndParams(),
+        [`${preAggForQuery.cube}.${preAggForQuery.preAggregationName}`]: lambdaQuery.buildSqlAndParams(),
       };
     }
   }

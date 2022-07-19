@@ -1598,7 +1598,7 @@ export class PreAggregations {
           requestId: queryBody.requestId,
           metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
-          lambdaSql: queryBody.lambda && queryBody.lambda.preAggregationId === p.preAggregationId ? queryBody.lambda.sql : undefined,
+          lambdaSql: (queryBody.lambdaSql ?? {})[p.preAggregationId],
           externalRefresh: this.externalRefresh
         }
       );
