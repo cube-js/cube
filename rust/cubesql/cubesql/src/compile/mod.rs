@@ -9904,6 +9904,53 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_quicksight_table_cat_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_table_cat_query",
+            execute_query(
+                "
+                SELECT
+                    NULL AS TABLE_CAT,
+                    n.nspname AS TABLE_SCHEM,
+                    ct.relname AS TABLE_NAME,
+                    a.attname AS COLUMN_NAME,
+                    (i.keys).n AS KEY_SEQ,
+                    ci.relname AS PK_NAME
+                FROM pg_catalog.pg_class ct
+                JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)
+                JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)
+                JOIN (
+                    SELECT
+                        i.indexrelid,
+                        i.indrelid,
+                        i.indisprimary,
+                        information_schema._pg_expandarray(i.indkey) AS keys
+                    FROM pg_catalog.pg_index i
+                ) i ON (
+                    a.attnum = (i.keys).x AND
+                    a.attrelid = i.indrelid
+                )
+                JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)
+                WHERE
+                    true AND
+                    n.nspname = 'public' AND
+                    ct.relname = 'Orders' AND
+                    i.indisprimary
+                ORDER BY
+                    table_name,
+                    pk_name,
+                    key_seq
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "cast_decimal_default_precision",

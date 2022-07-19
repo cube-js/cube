@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT\n                    NULL AS TABLE_CAT,\n                    n.nspname AS TABLE_SCHEM,\n                    ct.relname AS TABLE_NAME,\n                    a.attname AS COLUMN_NAME,\n                    (i.keys).n AS KEY_SEQ,\n                    ci.relname AS PK_NAME\n                FROM pg_catalog.pg_class ct\n                JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)\n                JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)\n                JOIN (\n                    SELECT\n                        i.indexrelid,\n                        i.indrelid,\n                        i.indisprimary,\n                        information_schema._pg_expandarray(i.indkey) AS keys\n                    FROM pg_catalog.pg_index i\n                ) i ON (\n                    a.attnum = (i.keys).x AND\n                    a.attrelid = i.indrelid\n                )\n                JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)\n                WHERE\n                    true AND\n                    n.nspname = 'public' AND\n                    ct.relname = 'Orders' AND\n                    i.indisprimary\n                ORDER BY\n                    table_name,\n                    pk_name,\n                    key_seq\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----------+-------------+------------+-------------+---------+---------+
+| TABLE_CAT | TABLE_SCHEM | TABLE_NAME | COLUMN_NAME | KEY_SEQ | PK_NAME |
++-----------+-------------+------------+-------------+---------+---------+
++-----------+-------------+------------+-------------+---------+---------+
