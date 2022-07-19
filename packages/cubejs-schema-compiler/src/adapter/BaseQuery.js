@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import {FROM_PARTITION_RANGE, inDbTimeZone, QueryAlias} from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -2223,7 +2223,7 @@ class BaseQuery {
     );
   }
 
-  preAggregationReadOnly(cube, preAggregation) {
+  preAggregationReadOnly(_cube, _preAggregation) {
     return false;
   }
 
