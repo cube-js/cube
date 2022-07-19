@@ -6,8 +6,8 @@ menuOrder: 3
 ---
 
 <InfoBox>
-  <b>Connecting your Business Intelligence Tools to Cube</b> workshop on July 27, 2022.<br/> 
-  Building on our <a href="https://cube.dev/events/sql-api">SQL API workshop</a>, we'll continue our discussion on making Cube available to your favorite Business Intelligence applications.<br /> 
+  <b>Connecting your Business Intelligence Tools to Cube</b> workshop on July 27, 2022.<br/>
+  Building on our <a href="https://cube.dev/events/sql-api">SQL API workshop</a>, we'll continue our discussion on making Cube available to your favorite Business Intelligence applications.<br />
   Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/adv-sql-api/">event page</a> 👈
 </InfoBox>
 
@@ -390,6 +390,29 @@ module.exports = {
 };
 ```
 
+## Security Context (Row-Level Security)
+
+Cube's SQL API can also use the Security Context for
+[Dynamic Schema Creation][ref-dynamic-schemas] or [`queryRewrite`][ref-config-queryrewrite] property in your [`cube.js`
+configuration file][ref-config-js].
+
+By default, the SQL API uses the current user's Security Context, but this behaviour can be modified so that certain users are allowed to switch. To do this, we must first define which user is allowed to change Security Context:
+
+First, you need to define what user is allowed to change security context:
+
+```
+CUBEJS_SQL_SUPER_USER=admin
+```
+
+If it's not enough for your case, you define your logic for check with `canSwitchSqlUser` property in your [`cube.js`
+configuration file][ref-config-js].
+
+You can change security context for specific query via virtual filter on:
+
+```sql
+SELECT * FROM Orders WHERE __user = 'anotheruser';
+```
+
 ## Limitations
 
 ### <--{"id" : "Limitations"}--> Projection
@@ -532,3 +555,6 @@ cube=> SELECT count, user_city FROM Orders;
 ```
 
 [ref-config-check-sql-auth]: /config#check-sql-auth
+[ref-config-queryrewrite]: /config#query-rewrite
+[ref-config-js]: /config
+[ref-dynamic-schemas]: /schema/dynamic-schema-creation

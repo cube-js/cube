@@ -37,7 +37,8 @@ interface CubejsConfiguration {
   contextToOrchestratorId: (context: RequestContext) => string;
   repositoryFactory: (context: RequestContext) => SchemaFileRepository;
   checkAuth: (req: ExpressRequest, authorization: string) => any;
-  checkSqlAuth: (req: SQLRequest, user: string) => any;
+  checkSqlAuth: (req: SQLRequest, user: string | null) => any;
+  canSwitchSqlUser: (current: string | null, user: string) => Promise<bool> | bool;
   queryRewrite: (query: object, context: RequestContext) => object;
   preAggregationsSchema: string | ((context: RequestContext) => string);
   schemaVersion: (context: RequestContext) => string;
@@ -170,10 +171,9 @@ Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
 [Multitenancy Applications][ref-multitenancy].
 
-Called once per [`dataSource`][ref-schema-ref-datasource]. Can return a
-`Promise` which resolves to a `DriverConfig`. `DriverConfig` consists of a
-`type` field corresponding to database type and options passed to a driver
-constructor.
+Called once per [`dataSource`][ref-schema-ref-datasource].
+Can return a `Promise` which resolves to a `DriverConfig`.
+`DriverConfig` consists of a `type` field corresponding to database type and options passed to a driver constructor.
 
 ```javascript
 module.exports = {
@@ -315,6 +315,31 @@ module.exports = {
     }
 
     throw new Error('Incorrect user name or password');
+  },
+};
+```
+
+### <--{"id" : "Options Reference"}--> canSwitchSqlUser
+
+Used in [SQL API][ref-sql-api], and can be an `async` function. Default
+implementation depends on `CUBEJS_SQL_SUPERUSER` and return `true` when it's equal to session's user.
+
+Called on each change request from Cube SQL API.
+
+For example, you can use `canSwitchSqlUser` to define your custom logic:
+
+```javascript
+module.exports = {
+  canSwitchSqlUser: async (current, username) => {
+    if (current === 'admin') {
+        return true;
+    }
+
+    if (current === 'service') {
+        return username !== 'admin';
+    }
+
+    return false;
   },
 };
 ```
@@ -743,7 +768,7 @@ the additional transpiler for check duplicates.
 [ref-development-mode]: /overview#development-mode
 [ref-multitenancy]: /multitenancy-setup
 [ref-rest-api]: /rest-api
-[ref-sql-api]: /sql-api
+[ref-sql-api]: /backend/sql
 [ref-rest-api-sched-refresh]: /rest-api#v-1-run-scheduled-refresh
 [ref-pre-aggregations-refresh-key]:
   /schema/reference/pre-aggregations#refresh-key
