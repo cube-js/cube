@@ -370,6 +370,7 @@ jobs:
       - name: Run Integration smoke tests
         timeout-minutes: 30
         run: |
+          mkdir -p rust/cubestore/downloaded/latest/bin
           cp rust/cubestore/target/debug/cubestored rust/cubestore/downloaded/latest/bin/cubestored
           cd packages/cubejs-testing/
           yarn run smoke:materialize
