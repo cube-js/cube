@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.37](https://github.com/cube-js/cube.js/compare/v0.30.36...v0.30.37) (2022-07-20)
+
+
+### Bug Fixes
+
+* **cubestore:** Optimize big plans send out for big number of workers ([#4948](https://github.com/cube-js/cube.js/issues/4948)) ([79421af](https://github.com/cube-js/cube.js/commit/79421afe65dab919f98116c5047a9f1a546fb952))
+
+
+### Features
+
+* **cubestore:** Stores build_range_end in table metadata ([#4938](https://github.com/cube-js/cube.js/issues/4938)) ([69f730f](https://github.com/cube-js/cube.js/commit/69f730fcb69709ddd14e6c44640d409cc382a075))
+
+
+
+
+
 ## [0.30.35](https://github.com/cube-js/cube.js/compare/v0.30.34...v0.30.35) (2022-07-14)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
