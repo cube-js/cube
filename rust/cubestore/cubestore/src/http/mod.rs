@@ -568,22 +568,18 @@ impl HttpMessage {
                     if let Some(query_inline_tables) = query.inline_tables() {
                         for inline_table in query_inline_tables.iter() {
                             let name = inline_table.name().unwrap().to_string();
-                            let names = inline_table
-                                .columns()
-                                .unwrap()
-                                .iter()
-                                .map(|name| name.to_string())
-                                .collect::<Vec<_>>();
                             let types = inline_table
                                 .types()
                                 .unwrap()
                                 .iter()
                                 .map(|column_type| ColumnType::from_string(column_type))
                                 .collect::<Result<Vec<_>, CubeError>>()?;
-                            let columns = names
+                            let columns = inline_table
+                                .columns()
+                                .unwrap()
                                 .iter()
                                 .enumerate()
-                                .map(|(i, name)| Column::new(name.clone(), types[i].clone(), i))
+                                .map(|(i, name)| Column::new(name.to_string(), types[i].clone(), i))
                                 .collect::<Vec<_>>();
                             let rows = inline_table
                                 .rows()
