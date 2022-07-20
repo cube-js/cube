@@ -6,7 +6,6 @@ import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
 
-
 describe('lambda', () => {
   jest.setTimeout(60 * 5 * 1000);
   //
