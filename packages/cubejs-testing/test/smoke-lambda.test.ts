@@ -1,5 +1,3 @@
-import fetch from "node-fetch";
-import { execSync } from "child_process";
 import { StartedTestContainer } from 'testcontainers';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
@@ -18,8 +16,7 @@ describe('lambda', () => {
 
   beforeAll(async () => {
     db = await PostgresDBRunner.startContainer({});
-    const ecom = await (await fetch('https://cube.dev/downloads/ecom-dump-d3-example.sql')).text();
-    execSync(`psql postgresql://test:test@${db.getHost()}:${db.getMappedPort(5432)}/test`, { input: ecom });
+    await PostgresDBRunner.loadEcom(db);
     birdbox = await getBirdbox(
       'postgres',
       {
@@ -75,21 +72,21 @@ describe('lambda', () => {
     expect(response.rawData()).toEqual(
       [
         {
+          'Orders.completedAt': '2020-12-31T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
+          'Orders.count': '11',
+          'Orders.status': 'shipped',
+        },
+        {
           'Orders.completedAt': '2020-12-30T00:00:00.000',
           'Orders.completedAt.day': '2020-12-30T00:00:00.000',
-          'Orders.count': '2',
+          'Orders.count': '8',
           'Orders.status': 'shipped',
         },
         {
-          'Orders.completedAt': '2020-12-27T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-27T00:00:00.000',
-          'Orders.count': '2',
-          'Orders.status': 'shipped',
-        },
-        {
-          'Orders.completedAt': '2020-12-26T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-26T00:00:00.000',
-          'Orders.count': '1',
+          'Orders.completedAt': '2020-12-29T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-29T00:00:00.000',
+          'Orders.count': '10',
           'Orders.status': 'shipped',
         },
       ]

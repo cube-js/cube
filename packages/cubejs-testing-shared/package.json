@@ -25,6 +25,7 @@
     "@cubejs-backend/schema-compiler": "^0.30.34",
     "@cubejs-backend/shared": "^0.30.34",
     "dedent": "^0.7.0",
+    "node-fetch": "^2.6.7",
     "testcontainers": "^7.5.0"
   },
   "devDependencies": {
