@@ -555,14 +555,13 @@ class BaseQuery {
 
   /**
    * Returns a dictionary mapping each preagregation to its corresponding query fragment.
-   * TODO(cristipp) Currently limited to the top query preaggregation.
+   * TODO(cristipp) Add support for subqueries and joins.
    * @returns {Record<string, Array<string>>}
    */
   buildLambdaSqlAndParams() {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
-    if (!(preAggForQuery && preAggForQuery.preAggregation.lambdaView)) {
-      return {};
-    } else {
+    const result = {};
+    if (preAggForQuery && preAggForQuery.preAggregation.lambdaView) {
       const QueryClass = this.constructor;
       const lambdaQuery = new QueryClass(
         this.compilers,
@@ -583,10 +582,9 @@ class BaseQuery {
           preAggregationQuery: true,
         }
       );
-      return {
-        [`${preAggForQuery.cube}.${preAggForQuery.preAggregationName}`]: lambdaQuery.buildSqlAndParams(),
-      };
+      result[`${preAggForQuery.cube}.${preAggForQuery.preAggregationName}`] = lambdaQuery.buildSqlAndParams();
     }
+    return result;
   }
 
   externalQuery() {

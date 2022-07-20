@@ -132,7 +132,11 @@ export class QueryOrchestrator {
 
     const usedPreAggregations = R.pipe(
       R.fromPairs,
-      R.map(({ inlineTable, lambdaTable, ...pa }) => pa),
+      R.map((pa: any) => ({
+        targetTableName: pa.targetTableName,
+        refreshKeyValues: pa.refreshKeyValues,
+        lastUpdatedAt: pa.lastUpdatedAt,
+      })),
     )(preAggregationsTablesToTempTables);
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
       throw new Error('No pre-aggregation table has been built for this query yet. Please check your refresh worker configuration if it persists.');

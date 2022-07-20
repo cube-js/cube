@@ -22,9 +22,8 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
 import {
   BaseDriver,
-  DownloadTableData, DownloadTableMemoryData,
+  DownloadTableData,
   InlineTable,
-  Rows,
   StreamOptions,
   UnloadOptions
 } from '../driver';
@@ -151,6 +150,7 @@ export type PreAggregationDescription = {
   timestampFormat: string;
   expandedPartition: boolean;
   lambdaView: boolean;
+  buildRangeEnd?: string;
 };
 
 const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -442,8 +442,6 @@ export class PreAggregationLoader {
 
   private externalRefresh: boolean;
 
-  private buildRangeEnd: string;
-
   public constructor(
     private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactory,
@@ -468,7 +466,6 @@ export class PreAggregationLoader {
     this.metadata = options.metadata;
     this.structureVersionPersistTime = preAggregations.structureVersionPersistTime;
     this.externalRefresh = options.externalRefresh;
-    this.buildRangeEnd = options.buildRangeEnd;
 
     if (this.externalRefresh && this.waitForRenew) {
       const message = 'Invalid configuration - when externalRefresh is true, it will not perform a renew, therefore you cannot wait for it using waitForRenew.';
@@ -725,7 +722,6 @@ export class PreAggregationLoader {
         forceBuild: this.forceBuild,
         metadata: this.metadata,
         orphanedTimeout: this.orphanedTimeout,
-        buildRangeEnd: this.buildRangeEnd,
       },
       priority,
       // eslint-disable-next-line no-use-before-define
@@ -779,7 +775,7 @@ export class PreAggregationLoader {
       targetTableName,
       requestId: this.requestId,
       newVersionEntry,
-      buildRangeEnd: this.buildRangeEnd,
+      buildRangeEnd: this.preAggregation.buildRangeEnd,
     };
   }
 
@@ -1233,11 +1229,16 @@ export class PreAggregationPartitionRangeLoader {
     }];
   }
 
-  private partitionPreAggregationDescription(range: QueryDateRange, loadRange?: QueryDateRange): PreAggregationDescription {
-    loadRange = loadRange ?? range;
+  private partitionPreAggregationDescription(range: QueryDateRange, buildRange: QueryDateRange): PreAggregationDescription {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
+    const loadRange: [string, string] = [...range];
+    let buildRangeEnd;
+    if (this.preAggregation.lambdaView && buildRange[1] < range[1]) {
+      loadRange[1] = buildRange[1];
+      buildRangeEnd = buildRange[1];
+    }
 
     return {
       ...this.preAggregation,
@@ -1251,51 +1252,35 @@ export class PreAggregationPartitionRangeLoader {
       indexesSql: (this.preAggregation.indexesSql || [])
         .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName) })),
       previewSql: this.preAggregation.previewSql &&
-        this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName)
+        this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
+      buildRangeEnd,
     };
   }
 
   public async loadPreAggregations(): Promise<LoadPreAggregationResult> {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
       const { buildRange, partitionRanges } = await this.partitionRanges();
-      const partitionLoaders = partitionRanges.map(range => {
-        const [_, buildRangeEnd] = buildRange;
-        let loadRange = range;
-        let { options } = this;
-        if (PreAggregationPartitionRangeLoader.dateRangeIncludesTimestamp(range, buildRangeEnd)) {
-          loadRange = [loadRange[0], buildRangeEnd];
-          options = { ...options, buildRangeEnd };
-        }
-        return new PreAggregationLoader(
-          this.redisPrefix,
-          this.driverFactory,
-          this.logger,
-          this.queryCache,
-          this.preAggregations,
-          this.partitionPreAggregationDescription(range, loadRange),
-          this.preAggregationsTablesToTempTables,
-          this.loadCache,
-          options,
-        );
-      });
+      const partitionLoaders = partitionRanges.map(range => new PreAggregationLoader(
+        this.redisPrefix,
+        this.driverFactory,
+        this.logger,
+        this.queryCache,
+        this.preAggregations,
+        this.partitionPreAggregationDescription(range, buildRange),
+        this.preAggregationsTablesToTempTables,
+        this.loadCache,
+        this.options,
+      ));
       const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
+      let lastUpdatedAt = getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt));
+      let lambdaTable: InlineTable;
 
       const lastLoadResult = loadResults[loadResults.length - 1];
       if (this.lambdaSql && lastLoadResult.buildRangeEnd) {
-        const lambdaTable = await this.downloadLambdaTable(lastLoadResult.buildRangeEnd);
-
-        const unionTargetTableName = [
-          ...allTableTargetNames.map(name => `SELECT * FROM ${name}`),
-          `SELECT * FROM ${lambdaTable.name}`,
-        ].join(' UNION ALL ');
-        return {
-          targetTableName: `(${unionTargetTableName})`,
-          refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
-          lastUpdatedAt: Date.now(),
-          buildRangeEnd: undefined,
-          lambdaTable,
-        };
+        lambdaTable = await this.downloadLambdaTable(lastLoadResult.buildRangeEnd);
+        allTableTargetNames.push(lambdaTable.name);
+        lastUpdatedAt = Date.now();
       }
 
       const unionTargetTableName = allTableTargetNames
@@ -1304,8 +1289,9 @@ export class PreAggregationPartitionRangeLoader {
       return {
         targetTableName: allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`,
         refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
-        lastUpdatedAt: getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt)),
+        lastUpdatedAt,
         buildRangeEnd: undefined,
+        lambdaTable,
       };
     } else {
       return new PreAggregationLoader(
@@ -1349,8 +1335,8 @@ export class PreAggregationPartitionRangeLoader {
 
   public async partitionPreAggregations(): Promise<PreAggregationDescription[]> {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
-      const { partitionRanges } = await this.partitionRanges();
-      return partitionRanges.map(range => this.partitionPreAggregationDescription(range, range));
+      const { buildRange, partitionRanges } = await this.partitionRanges();
+      return partitionRanges.map(range => this.partitionPreAggregationDescription(range, buildRange));
     } else {
       return [this.preAggregation];
     }
@@ -1430,10 +1416,6 @@ export class PreAggregationPartitionRangeLoader {
     if (range[0].length !== 23 || range[1].length !== 23) {
       throw new Error(`Date range expected to be in YYYY-MM-DDTHH:mm:ss.SSS format but ${range} found`);
     }
-  }
-
-  public static dateRangeIncludesTimestamp(range: QueryDateRange, timestamp: string) {
-    return range[0] <= timestamp && timestamp <= range[1];
   }
 
   public static intersectDateRanges(rangeA: QueryDateRange | null, rangeB: QueryDateRange | null): QueryDateRange {

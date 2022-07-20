@@ -91,4 +91,8 @@ describe('lambda', () => {
       ]
     );
   });
+
+  test('refresh', async () => {
+
+  });
 });
