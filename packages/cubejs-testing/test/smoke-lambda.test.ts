@@ -1,3 +1,5 @@
+import fetch from "node-fetch";
+import { execSync } from "child_process";
 import { StartedTestContainer } from 'testcontainers';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
@@ -6,23 +8,28 @@ import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
 
+
 describe('lambda', () => {
   jest.setTimeout(60 * 5 * 1000);
+  //
   let db: StartedTestContainer;
   let birdbox: BirdBox;
   let client: CubejsApi;
 
   beforeAll(async () => {
+    db = await PostgresDBRunner.startContainer({});
+    const ecom = await (await fetch('https://cube.dev/downloads/ecom-dump-d3-example.sql')).text();
+    execSync(`psql postgresql://test:test@${db.getHost()}:${db.getMappedPort(5432)}/test`, { input: ecom });
     birdbox = await getBirdbox(
       'postgres',
       {
         ...DEFAULT_CONFIG,
         CUBEJS_DB_TYPE: 'postgres',
-        CUBEJS_DB_HOST: 'demo-db-recipes.cube.dev',
-        CUBEJS_DB_PORT: '5432',
-        CUBEJS_DB_NAME: 'recipes',
-        CUBEJS_DB_USER: 'cube',
-        CUBEJS_DB_PASS: '12345',
+        CUBEJS_DB_HOST: db.getHost(),
+        CUBEJS_DB_PORT: db.getMappedPort(5432).toString(),
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
         CUBEJS_REFRESH_WORKER: 'true',
         CUBEJS_ROLLUP_ONLY: 'true',
       },
