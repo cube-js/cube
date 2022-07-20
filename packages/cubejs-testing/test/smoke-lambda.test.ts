@@ -93,6 +93,6 @@ describe('lambda', () => {
   });
 
   test('refresh', async () => {
-
+    const response = await client.run
   });
 });
