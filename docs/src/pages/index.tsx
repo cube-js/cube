@@ -12,8 +12,6 @@ import imgDashboards from './images/dashboards.svg';
 
 import * as styles from '../../static/styles/index.module.scss';
 import { Page, Scopes, SetScrollSectionsAndGithubUrlFunction } from '../types';
-import { HomeGridItem } from '../components/Grid/HomeGridItem';
-import { Grid } from '../components/Grid/Grid';
 
 type Props = {
   changePage(page: Page): void;
@@ -34,10 +32,10 @@ class IndexPage extends Component<Props> {
           <meta name="description" content={"Main | Documentation for working with Cube, the open-source analytics framework"}></meta>
         </Helmet>
         <h1>Documentation</h1>
-
+        
         <InfoBox>
-          <b>Connecting your Business Intelligence Tools to Cube</b> workshop on July 27, 2022.<br/>
-          Building on our <a href="https://cube.dev/events/sql-api">SQL API workshop</a>, we'll continue our discussion on making Cube available to your favorite Business Intelligence applications.<br />
+          <b>Connecting your Business Intelligence Tools to Cube</b> workshop on July 27, 2022.<br/> 
+          Building on our <a href="https://cube.dev/events/sql-api">SQL API workshop</a>, we'll continue our discussion on making Cube available to your favorite Business Intelligence applications.<br /> 
           Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/adv-sql-api/">event page</a> 👈
         </InfoBox>
 
@@ -50,44 +48,51 @@ class IndexPage extends Component<Props> {
           </Col>
         </Row>
         <div className={styles.mainTabs}>
-          <Grid cols={2} imageSize={[50, 50]}>
-            <HomeGridItem
-              description="Start here if you're new to Cube"
-              image={imgGettingStarted}
+          <Row>
+            <MainTab
               title="Getting Started"
-              url="getting-started"
+              img={imgGettingStarted}
+              desc="Start here if you're new to Cube"
+              to="/getting-started"
             />
-            <HomeGridItem
-              description="Connecting to data warehouses, query engines, relational databases, etc."
-              image={imgInsights}
+            <MainTab
               title="Connect to Data Sources"
-              url="config/databases"
+              img={imgInsights}
+              desc="Connecting to data warehouses, query engines, relational databases, etc."
+              to="/config/databases"
+              right
             />
-            <HomeGridItem
-              description="Building the data model, the single source of truth for your metrics"
-              image={imgForDevs}
+          </Row>
+          <Row>
+            <MainTab
               title="Data Model"
-              url="schema/getting-started"
+              img={imgForDevs}
+              desc="Building the data model, the single source of truth for your metrics"
+              to="/schema/getting-started"
             />
-            <HomeGridItem
-              description="Integrating Cube with BI tools, data apps, notebooks, and front-end tools"
-              image={imgDashboards}
+            <MainTab
               title="Connect to Visualization Tools"
-              url="config/downstream"
+              img={imgDashboards}
+              desc="Integrating Cube with BI tools, data apps, notebooks, and front-end tools"
+              to="/config/downstream"
+              right
             />
-            <HomeGridItem
-              description="Accelerating queries and getting the best performance from Cube"
-              image={imgDashboards}
+          </Row>
+          <Row>
+            <MainTab
               title="Caching"
-              url="caching"
+              img={imgDashboards}
+              desc="Accelerating queries and getting the best performance from Cube"
+              to="/caching"
             />
-            <HomeGridItem
-              description="Deploying your application to Cube Cloud, a public cloud, or on-premise"
-              image={imgInsights}
+            <MainTab
               title="Deployment"
-              url="deployment"
+              img={imgInsights}
+              desc="Deploying your application to Cube Cloud, a public cloud, or on-premise"
+              to="/deployment"
+              right
             />
-          </Grid>
+          </Row>
         </div>
       </div>
     );

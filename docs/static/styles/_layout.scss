@@ -280,6 +280,34 @@ a {
   }
 }
 
+.mainTabs {
+  @include card-grid;
+
+  .mainTab {
+    @include card-grid-item;
+
+    &.mainTabRight {
+      @include card-grid-item-adjacent;
+    }
+
+    .mainTabContent {
+      @include card-grid-item-content;
+
+      .mainTabImg {
+        @include card-grid-item-image;
+      }
+
+      .mainTabLink {
+        @include card-grid-item-link;
+      }
+
+      .mainTabText {
+        @include card-grid-item-text;
+      }
+    }
+  }
+}
+
 span.group-header {
   transition: color .2s ease;
   cursor: pointer;

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { GridContext, GridProps } from './Grid';
+import { GridContext } from './Grid';
 
 export type GridItemProps = {
   imageUrl: string;
@@ -16,14 +16,14 @@ export const GridItem = ({
   return (
     <GridContext.Consumer>
       {(value) => {
-        const settings = JSON.parse(value) as GridProps;
-        const [ width, height ] = settings.imageSize ?? [];
+        const settings = JSON.parse(value);
+        const [ width, height ] = settings.imageSize;
 
         return (
           <div className="grid-item">
             <a href={url}>
-              <div className="card">
-                <div className="card__image">
+              <div>
+                <div className="grid-item-image">
                   <img
                     src={imageUrl}
                     alt={title}
@@ -31,7 +31,7 @@ export const GridItem = ({
                     height={height}
                   />
                 </div>
-                <div className="card__title">{title}</div>
+                <div className="grid-item-title">{title}</div>
               </div>
             </a>
           </div>
