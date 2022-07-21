@@ -45,54 +45,54 @@ describe('lambda', () => {
     await db.stop();
   });
 
-  // test('query', async () => {
-  //   const response = await client.load({
-  //     measures: ['Orders.count'],
-  //     dimensions: ['Orders.status'],
-  //     timeDimensions: [
-  //       {
-  //         dimension: 'Orders.completedAt',
-  //         dateRange: ['2020-01-01', '2020-12-31'],
-  //         granularity: 'day'
-  //       }
-  //     ],
-  //     filters: [
-  //       {
-  //         member: 'Orders.status',
-  //         operator: 'equals',
-  //         values: ['shipped']
-  //       }
-  //     ],
-  //     order: {
-  //       'Orders.status': 'asc',
-  //       'Orders.completedAt': 'desc',
-  //     },
-  //     limit: 3
-  //   });
-  //   // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
-  //   expect(response.rawData()).toEqual(
-  //     [
-  //       {
-  //         'Orders.completedAt': '2020-12-31T00:00:00.000',
-  //         'Orders.completedAt.day': '2020-12-31T00:00:00.000',
-  //         'Orders.count': '11',
-  //         'Orders.status': 'shipped',
-  //       },
-  //       {
-  //         'Orders.completedAt': '2020-12-30T00:00:00.000',
-  //         'Orders.completedAt.day': '2020-12-30T00:00:00.000',
-  //         'Orders.count': '8',
-  //         'Orders.status': 'shipped',
-  //       },
-  //       {
-  //         'Orders.completedAt': '2020-12-29T00:00:00.000',
-  //         'Orders.completedAt.day': '2020-12-29T00:00:00.000',
-  //         'Orders.count': '10',
-  //         'Orders.status': 'shipped',
-  //       },
-  //     ]
-  //   );
-  // });
+  test('query', async () => {
+    const response = await client.load({
+      measures: ['Orders.count'],
+      dimensions: ['Orders.status'],
+      timeDimensions: [
+        {
+          dimension: 'Orders.completedAt',
+          dateRange: ['2020-01-01', '2020-12-31'],
+          granularity: 'day'
+        }
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'equals',
+          values: ['shipped']
+        }
+      ],
+      order: {
+        'Orders.status': 'asc',
+        'Orders.completedAt': 'desc',
+      },
+      limit: 3
+    });
+    // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
+    expect(response.rawData()).toEqual(
+      [
+        {
+          'Orders.completedAt': '2020-12-31T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
+          'Orders.count': '11',
+          'Orders.status': 'shipped',
+        },
+        {
+          'Orders.completedAt': '2020-12-30T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-30T00:00:00.000',
+          'Orders.count': '8',
+          'Orders.status': 'shipped',
+        },
+        {
+          'Orders.completedAt': '2020-12-29T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-29T00:00:00.000',
+          'Orders.count': '10',
+          'Orders.status': 'shipped',
+        },
+      ]
+    );
+  });
 
   test('refresh', async () => {
     await client.runScheduledRefresh();
@@ -110,24 +110,24 @@ describe('lambda', () => {
       .sort((p0: any, p1: any) => p0.tableName < p1.tableName)
       .map((p: any) => ({
         tableName: p.tableName,
-        buildRangeEnd: p.buildRangeEnd,
+        buildRangeEnd: p.versionEntries[0].build_range_end, // Actual value from CubeStore.
       }));
     expect(partitions).toEqual([
       {
         tableName: 'dev_pre_aggregations.orders_orders_by_completed_at20200201',
-        buildRangeEnd: undefined,
+        buildRangeEnd: null,
       },
       {
         tableName: 'dev_pre_aggregations.orders_orders_by_completed_at20200301',
-        buildRangeEnd: undefined,
+        buildRangeEnd: null,
       },
       {
         tableName: 'dev_pre_aggregations.orders_orders_by_completed_at20200401',
-        buildRangeEnd: undefined,
+        buildRangeEnd: null,
       },
       {
         tableName: 'dev_pre_aggregations.orders_orders_by_completed_at20200501',
-        buildRangeEnd: '2020-05-07T00:00:00.000',
+        buildRangeEnd: '2020-05-07T00:00:00.000Z',
       },
     ]);
   });

@@ -263,7 +263,7 @@ export class BaseDriver {
 
   getTablesQuery(schemaName) {
     return this.query(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
+      `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
       [schemaName]
     );
   }
