@@ -1,0 +1,104 @@
+---
+title: Connecting to Streamlit
+permalink: /config/downstream/streamlit
+---
+
+You can connect to Cube from Streamlit using the [Cube SQL API][ref-sql-api]. Streamlit turns data scripts into shareable web apps in minutes.
+
+## Enable Cube SQL API
+
+<InfoBox>
+
+Don't have a Cube project yet? [Learn how to get started here][ref-getting-started].
+
+</InfoBox>
+
+### <--{"id" : "Enable Cube SQL API"}--> Cube Cloud
+
+Click **Deploy SQL API** and then the **How to connect your BI tool** link on the Overview page of your Cube deployment.
+Navigate to the **BIs and Visualization Tools** tab. You should see the screen like the one below with
+your connection credentials:
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/78a4b90c-da5a-4d1f-9775-59ce6e7baad0/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
+
+You need to set the following environment variables to enable the Cube SQL API.
+These credentials will be required to connect to Cube from Apache Superset
+later.
+
+```bash
+CUBEJS_PG_SQL_PORT=5432
+CUBEJS_SQL_USER=myusername
+CUBEJS_SQL_PASSWORD=mypassword
+```
+## Connecting from Jupyter
+
+Jupyter connects to Cube as to a Postgres database.
+
+Make sure to install the `streamlit`, `sqlalchemy` and `pandas` modules.
+
+```bash
+pip install streamlit
+pip install sqlalchemy
+pip install pandas
+```
+
+Then you can use `sqlalchemy.create_engine` to connect to Cube's SQL API.
+
+```python
+import streamlit
+import sqlalchemy
+import pandas
+
+engine = sqlalchemy.create_engine(
+  sqlalchemy.engine.url.URL(
+    drivername="postgresql",
+    username="cube",
+    password="9943f670fd019692f58d66b64e375213",
+    host="thirsty-raccoon.sql.aws-eu-central-1.cubecloudapp.dev",
+    port="5432",
+    database="db@thirsty-raccoon",
+  ),
+  echo_pool=True,
+)
+print("connecting with engine " + str(engine))
+connection = engine.connect()
+
+# ...
+```
+
+## Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions are columns.
+
+You can write SQL in Streamlit that will be executed in Cube. Learn more about Cube SQL
+syntax on the [reference page][ref-sql-api].
+
+```python
+# ...
+
+with streamlit.echo():
+  query = "select sum(count) as orders_count, status from orders group by status;"
+df = pandas.read_sql_query(query, connection)
+streamlit.dataframe(df)
+```
+
+In your Streamlit notebook it'll look like this. You can create a visualization of the executed SQL query by using `streamlit.dataframe(df)`.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/298ee212-b4eb-4f13-afaf-7313d040456b/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+[ref-getting-started]: /cloud/getting-started
+[ref-sql-api]: /backend/sql
