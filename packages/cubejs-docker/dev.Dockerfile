@@ -67,7 +67,7 @@ COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-dri
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
 COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/package.json
 COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
-# Skip
+# Skip.
 # COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
 # COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
 # Frontend
