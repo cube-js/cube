@@ -89,6 +89,11 @@ export class MssqlQuery extends BaseQuery {
     return this.rowLimit === null ? '' : ` TOP ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
   }
 
+  aggregateSubQueryGroupByClause() {
+    const dimensionColumns = this.dimensionColumns(this.escapeColumnName('keys'));
+    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
+  }
+
   groupByClause() {
     const dimensionsForSelect = this.dimensionsForSelect();
     const dimensionColumns = R.flatten(dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql()))
