@@ -55,37 +55,37 @@ class IndexPage extends Component<Props> {
               description="Start here if you're new to Cube"
               image={imgGettingStarted}
               title="Getting Started"
-              url="/getting-started"
+              url="getting-started"
             />
             <HomeGridItem
               description="Connecting to data warehouses, query engines, relational databases, etc."
               image={imgInsights}
               title="Connect to Data Sources"
-              url="/config/databases"
+              url="config/databases"
             />
             <HomeGridItem
               description="Building the data model, the single source of truth for your metrics"
               image={imgForDevs}
               title="Data Model"
-              url="/schema/getting-started"
+              url="schema/getting-started"
             />
             <HomeGridItem
               description="Integrating Cube with BI tools, data apps, notebooks, and front-end tools"
               image={imgDashboards}
               title="Connect to Visualization Tools"
-              url="/config/downstream"
+              url="config/downstream"
             />
             <HomeGridItem
               description="Accelerating queries and getting the best performance from Cube"
               image={imgDashboards}
               title="Caching"
-              url="/caching"
+              url="caching"
             />
             <HomeGridItem
               description="Deploying your application to Cube Cloud, a public cloud, or on-premise"
               image={imgInsights}
               title="Deployment"
-              url="/deployment"
+              url="deployment"
             />
           </Grid>
         </div>
