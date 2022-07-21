@@ -1,6 +1,6 @@
 import { StartedTestContainer } from 'testcontainers';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
-import cubejs, {CubejsApi, HttpTransport} from '@cubejs-client/core';
+import cubejs, { CubejsApi, HttpTransport } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
