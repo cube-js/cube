@@ -20,7 +20,7 @@ RUN yarn policies set-version v1.22.5
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \
-    && apt-get install -y python2 python3 gcc g++ make cmake \
+    && apt-get install -y python2 python3 gcc g++ make cmake openjdk-11-jdk-headless \
     && npm config set python /usr/bin/python2.7 \
     && rm -rf /var/lib/apt/lists/*
 

@@ -8,7 +8,9 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl cmake \
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
+       cmake python2 python3 gcc g++ make cmake openjdk-11-jdk-headless \
+    && npm config set python /usr/bin/python2.7 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup
@@ -84,8 +86,10 @@ RUN yarn policies set-version v1.22.5
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
-#RUN yarn install --frozen-lockfile
+# RUN yarn install --frozen-lockfile
+
 FROM base as prod_dependencies
+
 RUN npm install -g lerna patch-package
 RUN yarn install --prod
 
@@ -144,6 +148,20 @@ COPY packages/cubejs-playground/ packages/cubejs-playground/
 RUN yarn build
 RUN yarn lerna run build
 
+RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
+
+FROM base AS databricks
+
+COPY --from=build /cubejs .
+COPY --from=prod_dependencies /cubejs .
+COPY packages/cubejs-jdbc-driver packages/cubejs-jdbc-driver
+COPY packages/cubejs-databricks-jdbc-driver packages/cubejs-databricks-jdbc-driver
+
+RUN npm config set python /usr/bin/python2.7
+RUN yarn policies set-version v1.22.5
+RUN yarn install
+RUN cd packages/cubejs-jdbc-driver && yarn tsc
+RUN cd packages/cubejs-databricks-jdbc-driver && yarn tsc
 RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
 
 FROM base AS final
