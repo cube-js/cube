@@ -1233,11 +1233,12 @@ export class PreAggregationPartitionRangeLoader {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
-    const loadRange: [string, string] = [...range];
     let buildRangeEnd;
+    const loadRange: [string, string] = [...range];
     if (this.preAggregation.lambdaView && buildRange[1] < range[1]) {
-      loadRange[1] = buildRange[1];
-      buildRangeEnd = buildRange[1];
+      let _;
+      [_, buildRangeEnd] = buildRange;
+      loadRange[1] = buildRangeEnd;
     }
 
     return {
