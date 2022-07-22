@@ -119,6 +119,8 @@ export class CubeStoreHandler {
   protected async getBinary() {
     const pathToExecutable = getBinaryPath();
 
+    throw new Error(`QQQ ${pathToExecutable}`)
+
     if (!fs.existsSync(pathToExecutable)) {
       await downloadBinaryFromRelease();
 
