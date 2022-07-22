@@ -9,8 +9,8 @@ use crate::{
             outer_aggregate_split_replacer, outer_projection_split_replacer, projection,
             projection_expr, projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
             rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
-            AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, ColumnExprColumn,
-            CubeScanTableName, InnerAggregateSplitReplacerCube, LiteralExprValue,
+            AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp,
+            ColumnExprColumn, CubeScanTableName, InnerAggregateSplitReplacerCube, LiteralExprValue,
             LogicalPlanLanguage, OuterAggregateSplitReplacerCube, OuterProjectionSplitReplacerCube,
             ProjectionAlias, TableScanSourceTableName,
         },
@@ -568,7 +568,11 @@ impl RewriteRules for SplitRules {
                     ("?arg", column_expr("?column")),
                 ],
                 alias_expr(
-                    agg_fun_expr("?output_fun", vec!["?alias".to_string()], "?distinct"),
+                    agg_fun_expr(
+                        "?output_fun",
+                        vec!["?alias".to_string()],
+                        "?output_distinct",
+                    ),
                     "?outer_alias",
                 ),
                 self.transform_outer_aggr_fun(
@@ -580,6 +584,7 @@ impl RewriteRules for SplitRules {
                     "?alias",
                     "?outer_alias",
                     "?output_fun",
+                    "?output_distinct",
                 ),
             ),
             transforming_chain_rewrite(
@@ -590,7 +595,11 @@ impl RewriteRules for SplitRules {
                     ("?arg", literal_expr("?literal")),
                 ],
                 alias_expr(
-                    agg_fun_expr("?output_fun", vec!["?alias".to_string()], "?distinct"),
+                    agg_fun_expr(
+                        "?output_fun",
+                        vec!["?alias".to_string()],
+                        "?output_distinct",
+                    ),
                     "?outer_alias",
                 ),
                 self.transform_outer_aggr_fun(
@@ -602,6 +611,7 @@ impl RewriteRules for SplitRules {
                     "?alias",
                     "?outer_alias",
                     "?output_fun",
+                    "?output_distinct",
                 ),
             ),
             transforming_rewrite(
@@ -1099,6 +1109,7 @@ impl SplitRules {
         alias_expr_var: &'static str,
         outer_alias_expr_var: &'static str,
         output_fun_var: &'static str,
+        output_distinct: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let original_expr_var = var!(original_expr_var);
@@ -1108,6 +1119,7 @@ impl SplitRules {
         let alias_expr_var = var!(alias_expr_var);
         let outer_alias_expr_var = var!(outer_alias_expr_var);
         let output_fun_var = var!(output_fun_var);
+        let output_distinct = var!(output_distinct);
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
             for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
@@ -1175,6 +1187,13 @@ impl SplitRules {
                             output_fun_var,
                             egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
                                 AggregateFunctionExprFun(output_fun),
+                            )),
+                        );
+
+                        subst.insert(
+                            output_distinct,
+                            egraph.add(LogicalPlanLanguage::AggregateFunctionExprDistinct(
+                                AggregateFunctionExprDistinct(false),
                             )),
                         );
 
