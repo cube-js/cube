@@ -20,7 +20,6 @@ export class CubeStoreDevDriver extends CubeStoreDriver {
   }
 
   protected async acquireCubeStore() {
-    throw new Error('NOOOOOOO');
     return this.cubeStoreHandler.acquire();
   }
 
