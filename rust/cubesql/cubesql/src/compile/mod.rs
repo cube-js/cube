@@ -10692,11 +10692,17 @@ ORDER BY \"COUNT(count)\" DESC"
     #[tokio::test]
     async fn test_extract_date_trunc_week() {
         let supported_granularities = vec![
-            "EXTRACT(WEEK FROM DATE_TRUNC('MONTH', \"order_date\"))::integer",
-            "EXTRACT(MONTH FROM DATE_TRUNC('WEEK', \"order_date\"))::integer",
+            (
+                "EXTRACT(WEEK FROM DATE_TRUNC('MONTH', \"order_date\"))::integer",
+                "month",
+            ),
+            (
+                "EXTRACT(MONTH FROM DATE_TRUNC('WEEK', \"order_date\"))::integer",
+                "week",
+            ),
         ];
 
-        for expr in supported_granularities {
+        for (expr, granularity) in supported_granularities {
             let logical_plan = convert_select_to_query_plan(
                 format!(
                     "SELECT {} AS \"qt_u3dj8wr1vc\" FROM KibanaSampleDataEcommerce GROUP BY \"qt_u3dj8wr1vc\"",
@@ -10715,7 +10721,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     segments: Some(vec![]),
                     time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                         dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                        granularity: Some("day".to_string()),
+                        granularity: Some(granularity.to_string()),
                         date_range: None,
                     }]),
                     order: None,

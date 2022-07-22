@@ -37,7 +37,11 @@ use datafusion::{
 };
 use egg::{EGraph, Id, Rewrite, Subst, Var};
 use itertools::Itertools;
-use std::{collections::HashSet, ops::Index, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Index,
+    sync::Arc,
+};
 
 pub struct MemberRules {
     cube_context: Arc<CubeContext>,
@@ -824,13 +828,17 @@ impl MemberRules {
                         .unwrap_or(outer_granularity.clone())
                 };
 
-                let date_trunc_granularity = match Self::get_larger_granularity_of_two(
-                    &outer_granularity,
-                    &inner_granularity,
-                ) {
-                    Some(granularity) => granularity,
-                    None => continue,
-                };
+                let date_trunc_granularity =
+                    match min_granularity(&outer_granularity, &inner_granularity) {
+                        Some(granularity) => {
+                            if granularity == inner_granularity {
+                                outer_granularity
+                            } else {
+                                inner_granularity
+                            }
+                        }
+                        None => continue,
+                    };
 
                 if let Ok(expr) = res {
                     // TODO unwrap
@@ -1692,35 +1700,16 @@ impl MemberRules {
         "count".to_string()
     }
 
-    fn get_larger_granularity_of_two(
-        first_granularity: &String,
-        second_granularity: &String,
-    ) -> Option<String> {
-        if first_granularity == second_granularity {
-            return Some(first_granularity.clone());
-        }
-
-        match (
-            CubeTimeGranularity::from_str(first_granularity),
-            CubeTimeGranularity::from_str(second_granularity),
-        ) {
-            (Some(first), Some(second)) => {
-                Some(CubeTimeGranularity::larger_of_two(first, second).to_str())
-            }
-            _ => None,
-        }
-    }
-
     fn parse_granularity(granularity: &ScalarValue, to_normalize: bool) -> Option<String> {
         match granularity {
             ScalarValue::Utf8(Some(granularity)) => {
                 if to_normalize {
                     match granularity.to_lowercase().as_str() {
                         "dow" | "doy" => Some("day".to_string()),
-                        _ => Some(granularity.clone()),
+                        _ => Some(granularity.to_lowercase()),
                     }
                 } else {
-                    Some(granularity.clone())
+                    Some(granularity.to_lowercase())
                 }
             }
             _ => None,
@@ -1747,62 +1736,105 @@ pub fn add_member_error(
     ]))
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-enum CubeTimeGranularity {
-    Second = 0,
-    Minute,
-    Hour,
-    Day,
-    Week,
-    Month,
-    Quarter,
-    Year,
+lazy_static! {
+    static ref STANDARD_GRANULARITIES_PARENTS: HashMap<&'static str, Vec<&'static str>> = [
+        (
+            "year",
+            vec!["year", "quarter", "month", "day", "hour", "minute", "second"]
+        ),
+        (
+            "quarter",
+            vec!["quarter", "month", "day", "hour", "minute", "second"]
+        ),
+        ("month", vec!["month", "day", "hour", "minute", "second"]),
+        ("week", vec!["week", "day", "hour", "minute", "second"]),
+        ("day", vec!["day", "hour", "minute", "second"]),
+        ("hour", vec!["hour", "minute", "second"]),
+        ("minute", vec!["minute", "second"]),
+        ("second", vec!["second"]),
+    ]
+    .iter()
+    .cloned()
+    .collect();
 }
 
-impl CubeTimeGranularity {
-    fn from_str(str: &String) -> Option<CubeTimeGranularity> {
-        match str.to_lowercase().as_str() {
-            "year" => Some(CubeTimeGranularity::Year),
-            "quarter" => Some(CubeTimeGranularity::Quarter),
-            "month" => Some(CubeTimeGranularity::Month),
-            "week" => Some(CubeTimeGranularity::Week),
-            "day" => Some(CubeTimeGranularity::Day),
-            "hour" => Some(CubeTimeGranularity::Hour),
-            "minute" => Some(CubeTimeGranularity::Minute),
-            "second" => Some(CubeTimeGranularity::Second),
-            _ => None,
-        }
+fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option<String> {
+    let granularity_a = granularity_a.to_lowercase();
+    let granularity_b = granularity_b.to_lowercase();
+
+    if granularity_a == granularity_b {
+        return Some(granularity_a);
+    }
+    if !STANDARD_GRANULARITIES_PARENTS.contains_key(granularity_a.as_str())
+        || !STANDARD_GRANULARITIES_PARENTS.contains_key(granularity_b.as_str())
+    {
+        return None;
     }
 
-    fn to_str(&self) -> String {
-        match &self {
-            CubeTimeGranularity::Year => "year".to_string(),
-            CubeTimeGranularity::Quarter => "quarter".to_string(),
-            CubeTimeGranularity::Month => "month".to_string(),
-            CubeTimeGranularity::Week => "week".to_string(),
-            CubeTimeGranularity::Day => "day".to_string(),
-            CubeTimeGranularity::Hour => "hour".to_string(),
-            CubeTimeGranularity::Minute => "minute".to_string(),
-            CubeTimeGranularity::Second => "second".to_string(),
-        }
+    let a_hierarchy = STANDARD_GRANULARITIES_PARENTS[granularity_a.as_str()].clone();
+    let b_hierarchy = STANDARD_GRANULARITIES_PARENTS[granularity_b.as_str()].clone();
+
+    fn first_diff(a_hierarchy: &Vec<&'static str>, b_hierarchy: &Vec<&'static str>) -> i32 {
+        a_hierarchy
+            .iter()
+            .rev()
+            .zip(b_hierarchy.iter().rev().chain(std::iter::repeat(&"")))
+            .enumerate()
+            .find_map(|(i, (a, b))| if a != b { Some(i as i32) } else { None })
+            .unwrap_or(-1)
     }
 
-    fn larger_of_two(
-        first_granularity: CubeTimeGranularity,
-        second_granularity: CubeTimeGranularity,
-    ) -> CubeTimeGranularity {
-        if first_granularity == second_granularity {
-            first_granularity
-        } else if first_granularity == CubeTimeGranularity::Week
-            || second_granularity == CubeTimeGranularity::Week
-        {
-            CubeTimeGranularity::Day
-        } else {
-            if first_granularity as i32 > second_granularity as i32 {
-                first_granularity
-            } else {
-                second_granularity
-            }
-        }
+    let last_index = std::cmp::max(
+        first_diff(&a_hierarchy, &b_hierarchy),
+        first_diff(&b_hierarchy, &a_hierarchy),
+    );
+
+    if last_index <= 0 {
+        None
+    } else {
+        Some(a_hierarchy[a_hierarchy.len() - last_index as usize].to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_min_granularity() {
+        assert_eq!(
+            min_granularity(&"month".to_string(), &"week".to_string()),
+            Some("day".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"week".to_string(), &"month".to_string()),
+            Some("day".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"year".to_string(), &"year".to_string()),
+            Some("year".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"YEAR".to_string(), &"year".to_string()),
+            Some("year".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"week".to_string(), &"second".to_string()),
+            Some("second".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"minute".to_string(), &"quarter".to_string()),
+            Some("minute".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"NULL".to_string(), &"quarter".to_string()),
+            None,
+        );
     }
 }
