@@ -813,8 +813,22 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                             str_val
                         );
                     }
-                    // TODO:
-                    _ => (),
+                    _ => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *expr = ast::Expr::Function(ast::Function {
+                            name: ast::ObjectName(vec![ast::Ident {
+                                value: "__cube_regclass_cast".to_string(),
+                                quote_style: None,
+                            }]),
+                            args: vec![ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(
+                                *cast_expr.clone(),
+                            ))],
+                            over: None,
+                            distinct: false,
+                            special: false,
+                        })
+                    }
                 },
                 _ => self.visit_expr(&mut *cast_expr)?,
             }
@@ -1006,6 +1020,10 @@ mod tests {
         run_cast_replacer(
             "SELECT NOW()::timestamptz",
             "SELECT CAST(NOW() AS TIMESTAMP)",
+        )?;
+        run_cast_replacer(
+            "SELECT CAST(1 + 1 as Regclass);",
+            "SELECT __cube_regclass_cast(1 + 1)",
         )?;
 
         Ok(())

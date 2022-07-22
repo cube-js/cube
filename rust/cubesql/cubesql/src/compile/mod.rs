@@ -46,10 +46,10 @@ use self::{
         provider::CubeContext,
         udf::{
             create_array_lower_udf, create_array_upper_udf, create_connection_id_udf,
-            create_convert_tz_udf, create_current_schema_udf, create_current_schemas_udf,
-            create_current_timestamp_udf, create_current_user_udf, create_date_add_udf,
-            create_date_sub_udf, create_date_udf, create_dayofmonth_udf, create_dayofweek_udf,
-            create_dayofyear_udf, create_db_udf, create_format_type_udf,
+            create_convert_tz_udf, create_cube_regclass_cast_udf, create_current_schema_udf,
+            create_current_schemas_udf, create_current_timestamp_udf, create_current_user_udf,
+            create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
+            create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_format_type_udf,
             create_generate_series_udtf, create_generate_subscripts_udtf,
             create_has_schema_privilege_udf, create_hour_udf, create_if_udf, create_instr_udf,
             create_isnull_udf, create_least_udf, create_locate_udf, create_makedate_udf,
@@ -2486,6 +2486,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_is_other_temp_schema());
         ctx.register_udf(create_has_schema_privilege_udf(self.state.clone()));
         ctx.register_udf(create_pg_total_relation_size_udf());
+        ctx.register_udf(create_cube_regclass_cast_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -7252,6 +7253,49 @@ ORDER BY \"COUNT(count)\" DESC"
             "pgcatalog_pgam_postgres",
             execute_query(
                 "SELECT * FROM pg_catalog.pg_am".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_dynamic_regclass() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "dynamic_regclass_postgres_utf8",
+            execute_query(
+                "SELECT cast(r.a as regclass) FROM (
+                    SELECT 'pg_class' as a
+                    UNION ALL
+                    SELECT NULL
+                ) as r"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "dynamic_regclass_postgres_int32",
+            execute_query(
+                "SELECT cast(r.a as regclass) FROM (
+                    SELECT CAST(83 as int) as a
+                ) as r"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "dynamic_regclass_postgres_int64",
+            execute_query(
+                "SELECT cast(r.a as regclass) FROM (
+                    SELECT 83 as a
+                ) as r"
+                    .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
