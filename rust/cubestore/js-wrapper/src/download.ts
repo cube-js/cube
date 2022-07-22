@@ -78,6 +78,8 @@ export async function downloadBinaryFromRelease() {
       ) {
         const cubestorePath = getCubeStorePath();
 
+        throw new Error(`QQQ ${version} ${cubestorePath}`)
+
         return downloadAndExtractFile(asset.browser_download_url, {
           cwd: cubestorePath,
           showProgress: true,
