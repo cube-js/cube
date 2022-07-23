@@ -446,6 +446,7 @@ jobs:
           file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
+          no-cache: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
       - name: Use Node.js 16.x
         uses: actions/setup-node@v1
