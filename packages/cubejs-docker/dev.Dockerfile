@@ -69,6 +69,7 @@ COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-dri
 COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
 COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/package.json
 COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
+COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
 # Skip
 # COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
 # COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
@@ -86,12 +87,17 @@ RUN yarn policies set-version v1.22.5
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
-# RUN yarn install --frozen-lockfile
-
-FROM base as prod_dependencies
-
+#RUN yarn install --frozen-lockfile
+FROM base as prod_base_dependencies
 RUN npm install -g lerna patch-package
 RUN yarn install --prod
+
+FROM prod_base_dependencies as prod_dependencies
+COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
+COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
+COPY packages/cubejs-databricks-jdbc-driver/dist/src/post-install.js packages/cubejs-databricks-jdbc-driver/dist/src/post-install.js
+COPY packages/cubejs-databricks-jdbc-driver/dist/src/installer.js packages/cubejs-databricks-jdbc-driver/dist/src/installer.js
+RUN yarn install --prod --ignore-scripts
 
 FROM base as build
 
@@ -132,6 +138,8 @@ COPY packages/cubejs-snowflake-driver/ packages/cubejs-snowflake-driver/
 COPY packages/cubejs-sqlite-driver/ packages/cubejs-sqlite-driver/
 COPY packages/cubejs-ksql-driver/ packages/cubejs-ksql-driver/
 COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
+COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
+COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-driver/
 # Skip
 # COPY packages/cubejs-testing/ packages/cubejs-testing/
 # COPY packages/cubejs-docker/ packages/cubejs-docker/
@@ -148,20 +156,6 @@ COPY packages/cubejs-playground/ packages/cubejs-playground/
 RUN yarn build
 RUN yarn lerna run build
 
-RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
-
-FROM base AS databricks
-
-COPY --from=build /cubejs .
-COPY --from=prod_dependencies /cubejs .
-COPY packages/cubejs-jdbc-driver packages/cubejs-jdbc-driver
-COPY packages/cubejs-databricks-jdbc-driver packages/cubejs-databricks-jdbc-driver
-
-RUN npm config set python /usr/bin/python2.7
-RUN yarn policies set-version v1.22.5
-RUN yarn install
-RUN cd packages/cubejs-jdbc-driver && yarn tsc
-RUN cd packages/cubejs-databricks-jdbc-driver && yarn tsc
 RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
 
 FROM base AS final
