@@ -438,6 +438,8 @@ jobs:
         with:
           version: v0.6.3
           driver-opts: network=host
+      - name: Check .dockerignore
+        run: echo "$(<.dockerignore)"
       - name: Build image
         uses: docker/build-push-action@v2
         timeout-minutes: 30
@@ -446,7 +448,6 @@ jobs:
           file: ./packages/cubejs-docker/${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
-          no-cache: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
       - name: Use Node.js 16.x
         uses: actions/setup-node@v1
