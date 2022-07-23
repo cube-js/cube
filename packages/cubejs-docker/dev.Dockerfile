@@ -95,8 +95,6 @@ RUN yarn install --prod
 FROM prod_base_dependencies as prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
-COPY packages/cubejs-databricks-jdbc-driver/dist/src/post-install.js packages/cubejs-databricks-jdbc-driver/dist/src/post-install.js
-COPY packages/cubejs-databricks-jdbc-driver/dist/src/installer.js packages/cubejs-databricks-jdbc-driver/dist/src/installer.js
 RUN yarn install --prod --ignore-scripts
 
 FROM base as build

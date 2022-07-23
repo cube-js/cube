@@ -438,8 +438,6 @@ jobs:
         with:
           version: v0.6.3
           driver-opts: network=host
-      - name: Clear cache
-        run: docker system prune -f
       - name: Build image
         uses: docker/build-push-action@v2
         timeout-minutes: 30
