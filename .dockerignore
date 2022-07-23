@@ -1,4 +1,5 @@
 **
+
 !package.json
 !tsconfig.base.json
 !rollup.config.js
@@ -19,5 +20,4 @@ packages/cubejs-serverless
 packages/cubejs-serverless-aws
 packages/cubejs-serverless-google
 
-!packages/cubejs-databricks-jdbc-driver/dist/src/post-install.js
-!packages/cubejs-databricks-jdbc-driver/dist/src/installer.js
+!packages/cubejs-databricks-jdbc-driver/dist/
