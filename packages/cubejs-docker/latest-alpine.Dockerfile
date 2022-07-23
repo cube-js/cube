@@ -17,12 +17,9 @@ RUN yarn policies set-version v1.22.5
 
 # Required for node-oracledb to buld on ARM64
 RUN apk update \
-    && apk add python2 gcc g++ make cmake bash openjdk11-jdk \
+    && apk add python2 gcc g++ make \
     && npm config set python /usr/bin/python2.7 \
     && rm -rf /var/cache/apk/*
-
-ENV JAVA_HOME /usr/lib/jvm/default-jvm
-ENV PATH "$JAVA_HOME/bin:${PATH}"
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
