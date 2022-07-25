@@ -1,0 +1,87 @@
+---
+title: Connecting to Metabase
+permalink: /config/downstream/metabase
+---
+
+You can connect to Cube from Metabase by using the [Cube SQL API][ref-sql-api]. Metabase is the easy, open-source way to help everyone in your company work with data like an analyst.
+
+## Enable Cube SQL API
+
+<InfoBox>
+
+Don't have a Cube project yet? [Learn how to get started here][ref-getting-started].
+
+</InfoBox>
+
+### <--{"id" : "Enable Cube SQL API"}--> Cube Cloud
+
+Click **Deploy SQL API** and then the **How to connect your BI tool** link on the Overview page of your Cube deployment.
+Navigate to the **BIs and Visualization Tools** tab. You should see the screen like the one below with
+your connection credentials:
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/78a4b90c-da5a-4d1f-9775-59ce6e7baad0/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
+
+You need to set the following environment variables to enable the Cube SQL API.
+These credentials will be required to connect to Cube from Apache Superset
+later.
+
+```dotenv
+CUBEJS_PG_SQL_PORT=5432
+CUBEJS_SQL_USER=myusername
+CUBEJS_SQL_PASSWORD=mypassword
+```
+## Connecting from Metabase
+
+Metabase connects to Cube as to a Postgres database.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/15722cdb-901e-4f21-aab2-b8c468997e4d/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions are columns.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/e25bff7f-c3d2-4b33-a8a4-72681e71f60c/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+You can write SQL in Metabase that will be executed in Cube. Learn more about Cube SQL
+syntax on the [reference page][ref-sql-api]. You can also create a visualization of the executed SQL query.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/c2740434-69ae-4e0b-ab3c-755205963892/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+If you prefer using the UI interface to "Ask a question", you can do that as well.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/aac8591f-47ae-47a3-b4f0-51a7164d6305/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+[ref-getting-started]: /cloud/getting-started
+[ref-sql-api]: /backend/sql
