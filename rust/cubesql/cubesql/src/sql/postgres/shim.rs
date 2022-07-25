@@ -1,4 +1,4 @@
-use std::{backtrace::Backtrace, collections::HashMap, sync::Arc};
+use std::{backtrace::Backtrace, collections::HashMap, io::ErrorKind, sync::Arc};
 
 use super::extended::PreparedStatement;
 use crate::{
@@ -191,6 +191,16 @@ impl AsyncPostgresShim {
 
         match shim.run().await {
             Err(e) => {
+                if let ConnectionError::Protocol(ProtocolError::IO { source, .. }) = &e {
+                    if source.kind() == ErrorKind::BrokenPipe
+                        || source.kind() == ErrorKind::UnexpectedEof
+                    {
+                        trace!("Error during processing PostgreSQL connection: {}", e);
+
+                        return Ok(());
+                    }
+                }
+
                 shim.logger.error(
                     format!("Error during processing PostgreSQL connection: {}", e).as_str(),
                     None,
