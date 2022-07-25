@@ -52,10 +52,11 @@ use self::{
             create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_format_type_udf,
             create_generate_series_udtf, create_generate_subscripts_udtf,
             create_has_schema_privilege_udf, create_hour_udf, create_if_udf, create_instr_udf,
-            create_isnull_udf, create_least_udf, create_locate_udf, create_makedate_udf,
-            create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
+            create_isnull_udf, create_json_build_object_udf, create_least_udf, create_locate_udf,
+            create_makedate_udf, create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
             create_pg_datetime_precision_udf, create_pg_expandarray_udtf,
-            create_pg_get_constraintdef_udf, create_pg_get_expr_udf, create_pg_get_userbyid_udf,
+            create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
+            create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
             create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
             create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
@@ -2487,6 +2488,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_has_schema_privilege_udf(self.state.clone()));
         ctx.register_udf(create_pg_total_relation_size_udf());
         ctx.register_udf(create_cube_regclass_cast_udf());
+        ctx.register_udf(create_pg_get_serial_sequence_udf());
+        ctx.register_udf(create_json_build_object_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -8297,6 +8300,83 @@ ORDER BY \"COUNT(count)\" DESC"
                 ORDER BY 1
                 "#
                 .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    // https://github.com/sqlalchemy/sqlalchemy/blob/6104c163eb58e35e46b0bb6a237e824ec1ee1d15/lib/sqlalchemy/dialects/postgresql/base.py
+    #[tokio::test]
+    async fn sqlalchemy_new_conname_query() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "sqlalchemy_new_conname_query",
+            execute_query(
+                r#"SELECT
+                a.attname,
+                pg_catalog.format_type(a.atttypid, a.atttypmod),
+                (
+                    SELECT
+                        pg_catalog.pg_get_expr(d.adbin, d.adrelid)
+                    FROM
+                        pg_catalog.pg_attrdef AS d
+                    WHERE
+                        d.adrelid = a.attrelid
+                        AND d.adnum = a.attnum
+                        AND a.atthasdef
+                ) AS DEFAULT,
+                a.attnotnull,
+                a.attrelid AS table_oid,
+                pgd.description AS comment,
+                a.attgenerated AS generated,
+                (
+                    SELECT
+                        json_build_object(
+                            'always',
+                            a.attidentity = 'a',
+                            'start',
+                            s.seqstart,
+                            'increment',
+                            s.seqincrement,
+                            'minvalue',
+                            s.seqmin,
+                            'maxvalue',
+                            s.seqmax,
+                            'cache',
+                            s.seqcache,
+                            'cycle',
+                            s.seqcycle
+                        )
+                    FROM
+                        pg_catalog.pg_sequence AS s
+                        JOIN pg_catalog.pg_class AS c ON s.seqrelid = c."oid"
+                    WHERE
+                        c.relkind = 'S'
+                        AND a.attidentity <> ''
+                        AND s.seqrelid = CAST(
+                            pg_catalog.pg_get_serial_sequence(
+                                CAST(CAST(a.attrelid AS REGCLASS) AS TEXT),
+                                a.attname
+                            ) AS REGCLASS
+                        )
+                ) AS identity_options
+            FROM
+                pg_catalog.pg_attribute AS a
+                LEFT JOIN pg_catalog.pg_description AS pgd ON (
+                    pgd.objoid = a.attrelid
+                    AND pgd.objsubid = a.attnum
+                )
+            WHERE
+                a.attrelid = 18000
+                AND a.attnum > 0
+                AND NOT a.attisdropped
+            ORDER BY
+                a.attnum"#
+                    .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
