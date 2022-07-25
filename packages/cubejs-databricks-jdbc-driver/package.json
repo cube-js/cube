@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/databricks-jdbc-driver",
   "description": "Cube.js Databricks database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.34",
+  "version": "0.30.38",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
