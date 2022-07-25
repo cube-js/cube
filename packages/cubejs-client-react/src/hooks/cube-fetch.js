@@ -1,13 +1,13 @@
-import { useContext, useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { isQueryPresent } from '@cubejs-client/core';
 
-import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
 import { useIsMounted } from './is-mounted';
+import { useCubeApi } from './cube-api';
 
 export function useCubeFetch(method, options = {}) {
   const isMounted = useIsMounted();
-  const context = useContext(CubeContext);
+  const cubejsApi = useCubeApi(options.cubejsApi);
   const mutexRef = useRef({});
 
   const [response, setResponse] = useState({
@@ -19,7 +19,6 @@ export function useCubeFetch(method, options = {}) {
   const { skip = false } = options;
 
   async function load(loadOptions = {}, ignoreSkip = false) {
-    const cubejsApi = options.cubejsApi || context?.cubejsApi;
     const query = loadOptions.query || options.query;
 
     const queryCondition = method === 'meta' ? true : query && isQueryPresent(query);

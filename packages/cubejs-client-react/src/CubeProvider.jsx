@@ -1,6 +1,16 @@
-import React from 'react';
+import React, { useContext, useMemo } from 'react';
 import CubeContext from './CubeContext';
 
-export default function CubeProvider({ cubejsApi, children }) {
-  return <CubeContext.Provider value={{ cubejsApi }}>{children}</CubeContext.Provider>;
+export default function CubeProvider({
+  name,
+  cubejsApi,
+  children,
+}) {
+  const oldContext = useContext(CubeContext);
+  const newContext = useMemo(() => ({
+    ...oldContext,
+    [name ?? 'default']: cubejsApi,
+  }), []);
+
+  return <CubeContext.Provider value={newContext}>{children}</CubeContext.Provider>;
 }
