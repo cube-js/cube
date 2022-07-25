@@ -1,11 +1,7 @@
 import R from 'ramda';
 import { StartedTestContainer } from 'testcontainers';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
-import {
-  CubeStoreDevDriver,
-  CubeStoreDriver,
-  CubeStoreHandler
-} from '@cubejs-backend/cubestore-driver';
+import CubeStoreDriver0, { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
@@ -57,7 +53,7 @@ describe('lambda', () => {
   let db: StartedTestContainer;
   let birdbox: BirdBox;
   let client: CubejsApi;
-  let cubestore: CubeStoreDevDriver;
+  let cubestore: CubeStoreDriver;
 
   beforeAll(async () => {
     db = await PostgresDBRunner.startContainer({});
@@ -84,17 +80,14 @@ describe('lambda', () => {
     client = cubejs(async () => 'test', {
       apiUrl: birdbox.configuration.apiUrl,
     });
-    const cubeStoreHandler = new CubeStoreHandler({
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      stdout: (data: Buffer) => {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      stderr: (data: Buffer) => {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      onRestart: (code: number | null) => {},
-    });
+    // TS compiler is confused: the ctor is the module, but the TS type is inside the module.
     // @ts-ignore
-    cubeStoreHandler.cubeStore = 123;
-    cubestore = new CubeStoreDevDriver(cubeStoreHandler);
+    cubestore = new CubeStoreDriver0({
+      host: '127.0.0.1',
+      user: undefined,
+      password: undefined,
+      port: 3030,
+    });
   });
 
   afterAll(async () => {
