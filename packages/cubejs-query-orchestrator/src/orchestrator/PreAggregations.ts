@@ -454,7 +454,9 @@ export class PreAggregationLoader {
     }
   }
 
-  public async loadPreAggregation(): Promise<LoadPreAggregationResult> {
+  public async loadPreAggregation(
+    throwOnMissingPartition: boolean,
+  ): Promise<null | LoadPreAggregationResult> {
     const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
       .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
     if (notLoadedKey && !this.waitForRenew) {
@@ -470,17 +472,25 @@ export class PreAggregationLoader {
 
       const versionEntryByStructureVersion = byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (this.externalRefresh) {
-        if (!versionEntryByStructureVersion) {
-          throw new Error('Your configuration restricts query requests to only be served from pre-aggregations, and required pre-aggregation partitions were not built yet. Please make sure your refresh worker is configured correctly and running.');
+        if (!versionEntryByStructureVersion && throwOnMissingPartition) {
+          throw new Error(
+            'Your configuration restricts query requests to only be served from ' +
+            'pre-aggregations, and required pre-aggregation partitions were not ' +
+            'built yet. Please make sure your refresh worker is configured ' +
+            'correctly and running.'
+          );
         }
-
-        // the rollups are being maintained independently of this instance of cube.js,
-        // immediately return the latest data it already has
-        return {
-          targetTableName: this.targetTableName(versionEntryByStructureVersion),
-          refreshKeyValues: [],
-          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at
-        };
+        if (!versionEntryByStructureVersion) {
+          return null;
+        } else {
+          // the rollups are being maintained independently of this instance of cube.js
+          // immediately return the latest rollup data that instance already has
+          return {
+            targetTableName: this.targetTableName(versionEntryByStructureVersion),
+            lastUpdatedAt: versionEntryByStructureVersion.last_updated_at,
+            refreshKeyValues: [],
+          };
+        }
       }
 
       if (versionEntryByStructureVersion) {
@@ -1224,7 +1234,16 @@ export class PreAggregationPartitionRangeLoader {
         this.loadCache,
         this.options
       ));
-      const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
+      const resolveResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation(false)));
+      const loadResults = resolveResults.filter(res => res !== null);
+      if (this.options.externalRefresh && loadResults.length === 0) {
+        throw new Error(
+          'Your configuration restricts query requests to only be served from ' +
+          'pre-aggregations, and required pre-aggregation partitions were not ' +
+          'built yet. Please make sure your refresh worker is configured ' +
+          'correctly and running.'
+        );
+      }
       const allTableTargetNames = loadResults
         .map(
           targetTableName => targetTableName.targetTableName
@@ -1248,7 +1267,7 @@ export class PreAggregationPartitionRangeLoader {
         this.preAggregationsTablesToTempTables,
         this.loadCache,
         this.options
-      ).loadPreAggregation();
+      ).loadPreAggregation(true);
     }
   }
 
