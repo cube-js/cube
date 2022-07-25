@@ -480,7 +480,7 @@ export class PreAggregationLoader {
             : NOT_READY,
           lastUpdatedAt: versionEntryByStructureVersion
             ? versionEntryByStructureVersion.last_updated_at
-            : Date.now(),
+            : 0,
           refreshKeyValues: [],
         };
       }
