@@ -66,6 +66,7 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
+    "@cubejs-backend/cubestore-driver": "^0.30.38",
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/query-orchestrator": "^0.30.34",
     "@cubejs-backend/schema-compiler": "^0.30.34",

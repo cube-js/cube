@@ -1325,7 +1325,7 @@ export class PreAggregationPartitionRangeLoader {
         forceBuild: true,
         useDownload: true,
       },
-      this.priority(10),
+      this.priority(11),
     );
     return {
       name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,

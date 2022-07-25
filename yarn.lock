@@ -3683,6 +3683,35 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.4.0.tgz#c3c5ae543c897caa9c2a68630bed355be5f9990f"
   integrity sha512-JZButFdZ1+/xAfpguQHoabIXkcqRRKpMrWKBkpEZZyxfY9C1DpADFB8PEqGSTeFr135SaTRfKqGKx5xSCLI7ZQ==
 
+"@cubejs-backend/cubestore-driver@^0.30.38":
+  version "0.30.38"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore-driver/-/cubestore-driver-0.30.38.tgz#3b6727d013956f805c4adc76eebbbf1cbdecc9b5"
+  integrity sha512-HtWfGD8k2YOkMi0v9ZSAq1S0AwBI9Oi4kjbj5i0GYcjMU9W+17sAk/PcKP/EAUKS7e/s96tcOopOqYDWKel5/Q==
+  dependencies:
+    "@cubejs-backend/cubestore" "^0.30.38"
+    "@cubejs-backend/query-orchestrator" "^0.30.34"
+    "@cubejs-backend/schema-compiler" "^0.30.34"
+    "@cubejs-backend/shared" "^0.30.34"
+    csv-write-stream "^2.0.0"
+    flatbuffers "^1.12.0"
+    fs-extra "^9.1.0"
+    generic-pool "^3.6.0"
+    moment-timezone "^0.5.31"
+    mysql "^2.16.0"
+    node-fetch "^2.6.1"
+    sqlstring "^2.3.2"
+    tempy "^1.0.1"
+    ws "^7.4.3"
+
+"@cubejs-backend/cubestore@^0.30.38":
+  version "0.30.38"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/cubestore/-/cubestore-0.30.38.tgz#a5e562f6662d998360db227a7fc07b57dce0b9bc"
+  integrity sha512-/tHT53U8N3JMOQvZIPbRUmLFrpPgraEXHd1T1UR4oMXLAxnGDK1LNaiHQLXO+Nc0XnxyO+ppQSWFin2zkdy3CA==
+  dependencies:
+    "@cubejs-backend/shared" "^0.30.34"
+    "@octokit/core" "^3.2.5"
+    source-map-support "^0.5.19"
+
 "@cubejs-backend/dotenv@^9.0.2":
   version "9.0.2"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"
@@ -20071,7 +20100,7 @@ node-fetch-npm@^2.0.2:
     json-parse-better-errors "^1.0.0"
     safe-buffer "^5.1.1"
 
-node-fetch@2.6.7, node-fetch@^2.5.0, node-fetch@^2.6.0, node-fetch@^2.6.1, node-fetch@^2.6.5, node-fetch@^2.6.6:
+node-fetch@2.6.7, node-fetch@^2.5.0, node-fetch@^2.6.0, node-fetch@^2.6.1, node-fetch@^2.6.5, node-fetch@^2.6.6, node-fetch@^2.6.7:
   version "2.6.7"
   resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.7.tgz#24de9fba827e3b4ae44dc8b20256a379160052ad"
   integrity sha512-ZjMPFEfVx5j+y2yF35Kzx5sF7kDzxuDj6ziH4FFbOp87zKDZNx8yExJIb05OGF4Nlt9IHFIMBkRl41VdvcNdbQ==

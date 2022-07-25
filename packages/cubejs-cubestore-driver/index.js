@@ -1,5 +1,5 @@
 const { CubeStoreDriver } = require('./dist/src/CubeStoreDriver');
-const { CubeStoreDevDriver } = require('./dist/src/CubeStoreDevDriver');
+const { X, CubeStoreDevDriver } = require('./dist/src/CubeStoreDevDriver');
 const { isCubeStoreSupported, CubeStoreHandler } = require('./dist/src/rexport');
 
 /**
@@ -12,6 +12,7 @@ module.exports = CubeStoreDriver;
  * It's needed to move our CLI to destructing style on import
  * Please sync this file with src/index.ts
  */
+module.exports.X = X;
 module.exports.CubeStoreDevDriver = CubeStoreDevDriver;
 module.exports.isCubeStoreSupported = isCubeStoreSupported;
 module.exports.CubeStoreHandler = CubeStoreHandler;

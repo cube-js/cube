@@ -1,10 +1,55 @@
+import R from 'ramda';
 import { StartedTestContainer } from 'testcontainers';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
-import cubejs, { CubejsApi, HttpTransport } from '@cubejs-client/core';
+import {
+  CubeStoreDevDriver,
+  CubeStoreDriver,
+  CubeStoreHandler
+} from '@cubejs-backend/cubestore-driver';
+import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
+
+async function checkCubestoreState(cubestore: CubeStoreDriver) {
+  let rows = await cubestore.query('SELECT table_schema, table_name, build_range_end FROM information_schema.tables ORDER BY table_name', []);
+  const table = rows[3];
+  rows = R.map(
+    // eslint-disable-next-line camelcase
+    ({ table_schema, table_name, build_range_end }) => ({ table_schema, table_name: table_name.split('_').slice(0, -3).join('_'), build_range_end }),
+    rows
+  );
+  expect(rows).toEqual([
+    {
+      table_schema: 'dev_pre_aggregations',
+      table_name: 'orders_orders_by_completed_at20200201',
+      build_range_end: null,
+    },
+    {
+      table_schema: 'dev_pre_aggregations',
+      table_name: 'orders_orders_by_completed_at20200301',
+      build_range_end: null,
+    },
+    {
+      table_schema: 'dev_pre_aggregations',
+      table_name: 'orders_orders_by_completed_at20200401',
+      build_range_end: null,
+    },
+    {
+      table_schema: 'dev_pre_aggregations',
+      table_name: 'orders_orders_by_completed_at20200501',
+      build_range_end: '2020-05-07T00:00:00.000Z',
+    }
+  ]);
+  expect(table.build_range_end).toEqual('2020-05-07T00:00:00.000Z');
+  rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name}`, []);
+  expect(rows.length).toEqual(18);
+  rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name} WHERE orders__completed_at_day < to_timestamp('${table.build_range_end}')`, []);
+  expect(rows.length).toEqual(18);
+  rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name} WHERE orders__completed_at_day >= to_timestamp('${table.build_range_end}')`, []);
+  expect(rows.length).toEqual(0);
+}
 
 describe('lambda', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -12,6 +57,7 @@ describe('lambda', () => {
   let db: StartedTestContainer;
   let birdbox: BirdBox;
   let client: CubejsApi;
+  let cubestore: CubeStoreDevDriver;
 
   beforeAll(async () => {
     db = await PostgresDBRunner.startContainer({});
@@ -38,11 +84,23 @@ describe('lambda', () => {
     client = cubejs(async () => 'test', {
       apiUrl: birdbox.configuration.apiUrl,
     });
+    const cubeStoreHandler = new CubeStoreHandler({
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      stdout: (data: Buffer) => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      stderr: (data: Buffer) => {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      onRestart: (code: number | null) => {},
+    });
+    // @ts-ignore
+    cubeStoreHandler.cubeStore = 123;
+    cubestore = new CubeStoreDevDriver(cubeStoreHandler);
   });
 
   afterAll(async () => {
     await birdbox.stop();
     await db.stop();
+    await cubestore.release();
   });
 
   test('query', async () => {
@@ -69,6 +127,7 @@ describe('lambda', () => {
       },
       limit: 3
     });
+
     // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
     expect(response.rawData()).toEqual(
       [
@@ -92,43 +151,12 @@ describe('lambda', () => {
         },
       ]
     );
+
+    await checkCubestoreState(cubestore);
   });
 
   test('refresh', async () => {
     await client.runScheduledRefresh();
-    const transport = new HttpTransport({
-      authorization: 'token',
-      apiUrl: birdbox.configuration.apiUrl.replace('cubejs-api', 'cubejs-system'),
-      method: 'POST'
-    });
-    const request = transport.request('pre-aggregations/partitions', { query: { preAggregations: [{ id: 'Orders.ordersByCompletedAt' }] } });
-    let response: any;
-    await request.subscribe((response0) => { response = response0; });
-    const json = await response!.json();
-    const ordersByCompletedAt = json.preAggregationPartitions.filter((pa: any) => pa.preAggregation.id === 'Orders.ordersByCompletedAt')[0];
-    const partitions = ordersByCompletedAt.partitions
-      .sort((p0: any, p1: any) => p0.tableName < p1.tableName)
-      .map((p: any) => ({
-        tableName: p.tableName,
-        buildRangeEnd: p.versionEntries[0].build_range_end, // Actual value from CubeStore.
-      }));
-    expect(partitions).toEqual([
-      {
-        tableName: 'dev_pre_aggregations.orders_orders_by_completed_at20200201',
-        buildRangeEnd: null,
-      },
-      {
-        tableName: 'dev_pre_aggregations.orders_orders_by_completed_at20200301',
-        buildRangeEnd: null,
-      },
-      {
-        tableName: 'dev_pre_aggregations.orders_orders_by_completed_at20200401',
-        buildRangeEnd: null,
-      },
-      {
-        tableName: 'dev_pre_aggregations.orders_orders_by_completed_at20200501',
-        buildRangeEnd: '2020-05-07T00:00:00.000Z',
-      },
-    ]);
+    await checkCubestoreState(cubestore);
   });
 });
