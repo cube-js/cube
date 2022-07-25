@@ -1219,8 +1219,8 @@ export class PreAggregationPartitionRangeLoader {
       ...options,
       renewalThreshold:
         options?.incremental && updateWindowToBoundary < new Date() ?
-          // if updateWindowToBoundary passed just moments ago we want to renew it earlier in case of server
-          // and db clock don't match
+          // if updateWindowToBoundary passed just moments ago we want to renew it earlier in case
+          // of server and db clock don't match
           Math.min(
             Math.round((new Date().getTime() - updateWindowToBoundary.getTime()) / 1000),
             options?.renewalThresholdOutsideUpdateWindow
