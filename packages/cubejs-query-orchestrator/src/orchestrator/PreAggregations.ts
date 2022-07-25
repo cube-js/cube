@@ -25,8 +25,6 @@ import { QueryQueue } from './QueryQueue';
 import { DriverInterface } from '../driver/driver.interface';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 
-const NOT_READY = 'table is not ready';
-
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
 }
@@ -458,7 +456,7 @@ export class PreAggregationLoader {
 
   public async loadPreAggregation(
     throwOnMissingPartition: boolean,
-  ): Promise<LoadPreAggregationResult> {
+  ): Promise<null | LoadPreAggregationResult> {
     const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
       .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
     if (notLoadedKey && !this.waitForRenew) {
@@ -482,17 +480,17 @@ export class PreAggregationLoader {
             'correctly and running.'
           );
         }
-        // the rollups are being maintained independently of this instance of cube.js
-        // immediately return the latest rollup data that instance already has
-        return {
-          targetTableName: versionEntryByStructureVersion
-            ? this.targetTableName(versionEntryByStructureVersion)
-            : NOT_READY,
-          lastUpdatedAt: versionEntryByStructureVersion
-            ? versionEntryByStructureVersion.last_updated_at
-            : 0,
-          refreshKeyValues: [],
-        };
+        if (!versionEntryByStructureVersion) {
+          return null;
+        } else {
+          // the rollups are being maintained independently of this instance of cube.js
+          // immediately return the latest rollup data that instance already has
+          return {
+            targetTableName: this.targetTableName(versionEntryByStructureVersion),
+            lastUpdatedAt: versionEntryByStructureVersion.last_updated_at,
+            refreshKeyValues: [],
+          };
+        }
       }
 
       if (versionEntryByStructureVersion) {
@@ -1237,7 +1235,7 @@ export class PreAggregationPartitionRangeLoader {
         this.options
       ));
       const resolveResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation(false)));
-      const loadResults = resolveResults.filter(res => res.targetTableName !== NOT_READY);
+      const loadResults = resolveResults.filter(res => res !== null);
       if (this.options.externalRefresh && loadResults.length === 0) {
         throw new Error(
           'Your configuration restricts query requests to only be served from ' +
