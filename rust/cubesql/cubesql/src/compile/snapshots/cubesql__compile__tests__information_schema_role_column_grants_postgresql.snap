@@ -1,12 +1,12 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 5729
 expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+
 | grantor | grantee | table_catalog | table_schema | table_name                | column_name        | privilege_type | is_grantable |
 +---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+
 | ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | count              | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | countDistinct      | SELECT         | YES          |
 | ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | maxPrice           | SELECT         | YES          |
 | ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | minPrice           | SELECT         | YES          |
 | ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | avgPrice           | SELECT         | YES          |

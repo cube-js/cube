@@ -6,13 +6,14 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | attname            | format_type(a.atttypid,a.atttypmod) | DEFAULT | attnotnull | attnum | table_oid | comment | generated |
 +--------------------+-------------------------------------+---------+------------+--------+-----------+---------+-----------+
 | count              | bigint                              | NULL    | true       | 1      | 18000     | NULL    |           |
-| maxPrice           | numeric                             | NULL    | true       | 2      | 18000     | NULL    |           |
-| minPrice           | numeric                             | NULL    | true       | 3      | 18000     | NULL    |           |
-| avgPrice           | numeric                             | NULL    | true       | 4      | 18000     | NULL    |           |
-| order_date         | timestamp without time zone         | NULL    | false      | 5      | 18000     | NULL    |           |
-| customer_gender    | text                                | NULL    | false      | 6      | 18000     | NULL    |           |
-| taxful_total_price | numeric                             | NULL    | false      | 7      | 18000     | NULL    |           |
-| has_subscription   | boolean                             | NULL    | false      | 8      | 18000     | NULL    |           |
-| is_male            | boolean                             | NULL    | true       | 9      | 18000     | NULL    |           |
-| is_female          | boolean                             | NULL    | true       | 10     | 18000     | NULL    |           |
+| countDistinct      | bigint                              | NULL    | true       | 2      | 18000     | NULL    |           |
+| maxPrice           | numeric                             | NULL    | true       | 3      | 18000     | NULL    |           |
+| minPrice           | numeric                             | NULL    | true       | 4      | 18000     | NULL    |           |
+| avgPrice           | numeric                             | NULL    | true       | 5      | 18000     | NULL    |           |
+| order_date         | timestamp without time zone         | NULL    | false      | 6      | 18000     | NULL    |           |
+| customer_gender    | text                                | NULL    | false      | 7      | 18000     | NULL    |           |
+| taxful_total_price | numeric                             | NULL    | false      | 8      | 18000     | NULL    |           |
+| has_subscription   | boolean                             | NULL    | false      | 9      | 18000     | NULL    |           |
+| is_male            | boolean                             | NULL    | true       | 10     | 18000     | NULL    |           |
+| is_female          | boolean                             | NULL    | true       | 11     | 18000     | NULL    |           |
 +--------------------+-------------------------------------+---------+------------+--------+-----------+---------+-----------+

@@ -7,6 +7,7 @@ expression: "execute_query(\"\n                SELECT\n                    attre
 +----------+--------------------+---------+
 | 18000    | avgPrice           | NULL    |
 | 18000    | count              | NULL    |
+| 18000    | countDistinct      | NULL    |
 | 18000    | customer_gender    | NULL    |
 | 18000    | has_subscription   | NULL    |
 | 18000    | is_female          | NULL    |
@@ -15,6 +16,6 @@ expression: "execute_query(\"\n                SELECT\n                    attre
 | 18000    | minPrice           | NULL    |
 | 18000    | order_date         | NULL    |
 | 18000    | taxful_total_price | NULL    |
-| 18013    | agentCount         | NULL    |
-| 18013    | agentCountApprox   | NULL    |
+| 18014    | agentCount         | NULL    |
+| 18014    | agentCountApprox   | NULL    |
 +----------+--------------------+---------+

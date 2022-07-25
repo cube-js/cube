@@ -61,6 +61,6 @@ expression: "execute_query(\"\n                SELECT t.oid, t.typname, n.nspnam
 | 13410 | sql_identifier             | information_schema | false      |
 | 18001 | KibanaSampleDataEcommerce  | public             | true       |
 | 18002 | _KibanaSampleDataEcommerce | public             | true       |
-| 18014 | Logs                       | public             | true       |
-| 18015 | _Logs                      | public             | true       |
+| 18015 | Logs                       | public             | true       |
+| 18016 | _Logs                      | public             | true       |
 +-------+----------------------------+--------------------+------------+

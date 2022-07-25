@@ -2815,6 +2815,12 @@ mod tests {
                         agg_type: Some("count".to_string()),
                     },
                     V1CubeMetaMeasure {
+                        name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                        title: None,
+                        _type: "number".to_string(),
+                        agg_type: Some("countDistinct".to_string()),
+                    },
+                    V1CubeMetaMeasure {
                         name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
                         title: None,
                         _type: "number".to_string(),
@@ -3463,6 +3469,7 @@ mod tests {
             V1LoadRequestQuery {
                 measures: Some(vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.countDistinct".to_string(),
                     "KibanaSampleDataEcommerce.maxPrice".to_string(),
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
@@ -10731,5 +10738,56 @@ ORDER BY \"COUNT(count)\" DESC"
                 }
             )
         }
+    }
+
+    #[tokio::test]
+    async fn metabase_count_distinct() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+                "
+                SELECT ((floor(((\"KibanaSampleDataEcommerce\".\"count\" - 1.0) / 1)) * 1) + 1.0) AS \"count\", count(distinct \"KibanaSampleDataEcommerce\".\"countDistinct\") AS \"count_2\"
+                FROM \"KibanaSampleDataEcommerce\"
+                WHERE \"KibanaSampleDataEcommerce\".\"taxful_total_price\" BETWEEN 1 AND 20
+                GROUP BY ((floor(((\"KibanaSampleDataEcommerce\".\"count\" - 1.0) / 1)) * 1) + 1.0)
+                ORDER BY ((floor(((\"KibanaSampleDataEcommerce\".\"count\" - 1.0) / 1)) * 1) + 1.0) ASC
+                "
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.countDistinct".to_string()
+                ]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                        operator: Some("gte".to_string()),
+                        values: Some(vec!["1".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
+                        operator: Some("lte".to_string()),
+                        values: Some(vec!["20".to_string()]),
+                        or: None,
+                        and: None,
+                    }
+                ]),
+            }
+        );
     }
 }

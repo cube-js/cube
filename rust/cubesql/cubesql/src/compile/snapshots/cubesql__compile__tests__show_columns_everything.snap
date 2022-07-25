@@ -1,12 +1,12 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 5381
 expression: "execute_query(\"show full columns from KibanaSampleDataEcommerce from db like '%';\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+
 | Field              | Type         | Collation          | Null | Key | Default | Extra | Privileges | Comment |
 +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+
 | count              | int          | NULL               | NO   |     | NULL    |       | select     |         |
+| countDistinct      | int          | NULL               | NO   |     | NULL    |       | select     |         |
 | maxPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
 | minPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
 | avgPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |

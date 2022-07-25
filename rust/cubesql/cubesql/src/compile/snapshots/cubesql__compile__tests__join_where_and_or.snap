@@ -6,15 +6,16 @@ expression: "execute_query(\"\n                SELECT\n                    att.a
 | attname            | attnum | oid   |
 +--------------------+--------+-------+
 | count              | 1      | 18000 |
-| maxPrice           | 2      | 18000 |
-| minPrice           | 3      | 18000 |
-| avgPrice           | 4      | 18000 |
-| order_date         | 5      | 18000 |
-| customer_gender    | 6      | 18000 |
-| taxful_total_price | 7      | 18000 |
-| has_subscription   | 8      | 18000 |
-| is_male            | 9      | 18000 |
-| is_female          | 10     | 18000 |
-| agentCount         | 1      | 18013 |
-| agentCountApprox   | 2      | 18013 |
+| countDistinct      | 2      | 18000 |
+| maxPrice           | 3      | 18000 |
+| minPrice           | 4      | 18000 |
+| avgPrice           | 5      | 18000 |
+| order_date         | 6      | 18000 |
+| customer_gender    | 7      | 18000 |
+| taxful_total_price | 8      | 18000 |
+| has_subscription   | 9      | 18000 |
+| is_male            | 10     | 18000 |
+| is_female          | 11     | 18000 |
+| agentCount         | 1      | 18014 |
+| agentCountApprox   | 2      | 18014 |
 +--------------------+--------+-------+

@@ -61,6 +61,6 @@ expression: "execute_query(\"\n                SELECT t.oid, information_schema.
 | 13410 | NULL  |
 | 18001 | NULL  |
 | 18002 | NULL  |
-| 18014 | NULL  |
 | 18015 | NULL  |
+| 18016 | NULL  |
 +-------+-------+

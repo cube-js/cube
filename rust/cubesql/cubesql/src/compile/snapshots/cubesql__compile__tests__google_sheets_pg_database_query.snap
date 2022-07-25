@@ -6,13 +6,14 @@ expression: "execute_query(\"\n                SELECT\n                    cl.re
 | Table                     | Name               | Position | Nullable | IsKey | IsAutoIncrement | TypeName  | Length | Precision | Scale | DatetimeLength |
 +---------------------------+--------------------+----------+----------+-------+-----------------+-----------+--------+-----------+-------+----------------+
 | KibanaSampleDataEcommerce | count              | 1        | false    | false | false           | int8      | -1     | 64        | 0     | NULL           |
-| KibanaSampleDataEcommerce | maxPrice           | 2        | false    | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | minPrice           | 3        | false    | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | avgPrice           | 4        | false    | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | order_date         | 5        | true     | false | false           | timestamp | -1     | NULL      | NULL  | 6              |
-| KibanaSampleDataEcommerce | customer_gender    | 6        | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | taxful_total_price | 7        | true     | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | has_subscription   | 8        | true     | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | is_male            | 9        | false    | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | is_female          | 10       | false    | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | countDistinct      | 2        | false    | false | false           | int8      | -1     | 64        | 0     | NULL           |
+| KibanaSampleDataEcommerce | maxPrice           | 3        | false    | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | minPrice           | 4        | false    | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | avgPrice           | 5        | false    | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | order_date         | 6        | true     | false | false           | timestamp | -1     | NULL      | NULL  | 6              |
+| KibanaSampleDataEcommerce | customer_gender    | 7        | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | taxful_total_price | 8        | true     | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | has_subscription   | 9        | true     | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | is_male            | 10       | false    | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | is_female          | 11       | false    | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
 +---------------------------+--------------------+----------+----------+-------+-----------------+-----------+--------+-----------+-------+----------------+

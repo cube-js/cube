@@ -6,6 +6,7 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | attrelid | attname            | typname   | typid | typmod | as_arg |
 +----------+--------------------+-----------+-------+--------+--------+
 | 18000    | count              | int8      | 20    | -1     | 64     |
+| 18000    | countDistinct      | int8      | 20    | -1     | 64     |
 | 18000    | maxPrice           | numeric   | 1700  | -1     | NULL   |
 | 18000    | minPrice           | numeric   | 1700  | -1     | NULL   |
 | 18000    | avgPrice           | numeric   | 1700  | -1     | NULL   |
@@ -15,6 +16,6 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | 18000    | has_subscription   | bool      | 16    | -1     | NULL   |
 | 18000    | is_male            | bool      | 16    | -1     | NULL   |
 | 18000    | is_female          | bool      | 16    | -1     | NULL   |
-| 18013    | agentCount         | int8      | 20    | -1     | 64     |
-| 18013    | agentCountApprox   | int8      | 20    | -1     | 64     |
+| 18014    | agentCount         | int8      | 20    | -1     | 64     |
+| 18014    | agentCountApprox   | int8      | 20    | -1     | 64     |
 +----------+--------------------+-----------+-------+--------+--------+
