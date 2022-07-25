@@ -470,16 +470,16 @@ export class PreAggregationLoader {
 
       const versionEntryByStructureVersion = byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (this.externalRefresh) {
-        if (!versionEntryByStructureVersion) {
-          throw new Error('Your configuration restricts query requests to only be served from pre-aggregations, and required pre-aggregation partitions were not built yet. Please make sure your refresh worker is configured correctly and running.');
-        }
-
-        // the rollups are being maintained independently of this instance of cube.js,
-        // immediately return the latest data it already has
+        // the rollups are being maintained independently of this instance of cube.js
+        // immediately return the latest rollup data that instance already has
         return {
-          targetTableName: this.targetTableName(versionEntryByStructureVersion),
+          targetTableName: versionEntryByStructureVersion
+            ? this.targetTableName(versionEntryByStructureVersion)
+            : 'table is not ready',
+          lastUpdatedAt: versionEntryByStructureVersion
+            ? versionEntryByStructureVersion.last_updated_at
+            : Date.now(),
           refreshKeyValues: [],
-          lastUpdatedAt: versionEntryByStructureVersion.last_updated_at
         };
       }
 
@@ -1224,7 +1224,16 @@ export class PreAggregationPartitionRangeLoader {
         this.loadCache,
         this.options
       ));
-      const loadResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
+      const resolveResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
+      const loadResults = resolveResults.filter(res => res.targetTableName !== 'table is not ready');
+      if (this.options.externalRefresh && loadResults.length === 0) {
+        throw new Error(
+          'Your configuration restricts query requests to only be served from ' +
+          'pre-aggregations, and required pre-aggregation partitions were not ' +
+          'built yet. Please make sure your refresh worker is configured ' +
+          'correctly and running.'
+        );
+      }
       const allTableTargetNames = loadResults
         .map(
           targetTableName => targetTableName.targetTableName
