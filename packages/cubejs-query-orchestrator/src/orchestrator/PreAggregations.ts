@@ -474,7 +474,7 @@ export class PreAggregationLoader {
 
       const versionEntryByStructureVersion = byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (this.externalRefresh) {
-        if (throwOnMissingPartition) {
+        if (!versionEntryByStructureVersion && throwOnMissingPartition) {
           throw new Error(
             'Your configuration restricts query requests to only be served from ' +
             'pre-aggregations, and required pre-aggregation partitions were not ' +
