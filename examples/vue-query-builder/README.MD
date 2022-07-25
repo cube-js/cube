@@ -1,4 +1,4 @@
-# Vue Query Builder with Cube.js
+# Vue Query Builder with Cube
 
 This live demo shows a Vue 2 dashboard built with PostgreSQL as a database, Vuetify, a Vue UI Library with material components, Chart.js and vue-chartkick for data visualization, and Cube.
 
