@@ -831,7 +831,7 @@ impl MemberRules {
                 let date_trunc_granularity =
                     match min_granularity(&outer_granularity, &inner_granularity) {
                         Some(granularity) => {
-                            if granularity == inner_granularity {
+                            if granularity.to_lowercase() == inner_granularity.to_lowercase() {
                                 outer_granularity
                             } else {
                                 inner_granularity
@@ -1706,10 +1706,10 @@ impl MemberRules {
                 if to_normalize {
                     match granularity.to_lowercase().as_str() {
                         "dow" | "doy" => Some("day".to_string()),
-                        _ => Some(granularity.to_lowercase()),
+                        _ => Some(granularity.clone()),
                     }
                 } else {
-                    Some(granularity.to_lowercase())
+                    Some(granularity.clone())
                 }
             }
             _ => None,
