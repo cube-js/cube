@@ -36,7 +36,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{EGraph, Id, Rewrite, Subst, Var};
-use itertools::Itertools;
+use itertools::{EitherOrBoth, Itertools};
 use std::{
     collections::{HashMap, HashSet},
     ops::Index,
@@ -1774,20 +1774,16 @@ fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option<Str
     let a_hierarchy = STANDARD_GRANULARITIES_PARENTS[granularity_a.as_str()].clone();
     let b_hierarchy = STANDARD_GRANULARITIES_PARENTS[granularity_b.as_str()].clone();
 
-    fn first_diff(a_hierarchy: &Vec<&'static str>, b_hierarchy: &Vec<&'static str>) -> i32 {
-        a_hierarchy
-            .iter()
-            .rev()
-            .zip(b_hierarchy.iter().rev().chain(std::iter::repeat(&"")))
-            .enumerate()
-            .find_map(|(i, (a, b))| if a != b { Some(i as i32) } else { None })
-            .unwrap_or(-1)
-    }
-
-    let last_index = std::cmp::max(
-        first_diff(&a_hierarchy, &b_hierarchy),
-        first_diff(&b_hierarchy, &a_hierarchy),
-    );
+    let last_index = a_hierarchy
+        .iter()
+        .rev()
+        .zip_longest(b_hierarchy.iter().rev())
+        .enumerate()
+        .find_map(|(i, val)| match val {
+            EitherOrBoth::Both(a, b) if a == b => None,
+            _ => Some(i as i32),
+        })
+        .unwrap_or(-1);
 
     if last_index <= 0 {
         None

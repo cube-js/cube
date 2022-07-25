@@ -471,7 +471,7 @@ impl RewriteRules for SplitRules {
                     fun_expr(
                         "DateTrunc",
                         vec![
-                            literal_expr("?rewrited_granularity"),
+                            literal_expr("?rewritten_granularity"),
                             column_expr("?column"),
                         ],
                     ),
@@ -481,7 +481,7 @@ impl RewriteRules for SplitRules {
                     "?expr",
                     "?date_part_granularity",
                     "?date_trunc_granularity",
-                    "?rewrited_granularity",
+                    "?rewritten_granularity",
                     "?alias_column",
                     Some("?alias"),
                     true,
