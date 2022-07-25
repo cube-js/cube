@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -551,6 +551,42 @@ class BaseQuery {
         { cache: this.queryCache }
       )
     );
+  }
+
+  /**
+   * Returns a dictionary mapping each preagregation to its corresponding query fragment.
+   * TODO(cristipp) Currently limited to the top query preaggregation.
+   * @returns {Record<string, Array<string>>}
+   */
+  buildLambdaSqlAndParams() {
+    const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
+    if (!(preAggForQuery && preAggForQuery.preAggregation.lambdaView)) {
+      return {};
+    } else {
+      const QueryClass = this.constructor;
+      const lambdaQuery = new QueryClass(
+        this.compilers,
+        {
+          ...this.options,
+          filters: [
+            ...this.options.filters ?? [],
+            this.options.timeDimensions.length > 0
+              ? {
+                member: this.options.timeDimensions[0].dimension,
+                operator: 'afterDate',
+                values: [FROM_PARTITION_RANGE]
+              }
+              : [],
+          ],
+          order: [],
+          rowLimit: undefined,
+          preAggregationQuery: true,
+        }
+      );
+      return {
+        [`${preAggForQuery.cube}.${preAggForQuery.preAggregationName}`]: lambdaQuery.buildSqlAndParams(),
+      };
+    }
   }
 
   externalQuery() {
@@ -2187,7 +2223,7 @@ class BaseQuery {
     );
   }
 
-  preAggregationReadOnly(cube, preAggregation) {
+  preAggregationReadOnly(_cube, _preAggregation) {
     return false;
   }
 
@@ -2418,6 +2454,10 @@ class BaseQuery {
       () => {
         const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
         if (preAggregation.refreshKey) {
+          if (preAggregation.refreshKey.every === 'never') {
+            return [];
+          }
+
           if (preAggregation.refreshKey.sql) {
             return [
               this.paramAllocator.buildSqlAndParams(

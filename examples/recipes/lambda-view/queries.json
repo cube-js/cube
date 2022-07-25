@@ -1,0 +1,23 @@
+[
+  {
+    "measures": [ "Orders.count" ],
+    "dimensions": ["Orders.status"],
+    "timeDimensions": [
+      {
+        "dimension": "Orders.completedAt",
+        "granularity": "day"
+      }
+    ],
+    "filters": [
+      {
+        "member": "Orders.status",
+        "operator": "equals",
+        "values": ["shipped"]
+      }
+    ],
+    "order": {
+      "Orders.completedAt": "desc"
+    },
+    "limit": 3
+  }
+]

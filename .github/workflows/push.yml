@@ -333,7 +333,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -369,6 +369,7 @@ jobs:
           yarn run smoke:materialize
           yarn run smoke:questdb
           yarn run smoke:multidb
+          yarn run smoke:lambda
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment

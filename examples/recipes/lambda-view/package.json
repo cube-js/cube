@@ -1,0 +1,14 @@
+{
+  "name": "lambda-view",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "cubejs-server"
+  },
+  "template": "docker",
+  "templateVersion": "0.29.15",
+  "devDependencies": {
+    "@cubejs-backend/postgres-driver": "^0.30.5",
+    "@cubejs-backend/server": "^0.30.5"
+  }
+}

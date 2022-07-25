@@ -23,9 +23,9 @@ export class CubeStoreDevDriver extends CubeStoreDriver {
     return this.cubeStoreHandler.acquire();
   }
 
-  public async query(query, values): Promise<any[]> {
+  public async query(query, values, options): Promise<any[]> {
     await this.acquireCubeStore();
 
-    return super.query(query, values);
+    return super.query(query, values, options);
   }
 }

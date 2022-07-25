@@ -1,5 +1,6 @@
-import { GenericContainer } from 'testcontainers';
-
+import fetch from 'node-fetch';
+import { execSync } from 'child_process';
+import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
 type PostgresStartOptions = DBRunnerContainerOptions & {
@@ -33,5 +34,10 @@ export class PostgresDBRunner extends DbRunnerAbstract {
     }
 
     return container.start();
+  }
+
+  public static async loadEcom(db: StartedTestContainer) {
+    const ecom = await (await fetch('https://cube.dev/downloads/ecom-dump-d3-example.sql')).text();
+    execSync(`psql postgresql://test:test@${db.getHost()}:${db.getMappedPort(5432)}/test`, { input: ecom });
   }
 }

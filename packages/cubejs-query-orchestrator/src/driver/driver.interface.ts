@@ -10,6 +10,14 @@ export type TableStructure = TableColumn[];
 export type SchemaStructure = Record<string, TableStructure>;
 export type DatabaseStructure = Record<string, SchemaStructure>;
 
+export type Rows = Record<string, unknown>[];
+export interface InlineTable {
+  name: string
+  columns: TableStructure
+  rows: Rows
+}
+export type InlineTables = InlineTable[];
+
 // It's more easy to use this interface with optional method release as a base interface instead of type assertion
 export interface DownloadTableBase {
   /**
@@ -19,7 +27,7 @@ export interface DownloadTableBase {
 }
 
 export interface DownloadTableMemoryData extends DownloadTableBase {
-  rows: Record<string, unknown>[];
+  rows: Rows;
   /**
    * Some drivers know types of response
    */

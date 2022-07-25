@@ -542,11 +542,7 @@ export async function getBirdbox(
     REQUIRED_ENV_VARS[type].forEach((key: string) => {
       if (process.env[key] === undefined) {
         process.stderr.write(
-          `Error: ${
-            key
-          } is required environment variable for ${
-            type
-          }\n`
+          `Error: ${key} is required environment variable for ${type}\n`
         );
         process.exit(1);
       } else {
