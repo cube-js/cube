@@ -25,6 +25,8 @@ import { QueryQueue } from './QueryQueue';
 import { DriverInterface } from '../driver/driver.interface';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 
+const NOT_READY = 'table is not ready';
+
 function encodeTimeStamp(time) {
   return Math.floor(time / 1000).toString(32);
 }
@@ -475,7 +477,7 @@ export class PreAggregationLoader {
         return {
           targetTableName: versionEntryByStructureVersion
             ? this.targetTableName(versionEntryByStructureVersion)
-            : 'table is not ready',
+            : NOT_READY,
           lastUpdatedAt: versionEntryByStructureVersion
             ? versionEntryByStructureVersion.last_updated_at
             : Date.now(),
@@ -1225,7 +1227,7 @@ export class PreAggregationPartitionRangeLoader {
         this.options
       ));
       const resolveResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation()));
-      const loadResults = resolveResults.filter(res => res.targetTableName !== 'table is not ready');
+      const loadResults = resolveResults.filter(res => res.targetTableName !== NOT_READY);
       if (this.options.externalRefresh && loadResults.length === 0) {
         throw new Error(
           'Your configuration restricts query requests to only be served from ' +
