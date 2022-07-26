@@ -1242,11 +1242,9 @@ export class PreAggregationPartitionRangeLoader {
     const partitionTableName = PreAggregationPartitionRangeLoader.partitionTableName(
       this.preAggregation.tableName, this.preAggregation.partitionGranularity, range
     );
-    let buildRangeEnd;
+    const [_, buildRangeEnd] = buildRange;
     const loadRange: [string, string] = [...range];
-    if (this.preAggregation.lambdaView && buildRange[1] < range[1]) {
-      let _;
-      [_, buildRangeEnd] = buildRange;
+    if (this.preAggregation.lambdaView && buildRangeEnd < range[1]) {
       loadRange[1] = buildRangeEnd;
     }
 
@@ -1295,9 +1293,9 @@ export class PreAggregationPartitionRangeLoader {
       let lastUpdatedAt = getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt));
       let lambdaTable: InlineTable;
 
-      const lastLoadResult = loadResults[loadResults.length - 1];
-      if (this.lambdaSql && lastLoadResult.buildRangeEnd) {
-        lambdaTable = await this.downloadLambdaTable(lastLoadResult.buildRangeEnd);
+      if (this.lambdaSql && loadResults.length > 0) {
+        const { buildRangeEnd } = loadResults[loadResults.length - 1];
+        lambdaTable = await this.downloadLambdaTable(buildRangeEnd);
         allTableTargetNames.push(lambdaTable.name);
         lastUpdatedAt = Date.now();
       }
