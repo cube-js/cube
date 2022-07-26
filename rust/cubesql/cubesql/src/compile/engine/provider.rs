@@ -47,9 +47,9 @@ use super::information_schema::postgres::{
     PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
     PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogIndexProvider,
     PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
-    PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSettingsProvider,
-    PgCatalogStatActivityProvider, PgCatalogStatioUserTablesProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider,
+    PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
+    PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatioUserTablesProvider,
+    PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
 #[derive(Clone)]
@@ -320,6 +320,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_stat_activity".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogStatioUserTablesProvider>() {
             "pg_catalog.pg_statio_user_tables".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogSequenceProvider>() {
+            "pg_catalog.pg_sequence".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
             "information_schema.constraint_column_usage".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaViewsProvider>() {
@@ -487,6 +489,7 @@ impl DatabaseProtocol {
                         &context.meta.tables,
                     )))
                 }
+                "pg_sequence" => return Some(Arc::new(PgCatalogSequenceProvider::new())),
                 _ => return None,
             },
             _ => return None,

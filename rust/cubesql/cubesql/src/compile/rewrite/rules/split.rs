@@ -448,6 +448,80 @@ impl RewriteRules for SplitRules {
                     false,
                 ),
             ),
+            transforming_chain_rewrite(
+                "split-push-down-date-part-with-date-trunc-inner-replacer",
+                inner_aggregate_split_replacer(
+                    fun_expr(
+                        "DatePart",
+                        vec![literal_expr("?date_part_granularity"), "?expr".to_string()],
+                    ),
+                    "?cube",
+                ),
+                vec![(
+                    "?expr",
+                    fun_expr(
+                        "DateTrunc",
+                        vec![
+                            literal_expr("?date_trunc_granularity"),
+                            column_expr("?column"),
+                        ],
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![
+                            literal_expr("?rewritten_granularity"),
+                            column_expr("?column"),
+                        ],
+                    ),
+                    "?alias",
+                ),
+                MemberRules::transform_original_expr_nested_date_trunc(
+                    "?expr",
+                    "?date_part_granularity",
+                    "?date_trunc_granularity",
+                    "?rewritten_granularity",
+                    "?alias_column",
+                    Some("?alias"),
+                    true,
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-date-part-with-date-trunc-outer-aggr-replacer",
+                outer_aggregate_split_replacer(
+                    fun_expr(
+                        "DatePart",
+                        vec![literal_expr("?date_part_granularity"), "?expr".to_string()],
+                    ),
+                    "?cube",
+                ),
+                vec![(
+                    "?expr",
+                    fun_expr(
+                        "DateTrunc",
+                        vec![
+                            literal_expr("?date_trunc_granularity"),
+                            column_expr("?column"),
+                        ],
+                    ),
+                )],
+                fun_expr(
+                    "DatePart",
+                    vec![
+                        literal_expr("?date_part_granularity"),
+                        alias_expr("?alias_column", "?alias"),
+                    ],
+                ),
+                MemberRules::transform_original_expr_date_trunc(
+                    "?expr",
+                    "?date_part_granularity",
+                    "?date_part_granularity",
+                    "?alias_column",
+                    Some("?alias"),
+                    false,
+                ),
+            ),
             // Aggregate function
             transforming_rewrite(
                 "split-push-down-aggr-fun-inner-replacer",

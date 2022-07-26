@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.39](https://github.com/cube-js/cube.js/compare/v0.30.38...v0.30.39) (2022-07-25)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** API instance throw on missing partitions ([3bf0882](https://github.com/cube-js/cube.js/commit/3bf08822d77c317e145fc498207372618c862498))
+
+
+
+
+
 ## [0.30.36](https://github.com/cube-js/cube.js/compare/v0.30.35...v0.30.36) (2022-07-18)
 
 **Note:** Version bump only for package @cubejs-backend/testing

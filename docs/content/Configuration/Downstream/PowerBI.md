@@ -44,8 +44,8 @@ later.
 
 ```dotenv
 CUBEJS_PG_SQL_PORT=5432
-CUBE_SQL_USERNAME=myusername
-CUBE_SQL_PASSWORD=mypassword
+CUBEJS_SQL_USER=myusername
+CUBEJS_SQL_PASSWORD=mypassword
 ```
 
 ## Connecting from Power BI

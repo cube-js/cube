@@ -511,6 +511,12 @@ impl AsyncPostgresShim {
             protocol::ParameterStatus::new("integer_datetimes".to_string(), "on".to_string()),
             protocol::ParameterStatus::new("TimeZone".to_string(), "Etc/UTC".to_string()),
             protocol::ParameterStatus::new("IntervalStyle".to_string(), "postgres".to_string()),
+            // Some drivers rely on it, for example, SQLAlchemy
+            // https://github.com/sqlalchemy/sqlalchemy/blob/6104c163eb58e35e46b0bb6a237e824ec1ee1d15/lib/sqlalchemy/dialects/postgresql/base.py#L2994
+            protocol::ParameterStatus::new(
+                "standard_conforming_strings".to_string(),
+                "on".to_string(),
+            ),
         ];
 
         self.write_multi(params).await?;

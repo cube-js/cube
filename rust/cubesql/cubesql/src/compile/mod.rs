@@ -46,16 +46,17 @@ use self::{
         provider::CubeContext,
         udf::{
             create_array_lower_udf, create_array_upper_udf, create_connection_id_udf,
-            create_convert_tz_udf, create_current_schema_udf, create_current_schemas_udf,
-            create_current_timestamp_udf, create_current_user_udf, create_date_add_udf,
-            create_date_sub_udf, create_date_udf, create_dayofmonth_udf, create_dayofweek_udf,
-            create_dayofyear_udf, create_db_udf, create_format_type_udf,
+            create_convert_tz_udf, create_cube_regclass_cast_udf, create_current_schema_udf,
+            create_current_schemas_udf, create_current_timestamp_udf, create_current_user_udf,
+            create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
+            create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_format_type_udf,
             create_generate_series_udtf, create_generate_subscripts_udtf,
             create_has_schema_privilege_udf, create_hour_udf, create_if_udf, create_instr_udf,
-            create_isnull_udf, create_least_udf, create_locate_udf, create_makedate_udf,
-            create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
+            create_isnull_udf, create_json_build_object_udf, create_least_udf, create_locate_udf,
+            create_makedate_udf, create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
             create_pg_datetime_precision_udf, create_pg_expandarray_udtf,
-            create_pg_get_constraintdef_udf, create_pg_get_expr_udf, create_pg_get_userbyid_udf,
+            create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
+            create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
             create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
             create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
@@ -2486,6 +2487,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_is_other_temp_schema());
         ctx.register_udf(create_has_schema_privilege_udf(self.state.clone()));
         ctx.register_udf(create_pg_total_relation_size_udf());
+        ctx.register_udf(create_cube_regclass_cast_udf());
+        ctx.register_udf(create_pg_get_serial_sequence_udf());
+        ctx.register_udf(create_json_build_object_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -7261,6 +7265,63 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_dynamic_regclass() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "dynamic_regclass_postgres_utf8",
+            execute_query(
+                "SELECT cast(r.a as regclass) FROM (
+                    SELECT 'pg_class' as a
+                    UNION ALL
+                    SELECT NULL
+                ) as r"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "dynamic_regclass_postgres_int32",
+            execute_query(
+                "SELECT cast(r.a as regclass) FROM (
+                    SELECT CAST(83 as int) as a
+                ) as r"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "dynamic_regclass_postgres_int64",
+            execute_query(
+                "SELECT cast(r.a as regclass) FROM (
+                    SELECT 83 as a
+                ) as r"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_sequence_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgsequence_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_sequence".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_pgcatalog_pgrange_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "pgcatalog_pgrange_postgres",
@@ -8239,6 +8300,83 @@ ORDER BY \"COUNT(count)\" DESC"
                 ORDER BY 1
                 "#
                 .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    // https://github.com/sqlalchemy/sqlalchemy/blob/6104c163eb58e35e46b0bb6a237e824ec1ee1d15/lib/sqlalchemy/dialects/postgresql/base.py
+    #[tokio::test]
+    async fn sqlalchemy_new_conname_query() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "sqlalchemy_new_conname_query",
+            execute_query(
+                r#"SELECT
+                a.attname,
+                pg_catalog.format_type(a.atttypid, a.atttypmod),
+                (
+                    SELECT
+                        pg_catalog.pg_get_expr(d.adbin, d.adrelid)
+                    FROM
+                        pg_catalog.pg_attrdef AS d
+                    WHERE
+                        d.adrelid = a.attrelid
+                        AND d.adnum = a.attnum
+                        AND a.atthasdef
+                ) AS DEFAULT,
+                a.attnotnull,
+                a.attrelid AS table_oid,
+                pgd.description AS comment,
+                a.attgenerated AS generated,
+                (
+                    SELECT
+                        json_build_object(
+                            'always',
+                            a.attidentity = 'a',
+                            'start',
+                            s.seqstart,
+                            'increment',
+                            s.seqincrement,
+                            'minvalue',
+                            s.seqmin,
+                            'maxvalue',
+                            s.seqmax,
+                            'cache',
+                            s.seqcache,
+                            'cycle',
+                            s.seqcycle
+                        )
+                    FROM
+                        pg_catalog.pg_sequence AS s
+                        JOIN pg_catalog.pg_class AS c ON s.seqrelid = c."oid"
+                    WHERE
+                        c.relkind = 'S'
+                        AND a.attidentity <> ''
+                        AND s.seqrelid = CAST(
+                            pg_catalog.pg_get_serial_sequence(
+                                CAST(CAST(a.attrelid AS REGCLASS) AS TEXT),
+                                a.attname
+                            ) AS REGCLASS
+                        )
+                ) AS identity_options
+            FROM
+                pg_catalog.pg_attribute AS a
+                LEFT JOIN pg_catalog.pg_description AS pgd ON (
+                    pgd.objoid = a.attrelid
+                    AND pgd.objsubid = a.attnum
+                )
+            WHERE
+                a.attrelid = 18000
+                AND a.attnum > 0
+                AND NOT a.attisdropped
+            ORDER BY
+                a.attnum"#
+                    .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -10591,5 +10729,145 @@ ORDER BY \"COUNT(count)\" DESC"
                 },]),
             }
         );
+    }
+
+    #[tokio::test]
+    async fn datastudio_date_aggregations() {
+        let supported_granularities = vec![
+            // date
+            [
+                "CAST(DATE_TRUNC('SECOND', \"order_date\") AS DATE)",
+                "second",
+            ],
+            // date, time
+            ["DATE_TRUNC('SECOND', \"order_date\")", "second"],
+            // date, hour, minute
+            [
+                "DATE_TRUNC('MINUTE', DATE_TRUNC('SECOND', \"order_date\"))",
+                "minute",
+            ],
+            // month
+            [
+                "EXTRACT(MONTH FROM DATE_TRUNC('SECOND', \"order_date\"))::integer",
+                "month",
+            ],
+            // minute
+            [
+                "EXTRACT(MINUTE FROM DATE_TRUNC('SECOND', \"order_date\"))::integer",
+                "minute",
+            ],
+            // hour
+            [
+                "EXTRACT(HOUR FROM DATE_TRUNC('SECOND', \"order_date\"))::integer",
+                "hour",
+            ],
+            // day of month
+            [
+                "EXTRACT(DAY FROM DATE_TRUNC('SECOND', \"order_date\"))::integer",
+                "day",
+            ],
+            // iso week / iso year / day of year
+            ["DATE_TRUNC('SECOND', \"order_date\")", "second"],
+            // month, day
+            // TODO: support TO_CHAR aggregation
+            // [
+            //     "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
+            //     "second",
+            // ],
+            // date, hour, minute
+            [
+                "DATE_TRUNC('MINUTE', DATE_TRUNC('SECOND', \"order_date\"))",
+                "minute",
+            ],
+            // date, hour
+            [
+                "DATE_TRUNC('HOUR', DATE_TRUNC('SECOND', \"order_date\"))",
+                "hour",
+            ],
+            // year, month
+            [
+                "CAST(DATE_TRUNC('MONTH', DATE_TRUNC('SECOND', \"order_date\")) AS DATE)",
+                "month",
+            ],
+            // year
+            [
+                "CAST(DATE_TRUNC('YEAR', DATE_TRUNC('SECOND', \"order_date\")) AS DATE)",
+                "year",
+            ],
+        ];
+
+        for [expr, expected_granularity] in supported_granularities {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT {} AS \"qt_u3dj8wr1vc\", COUNT(1) AS \"__record_count\" FROM KibanaSampleDataEcommerce GROUP BY \"qt_u3dj8wr1vc\"",
+                    expr
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(expected_granularity.to_string()),
+                        date_range: None,
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn test_extract_date_trunc_week() {
+        let supported_granularities = vec![
+            (
+                "EXTRACT(WEEK FROM DATE_TRUNC('MONTH', \"order_date\"))::integer",
+                "month",
+            ),
+            (
+                "EXTRACT(MONTH FROM DATE_TRUNC('WEEK', \"order_date\"))::integer",
+                "week",
+            ),
+        ];
+
+        for (expr, granularity) in supported_granularities {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "SELECT {} AS \"qt_u3dj8wr1vc\" FROM KibanaSampleDataEcommerce GROUP BY \"qt_u3dj8wr1vc\"",
+                    expr
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(granularity.to_string()),
+                        date_range: None,
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None
+                }
+            )
+        }
     }
 }
