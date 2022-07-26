@@ -66,7 +66,7 @@ type CheckSQLAuthFn =
  * explains to SQL APi that it's possible to change current user to user.
  */
 type CanSwitchSQLUserFn =
-  (current: string, user: string) =>
+  (current: string | null, user: string) =>
     Promise<boolean> |
     boolean;
 

@@ -14,15 +14,12 @@ use super::scan::CubeScanExtensionPlanner;
 
 pub struct CubeQueryPlanner {
     pub transport: Arc<dyn TransportService>,
-    pub meta_fields: LoadRequestMeta,
+    pub meta: LoadRequestMeta,
 }
 
 impl CubeQueryPlanner {
-    pub fn new(transport: Arc<dyn TransportService>, meta_fields: LoadRequestMeta) -> Self {
-        Self {
-            transport,
-            meta_fields,
-        }
+    pub fn new(transport: Arc<dyn TransportService>, meta: LoadRequestMeta) -> Self {
+        Self { transport, meta }
     }
 }
 
@@ -38,6 +35,7 @@ impl QueryPlanner for CubeQueryPlanner {
         let physical_planner = DefaultPhysicalPlanner::with_extension_planners(vec![Arc::new(
             CubeScanExtensionPlanner {
                 transport: self.transport.clone(),
+                meta: self.meta.clone(),
             },
         )]);
         // Delegate most work of physical planning to the default physical planner

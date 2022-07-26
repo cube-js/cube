@@ -1,25 +1,33 @@
-use std::{env, fmt::Debug, sync::Arc};
+use std::{any::Any, env, fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 
 use crate::CubeError;
 
+// We cannot use generic here. It's why there is this trait
+// Any type will allow us to split (with downcast) auth context into HTTP (standalone) or Native
+pub trait AuthContext: Debug + Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+}
+
+pub type AuthContextRef = Arc<dyn AuthContext>;
+
 #[derive(Debug, Clone)]
-pub struct AuthContext {
+pub struct HttpAuthContext {
     pub access_token: String,
     pub base_path: String,
 }
 
-#[derive(Debug)]
-pub struct AuthenticateResponse {
-    pub(crate) context: AuthContext,
-    pub(crate) password: Option<String>,
+impl AuthContext for HttpAuthContext {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
-impl AuthenticateResponse {
-    pub fn new(context: AuthContext, password: Option<String>) -> Self {
-        Self { context, password }
-    }
+#[derive(Debug)]
+pub struct AuthenticateResponse {
+    pub context: AuthContextRef,
+    pub password: Option<String>,
 }
 
 #[async_trait]
@@ -36,14 +44,14 @@ crate::di_service!(SqlAuthDefaultImpl, [SqlAuthService]);
 impl SqlAuthService for SqlAuthDefaultImpl {
     async fn authenticate(&self, _user: Option<String>) -> Result<AuthenticateResponse, CubeError> {
         Ok(AuthenticateResponse {
-            context: AuthContext {
+            context: Arc::new(HttpAuthContext {
                 access_token: env::var("CUBESQL_CUBE_TOKEN")
                     .ok()
                     .unwrap_or_else(|| panic!("CUBESQL_CUBE_TOKEN is a required ENV variable")),
                 base_path: env::var("CUBESQL_CUBE_URL")
                     .ok()
                     .unwrap_or_else(|| panic!("CUBESQL_CUBE_URL is a required ENV variable")),
-            },
+            }),
             password: None,
         })
     }

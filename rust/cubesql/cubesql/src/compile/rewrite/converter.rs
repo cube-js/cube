@@ -1,7 +1,7 @@
 use crate::{
     compile::{
         engine::{
-            df::scan::{CubeScanNode, MemberField},
+            df::scan::{CubeScanNode, CubeScanOptions, MemberField},
             provider::CubeContext,
         },
         rewrite::{
@@ -21,7 +21,7 @@ use crate::{
             WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
-    sql::auth_service::AuthContext,
+    sql::AuthContextRef,
     CubeError,
 };
 use cubeclient::models::{
@@ -566,7 +566,7 @@ macro_rules! match_expr_list_node {
 pub struct LanguageToLogicalPlanConverter {
     best_expr: RecExpr<LogicalPlanLanguage>,
     cube_context: Arc<CubeContext>,
-    auth_context: Arc<AuthContext>,
+    auth_context: AuthContextRef,
 }
 
 pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
@@ -806,7 +806,7 @@ impl LanguageToLogicalPlanConverter {
     pub fn new(
         best_expr: RecExpr<LogicalPlanLanguage>,
         cube_context: Arc<CubeContext>,
-        auth_context: Arc<AuthContext>,
+        auth_context: AuthContextRef,
     ) -> Self {
         Self {
             best_expr,
@@ -1174,10 +1174,10 @@ impl LanguageToLogicalPlanConverter {
                                             Some(&table_name),
                                             // TODO empty schema
                                             &expr_name(&expr)?,
-                                            DataType::Boolean,
+                                            DataType::Utf8,
                                             true,
                                         ),
-                                        MemberField::Literal(ScalarValue::Boolean(None)),
+                                        MemberField::Literal(ScalarValue::Utf8(None)),
                                     ));
                                 }
                                 LogicalPlanLanguage::LiteralMember(params) => {
@@ -1269,13 +1269,15 @@ impl LanguageToLogicalPlanConverter {
                                                 });
                                                 if !segments.is_empty() {
                                                     return Err(CubeError::internal(
-                                                        "Can't or segments".to_string(),
+                                                        "Can't use OR operator with segments"
+                                                            .to_string(),
                                                     ));
                                                 }
 
                                                 if change_user.is_some() {
                                                     return Err(CubeError::internal(
-                                                        "Can't or __user".to_string(),
+                                                        "Can't use OR operator with __user column"
+                                                            .to_string(),
                                                     ));
                                                 }
                                             }
@@ -1442,9 +1444,6 @@ impl LanguageToLogicalPlanConverter {
                             fields = new_fields;
                         }
 
-                        let mut meta = self.cube_context.session_state.get_load_request_meta();
-                        meta.set_change_user(change_user);
-
                         let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
 
                         Arc::new(CubeScanNode::new(
@@ -1455,7 +1454,7 @@ impl LanguageToLogicalPlanConverter {
                             member_fields,
                             query,
                             self.auth_context.clone(),
-                            meta,
+                            CubeScanOptions { change_user },
                         ))
                     }
                     x => panic!("Unexpected extension node: {:?}", x),

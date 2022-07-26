@@ -50,16 +50,17 @@ export class SQLServer {
       pgPort: options.pgSqlPort,
       nonce: options.sqlNonce,
       checkAuth: async ({ request, user }) => {
-        const { password } = await checkSqlAuth(request, user);
+        const { password, superuser } = await checkSqlAuth(request, user);
 
         // Strip securityContext to improve speed deserialization
         return {
-          password
+          password,
+          superuser: superuser || false,
         };
       },
-      meta: async ({ request, user }) => {
+      meta: async ({ request, session }) => {
         // @todo Store security context in native
-        const { securityContext } = await checkSqlAuth(request, user);
+        const { securityContext } = await checkSqlAuth(request, session.user);
         const context = await this.apiGateway.contextByReq(<any> request, securityContext, request.id);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -76,22 +77,22 @@ export class SQLServer {
           }
         });
       },
-      load: async ({ request, user, query }) => {
-        // @todo Store security context in native
-        let current = await checkSqlAuth(request, user);
+      load: async ({ request, session, query }) => {
+        let userForContext = session.user;
 
-        if (request.meta.changeUser && request.meta.changeUser !== user) {
-          const canSwitch = current.superuser || await canSwitchSqlUser(user, request.meta.changeUser);
+        if (request.meta.changeUser && request.meta.changeUser !== session.user) {
+          const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
           if (canSwitch) {
-            // TODO: Cache?
-            current = await checkSqlAuth(request, request.meta.changeUser);
+            userForContext = request.meta.changeUser;
           } else {
             throw new Error(
-              `You cannot change security context via __user from ${user} to ${request.meta.changeUser}, because it's not allowed.`
+              `You cannot change security context via __user from ${session.user} to ${request.meta.changeUser}, because it's not allowed.`
             );
           }
         }
 
+        // @todo Store security context in native for session's user, but not for switching
+        const current = await checkSqlAuth(request, userForContext);
         const context = await this.contextByNativeReq(request, current.securityContext, request.id);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -132,7 +133,7 @@ export class SQLServer {
   protected createDefaultCanSwitchSqlUserFn(options: SQLServerOptions): CanSwitchSQLUserFn {
     const superUser = options.sqlSuperUser || getEnv('sqlSuperUser');
 
-    return async (current: string, _user: string) => {
+    return async (current: string | null, _user: string) => {
       if (superUser) {
         return current === superUser;
       }

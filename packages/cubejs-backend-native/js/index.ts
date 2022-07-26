@@ -20,27 +20,37 @@ export interface Request<Meta> {
     meta: Meta,
 }
 
+export interface CheckAuthResponse {
+    password: string | null,
+    superuser: boolean
+}
+
 export interface CheckAuthPayload {
     request: Request<undefined>,
     user: string|null
 }
 
+export interface SessionContext {
+    user: string | null,
+    superuser: boolean,
+}
+
 export interface LoadPayload {
     request: Request<LoadRequestMeta>,
-    user: string,
+    session: SessionContext,
     query: any,
 }
 
 export interface MetaPayload {
     request: Request<undefined>,
-    user: string|null
+    session: SessionContext,
 }
 
 export type SQLInterfaceOptions = {
     port?: number,
     pgPort?: number,
     nonce?: string,
-    checkAuth: (payload: CheckAuthPayload) => unknown | Promise<unknown>,
+    checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
     load: (payload: LoadPayload) => unknown | Promise<unknown>,
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
 };
@@ -67,8 +77,6 @@ export function isSupported(): boolean {
 function wrapNativeFunctionWithChannelCallback(
     fn: (extra: any) => unknown | Promise<unknown>
 ) {
-    const native = loadNative();
-
     return async (extra: any, channel: any) => {
         try {
             const result = await fn(JSON.parse(extra));
@@ -85,13 +93,15 @@ function wrapNativeFunctionWithChannelCallback(
                 channel.resolve(JSON.stringify(result));
             }
           } catch (e: any) {
+            if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+                console.debug("[js] channel.reject", {
+                    e
+                });
+            }
+
             channel.reject(e.message || 'Unknown JS exception');
 
             // throw e;
-
-            console.debug("[js] channel.reject", {
-                e
-            });
           }
     };
 };
