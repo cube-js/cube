@@ -31,7 +31,8 @@ use crate::{
         dataframe::{self, batch_to_dataframe},
         session::DatabaseProtocol,
         statement::{MySQLStatementParamsFinder, MysqlStatementParamsBinder},
-        AuthContext, ColumnFlags, ColumnType, QueryResponse, Session, SessionManager, StatusFlags,
+        AuthContextRef, ColumnFlags, ColumnType, QueryResponse, Session, SessionManager,
+        StatusFlags,
     },
     CubeError,
 };
@@ -248,12 +249,11 @@ impl MySqlConnection {
         }
     }
 
-    pub(crate) fn auth_context(&self) -> Result<Arc<AuthContext>, CubeError> {
-        if let Some(ctx) = self.session.state.auth_context() {
-            Ok(Arc::new(ctx))
-        } else {
-            Err(CubeError::internal("must be auth".to_string()))
-        }
+    pub(crate) fn auth_context(&self) -> Result<AuthContextRef, CubeError> {
+        self.session
+            .state
+            .auth_context()
+            .ok_or(CubeError::internal("must be auth".to_string()))
     }
 }
 

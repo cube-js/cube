@@ -14,7 +14,7 @@ use crate::{
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
         writer::BatchWriter,
-        AuthContext, Session, StatusFlags,
+        AuthContextRef, Session, StatusFlags,
     },
     telemetry::ContextLogger,
     CubeError,
@@ -465,7 +465,8 @@ impl AsyncPostgresShim {
             .authenticate(Some(user.clone()))
             .await;
 
-        let mut auth_context: Option<AuthContext> = None;
+        let mut auth_context: Option<AuthContextRef> = None;
+
         let auth_success = match authenticate_response {
             Ok(authenticate_response) => {
                 auth_context = Some(authenticate_response.context);
@@ -1286,12 +1287,11 @@ impl AsyncPostgresShim {
         self.write_ready().await
     }
 
-    pub(crate) fn auth_context(&self) -> Result<Arc<AuthContext>, CubeError> {
-        if let Some(ctx) = self.session.state.auth_context() {
-            Ok(Arc::new(ctx))
-        } else {
-            Err(CubeError::internal("must be auth".to_string()))
-        }
+    pub(crate) fn auth_context(&self) -> Result<AuthContextRef, CubeError> {
+        self.session
+            .state
+            .auth_context()
+            .ok_or(CubeError::internal("must be auth".to_string()))
     }
 }
 

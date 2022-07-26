@@ -70,6 +70,7 @@ use self::{
     rewrite::converter::LogicalPlanToLanguageConverter,
 };
 use crate::{
+    compile::engine::df::scan::CubeScanOptions,
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariables},
         dataframe,
@@ -1674,8 +1675,8 @@ impl QueryPlanner {
                         .collect(),
                     query.request,
                     // @todo Remove after split!
-                    Arc::new(self.state.auth_context().unwrap()),
-                    self.state.get_load_request_meta(),
+                    self.state.auth_context().unwrap(),
+                    CubeScanOptions { change_user: None },
                 )),
             });
             let logical_plan = LogicalPlan::Projection(Projection {
@@ -2548,7 +2549,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
             .map_err(|e| CompilationError::internal(e.to_string()))?;
         let result = converter
             .take_rewriter()
-            .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
+            .find_best_plan(root, self.state.auth_context().unwrap())
             .await
             .map_err(|e| match e.cause {
                 CubeErrorCauseType::Internal(_) => CompilationError::Internal(
@@ -2745,7 +2746,7 @@ mod tests {
     use crate::{
         sql::{
             dataframe::batch_to_dataframe, server_manager::ServerConfiguration, types::StatusFlags,
-            AuthContext, AuthenticateResponse, ServerManager, SqlAuthService,
+            AuthContextRef, AuthenticateResponse, HttpAuthContext, ServerManager, SqlAuthService,
         },
         transport::{LoadRequestMeta, TransportService},
     };
@@ -2878,10 +2879,13 @@ mod tests {
         // Populate like shims
         session.state.set_database(Some("db".to_string()));
         session.state.set_user(Some("ovr".to_string()));
-        session.state.set_auth_context(Some(AuthContext {
+
+        let auth_ctx = HttpAuthContext {
             access_token: "access_token".to_string(),
             base_path: "base_path".to_string(),
-        }));
+        };
+
+        session.state.set_auth_context(Some(Arc::new(auth_ctx)));
 
         session
     }
@@ -2897,10 +2901,10 @@ mod tests {
                 _user: Option<String>,
             ) -> Result<AuthenticateResponse, CubeError> {
                 Ok(AuthenticateResponse {
-                    context: AuthContext {
+                    context: Arc::new(HttpAuthContext {
                         access_token: "fake".to_string(),
                         base_path: "fake".to_string(),
-                    },
+                    }),
                     password: None,
                 })
             }
@@ -2916,7 +2920,7 @@ mod tests {
         #[async_trait]
         impl TransportService for TestConnectionTransport {
             // Load meta information about cubes
-            async fn meta(&self, _ctx: Arc<AuthContext>) -> Result<Arc<MetaContext>, CubeError> {
+            async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
                 panic!("It's a fake transport");
             }
 
@@ -2924,7 +2928,7 @@ mod tests {
             async fn load(
                 &self,
                 _query: V1LoadRequestQuery,
-                _ctx: Arc<AuthContext>,
+                _ctx: AuthContextRef,
                 _meta_fields: LoadRequestMeta,
             ) -> Result<V1LoadResponse, CubeError> {
                 panic!("It's a fake transport");
@@ -3081,7 +3085,7 @@ mod tests {
 
         let cube_scan = query_plan.as_logical_plan().find_cube_scan();
 
-        assert_eq!(cube_scan.meta.change_user(), Some("gopher".to_string()));
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
 
         assert_eq!(
             cube_scan.request,
@@ -3108,7 +3112,7 @@ mod tests {
 
         let cube_scan = query_plan.as_logical_plan().find_cube_scan();
 
-        assert_eq!(cube_scan.meta.change_user(), Some("gopher".to_string()));
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
 
         assert_eq!(
             cube_scan.request,

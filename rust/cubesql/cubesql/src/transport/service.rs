@@ -8,7 +8,11 @@ use serde_derive::*;
 use std::{fmt::Debug, sync::Arc, time::Duration};
 use tokio::{sync::RwLock as RwLockAsync, time::Instant};
 
-use crate::{compile::MetaContext, sql::AuthContext, CubeError};
+use crate::{
+    compile::MetaContext,
+    sql::{AuthContextRef, HttpAuthContext},
+    CubeError,
+};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LoadRequestMeta {
@@ -45,13 +49,13 @@ impl LoadRequestMeta {
 #[async_trait]
 pub trait TransportService: Send + Sync + Debug {
     // Load meta information about cubes
-    async fn meta(&self, ctx: Arc<AuthContext>) -> Result<Arc<MetaContext>, CubeError>;
+    async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError>;
 
     // Execute load query
     async fn load(
         &self,
         query: V1LoadRequestQuery,
-        ctx: Arc<AuthContext>,
+        ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError>;
 }
@@ -80,10 +84,15 @@ impl HttpTransport {
         }
     }
 
-    fn get_client_config_for_ctx(&self, ctx: Arc<AuthContext>) -> ClientConfiguration {
+    fn get_client_config_for_ctx(&self, ctx: AuthContextRef) -> ClientConfiguration {
+        let http_ctx = ctx
+            .as_any()
+            .downcast_ref::<HttpAuthContext>()
+            .expect("Unable to cast AuthContext to HttpAuthContext");
+
         let mut cube_config = ClientConfiguration::default();
-        cube_config.bearer_access_token = Some(ctx.access_token.clone());
-        cube_config.base_path = ctx.base_path.clone();
+        cube_config.bearer_access_token = Some(http_ctx.access_token.clone());
+        cube_config.base_path = http_ctx.base_path.clone();
 
         cube_config
     }
@@ -93,7 +102,7 @@ crate::di_service!(HttpTransport, [TransportService]);
 
 #[async_trait]
 impl TransportService for HttpTransport {
-    async fn meta(&self, ctx: Arc<AuthContext>) -> Result<Arc<MetaContext>, CubeError> {
+    async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
         {
             let store = self.cache.read().await;
             if let Some(cache_bucket) = &*store {
@@ -125,7 +134,7 @@ impl TransportService for HttpTransport {
     async fn load(
         &self,
         query: V1LoadRequestQuery,
-        ctx: Arc<AuthContext>,
+        ctx: AuthContextRef,
         meta: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError> {
         if meta.change_user().is_some() {

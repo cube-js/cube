@@ -18,6 +18,7 @@
     "install": "node-pre-gyp install || echo 'Your system is not supported by @cubejs-backend/native, some feature will be unavailable.'",
     "upload-binary-cross": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package --target_arch=$PACKAGE_TARGET_ARCH --target_platform=$PACKAGE_TARGET_PLATFORM --target_libc=$PACKAGE_TARGET_LIBC && node-pre-gyp-github publish",
     "upload-binary": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
+    "test:server": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node test/server.js",
     "test:unit": "jest --forceExit test",
     "test:cargo": "cargo test"
   },

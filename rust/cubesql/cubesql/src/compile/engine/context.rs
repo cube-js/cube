@@ -32,7 +32,7 @@ impl VariablesProvider {
             identifier.concat()[1..].to_string()
         };
 
-        if let Some(var) = self.session.all_variables().get(&key) {
+        if let Some(var) = self.session.get_variable(&key) {
             if var.var_type == var_type {
                 return Ok(var.value.clone());
             }
