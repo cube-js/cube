@@ -795,7 +795,7 @@ describe('OptsHandler class', () => {
   );
 
   test(
-    'must set preAggregationsOptions.externalRefresh to true and do not test ' +
+    'must set preAggregationsOptions.externalRefresh to true and test ' +
     'driver connection for api worker in the production mode if specified in' +
     'preAggregationsOptions.externalRefresh',
     async () => {
@@ -840,7 +840,7 @@ describe('OptsHandler class', () => {
   );
 
   test(
-    'must set preAggregationsOptions.externalRefresh to true and do not test ' +
+    'must set preAggregationsOptions.externalRefresh to true and test ' +
     'driver connection for api worker if CUBEJS_PRE_AGGREGATIONS_BUILDER is unset',
     async () => {
       process.env.NODE_ENV = 'production';
