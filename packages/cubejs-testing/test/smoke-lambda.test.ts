@@ -1,14 +1,15 @@
 import R from 'ramda';
 import { StartedTestContainer } from 'testcontainers';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
-import CubeStoreDriver0, { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
 
-async function checkCubestoreState(cubestore: CubeStoreDriver) {
+const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
+
+async function checkCubestoreState(cubestore: any) {
   let rows = await cubestore.query('SELECT table_schema, table_name, build_range_end FROM information_schema.tables ORDER BY table_name', []);
   const table = rows[3];
   rows = R.map(
@@ -53,7 +54,7 @@ describe('lambda', () => {
   let db: StartedTestContainer;
   let birdbox: BirdBox;
   let client: CubejsApi;
-  let cubestore: CubeStoreDriver;
+  let cubestore: any;
 
   beforeAll(async () => {
     db = await PostgresDBRunner.startContainer({});
@@ -82,7 +83,7 @@ describe('lambda', () => {
     });
     // TS compiler is confused: the ctor is the module, but the TS type is inside the module.
     // @ts-ignore
-    cubestore = new CubeStoreDriver0({
+    cubestore = new CubeStoreDriver({
       host: '127.0.0.1',
       user: undefined,
       password: undefined,
