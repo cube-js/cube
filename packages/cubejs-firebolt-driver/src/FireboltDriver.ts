@@ -52,6 +52,9 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
         username: <string>process.env.CUBEJS_DB_USER,
         password: <string>process.env.CUBEJS_DB_PASS,
         database: <string>process.env.CUBEJS_DB_NAME,
+        account: <string>process.env.CUBEJS_FIREBOLT_ACCOUNT,
+        engineName: <string>process.env.CUBEJS_FIREBOLT_ENGINE_NAME,
+        // engineEndpoint was deprecated in favor of engineName + account
         engineEndpoint: <string>process.env.CUBEJS_FIREBOLT_ENGINE_ENDPOINT,
         ...(config.connection || {}),
       },
@@ -69,6 +72,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   private async initConnection() {
     try {
       const connection = await this.firebolt.connect(this.config.connection);
+      await this.ensureEngineRunning();
       return connection;
     } catch (e) {
       this.connection = null;
@@ -184,16 +188,34 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     throw new Error('Unload is not supported');
   }
 
-  private async queryResponse(query: string, parameters?: unknown[]) {
-    const connection = await this.getConnection();
+  private async ensureEngineRunning() {
+    if (this.config.connection.engineName) {
+      const engine = await this.firebolt.resourceManager.engine.getByName(this.config.connection.engineName);
+      await engine.startAndWait();
+    }
+  }
 
-    const statement = await connection.execute(query, {
-      settings: { output_format: OutputFormat.JSON },
-      parameters,
-      response: { hydrateRow: this.hydrateRow }
-    });
-    const response = await statement.fetchResult();
-    return response;
+  private async queryResponse(query: string, parameters?: unknown[], retry = true): Promise<{
+    data: Row[];
+    meta: Meta[];
+  }> {
+    try {
+      const connection = await this.getConnection();
+
+      const statement = await connection.execute(query, {
+        settings: { output_format: OutputFormat.JSON },
+        parameters,
+        response: { hydrateRow: this.hydrateRow }
+      });
+      const response = await statement.fetchResult();
+      return response;
+    } catch (error) {
+      if (error.status === 404 && retry) {
+        await this.ensureEngineRunning();
+        return this.queryResponse(query, parameters, false);
+      }
+      throw error;
+    }
   }
 
   /* eslint-disable camelcase */

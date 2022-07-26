@@ -19,7 +19,7 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
     'CUBEJS_DB_USER',
     'CUBEJS_DB_PASS',
     'CUBEJS_DB_NAME',
-    'CUBEJS_FIREBOLT_ENGINE_ENDPOINT'
+    'CUBEJS_FIREBOLT_ENGINE_NAME'
   ],
   materialize: [],
   multidb: [],

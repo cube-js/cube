@@ -100,7 +100,8 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
     settings: [
       ...BASE_CRED,
       DB_NAME,
-      { env: 'CUBEJS_FIREBOLT_ENGINE_ENDPOINT', title: 'Engine Endpoint' },
+      { env: 'CUBEJS_FIREBOLT_ACCOUNT', title: 'Account' },
+      { env: 'CUBEJS_FIREBOLT_ENGINE_NAME', title: 'Engine name' },
     ]
   },
   {
