@@ -646,7 +646,7 @@ describe('OptsHandler class', () => {
   );
 
   test(
-    'must set preAggregationsOptions.externalRefresh to true and doesn`t ' +
+    'must set preAggregationsOptions.externalRefresh to true and ' +
     'test driver connection for dev server with preAggregationsOptions.' +
     'externalRefresh set to true',
     async () => {
@@ -676,17 +676,17 @@ describe('OptsHandler class', () => {
       expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
-      expect(async () => {
+      await expect(async () => {
         await oapi.testConnection();
-      }).not.toThrow();
-      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+      }).rejects.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
 
       testDriverConnectionSpy.mockRestore();
     }
   );
 
   test(
-    'must set preAggregationsOptions.externalRefresh to false and doesn`t ' +
+    'must set preAggregationsOptions.externalRefresh to false and ' +
     'test driver connection for dev server with rollupOnlyMode set to true',
     async () => {
       process.env.NODE_ENV = 'test';
@@ -830,10 +830,10 @@ describe('OptsHandler class', () => {
       expect(core.optsHandler.configuredForScheduledRefresh()).toBe(false);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
-      expect(async () => {
+      await expect(async () => {
         await oapi.testConnection();
-      }).not.toThrow();
-      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+      }).rejects.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
 
       testDriverConnectionSpy.mockRestore();
     }
@@ -867,10 +867,10 @@ describe('OptsHandler class', () => {
       expect(core.optsHandler.configuredForScheduledRefresh()).toBe(false);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
-      expect(async () => {
+      await expect(async () => {
         await oapi.testConnection();
-      }).not.toThrow();
-      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+      }).rejects.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
 
       testDriverConnectionSpy.mockRestore();
     }
