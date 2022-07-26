@@ -20,17 +20,17 @@ async function checkCubestoreState(cubestore: CubeStoreDriver) {
     {
       table_schema: 'dev_pre_aggregations',
       table_name: 'orders_orders_by_completed_at20200201',
-      build_range_end: null,
+      build_range_end: '2020-05-07T00:00:00.000Z',
     },
     {
       table_schema: 'dev_pre_aggregations',
       table_name: 'orders_orders_by_completed_at20200301',
-      build_range_end: null,
+      build_range_end: '2020-05-07T00:00:00.000Z',
     },
     {
       table_schema: 'dev_pre_aggregations',
       table_name: 'orders_orders_by_completed_at20200401',
-      build_range_end: null,
+      build_range_end: '2020-05-07T00:00:00.000Z',
     },
     {
       table_schema: 'dev_pre_aggregations',
