@@ -32,7 +32,7 @@ interface CubejsConfiguration {
   logger: (msg: string, params: object) => any;
   driverFactory: (
     context: DriverContext
-  ) => DriverConfig | BaseDriver | Promise<BaseDriver>;
+  ) => DriverConfig | BaseDriver | Promise<BaseDriver> | Promise <DriverConfig>;
   contextToAppId: (context: RequestContext) => string;
   contextToOrchestratorId: (context: RequestContext) => string;
   repositoryFactory: (context: RequestContext) => SchemaFileRepository;
