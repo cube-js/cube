@@ -478,7 +478,6 @@ jobs:
         run: |
           cd packages/cubejs-testing/
           export BIRDBOX_CUBEJS_VERSION=${{ matrix.tag }}
-          export BIRDBOX_CUBESTORE_VERSION=${{ matrix.tag }}
           export BIRDBOX_CUBEJS_REGISTRY_PATH=localhost:5000/
           export DEBUG=testcontainers
           yarn run dataset:minimal
