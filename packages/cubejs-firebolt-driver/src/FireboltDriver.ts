@@ -72,7 +72,6 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   private async initConnection() {
     try {
       const connection = await this.firebolt.connect(this.config.connection);
-      await this.ensureEngineRunning();
       return connection;
     } catch (e) {
       this.connection = null;
