@@ -193,7 +193,7 @@ export async function startBirdBoxFromContainer(
   }
 
   if (process.env.BIRDBOX_CUBESTORE_VERSION === undefined) {
-    process.env.BIRDBOX_CUBESTORE_VERSION = process.env.BIRDBOX_CUBEJS_VERSION;
+    process.env.BIRDBOX_CUBESTORE_VERSION = 'latest';
   }
 
   const composeFile = `${options.type}.yml`;
