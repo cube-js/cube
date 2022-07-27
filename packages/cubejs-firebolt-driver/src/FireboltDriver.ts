@@ -160,27 +160,43 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     query: string,
     parameters: unknown[]
   ): Promise<StreamTableData> {
-    const connection = await this.getConnection();
+    return this.streamResponse(query, parameters);
+  }
 
-    const statement = await connection.execute(query, {
-      settings: { output_format: OutputFormat.JSON },
-      parameters,
-      response: { hydrateRow: this.hydrateRow }
-    });
+  private async streamResponse(
+    query: string,
+    parameters: unknown[],
+    retry = true
+  ): Promise<StreamTableData> {
+    try {
+      const connection = await this.getConnection();
 
-    const { data: rowStream, meta: metaPromise } =
-      await statement.streamResult();
-    const meta = await metaPromise;
+      const statement = await connection.execute(query, {
+        settings: { output_format: OutputFormat.JSON },
+        parameters,
+        response: { hydrateRow: this.hydrateRow }
+      });
 
-    const types = meta.map(({ type, name }) => ({
-      name,
-      type: this.toGenericType(type),
-    }));
+      const { data: rowStream, meta: metaPromise } =
+        await statement.streamResult();
+      const meta = await metaPromise;
 
-    return {
-      rowStream,
-      types,
-    };
+      const types = meta.map(({ type, name }) => ({
+        name,
+        type: this.toGenericType(type),
+      }));
+
+      return {
+        rowStream,
+        types,
+      };
+    } catch (error) {
+      if (error.status === 404 && retry) {
+        await this.ensureEngineRunning();
+        return this.streamResponse(query, parameters, false);
+      }
+      throw error;
+    }
   }
 
   public async unload(): Promise<DownloadTableCSVData> {
