@@ -107,6 +107,13 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     });
   }
 
+  public async getTablesQuery(schemaName) {
+    return this.query(
+      `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
+      [schemaName]
+    );
+  }
+
   public async getPrefixTablesQuery(schemaName, tablePrefixes) {
     const prefixWhere = tablePrefixes.map(_ => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
     return this.query(
