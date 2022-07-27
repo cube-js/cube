@@ -561,7 +561,7 @@ class BaseQuery {
   buildLambdaSqlAndParams() {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
     const result = {};
-    if (preAggForQuery && preAggForQuery.preAggregation.lambdaView) {
+    if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
       const QueryClass = this.constructor;
       const lambdaQuery = new QueryClass(
         this.compilers,

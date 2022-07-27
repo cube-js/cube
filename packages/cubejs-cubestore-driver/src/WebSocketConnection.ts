@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import { flatbuffers } from 'flatbuffers';
+import { InlineTables } from '@cubejs-backend/query-orchestrator';
 import {
   HttpColumnValue,
   HttpCommand,
@@ -9,6 +10,11 @@ import {
   HttpResultSet, HttpRow,
   HttpTable
 } from '../codegen/HttpMessage';
+
+export interface QueryOptions {
+  inlineTables?: InlineTables,
+  [key: string]: any,
+}
 
 export class WebSocketConnection {
   protected messageCounter: number;
@@ -153,8 +159,8 @@ export class WebSocketConnection {
     });
   }
 
-  public async query(query: string, queryTracingObj0?: any): Promise<any[]> {
-    const { inlineTables, ...queryTracingObj } = queryTracingObj0;
+  public async query(query: string, options?: QueryOptions): Promise<any[]> {
+    const { inlineTables, ...queryTracingObj } = options ?? {};
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
     let traceObjOffset: number | null = null;
@@ -182,7 +188,7 @@ export class WebSocketConnection {
         for (const row of table.rows) {
           const valueOffsets: number[] = [];
           for (const column of table.columns) {
-            const stringOffset = builder.createString(row[column.name].toString());
+            const stringOffset = builder.createString((row[column.name] as any).toString());
             HttpColumnValue.startHttpColumnValue(builder);
             HttpColumnValue.addStringValue(builder, stringOffset);
             const valueOffset = HttpColumnValue.endHttpColumnValue(builder);

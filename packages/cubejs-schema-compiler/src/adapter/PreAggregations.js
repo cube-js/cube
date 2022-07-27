@@ -183,7 +183,7 @@ export class PreAggregations {
         }
       ),
       readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation),
-      lambdaView: preAggregation.lambdaView,
+      unionWithSourceData: preAggregation.unionWithSourceData,
     };
   }
 

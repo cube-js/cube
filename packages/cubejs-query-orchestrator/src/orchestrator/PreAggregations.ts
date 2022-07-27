@@ -149,7 +149,7 @@ export type PreAggregationDescription = {
   preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
   timestampFormat: string;
   expandedPartition: boolean;
-  lambdaView: boolean;
+  unionWithSourceData: boolean;
   buildRangeEnd?: string;
 };
 
@@ -1244,7 +1244,7 @@ export class PreAggregationPartitionRangeLoader {
     );
     const [_, buildRangeEnd] = buildRange;
     const loadRange: [string, string] = [...range];
-    if (this.preAggregation.lambdaView && buildRangeEnd < range[1]) {
+    if (this.preAggregation.unionWithSourceData && buildRangeEnd < range[1]) {
       loadRange[1] = buildRangeEnd;
     }
 
