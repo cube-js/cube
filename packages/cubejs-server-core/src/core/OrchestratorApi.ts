@@ -161,15 +161,29 @@ export class OrchestratorApi {
     return this.orchestrator.testConnections();
   }
 
+  /**
+   * Tests worker's connections to the Cubstore and, if not in the rollup only
+   * mode, to the datasources.
+   */
   public async testConnection() {
-    return Promise.all([
-      ...Object.keys(this.seenDataSources).map(
-        ds => this.testDriverConnection(this.driverFactory, ds),
-      ),
-      this.testDriverConnection(this.options.externalDriverFactory),
-    ]);
+    if (this.options.rollupOnlyMode) {
+      return Promise.all([
+        this.testDriverConnection(this.options.externalDriverFactory),
+      ]);
+    } else {
+      return Promise.all([
+        ...Object.keys(this.seenDataSources).map(
+          ds => this.testDriverConnection(this.driverFactory, ds),
+        ),
+        this.testDriverConnection(this.options.externalDriverFactory),
+      ]);
+    }
   }
 
+  /**
+   * Tests connection to the data source specified by the driver factory
+   * function and data source name.
+   */
   public async testDriverConnection(
     driverFn?: DriverFactoryByDataSource,
     dataSource: string = 'default',
