@@ -522,6 +522,7 @@ impl RewriteRules for SplitRules {
                     false,
                 ),
             ),
+            // TODO: refactor. rm this rule and add uncast rule + alias rewrite on top projection
             transforming_chain_rewrite(
                 "split-push-down-date-part-with-date-trunc-and-cast-inner-replacer",
                 inner_aggregate_split_replacer(
@@ -564,6 +565,7 @@ impl RewriteRules for SplitRules {
                     true,
                 ),
             ),
+            // TODO: refactor. rm this rule and add uncast rule + alias rewrite on top projection
             transforming_chain_rewrite(
                 "split-push-down-date-part-with-date-trunc-and-cast-outer-aggr-replacer",
                 outer_aggregate_split_replacer(
