@@ -686,7 +686,7 @@ describe('OptsHandler class', () => {
   );
 
   test(
-    'must set preAggregationsOptions.externalRefresh to false and ' +
+    'must set preAggregationsOptions.externalRefresh to false and doesn\'t' +
     'test driver connection for dev server with rollupOnlyMode set to true',
     async () => {
       process.env.NODE_ENV = 'test';
@@ -713,10 +713,10 @@ describe('OptsHandler class', () => {
       expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
       expect(opts.rollupOnlyMode).toBe(true);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
-      await expect(async () => {
+      expect(async () => {
         await oapi.testConnection();
-      }).rejects.toThrow();
-      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
+      }).not.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
 
       testDriverConnectionSpy.mockRestore();
     }
