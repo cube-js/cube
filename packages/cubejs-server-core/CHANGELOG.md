@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.40](https://github.com/cube-js/cube.js/compare/v0.30.39...v0.30.40) (2022-07-26)
+
+
+### Bug Fixes
+
+* **server-core:** restoring health check for the API instances ([bfaee0f](https://github.com/cube-js/cube.js/commit/bfaee0fe26da9b3ea82c41d62df1b8a0018ade31))
+
+
+
+
+
 ## [0.30.39](https://github.com/cube-js/cube.js/compare/v0.30.38...v0.30.39) (2022-07-25)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

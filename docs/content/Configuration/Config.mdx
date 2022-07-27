@@ -30,7 +30,9 @@ interface CubejsConfiguration {
   basePath: string;
   webSocketsBasePath: string;
   logger: (msg: string, params: object) => any;
-  driverFactory: (context: DriverContext) => DriverConfig | BaseDriver | Promise<BaseDriver>;
+  driverFactory: (
+    context: DriverContext
+  ) => DriverConfig | BaseDriver | Promise<BaseDriver> | Promise <DriverConfig>;
   contextToAppId: (context: RequestContext) => string;
   contextToOrchestratorId: (context: RequestContext) => string;
   repositoryFactory: (context: RequestContext) => SchemaFileRepository;
@@ -119,8 +121,9 @@ interface FileContent {
 
 <WarningBox>
 
-Since v0.30.30 `dbType` usage is discouraged and substituted with a unified [driverFactory][self-driver-factory] implementation that returns `DriverConfig` object.
-Please consider defining [driverFactory][self-driver-factory] that returns `DriverConfig` object instead.
+Since v0.30.30, using `dbType` is discouraged. Instead of using `dbType`,
+consider defining [`driverFactory`][self-driver-factory] to return a
+`DriverConfig` object instead.
 
 </WarningBox>
 
@@ -167,20 +170,22 @@ Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
 [Multitenancy Applications][ref-multitenancy].
 
-Called once per [`dataSource`][ref-schema-ref-datasource]. 
-Can return a `Promise` which resolves to a `DriverConfig`.
-`DriverConfig` consists of a `type` field corresponding to database type and options passed to a driver constructor.
+Called once per [`dataSource`][ref-schema-ref-datasource]. Can return a
+`Promise` which resolves to a `DriverConfig`. `DriverConfig` consists of a
+`type` field corresponding to database type and options passed to a driver
+constructor.
 
 ```javascript
 module.exports = {
   driverFactory: ({ dataSource }) => ({
     type: 'postgres',
-    database: dataSource
-  })
+    database: dataSource,
+  }),
 };
 ```
 
-Drivers can also be instantiated directly in case custom driver implementations are used.
+Drivers can also be instantiated directly in case custom driver implementations
+are used.
 
 ```javascript
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
@@ -303,10 +308,10 @@ For example, you can use `checkSqlAuth` to validate username and password.
 module.exports = {
   checkSqlAuth: (req, username) => {
     if (username === 'fooUser') {
-        return {
-            password: 'mypassword',
-            securityContext: {},
-        }
+      return {
+        password: 'mypassword',
+        securityContext: {},
+      };
     }
 
     throw new Error('Incorrect user name or password');
