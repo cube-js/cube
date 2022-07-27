@@ -711,7 +711,7 @@ export class PreAggregations {
     }
     if (fromPreAggObj.length > 1) {
       throw new UserError(
-        `Multiple rollups found that can be used for rollup join ${JSON.stringify(join)}: ${fromPreAggObj.map(p => `${p.cube}.${p.preAggregationName}`).join(', ')}`,
+        `Multiple rollups found that can be used for rollup join ${JSON.stringify(join)}: ${fromPreAggObj.map(p => this.preAggregationId(p)).join(', ')}`,
       );
     }
     return fromPreAggObj[0];
