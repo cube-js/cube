@@ -987,4 +987,8 @@ export class PreAggregations {
       preAggregationForQuery.preAggregation.measures :
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures;
   }
+
+  preAggregationId(preAggregation) {
+    return `${preAggregation.cube}.${preAggregation.preAggregationName}`;
+  }
 }

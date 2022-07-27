@@ -582,7 +582,7 @@ class BaseQuery {
           preAggregationQuery: true,
         }
       );
-      result[`${preAggForQuery.cube}.${preAggForQuery.preAggregationName}`] = lambdaQuery.buildSqlAndParams();
+      result[this.preAggregations.preAggregationId(preAggForQuery)] = lambdaQuery.buildSqlAndParams();
     }
     return result;
   }
