@@ -99,7 +99,10 @@ export type UnloadOptions = {
   maxFileSize: number,
 };
 
-export type QueryOptions = {};
+export type QueryOptions = {
+  inlineTables?: InlineTables,
+  [key: string]: any
+};
 export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData);
 
 export interface DriverInterface {

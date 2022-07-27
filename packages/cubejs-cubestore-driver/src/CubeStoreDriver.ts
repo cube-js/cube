@@ -9,7 +9,7 @@ import {
   DownloadTableCSVData,
   DownloadTableMemoryData, DriverInterface, IndexesSQL,
   StreamTableData,
-  StreamingSourceTableData,
+  StreamingSourceTableData, QueryOptions,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv } from '@cubejs-backend/shared';
 import { format as formatSql } from 'sqlstring';
@@ -65,8 +65,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     await this.query('SELECT 1', []);
   }
 
-  public async query(query: string, values: any[], queryTracingObj?: any) {
-    return this.connection.query(formatSql(query, values || []), { ...queryTracingObj, instance: getEnv('instanceId') });
+  public async query(query: string, values: any[], options?: QueryOptions) {
+    const { inlineTables, ...queryTracingObj } = options ?? {};
+    return this.connection.query(formatSql(query, values || []), inlineTables, { ...queryTracingObj, instance: getEnv('instanceId') });
   }
 
   public async release() {

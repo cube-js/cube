@@ -11,11 +11,6 @@ import {
   HttpTable
 } from '../codegen/HttpMessage';
 
-export interface QueryOptions {
-  inlineTables?: InlineTables,
-  [key: string]: any,
-}
-
 export class WebSocketConnection {
   protected messageCounter: number;
 
@@ -159,8 +154,7 @@ export class WebSocketConnection {
     });
   }
 
-  public async query(query: string, options?: QueryOptions): Promise<any[]> {
-    const { inlineTables, ...queryTracingObj } = options ?? {};
+  public async query(query: string, inlineTables: InlineTables, queryTracingObj?: any): Promise<any[]> {
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
     let traceObjOffset: number | null = null;
