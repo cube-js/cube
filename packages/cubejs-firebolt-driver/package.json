@@ -31,7 +31,7 @@
     "@cubejs-backend/query-orchestrator": "^0.30.39",
     "@cubejs-backend/schema-compiler": "^0.30.39",
     "@cubejs-backend/shared": "^0.30.34",
-    "firebolt-sdk": "^0.1.2"
+    "firebolt-sdk": "^0.1.5"
   },
   "license": "Apache-2.0",
   "devDependencies": {
