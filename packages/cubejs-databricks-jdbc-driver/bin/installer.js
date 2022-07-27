@@ -43,10 +43,10 @@ async function downloadJDBCDriver(isCli = false) {
         console.log('Downloading SimbaSparkJDBC42-2.6.17.1021');
         await shared_1.downloadAndExtractFile('https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/2.6.17/SimbaSparkJDBC42-2.6.17.1021.zip', {
             showProgress: true,
-            cwd: path_1.default.resolve(path_1.default.join(__dirname, '..', '..', 'download')),
+            cwd: path_1.default.resolve(path_1.default.join(__dirname, '..', 'download')),
         });
         console.log('Release notes: https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/2.6.17/docs/release-notes.txt');
-        return path_1.default.resolve(path_1.default.join(__dirname, '..', '..', 'download', 'SparkJDBC42.jar'));
+        return path_1.default.resolve(path_1.default.join(__dirname, '..', 'download', 'SparkJDBC42.jar'));
     }
     return null;
 }
