@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.41](https://github.com/cube-js/cube.js/compare/v0.30.40...v0.30.41) (2022-07-27)
+
+
+### Bug Fixes
+
+* **databricks-jdbc:** postinstall script with accept_policy env ([1e38791](https://github.com/cube-js/cube.js/commit/1e387919e8636fc9320ec2f043073e91f5b2e671))
+
+
+
+
+
 ## [0.30.39](https://github.com/cube-js/cube.js/compare/v0.30.38...v0.30.39) (2022-07-25)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
