@@ -10,7 +10,7 @@ import {
   TO_PARTITION_RANGE,
   BUILD_RANGE_START_LOCAL,
   BUILD_RANGE_END_LOCAL,
-  utcToLocalTimeZone,
+  utcToLocalTimeZone, timeSnap,
 } from '@cubejs-backend/shared';
 
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
@@ -1330,18 +1330,19 @@ export class PreAggregationPartitionRangeLoader {
    */
   private async downloadLambdaTable(from: string): Promise<InlineTable> {
     const queue = await this.queryCache.getQueue(this.preAggregation.dataSource);
+    const refreshKeys = [timeSnap(this.preAggregation.granularity, this.now())[1]];
     const [query, params] = this.lambdaSql;
     const values = params.map((p) => (p === FROM_PARTITION_RANGE ? from : p));
     const table = await queue.executeInQueue(
       'query',
-      [],
+      refreshKeys,
       {
         query,
         values,
         forceBuild: true,
         useDownload: true,
       },
-      this.priority(11),
+      this.priority(10),
     );
     return {
       name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
@@ -1406,9 +1407,13 @@ export class PreAggregationPartitionRangeLoader {
     return this.orNowIfEmpty([rangeStart, rangeEnd]);
   }
 
+  private now() {
+    return utcToLocalTimeZone(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', new Date().toJSON().substring(0, 23));
+  }
+
   private orNowIfEmpty(dateRange: QueryDateRange): QueryDateRange {
     if (!dateRange[0] && !dateRange[1]) {
-      const now = utcToLocalTimeZone(this.preAggregation.timezone, 'YYYY-MM-DDTHH:mm:ss.SSS', new Date().toJSON().substring(0, 23));
+      const now = this.now();
       return [now, now];
     }
     if (!dateRange[0]) {

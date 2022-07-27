@@ -157,6 +157,7 @@ export class PreAggregations {
       sql: this.query.preAggregationSql(cube, preAggregation),
       uniqueKeyColumns,
       dataSource: queryForSqlEvaluation.dataSource,
+      granularity: preAggregation.granularity,
       partitionGranularity: preAggregation.partitionGranularity,
       preAggregationStartEndQueries:
         (preAggregation.partitionGranularity || preAggregation.granularity) &&

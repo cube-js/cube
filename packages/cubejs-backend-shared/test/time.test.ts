@@ -1,4 +1,4 @@
-import { timeSeries } from '../src';
+import { timeSnap, timeSeries } from '../src';
 
 describe('timeSeries', () => {
   it('day', () => {
@@ -15,5 +15,13 @@ describe('timeSeries', () => {
       ['2021-07-01T00:00:00.000', '2021-09-30T23:59:59.999'],
       ['2021-10-01T00:00:00.000', '2021-12-31T23:59:59.999'],
     ]);
+  });
+});
+
+describe('timeSnap', () => {
+  it('day', () => {
+    expect(timeSnap('day', '2021-01-01T08:08:08')).toEqual(
+      ['2021-01-01T00:00:00.000', '2021-01-01T23:59:59.999'],
+    );
   });
 });
