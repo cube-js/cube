@@ -1,13 +1,15 @@
-use std::sync::{Arc, RwLock as RwLockSync};
-
 use crate::{
     sql::{
-        database_variables::{mysql_default_global_variables, postgres_default_global_variables},
+        database_variables::{
+            mysql_default_global_variables, postgres_default_global_variables,
+            DatabaseVariablesToUpdate,
+        },
         SqlAuthService,
     },
     transport::TransportService,
     CubeError,
 };
+use std::sync::{Arc, RwLock as RwLockSync, RwLockReadGuard, RwLockWriteGuard};
 
 use super::{database_variables::DatabaseVariables, session::DatabaseProtocol};
 
@@ -31,13 +33,6 @@ impl Default for ServerConfiguration {
     }
 }
 
-lazy_static! {
-    static ref POSTGRES_DEFAULT_VARIABLES: RwLockSync<DatabaseVariables> =
-        RwLockSync::new(postgres_default_global_variables());
-    static ref MYSQL_DEFAULT_VARIABLES: RwLockSync<DatabaseVariables> =
-        RwLockSync::new(mysql_default_global_variables());
-}
-
 #[derive(Debug)]
 pub struct ServerManager {
     // References to shared things
@@ -46,6 +41,8 @@ pub struct ServerManager {
     // Non references
     pub configuration: ServerConfiguration,
     pub nonce: Option<Vec<u8>>,
+    postgres_variables: RwLockSync<DatabaseVariables>,
+    mysql_variables: RwLockSync<DatabaseVariables>,
 }
 
 crate::di_service!(ServerManager, []);
@@ -61,54 +58,57 @@ impl ServerManager {
             transport,
             nonce,
             configuration: ServerConfiguration::default(),
+            postgres_variables: RwLockSync::new(postgres_default_global_variables()),
+            mysql_variables: RwLockSync::new(mysql_default_global_variables()),
         }
     }
 
-    pub fn all_variables(&self, protocol: DatabaseProtocol) -> DatabaseVariables {
+    pub fn read_variables(
+        &self,
+        protocol: DatabaseProtocol,
+    ) -> RwLockReadGuard<'_, DatabaseVariables> {
         match protocol {
-            DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES
+            DatabaseProtocol::MySQL => self
+                .mysql_variables
                 .read()
-                .expect("failed to unlock variables for reading")
-                .clone(),
-            DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES
+                .expect("failed to unlock variables for reading"),
+            DatabaseProtocol::PostgreSQL => self
+                .postgres_variables
                 .read()
-                .expect("failed to unlock variables for reading")
-                .clone(),
+                .expect("failed to unlock variables for reading"),
         }
     }
 
-    pub fn set_variables(&self, variables: DatabaseVariables, protocol: DatabaseProtocol) {
-        let mut to_override = false;
+    fn write_variables(
+        &self,
+        protocol: DatabaseProtocol,
+    ) -> RwLockWriteGuard<'_, DatabaseVariables> {
+        match protocol {
+            DatabaseProtocol::MySQL => self
+                .mysql_variables
+                .write()
+                .expect("failed to unlock variables for reading"),
+            DatabaseProtocol::PostgreSQL => self
+                .postgres_variables
+                .write()
+                .expect("failed to unlock variables for reading"),
+        }
+    }
 
-        let mut current_variables = self.all_variables(protocol.clone());
-        for (new_var_key, new_var_value) in variables.iter() {
-            let mut key_to_update: Option<String> = None;
-            for (current_var_key, current_var_value) in current_variables.iter() {
-                if current_var_key.to_lowercase() == new_var_key.to_lowercase()
-                    && !current_var_value.readonly
-                {
-                    key_to_update = Some(current_var_key.clone());
+    // TODO: Read without copy by holding acquired lock
+    pub fn all_variables(&self, protocol: DatabaseProtocol) -> DatabaseVariables {
+        self.read_variables(protocol).clone()
+    }
 
-                    break;
+    pub fn set_variables(&self, variables: DatabaseVariablesToUpdate, protocol: DatabaseProtocol) {
+        let mut current = self.write_variables(protocol.clone());
+
+        for new_var in variables.into_iter() {
+            if let Some(current_var_value) = current.get(&new_var.name) {
+                if !current_var_value.readonly {
+                    current.insert(new_var.name.clone(), new_var);
                 }
             }
-            if key_to_update.is_some() {
-                to_override = true;
-                current_variables.insert(key_to_update.unwrap(), new_var_value.clone());
-            }
-        }
-
-        if to_override {
-            let mut guard = match protocol {
-                DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES
-                    .write()
-                    .expect("failed to unlock variables for writing"),
-                DatabaseProtocol::PostgreSQL => POSTGRES_DEFAULT_VARIABLES
-                    .write()
-                    .expect("failed to unlock variables for writing"),
-            };
-
-            *guard = current_variables;
         }
     }
 }
