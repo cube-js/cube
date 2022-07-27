@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.40](https://github.com/cube-js/cube.js/compare/v0.30.39...v0.30.40) (2022-07-26)
+
+
+### Bug Fixes
+
+* **client-react:** update hooks for React 18 StrictMode ([#4999](https://github.com/cube-js/cube.js/issues/4999)) ([fd6352c](https://github.com/cube-js/cube.js/commit/fd6352c61a614afef61b2a9d4332ecf300594b3b))
+* **server-core:** restoring health check for the API instances ([bfaee0f](https://github.com/cube-js/cube.js/commit/bfaee0fe26da9b3ea82c41d62df1b8a0018ade31))
+
+
+
+
+
+## [0.30.39](https://github.com/cube-js/cube.js/compare/v0.30.38...v0.30.39) (2022-07-25)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** API instance throw on missing partitions ([3bf0882](https://github.com/cube-js/cube.js/commit/3bf08822d77c317e145fc498207372618c862498))
+
+
+
+
+
+## [0.30.38](https://github.com/cube-js/cube.js/compare/v0.30.37...v0.30.38) (2022-07-25)
+
+
+### Features
+
+* **cubesql:** Define standard_conforming_strings (SQLAlchemy compatibility) ([8fbc046](https://github.com/cube-js/cube.js/commit/8fbc0467c2e3e37fa9c4b320630dc9200884f3ee)), closes [#L2994](https://github.com/cube-js/cube.js/issues/L2994)
+* **cubesql:** Support Cast(expr as Regclass) ([e3cafe4](https://github.com/cube-js/cube.js/commit/e3cafe4a0a291d61545e8855425b8755f3629a4e))
+* **cubesql:** Support for new introspection query in SQLAlchemy ([0dbc9e6](https://github.com/cube-js/cube.js/commit/0dbc9e6551016d12155bba27a57b9a17e13dbd02)), closes [#L3381](https://github.com/cube-js/cube.js/issues/L3381)
+* **cubesql:** Support pg_catalog.pg_sequence table ([fe057bf](https://github.com/cube-js/cube.js/commit/fe057bf256b8744a9c3f407908808cefa6cd6d8c))
+* **docker:** jdk containers ([90dbe9f](https://github.com/cube-js/cube.js/commit/90dbe9f846b3aadaa6fe2b7cf8462cf1fb53e413))
+
+
+### Reverts
+
+* revert "docs: update Home page to use new grid (#4898)" ([71bcdf8](https://github.com/cube-js/cube.js/commit/71bcdf82636a54eb326e6a95efbab6a2d6b7df87)), closes [#4898](https://github.com/cube-js/cube.js/issues/4898)
+
+
+
+
+
 ## [0.30.37](https://github.com/cube-js/cube.js/compare/v0.30.36...v0.30.37) (2022-07-20)
 
 

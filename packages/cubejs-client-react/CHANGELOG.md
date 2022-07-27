@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.40](https://github.com/cube-js/cube.js/compare/v0.30.39...v0.30.40) (2022-07-26)
+
+
+### Bug Fixes
+
+* **client-react:** update hooks for React 18 StrictMode ([#4999](https://github.com/cube-js/cube.js/issues/4999)) ([fd6352c](https://github.com/cube-js/cube.js/commit/fd6352c61a614afef61b2a9d4332ecf300594b3b))
+
+
+
+
+
 ## [0.30.30](https://github.com/cube-js/cube.js/compare/v0.30.29...v0.30.30) (2022-07-05)
 
 

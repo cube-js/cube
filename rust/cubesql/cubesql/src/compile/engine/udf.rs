@@ -32,7 +32,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use itertools::izip;
-use pg_srv::PgTypeId;
+use pg_srv::{PgType, PgTypeId};
 
 use crate::{
     compile::engine::df::{
@@ -2398,6 +2398,110 @@ pub fn create_pg_total_relation_size_udf() -> ScalarUDF {
     ScalarUDF::new(
         "pg_total_relation_size",
         &Signature::exact(vec![DataType::UInt32], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+// Additional function which is used under the hood for CAST(x as Regclass) where
+// x is a dynamic expression which doesnt allow us to use CastReplacer
+pub fn create_cube_regclass_cast_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        match args[0].data_type() {
+            DataType::Utf8 => {
+                let string_arr = downcast_string_arg!(args[0], "expr", i32);
+                let mut builder = Int64Builder::new(args[0].len());
+
+                for value in string_arr {
+                    match value {
+                        None => builder.append_null()?,
+                        Some(as_str) => {
+                            match PgType::get_all().iter().find(|e| e.typname == as_str) {
+                                None => {
+                                    return Err(DataFusionError::Execution(format!(
+                                        "Unable to cast expression to Regclass: Unknown type: {}",
+                                        as_str
+                                    )))
+                                }
+                                Some(ty) => {
+                                    builder.append_value(ty.oid as i64)?;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Ok(Arc::new(builder.finish()) as ArrayRef)
+            }
+            DataType::Int32 | DataType::UInt32 => {
+                cast(&args[0], &DataType::Int64).map_err(|err| err.into())
+            }
+            DataType::Int64 => Ok(args[0].clone()),
+            _ => Err(DataFusionError::Execution(format!(
+                "CAST with Regclass doesn't support this type: {}",
+                args[0].data_type()
+            ))),
+        }
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "__cube_regclass_cast",
+        &Signature::any(1, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_get_serial_sequence_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let tbl_nm_arr = downcast_string_arg!(args[0], "table", i32);
+
+        // TODO: Checks that table/field was defined in the schema
+        let res = tbl_nm_arr
+            .iter()
+            .map(|_| Option::<String>::None)
+            .collect::<StringArray>();
+
+        Ok(Arc::new(res) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_get_serial_sequence",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_json_build_object_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_args: &[ArrayRef]| {
+        // TODO: Implement
+        return Err(DataFusionError::NotImplemented(format!(
+            "json_build_object is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "json_build_object",
+        &Signature::variadic(
+            vec![
+                DataType::Utf8,
+                DataType::Boolean,
+                DataType::Int64,
+                DataType::UInt32,
+            ],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )
