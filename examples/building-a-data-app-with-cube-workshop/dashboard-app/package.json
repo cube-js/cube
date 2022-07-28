@@ -13,7 +13,7 @@
     "@testing-library/user-event": "^12.1.10",
     "bootstrap": "5.1.3",
     "jsonwebtoken": "^8.5.1",
-    "moment": "^2.29.3",
+    "moment": "^2.29.4",
     "numeral": "^2.0.6",
     "react": "^17.0.2",
     "react-bootstrap": "^2.0.0",
