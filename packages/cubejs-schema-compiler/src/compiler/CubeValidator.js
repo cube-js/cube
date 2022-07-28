@@ -162,8 +162,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
     }),
     Joi.object().keys({
       columns: Joi.func().required(),
-      regular: Joi.boolean().strict(),
-      aggregating: Joi.boolean().strict()
+      type: Joi.any().valid('regular', 'aggregate').required().default('regular'),
     })
   )),
   // refreshRange was deprecated
@@ -530,7 +529,6 @@ export function functionFieldsPatterns() {
 
 export class CubeValidator {
   constructor(cubeSymbols) {
-    console.log("!!!!!!!!! ?JJJJJ");
     this.cubeSymbols = cubeSymbols;
     this.validCubes = {};
   }

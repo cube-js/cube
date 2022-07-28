@@ -4,7 +4,6 @@ import { UserError } from '../compiler/UserError';
 
 export class PreAggregations {
   constructor(query, historyQueries, cubeLatticeCache) {
-    console.log("here !!!");
     this.query = query;
     this.historyQueries = historyQueries;
     this.cubeLatticeCache = cubeLatticeCache;
@@ -119,6 +118,28 @@ export class PreAggregations {
     return this.hasCumulativeMeasuresValue;
   }
 
+  aggregatesColumns(cube, preAggregation) {
+    if (preAggregation.type  === 'rollup') {
+        
+        return this.query
+            .preAggregationQueryForSqlEvaluation(cube, preAggregation)
+            .measures
+            .filter(m => m.isAdditive())
+            .map(m => {
+                const fname = {
+                    sum: 'sum',
+                    count: 'sum',
+                    countDistinctApprox: 'merge',
+                    min: 'min',
+                    max: 'max'
+                }[m.measureDefinition().type];
+                return `${fname}(${m.aliasName()})`;
+            });
+
+    }
+    return [];
+  }
+ 
   preAggregationDescriptionFor(cube, foundPreAggregation) {
     const { preAggregationName, preAggregation } = foundPreAggregation;
 
@@ -144,6 +165,8 @@ export class PreAggregations {
       originalSql: () => preAggregation.uniqueKeyColumns || null
     }[preAggregation.type] || uniqueKeyColumnsDefault)();
 
+    const aggregatesColumns = this.aggregatesColumns(cube, preAggregation);
+    
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
@@ -157,6 +180,7 @@ export class PreAggregations {
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
       uniqueKeyColumns,
+      aggregatesColumns,
       dataSource: queryForSqlEvaluation.dataSource,
       partitionGranularity: preAggregation.partitionGranularity,
       preAggregationStartEndQueries:
@@ -167,7 +191,11 @@ export class PreAggregations {
           matchedTimeDimension && matchedTimeDimension.boundaryDateRangeFormatted() ||
           filters && filters[0] && filters[0].formattedDateRange() // TODO intersect all date ranges
         ),
-      indexesSql: Object.keys(preAggregation.indexes || {}).map(
+      indexesSql: Object.keys(preAggregation.indexes || {})
+        .filter(index => {
+            return preAggregation.indexes[index].type === 'regular';
+        })
+        .map(
         index => {
           // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
           const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
@@ -180,6 +208,21 @@ export class PreAggregations {
               indexName,
               tableName
             )
+          };
+        }
+      ),
+      additionalIndexes: Object.keys(preAggregation.indexes || {})
+        .filter(index => {
+            return preAggregation.indexes[index].type !== 'regular';
+        })
+        .map(
+        index => {
+          // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
+          const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
+          return {
+            indexName,
+            type: preAggregation.indexes[index].type,
+            columns: this.query.evaluateIndexColumns(cube, preAggregation.indexes[index])
           };
         }
       ),

@@ -145,10 +145,8 @@ export class CubeEvaluator extends CubeSymbols {
                     indexes[indexName].columns,
                     { originalSorting: true }
                   ),
-                  regular: indexes[indexName].regular || true,
-                  aggregating: indexes[indexName].aggregating || false,
+                  type: indexes[indexName].type 
                 };
-                console.log(indexes[indexName]);
                 return obj;
               }, {})
             };
