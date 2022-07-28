@@ -120,7 +120,6 @@ export class PreAggregations {
 
   aggregatesColumns(cube, preAggregation) {
     if (preAggregation.type === 'rollup') {
-        
       return this.query
         .preAggregationQueryForSqlEvaluation(cube, preAggregation)
         .measures
@@ -135,7 +134,6 @@ export class PreAggregations {
           }[m.measureDefinition().type];
           return `${fname}(${m.aliasName()})`;
         });
-
     }
     return [];
   }
