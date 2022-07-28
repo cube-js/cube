@@ -30,7 +30,8 @@
   "dependencies": {
     "@cubejs-backend/postgres-driver": "^0.30.8",
     "@cubejs-backend/query-orchestrator": "^0.30.7",
-    "@cubejs-backend/shared": "^0.30.7"
+    "@cubejs-backend/shared": "^0.30.7",
+    "pg": "^8.7.1"
   },
   "license": "Apache-2.0",
   "devDependencies": {

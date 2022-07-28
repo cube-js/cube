@@ -1,10 +1,6 @@
 const fromExports = require('./dist/src');
 const { CrateDriver } = require('./dist/src/CrateDriver');
 
-/**
- * After 5 years working with TypeScript, now I know
- * that commonjs and nodejs require is not compatibility with using export default
- */
 const toExport = CrateDriver;
 
 // eslint-disable-next-line no-restricted-syntax
