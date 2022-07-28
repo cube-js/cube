@@ -1328,26 +1328,39 @@ export class PreAggregationPartitionRangeLoader {
   /**
    * Downloads the lambda table from the source DB.
    */
-  private async downloadLambdaTable(from: string): Promise<InlineTable> {
-    const queue = await this.queryCache.getQueue(this.preAggregation.dataSource);
-    const refreshKeys = [timeSnap(this.preAggregation.granularity, this.now())[1]];
+  private async downloadLambdaTable(fromDate: string): Promise<InlineTable> {
+    const [_, highNow] = timeSnap(this.preAggregation.granularity, this.now());
     const [query, params] = this.lambdaSql;
-    const values = params.map((p) => (p === FROM_PARTITION_RANGE ? from : p));
-    const table = await queue.executeInQueue(
-      'query',
-      refreshKeys,
+    const values = params.map((p) => {
+      if (p === FROM_PARTITION_RANGE) {
+        return fromDate;
+      }
+      if (p === TO_PARTITION_RANGE) {
+        return highNow;
+      }
+      return p;
+    });
+    const rows = await this.queryCache.cacheQueryResult(
+      query,
+      values,
+      [query, values],
+      60 * 60,
       {
-        query,
-        values,
-        forceBuild: true,
+        renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold || 2 * 60,
+        renewalKey: [query, values],
+        waitForRenew: false,
+        priority: 10,
+        requestId: this.requestId,
+        dataSource: this.dataSource,
+        useInMemory: true,
         useDownload: true,
-      },
-      this.priority(10),
+        external: false
+      }
     );
     return {
       name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
-      columns: table.types,
-      rows: table.rows,
+      columns: [], // table.types,
+      rows,
     };
   }
 

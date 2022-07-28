@@ -45,6 +45,7 @@ export class QueryQueue {
         priority,
         requestId: options.requestId,
         buildRangeEnd: options.buildRangeEnd,
+        useDownload: options.useDownload,
         addedToQueueTime: new Date().getTime(),
       };
       this.logger('Waiting for query', {

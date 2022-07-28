@@ -163,7 +163,7 @@ export class QueryCache {
         forceNoCache,
         external: queryBody.external,
         requestId: queryBody.requestId,
-        dataSource: queryBody.dataSource
+        dataSource: queryBody.dataSource,
       }
     );
 
@@ -213,7 +213,7 @@ export class QueryCache {
   }
 
   public async queryWithRetryAndRelease(query, values, {
-    priority, cacheKey, external, requestId, dataSource, inlineTables,
+    priority, cacheKey, external, requestId, dataSource, inlineTables, useDownload,
   }: {
     priority?: number,
     cacheKey: object,
@@ -221,6 +221,7 @@ export class QueryCache {
     requestId?: string,
     dataSource: string,
     inlineTables?: InlineTables,
+    useDownload?: boolean,
   }) {
     const queue = external
       ? this.getExternalQueue()
@@ -230,6 +231,7 @@ export class QueryCache {
     }, priority, {
       stageQueryKey: cacheKey,
       requestId,
+      useDownload,
     });
   }
 
@@ -242,6 +244,7 @@ export class QueryCache {
           this.logger('Executing SQL', {
             ...q
           });
+          console.log('QQQ', q.useDownload, q.query, q.values);
           if (q.useDownload) {
             return client.downloadQueryResults(q.query, q.values, q);
           } else {
@@ -339,7 +342,7 @@ export class QueryCache {
     requestId?: string,
     skipRefreshKeyWaitForRenew?: boolean,
     external?: boolean,
-    dataSource: string
+    dataSource: string,
   }) {
     this.renewQuery(
       query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options
@@ -356,7 +359,7 @@ export class QueryCache {
     requestId?: string,
     skipRefreshKeyWaitForRenew?: boolean,
     external?: boolean,
-    dataSource: string
+    dataSource: string,
   }) {
     options = options || { dataSource: 'default' };
     return Promise.all(
@@ -383,7 +386,7 @@ export class QueryCache {
               waitForRenew: true,
               external: options.external,
               requestId: options.requestId,
-              dataSource: options.dataSource
+              dataSource: options.dataSource,
             }
           ),
           refreshKeyValues: cacheKeyQueryResults,
@@ -451,6 +454,7 @@ export class QueryCache {
     waitForRenew?: boolean,
     forceNoCache?: boolean,
     useInMemory?: boolean,
+    useDownload?: boolean,
   }) {
     options = options || { dataSource: 'default' };
     const { renewalThreshold } = options;
@@ -462,7 +466,8 @@ export class QueryCache {
         cacheKey,
         external: options.external,
         requestId: options.requestId,
-        dataSource: options.dataSource
+        dataSource: options.dataSource,
+        useDownload: options.useDownload,
       }).then(res => {
         const result = {
           time: (new Date()).getTime(),
