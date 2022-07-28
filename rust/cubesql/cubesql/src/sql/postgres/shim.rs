@@ -341,7 +341,7 @@ impl AsyncPostgresShim {
                 if let Ok(statement) = parse_sql_to_statement(&query, DatabaseProtocol::PostgreSQL)
                 {
                     props.insert(
-                        "sanitized_query".to_string(),
+                        "sanitizedQuery".to_string(),
                         SensitiveDataSanitizer::new()
                             .replace(&statement)
                             .to_string(),
