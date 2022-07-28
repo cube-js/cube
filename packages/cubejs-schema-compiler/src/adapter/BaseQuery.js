@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -572,8 +572,8 @@ class BaseQuery {
             this.options.timeDimensions.length > 0
               ? {
                 member: this.options.timeDimensions[0].dimension,
-                operator: 'inDateRange',
-                values: [FROM_PARTITION_RANGE, TO_PARTITION_RANGE]
+                operator: 'afterDate',
+                values: [FROM_PARTITION_RANGE]
               }
               : [],
           ],

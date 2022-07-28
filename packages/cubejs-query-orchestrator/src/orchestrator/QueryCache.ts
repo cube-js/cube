@@ -227,11 +227,10 @@ export class QueryCache {
       ? this.getExternalQueue()
       : await this.getQueue(dataSource);
     return queue.executeInQueue('query', cacheKey, {
-      queryKey: cacheKey, query, values, requestId, inlineTables,
+      queryKey: cacheKey, query, values, requestId, inlineTables, useDownload
     }, priority, {
       stageQueryKey: cacheKey,
       requestId,
-      useDownload,
     });
   }
 
@@ -244,7 +243,7 @@ export class QueryCache {
           this.logger('Executing SQL', {
             ...q
           });
-          console.log('QQQ', q.useDownload, q.query, q.values);
+          console.log('QQQ', q);
           if (q.useDownload) {
             return client.downloadQueryResults(q.query, q.values, q);
           } else {

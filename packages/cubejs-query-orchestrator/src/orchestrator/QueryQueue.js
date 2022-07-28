@@ -86,6 +86,8 @@ export class QueryQueue {
         keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
 
+      console.log('AAA', query, options);
+
       if (added > 0) {
         this.logger('Added to queue', {
           priority,
@@ -106,6 +108,8 @@ export class QueryQueue {
 
       const queryDef = await redisClient.getQueryDef(queryKey);
       const [active, toProcess] = await redisClient.getQueryStageState(true);
+
+      console.log('BBB', query, options);
 
       if (queryDef) {
         this.logger('Waiting for query', {

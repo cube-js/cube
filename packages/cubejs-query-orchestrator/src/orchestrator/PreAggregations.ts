@@ -1335,15 +1335,12 @@ export class PreAggregationPartitionRangeLoader {
       if (p === FROM_PARTITION_RANGE) {
         return fromDate;
       }
-      if (p === TO_PARTITION_RANGE) {
-        return highNow;
-      }
       return p;
     });
-    const rows = await this.queryCache.cacheQueryResult(
+    const result = await this.queryCache.cacheQueryResult(
       query,
       values,
-      [query, values],
+      [query, values, highNow],
       60 * 60,
       {
         renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold || 2 * 60,
@@ -1359,8 +1356,8 @@ export class PreAggregationPartitionRangeLoader {
     );
     return {
       name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
-      columns: [], // table.types,
-      rows,
+      columns: result.types,
+      rows: result.rows,
     };
   }
 
