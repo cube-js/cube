@@ -75,9 +75,7 @@ use crate::{
         database_variables::{DatabaseVariable, DatabaseVariables},
         dataframe,
         session::DatabaseProtocol,
-        statement::{
-            CastReplacer, SensitiveDataSanitizer, ToTimestampReplacer, UdfWildcardArgReplacer,
-        },
+        statement::{CastReplacer, ToTimestampReplacer, UdfWildcardArgReplacer},
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -1701,7 +1699,7 @@ impl QueryPlanner {
     }
 
     pub async fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
-        let plan = match (stmt, &self.state.protocol) {
+        match (stmt, &self.state.protocol) {
             (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q).await,
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -1811,21 +1809,6 @@ impl QueryPlanner {
                 "Unsupported query type: {}",
                 stmt.to_string()
             ))),
-        };
-
-        match plan {
-            Err(err) => {
-                let meta = Some(HashMap::from([("query".to_string(), stmt.to_string())]));
-                let msg = err.message();
-                Err(err
-                    .with_message(format!(
-                        "{} QUERY: {}",
-                        msg,
-                        SensitiveDataSanitizer::new().replace(stmt).to_string()
-                    ))
-                    .with_meta(meta))
-            }
-            _ => plan,
         }
     }
 
@@ -2532,10 +2515,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let plan = df_query_planner
             .statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))
             .map_err(|err| {
-                let message = format!("Initial planning error: {}", err,);
-                let meta = Some(HashMap::from([("query".to_string(), stmt.to_string())]));
-
-                CompilationError::internal(message).with_meta(meta)
+                CompilationError::internal(format!("Initial planning error: {}", err))
             })?;
 
         let optimized_plan = plan;
@@ -2558,15 +2538,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
                         e.message
                     ),
                     e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
-                    Some(HashMap::from([("query".to_string(), stmt.to_string())])),
+                    None,
                 ),
-                CubeErrorCauseType::User(_) => CompilationError::User(
-                    format!(
-                        "Error during rewrite: {}. Please check logs for additional information.",
-                        e.message
-                    ),
-                    Some(HashMap::from([("query".to_string(), stmt.to_string())])),
-                ),
+                CubeErrorCauseType::User(_) => CompilationError::user(format!(
+                    "Error during rewrite: {}. Please check logs for additional information.",
+                    e.message
+                )),
             });
 
         if let Err(_) = &result {
@@ -4290,7 +4267,7 @@ ORDER BY \"COUNT(count)\" DESC"
 
         assert_eq!(
             create_query.err().unwrap().message(),
-            "Error during rewrite: Dimension 'customer_gender' was used with the aggregate function 'MEASURE()'. Please use a measure instead. Please check logs for additional information. QUERY: SELECT MEASURE(customer_gender) FROM \"public\".\"KibanaSampleDataEcommerce\" AS \"KibanaSampleDataEcommerce\"",
+            "Error during rewrite: Dimension 'customer_gender' was used with the aggregate function 'MEASURE()'. Please use a measure instead. Please check logs for additional information.",
         );
     }
 
@@ -4559,11 +4536,11 @@ ORDER BY \"COUNT(count)\" DESC"
             vec![
                 (
                     "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information. QUERY: SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string()),
+                    CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
                 ),
                 (
                     "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information. QUERY: SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string()),
+                    CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information.".to_string()),
                 ),
             ]
         } else {
@@ -4571,11 +4548,11 @@ ORDER BY \"COUNT(count)\" DESC"
                 // Count agg fn
                 (
                     "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided QUERY: SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string()),
+                    CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided".to_string()),
                 ),
                 (
                     "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead QUERY: SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string()),
+                    CompilationError::user("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead".to_string()),
                 ),
                 // (
                 //     "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
@@ -4613,7 +4590,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 // ),
                 // (
                 //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' in GROUP BY QUERY: SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string()),
+                //     CompilationError::user("Unable to use segment 'is_male' in GROUP BY".to_string()),
                 // ),
                 // (
                 //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
@@ -9098,7 +9075,7 @@ ORDER BY \"COUNT(count)\" DESC"
             get_test_session(DatabaseProtocol::PostgreSQL),
         ).await;
         match create_query {
-            Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS QUERY: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
+            Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
             _ => panic!("CREATE TABLE should throw CompilationError::Unsupported"),
         };
 
@@ -9116,7 +9093,7 @@ ORDER BY \"COUNT(count)\" DESC"
         .await;
         match select_into_query {
             Err(CompilationError::Unsupported(msg, _)) => {
-                assert_eq!(msg, "Unsupported query type: SELECT INTO QUERY: SELECT * INTO TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_1_Connect_C\" FROM (SELECT 1 AS COL) AS CHECKTEMP LIMIT 1")
+                assert_eq!(msg, "Unsupported query type: SELECT INTO")
             }
             _ => panic!("SELECT INTO should throw CompilationError::unsupported"),
         }

@@ -261,6 +261,7 @@ export class CubejsServerCore {
             ...(params.apiType ? { apiType: params.apiType } : {}),
             ...(params.protocol ? { protocol: params.protocol } : {}),
             ...(params.appName ? { appName: params.appName } : {}),
+            ...(params.sanitizedQuery ? { query: params.sanitizedQuery } : {}),
           };
 
           this.event(msg, props);
@@ -289,6 +290,7 @@ export class CubejsServerCore {
             apiType: params.apiType,
             protocol: params.protocol,
             ...(params.appName ? { appName: params.appName } : {}),
+            ...(params.sanitizedQuery ? { query: params.sanitizedQuery } : {}),
           };
           this.event(msg, props);
         }

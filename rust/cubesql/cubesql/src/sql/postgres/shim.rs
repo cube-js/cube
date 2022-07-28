@@ -11,7 +11,9 @@ use crate::{
         df_type_to_pg_tid,
         extended::{Cursor, Portal, PortalFrom},
         session::DatabaseProtocol,
-        statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
+        statement::{
+            PostgresStatementParamsFinder, SensitiveDataSanitizer, StatementPlaceholderReplacer,
+        },
         types::CommandCompletion,
         writer::BatchWriter,
         AuthContextRef, Session, StatusFlags,
@@ -240,15 +242,19 @@ impl AsyncPostgresShim {
         loop {
             let mut doing_extended_query_message = false;
 
-            let result = match buffer::read_message(&mut self.socket).await? {
-                protocol::FrontendMessage::Query(body) => self.process_query(body.query).await,
-                protocol::FrontendMessage::Flush => self.flush().await,
+            let (result, query) = match buffer::read_message(&mut self.socket).await? {
+                protocol::FrontendMessage::Query(body) => {
+                    let query = body.query.clone();
+                    (self.process_query(body.query).await, Some(query))
+                }
+                protocol::FrontendMessage::Flush => (self.flush().await, None),
                 protocol::FrontendMessage::Terminate => return Ok(()),
                 // Extended
                 protocol::FrontendMessage::Parse(body) => {
                     if tracked_error.is_none() {
                         doing_extended_query_message = true;
-                        self.parse(body).await
+                        let query = body.query.clone();
+                        (self.parse(body).await, Some(query))
                     } else {
                         continue;
                     }
@@ -256,7 +262,7 @@ impl AsyncPostgresShim {
                 protocol::FrontendMessage::Bind(body) => {
                     if tracked_error.is_none() {
                         doing_extended_query_message = true;
-                        self.bind(body).await
+                        (self.bind(body).await, None)
                     } else {
                         continue;
                     }
@@ -264,28 +270,28 @@ impl AsyncPostgresShim {
                 protocol::FrontendMessage::Execute(body) => {
                     if tracked_error.is_none() {
                         doing_extended_query_message = true;
-                        self.execute(body).await
+                        (self.execute(body).await, None)
                     } else {
                         continue;
                     }
                 }
                 protocol::FrontendMessage::Close(body) => {
                     if tracked_error.is_none() {
-                        self.close(body).await
+                        (self.close(body).await, None)
                     } else {
                         continue;
                     }
                 }
                 protocol::FrontendMessage::Describe(body) => {
                     if tracked_error.is_none() {
-                        self.describe(body).await
+                        (self.describe(body).await, None)
                     } else {
                         continue;
                     }
                 }
                 protocol::FrontendMessage::Sync => {
                     if let Some(err) = tracked_error.take() {
-                        self.handle_connection_error(err).await?;
+                        self.handle_connection_error(err, None).await?;
                     };
 
                     self.write_ready().await?;
@@ -306,7 +312,7 @@ impl AsyncPostgresShim {
                 if doing_extended_query_message {
                     tracked_error = Some(err);
                 } else {
-                    self.handle_connection_error(err).await?;
+                    self.handle_connection_error(err, query).await?;
                 }
             }
         }
@@ -315,6 +321,7 @@ impl AsyncPostgresShim {
     pub async fn handle_connection_error(
         &mut self,
         err: ConnectionError,
+        query: Option<String>,
     ) -> Result<(), ConnectionError> {
         let (message, props) = match &err {
             ConnectionError::CompilationError(err) => match err {
@@ -328,7 +335,24 @@ impl AsyncPostgresShim {
             ),
         };
 
-        self.logger.error(message.as_str(), props);
+        let mut props = props.unwrap_or_default();
+        match query {
+            Some(query) => {
+                if let Ok(statement) = parse_sql_to_statement(&query, DatabaseProtocol::PostgreSQL)
+                {
+                    props.insert(
+                        "sanitizedQuery".to_string(),
+                        SensitiveDataSanitizer::new()
+                            .replace(&statement)
+                            .to_string(),
+                    );
+                }
+                props.insert("query".to_string(), query);
+            }
+            _ => (),
+        }
+
+        self.logger.error(message.as_str(), Some(props));
 
         if let Some(bt) = err.backtrace() {
             trace!("{}", bt);
@@ -1281,7 +1305,7 @@ impl AsyncPostgresShim {
         debug!("Query: {}", query);
 
         if let Err(err) = self.execute_query(&query).await {
-            self.handle_connection_error(err).await?;
+            self.handle_connection_error(err, Some(query)).await?;
         };
 
         self.write_ready().await
