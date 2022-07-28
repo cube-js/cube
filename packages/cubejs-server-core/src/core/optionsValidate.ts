@@ -126,6 +126,7 @@ const schemaOptions = Joi.object().keys({
       preAggregationsOptions: {
         queueOptions: schemaQueueOptions,
         externalRefresh: Joi.boolean(),
+        maxPartitions: Joi.number(),
       },
       rollupOnlyMode: Joi.boolean()
     })
