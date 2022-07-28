@@ -207,8 +207,7 @@ export class PreAggregations {
             };
           }
         ),
-      additionalIndexes: Object.keys(preAggregation.indexes || {})
-        .filter(index => preAggregation.indexes[index].type !== 'regular')
+      createTableIndexes: Object.keys(preAggregation.indexes || {})
         .map(
           index => {
             // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName

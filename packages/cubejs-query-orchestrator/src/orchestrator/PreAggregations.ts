@@ -975,7 +975,7 @@ export class PreAggregationLoader {
         this.prepareIndexesSql(newVersionEntry, queryOptions),
         this.preAggregation.uniqueKeyColumns,
         this.preAggregation.aggregatesColumns,
-        this.prepareAdditionalIndexes(newVersionEntry, queryOptions),
+        this.prepareCreateTableIndexes(newVersionEntry, queryOptions),
         queryOptions
       )
     ).catch((error: any) => {
@@ -1018,11 +1018,11 @@ export class PreAggregationLoader {
     });
   }
 
-  protected prepareAdditionalIndexes(newVersionEntry, queryOptions) {
-    if (!this.preAggregation.additionalIndexes || !this.preAggregation.additionalIndexes.length) {
+  protected prepareCreateTableIndexes(newVersionEntry, queryOptions) {
+    if (!this.preAggregation.createTableIndexes || !this.preAggregation.createTableIndexes.length) {
       return [];
     }
-    return this.preAggregation.additionalIndexes.map(({ indexName, type, columns }) => {
+    return this.preAggregation.createTableIndexes.map(({ indexName, type, columns }) => {
       const indexVersionEntry = {
         ...newVersionEntry,
         table_name: indexName

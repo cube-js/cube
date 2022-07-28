@@ -87,6 +87,12 @@ export type IndexesSQL = {
   sql: [string, unknown[]];
 }[];
 
+export type CreateTableIndex = {
+  indexName: string,
+  type: string,
+  columns: string[]
+};
+
 export type UnloadOptions = {
   maxFileSize: number,
 };
@@ -97,7 +103,7 @@ export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTab
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
   uploadTableWithIndexes(
-    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], aggregatesColumns: string[], additionalIndexes: any, queryTracingObj: any
+    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], aggregatesColumns: string[], createTableIndexes: CreateTableIndex[], queryTracingObj: any
   ): Promise<void>;
   loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
   //

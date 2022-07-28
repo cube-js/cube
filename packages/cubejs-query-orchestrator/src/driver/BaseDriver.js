@@ -301,7 +301,7 @@ export class BaseDriver {
     return this.uploadTableWithIndexes(table, columns, tableData, [], null);
   }
 
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql, _uniqueKeyColumns, _aggregates, _additionalIndexes, _queryTracingObj) {
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql, _uniqueKeyColumns, _aggregates, _createTableIndexes, _queryTracingObj) {
     if (!tableData.rows) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }

@@ -7,7 +7,7 @@ import csvWriter from 'csv-write-stream';
 import {
   BaseDriver,
   DownloadTableCSVData,
-  DownloadTableMemoryData, DriverInterface, IndexesSQL,
+  DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
   StreamTableData,
   StreamingSourceTableData,
 } from '@cubejs-backend/query-orchestrator';
@@ -100,12 +100,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[], aggregatesColumns?: string[], additionalIndexes?: any, queryTracingObj?: any) {
-    const regularIndexes =
-      indexesSql.map((s: any) => s.sql[0].replace(/^CREATE INDEX (.*?) ON (.*?) \((.*)$/, 'INDEX $1 ($3')).join(' ');
-    const aggregateIndexes = additionalIndexes ?
-      additionalIndexes.filter((s: any) => s.type === 'aggregate').map((s: any) => `AGGREGATE INDEX ${s.indexName} (${s.columns.join(',')})`).join(' ') : '';
-    const indexes = `${regularIndexes} ${aggregateIndexes}`;
+  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[], aggregatesColumns?: string[], createTableIndexes?: CreateTableIndex[], queryTracingObj?: any) {
+    const indexes = createTableIndexes && createTableIndexes.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
     const aggregations = aggregatesColumns && aggregatesColumns.length ? ` AGGREGATIONS (${aggregatesColumns.join(', ')})` : '';
 
     if (tableData.rowStream) {
@@ -119,6 +115,14 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     } else {
       throw new Error(`Unsupported table data passed to ${this.constructor}`);
     }
+  }
+
+  private createIndexString(index: CreateTableIndex) {
+    const prefix = {
+      regular: '',
+      aggregate: 'AGGREGATE '
+    }[index.type] || '';
+    return `${prefix}INDEX ${index.indexName} (${index.columns.join(',')})`;
   }
 
   private async importRows(table: string, columns: Column[], indexes: any, aggregations: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
