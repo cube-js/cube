@@ -34,7 +34,11 @@ one or multiple API instances, a Refresh Worker, Redis and a Cube Store cluster.
 pre-aggregated data or connected database(s) for raw data. The **Refresh
 Worker** builds and refreshes pre-aggregations in the background. **Cube Store**
 ingests pre-aggregations built by Refresh Worker and responds to queries from
-API instances. **Redis** is used to manage the queue and query-level cache.
+API instances.
+
+ **Redis** is used to manage the queue and query-level cache. Please note, we
+are planning to [replace Redis with Cube Store][replace-redis] for in-memory cache and queue management in late
+2022.
 
 API instances and Refresh Worker can be configured via [environment
 variables][ref-config-env] or [cube.js configuration file][ref-config-js]. They
@@ -283,6 +287,14 @@ services:
 
 ## Redis
 
+<WarningBox>
+
+Cube Store [will replace
+Redis][replace-redis] for in-memory cache and queue management in late
+2022.
+
+</WarningBox>
+
 Cube.js uses Redis, an in-memory data structure store, for query caching and
 queue.
 
@@ -327,7 +339,7 @@ If you want to run Cube.js in production without Redis, you can use
 
 <WarningBox>
 
-Serverless and clustered deployments can't be run without Redis as it is used to
+Clustered deployments can't be run without Redis as it is used to
 manage the query queue.
 
 </WarningBox>
@@ -342,3 +354,4 @@ manage the query queue.
 [ref-deploy-sls-gcp]: /deployment/platforms/serverless/google-cloud
 [ref-config-env]: /reference/environment-variables
 [ref-config-js]: /config
+[replace-redis]: https://cube.dev/blog/replacing-redis-with-cube-store
