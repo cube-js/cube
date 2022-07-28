@@ -243,7 +243,6 @@ export class QueryCache {
           this.logger('Executing SQL', {
             ...q
           });
-          console.log('QQQ', q);
           if (q.useDownload) {
             return client.downloadQueryResults(q.query, q.values, q);
           } else {
