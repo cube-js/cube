@@ -106,6 +106,13 @@ By default local dir are not persisted. You can enable persistance on router and
 | `cloudStorage.aws.bucket`                     | The name of a bucket in AWS S3. Required when using AWS S3                                                             |       |
 | `cloudStorage.aws.region`                     | The region of a bucket in AWS S3. Required when using AWS S3                                                           |       |
 | `cloudStorage.aws.subPath`                    | The path in a AWS S3 bucket to store pre-aggregations. Optional                                                        |       |
+| `cloudStorage.minio.accessKeyID`              | The The Access Key ID for minIO. Required when using minIO                                                             |       |
+| `cloudStorage.minio.secretKey`                | The Secret Access Key for minIO. Required when using minIO                                                             |       |
+| `cloudStorage.minio.secretKeyFromSecret.name` | The Secret Access Key for minIO. Required when using minIO (using secret)                                              |       |
+| `cloudStorage.minio.secretKeyFromSecret.key`  | The Secret Access Key for minIO. Required when using minIO (using secret)                                              |       |
+| `cloudStorage.minio.bucket`                   | The name of the bucket that you want to use minIO. Required when using minIO                                           |       |
+| `cloudStorage.minio.region`                   | The region of a bucket in S3 that you want to use minIO. Optional when using minIO                                     |       |
+| `cloudStorage.minio.endpoint`                 | The minIO server endpoint. Required when using minIO                                                                   |       |
 
 ### Router parameters
 
