@@ -3,7 +3,7 @@ title: Serverless Framework on GCP
 permalink: /deployment/platforms/serverless/google-cloud
 category: Deployment
 subCategory: Platforms
-menuOrder: 4
+menuOrder: 5
 ---
 
 This guide walks you through deploying Cube.js with the [Serverless
@@ -13,8 +13,11 @@ Framework][link-sls] on [Google Cloud][link-google-cloud].
 
 <b>WARNING!</b>
 
-Cube does not offer production-level support for AWS Lambda, AWS Fargate and
-Google Cloud Functions.
+We do not recommend deploying Cube with AWS Lambda, AWS Fargate and
+Google Cloud Functions. This guide will be removed soon. Additionally, please
+note that Cube Store [will replace Redis for in-memory caching and queue management in
+late 2022](https://cube.dev/blog/replacing-redis-with-cube-store) and will be a
+required component to run clustered Cube deployments.
 
 </WarningBox>
 
