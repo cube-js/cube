@@ -238,6 +238,7 @@ impl AsyncPostgresShim {
         // When an error is detected while processing any extended-query message, the backend issues ErrorResponse,
         // then reads and discards messages until a Sync is reached, then issues ReadyForQuery and returns to normal message processing.
         let mut tracked_error: Option<ConnectionError> = None;
+        let mut tracked_error_query: Option<String> = None;
 
         loop {
             let mut doing_extended_query_message = false;
@@ -291,7 +292,8 @@ impl AsyncPostgresShim {
                 }
                 protocol::FrontendMessage::Sync => {
                     if let Some(err) = tracked_error.take() {
-                        self.handle_connection_error(err, None).await?;
+                        self.handle_connection_error(err, tracked_error_query.take())
+                            .await?;
                     };
 
                     self.write_ready().await?;
@@ -311,6 +313,7 @@ impl AsyncPostgresShim {
             if let Err(err) = result {
                 if doing_extended_query_message {
                     tracked_error = Some(err);
+                    tracked_error_query = query;
                 } else {
                     self.handle_connection_error(err, query).await?;
                 }
