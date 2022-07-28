@@ -292,7 +292,8 @@ impl AsyncPostgresShim {
                 }
                 protocol::FrontendMessage::Sync => {
                     if let Some(err) = tracked_error.take() {
-                        self.handle_connection_error(err, tracked_error_query.take()).await?;
+                        self.handle_connection_error(err, tracked_error_query.take())
+                            .await?;
                     };
 
                     self.write_ready().await?;
