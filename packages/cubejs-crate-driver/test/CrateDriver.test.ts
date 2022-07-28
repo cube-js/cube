@@ -1,57 +1,32 @@
-import { CrateRunner } from '@cubejs-backend/testing-shared';
-
 import { StartedTestContainer } from 'testcontainers';
-
+import { CrateDBRunner, DriverTests } from '@cubejs-backend/testing-shared';
 import { CrateDriver } from '../src';
 
 describe('CrateDriver', () => {
-  let container: StartedTestContainer;
-  let driver: CrateDriver;
-
+  let db: StartedTestContainer;
+  let tests: DriverTests;
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
-    container = await CrateRunner.startContainer({ volumes: [] });
-    driver = new CrateDriver({
-      host: container.getHost(),
-      port: container.getMappedPort(5432),
-      user: 'crate',
-      password: '',
-      database: 'crate',
-    });
+    db = await CrateDBRunner.startContainer({ volumes: [] });
+    tests = new DriverTests(
+      new CrateDriver({
+        host: db.getHost(),
+        port: db.getMappedPort(5432),
+        user: 'crate',
+        password: '',
+        database: 'crate',
+      }),
+      {}
+    );
   });
 
   afterAll(async () => {
-    await driver.release();
-
-    if (container) {
-      await container.stop();
-    }
+    await tests.release();
+    await db.stop();
   });
 
   test('query', async () => {
-    await driver.uploadTable(
-      'query_test',
-      [
-        { name: 'id', type: 'int' },
-        { name: 'created', type: 'timestamp' },
-        { name: 'price', type: 'real' }
-      ],
-      {
-        rows: [
-          { id: 1, created: '2020-01-01T00:00:00.000Z', price: 100.5 },
-          { id: 2, created: '2020-01-02T00:00:00.000Z', price: 200.5 },
-          { id: 3, created: '2020-01-03T00:00:00.000Z', price: 300.5 }
-        ]
-      }
-    );
-
-    const tableData = await driver.query('select * from query_test', []);
-
-    expect(tableData).toEqual([
-      { id: '1', created: '2020-01-01T00:00:00.000', price: 100.5 },
-      { id: '2', created: '2020-01-02T00:00:00.000', price: 200.5 },
-      { id: '3', created: '2020-01-03T00:00:00.000', price: 300.5 }
-    ]);
+    await tests.testQuery();
   });
 });

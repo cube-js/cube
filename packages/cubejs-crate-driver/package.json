@@ -21,6 +21,7 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "test": "yarn integration",
     "integration": "npm run integration:crate",
     "integration:crate": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",

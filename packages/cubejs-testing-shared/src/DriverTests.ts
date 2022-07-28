@@ -34,7 +34,7 @@ export class DriverTests {
       SELECT 2 AS id, 200 AS amount, 'new' AS status
       UNION ALL
       SELECT 3 AS id, 400 AS amount, 'processed' AS status
-    )
+    ) AS data
     ORDER BY 1
   `;
 

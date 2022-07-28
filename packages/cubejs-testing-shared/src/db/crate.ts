@@ -2,7 +2,7 @@ import { GenericContainer } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
-export class CrateRunner extends DbRunnerAbstract {
+export class CrateDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
     const version = process.env.TEST_QUEST_DB_VERSION || '5.0.0';
 

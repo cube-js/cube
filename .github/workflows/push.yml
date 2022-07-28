@@ -276,7 +276,10 @@ jobs:
     strategy:
       matrix:
         node-version: [14.x]
-        db: ['clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb', 'mysql-aurora-serverless', 'cubestore']
+        db: [
+            'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
+            'mysql-aurora-serverless', 'cubestore', 'crate'
+        ]
       fail-fast: false
 
     steps:
@@ -366,6 +369,7 @@ jobs:
         timeout-minutes: 30
         run: |
           cd packages/cubejs-testing/
+          yarn run smoke:crate
           yarn run smoke:materialize
           yarn run smoke:questdb
           yarn run smoke:multidb
