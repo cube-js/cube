@@ -104,10 +104,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     const regularIndexes =
       indexesSql.map((s: any) => s.sql[0].replace(/^CREATE INDEX (.*?) ON (.*?) \((.*)$/, 'INDEX $1 ($3')).join(' ');
     const aggregateIndexes = additionalIndexes ?
-      additionalIndexes.filter((s:any) => s.type === 'aggregate').map((s:any) => {
-        return `AGGREGATE INDEX ${s.indexName} (${s.columns.join(',')})`;
-      }
-    ).join(' ') : '';
+      additionalIndexes.filter((s: any) => s.type === 'aggregate').map((s: any) => `AGGREGATE INDEX ${s.indexName} (${s.columns.join(',')})`).join(' ') : '';
     const indexes = `${regularIndexes} ${aggregateIndexes}`;
     const aggregations = aggregatesColumns && aggregatesColumns.length ? ` AGGREGATIONS (${aggregatesColumns.join(', ')})` : '';
 
@@ -124,7 +121,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private async importRows(table: string, columns: Column[], indexes: any, aggregations:any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
+  private async importRows(table: string, columns: Column[], indexes: any, aggregations: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
     const createTableSql = this.createTableSql(table, columns);
     const createTableSqlWithIndexes = `${createTableSql}${aggregations} ${indexes}`;
 
@@ -158,7 +155,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes:any, aggregations: any, queryTracingObj?: any) {
+  private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes: any, aggregations: any, queryTracingObj?: any) {
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const createTableSql = this.createTableSql(table, columns);
     const inputFormat = tableData.csvNoHeader ? 'csv_no_header' : 'csv';

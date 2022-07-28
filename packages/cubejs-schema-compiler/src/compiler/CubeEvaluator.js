@@ -145,7 +145,7 @@ export class CubeEvaluator extends CubeSymbols {
                     indexes[indexName].columns,
                     { originalSorting: true }
                   ),
-                  type: indexes[indexName].type 
+                  type: indexes[indexName].type
                 };
                 return obj;
               }, {})
