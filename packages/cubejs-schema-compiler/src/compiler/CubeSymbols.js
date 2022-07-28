@@ -160,9 +160,9 @@ export class CubeSymbols {
 
   transformPreAggregationIndexes(indexes) {
     for (const index of Object.values(indexes)) {
-        if (!index.type) {
-            index.type = 'regular';
-        }
+      if (!index.type) {
+        index.type = 'regular';
+      }
     }
   }
 

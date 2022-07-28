@@ -119,22 +119,22 @@ export class PreAggregations {
   }
 
   aggregatesColumns(cube, preAggregation) {
-    if (preAggregation.type  === 'rollup') {
+    if (preAggregation.type === 'rollup') {
         
-        return this.query
-            .preAggregationQueryForSqlEvaluation(cube, preAggregation)
-            .measures
-            .filter(m => m.isAdditive())
-            .map(m => {
-                const fname = {
-                    sum: 'sum',
-                    count: 'sum',
-                    countDistinctApprox: 'merge',
-                    min: 'min',
-                    max: 'max'
-                }[m.measureDefinition().type];
-                return `${fname}(${m.aliasName()})`;
-            });
+      return this.query
+        .preAggregationQueryForSqlEvaluation(cube, preAggregation)
+        .measures
+        .filter(m => m.isAdditive())
+        .map(m => {
+          const fname = {
+            sum: 'sum',
+            count: 'sum',
+            countDistinctApprox: 'merge',
+            min: 'min',
+            max: 'max'
+          }[m.measureDefinition().type];
+          return `${fname}(${m.aliasName()})`;
+        });
 
     }
     return [];
@@ -192,40 +192,36 @@ export class PreAggregations {
           filters && filters[0] && filters[0].formattedDateRange() // TODO intersect all date ranges
         ),
       indexesSql: Object.keys(preAggregation.indexes || {})
-        .filter(index => {
-            return preAggregation.indexes[index].type === 'regular';
-        })
+        .filter(index => preAggregation.indexes[index].type === 'regular')
         .map(
-        index => {
-          // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
-          const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
-          return {
-            indexName,
-            sql: this.query.indexSql(
-              cube,
-              preAggregation,
-              preAggregation.indexes[index],
+          index => {
+            // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
+            const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
+            return {
               indexName,
-              tableName
-            )
-          };
-        }
-      ),
+              sql: this.query.indexSql(
+                cube,
+                preAggregation,
+                preAggregation.indexes[index],
+                indexName,
+                tableName
+              )
+            };
+          }
+        ),
       additionalIndexes: Object.keys(preAggregation.indexes || {})
-        .filter(index => {
-            return preAggregation.indexes[index].type !== 'regular';
-        })
+        .filter(index => preAggregation.indexes[index].type !== 'regular')
         .map(
-        index => {
-          // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
-          const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
-          return {
-            indexName,
-            type: preAggregation.indexes[index].type,
-            columns: this.query.evaluateIndexColumns(cube, preAggregation.indexes[index])
-          };
-        }
-      ),
+          index => {
+            // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
+            const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
+            return {
+              indexName,
+              type: preAggregation.indexes[index].type,
+              columns: this.query.evaluateIndexColumns(cube, preAggregation.indexes[index])
+            };
+          }
+        ),
       readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation)
     };
   }
