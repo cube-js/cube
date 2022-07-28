@@ -1,0 +1,110 @@
+---
+title: Connecting to Jupyter
+permalink: /config/downstream/jupyter
+---
+
+You can connect to Cube from Jupyter using the [Cube SQL API][ref-sql-api]. The Jupyter Notebook is a web application for creating and sharing computational documents.
+
+## Enable Cube SQL API
+
+<InfoBox>
+
+Don't have a Cube project yet? [Learn how to get started here][ref-getting-started].
+
+</InfoBox>
+
+### <--{"id" : "Enable Cube SQL API"}--> Cube Cloud
+
+Click **Deploy SQL API** and then the **How to connect your BI tool** link on the Overview page of your Cube deployment.
+Navigate to the **BIs and Visualization Tools** tab. You should see the screen like the one below with
+your connection credentials:
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/78a4b90c-da5a-4d1f-9775-59ce6e7baad0/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
+
+You need to set the following environment variables to enable the Cube SQL API.
+These credentials will be required to connect to Cube from Apache Superset
+later.
+
+```bash
+CUBEJS_PG_SQL_PORT=5432
+CUBEJS_SQL_USER=myusername
+CUBEJS_SQL_PASSWORD=mypassword
+```
+## Connecting from Jupyter
+
+Jupyter connects to Cube as to a Postgres database.
+
+Make sure to install the `sqlalchemy` and `pandas` modules.
+
+```bash
+pip install sqlalchemy
+pip install pandas
+```
+
+Then you can use `sqlalchemy.create_engine` to connect to Cube's SQL API.
+
+```python
+import sqlalchemy
+import pandas
+
+engine = sqlalchemy.create_engine(
+    sqlalchemy.engine.url.URL(
+        drivername="postgresql",
+        username="cube",
+        password="9943f670fd019692f58d66b64e375213",
+        host="thirsty-raccoon.sql.aws-eu-central-1.cubecloudapp.dev",
+        port="5432",
+        database="db@thirsty-raccoon",
+    ),
+    echo_pool=True,
+)
+print("connecting with engine " + str(engine))
+connection = engine.connect()
+
+# ...
+```
+
+## Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions are columns.
+
+You can write SQL in Jupyter that will be executed in Cube. Learn more about Cube SQL
+syntax on the [reference page][ref-sql-api].
+
+```python
+# ...
+
+query = "SELECT SUM(count), status FROM orders GROUP BY status;"
+df = pandas.read_sql_query(query, connection)
+```
+
+In your Jupyter notebook it'll look like this.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/616046d9-729f-426e-8000-d15c6ca90347/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+You can also create a visualization of the executed SQL query.
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/91f558c2-f65c-43cf-9747-3423c3894330/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+[ref-getting-started]: /cloud/getting-started
+[ref-sql-api]: /backend/sql

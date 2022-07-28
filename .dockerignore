@@ -15,7 +15,6 @@ packages/*/node_modules/
 packages/*/dist/
 packages/*/coverage/
 packages/cubejs-server-core/playground/
-packages/cubejs-jdbc-driver
 packages/cubejs-serverless
 packages/cubejs-serverless-aws
 packages/cubejs-serverless-google

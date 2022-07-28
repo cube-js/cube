@@ -10,7 +10,10 @@ pub(crate) mod session_manager;
 pub(crate) mod statement;
 pub(crate) mod types;
 
-pub use auth_service::{AuthContext, AuthenticateResponse, SqlAuthDefaultImpl, SqlAuthService};
+pub use auth_service::{
+    AuthContext, AuthContextRef, AuthenticateResponse, HttpAuthContext, SqlAuthDefaultImpl,
+    SqlAuthService,
+};
 pub use mysql::*;
 pub use postgres::*;
 pub use server_manager::ServerManager;

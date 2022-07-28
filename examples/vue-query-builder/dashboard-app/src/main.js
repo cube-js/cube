@@ -14,6 +14,16 @@ import apolloClient from './graphql/client';
 
 const exampleDescription = {
   title: "Vue Dashboard",
+  text:`
+    <p>This live demo shows a Vue 2 dashboard built with PostgreSQL as a database, Vuetify, a Vue UI Library with material components, Chart.js and vue-chartkick for data visualization, and Cube.</p>
+    <p>
+      Follow 
+      the <a href="https://cube.dev/blog/vue-query-builder-with-cubejs">tutorial</a>
+      or explore 
+      the <a href="https://github.com/cube-js/cube.js/tree/master/examples/vue-query-builder">source code</a>
+      to learn more.
+    </p>
+  `
 };
 
 createExampleWrapper(exampleDescription);

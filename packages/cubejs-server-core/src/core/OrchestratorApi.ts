@@ -161,8 +161,12 @@ export class OrchestratorApi {
     return this.orchestrator.testConnections();
   }
 
+  /**
+   * Tests worker's connections to the Cubstore and, if not in the rollup only
+   * mode, to the datasources.
+   */
   public async testConnection() {
-    if (this.options.preAggregationsOptions.externalRefresh) {
+    if (this.options.rollupOnlyMode) {
       return Promise.all([
         this.testDriverConnection(this.options.externalDriverFactory),
       ]);
@@ -176,6 +180,10 @@ export class OrchestratorApi {
     }
   }
 
+  /**
+   * Tests connection to the data source specified by the driver factory
+   * function and data source name.
+   */
   public async testDriverConnection(
     driverFn?: DriverFactoryByDataSource,
     dataSource: string = 'default',

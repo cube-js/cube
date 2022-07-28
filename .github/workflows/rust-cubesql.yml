@@ -31,6 +31,12 @@ jobs:
           toolchain: nightly-2022-03-08
           override: true
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubesql
+          # default key
+          key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Lint CubeSQL
         run: cd rust/cubesql/cubesql && cargo fmt --all -- --check
       - name: Lint Native
@@ -64,11 +70,11 @@ jobs:
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
           sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-      - name: Install tarpaulin@0.20.0
-        uses: actions-rs/cargo@v1
+      - name: Install tarpaulin@0.20.1
+        uses: baptiste0928/cargo-install@v1
         with:
-          command: install
-          args: cargo-tarpaulin --version 0.20.0
+          crate: cargo-tarpaulin
+          version: "0.20.1"
       - name: Unit tests (Rewrite Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
@@ -206,14 +212,27 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+      - name: Restore lerna (excluding Windows)
         uses: actions/cache@v2
+        if: ${{ !startsWith(matrix.os-version, 'windows') }}
         with:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
             rust/cubesql/node_modules
             packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      # Windows doesn't support links + cache action doesn't support exclude
+      # cache will include rust cache for native, which causes 3GB archive
+      # Right now, GH provides 10 gb for each repository with automatic retention.
+      - name: Restore lerna (Windows only)
+        uses: actions/cache@v2
+        if: ${{ startsWith(matrix.os-version, 'windows') }}
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-

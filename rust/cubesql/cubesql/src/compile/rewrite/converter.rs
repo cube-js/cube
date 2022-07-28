@@ -1,26 +1,27 @@
 use crate::{
     compile::{
         engine::{
-            df::scan::{CubeScanNode, MemberField},
+            df::scan::{CubeScanNode, CubeScanOptions, MemberField},
             provider::CubeContext,
         },
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
-            BetweenExprNegated, BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliases,
-            CubeScanLimit, CubeScanTableName, DimensionName, EmptyRelationProduceOneRow,
-            FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated,
-            JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn, LimitN, LiteralExprValue,
-            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
-            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
-            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
-            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
-            TableScanLimit, TableScanProjection, TableScanSourceTableName, TableScanTableName,
-            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
-            TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
+            BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
+            ColumnExprColumn, CubeScanAliases, CubeScanLimit, CubeScanTableName, DimensionName,
+            EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
+            FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
+            JoinRightOn, LimitN, LiteralExprValue, LiteralMemberValue, LogicalPlanLanguage,
+            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
+            OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun, ScalarUDFExprFun,
+            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
+            SortExprAsc, SortExprNullsFirst, TableScanLimit, TableScanProjection,
+            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
+            WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
-    sql::auth_service::AuthContext,
+    sql::AuthContextRef,
     CubeError,
 };
 use cubeclient::models::{
@@ -565,7 +566,7 @@ macro_rules! match_expr_list_node {
 pub struct LanguageToLogicalPlanConverter {
     best_expr: RecExpr<LogicalPlanLanguage>,
     cube_context: Arc<CubeContext>,
-    auth_context: Arc<AuthContext>,
+    auth_context: AuthContextRef,
 }
 
 pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
@@ -805,7 +806,7 @@ impl LanguageToLogicalPlanConverter {
     pub fn new(
         best_expr: RecExpr<LogicalPlanLanguage>,
         cube_context: Arc<CubeContext>,
-        auth_context: Arc<AuthContext>,
+        auth_context: AuthContextRef,
     ) -> Self {
         Self {
             best_expr,
@@ -1082,8 +1083,7 @@ impl LanguageToLogicalPlanConverter {
                                             Some(&table_name),
                                             &expr_name(&expr)?,
                                             data_type,
-                                            // TODO actually nullable. Just to fit tests
-                                            false,
+                                            true,
                                         ),
                                         MemberField::Member(measure.to_string()),
                                     ));
@@ -1121,8 +1121,7 @@ impl LanguageToLogicalPlanConverter {
                                                 // TODO empty schema
                                                 &expr_name(&expr)?,
                                                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                                                // TODO actually nullable. Just to fit tests
-                                                false,
+                                                true,
                                             ),
                                             MemberField::Member(format!(
                                                 "{}.{}",
@@ -1150,8 +1149,7 @@ impl LanguageToLogicalPlanConverter {
                                             // TODO empty schema
                                             &expr_name(&expr)?,
                                             data_type,
-                                            // TODO actually nullable. Just to fit tests
-                                            false,
+                                            true,
                                         ),
                                         MemberField::Member(dimension),
                                     ));
@@ -1164,10 +1162,22 @@ impl LanguageToLogicalPlanConverter {
                                             // TODO empty schema
                                             &expr_name(&expr)?,
                                             DataType::Boolean,
-                                            // TODO actually nullable. Just to fit tests
-                                            false,
+                                            true,
                                         ),
                                         MemberField::Literal(ScalarValue::Boolean(None)),
+                                    ));
+                                }
+                                LogicalPlanLanguage::ChangeUser(params) => {
+                                    let expr = self.to_expr(params[0])?;
+                                    fields.push((
+                                        DFField::new(
+                                            Some(&table_name),
+                                            // TODO empty schema
+                                            &expr_name(&expr)?,
+                                            DataType::Utf8,
+                                            true,
+                                        ),
+                                        MemberField::Literal(ScalarValue::Utf8(None)),
                                     ));
                                 }
                                 LogicalPlanLanguage::LiteralMember(params) => {
@@ -1179,8 +1189,7 @@ impl LanguageToLogicalPlanConverter {
                                             Some(&table_name),
                                             &expr_name(&expr)?,
                                             value.get_datatype(),
-                                            // TODO actually nullable. Just to fit tests
-                                            false,
+                                            true,
                                         ),
                                         MemberField::Literal(value),
                                     ));
@@ -1201,10 +1210,18 @@ impl LanguageToLogicalPlanConverter {
                             query_time_dimensions: &mut Vec<V1LoadRequestQueryTimeDimension>,
                             filters: Vec<LogicalPlanLanguage>,
                             node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
-                        ) -> Result<(Vec<V1LoadRequestQueryFilterItem>, Vec<String>), CubeError>
-                        {
+                        ) -> Result<
+                            (
+                                Vec<V1LoadRequestQueryFilterItem>,
+                                Vec<String>,
+                                Option<String>,
+                            ),
+                            CubeError,
+                        > {
                             let mut result = Vec::new();
                             let mut segments_result = Vec::new();
+                            let mut change_user_result = Vec::new();
+
                             for f in filters {
                                 match f {
                                     LogicalPlanLanguage::FilterOp(params) => {
@@ -1215,7 +1232,7 @@ impl LanguageToLogicalPlanConverter {
                                         );
                                         let op =
                                             match_data_node!(node_by_id, params[1], FilterOpOp);
-                                        let (filters, segments) =
+                                        let (filters, segments, change_user) =
                                             to_filter(query_time_dimensions, filters, node_by_id)?;
                                         match op.as_str() {
                                             "and" => {
@@ -1232,6 +1249,10 @@ impl LanguageToLogicalPlanConverter {
                                                     ),
                                                 });
                                                 segments_result.extend(segments);
+
+                                                if change_user.is_some() {
+                                                    change_user_result.extend(change_user);
+                                                }
                                             }
                                             "or" => {
                                                 result.push(V1LoadRequestQueryFilterItem {
@@ -1248,7 +1269,15 @@ impl LanguageToLogicalPlanConverter {
                                                 });
                                                 if !segments.is_empty() {
                                                     return Err(CubeError::internal(
-                                                        "Can't or segments".to_string(),
+                                                        "Can't use OR operator with segments"
+                                                            .to_string(),
+                                                    ));
+                                                }
+
+                                                if change_user.is_some() {
+                                                    return Err(CubeError::internal(
+                                                        "Can't use OR operator with __user column"
+                                                            .to_string(),
                                                     ));
                                                 }
                                             }
@@ -1311,13 +1340,28 @@ impl LanguageToLogicalPlanConverter {
                                         );
                                         segments_result.push(member);
                                     }
+                                    LogicalPlanLanguage::ChangeUserMember(params) => {
+                                        let member = match_data_node!(
+                                            node_by_id,
+                                            params[0],
+                                            ChangeUserMemberValue
+                                        );
+                                        change_user_result.push(member);
+                                    }
                                     x => panic!("Expected filter but found {:?}", x),
                                 }
                             }
-                            Ok((result, segments_result))
+
+                            if change_user_result.len() > 1 {
+                                return Err(CubeError::internal(
+                                    "Unable to use multiple __user in one Cube query".to_string(),
+                                ));
+                            }
+
+                            Ok((result, segments_result, change_user_result.pop()))
                         }
 
-                        let (filters, segments) =
+                        let (filters, segments, change_user) =
                             to_filter(&mut query_time_dimensions, filters, node_by_id)?;
 
                         query.filters = if filters.len() > 0 {
@@ -1401,6 +1445,7 @@ impl LanguageToLogicalPlanConverter {
                         }
 
                         let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
+
                         Arc::new(CubeScanNode::new(
                             Arc::new(DFSchema::new_with_metadata(
                                 fields.into_iter().map(|(f, _)| f).collect(),
@@ -1409,6 +1454,7 @@ impl LanguageToLogicalPlanConverter {
                             member_fields,
                             query,
                             self.auth_context.clone(),
+                            CubeScanOptions { change_user },
                         ))
                     }
                     x => panic!("Unexpected extension node: {:?}", x),

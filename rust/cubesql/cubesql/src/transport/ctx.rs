@@ -121,7 +121,7 @@ mod tests {
         }
 
         match test_context.find_cube_table_with_name("test2".to_string()) {
-            Some(table) => assert_eq!(18003, table.oid),
+            Some(table) => assert_eq!(18004, table.oid),
             _ => panic!("wrong name!"),
         }
     }

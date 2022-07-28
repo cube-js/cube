@@ -1,33 +1,5 @@
-# Vue Query Builder
+# Vue Query Builder with Cube
 
-Query builder example built with Vue.js and Vuetify.
+This live demo shows a Vue 2 dashboard built with PostgreSQL as a database, Vuetify, a Vue UI Library with material components, Chart.js and vue-chartkick for data visualization, and Cube.
 
-Demo: https://vue-query-builder-demo.cube.dev/
-
-## Run Project
-
-### Download and Import Example Dataset
-
-Make sure you have a PostgreSQL installed. You can download and import example dataset by running the following commands.
-
-```
-$ curl http://cube.dev/downloads/ecom-dump.sql > ecom-dump.sql
-$ createdb ecom
-$ psql --dbname ecom -f ecom-dump.sql
-```
-
-### Backend run
-To start frontend application use this commands
-```
-$ yarn
-$ yarn dev
-```
-
-### Frontend run
-To start frontend application use this commands
-```
-$ cd dashboard-app
-$ yarn
-$ yarn serve
-```
-
+Follow the [tutorial](https://cube.dev/blog/vue-query-builder-with-cubejs) or check out a live demo [here](https://vue-query-builder-demo.cube.dev/#/).

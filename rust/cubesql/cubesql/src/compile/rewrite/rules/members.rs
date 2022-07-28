@@ -5,7 +5,7 @@ use crate::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr,
             analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, column_expr, column_name_to_member_name,
+            binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_name,
             column_name_to_member_vec, cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
             expr_column_name, expr_column_name_with_relation, fun_expr, limit,
@@ -36,8 +36,12 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{EGraph, Id, Rewrite, Subst, Var};
-use itertools::Itertools;
-use std::{collections::HashSet, ops::Index, sync::Arc};
+use itertools::{EitherOrBoth, Itertools};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Index,
+    sync::Arc,
+};
 
 pub struct MemberRules {
     cube_context: Arc<CubeContext>,
@@ -614,6 +618,9 @@ impl MemberRules {
         rules.extend(member_column_pushdown("segment", |column| {
             segment_expr("?name", column)
         }));
+        rules.extend(member_column_pushdown("change-user", |column| {
+            change_user_expr(column)
+        }));
         rules.extend(member_column_pushdown("time-dimension", |column| {
             time_dimension_expr("?name", "?granularity", "?date_range", column)
         }));
@@ -652,6 +659,10 @@ impl MemberRules {
         rules.push(list_concat_terminal(
             "segment",
             segment_expr("?name", "?expr"),
+        ));
+        rules.push(list_concat_terminal(
+            "change-user",
+            change_user_expr("?expr"),
         ));
         rules.push(list_concat_terminal(
             "time-dimension",
@@ -780,10 +791,12 @@ impl MemberRules {
         }
     }
 
-    pub fn transform_original_expr_date_trunc(
+    pub fn transform_original_expr_nested_date_trunc(
         original_expr_var: &'static str,
         // Original granularity from date_part/date_trunc
-        granularity_var: &'static str,
+        outer_granularity_var: &'static str,
+        // Original nested granularity from date_trunc
+        inner_granularity_var: &'static str,
         // Var for substr which is used to pass value to Date_Trunc
         date_trunc_granularity_var: &'static str,
         column_expr_var: &'static str,
@@ -791,7 +804,8 @@ impl MemberRules {
         inner_replacer: bool,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let original_expr_var = var!(original_expr_var);
-        let granularity_var = var!(granularity_var);
+        let outer_granularity_var = var!(outer_granularity_var);
+        let inner_granularity_var = var!(inner_granularity_var);
         let date_trunc_granularity_var = var!(date_trunc_granularity_var);
         let column_expr_var = var!(column_expr_var);
         let alias_expr_var = alias_expr_var.map(|alias_expr_var| var!(alias_expr_var));
@@ -808,20 +822,30 @@ impl MemberRules {
                         original_expr_id
                     )));
 
-            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
-                let date_trunc_granularity = match granularity {
-                    ScalarValue::Utf8(Some(granularity)) => {
-                        if inner_replacer {
-                            match granularity.to_lowercase().as_str() {
-                                "dow" | "doy" => "day".to_string(),
-                                _ => granularity.clone(),
-                            }
-                        } else {
-                            granularity.clone()
-                        }
-                    }
-                    _ => continue,
+            for granularity in var_iter!(egraph[subst[outer_granularity_var]], LiteralExprValue) {
+                let outer_granularity = match Self::parse_granularity(granularity, inner_replacer) {
+                    Some(granularity) => granularity,
+                    None => continue,
                 };
+                let inner_granularity = if outer_granularity_var == inner_granularity_var {
+                    outer_granularity.clone()
+                } else {
+                    var_iter!(egraph[subst[inner_granularity_var]], LiteralExprValue)
+                        .find_map(|g| Self::parse_granularity(g, inner_replacer))
+                        .unwrap_or(outer_granularity.clone())
+                };
+
+                let date_trunc_granularity =
+                    match min_granularity(&outer_granularity, &inner_granularity) {
+                        Some(granularity) => {
+                            if granularity.to_lowercase() == inner_granularity.to_lowercase() {
+                                outer_granularity
+                            } else {
+                                inner_granularity
+                            }
+                        }
+                        None => continue,
+                    };
 
                 if let Ok(expr) = res {
                     // TODO unwrap
@@ -857,6 +881,27 @@ impl MemberRules {
             }
             false
         }
+    }
+
+    pub fn transform_original_expr_date_trunc(
+        original_expr_var: &'static str,
+        // Original granularity from date_part/date_trunc
+        granularity_var: &'static str,
+        // Var for substr which is used to pass value to Date_Trunc
+        date_trunc_granularity_var: &'static str,
+        column_expr_var: &'static str,
+        alias_expr_var: Option<&'static str>,
+        inner_replacer: bool,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        Self::transform_original_expr_nested_date_trunc(
+            original_expr_var,
+            granularity_var,
+            granularity_var,
+            date_trunc_granularity_var,
+            column_expr_var,
+            alias_expr_var,
+            inner_replacer,
+        )
     }
 
     fn push_down_projection(
@@ -1230,6 +1275,19 @@ impl MemberRules {
                                         measure_name,
                                         alias_expr,
                                     ])),
+                                );
+                                return true;
+                            }
+
+                            if column_name.eq_ignore_ascii_case(&"__user") {
+                                let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                    ColumnExprColumn(Column::from_name(column_name)),
+                                ));
+                                let alias_expr =
+                                    egraph.add(LogicalPlanLanguage::ColumnExpr([alias]));
+                                subst.insert(
+                                    member_var,
+                                    egraph.add(LogicalPlanLanguage::ChangeUser([alias_expr])),
                                 );
                                 return true;
                             }
@@ -1661,6 +1719,22 @@ impl MemberRules {
     pub fn default_count_measure_name() -> String {
         "count".to_string()
     }
+
+    fn parse_granularity(granularity: &ScalarValue, to_normalize: bool) -> Option<String> {
+        match granularity {
+            ScalarValue::Utf8(Some(granularity)) => {
+                if to_normalize {
+                    match granularity.to_lowercase().as_str() {
+                        "dow" | "doy" => Some("day".to_string()),
+                        _ => Some(granularity.clone()),
+                    }
+                } else {
+                    Some(granularity.clone())
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 pub fn add_member_error(
@@ -1680,4 +1754,103 @@ pub fn add_member_error(
         member_error,
         member_priority,
     ]))
+}
+
+lazy_static! {
+    static ref STANDARD_GRANULARITIES_PARENTS: HashMap<&'static str, Vec<&'static str>> = [
+        (
+            "year",
+            vec!["year", "quarter", "month", "day", "hour", "minute", "second"]
+        ),
+        (
+            "quarter",
+            vec!["quarter", "month", "day", "hour", "minute", "second"]
+        ),
+        ("month", vec!["month", "day", "hour", "minute", "second"]),
+        ("week", vec!["week", "day", "hour", "minute", "second"]),
+        ("day", vec!["day", "hour", "minute", "second"]),
+        ("hour", vec!["hour", "minute", "second"]),
+        ("minute", vec!["minute", "second"]),
+        ("second", vec!["second"]),
+    ]
+    .iter()
+    .cloned()
+    .collect();
+}
+
+fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option<String> {
+    let granularity_a = granularity_a.to_lowercase();
+    let granularity_b = granularity_b.to_lowercase();
+
+    if granularity_a == granularity_b {
+        return Some(granularity_a);
+    }
+    if !STANDARD_GRANULARITIES_PARENTS.contains_key(granularity_a.as_str())
+        || !STANDARD_GRANULARITIES_PARENTS.contains_key(granularity_b.as_str())
+    {
+        return None;
+    }
+
+    let a_hierarchy = STANDARD_GRANULARITIES_PARENTS[granularity_a.as_str()].clone();
+    let b_hierarchy = STANDARD_GRANULARITIES_PARENTS[granularity_b.as_str()].clone();
+
+    let last_index = a_hierarchy
+        .iter()
+        .rev()
+        .zip_longest(b_hierarchy.iter().rev())
+        .enumerate()
+        .find_map(|(i, val)| match val {
+            EitherOrBoth::Both(a, b) if a == b => None,
+            _ => Some(i as i32),
+        })
+        .unwrap_or(-1);
+
+    if last_index <= 0 {
+        None
+    } else {
+        Some(a_hierarchy[a_hierarchy.len() - last_index as usize].to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_min_granularity() {
+        assert_eq!(
+            min_granularity(&"month".to_string(), &"week".to_string()),
+            Some("day".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"week".to_string(), &"month".to_string()),
+            Some("day".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"year".to_string(), &"year".to_string()),
+            Some("year".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"YEAR".to_string(), &"year".to_string()),
+            Some("year".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"week".to_string(), &"second".to_string()),
+            Some("second".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"minute".to_string(), &"quarter".to_string()),
+            Some("minute".to_string())
+        );
+
+        assert_eq!(
+            min_granularity(&"NULL".to_string(), &"quarter".to_string()),
+            None,
+        );
+    }
 }

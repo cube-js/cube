@@ -27,6 +27,7 @@ import {
   CheckAuthFn,
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
+  CanSwitchSQLUserFn,
 } from './types/auth';
 
 import {
@@ -53,6 +54,7 @@ export {
   CheckAuthFn,
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
+  CanSwitchSQLUserFn,
   RequestContext,
   RequestExtension,
   ExtendedRequestContext,

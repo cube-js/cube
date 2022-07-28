@@ -384,10 +384,10 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 
 ### <--{"id" : "Parameters"}--> dataSource
 
-Each cube in schema can have it's own `dataSource` name to support scenarios
+Each cube in schema can have its own `dataSource` name to support scenarios
 where data should be fetched from multiple databases. The value of the
-`dataSource` parameter will be passed to the [`dbType()`][ref-config-dbtype] and
-[`driverFactory()`][ref-config-driverfactory] functions as part of the context
+`dataSource` parameter will be passed to the
+[`driverFactory()`][ref-config-driverfactory] function as part of the `context`
 parameter. By default, each cube has a `default` value for its `dataSource`; to
 override it you can use:
 
@@ -658,7 +658,6 @@ cube(`Users`, {
 });
 ```
 
-[ref-config-dbtype]: /config#db-type
 [ref-config-driverfactory]: /config#driver-factory
 [ref-config-ext-ctx]: /config#extend-context
 [ref-config-queryrewrite]: /config#query-rewrite

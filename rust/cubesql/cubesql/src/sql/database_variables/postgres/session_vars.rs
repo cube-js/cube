@@ -78,5 +78,14 @@ pub fn defaults() -> DatabaseVariables {
         ),
     );
 
+    variables.insert(
+        "standard_conforming_strings".to_string(),
+        DatabaseVariable::system(
+            "standard_conforming_strings".to_string(),
+            ScalarValue::Utf8(Some("on".to_string())),
+            None,
+        ),
+    );
+
     variables
 }

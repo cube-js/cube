@@ -4,13 +4,16 @@ use rand::Rng;
 use std::sync::{Arc, RwLock as RwLockSync};
 use tokio_util::sync::CancellationToken;
 
-use crate::sql::database_variables::{
-    mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
+use crate::{
+    sql::database_variables::{
+        mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
+    },
+    transport::LoadRequestMeta,
 };
 
 use super::{
     database_variables::DatabaseVariables, server_manager::ServerManager,
-    session_manager::SessionManager, AuthContext,
+    session_manager::SessionManager, AuthContextRef,
 };
 
 extern crate lazy_static;
@@ -81,7 +84,7 @@ pub struct SessionState {
 
     // @todo Remove RWLock after split of Connection & SQLWorker
     // Context for Transport
-    auth_context: RwLockSync<Option<AuthContext>>,
+    auth_context: RwLockSync<Option<AuthContextRef>>,
 
     transaction: RwLockSync<TransactionState>,
 
@@ -93,7 +96,7 @@ impl SessionState {
         connection_id: u32,
         host: String,
         protocol: DatabaseProtocol,
-        auth_context: Option<AuthContext>,
+        auth_context: Option<AuthContextRef>,
     ) -> Self {
         let mut rng = rand::thread_rng();
 
@@ -251,7 +254,7 @@ impl SessionState {
         guard.database = database;
     }
 
-    pub fn auth_context(&self) -> Option<AuthContext> {
+    pub fn auth_context(&self) -> Option<AuthContextRef> {
         let guard = self
             .auth_context
             .read()
@@ -259,7 +262,7 @@ impl SessionState {
         guard.clone()
     }
 
-    pub fn set_auth_context(&self, auth_context: Option<AuthContext>) {
+    pub fn set_auth_context(&self, auth_context: Option<AuthContextRef>) {
         let mut guard = self
             .auth_context
             .write()
@@ -287,10 +290,9 @@ impl SessionState {
         let guard = self
             .variables
             .read()
-            .expect("failed to unlock variables for reading")
-            .clone();
+            .expect("failed to unlock variables for reading");
 
-        match guard {
+        match &*guard {
             Some(vars) => vars.get(name).map(|v| v.clone()),
             _ => match self.protocol {
                 DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).map(|v| v.clone()),
@@ -332,6 +334,20 @@ impl SessionState {
 
             *guard = Some(current_variables);
         }
+    }
+
+    pub fn get_load_request_meta(&self) -> LoadRequestMeta {
+        let application_name = if let Some(var) = self.get_variable("application_name") {
+            Some(var.value.to_string())
+        } else {
+            None
+        };
+
+        LoadRequestMeta::new(
+            self.protocol.to_string(),
+            "sql".to_string(),
+            application_name,
+        )
     }
 }
 

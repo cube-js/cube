@@ -21,6 +21,8 @@ import { getEnv } from '@cubejs-backend/shared';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
+const { version } = require('../../package.json');
+
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
     readOnly?: boolean,
@@ -110,7 +112,14 @@ export class DatabricksDriver extends JDBCDriver {
       ...conf,
       drivername: 'com.simba.spark.jdbc.Driver',
       customClassPath: undefined,
-      properties: {},
+      properties: {
+        // PWD-parameter passed to the connection string has higher priority,
+        // so we can set this one to an empty string to avoid a Java error.
+        PWD: getEnv('databrickToken') || '',
+        // CUBEJS_DB_DATABRICKS_AGENT is a predefined way to override the user
+        // agent for the Cloud application.
+        UserAgentEntry: getEnv('databrickAgent') || `Cube+OS/${version} (Databricks)`,
+      },
       dbType: 'databricks',
       database: getEnv('dbName', { required: false }),
       url: getEnv('databrickUrl'),
@@ -138,6 +147,9 @@ export class DatabricksDriver extends JDBCDriver {
     return !!this.config.readOnly;
   }
 
+  /**
+   * @override
+   */
   protected async getCustomClassPath() {
     return resolveJDBCDriver();
   }

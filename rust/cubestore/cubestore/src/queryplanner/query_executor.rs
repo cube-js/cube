@@ -372,6 +372,15 @@ impl CubeTable {
         })
     }
 
+    pub fn has_partitions(&self, partition_ids: &Vec<(u64, RowFilter)>) -> bool {
+        let partition_snapshots = self.index_snapshot.partitions();
+        partition_snapshots.iter().any(|p| {
+            partition_ids
+                .binary_search_by_key(&p.partition().get_id(), |(id, _)| *id)
+                .is_ok()
+        })
+    }
+
     #[must_use]
     pub fn to_worker_table(
         &self,
