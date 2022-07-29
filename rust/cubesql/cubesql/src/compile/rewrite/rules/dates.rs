@@ -4,15 +4,19 @@ use crate::{
         rewrite::{
             agg_fun_expr, analysis::LogicalPlanAnalysis, binary_expr, cast_expr, column_expr,
             fun_expr, literal_expr, literal_string, negative_expr, rewrite, rewriter::RewriteRules,
-            to_day_interval_expr, transforming_rewrite, udf_expr, CastExprDataType,
-            LiteralExprValue, LogicalPlanLanguage,
+            to_day_interval_expr, transforming_rewrite, udf_expr, AggregateFunctionExprFun,
+            CastExprDataType, LiteralExprValue, LogicalPlanLanguage,
         },
     },
     var, var_iter,
 };
-use datafusion::{arrow::datatypes::DataType, scalar::ScalarValue};
+use datafusion::{
+    arrow::datatypes::DataType, physical_plan::aggregates::AggregateFunction, scalar::ScalarValue,
+};
 use egg::{EGraph, Rewrite, Subst};
 use std::sync::Arc;
+
+use super::members::MemberRules;
 
 pub struct DateRules {
     _cube_context: Arc<CubeContext>,
@@ -333,6 +337,19 @@ impl RewriteRules for DateRules {
                 agg_fun_expr("?aggr_fun", vec![column_expr("?column")], "?distinct"),
                 self.unwrap_cast_to_date("?data_type"),
             ),
+            transforming_rewrite(
+                "unwrap-aggr-fun-from-datetrunc",
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
+                    )],
+                    "?distinct",
+                ),
+                agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+                self.unwrap_aggr_fun_from_datetrunc("?fun_name", "?granularity"),
+            ),
         ]
     }
 }
@@ -378,6 +395,31 @@ impl DateRules {
                         _ => (),
                     },
                     _ => (),
+                }
+            }
+
+            false
+        }
+    }
+
+    fn unwrap_aggr_fun_from_datetrunc(
+        &self,
+        fun_expr_var: &'static str,
+        granularity_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let fun_expr_var = var!(fun_expr_var);
+        let granularity_var = var!(granularity_var);
+        move |egraph, subst| {
+            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
+                match MemberRules::parse_granularity(granularity, false) {
+                    Some(granularity) if granularity.to_lowercase() == "second".to_string() => (),
+                    _ => continue,
+                }
+                for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun).cloned()
+                {
+                    if fun == AggregateFunction::Min || fun == AggregateFunction::Max {
+                        return true;
+                    }
                 }
             }
 
