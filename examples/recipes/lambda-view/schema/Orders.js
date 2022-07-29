@@ -37,7 +37,7 @@ cube(`Orders`, {
     preAggregations: {
         ordersByCompletedAt: {
             unionWithSourceData: true,
-            measures: [count, sum],
+            measures: [count, count2],
             dimensions: [status, userId],
             timeDimension: completedAt,
             granularity: `day`,

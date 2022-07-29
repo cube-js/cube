@@ -44,7 +44,6 @@ export class QueryQueue {
         stageQueryKey: options.stageQueryKey,
         priority,
         requestId: options.requestId,
-        buildRangeEnd: options.buildRangeEnd,
         useDownload: options.useDownload,
         addedToQueueTime: new Date().getTime(),
       };
