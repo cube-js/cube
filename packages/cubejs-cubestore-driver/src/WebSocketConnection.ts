@@ -182,11 +182,18 @@ export class WebSocketConnection {
         for (const row of table.rows) {
           const valueOffsets: number[] = [];
           for (const column of table.columns) {
-            const stringOffset = builder.createString((row[column.name] as any).toString());
-            HttpColumnValue.startHttpColumnValue(builder);
-            HttpColumnValue.addStringValue(builder, stringOffset);
-            const valueOffset = HttpColumnValue.endHttpColumnValue(builder);
-            valueOffsets.push(valueOffset);
+            const value = row[column.name];
+            if (value === null || value === undefined) {
+              HttpColumnValue.startHttpColumnValue(builder);
+              const valueOffset = HttpColumnValue.endHttpColumnValue(builder);
+              valueOffsets.push(valueOffset);
+            } else {
+              const stringOffset = builder.createString(WebSocketConnection.stringValue(value));
+              HttpColumnValue.startHttpColumnValue(builder);
+              HttpColumnValue.addStringValue(builder, stringOffset);
+              const valueOffset = HttpColumnValue.endHttpColumnValue(builder);
+              valueOffsets.push(valueOffset);
+            }
           }
           const valuesOffset = HttpRow.createValuesVector(builder, valueOffsets);
           HttpRow.startHttpRow(builder);
@@ -223,6 +230,17 @@ export class WebSocketConnection {
   public close() {
     if (this.webSocket) {
       this.webSocket.close();
+    }
+  }
+
+  public static stringValue(value: any): string {
+    if (typeof value === 'string') {
+      return value;
+    } else if (value instanceof Date) {
+      const result = JSON.stringify(value);
+      return result.slice(1, -1); // remove quotes
+    } else {
+      return value.toString();
     }
   }
 }

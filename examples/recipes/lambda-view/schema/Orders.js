@@ -4,9 +4,10 @@ cube(`Orders`, {
     measures: {
         count: {
             type: `count`,
-            filters: [
-                { sql: `${CUBE}.completed_at >= DATE('2019-08-01')` },
-            ],
+        },
+
+        count2: {
+            type: `count`,
         },
     },
 
@@ -22,6 +23,11 @@ cube(`Orders`, {
             type: `string`,
         },
 
+        userId: {
+            sql: `user_id`,
+            type: `number`,
+        },
+
         completedAt: {
             sql: `completed_at`,
             type: `time`,
@@ -31,8 +37,8 @@ cube(`Orders`, {
     preAggregations: {
         ordersByCompletedAt: {
             unionWithSourceData: true,
-            measures: [count],
-            dimensions: [status],
+            measures: [count, sum],
+            dimensions: [status, userId],
             timeDimension: completedAt,
             granularity: `day`,
             partitionGranularity: `month`,

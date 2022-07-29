@@ -563,15 +563,19 @@ class BaseQuery {
     const result = {};
     if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
       const QueryClass = this.constructor;
+      const references = this.cubeEvaluator.evaluatePreAggregationReferences(preAggForQuery.cube, preAggForQuery.preAggregation);
       const lambdaQuery = new QueryClass(
         this.compilers,
         {
           ...this.options,
+          measures: references.measures,
+          dimensions: references.dimensions,
+          timeDimensions: references.timeDimensions,
           filters: [
             ...this.options.filters ?? [],
-            this.options.timeDimensions.length > 0
+            references.timeDimensions.length > 0
               ? {
-                member: this.options.timeDimensions[0].dimension,
+                member: references.timeDimensions[0].dimension,
                 operator: 'afterDate',
                 values: [FROM_PARTITION_RANGE]
               }

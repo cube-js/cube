@@ -41,16 +41,16 @@ async function checkCubestoreState(cubestore: any) {
   ]);
   expect(table.build_range_end).toEqual('2020-05-07T00:00:00.000Z');
   rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name}`, []);
-  expect(rows.length).toEqual(18);
+  expect(rows.length).toEqual(171);
   rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name} WHERE orders__completed_at_day < to_timestamp('${table.build_range_end}')`, []);
-  expect(rows.length).toEqual(18);
+  expect(rows.length).toEqual(171);
   rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name} WHERE orders__completed_at_day >= to_timestamp('${table.build_range_end}')`, []);
   expect(rows.length).toEqual(0);
 }
 
 describe('lambda', () => {
   jest.setTimeout(60 * 5 * 1000);
-  //
+
   let db: StartedTestContainer;
   let birdbox: BirdBox;
   let client: CubejsApi;
@@ -118,9 +118,15 @@ describe('lambda', () => {
       order: {
         'Orders.status': 'asc',
         'Orders.completedAt': 'desc',
+        'Orders.userId': 'asc',
       },
       limit: 3
     });
+
+    // @ts-ignore
+    expect(Object.keys(response.loadResponse.results[0].usedPreAggregations)).toEqual([
+      'dev_pre_aggregations.orders_orders_by_completed_at'
+    ]);
 
     // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
     expect(response.rawData()).toEqual(
@@ -142,6 +148,67 @@ describe('lambda', () => {
           'Orders.completedAt.day': '2020-12-29T00:00:00.000',
           'Orders.count': '10',
           'Orders.status': 'shipped',
+        },
+      ]
+    );
+
+    await checkCubestoreState(cubestore);
+  });
+
+  test('query with 2 dimensions', async () => {
+    const response = await client.load({
+      measures: ['Orders.count'],
+      dimensions: ['Orders.status', 'Orders.userId'],
+      timeDimensions: [
+        {
+          dimension: 'Orders.completedAt',
+          dateRange: ['2020-01-01', '2020-12-31'],
+          granularity: 'day'
+        }
+      ],
+      filters: [
+        {
+          member: 'Orders.status',
+          operator: 'equals',
+          values: ['shipped']
+        }
+      ],
+      order: {
+        'Orders.status': 'asc',
+        'Orders.completedAt': 'desc',
+        'Orders.userId': 'asc',
+      },
+      limit: 3
+    });
+
+    // @ts-ignore
+    expect(Object.keys(response.loadResponse.results[0].usedPreAggregations)).toEqual([
+      'dev_pre_aggregations.orders_orders_by_completed_at'
+    ]);
+
+    // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
+    expect(response.rawData()).toEqual(
+      [
+        {
+          'Orders.completedAt': '2020-12-31T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
+          'Orders.count': '1',
+          'Orders.status': 'shipped',
+          'Orders.userId': '31',
+        },
+        {
+          'Orders.completedAt': '2020-12-31T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
+          'Orders.count': '1',
+          'Orders.status': 'shipped',
+          'Orders.userId': '111',
+        },
+        {
+          'Orders.completedAt': '2020-12-31T00:00:00.000',
+          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
+          'Orders.count': '1',
+          'Orders.status': 'shipped',
+          'Orders.userId': '140',
         },
       ]
     );
