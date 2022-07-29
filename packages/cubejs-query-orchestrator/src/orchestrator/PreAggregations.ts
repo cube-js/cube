@@ -881,41 +881,8 @@ export class PreAggregationLoader {
     saveCancelFn,
     invalidationKeys
   ) {
-    const { tableData, queryOptions } = await this.downloadPreAggregation(client, newVersionEntry, saveCancelFn, invalidationKeys);
-
-    try {
-      await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn, queryOptions);
-    } finally {
-      if (tableData.release) {
-        await tableData.release();
-      }
-    }
-
-    await this.loadCache.fetchTables(this.preAggregation);
-  }
-
-  protected getUnloadOptions(): UnloadOptions {
-    return {
-      // Default: 16mb for Snowflake, Should be specified in MBs, because drivers convert it
-      maxFileSize: 64
-    };
-  }
-
-  protected getStreamingOptions(): StreamOptions {
-    return {
-      // Default: 16384 (16KB), or 16 for objectMode streams. PostgreSQL/MySQL use object streams
-      highWaterMark: 10000
-    };
-  }
-
-  protected async downloadPreAggregation(
-    client: DriverInterface,
-    newVersionEntry: VersionEntry,
-    saveCancelFn,
-    invalidationKeys
-  ) {
     const [sql, params] =
-      Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+        Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
 
     // @todo Deprecated, BaseDriver already implements it, before remove we need to add check for factoryDriver
     if (!client.downloadQueryResults) {
@@ -941,7 +908,29 @@ export class PreAggregationLoader {
     });
     this.logger('Downloading external pre-aggregation via query completed', queryOptions);
 
-    return { queryOptions, tableData };
+    try {
+      await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn, queryOptions);
+    } finally {
+      if (tableData.release) {
+        await tableData.release();
+      }
+    }
+
+    await this.loadCache.fetchTables(this.preAggregation);
+  }
+
+  protected getUnloadOptions(): UnloadOptions {
+    return {
+      // Default: 16mb for Snowflake, Should be specified in MBs, because drivers convert it
+      maxFileSize: 64
+    };
+  }
+
+  protected getStreamingOptions(): StreamOptions {
+    return {
+      // Default: 16384 (16KB), or 16 for objectMode streams. PostgreSQL/MySQL use object streams
+      highWaterMark: 10000
+    };
   }
 
   /**
