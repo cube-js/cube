@@ -11044,11 +11044,6 @@ ORDER BY \"COUNT(count)\" DESC"
                             granularity: Some("second".to_string()),
                             date_range: None,
                         },
-                        V1LoadRequestQueryTimeDimension {
-                            dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                            granularity: Some("month".to_string()),
-                            date_range: None,
-                        },
                     ]),
                     order: None,
                     limit: None,
