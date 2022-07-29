@@ -2,13 +2,14 @@ use async_trait::async_trait;
 use cubesql::{
     di_service,
     sql::{AuthContext, AuthenticateResponse, SqlAuthService},
-    transport::TransportServiceMetaFields,
+    transport::LoadRequestMeta,
     CubeError,
 };
 use log::trace;
 use neon::prelude::*;
 use serde::Deserialize;
 use serde_derive::Serialize;
+use std::any::Any;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -32,7 +33,7 @@ impl NodeBridgeAuthService {
 #[derive(Debug, Serialize)]
 pub struct TransportRequest {
     pub id: String,
-    pub meta: TransportServiceMetaFields,
+    pub meta: Option<LoadRequestMeta>,
 }
 
 #[derive(Debug, Serialize)]
@@ -44,6 +45,19 @@ struct CheckAuthRequest {
 #[derive(Debug, Deserialize)]
 struct CheckAuthResponse {
     password: Option<String>,
+    superuser: bool,
+}
+
+#[derive(Debug)]
+pub struct NativeAuthContext {
+    pub user: Option<String>,
+    pub superuser: bool,
+}
+
+impl AuthContext for NativeAuthContext {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 #[async_trait]
@@ -68,13 +82,13 @@ impl SqlAuthService for NodeBridgeAuthService {
         .await?;
         trace!("[auth] Request <- {:?}", response);
 
-        Ok(AuthenticateResponse::new(
-            AuthContext {
-                access_token: user.unwrap_or_else(|| "fake".to_string()),
-                base_path: "fake".to_string(),
-            },
-            response.password,
-        ))
+        Ok(AuthenticateResponse {
+            context: Arc::new(NativeAuthContext {
+                user,
+                superuser: response.superuser,
+            }),
+            password: response.password,
+        })
     }
 }
 

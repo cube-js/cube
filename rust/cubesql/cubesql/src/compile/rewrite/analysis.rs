@@ -140,6 +140,14 @@ impl LogicalPlanAnalysis {
                     None
                 }
             }
+            LogicalPlanLanguage::ChangeUser(params) => {
+                if let Some(expr) = original_expr(params[0]) {
+                    map.push(("__user".to_string(), expr));
+                    Some(map)
+                } else {
+                    None
+                }
+            }
             LogicalPlanLanguage::TimeDimension(params) => {
                 if let Some(_) = column_name(params[3]) {
                     let expr = original_expr(params[3])?;

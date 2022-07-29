@@ -7,6 +7,7 @@ import {
   UserBackgroundContext,
   QueryRewriteFn,
   CheckSQLAuthFn,
+  CanSwitchSQLUserFn,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
@@ -161,6 +162,7 @@ export interface CreateOptions {
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   checkSqlAuth?: CheckSQLAuthFn;
+  canSwitchSqlUser?: CanSwitchSQLUserFn;
   jwt?: JWTOptions;
   // @deprecated Please use queryRewrite
   queryTransformer?: QueryRewriteFn;

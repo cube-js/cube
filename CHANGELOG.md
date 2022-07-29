@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.43](https://github.com/cube-js/cube.js/compare/v0.30.42...v0.30.43) (2022-07-28)
+
+
+### Bug Fixes
+
+* **cubesq:** Ignore BrokenPipe/UnexpectedEOF as error in pg-wire ([4ec01d2](https://github.com/cube-js/cube.js/commit/4ec01d269f2216f74b841ebe2fd96d3b8597fdcc))
+
+
+### Features
+
+* **cubesql:** Security Context switching (Row Access) ([731e1ab](https://github.com/cube-js/cube.js/commit/731e1ab6d9362fb9a1857f5276e22a565f79781c))
+* **databricks-jdbc:** UserAgentEntry property configuration for the databricks-jdbc driver ([bccae12](https://github.com/cube-js/cube.js/commit/bccae12715fcbfdecbc2175de5e4ad6601ba374f))
+
+
+
+
+
+## [0.30.42](https://github.com/cube-js/cube.js/compare/v0.30.41...v0.30.42) (2022-07-27)
+
+
+### Features
+
+* **cubesql:** Metabase - support Summarize by week of year ([#5000](https://github.com/cube-js/cube.js/issues/5000)) ([37589a9](https://github.com/cube-js/cube.js/commit/37589a9e58b0c8f14922041432647b814759f22a))
+* **server-core:** disable health checks for API instances with rollup only mode ([a6601e5](https://github.com/cube-js/cube.js/commit/a6601e5ad82922446654d832cf5e7a6cb7cee870))
+
+
+
+
+
+## [0.30.41](https://github.com/cube-js/cube.js/compare/v0.30.40...v0.30.41) (2022-07-27)
+
+
+### Bug Fixes
+
+* **databricks-jdbc:** postinstall script with accept_policy env ([1e38791](https://github.com/cube-js/cube.js/commit/1e387919e8636fc9320ec2f043073e91f5b2e671))
+
+
+
+
+
 ## [0.30.40](https://github.com/cube-js/cube.js/compare/v0.30.39...v0.30.40) (2022-07-26)
 
 

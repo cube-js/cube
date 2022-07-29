@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 9718
 expression: "execute_query(\"\n                with\n                    nsp as (\n                        select oid\n                        from pg_catalog.pg_namespace\n                        where nspname = 'public'\n                    ),\n                    tbl as (\n                        select oid\n                        from pg_catalog.pg_class\n                        where\n                            relname = 'KibanaSampleDataEcommerce' and\n                            relnamespace = (select oid from nsp)\n                    )\n                select\n                    attname,\n                    typname,\n                    description\n                from pg_attribute a\n                join pg_type on atttypid = pg_type.oid\n                left join pg_description on\n                    attrelid = objoid and\n                    attnum = objsubid\n                where\n                    attnum > 0 and\n                    attrelid = (select oid from tbl)\n                order by attnum\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +--------------------+-----------+-------------+
@@ -15,4 +16,5 @@ expression: "execute_query(\"\n                with\n                    nsp as 
 | has_subscription   | bool      | NULL        |
 | is_male            | bool      | NULL        |
 | is_female          | bool      | NULL        |
+| __user             | text      | NULL        |
 +--------------------+-----------+-------------+

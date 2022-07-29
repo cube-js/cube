@@ -132,6 +132,30 @@ cloudStorage:
     ##
     subPath:
 
+  minio:
+    ## The Access Key ID for minIO. Required when using minIO
+    ##
+    accessKeyID:
+
+    ## The Secret Access Key for minIO. Required when using minIO
+    ##
+    secretKey:
+    # secretKeyFromSecret:
+    #   name:
+    #   key:
+
+    ## The name of the bucket that you want to use minIO. Required when using minIO
+    ##
+    bucket:
+
+    ## The region of a bucket in S3 that you want to use minIO. Optional when using minIO
+    ##
+    region:
+
+    ## The minIO server endpoint. Required when using minIO
+    ##
+    endpoint:
+
 router:
   ## The port for Cube Store to listen to HTTP connections on
   ##

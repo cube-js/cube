@@ -63,4 +63,30 @@
 - name: CUBESTORE_S3_SUB_PATH
   value: {{ .Values.cloudStorage.aws.subPath | quote }}
 {{- end }}
+{{- if .Values.cloudStorage.minio.accessKeyID }}
+- name: CUBESTORE_MINIO_ACCESS_KEY_ID
+  value: {{ .Values.cloudStorage.minio.accessKeyID | quote }}
+{{- end }}
+{{- if .Values.cloudStorage.minio.secretKey }}
+- name: CUBESTORE_MINIO_SECRET_ACCESS_KEY
+  value: {{ .Values.cloudStorage.minio.secretKey | quote }}
+{{- else if .Values.cloudStorage.minio.secretKeyFromSecret }}
+- name: CUBESTORE_MINIO_SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.cloudStorage.minio.secretKeyFromSecret.name | required "cloudStorage.minio.secretKeyFromSecret.name is required" }}
+      key: {{ .Values.cloudStorage.minio.secretKeyFromSecret.key | required "cloudStorage.minio.secretKeyFromSecret.key is required" }}
+{{- end }}
+{{- if .Values.cloudStorage.minio.bucket }}
+- name: CUBESTORE_MINIO_BUCKET
+  value: {{ .Values.cloudStorage.minio.bucket | quote }}
+{{- end }}
+{{- if .Values.cloudStorage.minio.region }}
+- name: CUBESTORE_MINIO_REGION
+  value: {{ .Values.cloudStorage.minio.region | quote }}
+{{- end }}
+{{- if .Values.cloudStorage.minio.endpoint }}
+- name: CUBESTORE_MINIO_SERVER_ENDPOINT
+  value: {{ .Values.cloudStorage.minio.endpoint | quote }}
+{{- end }}
 {{- end }}

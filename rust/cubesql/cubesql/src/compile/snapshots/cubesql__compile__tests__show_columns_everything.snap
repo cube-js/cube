@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 5381
+assertion_line: 6314
 expression: "execute_query(\"show full columns from KibanaSampleDataEcommerce from db like '%';\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+
@@ -16,4 +16,5 @@ expression: "execute_query(\"show full columns from KibanaSampleDataEcommerce fr
 | has_subscription   | tinyint(1)   | NULL               | YES  |     | NULL    |       | select     |         |
 | is_male            | tinyint(1)   | NULL               | NO   |     | NULL    |       | select     |         |
 | is_female          | tinyint(1)   | NULL               | NO   |     | NULL    |       | select     |         |
+| __user             | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |
 +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+

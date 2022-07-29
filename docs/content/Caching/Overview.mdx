@@ -6,8 +6,11 @@ menuOrder: 1
 ---
 
 Cube.js provides a two-level caching system. The first level is **in-memory**
-cache and is active by default. We recommend using [Redis][link-redis] for
-in-memory cache when [running Cube.js in production][ref-production-checklist].
+cache and is active by default. Currently, [Redis][link-redis] is being used for
+in-memory cache and queue management for [clsutered Cube
+deployments][ref-production-checklist]. Cube Store will [replace
+Redis][replace-redis] in late
+2022.
 
 Cube.js [in-memory cache](#in-memory-cache) acts as a buffer for your database
 when there's a burst of requests hitting the same data from multiple concurrent
@@ -85,9 +88,7 @@ database to populate the cache with the results and return them.
 ### <--{"id" : "In-memory Cache"}--> Refresh Keys
 
 Cube.js takes great care to prevent unnecessary queries from hitting your
-database. The first stage caching system caches query results in Redis (or in
-the in-memory store in development), but Cube.js needs a way to know if the data
-powering that query result has changed. If the underlying data isn't any
+database. The first stage caching system caches query results, but Cube.js needs a way to know if the data powering that query result has changed. If the underlying data isn't any
 different, the cached result is valid and can be returned skipping an expensive
 query, but if there is a difference, the query needs to be re-run and its result
 cached.
@@ -193,3 +194,4 @@ versions.
   /deployment/production-checklist#set-up-refresh-worker
 [ref-schema-ref-cube-refresh-key]: /schema/reference/cube#refresh-key
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
+[replace-redis]: https://cube.dev/blog/replacing-redis-with-cube-store
