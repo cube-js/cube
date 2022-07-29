@@ -133,14 +133,12 @@ class ElasticSearchDriver extends BaseDriver {
   }
 
   async tablesSchema() {
-    const indices = await this.client.cat.indices({
-      format: 'json'
-    });
+    const mappings = await this.client.indices.getMapping();
 
-    const schema = (await Promise.all(indices.body.map(async i => {
-      const props = (await this.client.indices.getMapping({ index: i.index })).body[i.index].mappings.properties || {};
+    const schema = (await Promise.all(Object.keys(mappings.body).map(async index => {
+      const props = mappings.body[index].mappings.properties || {};
       return {
-        [i.index]: Object.keys(props).map(p => ({ name: p, type: props[p].type })).filter(c => !!c.type)
+        [index]: Object.keys(props).map(p => ({ name: p, type: props[p].type })).filter(c => !!c.type)
       };
     }))).reduce((a, b) => ({ ...a, ...b }));
 
