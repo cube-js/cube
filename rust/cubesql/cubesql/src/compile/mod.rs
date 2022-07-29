@@ -11038,13 +11038,11 @@ ORDER BY \"COUNT(count)\" DESC"
                     measures: Some(vec![]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: Some(vec![
-                        V1LoadRequestQueryTimeDimension {
-                            dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                            granularity: Some("second".to_string()),
-                            date_range: None,
-                        },
-                    ]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("second".to_string()),
+                        date_range: None,
+                    },]),
                     order: None,
                     limit: None,
                     offset: None,
