@@ -78,7 +78,6 @@
     "http-proxy": "^1.18.1",
     "node-fetch": "^2.6.1",
     "ramda": "^0.27.2",
-    "shelljs": "^0.8.5",
     "testcontainers": "^7.5.0",
     "yargs": "^17.3.1"
   },
