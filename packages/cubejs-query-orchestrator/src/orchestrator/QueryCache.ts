@@ -266,6 +266,7 @@ export class QueryCache {
   }
 
   private async inlineQuery(client, q) {
+    // const tableData = await client.downloadQueryResults(q.query, q.values, q);
     const tableData = await client.stream(q.query, q.values, q);
     const columns = tableData.types.map(c => c.name);
     const writer = csvWriter({ headers: columns });
