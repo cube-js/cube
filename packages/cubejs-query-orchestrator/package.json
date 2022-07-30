@@ -32,6 +32,8 @@
   ],
   "dependencies": {
     "@cubejs-backend/shared": "^0.30.43",
+    "csv-write-stream": "^2.0.0",
+    "csv-parse": "^5.3.0",
     "es5-ext": "0.10.53",
     "generic-pool": "^3.7.1",
     "ioredis": "^4.27.8",

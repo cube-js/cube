@@ -1,6 +1,9 @@
 import crypto from 'crypto';
+import csvWriter from 'csv-write-stream';
+import { parse } from 'csv-parse';
 import LRUCache from 'lru-cache';
-import { MaybeCancelablePromise } from '@cubejs-backend/shared';
+import { pipeline } from 'stream';
+import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -244,7 +247,7 @@ export class QueryCache {
             ...q
           });
           if (q.useDownload) {
-            return client.downloadQueryResults(q.query, q.values, q);
+            return this.inlineQuery(client, q);
           } else {
             return client.query(q.query, q.values, q);
           }
@@ -260,6 +263,31 @@ export class QueryCache {
       );
     }
     return this.queue[dataSource];
+  }
+
+  private async inlineQuery(client, q) {
+    const tableData = await client.stream(q.query, q.values, q);
+    const columns = tableData.types.map(c => c.name);
+    const writer = csvWriter({ headers: columns });
+    const reader = parse({
+      columns,
+      // read fields as strings
+      cast: false,
+      // skip header, count starts at 1
+      from: 2,
+    });
+    const errors = [];
+    const csvPipeline = await pipeline(tableData.rowStream, writer, reader, (err) => {
+      errors.push(err);
+    });
+    if (errors.length > 0) {
+      throw new Error(`Inline query errors ${errors.join(', ')}`);
+    }
+    const rows = await streamToArray(csvPipeline);
+    return {
+      types: tableData.types,
+      rows,
+    };
   }
 
   public getExternalQueue() {
