@@ -235,6 +235,12 @@ services:
       - cubestore_router
 ```
 
+### Local Storage
+
+Separately from remote storage, Cube Store requires local scratch space to warm up partitions by downloading Parquet files before querying them.
+By default, this directory should be mounted to `.cubestore/data` dir inside contained and can be configured by [CUBESTORE_DATA_DIR][ref-config-env] environment variable.
+It is advised to use local SSDs for this scratch space to maximize querying performance.
+
 ### <--{"id" : "Storage"}--> AWS
 
 Cube Store can retrieve security credentials from instance metadata
