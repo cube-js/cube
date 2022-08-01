@@ -110,7 +110,7 @@ export class OptsHandler {
     val: DriverConfig | BaseDriver,
   ) {
     let isDriverInstance = val instanceof BaseDriver;
-    if (!isDriverInstance) {
+    if (!isDriverInstance && val && val.constructor) {
       let end = false;
       let obj = val.constructor;
       while (!isDriverInstance && !end) {
