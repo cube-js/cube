@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use arrow::array::{ArrayBuilder, ArrayRef};
 use async_compression::tokio::bufread::GzipDecoder;
-use async_std::io::{SeekFrom};
+use async_std::io::SeekFrom;
 use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
@@ -63,10 +63,12 @@ impl ImportFormat {
         &self,
         reader: Pin<Box<dyn AsyncBufRead + Send + 'a>>,
         columns: Vec<Column>,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send + 'a>>, CubeError> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send + 'a>>, CubeError>
+    {
         match self {
             ImportFormat::CSV | ImportFormat::CSVNoHeader => {
-                let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> = Box::pin(CsvLineStream::new(reader));
+                let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
+                    Box::pin(CsvLineStream::new(reader));
 
                 let mut header_mapping = match self {
                     ImportFormat::CSV => None,
@@ -765,12 +767,12 @@ impl Ingestion {
 mod tests {
     extern crate test;
 
-    use indoc::indoc;
-    use tokio::io::BufReader;
-    use tokio_stream::StreamExt;
     use crate::import::parse_decimal;
     use crate::metastore::{Column, ColumnType, ImportFormat};
     use crate::table::{Row, TableValue};
+    use indoc::indoc;
+    use tokio::io::BufReader;
+    use tokio_stream::StreamExt;
 
     #[test]
     fn parse_decimal_test() {
@@ -804,17 +806,28 @@ mod tests {
             Column::new("A".to_string(), ColumnType::String, 0),
             Column::new("B".to_string(), ColumnType::Int, 1),
         ];
-        let mut row_stream = ImportFormat::CSVNoHeader.row_stream_from_reader(csv_reader, columns).unwrap();
+        let mut row_stream = ImportFormat::CSVNoHeader
+            .row_stream_from_reader(csv_reader, columns)
+            .unwrap();
         let mut rows = vec![];
         while let Some(row) = row_stream.next().await {
             if let Some(row) = row.unwrap() {
                 rows.push(row)
             }
         }
-        assert_eq!(rows, vec![
-            Row::new(vec![TableValue::String("one".to_string()), TableValue::Int(1)]),
-            Row::new(vec![TableValue::Null, TableValue::Null]),
-            Row::new(vec![TableValue::String("three".to_string()), TableValue::Int(3)]),
-        ]);
+        assert_eq!(
+            rows,
+            vec![
+                Row::new(vec![
+                    TableValue::String("one".to_string()),
+                    TableValue::Int(1)
+                ]),
+                Row::new(vec![TableValue::Null, TableValue::Null]),
+                Row::new(vec![
+                    TableValue::String("three".to_string()),
+                    TableValue::Int(3)
+                ]),
+            ]
+        );
     }
 }
