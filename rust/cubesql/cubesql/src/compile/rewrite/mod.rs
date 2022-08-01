@@ -23,7 +23,7 @@ use egg::{
     rewrite, Applier, EGraph, Id, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
     Symbol, Var,
 };
-use std::{collections::HashMap, fmt::Display, ops::Index, slice::Iter, str::FromStr};
+use std::{fmt::Display, ops::Index, slice::Iter, str::FromStr};
 
 // trace_macros!(true);
 
@@ -205,14 +205,13 @@ crate::plan_to_language! {
             key: Box<Expr>,
         },
         CubeScan {
-            cube: Arc<LogicalPlan>,
+            alias_to_cube: Vec<(String, String)>,
             members: Vec<LogicalPlan>,
             filters: Vec<LogicalPlan>,
             order: Vec<LogicalPlan>,
             limit: Option<usize>,
             offset: Option<usize>,
             aliases: Option<Vec<String>>,
-            table_name: String,
             split: bool,
         },
         Measure {
@@ -268,13 +267,12 @@ crate::plan_to_language! {
         },
         MemberReplacer {
             members: Vec<LogicalPlan>,
-            cube: Arc<LogicalPlan>,
+            alias_to_cube: Vec<(String, String)>,
         },
         MemberPushdownReplacer {
             members: Vec<LogicalPlan>,
             old_members: Arc<LogicalPlan>,
-            table_name: String,
-            target_table_name: String,
+            alias_to_cube: Vec<(String, String)>,
         },
         ListConcatPushdownReplacer {
             members: Arc<LogicalPlan>,
@@ -289,9 +287,8 @@ crate::plan_to_language! {
         },
         FilterReplacer {
             filters: Vec<LogicalPlan>,
-            cube: Option<String>,
+            alias_to_cube: Vec<(String, String)>,
             members: Vec<LogicalPlan>,
-            table_name: String,
         },
         FilterCastUnwrapReplacer {
             filters: Vec<LogicalPlan>,
@@ -299,19 +296,18 @@ crate::plan_to_language! {
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
             column_name_to_member: Vec<(String, String)>,
-            cube: Option<String>,
         },
         InnerAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
-            cube: String,
+            alias_to_cube: Vec<(String, String)>,
         },
         OuterProjectionSplitReplacer {
             members: Vec<LogicalPlan>,
-            cube: String,
+            alias_to_cube: Vec<(String, String)>,
         },
         OuterAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
-            cube: String,
+            alias_to_cube: Vec<(String, String)>,
         },
     }
 }
@@ -345,37 +341,31 @@ macro_rules! var {
     };
 }
 
-pub struct WithColumnRelation(String);
+pub struct WithColumnRelation(Option<String>);
 
 impl ExprRewriter for WithColumnRelation {
     fn mutate(&mut self, expr: Expr) -> Result<Expr, DataFusionError> {
         match expr {
             Expr::Column(c) => Ok(Expr::Column(Column {
                 name: c.name.to_string(),
-                relation: c.relation.or_else(|| Some(self.0.to_string())),
+                relation: c.relation.or_else(|| self.0.clone()),
             })),
             e => Ok(e),
         }
     }
 }
 
-fn column_name_to_member_name(
-    member_name_to_expr: Vec<(String, Expr)>,
-    table_name: String,
-) -> HashMap<String, String> {
-    column_name_to_member_vec(member_name_to_expr, table_name)
-        .into_iter()
-        .collect::<HashMap<_, _>>()
-}
-
-fn column_name_to_member_vec(
-    member_name_to_expr: Vec<(String, Expr)>,
-    table_name: String,
-) -> Vec<(String, String)> {
-    let mut relation = WithColumnRelation(table_name);
+fn column_name_to_member_vec(member_name_to_expr: Vec<(String, Expr)>) -> Vec<(String, String)> {
+    let mut relation = WithColumnRelation(None);
     member_name_to_expr
         .into_iter()
-        .map(|(member, expr)| (expr_column_name_with_relation(expr, &mut relation), member))
+        .map(|(member, expr)| {
+            vec![
+                (expr_column_name(expr.clone(), &None), member.to_string()),
+                (expr_column_name_with_relation(expr, &mut relation), member),
+            ]
+        })
+        .flatten()
         .collect::<Vec<_>>()
 }
 
@@ -383,22 +373,22 @@ fn member_name_by_alias(
     egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     id: Id,
     alias: &str,
-    table_name: String,
 ) -> Option<String> {
     if let Some(member_name_to_expr) = egraph.index(id).data.member_name_to_expr.as_ref() {
-        let column_name_to_member =
-            column_name_to_member_name(member_name_to_expr.clone(), table_name);
-        column_name_to_member.get(alias).cloned()
+        let column_name_to_member = column_name_to_member_vec(member_name_to_expr.clone());
+        column_name_to_member
+            .into_iter()
+            .find(|(cn, _)| cn == alias)
+            .map(|(_, member)| member)
     } else {
         None
     }
 }
 
-fn referenced_columns(referenced_expr: Vec<Expr>, table_name: String) -> Vec<String> {
-    let mut relation = WithColumnRelation(table_name);
+fn referenced_columns(referenced_expr: Vec<Expr>) -> Vec<String> {
     referenced_expr
         .into_iter()
-        .map(|expr| expr_column_name_with_relation(expr, &mut relation))
+        .map(|expr| expr_column_name(expr, &None))
         .collect::<Vec<_>>()
 }
 
@@ -411,7 +401,7 @@ fn expr_column_name_with_relation(expr: Expr, relation: &mut WithColumnRelation)
 
 fn expr_column_name(expr: Expr, cube: &Option<String>) -> String {
     if let Some(cube) = cube.as_ref() {
-        expr_column_name_with_relation(expr, &mut WithColumnRelation(cube.to_string()))
+        expr_column_name_with_relation(expr, &mut WithColumnRelation(Some(cube.to_string())))
     } else {
         expr.name(&DFSchema::empty()).unwrap()
     }
@@ -693,12 +683,11 @@ fn member_replacer(members: impl Display, aliases: impl Display) -> String {
 fn member_pushdown_replacer(
     members: impl Display,
     old_members: impl Display,
-    table_name: impl Display,
-    target_table_name: impl Display,
+    alias_to_cube: impl Display,
 ) -> String {
     format!(
-        "(MemberPushdownReplacer {} {} {} {})",
-        members, old_members, table_name, target_table_name
+        "(MemberPushdownReplacer {} {} {})",
+        members, old_members, alias_to_cube
     )
 }
 
@@ -721,19 +710,18 @@ fn time_dimension_date_range_replacer(
     )
 }
 
-fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Display) -> String {
-    format!("(OrderReplacer {} {} {})", members, aliases, cube)
+fn order_replacer(members: impl Display, aliases: impl Display) -> String {
+    format!("(OrderReplacer {} {})", members, aliases)
 }
 
 fn filter_replacer(
     members: impl Display,
-    cube: impl Display,
+    alias_to_cube: impl Display,
     cube_members: impl Display,
-    table_name: impl Display,
 ) -> String {
     format!(
-        "(FilterReplacer {} {} {} {})",
-        members, cube, cube_members, table_name
+        "(FilterReplacer {} {} {})",
+        members, alias_to_cube, cube_members
     )
 }
 
@@ -741,16 +729,25 @@ fn filter_cast_unwrap_replacer(members: impl Display) -> String {
     format!("(FilterCastUnwrapReplacer {})", members)
 }
 
-fn inner_aggregate_split_replacer(members: impl Display, cube: impl Display) -> String {
-    format!("(InnerAggregateSplitReplacer {} {})", members, cube)
+fn inner_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
+    format!(
+        "(InnerAggregateSplitReplacer {} {})",
+        members, alias_to_cube
+    )
 }
 
-fn outer_projection_split_replacer(members: impl Display, cube: impl Display) -> String {
-    format!("(OuterProjectionSplitReplacer {} {})", members, cube)
+fn outer_projection_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
+    format!(
+        "(OuterProjectionSplitReplacer {} {})",
+        members, alias_to_cube
+    )
 }
 
-fn outer_aggregate_split_replacer(members: impl Display, cube: impl Display) -> String {
-    format!("(OuterAggregateSplitReplacer {} {})", members, cube)
+fn outer_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
+    format!(
+        "(OuterAggregateSplitReplacer {} {})",
+        members, alias_to_cube
+    )
 }
 
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {
@@ -847,19 +844,18 @@ fn table_scan(
 }
 
 fn cube_scan(
-    source_table_name: impl Display,
+    alias_to_cube: impl Display,
     members: impl Display,
     filters: impl Display,
     orders: impl Display,
     limit: impl Display,
     offset: impl Display,
     aliases: impl Display,
-    table_name: impl Display,
     split: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {} {} {}))",
-        source_table_name, members, filters, orders, limit, offset, aliases, table_name, split
+        "(Extension (CubeScan {} {} {} {} {} {} {} {}))",
+        alias_to_cube, members, filters, orders, limit, offset, aliases, split
     )
 }
 
