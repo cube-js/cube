@@ -73,7 +73,7 @@
     "dedent": "^0.7.0",
     "fs-extra": "^8.1.0",
     "http-proxy": "^1.18.1",
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^3.2.10",
     "ramda": "^0.27.2",
     "testcontainers": "^7.5.0",
     "yargs": "^17.3.1"
