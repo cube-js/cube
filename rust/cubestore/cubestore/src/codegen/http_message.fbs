@@ -19,9 +19,9 @@ table HttpTable {
     name: string;
     columns: [string];
     types: [string];
-    // Either csvBlob or rows.
-    csv_rows: string;
+    // Either rows or csv_rows.
     rows: [HttpRow];
+    csv_rows: string;
 }
 
 table HttpError {

@@ -30,6 +30,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
 use tempfile::NamedTempFile;
+use tokio::io::BufReader;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
@@ -132,7 +133,7 @@ impl HttpServer {
                                     }
                                     Ok(msg) => {
                                         if msg.is_binary() {
-                                            match HttpMessage::read(msg.into_bytes()) {
+                                            match HttpMessage::read(msg.into_bytes()).await {
                                                 Err(e) => error!("Websocket message read error: {:?}", e),
                                                 Ok(msg) => {
                                                     trace!("Received web socket message");
@@ -403,9 +404,9 @@ impl HttpMessage {
                     for (name, inline_table) in inline_tables.iter() {
                         let name_offset = builder.create_string(&name);
                         let columns_vec =
-                            HttpMessage::build_columns(&mut builder, inline_table.clone());
+                            HttpMessage::build_columns(&mut builder, inline_table.get_columns());
                         let types_vec =
-                            HttpMessage::build_types(&mut builder, inline_table.clone());
+                            HttpMessage::build_types(&mut builder, inline_table.get_columns());
                         let rows_vec = HttpMessage::build_rows(&mut builder, inline_table.clone());
                         let inline_table_offset = HttpTable::create(
                             &mut builder,
@@ -450,7 +451,7 @@ impl HttpMessage {
                     )
                 }
                 HttpCommand::ResultSet { data_frame } => {
-                    let columns_vec = HttpMessage::build_columns(&mut builder, data_frame.clone());
+                    let columns_vec = HttpMessage::build_columns(&mut builder, data_frame.get_columns());
                     let rows = HttpMessage::build_rows(&mut builder, data_frame.clone());
 
                     Some(
@@ -474,10 +475,9 @@ impl HttpMessage {
 
     fn build_columns<'a: 'ma, 'ma>(
         builder: &'ma mut FlatBufferBuilder<'a>,
-        data_frame: Arc<DataFrame>,
+        columns: &Vec<Column>,
     ) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
-        let columns = data_frame
-            .get_columns()
+        let columns = columns
             .iter()
             .map(|c| c.get_name().as_str())
             .collect::<Vec<_>>();
@@ -487,10 +487,9 @@ impl HttpMessage {
 
     fn build_types<'a: 'ma, 'ma>(
         builder: &'ma mut FlatBufferBuilder<'a>,
-        data_frame: Arc<DataFrame>,
+        columns: &Vec<Column>,
     ) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
-        let types = data_frame
-            .get_columns()
+        let types = columns
             .iter()
             .map(|c| c.get_column_type().to_string())
             .collect::<Vec<_>>();
@@ -503,8 +502,10 @@ impl HttpMessage {
         builder: &'ma mut FlatBufferBuilder<'a>,
         data_frame: Arc<DataFrame>,
     ) -> WIPOffset<Vector<'a, ForwardsUOffset<HttpRow<'a>>>> {
-        let mut row_offsets = Vec::with_capacity(data_frame.get_rows().len());
-        for row in data_frame.get_rows().iter() {
+        let columns = data_frame.get_columns();
+        let rows = data_frame.get_rows();
+        let mut row_offsets = Vec::with_capacity(rows.len());
+        for row in rows.iter() {
             let mut value_offsets = Vec::with_capacity(row.values().len());
             for (i, value) in row.values().iter().enumerate() {
                 let value = match value {
@@ -522,7 +523,7 @@ impl HttpMessage {
                     }
                     TableValue::Decimal(v) => {
                         let scale = u8::try_from(
-                            data_frame.get_columns()[i].get_column_type().target_scale(),
+                            columns[i].get_column_type().target_scale(),
                         )
                         .unwrap();
                         let string_value = Some(builder.create_string(&v.to_string(scale)));
@@ -558,7 +559,7 @@ impl HttpMessage {
         rows
     }
 
-    pub fn read(buffer: Vec<u8>) -> Result<Self, CubeError> {
+    pub async fn read(buffer: Vec<u8>) -> Result<Self, CubeError> {
         let http_message = get_root_as_http_message(buffer.as_slice());
         Ok(HttpMessage {
             message_id: http_message.message_id(),
@@ -582,25 +583,40 @@ impl HttpMessage {
                                 .enumerate()
                                 .map(|(i, name)| Column::new(name.to_string(), types[i].clone(), i))
                                 .collect::<Vec<_>>();
-                            let rows = inline_table
-                                .rows()
-                                .unwrap()
-                                .iter()
-                                .map(|r| {
-                                    let values = r
-                                        .values()
-                                        .unwrap()
-                                        .iter()
-                                        .enumerate()
-                                        .map(|(i, v)| {
-                                            v.string_value().map_or(Ok(TableValue::Null), |v| {
-                                                ImportFormat::parse_column_value_str(&columns[i], v)
+                            let rows = if inline_table.rows().is_some() {
+                                inline_table
+                                    .rows()
+                                    .unwrap()
+                                    .iter()
+                                    .map(|r| {
+                                        let values = r
+                                            .values()
+                                            .unwrap()
+                                            .iter()
+                                            .enumerate()
+                                            .map(|(i, v)| {
+                                                v.string_value().map_or(Ok(TableValue::Null), |v| {
+                                                    ImportFormat::parse_column_value_str(&columns[i], v)
+                                                })
                                             })
-                                        })
-                                        .collect::<Result<Vec<_>, CubeError>>();
-                                    values.map(|values| Row::new(values))
-                                })
-                                .collect::<Result<Vec<_>, CubeError>>()?;
+                                            .collect::<Result<Vec<_>, CubeError>>();
+                                        values.map(|values| Row::new(values))
+                                    })
+                                    .collect::<Result<Vec<_>, CubeError>>()?
+                            } else if inline_table.csv_rows().is_some() {
+                                let csv_rows = inline_table.csv_rows().unwrap().to_owned();
+                                let csv_reader = Box::pin(BufReader::new(csv_rows.as_bytes()));
+                                let mut rows_stream = ImportFormat::CSVNoHeader.row_stream_from_reader(csv_reader, columns.clone())?;
+                                let mut rows = vec![];
+                                while let Some(row) = rows_stream.next().await {
+                                    if let Some(row) = row? {
+                                        rows.push(row)
+                                    }
+                                }
+                                rows
+                            } else {
+                                vec![]
+                            };
                             inline_tables.push((name, Arc::new(DataFrame::new(columns, rows))));
                         }
                     };
@@ -629,9 +645,11 @@ mod tests {
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
     use std::sync::Arc;
+    use indoc::indoc;
+    use crate::codegen::http_message_generated::{HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs};
 
-    #[test]
-    fn query_test() {
+    #[tokio::test]
+    async fn query_test() {
         let message = HttpMessage {
             message_id: 1234,
             command: HttpCommand::Query {
@@ -641,12 +659,12 @@ mod tests {
             },
         };
         let bytes = message.bytes();
-        let output_message = HttpMessage::read(bytes).unwrap();
+        let output_message = HttpMessage::read(bytes).await.unwrap();
         assert_eq!(message, output_message);
     }
 
-    #[test]
-    fn inline_tables_query_test() {
+    #[tokio::test]
+    async fn inline_tables_query_test() {
         let columns = vec![
             Column::new("ID".to_string(), ColumnType::Int, 0),
             Column::new("LastName".to_string(), ColumnType::String, 1),
@@ -693,7 +711,90 @@ mod tests {
             },
         };
         let bytes = message.bytes();
-        let output_message = HttpMessage::read(bytes).unwrap();
+        let output_message = HttpMessage::read(bytes).await.unwrap();
         assert_eq!(message, output_message);
+    }
+
+    #[tokio::test]
+    async fn csv_rows_test() {
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::Int, 0),
+            Column::new("B".to_string(), ColumnType::String, 1),
+            Column::new("C".to_string(), ColumnType::Timestamp, 2),
+        ];
+        let rows = vec![
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::String("one".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::String("two".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Null,
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::String("four".to_string()),
+                TableValue::Null,
+            ]),
+        ];
+        let csv_rows = indoc! {"
+            1,one,2020-01-01T00:00:00.000Z
+            ,two,2020-01-02T00:00:00.000Z
+            3,,2020-01-03T00:00:00.000Z
+            4,four,
+        "};
+        let mut builder = flatbuffers::FlatBufferBuilder::new_with_capacity(1024);
+        let query_offset = builder.create_string("query");
+        let mut inline_tables_offsets = Vec::with_capacity(1);
+        let name_offset = builder.create_string("table");
+        let columns_vec = HttpMessage::build_columns(&mut builder, &columns);
+        let types_vec = HttpMessage::build_types(&mut builder, &columns);
+        let csv_rows_value = builder.create_string(csv_rows);
+        let inline_table_offset = HttpTable::create(
+            &mut builder,
+            &HttpTableArgs {
+                name: Some(name_offset),
+                columns: Some(columns_vec),
+                types: Some(types_vec),
+                rows: None,
+                csv_rows: Some(csv_rows_value),
+            },
+        );
+        inline_tables_offsets.push(inline_table_offset);
+        let inline_tables_offset = builder.create_vector(inline_tables_offsets.as_slice());
+        let query_value = HttpQuery::create(
+            &mut builder,
+            &HttpQueryArgs {
+                query: Some(query_offset),
+                inline_tables: Some(inline_tables_offset),
+                trace_obj: None,
+            },
+        );
+        let args = HttpMessageArgs {
+            message_id: 1234,
+            command_type: crate::codegen::http_message_generated::HttpCommand::HttpQuery,
+            command: Some(query_value.as_union_value()),
+        };
+        let message = crate::codegen::http_message_generated::HttpMessage::create(&mut builder, &args);
+        builder.finish(message, None);
+        let bytes = builder.finished_data().to_vec();
+        let message = HttpMessage::read(bytes).await.unwrap();
+        assert_eq!(message, HttpMessage {
+            message_id: 1234,
+            command: HttpCommand::Query {
+                query: "query".to_string(),
+                inline_tables: vec![
+                    ("table".to_string(), Arc::new(DataFrame::new(columns, rows.clone())))
+                ],
+                trace_obj: None
+            }
+        });
     }
 }

@@ -51,23 +51,22 @@ impl ImportFormat {
         location: String,
         columns: Vec<Column>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
-        let stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> = if location.contains(".gz") {
-            Box::pin(CsvLineStream::new(BufReader::new(GzipDecoder::new(BufReader::new(file)))))
+        let reader: Pin<Box<dyn AsyncBufRead + Send>> = if location.contains(".gz") {
+            Box::pin(BufReader::new(GzipDecoder::new(BufReader::new(file))))
         } else {
-            // Box::pin(CsvLineStream::new(BufReader::new(file)))
-            Box::pin(CsvLineStream::new(StringReader::new("abacus")))
+            Box::pin(BufReader::new(file))
         };
-        self.row_stream_from_lines_stream(stream, columns).await
+        self.row_stream_from_reader(reader, columns)
     }
 
-    async fn row_stream_from_lines_stream(
+    pub fn row_stream_from_reader<'a>(
         &self,
-        lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>>,
+        reader: Pin<Box<dyn AsyncBufRead + Send + 'a>>,
         columns: Vec<Column>,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send + 'a>>, CubeError> {
         match self {
             ImportFormat::CSV | ImportFormat::CSVNoHeader => {
-                // let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> = Box::pin(CsvLineStream::new(reader));
+                let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> = Box::pin(CsvLineStream::new(reader));
 
                 let mut header_mapping = match self {
                     ImportFormat::CSV => None,
@@ -766,7 +765,12 @@ impl Ingestion {
 mod tests {
     extern crate test;
 
+    use indoc::indoc;
+    use tokio::io::BufReader;
+    use tokio_stream::StreamExt;
     use crate::import::parse_decimal;
+    use crate::metastore::{Column, ColumnType, ImportFormat};
+    use crate::table::{Row, TableValue};
 
     #[test]
     fn parse_decimal_test() {
@@ -786,5 +790,31 @@ mod tests {
             parse_decimal("-200.040000", 5).unwrap().to_string(5),
             "-200.04",
         );
+    }
+
+    #[tokio::test]
+    async fn read_nulls() {
+        let data = indoc! {"
+            one,1
+            ,
+            three,3
+        "};
+        let csv_reader = Box::pin(BufReader::new(data.as_bytes()));
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::Int, 1),
+        ];
+        let mut row_stream = ImportFormat::CSVNoHeader.row_stream_from_reader(csv_reader, columns).unwrap();
+        let mut rows = vec![];
+        while let Some(row) = row_stream.next().await {
+            if let Some(row) = row.unwrap() {
+                rows.push(row)
+            }
+        }
+        assert_eq!(rows, vec![
+            Row::new(vec![TableValue::String("one".to_string()), TableValue::Int(1)]),
+            Row::new(vec![TableValue::Null, TableValue::Null]),
+            Row::new(vec![TableValue::String("three".to_string()), TableValue::Int(3)]),
+        ]);
     }
 }

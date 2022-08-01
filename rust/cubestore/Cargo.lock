@@ -1140,6 +1140,7 @@ dependencies = [
  "futures-util",
  "hex",
  "http-auth-basic",
+ "indoc",
  "ipc-channel",
  "itertools 0.9.0",
  "json",
