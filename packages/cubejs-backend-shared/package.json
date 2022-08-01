@@ -45,7 +45,7 @@
     "http-proxy-agent": "^4.0.1",
     "moment-range": "^4.0.1",
     "moment-timezone": "^0.5.33",
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^3.2.10",
     "shelljs": "^0.8.5",
     "throttle-debounce": "^3.0.1"
   },
