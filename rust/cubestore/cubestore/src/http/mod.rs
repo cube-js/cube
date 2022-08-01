@@ -413,6 +413,7 @@ impl HttpMessage {
                                 name: Some(name_offset),
                                 columns: Some(columns_vec),
                                 types: Some(types_vec),
+                                csv_rows: None,
                                 rows: Some(rows_vec),
                             },
                         );

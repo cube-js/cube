@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use arrow::array::{ArrayBuilder, ArrayRef};
 use async_compression::tokio::bufread::GzipDecoder;
-use async_std::io::SeekFrom;
+use async_std::io::{SeekFrom};
 use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
@@ -51,16 +51,23 @@ impl ImportFormat {
         location: String,
         columns: Vec<Column>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
+        let stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> = if location.contains(".gz") {
+            Box::pin(CsvLineStream::new(BufReader::new(GzipDecoder::new(BufReader::new(file)))))
+        } else {
+            // Box::pin(CsvLineStream::new(BufReader::new(file)))
+            Box::pin(CsvLineStream::new(StringReader::new("abacus")))
+        };
+        self.row_stream_from_lines_stream(stream, columns).await
+    }
+
+    async fn row_stream_from_lines_stream(
+        &self,
+        lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>>,
+        columns: Vec<Column>,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
         match self {
             ImportFormat::CSV | ImportFormat::CSVNoHeader => {
-                let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
-                    if location.contains(".gz") {
-                        let reader = BufReader::new(GzipDecoder::new(BufReader::new(file)));
-                        Box::pin(CsvLineStream::new(reader))
-                    } else {
-                        let reader = BufReader::new(file);
-                        Box::pin(CsvLineStream::new(reader))
-                    };
+                // let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> = Box::pin(CsvLineStream::new(reader));
 
                 let mut header_mapping = match self {
                     ImportFormat::CSV => None,
