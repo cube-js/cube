@@ -72,7 +72,7 @@ use self::{
 use crate::{
     compile::engine::df::scan::CubeScanOptions,
     sql::{
-        database_variables::{DatabaseVariable, DatabaseVariables},
+        database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
         dataframe,
         session::DatabaseProtocol,
         statement::{CastReplacer, ToTimestampReplacer, UdfWildcardArgReplacer},
@@ -2236,8 +2236,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
     ) -> Result<QueryPlan, CompilationError> {
         let mut flags = StatusFlags::SERVER_STATE_CHANGED;
 
-        let mut session_columns_to_update: DatabaseVariables = DatabaseVariables::new();
-        let mut global_columns_to_update: DatabaseVariables = DatabaseVariables::new();
+        let mut session_columns_to_update =
+            DatabaseVariablesToUpdate::with_capacity(key_values.len());
+        let mut global_columns_to_update =
+            DatabaseVariablesToUpdate::with_capacity(key_values.len());
 
         match self.state.protocol {
             DatabaseProtocol::PostgreSQL => {
@@ -2267,14 +2269,11 @@ WHERE `TABLE_SCHEMA` = '{}'",
                         }
                     };
 
-                    session_columns_to_update.insert(
+                    session_columns_to_update.push(DatabaseVariable::system(
                         key_value.key.value.to_lowercase(),
-                        DatabaseVariable::system(
-                            key_value.key.value.to_lowercase(),
-                            ScalarValue::Utf8(Some(value.clone())),
-                            None,
-                        ),
-                    );
+                        ScalarValue::Utf8(Some(value.clone())),
+                        None,
+                    ));
                 }
             }
             DatabaseProtocol::MySQL => {
@@ -2325,24 +2324,18 @@ WHERE `TABLE_SCHEMA` = '{}'",
                         } else {
                             key_value.key.value.to_lowercase()
                         };
-                        global_columns_to_update.insert(
-                            key.clone(),
-                            DatabaseVariable::system(
-                                key.clone(),
-                                ScalarValue::Utf8(Some(value.clone())),
-                                None,
-                            ),
-                        );
+                        global_columns_to_update.push(DatabaseVariable::system(
+                            key.to_lowercase(),
+                            ScalarValue::Utf8(Some(value.clone())),
+                            None,
+                        ));
                     } else if is_user_defined_var {
                         let key = key_value.key.value[1..].to_lowercase();
-                        session_columns_to_update.insert(
-                            key.clone(),
-                            DatabaseVariable::user_defined(
-                                key.clone(),
-                                ScalarValue::Utf8(Some(value.clone())),
-                                None,
-                            ),
-                        );
+                        session_columns_to_update.push(DatabaseVariable::user_defined(
+                            key.to_lowercase(),
+                            ScalarValue::Utf8(Some(value.clone())),
+                            None,
+                        ));
                     }
                 }
             }
@@ -2351,6 +2344,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         if !session_columns_to_update.is_empty() {
             self.state.set_variables(session_columns_to_update);
         }
+
         if !global_columns_to_update.is_empty() {
             self.session_manager
                 .server
@@ -2722,8 +2716,8 @@ mod tests {
     use super::*;
     use crate::{
         sql::{
-            dataframe::batch_to_dataframe, server_manager::ServerConfiguration, types::StatusFlags,
-            AuthContextRef, AuthenticateResponse, HttpAuthContext, ServerManager, SqlAuthService,
+            dataframe::batch_to_dataframe, types::StatusFlags, AuthContextRef,
+            AuthenticateResponse, HttpAuthContext, ServerManager, SqlAuthService,
         },
         transport::{LoadRequestMeta, TransportService},
     };
@@ -2843,12 +2837,11 @@ mod tests {
     }
 
     fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
-        let server = Arc::new(ServerManager {
-            auth: get_test_auth(),
-            transport: get_test_transport(),
-            configuration: ServerConfiguration::default(),
-            nonce: None,
-        });
+        let server = Arc::new(ServerManager::new(
+            get_test_auth(),
+            get_test_transport(),
+            None,
+        ));
 
         let session_manager = Arc::new(SessionManager::new(server.clone()));
         let session = session_manager.create_session(protocol, "127.0.0.1".to_string());
@@ -5790,23 +5783,41 @@ ORDER BY \"COUNT(count)\" DESC"
         query: String,
         db: DatabaseProtocol,
     ) -> Result<(String, StatusFlags), CubeError> {
-        let query =
-            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db)).await;
-        match query.unwrap() {
-            QueryPlan::DataFusionSelect(flags, plan, ctx) => {
-                let df = DFDataFrame::new(ctx.state, &plan);
-                let batches = df.collect().await?;
-                let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+        execute_queries_with_flags(vec![query], db).await
+    }
 
-                return Ok((frame.print(), flags));
-            }
-            QueryPlan::MetaTabular(flags, frame) => {
-                return Ok((frame.print(), flags));
-            }
-            QueryPlan::MetaOk(flags, _) => {
-                return Ok(("".to_string(), flags));
+    async fn execute_queries_with_flags(
+        queries: Vec<String>,
+        db: DatabaseProtocol,
+    ) -> Result<(String, StatusFlags), CubeError> {
+        let meta = get_test_tenant_ctx();
+        let session = get_test_session(db);
+
+        let mut output: Vec<String> = Vec::new();
+        let mut output_flags = StatusFlags::empty();
+
+        for query in queries {
+            let query = convert_sql_to_cube_query(&query, meta.clone(), session.clone()).await;
+            match query.unwrap() {
+                QueryPlan::DataFusionSelect(flags, plan, ctx) => {
+                    let df = DFDataFrame::new(ctx.state, &plan);
+                    let batches = df.collect().await?;
+                    let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+
+                    output.push(frame.print());
+                    output_flags = flags;
+                }
+                QueryPlan::MetaTabular(flags, frame) => {
+                    output.push(frame.print());
+                    output_flags = flags;
+                }
+                QueryPlan::MetaOk(flags, _) => {
+                    output_flags = flags;
+                }
             }
         }
+
+        Ok((output.join("\n").to_string(), output_flags))
     }
 
     #[tokio::test]
@@ -6986,6 +6997,19 @@ ORDER BY \"COUNT(count)\" DESC"
                 "++\n++\n++".to_string(),
                 StatusFlags::SERVER_STATE_CHANGED | StatusFlags::AUTOCOMMIT
             )
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_app_show",
+            execute_queries_with_flags(
+                vec![
+                    "set application_name = 'testing app'".to_string(),
+                    "show application_name".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
         );
 
         Ok(())

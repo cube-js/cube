@@ -7,6 +7,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     sql::database_variables::{
         mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
+        DatabaseVariablesToUpdate,
     },
     transport::LoadRequestMeta,
 };
@@ -270,6 +271,7 @@ impl SessionState {
         *guard = auth_context;
     }
 
+    // TODO: Read without copy by holding acquired lock
     pub fn all_variables(&self) -> DatabaseVariables {
         let guard = self
             .variables
@@ -303,26 +305,16 @@ impl SessionState {
         }
     }
 
-    pub fn set_variables(&self, variables: DatabaseVariables) {
+    pub fn set_variables(&self, variables: DatabaseVariablesToUpdate) {
         let mut to_override = false;
-
         let mut current_variables = self.all_variables();
-        for (new_var_key, new_var_value) in variables.iter() {
-            let mut key_to_update: Option<String> = Some(new_var_key.to_string());
-            for (current_var_key, current_var_value) in current_variables.iter() {
-                if current_var_key.to_lowercase() == new_var_key.to_lowercase() {
-                    key_to_update = if current_var_value.readonly {
-                        None
-                    } else {
-                        Some(current_var_key.clone())
-                    };
 
-                    break;
+        for new_var in variables.into_iter() {
+            if let Some(current_var_value) = current_variables.get(&new_var.name) {
+                if !current_var_value.readonly {
+                    to_override = true;
+                    current_variables.insert(new_var.name.clone(), new_var);
                 }
-            }
-            if key_to_update.is_some() {
-                to_override = true;
-                current_variables.insert(key_to_update.unwrap(), new_var_value.clone());
             }
         }
 

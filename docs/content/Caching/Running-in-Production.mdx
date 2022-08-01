@@ -119,6 +119,11 @@ reference][ref-config-env].
 | `CUBESTORE_WORKER_PORT` | -                  | Yes                |
 | `CUBESTORE_META_ADDR`   | -                  | Yes                |
 
+`CUBESTORE_WORKERS` and `CUBESTORE_META_ADDR` variables should be set with stable addresses, which should not change.
+You can use stable DNS names and put load balancers in front of your worker and router instances to fulfill stable name requirements in environments where stable IP addresses can't be guaranteed.
+Please note that instances behind load balancer can't be replicated, and replication will lead to undefined behavior of cluster, including connection errors and data loss.
+If Cube Store replication is a requirement, please consider using Cube Cloud.
+
 <InfoBox>
 
 To fully take advantage of the worker nodes in the cluster, we **strongly**
@@ -229,6 +234,12 @@ services:
     depends_on:
       - cubestore_router
 ```
+
+### Local Storage
+
+Separately from remote storage, Cube Store requires local scratch space to warm up partitions by downloading Parquet files before querying them.
+By default, this directory should be mounted to `.cubestore/data` dir inside contained and can be configured by [CUBESTORE_DATA_DIR][ref-config-env] environment variable.
+It is advised to use local SSDs for this scratch space to maximize querying performance.
 
 ### <--{"id" : "Storage"}--> AWS
 

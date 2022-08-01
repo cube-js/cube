@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server",
   "description": "Cube.js all-in-one server",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.43",
+  "version": "0.30.44",
   "types": "index.d.ts",
   "repository": {
     "type": "git",
@@ -42,7 +42,7 @@
   "dependencies": {
     "@cubejs-backend/cubestore-driver": "^0.30.43",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/server-core": "^0.30.43",
+    "@cubejs-backend/server-core": "^0.30.44",
     "@cubejs-backend/shared": "^0.30.43",
     "@oclif/color": "^1.0.0",
     "@oclif/command": "^1.8.13",

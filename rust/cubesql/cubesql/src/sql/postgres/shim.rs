@@ -342,6 +342,14 @@ impl AsyncPostgresShim {
                 | CompilationError::User(msg, meta)
                 | CompilationError::Internal(msg, _, meta) => (msg.clone(), meta.clone()),
             },
+            ConnectionError::Protocol(ProtocolError::IO { source, .. }) => match source.kind() {
+                // Propagate unrecoverable errors to top level - run_on
+                ErrorKind::UnexpectedEof | ErrorKind::BrokenPipe => return Err(err),
+                _ => (
+                    format!("Error during processing PostgreSQL message: {}", err),
+                    None,
+                ),
+            },
             _ => (
                 format!("Error during processing PostgreSQL message: {}", err),
                 None,
