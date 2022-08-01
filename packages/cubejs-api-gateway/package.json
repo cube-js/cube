@@ -27,7 +27,7 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/native": "^0.30.43",
+    "@cubejs-backend/native": "0.30.43",
     "@cubejs-backend/shared": "^0.30.43",
     "@hapi/joi": "^15.1.1",
     "@ungap/structured-clone": "^0.3.4",
