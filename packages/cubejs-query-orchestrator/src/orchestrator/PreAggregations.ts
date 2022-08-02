@@ -1339,14 +1339,14 @@ export class PreAggregationPartitionRangeLoader {
         requestId: this.requestId,
         dataSource: this.dataSource,
         useInMemory: true,
-        useDownload: true,
+        useCsvQuery: true,
         external: false
       }
     );
     return {
       name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
       columns: result.types,
-      rows: result.rows,
+      csvRows: result.csvRows,
     };
   }
 

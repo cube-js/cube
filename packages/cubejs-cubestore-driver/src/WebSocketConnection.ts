@@ -178,35 +178,12 @@ export class WebSocketConnection {
           typeOffsets.push(typeOffset);
         }
         const typesOffset = HttpTable.createColumnsVector(builder, typeOffsets);
-        const rowOffsets: number[] = [];
-        for (const row of table.rows) {
-          const valueOffsets: number[] = [];
-          for (const column of table.columns) {
-            const value = row[column.name];
-            if (value === null || value === undefined) {
-              HttpColumnValue.startHttpColumnValue(builder);
-              const valueOffset = HttpColumnValue.endHttpColumnValue(builder);
-              valueOffsets.push(valueOffset);
-            } else {
-              const stringOffset = builder.createString(WebSocketConnection.stringValue(value));
-              HttpColumnValue.startHttpColumnValue(builder);
-              HttpColumnValue.addStringValue(builder, stringOffset);
-              const valueOffset = HttpColumnValue.endHttpColumnValue(builder);
-              valueOffsets.push(valueOffset);
-            }
-          }
-          const valuesOffset = HttpRow.createValuesVector(builder, valueOffsets);
-          HttpRow.startHttpRow(builder);
-          HttpRow.addValues(builder, valuesOffset);
-          const rowOffset = HttpRow.endHttpRow(builder);
-          rowOffsets.push(rowOffset);
-        }
-        const rowsOffset = HttpTable.createRowsVector(builder, rowOffsets);
+        const csvRowsOffset = builder.createString(table.csvRows);
         HttpTable.startHttpTable(builder);
         HttpTable.addName(builder, nameOffset);
         HttpTable.addColumns(builder, columnsOffset);
         HttpTable.addTypes(builder, typesOffset);
-        HttpTable.addRows(builder, rowsOffset);
+        HttpTable.addCsvRows(builder, csvRowsOffset);
         const inlineTableOffset = HttpTable.endHttpTable(builder);
         inlineTableOffsets.push(inlineTableOffset);
       }

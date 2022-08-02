@@ -216,7 +216,7 @@ export class QueryCache {
   }
 
   public async queryWithRetryAndRelease(query, values, {
-    priority, cacheKey, external, requestId, dataSource, inlineTables, useDownload,
+    priority, cacheKey, external, requestId, dataSource, inlineTables, useCsvQuery,
   }: {
     priority?: number,
     cacheKey: object,
@@ -224,13 +224,13 @@ export class QueryCache {
     requestId?: string,
     dataSource: string,
     inlineTables?: InlineTables,
-    useDownload?: boolean,
+    useCsvQuery?: boolean,
   }) {
     const queue = external
       ? this.getExternalQueue()
       : await this.getQueue(dataSource);
     return queue.executeInQueue('query', cacheKey, {
-      queryKey: cacheKey, query, values, requestId, inlineTables, useDownload
+      queryKey: cacheKey, query, values, requestId, inlineTables, useCsvQuery
     }, priority, {
       stageQueryKey: cacheKey,
       requestId,
@@ -246,8 +246,8 @@ export class QueryCache {
           this.logger('Executing SQL', {
             ...q
           });
-          if (q.useDownload) {
-            return this.inlineQuery(client, q);
+          if (q.useCsvQuery) {
+            return this.csvQuery(client, q);
           } else {
             return client.query(q.query, q.values, q);
           }
@@ -265,29 +265,26 @@ export class QueryCache {
     return this.queue[dataSource];
   }
 
-  private async inlineQuery(client, q) {
+  private async csvQuery(client, q) {
     // const tableData = await client.downloadQueryResults(q.query, q.values, q);
     const tableData = await client.stream(q.query, q.values, q);
-    const columns = tableData.types.map(c => c.name);
-    const writer = csvWriter({ headers: columns });
-    const reader = parse({
-      columns,
-      // read fields as strings
-      cast: false,
-      // skip header, count starts at 1
-      from: 2,
+    const headers = tableData.types.map(c => c.name);
+    const writer = csvWriter({
+      headers,
+      sendHeaders: false,
     });
     const errors = [];
-    const csvPipeline = await pipeline(tableData.rowStream, writer, reader, (err) => {
+    const csvPipeline = await pipeline(tableData.rowStream, writer, (err) => {
       errors.push(err);
     });
+    const lines = await streamToArray(csvPipeline);
     if (errors.length > 0) {
       throw new Error(`Inline query errors ${errors.join(', ')}`);
     }
-    const rows = await streamToArray(csvPipeline);
+    const csvRows = lines.join('\n');
     return {
       types: tableData.types,
-      rows,
+      csvRows,
     };
   }
 
@@ -481,7 +478,7 @@ export class QueryCache {
     waitForRenew?: boolean,
     forceNoCache?: boolean,
     useInMemory?: boolean,
-    useDownload?: boolean,
+    useCsvQuery?: boolean,
   }) {
     options = options || { dataSource: 'default' };
     const { renewalThreshold } = options;
@@ -494,7 +491,7 @@ export class QueryCache {
         external: options.external,
         requestId: options.requestId,
         dataSource: options.dataSource,
-        useDownload: options.useDownload,
+        useCsvQuery: options.useCsvQuery,
       }).then(res => {
         const result = {
           time: (new Date()).getTime(),

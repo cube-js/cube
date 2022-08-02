@@ -390,10 +390,21 @@ rowsLength():number {
 };
 
 /**
+ * @param flatbuffers.Encoding= optionalEncoding
+ * @returns string|Uint8Array|null
+ */
+csvRows():string|null
+csvRows(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+csvRows(optionalEncoding?:any):string|Uint8Array|null {
+  var offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+};
+
+/**
  * @param flatbuffers.Builder builder
  */
 static startHttpTable(builder:flatbuffers.Builder) {
-  builder.startObject(4);
+  builder.startObject(5);
 };
 
 /**
@@ -493,6 +504,14 @@ static startRowsVector(builder:flatbuffers.Builder, numElems:number) {
 
 /**
  * @param flatbuffers.Builder builder
+ * @param flatbuffers.Offset csvRowsOffset
+ */
+static addCsvRows(builder:flatbuffers.Builder, csvRowsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(4, csvRowsOffset, 0);
+};
+
+/**
+ * @param flatbuffers.Builder builder
  * @returns flatbuffers.Offset
  */
 static endHttpTable(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -500,12 +519,13 @@ static endHttpTable(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 };
 
-static createHttpTable(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset, columnsOffset:flatbuffers.Offset, typesOffset:flatbuffers.Offset, rowsOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createHttpTable(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset, columnsOffset:flatbuffers.Offset, typesOffset:flatbuffers.Offset, rowsOffset:flatbuffers.Offset, csvRowsOffset:flatbuffers.Offset):flatbuffers.Offset {
   HttpTable.startHttpTable(builder);
   HttpTable.addName(builder, nameOffset);
   HttpTable.addColumns(builder, columnsOffset);
   HttpTable.addTypes(builder, typesOffset);
   HttpTable.addRows(builder, rowsOffset);
+  HttpTable.addCsvRows(builder, csvRowsOffset);
   return HttpTable.endHttpTable(builder);
 }
 }

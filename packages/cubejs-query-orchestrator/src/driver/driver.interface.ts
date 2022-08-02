@@ -14,7 +14,7 @@ export type Rows = Record<string, unknown>[];
 export interface InlineTable {
   name: string
   columns: TableStructure
-  rows: Rows
+  csvRows: string // in csv format
 }
 export type InlineTables = InlineTable[];
 
