@@ -247,7 +247,7 @@ export class QueryCache {
             ...q
           });
           if (q.useCsvQuery) {
-            return this.csvQuery(client, q);
+            return this.lambdaQuery(client, q);
           } else {
             return client.query(q.query, q.values, q);
           }
@@ -265,8 +265,7 @@ export class QueryCache {
     return this.queue[dataSource];
   }
 
-  private async csvQuery(client, q) {
-    // const tableData = await client.downloadQueryResults(q.query, q.values, q);
+  private async lambdaQuery(client, q) {
     const tableData = await client.stream(q.query, q.values, q);
     const headers = tableData.types.map(c => c.name);
     const writer = csvWriter({
@@ -278,10 +277,13 @@ export class QueryCache {
       errors.push(err);
     });
     const lines = await streamToArray(csvPipeline);
-    if (errors.length > 0) {
-      throw new Error(`Inline query errors ${errors.join(', ')}`);
+    if (tableData.release) {
+      await tableData.release();
     }
-    const csvRows = lines.join('\n');
+    if (errors.length > 0) {
+      throw new Error(`Lambda query errors ${errors.join(', ')}`);
+    }
+    const csvRows = lines.join('');
     return {
       types: tableData.types,
       csvRows,
