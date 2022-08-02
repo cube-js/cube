@@ -44,7 +44,7 @@ exports.createPages = ({ actions, graphql }) => {
         },
       });
 
-      if (node.frontmatter.redirect_from) {
+      if (Array.isArray(node.frontmatter.redirect_from)) {
         node.frontmatter.redirect_from.forEach(
           (from) => createRedirect({ fromPath: from, toPath: node.frontmatter.permalink, isPermanent: true })
         );
