@@ -59,7 +59,9 @@
     "smoke:multidb": "jest --verbose -i dist/test/smoke-multidb.test.js",
     "smoke:multidb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-multidb.test.js",
     "smoke:redshift": "jest --verbose -i dist/test/smoke-redshift.test.js",
-    "smoke:redshift:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-redshift.test.js"
+    "smoke:redshift:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-redshift.test.js",
+    "smoke:cubesql": "jest --verbose --forceExit -i dist/test/smoke-cubesql.test.js",
+    "smoke:cubesql:snapshot": "jest --verbose --forceExit --updateSnapshot -i dist/test/smoke-cubesql.test.js"
   },
   "files": [
     "dist/src",
@@ -88,7 +90,7 @@
     "@types/dedent": "^0.7.0",
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^26.0.22",
-    "@types/node": "^10.17.55",
+    "@types/node": "^12",
     "cypress": "6.9.1",
     "cypress-image-snapshot": "^4.0.1",
     "cypress-localstorage-commands": "^1.4.5",
@@ -97,7 +99,8 @@
     "eslint-plugin-cypress": "^2.12.1",
     "jest": "^26.6.3",
     "jwt-decode": "^3.1.2",
-    "typescript": "~4.1.5"
+    "typescript": "~4.1.5",
+    "pg": "^8.7.3"
   },
   "jest": {
     "coveragePathIgnorePatterns": [

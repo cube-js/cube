@@ -174,11 +174,16 @@ jobs:
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cd packages/cubejs-backend-native && yarn run native:build
-      - name: Test native
+      - name: Test native (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
         run: cd packages/cubejs-backend-native && yarn run test:unit
+      - name: Run E2E Smoke testing over whole Cube (GNU only)
+        if: (matrix.target == 'x86_64-unknown-linux-gnu')
+        env:
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+        run: yarn tsc && cd packages/cubejs-testing && yarn smoke:cubesql
 
   native:
     needs: [lint,unit,unit_legacy]

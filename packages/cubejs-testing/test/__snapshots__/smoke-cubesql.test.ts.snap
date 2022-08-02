@@ -1,0 +1,18 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SQL API Postgres (Data) SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC: sql_orders 1`] = `
+Array [
+  Object {
+    "cn": "2",
+    "status": "processed",
+  },
+  Object {
+    "cn": "2",
+    "status": "new",
+  },
+  Object {
+    "cn": "1",
+    "status": "shipped",
+  },
+]
+`;
