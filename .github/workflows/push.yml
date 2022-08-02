@@ -362,7 +362,11 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
-      - name: Run cargo build
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubestore
+          key: ubuntu-20.04
+      - name: Build cubestore
         uses: actions-rs/cargo@v1
         with:
           command: build
