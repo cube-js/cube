@@ -2983,10 +2983,11 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
     );
 
     let p = service
-        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 and a > 5 and a < 10 GROUP BY 1")
+        .plan_query(
+            "SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 and a > 5 and a < 10 GROUP BY 1",
+        )
         .await
         .unwrap();
-
 
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
@@ -3004,7 +3005,6 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
         \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [a, b, c, amount]\
         \n              Empty"
     );
-
 }
 
 async fn planning_joins(service: Box<dyn SqlClient>) {
@@ -3379,7 +3379,7 @@ async fn topk_having(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("y", 80), ("c", 48), ("d", 44)]));
-    
+
     service
         .exec_query("CREATE TABLE s.Data21(url text, hits int, hits_2 int)")
         .await
@@ -3411,7 +3411,6 @@ async fn topk_having(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("b", 55), ("d", 43)]));
-
 }
 
 async fn topk_decimals(service: Box<dyn SqlClient>) {
@@ -3492,7 +3491,7 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
         \n              MergeSort\
         \n                Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
         \n                  Empty"
-        );
+    );
 
     let p = service
         .plan_query(
@@ -3527,7 +3526,6 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
         );
 }
 async fn planning_topk_hll(service: Box<dyn SqlClient>) {
-
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
         .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
@@ -3567,7 +3565,7 @@ async fn planning_topk_hll(service: Box<dyn SqlClient>) {
          \n              MergeSort\
          \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
          \n                  Empty"
-        );
+    );
 
     let p = service
         .plan_query(
@@ -3647,10 +3645,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("d", 10383), ("b", 9722), ("c", 171)])
-    ); 
+    assert_eq!(to_rows(&r), rows(&[("d", 10383), ("b", 9722), ("c", 171)]));
 
     let r = service
         .exec_query(
@@ -3665,10 +3660,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("b", 9722), ("c", 171), ("h", 164)])
-    ); 
+    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("c", 171), ("h", 164)]));
     let r = service
         .exec_query(
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
@@ -3682,11 +3674,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("h", 164)])
-    ); 
-
+    assert_eq!(to_rows(&r), rows(&[("h", 164)]));
 }
 
 async fn topk_hll_with_nulls(service: Box<dyn SqlClient>) {
@@ -3734,11 +3722,7 @@ async fn topk_hll_with_nulls(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("a", 0), ("e", 1), ("c", 164)])
-    ); 
-
+    assert_eq!(to_rows(&r), rows(&[("a", 0), ("e", 1), ("c", 164)]));
 }
 
 async fn offset(service: Box<dyn SqlClient>) {
@@ -5659,7 +5643,9 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
     );
 
     let r = service
-        .exec_query("SELECT table_schema, table_name, build_range_end FROM information_schema.tables")
+        .exec_query(
+            "SELECT table_schema, table_name, build_range_end FROM information_schema.tables",
+        )
         .await
         .unwrap();
 

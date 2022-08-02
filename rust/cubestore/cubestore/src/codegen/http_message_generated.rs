@@ -361,6 +361,9 @@ impl<'a> HttpTable<'a> {
         args: &'args HttpTableArgs<'args>,
     ) -> flatbuffers::WIPOffset<HttpTable<'bldr>> {
         let mut builder = HttpTableBuilder::new(_fbb);
+        if let Some(x) = args.csv_rows {
+            builder.add_csv_rows(x);
+        }
         if let Some(x) = args.rows {
             builder.add_rows(x);
         }
@@ -380,6 +383,7 @@ impl<'a> HttpTable<'a> {
     pub const VT_COLUMNS: flatbuffers::VOffsetT = 6;
     pub const VT_TYPES: flatbuffers::VOffsetT = 8;
     pub const VT_ROWS: flatbuffers::VOffsetT = 10;
+    pub const VT_CSV_ROWS: flatbuffers::VOffsetT = 12;
 
     #[inline]
     pub fn name(&self) -> Option<&'a str> {
@@ -408,6 +412,11 @@ impl<'a> HttpTable<'a> {
             flatbuffers::Vector<flatbuffers::ForwardsUOffset<HttpRow<'a>>>,
         >>(HttpTable::VT_ROWS, None)
     }
+    #[inline]
+    pub fn csv_rows(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(HttpTable::VT_CSV_ROWS, None)
+    }
 }
 
 pub struct HttpTableArgs<'a> {
@@ -421,6 +430,7 @@ pub struct HttpTableArgs<'a> {
     pub rows: Option<
         flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpRow<'a>>>>,
     >,
+    pub csv_rows: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for HttpTableArgs<'a> {
     #[inline]
@@ -430,6 +440,7 @@ impl<'a> Default for HttpTableArgs<'a> {
             columns: None,
             types: None,
             rows: None,
+            csv_rows: None,
         }
     }
 }
@@ -472,6 +483,11 @@ impl<'a: 'b, 'b> HttpTableBuilder<'a, 'b> {
     ) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<_>>(HttpTable::VT_ROWS, rows);
+    }
+    #[inline]
+    pub fn add_csv_rows(&mut self, csv_rows: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(HttpTable::VT_CSV_ROWS, csv_rows);
     }
     #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> HttpTableBuilder<'a, 'b> {
