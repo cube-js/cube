@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.44](https://github.com/cube-js/cube.js/compare/v0.30.43...v0.30.44) (2022-08-01)
+
+
+### Bug Fixes
+
+* **server-core:** driverFactory results assertion ([5eaad01](https://github.com/cube-js/cube.js/commit/5eaad018a4150c1ab7d56f68f372ba681548d84d))
+
+
+
+
+
+## [0.30.43](https://github.com/cube-js/cube.js/compare/v0.30.42...v0.30.43) (2022-07-28)
+
+
+### Features
+
+* **cubesql:** Security Context switching (Row Access) ([731e1ab](https://github.com/cube-js/cube.js/commit/731e1ab6d9362fb9a1857f5276e22a565f79781c))
+
+
+
+
+
+## [0.30.42](https://github.com/cube-js/cube.js/compare/v0.30.41...v0.30.42) (2022-07-27)
+
+
+### Features
+
+* **server-core:** disable health checks for API instances with rollup only mode ([a6601e5](https://github.com/cube-js/cube.js/commit/a6601e5ad82922446654d832cf5e7a6cb7cee870))
+
+
+
+
+
 ## [0.30.40](https://github.com/cube-js/cube.js/compare/v0.30.39...v0.30.40) (2022-07-26)
 
 

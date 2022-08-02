@@ -39,7 +39,7 @@ your connection credentials:
 ### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Apache Superset
+These credentials will be required to connect to Cube from PowerBI
 later.
 
 ```dotenv

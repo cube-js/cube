@@ -1,10 +1,11 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 8121
 expression: "execute_query(\"SELECT\n                    oid,\n                    relname,\n                    pg_total_relation_size(oid) relsize\n                FROM pg_class\n                ORDER BY oid ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+---------------------------+---------+
 | oid   | relname                   | relsize |
 +-------+---------------------------+---------+
 | 18000 | KibanaSampleDataEcommerce | 8192    |
-| 18013 | Logs                      | 8192    |
+| 18014 | Logs                      | 8192    |
 +-------+---------------------------+---------+

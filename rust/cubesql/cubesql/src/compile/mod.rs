@@ -70,19 +70,18 @@ use self::{
     rewrite::converter::LogicalPlanToLanguageConverter,
 };
 use crate::{
+    compile::engine::df::scan::CubeScanOptions,
     sql::{
-        database_variables::{DatabaseVariable, DatabaseVariables},
+        database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
         dataframe,
         session::DatabaseProtocol,
-        statement::{
-            CastReplacer, SensitiveDataSanitizer, ToTimestampReplacer, UdfWildcardArgReplacer,
-        },
+        statement::{CastReplacer, ToTimestampReplacer, UdfWildcardArgReplacer},
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
     transport::{
-        df_data_type_by_column_type, TransportServiceMetaFields, V1CubeMetaDimensionExt,
-        V1CubeMetaExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt,
+        df_data_type_by_column_type, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt,
+        V1CubeMetaSegmentExt,
     },
     CubeError, CubeErrorCauseType,
 };
@@ -1674,7 +1673,8 @@ impl QueryPlanner {
                         .collect(),
                     query.request,
                     // @todo Remove after split!
-                    Arc::new(self.state.auth_context().unwrap()),
+                    self.state.auth_context().unwrap(),
+                    CubeScanOptions { change_user: None },
                 )),
             });
             let logical_plan = LogicalPlan::Projection(Projection {
@@ -1699,7 +1699,7 @@ impl QueryPlanner {
     }
 
     pub async fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
-        let plan = match (stmt, &self.state.protocol) {
+        match (stmt, &self.state.protocol) {
             (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q).await,
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -1809,21 +1809,6 @@ impl QueryPlanner {
                 "Unsupported query type: {}",
                 stmt.to_string()
             ))),
-        };
-
-        match plan {
-            Err(err) => {
-                let meta = Some(HashMap::from([("query".to_string(), stmt.to_string())]));
-                let msg = err.message();
-                Err(err
-                    .with_message(format!(
-                        "{} QUERY: {}",
-                        msg,
-                        SensitiveDataSanitizer::new().replace(stmt).to_string()
-                    ))
-                    .with_meta(meta))
-            }
-            _ => plan,
         }
     }
 
@@ -2251,8 +2236,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
     ) -> Result<QueryPlan, CompilationError> {
         let mut flags = StatusFlags::SERVER_STATE_CHANGED;
 
-        let mut session_columns_to_update: DatabaseVariables = DatabaseVariables::new();
-        let mut global_columns_to_update: DatabaseVariables = DatabaseVariables::new();
+        let mut session_columns_to_update =
+            DatabaseVariablesToUpdate::with_capacity(key_values.len());
+        let mut global_columns_to_update =
+            DatabaseVariablesToUpdate::with_capacity(key_values.len());
 
         match self.state.protocol {
             DatabaseProtocol::PostgreSQL => {
@@ -2282,14 +2269,11 @@ WHERE `TABLE_SCHEMA` = '{}'",
                         }
                     };
 
-                    session_columns_to_update.insert(
+                    session_columns_to_update.push(DatabaseVariable::system(
                         key_value.key.value.to_lowercase(),
-                        DatabaseVariable::system(
-                            key_value.key.value.to_lowercase(),
-                            ScalarValue::Utf8(Some(value.clone())),
-                            None,
-                        ),
-                    );
+                        ScalarValue::Utf8(Some(value.clone())),
+                        None,
+                    ));
                 }
             }
             DatabaseProtocol::MySQL => {
@@ -2340,24 +2324,18 @@ WHERE `TABLE_SCHEMA` = '{}'",
                         } else {
                             key_value.key.value.to_lowercase()
                         };
-                        global_columns_to_update.insert(
-                            key.clone(),
-                            DatabaseVariable::system(
-                                key.clone(),
-                                ScalarValue::Utf8(Some(value.clone())),
-                                None,
-                            ),
-                        );
+                        global_columns_to_update.push(DatabaseVariable::system(
+                            key.to_lowercase(),
+                            ScalarValue::Utf8(Some(value.clone())),
+                            None,
+                        ));
                     } else if is_user_defined_var {
                         let key = key_value.key.value[1..].to_lowercase();
-                        session_columns_to_update.insert(
-                            key.clone(),
-                            DatabaseVariable::user_defined(
-                                key.clone(),
-                                ScalarValue::Utf8(Some(value.clone())),
-                                None,
-                            ),
-                        );
+                        session_columns_to_update.push(DatabaseVariable::user_defined(
+                            key.to_lowercase(),
+                            ScalarValue::Utf8(Some(value.clone())),
+                            None,
+                        ));
                     }
                 }
             }
@@ -2366,6 +2344,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         if !session_columns_to_update.is_empty() {
             self.state.set_variables(session_columns_to_update);
         }
+
         if !global_columns_to_update.is_empty() {
             self.session_manager
                 .server
@@ -2385,7 +2364,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
     fn create_execution_ctx(&self) -> DFSessionContext {
         let query_planner = Arc::new(CubeQueryPlanner::new(
             self.session_manager.server.transport.clone(),
-            self.planner_meta_fields(),
+            self.state.get_load_request_meta(),
         ));
         let mut ctx = DFSessionContext::with_state(
             default_session_builder(
@@ -2530,10 +2509,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let plan = df_query_planner
             .statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))
             .map_err(|err| {
-                let message = format!("Initial planning error: {}", err,);
-                let meta = Some(HashMap::from([("query".to_string(), stmt.to_string())]));
-
-                CompilationError::internal(message).with_meta(meta)
+                CompilationError::internal(format!("Initial planning error: {}", err))
             })?;
 
         let optimized_plan = plan;
@@ -2547,7 +2523,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
             .map_err(|e| CompilationError::internal(e.to_string()))?;
         let result = converter
             .take_rewriter()
-            .find_best_plan(root, Arc::new(self.state.auth_context().unwrap()))
+            .find_best_plan(root, self.state.auth_context().unwrap())
             .await
             .map_err(|e| match e.cause {
                 CubeErrorCauseType::Internal(_) => CompilationError::Internal(
@@ -2556,15 +2532,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
                         e.message
                     ),
                     e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
-                    Some(HashMap::from([("query".to_string(), stmt.to_string())])),
+                    None,
                 ),
-                CubeErrorCauseType::User(_) => CompilationError::User(
-                    format!(
-                        "Error during rewrite: {}. Please check logs for additional information.",
-                        e.message
-                    ),
-                    Some(HashMap::from([("query".to_string(), stmt.to_string())])),
-                ),
+                CubeErrorCauseType::User(_) => CompilationError::user(format!(
+                    "Error during rewrite: {}. Please check logs for additional information.",
+                    e.message
+                )),
             });
 
         if let Err(_) = &result {
@@ -2580,20 +2553,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
             rewrite_plan,
             ctx,
         ))
-    }
-
-    fn planner_meta_fields(&self) -> TransportServiceMetaFields {
-        // TODO: application_name for mysql
-        let mut meta_fields = HashMap::new();
-        if let Some(var) = self.state.all_variables().get("application_name") {
-            meta_fields.insert("appName".to_string(), var.value.to_string());
-        }
-
-        let protocol = self.state.protocol.to_string();
-        meta_fields.insert("protocol".to_string(), protocol);
-        meta_fields.insert("apiType".to_string(), "sql".to_string());
-
-        Some(meta_fields)
     }
 }
 
@@ -2757,10 +2716,10 @@ mod tests {
     use super::*;
     use crate::{
         sql::{
-            dataframe::batch_to_dataframe, server_manager::ServerConfiguration, types::StatusFlags,
-            AuthContext, AuthenticateResponse, ServerManager, SqlAuthService,
+            dataframe::batch_to_dataframe, types::StatusFlags, AuthContextRef,
+            AuthenticateResponse, HttpAuthContext, ServerManager, SqlAuthService,
         },
-        transport::TransportService,
+        transport::{LoadRequestMeta, TransportService},
     };
     use datafusion::logical_plan::PlanVisitor;
     use log::Level;
@@ -2878,12 +2837,11 @@ mod tests {
     }
 
     fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
-        let server = Arc::new(ServerManager {
-            auth: get_test_auth(),
-            transport: get_test_transport(),
-            configuration: ServerConfiguration::default(),
-            nonce: None,
-        });
+        let server = Arc::new(ServerManager::new(
+            get_test_auth(),
+            get_test_transport(),
+            None,
+        ));
 
         let session_manager = Arc::new(SessionManager::new(server.clone()));
         let session = session_manager.create_session(protocol, "127.0.0.1".to_string());
@@ -2891,10 +2849,13 @@ mod tests {
         // Populate like shims
         session.state.set_database(Some("db".to_string()));
         session.state.set_user(Some("ovr".to_string()));
-        session.state.set_auth_context(Some(AuthContext {
+
+        let auth_ctx = HttpAuthContext {
             access_token: "access_token".to_string(),
             base_path: "base_path".to_string(),
-        }));
+        };
+
+        session.state.set_auth_context(Some(Arc::new(auth_ctx)));
 
         session
     }
@@ -2910,10 +2871,10 @@ mod tests {
                 _user: Option<String>,
             ) -> Result<AuthenticateResponse, CubeError> {
                 Ok(AuthenticateResponse {
-                    context: AuthContext {
+                    context: Arc::new(HttpAuthContext {
                         access_token: "fake".to_string(),
                         base_path: "fake".to_string(),
-                    },
+                    }),
                     password: None,
                 })
             }
@@ -2929,7 +2890,7 @@ mod tests {
         #[async_trait]
         impl TransportService for TestConnectionTransport {
             // Load meta information about cubes
-            async fn meta(&self, _ctx: Arc<AuthContext>) -> Result<Arc<MetaContext>, CubeError> {
+            async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
                 panic!("It's a fake transport");
             }
 
@@ -2937,8 +2898,8 @@ mod tests {
             async fn load(
                 &self,
                 _query: V1LoadRequestQuery,
-                _ctx: Arc<AuthContext>,
-                _meta_fields: TransportServiceMetaFields,
+                _ctx: AuthContextRef,
+                _meta_fields: LoadRequestMeta,
             ) -> Result<V1LoadResponse, CubeError> {
                 panic!("It's a fake transport");
             }
@@ -3081,6 +3042,81 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![DataType::Float64, DataType::Float64, DataType::Float64]
         );
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_filter() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher'"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_filter_and() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' AND customer_gender = 'male'".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["male".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_filter_or() {
+        // OR is not allowed for __user
+        let query =
+            convert_sql_to_cube_query(
+                &"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' OR customer_gender = 'male'".to_string(),
+                get_test_tenant_ctx(),
+                get_test_session(DatabaseProtocol::PostgreSQL)
+            ).await;
+
+        // TODO: We need to propagate error to result, to assert message
+        query.unwrap_err();
     }
 
     #[tokio::test]
@@ -4224,7 +4260,7 @@ ORDER BY \"COUNT(count)\" DESC"
 
         assert_eq!(
             create_query.err().unwrap().message(),
-            "Error during rewrite: Dimension 'customer_gender' was used with the aggregate function 'MEASURE()'. Please use a measure instead. Please check logs for additional information. QUERY: SELECT MEASURE(customer_gender) FROM \"public\".\"KibanaSampleDataEcommerce\" AS \"KibanaSampleDataEcommerce\"",
+            "Error during rewrite: Dimension 'customer_gender' was used with the aggregate function 'MEASURE()'. Please use a measure instead. Please check logs for additional information.",
         );
     }
 
@@ -4493,11 +4529,11 @@ ORDER BY \"COUNT(count)\" DESC"
             vec![
                 (
                     "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information. QUERY: SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string()),
+                    CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
                 ),
                 (
                     "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information. QUERY: SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string()),
+                    CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information.".to_string()),
                 ),
             ]
         } else {
@@ -4505,11 +4541,11 @@ ORDER BY \"COUNT(count)\" DESC"
                 // Count agg fn
                 (
                     "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided QUERY: SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string()),
+                    CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided".to_string()),
                 ),
                 (
                     "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead QUERY: SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string()),
+                    CompilationError::user("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead".to_string()),
                 ),
                 // (
                 //     "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
@@ -4547,7 +4583,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 // ),
                 // (
                 //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' in GROUP BY QUERY: SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string()),
+                //     CompilationError::user("Unable to use segment 'is_male' in GROUP BY".to_string()),
                 // ),
                 // (
                 //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
@@ -5747,23 +5783,41 @@ ORDER BY \"COUNT(count)\" DESC"
         query: String,
         db: DatabaseProtocol,
     ) -> Result<(String, StatusFlags), CubeError> {
-        let query =
-            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db)).await;
-        match query.unwrap() {
-            QueryPlan::DataFusionSelect(flags, plan, ctx) => {
-                let df = DFDataFrame::new(ctx.state, &plan);
-                let batches = df.collect().await?;
-                let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+        execute_queries_with_flags(vec![query], db).await
+    }
 
-                return Ok((frame.print(), flags));
-            }
-            QueryPlan::MetaTabular(flags, frame) => {
-                return Ok((frame.print(), flags));
-            }
-            QueryPlan::MetaOk(flags, _) => {
-                return Ok(("".to_string(), flags));
+    async fn execute_queries_with_flags(
+        queries: Vec<String>,
+        db: DatabaseProtocol,
+    ) -> Result<(String, StatusFlags), CubeError> {
+        let meta = get_test_tenant_ctx();
+        let session = get_test_session(db);
+
+        let mut output: Vec<String> = Vec::new();
+        let mut output_flags = StatusFlags::empty();
+
+        for query in queries {
+            let query = convert_sql_to_cube_query(&query, meta.clone(), session.clone()).await;
+            match query.unwrap() {
+                QueryPlan::DataFusionSelect(flags, plan, ctx) => {
+                    let df = DFDataFrame::new(ctx.state, &plan);
+                    let batches = df.collect().await?;
+                    let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+
+                    output.push(frame.print());
+                    output_flags = flags;
+                }
+                QueryPlan::MetaTabular(flags, frame) => {
+                    output.push(frame.print());
+                    output_flags = flags;
+                }
+                QueryPlan::MetaOk(flags, _) => {
+                    output_flags = flags;
+                }
             }
         }
+
+        Ok((output.join("\n").to_string(), output_flags))
     }
 
     #[tokio::test]
@@ -6943,6 +6997,19 @@ ORDER BY \"COUNT(count)\" DESC"
                 "++\n++\n++".to_string(),
                 StatusFlags::SERVER_STATE_CHANGED | StatusFlags::AUTOCOMMIT
             )
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_app_show",
+            execute_queries_with_flags(
+                vec![
+                    "set application_name = 'testing app'".to_string(),
+                    "show application_name".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
         );
 
         Ok(())
@@ -9032,7 +9099,7 @@ ORDER BY \"COUNT(count)\" DESC"
             get_test_session(DatabaseProtocol::PostgreSQL),
         ).await;
         match create_query {
-            Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS QUERY: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
+            Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
             _ => panic!("CREATE TABLE should throw CompilationError::Unsupported"),
         };
 
@@ -9050,7 +9117,7 @@ ORDER BY \"COUNT(count)\" DESC"
         .await;
         match select_into_query {
             Err(CompilationError::Unsupported(msg, _)) => {
-                assert_eq!(msg, "Unsupported query type: SELECT INTO QUERY: SELECT * INTO TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_1_Connect_C\" FROM (SELECT 1 AS COL) AS CHECKTEMP LIMIT 1")
+                assert_eq!(msg, "Unsupported query type: SELECT INTO")
             }
             _ => panic!("SELECT INTO should throw CompilationError::unsupported"),
         }
@@ -10727,6 +10794,41 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 },]),
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn metabase_aggreagte_by_week_of_year() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+                "SELECT ceil((CAST(extract(doy from CAST(date_trunc('week', \"KibanaSampleDataEcommerce\".\"order_date\") AS timestamp)) AS integer) / 7.0)) AS \"order_date\", 
+                               min(\"KibanaSampleDataEcommerce\".\"minPrice\") AS \"min\"
+                FROM \"KibanaSampleDataEcommerce\"
+                GROUP BY ceil((CAST(extract(doy from CAST(date_trunc('week', \"KibanaSampleDataEcommerce\".\"order_date\") AS timestamp)) AS integer) / 7.0))
+                ORDER BY ceil((CAST(extract(doy from CAST(date_trunc('week', \"KibanaSampleDataEcommerce\".\"order_date\") AS timestamp)) AS integer) / 7.0)) ASC"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.minPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("week".to_string()),
+                    date_range: None,
+                },]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
             }
         );
     }

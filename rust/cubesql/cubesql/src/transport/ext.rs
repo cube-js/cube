@@ -114,6 +114,7 @@ impl V1CubeMetaDimensionExt for V1CubeMetaDimension {
 #[derive(Debug)]
 pub struct CubeColumn {
     name: String,
+    description: Option<String>,
     column_type: ColumnType,
     can_be_null: bool,
 }
@@ -121,6 +122,10 @@ pub struct CubeColumn {
 impl CubeColumn {
     pub fn get_name(&self) -> &String {
         &self.name
+    }
+
+    pub fn get_description(&self) -> &Option<String> {
+        &self.description
     }
 
     pub fn sql_can_be_null(&self) -> bool {
@@ -170,6 +175,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for measure in &self.measures {
             columns.push(CubeColumn {
                 name: measure.get_real_name(),
+                description: None,
                 column_type: measure.get_sql_type(),
                 can_be_null: false,
             });
@@ -178,6 +184,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for dimension in &self.dimensions {
             columns.push(CubeColumn {
                 name: dimension.get_real_name(),
+                description: None,
                 column_type: dimension.get_sql_type(),
                 can_be_null: dimension.sql_can_be_null(),
             });
@@ -186,10 +193,18 @@ impl V1CubeMetaExt for V1CubeMeta {
         for segment in &self.segments {
             columns.push(CubeColumn {
                 name: segment.get_real_name(),
+                description: None,
                 column_type: ColumnType::Boolean,
                 can_be_null: false,
             });
         }
+
+        columns.push(CubeColumn {
+            name: "__user".to_string(),
+            description: Some("Virtual column for security context switching".to_string()),
+            column_type: ColumnType::String,
+            can_be_null: true,
+        });
 
         columns
     }
@@ -200,6 +215,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for measure in &self.measures {
             columns.push(CubeColumn {
                 name: measure.get_real_name(),
+                description: None,
                 column_type: measure.get_sql_type(),
                 can_be_null: false,
             });
@@ -208,6 +224,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for dimension in &self.dimensions {
             columns.push(CubeColumn {
                 name: dimension.get_real_name(),
+                description: None,
                 column_type: dimension.get_sql_type(),
                 can_be_null: dimension.sql_can_be_null(),
             });

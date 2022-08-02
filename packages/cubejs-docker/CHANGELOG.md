@@ -3,6 +3,38 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.44](https://github.com/cube-js/cube.js/compare/v0.30.43...v0.30.44) (2022-08-01)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.30.43](https://github.com/cube-js/cube.js/compare/v0.30.42...v0.30.43) (2022-07-28)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.30.42](https://github.com/cube-js/cube.js/compare/v0.30.41...v0.30.42) (2022-07-27)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.30.41](https://github.com/cube-js/cube.js/compare/v0.30.40...v0.30.41) (2022-07-27)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
 ## [0.30.40](https://github.com/cube-js/cube.js/compare/v0.30.39...v0.30.40) (2022-07-26)
 
 **Note:** Version bump only for package @cubejs-backend/docker
