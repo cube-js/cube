@@ -202,7 +202,7 @@ mod tests {
                     }"#,
                 )
             } else {
-                ResponseTemplate::new(200)
+                ResponseTemplate::new(202)
                     .set_delay(self.2)
                     .set_body_string(r#"{"error":"Continue Wait"}"#)
             }

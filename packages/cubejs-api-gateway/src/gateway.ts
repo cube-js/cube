@@ -1160,7 +1160,7 @@ class ApiGateway {
     e, context, query, res, requestStarted
   }: any) {
     const { requestId } = context;
-    
+
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
@@ -1176,7 +1176,7 @@ class ApiGateway {
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
-      res(e, { status: 200 });
+      res(e, { status: 202 });
     } else if (e.error) {
       this.log({
         type: 'Orchestrator error',
