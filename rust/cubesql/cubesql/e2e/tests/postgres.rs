@@ -12,7 +12,7 @@ use super::utils::escape_snapshot_name;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use datafusion::assert_contains;
 use pg_interval::Interval;
-use pg_srv::{PgType, PgTypeId};
+use pg_srv::{Oid, PgType, PgTypeId};
 use tokio::join;
 use tokio_postgres::{error::SqlState, Client, NoTls, Row, SimpleQueryMessage};
 
@@ -125,7 +125,7 @@ impl PostgresIntegrationTestSuite {
                         column.name(),
                         column.type_().oid(),
                         PgType::get_by_tid(
-                            PgTypeId::from_oid(column.type_().oid())
+                            PgTypeId::from_oid(column.type_().oid() as Oid)
                                 .expect(&format!("Unknown oid {}", column.type_().oid()))
                         )
                         .typname,
@@ -133,7 +133,7 @@ impl PostgresIntegrationTestSuite {
                 }
 
                 // We dont need data when with_rows = false, but it's useful for testing that data type is correct
-                match PgTypeId::from_oid(column.type_().oid())
+                match PgTypeId::from_oid(column.type_().oid() as Oid)
                     .expect(&format!("Unknown type oid: {}", column.type_().oid()))
                 {
                     PgTypeId::INT8 => {
@@ -692,6 +692,8 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
                 NULL,
                 1.234::float as f32,
                 1.234::double as f64,
+                1::tinyint as i8,
+                CAST(1 as TINYINT UNSIGNED) as u8,
                 1::smallint as i16,
                 CAST(1 as SMALLINT UNSIGNED) as u16,
                 1::integer as i32,

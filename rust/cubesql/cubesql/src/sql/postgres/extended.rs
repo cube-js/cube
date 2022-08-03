@@ -401,7 +401,7 @@ impl Portal {
 #[cfg(test)]
 mod tests {
     use crate::{
-        compile::engine::information_schema::postgres::InfoSchemaTestingDatasetProvider,
+        compile::engine::information_schema::postgres::testing_dataset::InfoSchemaTestingDatasetProvider,
         sql::{
             dataframe::{Column, DataFrame, Row, TableValue},
             extended::{InExecutionFrameState, InExecutionStreamState, Portal, PortalState},

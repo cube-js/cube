@@ -4,12 +4,9 @@ use pg_srv::{protocol, PgTypeId, ProtocolError};
 pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, ProtocolError> {
     match dt {
         DataType::Boolean => Ok(PgTypeId::BOOL),
-        DataType::Int16 => Ok(PgTypeId::INT2),
-        DataType::UInt16 => Ok(PgTypeId::INT2),
-        DataType::Int32 => Ok(PgTypeId::INT4),
-        DataType::UInt32 => Ok(PgTypeId::INT4),
-        DataType::Int64 => Ok(PgTypeId::INT8),
-        DataType::UInt64 => Ok(PgTypeId::INT8),
+        DataType::Int8 | DataType::UInt8 | DataType::Int16 | DataType::UInt16 => Ok(PgTypeId::INT2),
+        DataType::Int32 | DataType::UInt32 => Ok(PgTypeId::INT4),
+        DataType::Int64 | DataType::UInt64 => Ok(PgTypeId::INT8),
         DataType::Float32 => Ok(PgTypeId::FLOAT4),
         DataType::Float64 => Ok(PgTypeId::FLOAT8),
         DataType::Decimal(_, _) => Ok(PgTypeId::NUMERIC),
@@ -23,15 +20,11 @@ pub fn df_type_to_pg_tid(dt: &DataType) -> Result<PgTypeId, ProtocolError> {
         DataType::Null => Ok(PgTypeId::BOOL),
         DataType::List(field) => match field.data_type() {
             DataType::Boolean => Ok(PgTypeId::ARRAYBOOL),
-            DataType::Int8 => Ok(PgTypeId::ARRAYINT2),
-            DataType::Int16 => Ok(PgTypeId::ARRAYINT2),
-            DataType::Int32 => Ok(PgTypeId::ARRAYINT4),
-            DataType::Int64 => Ok(PgTypeId::ARRAYINT8),
-            DataType::UInt8 => Ok(PgTypeId::ARRAYINT2),
-            DataType::UInt16 => Ok(PgTypeId::ARRAYINT2),
-            DataType::UInt32 => Ok(PgTypeId::ARRAYINT4),
-            DataType::UInt64 => Ok(PgTypeId::ARRAYINT8),
-            DataType::Float16 => Ok(PgTypeId::ARRAYFLOAT4),
+            DataType::Int8 | DataType::UInt8 | DataType::Int16 | DataType::UInt16 => {
+                Ok(PgTypeId::ARRAYINT2)
+            }
+            DataType::Int32 | DataType::UInt32 => Ok(PgTypeId::ARRAYINT4),
+            DataType::Int64 | DataType::UInt64 => Ok(PgTypeId::ARRAYINT8),
             DataType::Float32 => Ok(PgTypeId::ARRAYFLOAT4),
             DataType::Float64 => Ok(PgTypeId::ARRAYFLOAT8),
             DataType::Binary => Ok(PgTypeId::ARRAYBYTEA),

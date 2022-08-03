@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::{Array, StringBuilder, UInt32Builder},
+        array::{Array, Int32Builder, StringBuilder, UInt64Builder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -19,12 +19,12 @@ use super::utils::new_string_array_with_placeholder;
 use crate::compile::engine::provider::TableName;
 
 struct InformationSchemaProcesslistBuilder {
-    id: UInt32Builder,
+    id: UInt64Builder,
     user: StringBuilder,
     host: StringBuilder,
     db: StringBuilder,
     command: StringBuilder,
-    time: UInt32Builder,
+    time: Int32Builder,
     state: StringBuilder,
     // info: StringBuilder,
 }
@@ -34,34 +34,24 @@ impl InformationSchemaProcesslistBuilder {
         let capacity = 10;
 
         Self {
-            id: UInt32Builder::new(capacity),
+            id: UInt64Builder::new(capacity),
             user: StringBuilder::new(capacity),
             host: StringBuilder::new(capacity),
             db: StringBuilder::new(capacity),
             command: StringBuilder::new(capacity),
-            time: UInt32Builder::new(capacity),
+            time: Int32Builder::new(capacity),
             state: StringBuilder::new(capacity),
             // info: StringBuilder::new(capacity),
         }
     }
 
     fn add_row(&mut self, process_list: SessionProcessList) {
-        self.id.append_value(process_list.id).unwrap();
-
-        if let Some(user) = process_list.user {
-            self.user.append_value(user).unwrap();
-        } else {
-            self.user.append_null().unwrap();
-        }
-
+        self.id.append_value(process_list.id as u64).unwrap();
+        self.user
+            .append_value(process_list.user.unwrap_or("root".to_string()))
+            .unwrap();
         self.host.append_value(process_list.host).unwrap();
-
-        if let Some(database) = process_list.database {
-            self.db.append_value(database).unwrap();
-        } else {
-            self.db.append_null().unwrap();
-        }
-
+        self.db.append_option(process_list.database).unwrap();
         self.command.append_value("daemon").unwrap();
         self.time.append_value(0).unwrap();
         self.state.append_value("Waiting on empty queue").unwrap();
@@ -114,14 +104,14 @@ impl TableProvider for InfoSchemaProcesslistProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("ID", DataType::UInt32, false),
+            Field::new("ID", DataType::UInt64, false),
             // @todo Null support?
-            Field::new("USER", DataType::Utf8, true),
+            Field::new("USER", DataType::Utf8, false),
             Field::new("HOST", DataType::Utf8, false),
             Field::new("DB", DataType::Utf8, true),
             Field::new("COMMAND", DataType::Utf8, false),
-            Field::new("TIME", DataType::UInt32, false),
-            Field::new("STATE", DataType::Utf8, false),
+            Field::new("TIME", DataType::Int32, false),
+            Field::new("STATE", DataType::Utf8, true),
             Field::new("INFO", DataType::Utf8, true),
         ]))
     }

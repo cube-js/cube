@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::{Array, StringBuilder, UInt32Builder},
+        array::{Array, Int32Builder, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -16,7 +16,7 @@ use datafusion::{
 pub struct InfoSchemaTestingDatasetProviderBuilder {
     start: usize,
     capacity: usize,
-    id: UInt32Builder,
+    id: Int32Builder,
     random_str: StringBuilder,
 }
 
@@ -25,14 +25,14 @@ impl InfoSchemaTestingDatasetProviderBuilder {
         Self {
             start,
             capacity,
-            id: UInt32Builder::new(capacity),
+            id: Int32Builder::new(capacity),
             random_str: StringBuilder::new(capacity),
         }
     }
 
     pub fn finish(mut self) -> Vec<Arc<dyn Array>> {
         for i in self.start..(self.start + self.capacity) {
-            self.id.append_value(i as u32).unwrap();
+            self.id.append_value(i as i32).unwrap();
             self.random_str.append_value("test".to_string()).unwrap();
         }
 
@@ -66,7 +66,7 @@ impl TableProvider for InfoSchemaTestingDatasetProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("id", DataType::UInt32, false),
+            Field::new("id", DataType::Int32, false),
             Field::new("random_str", DataType::Utf8, false),
         ]))
     }

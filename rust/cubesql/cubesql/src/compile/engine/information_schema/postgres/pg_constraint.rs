@@ -5,8 +5,7 @@ use async_trait::async_trait;
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, ListBuilder,
-            StringBuilder, UInt32Builder,
+            Array, ArrayRef, BooleanBuilder, Int16Builder, Int32Builder, ListBuilder, StringBuilder,
         },
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
@@ -17,19 +16,21 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, OidBuilder};
+
 struct PgCatalogConstraintBuilder {
-    oid: UInt32Builder,
+    oid: OidBuilder,
     conname: StringBuilder,
-    connamespace: UInt32Builder,
+    connamespace: OidBuilder,
     contype: StringBuilder,
     condeferrable: BooleanBuilder,
     condeferred: BooleanBuilder,
     convalidated: BooleanBuilder,
-    conrelid: UInt32Builder,
-    contypid: UInt32Builder,
-    conindid: UInt32Builder,
-    conparentid: UInt32Builder,
-    confrelid: UInt32Builder,
+    conrelid: OidBuilder,
+    contypid: OidBuilder,
+    conindid: OidBuilder,
+    conparentid: OidBuilder,
+    confrelid: OidBuilder,
     confupdtype: StringBuilder,
     confdeltype: StringBuilder,
     confmatchtype: StringBuilder,
@@ -38,10 +39,11 @@ struct PgCatalogConstraintBuilder {
     connoinherit: BooleanBuilder,
     conkey: ListBuilder<Int16Builder>,
     confkey: ListBuilder<Int16Builder>,
-    conpfeqop: StringBuilder,
-    conppeqop: StringBuilder,
-    conffeqop: StringBuilder,
-    conexclop: StringBuilder,
+    conpfeqop: ListBuilder<OidBuilder>,
+    conppeqop: ListBuilder<OidBuilder>,
+    conffeqop: ListBuilder<OidBuilder>,
+    conexclop: ListBuilder<OidBuilder>,
+    // TODO: type pg_node_tree?
     conbin: StringBuilder,
 }
 
@@ -50,18 +52,18 @@ impl PgCatalogConstraintBuilder {
         let capacity = 10;
 
         Self {
-            oid: UInt32Builder::new(capacity),
+            oid: OidBuilder::new(capacity),
             conname: StringBuilder::new(capacity),
-            connamespace: UInt32Builder::new(capacity),
+            connamespace: OidBuilder::new(capacity),
             contype: StringBuilder::new(capacity),
             condeferrable: BooleanBuilder::new(capacity),
             condeferred: BooleanBuilder::new(capacity),
             convalidated: BooleanBuilder::new(capacity),
-            conrelid: UInt32Builder::new(capacity),
-            contypid: UInt32Builder::new(capacity),
-            conindid: UInt32Builder::new(capacity),
-            conparentid: UInt32Builder::new(capacity),
-            confrelid: UInt32Builder::new(capacity),
+            conrelid: OidBuilder::new(capacity),
+            contypid: OidBuilder::new(capacity),
+            conindid: OidBuilder::new(capacity),
+            conparentid: OidBuilder::new(capacity),
+            confrelid: OidBuilder::new(capacity),
             confupdtype: StringBuilder::new(capacity),
             confdeltype: StringBuilder::new(capacity),
             confmatchtype: StringBuilder::new(capacity),
@@ -70,10 +72,10 @@ impl PgCatalogConstraintBuilder {
             connoinherit: BooleanBuilder::new(capacity),
             conkey: ListBuilder::new(Int16Builder::new(capacity)),
             confkey: ListBuilder::new(Int16Builder::new(capacity)),
-            conpfeqop: StringBuilder::new(capacity),
-            conppeqop: StringBuilder::new(capacity),
-            conffeqop: StringBuilder::new(capacity),
-            conexclop: StringBuilder::new(capacity),
+            conpfeqop: ListBuilder::new(OidBuilder::new(capacity)),
+            conppeqop: ListBuilder::new(OidBuilder::new(capacity)),
+            conffeqop: ListBuilder::new(OidBuilder::new(capacity)),
+            conexclop: ListBuilder::new(OidBuilder::new(capacity)),
             conbin: StringBuilder::new(capacity),
         }
     }
@@ -137,18 +139,18 @@ impl TableProvider for PgCatalogConstraintProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("oid", DataType::UInt32, false),
+            Field::new("oid", ExtDataType::Oid.into(), false),
             Field::new("conname", DataType::Utf8, false),
-            Field::new("connamespace", DataType::UInt32, false),
+            Field::new("connamespace", ExtDataType::Oid.into(), false),
             Field::new("contype", DataType::Utf8, false),
             Field::new("condeferrable", DataType::Boolean, false),
             Field::new("condeferred", DataType::Boolean, false),
             Field::new("convalidated", DataType::Boolean, false),
-            Field::new("conrelid", DataType::UInt32, false),
-            Field::new("contypid", DataType::UInt32, false),
-            Field::new("conindid", DataType::UInt32, false),
-            Field::new("conparentid", DataType::UInt32, false),
-            Field::new("confrelid", DataType::UInt32, false),
+            Field::new("conrelid", ExtDataType::Oid.into(), false),
+            Field::new("contypid", ExtDataType::Oid.into(), false),
+            Field::new("conindid", ExtDataType::Oid.into(), false),
+            Field::new("conparentid", ExtDataType::Oid.into(), false),
+            Field::new("confrelid", ExtDataType::Oid.into(), false),
             Field::new("confupdtype", DataType::Utf8, false),
             Field::new("confdeltype", DataType::Utf8, false),
             Field::new("confmatchtype", DataType::Utf8, false),
@@ -165,10 +167,26 @@ impl TableProvider for PgCatalogConstraintProvider {
                 DataType::List(Box::new(Field::new("item", DataType::Int16, true))),
                 true,
             ),
-            Field::new("conpfeqop", DataType::Utf8, true),
-            Field::new("conppeqop", DataType::Utf8, true),
-            Field::new("conffeqop", DataType::Utf8, true),
-            Field::new("conexclop", DataType::Utf8, true),
+            Field::new(
+                "conpfeqop",
+                DataType::List(Box::new(Field::new("item", ExtDataType::Oid.into(), true))),
+                true,
+            ),
+            Field::new(
+                "conppeqop",
+                DataType::List(Box::new(Field::new("item", ExtDataType::Oid.into(), true))),
+                true,
+            ),
+            Field::new(
+                "conffeqop",
+                DataType::List(Box::new(Field::new("item", ExtDataType::Oid.into(), true))),
+                true,
+            ),
+            Field::new(
+                "conexclop",
+                DataType::List(Box::new(Field::new("item", ExtDataType::Oid.into(), true))),
+                true,
+            ),
             Field::new("conbin", DataType::Utf8, true),
         ]))
     }

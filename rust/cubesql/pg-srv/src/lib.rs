@@ -21,6 +21,8 @@ pub use pg_type::*;
 
 use std::backtrace::Backtrace;
 
+pub type Oid = i32;
+
 /// Protocol error abstract of handled/unhandled errors, it should not handle any kind of business logic errors
 #[derive(thiserror::Error, Debug)]
 pub enum ProtocolError {

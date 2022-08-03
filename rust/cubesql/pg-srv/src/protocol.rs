@@ -20,15 +20,15 @@ const DEFAULT_CAPACITY: usize = 64;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct StartupMessage {
-    pub major: u16,
-    pub minor: u16,
+    pub major: i16,
+    pub minor: i16,
     pub parameters: HashMap<String, String>,
 }
 
 impl StartupMessage {
     async fn from(mut buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
-        let major = buffer.read_u16().await?;
-        let minor = buffer.read_u16().await?;
+        let major = buffer.read_i16().await?;
+        let minor = buffer.read_i16().await?;
 
         let mut parameters = HashMap::new();
 
@@ -51,15 +51,15 @@ impl StartupMessage {
 
 #[derive(Debug, PartialEq)]
 pub struct CancelRequest {
-    pub process_id: u32,
-    pub secret: u32,
+    pub process_id: i32,
+    pub secret: i32,
 }
 
 impl CancelRequest {
     async fn from(buffer: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
         Ok(Self {
-            process_id: buffer.read_u32().await?,
-            secret: buffer.read_u32().await?,
+            process_id: buffer.read_i32().await?,
+            secret: buffer.read_i32().await?,
         })
     }
 }
@@ -111,8 +111,8 @@ impl Serialize for StartupMessage {
 
     fn serialize(&self) -> Option<Vec<u8>> {
         let mut buffer = Vec::with_capacity(DEFAULT_CAPACITY);
-        buffer.put_u16(self.major);
-        buffer.put_u16(self.minor);
+        buffer.put_i16(self.major);
+        buffer.put_i16(self.minor);
 
         for (name, value) in &self.parameters {
             buffer::write_string(&mut buffer, &name);
@@ -302,12 +302,12 @@ impl Serialize for EmptyQuery {
 }
 
 pub struct BackendKeyData {
-    process_id: u32,
-    secret: u32,
+    process_id: i32,
+    secret: i32,
 }
 
 impl BackendKeyData {
-    pub fn new(process_id: u32, secret: u32) -> Self {
+    pub fn new(process_id: i32, secret: i32) -> Self {
         Self { process_id, secret }
     }
 }
@@ -317,8 +317,8 @@ impl Serialize for BackendKeyData {
 
     fn serialize(&self) -> Option<Vec<u8>> {
         let mut buffer = Vec::with_capacity(4 + 4);
-        buffer.put_u32(self.process_id);
-        buffer.put_u32(self.secret);
+        buffer.put_i32(self.process_id);
+        buffer.put_i32(self.secret);
 
         Some(buffer)
     }
@@ -520,7 +520,7 @@ impl Serialize for ParameterDescription {
         buffer.put_i16(size);
 
         for parameter in &self.parameters {
-            buffer.put_i32((*parameter as u32) as i32);
+            buffer.put_i32(*parameter as i32);
         }
 
         Some(buffer)
@@ -1043,7 +1043,7 @@ impl AuthenticationRequest {
         self.to_code().to_be_bytes().to_vec()
     }
 
-    pub fn to_code(&self) -> u32 {
+    pub fn to_code(&self) -> i32 {
         match self {
             Self::Ok => 0,
             Self::CleartextPassword => 3,

@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -13,9 +13,12 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, OidBuilder};
+
 struct PgCatalogAmBuilder {
-    oid: UInt32Builder,
+    oid: OidBuilder,
     amname: StringBuilder,
+    // TODO: type regproc?
     amhandler: StringBuilder,
     amtype: StringBuilder,
 }
@@ -25,7 +28,7 @@ impl PgCatalogAmBuilder {
         let capacity = 0;
 
         Self {
-            oid: UInt32Builder::new(capacity),
+            oid: OidBuilder::new(capacity),
             amname: StringBuilder::new(capacity),
             amhandler: StringBuilder::new(capacity),
             amtype: StringBuilder::new(capacity),
@@ -69,7 +72,7 @@ impl TableProvider for PgCatalogAmProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("oid", DataType::UInt32, false),
+            Field::new("oid", ExtDataType::Oid.into(), false),
             Field::new("amname", DataType::Utf8, false),
             Field::new("amhandler", DataType::Utf8, false),
             Field::new("amtype", DataType::Utf8, false),

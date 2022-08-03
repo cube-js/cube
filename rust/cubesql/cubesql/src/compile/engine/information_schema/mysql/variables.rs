@@ -49,7 +49,7 @@ impl TableProvider for PerfSchemaVariablesProvider {
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
             Field::new("VARIABLE_NAME", DataType::Utf8, false),
-            Field::new("VARIABLE_VALUE", DataType::Utf8, false),
+            Field::new("VARIABLE_VALUE", DataType::Utf8, true),
         ]))
     }
 
@@ -63,7 +63,7 @@ impl TableProvider for PerfSchemaVariablesProvider {
         let mut values = StringBuilder::new(100);
 
         for (key, variable) in self.variables.iter() {
-            names.append_value(key.clone()).unwrap();
+            names.append_value(key).unwrap();
             values.append_value(variable.value.to_string()).unwrap();
         }
 

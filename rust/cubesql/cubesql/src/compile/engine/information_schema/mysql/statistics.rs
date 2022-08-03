@@ -14,7 +14,10 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use super::utils::{new_string_array_with_placeholder, new_uint32_array_with_placeholder};
+use super::utils::{
+    new_int32_array_with_placeholder, new_int64_array_with_placeholder,
+    new_string_array_with_placeholder, new_uint32_array_with_placeholder,
+};
 use crate::compile::engine::provider::TableName;
 
 struct InformationSchemaStatisticsBuilder {
@@ -44,31 +47,19 @@ impl InformationSchemaStatisticsBuilder {
         columns.push(Arc::new(self.table_names.finish()));
 
         // NON_UNIQUE
-        columns.push(Arc::new(new_uint32_array_with_placeholder(total, 0)));
+        columns.push(Arc::new(new_int32_array_with_placeholder(total, Some(0))));
         // INDEX_SCHEMA
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
         // INDEX_NAME
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
         // SEQ_IN_INDEX
-        columns.push(Arc::new(new_uint32_array_with_placeholder(total, 0)));
+        columns.push(Arc::new(new_uint32_array_with_placeholder(total, Some(0))));
         // COLUMN_NAME
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
         // COLLATION
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-        // EXPRESSION
-        columns.push(Arc::new(new_uint32_array_with_placeholder(total, 0)));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
+        // CARDINALITY
+        columns.push(Arc::new(new_int64_array_with_placeholder(total, Some(0))));
 
         columns
     }
@@ -109,13 +100,13 @@ impl TableProvider for InfoSchemaStatisticsProvider {
             Field::new("TABLE_CATALOG", DataType::Utf8, false),
             Field::new("TABLE_SCHEMA", DataType::Utf8, false),
             Field::new("TABLE_NAME", DataType::Utf8, false),
-            Field::new("NON_UNIQUE", DataType::UInt32, false),
+            Field::new("NON_UNIQUE", DataType::Int32, false),
             Field::new("INDEX_SCHEMA", DataType::Utf8, false),
-            Field::new("INDEX_NAME", DataType::Utf8, false),
+            Field::new("INDEX_NAME", DataType::Utf8, true),
             Field::new("SEQ_IN_INDEX", DataType::UInt32, false),
-            Field::new("COLUMN_NAME", DataType::Utf8, false),
+            Field::new("COLUMN_NAME", DataType::Utf8, true),
             Field::new("COLLATION", DataType::Utf8, true),
-            Field::new("CARDINALITY", DataType::UInt32, true),
+            Field::new("CARDINALITY", DataType::Int64, true),
             // @todo
             // SUB_PART
             // PACKED

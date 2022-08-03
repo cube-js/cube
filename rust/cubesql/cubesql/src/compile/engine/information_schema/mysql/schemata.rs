@@ -14,7 +14,9 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use super::utils::new_string_array_with_placeholder;
+use super::utils::{
+    new_string_array_with_placeholder, new_yes_no_array_with_placeholder, ExtDataType,
+};
 use crate::compile::engine::provider::TableName;
 
 struct InformationSchemaSchemataBuilder {
@@ -43,14 +45,12 @@ impl InformationSchemaSchemataBuilder {
         default_collation_name: impl AsRef<str>,
     ) {
         self.catalog_names.append_value("def").unwrap();
-        self.schema_names
-            .append_value(schema_name.as_ref())
-            .unwrap();
+        self.schema_names.append_value(schema_name).unwrap();
         self.default_character_set_names
-            .append_value(default_character_set_name.as_ref())
+            .append_value(default_character_set_name)
             .unwrap();
         self.default_collation_names
-            .append_value(default_collation_name.as_ref())
+            .append_value(default_collation_name)
             .unwrap();
     }
 
@@ -65,9 +65,9 @@ impl InformationSchemaSchemataBuilder {
         columns.push(Arc::new(self.default_collation_names.finish()));
 
         columns.push(Arc::new(new_string_array_with_placeholder(total, None)));
-        columns.push(Arc::new(new_string_array_with_placeholder(
+        columns.push(Arc::new(new_yes_no_array_with_placeholder(
             total,
-            Some("NO".to_string()),
+            Some(false),
         )));
 
         columns
@@ -117,7 +117,7 @@ impl TableProvider for InfoSchemaSchemataProvider {
             Field::new("DEFAULT_CHARACTER_SET_NAME", DataType::Utf8, false),
             Field::new("DEFAULT_COLLATION_NAME", DataType::Utf8, false),
             Field::new("SQL_PATH", DataType::Utf8, true),
-            Field::new("DEFAULT_ENCRYPTION", DataType::Utf8, false),
+            Field::new("DEFAULT_ENCRYPTION", ExtDataType::YesNo.into(), false),
         ]))
     }
 

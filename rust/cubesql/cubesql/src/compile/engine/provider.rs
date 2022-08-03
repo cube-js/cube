@@ -37,12 +37,13 @@ use super::information_schema::postgres::{
     constraint_column_usage::InfoSchemaConstraintColumnUsageProvider as PostgresSchemaConstraintColumnUsageProvider,
     key_column_usage::InfoSchemaKeyColumnUsageProvider as PostgresSchemaKeyColumnUsageProvider,
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
+    role_column_grants::InfoSchemaRoleColumnGrantsProvider as PostgresSchemaRoleColumnGrantsProvider,
+    role_table_grants::InfoSchemaRoleTableGrantsProvider as PostgresSchemaRoleTableGrantsProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
-    views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider,
-    InfoSchemaRoleColumnGrantsProvider as PostgresInfoSchemaRoleColumnGrantsProvider,
-    InfoSchemaRoleTableGrantsProvider as PostgresInfoSchemaRoleTableGrantsProvider,
-    InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
+    testing_blocking::InfoSchemaTestingBlockingProvider as PostgresSchemaTestingBlockingProvider,
+    testing_dataset::InfoSchemaTestingDatasetProvider as PostgresSchemaTestingDatasetProvider,
+    views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider, PgCatalogAmProvider,
     PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
     PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
     PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogIndexProvider,
@@ -276,9 +277,9 @@ impl DatabaseProtocol {
             "information_schema.referential_constraints".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaTableConstraintsProvider>() {
             "information_schema.table_constraints".to_string()
-        } else if let Some(_) = any.downcast_ref::<PostgresInfoSchemaRoleTableGrantsProvider>() {
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaRoleTableGrantsProvider>() {
             "information_schema.role_table_grants".to_string()
-        } else if let Some(_) = any.downcast_ref::<PostgresInfoSchemaRoleColumnGrantsProvider>() {
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaRoleColumnGrantsProvider>() {
             "information_schema.role_column_grants".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
             "pg_catalog.pg_tables".to_string()
@@ -326,9 +327,9 @@ impl DatabaseProtocol {
             "information_schema.constraint_column_usage".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaViewsProvider>() {
             "information_schema.views".to_string()
-        } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingDatasetProvider>() {
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaTestingDatasetProvider>() {
             "information_schema.testing_dataset".to_string()
-        } else if let Some(_) = any.downcast_ref::<InfoSchemaTestingBlockingProvider>() {
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaTestingBlockingProvider>() {
             "information_schema.testing_blocking".to_string()
         } else {
             return Err(CubeError::internal(format!(
@@ -390,11 +391,13 @@ impl DatabaseProtocol {
             "information_schema" => match table.as_str() {
                 "columns" => {
                     return Some(Arc::new(PostgresSchemaColumnsProvider::new(
+                        &context.session_state.database().unwrap_or("db".to_string()),
                         &context.meta.cubes,
                     )))
                 }
                 "tables" => {
                     return Some(Arc::new(PostgresSchemaTableProvider::new(
+                        &context.session_state.database().unwrap_or("db".to_string()),
                         &context.meta.cubes,
                     )))
                 }
@@ -410,14 +413,22 @@ impl DatabaseProtocol {
                     return Some(Arc::new(PostgresSchemaReferentialConstraintsProvider::new()))
                 }
                 "role_table_grants" => {
-                    return Some(Arc::new(PostgresInfoSchemaRoleTableGrantsProvider::new(
-                        context.session_state.user().unwrap_or("test".to_string()),
+                    return Some(Arc::new(PostgresSchemaRoleTableGrantsProvider::new(
+                        context
+                            .session_state
+                            .user()
+                            .unwrap_or("postgres".to_string()),
+                        context.session_state.database().unwrap_or("db".to_string()),
                         &context.meta.cubes,
                     )))
                 }
                 "role_column_grants" => {
-                    return Some(Arc::new(PostgresInfoSchemaRoleColumnGrantsProvider::new(
-                        context.session_state.user().unwrap_or("test".to_string()),
+                    return Some(Arc::new(PostgresSchemaRoleColumnGrantsProvider::new(
+                        context
+                            .session_state
+                            .user()
+                            .unwrap_or("postgres".to_string()),
+                        context.session_state.database().unwrap_or("db".to_string()),
                         &context.meta.cubes,
                     )))
                 }
@@ -430,22 +441,29 @@ impl DatabaseProtocol {
                 "views" => return Some(Arc::new(PostgresSchemaViewsProvider::new())),
                 #[cfg(debug_assertions)]
                 "testing_dataset" => {
-                    return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
+                    return Some(Arc::new(PostgresSchemaTestingDatasetProvider::new(5, 1000)))
                 }
                 #[cfg(debug_assertions)]
                 "testing_blocking" => {
-                    return Some(Arc::new(InfoSchemaTestingBlockingProvider::new()))
+                    return Some(Arc::new(PostgresSchemaTestingBlockingProvider::new()))
                 }
                 _ => return None,
             },
             "pg_catalog" => match table.as_str() {
                 "pg_tables" => {
-                    return Some(Arc::new(PgCatalogTableProvider::new(&context.meta.cubes)))
+                    return Some(Arc::new(PgCatalogTableProvider::new(
+                        &context.meta.cubes,
+                        context.session_state.user(),
+                    )))
                 }
                 "pg_type" => {
                     return Some(Arc::new(PgCatalogTypeProvider::new(&context.meta.tables)))
                 }
-                "pg_namespace" => return Some(Arc::new(PgCatalogNamespaceProvider::new())),
+                "pg_namespace" => {
+                    return Some(Arc::new(PgCatalogNamespaceProvider::new(
+                        context.session_state.user(),
+                    )))
+                }
                 "pg_range" => return Some(Arc::new(PgCatalogRangeProvider::new())),
                 "pg_attrdef" => return Some(Arc::new(PgCatalogAttrdefProvider::new())),
                 "pg_attribute" => {
@@ -476,7 +494,10 @@ impl DatabaseProtocol {
                 }
                 "pg_roles" => {
                     return Some(Arc::new(PgCatalogRolesProvider::new(
-                        &context.session_state.user().unwrap_or("test".to_string()),
+                        &context
+                            .session_state
+                            .user()
+                            .unwrap_or("postgres".to_string()),
                     )))
                 }
                 "pg_stat_activity" => {
@@ -547,6 +568,7 @@ impl TableProvider for CubeTableProvider {
                             ColumnType::Boolean => DataType::Boolean,
                             ColumnType::Double => DataType::Float64,
                             ColumnType::Int8 => DataType::Int64,
+                            ColumnType::Int16 => DataType::Int64,
                             ColumnType::Int32 => DataType::Int64,
                             ColumnType::Int64 => DataType::Int64,
                             ColumnType::Blob => DataType::Utf8,

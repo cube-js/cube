@@ -1112,10 +1112,6 @@ impl SplitRules {
                 {
                     // This match is re-used to verify literal_expr type
                     let is_zero = match scalar {
-                        ScalarValue::UInt64(Some(v)) => v == 0,
-                        ScalarValue::UInt32(Some(v)) => v == 0,
-                        ScalarValue::UInt16(Some(v)) => v == 0,
-                        ScalarValue::UInt8(Some(v)) => v == 0,
                         ScalarValue::Int64(Some(v)) => v == 0,
                         ScalarValue::Int32(Some(v)) => v == 0,
                         ScalarValue::Int16(Some(v)) => v == 0,

@@ -48,22 +48,18 @@ impl InformationSchemaCollationsBuilder {
         sortlen: u32,
         no_pad: bool,
     ) {
-        self.collation_names
-            .append_value(collation_name.as_ref())
-            .unwrap();
+        self.collation_names.append_value(collation_name).unwrap();
         self.character_set_names
-            .append_value(character_set_name.as_ref())
+            .append_value(character_set_name)
             .unwrap();
         self.ids.append_value(id).unwrap();
         self.is_defaults
-            .append_value((if is_default { "Yes" } else { "" }).to_string())
+            .append_value(if is_default { "Yes" } else { "" })
             .unwrap();
-        self.is_compiled_values
-            .append_value("Yes".to_string())
-            .unwrap();
+        self.is_compiled_values.append_value("Yes").unwrap();
         self.sortlens.append_value(sortlen).unwrap();
         self.pad_attributes
-            .append_value((if no_pad { "NO PAD" } else { "PAD SPACE" }).to_string())
+            .append_value(if no_pad { "NO PAD" } else { "PAD SPACE" })
             .unwrap();
     }
 

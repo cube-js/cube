@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicI32, Ordering},
         Arc, RwLock as RwLockSync,
     },
 };
@@ -16,8 +16,8 @@ use super::{
 #[derive(Debug)]
 pub struct SessionManager {
     // Sessions
-    last_id: AtomicU32,
-    sessions: RwLockSync<HashMap<u32, Arc<Session>>>,
+    last_id: AtomicI32,
+    sessions: RwLockSync<HashMap<i32, Arc<Session>>>,
     // Backref
     pub server: Arc<ServerManager>,
 }
@@ -27,7 +27,7 @@ crate::di_service!(SessionManager, []);
 impl SessionManager {
     pub fn new(server: Arc<ServerManager>) -> Self {
         Self {
-            last_id: AtomicU32::new(1),
+            last_id: AtomicI32::new(1),
             sessions: RwLockSync::new(HashMap::new()),
             server,
         }
@@ -81,7 +81,7 @@ impl SessionManager {
             .collect::<Vec<SessionProcessList>>()
     }
 
-    pub fn get_session(&self, connection_id: u32) -> Option<Arc<Session>> {
+    pub fn get_session(&self, connection_id: i32) -> Option<Arc<Session>> {
         let guard = self
             .sessions
             .read()
@@ -90,7 +90,7 @@ impl SessionManager {
         guard.get(&connection_id).map(|s| s.clone())
     }
 
-    pub fn drop_session(&self, connection_id: u32) {
+    pub fn drop_session(&self, connection_id: i32) {
         let mut guard = self
             .sessions
             .write()

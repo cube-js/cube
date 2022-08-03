@@ -1,18 +1,29 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 7096
 expression: "execute_query(\"/*** Load all supported types ***/\n                SELECT ns.nspname, a.typname, a.oid, a.typrelid, a.typbasetype,\n                CASE WHEN pg_proc.proname='array_recv' THEN 'a' ELSE a.typtype END AS type,\n                CASE\n                  WHEN pg_proc.proname='array_recv' THEN a.typelem\n                  WHEN a.typtype='r' THEN rngsubtype\n                  ELSE 0\n                END AS elemoid,\n                CASE\n                  WHEN pg_proc.proname IN ('array_recv','oidvectorrecv') THEN 3    /* Arrays last */\n                  WHEN a.typtype='r' THEN 2                                        /* Ranges before */\n                  WHEN a.typtype='d' THEN 1                                        /* Domains before */\n                  ELSE 0                                                           /* Base types first */\n                END AS ord\n                FROM pg_type AS a\n                JOIN pg_namespace AS ns ON (ns.oid = a.typnamespace)\n                JOIN pg_proc ON pg_proc.oid = a.typreceive\n                LEFT OUTER JOIN pg_class AS cls ON (cls.oid = a.typrelid)\n                LEFT OUTER JOIN pg_type AS b ON (b.oid = a.typelem)\n                LEFT OUTER JOIN pg_class AS elemcls ON (elemcls.oid = b.typrelid)\n                LEFT OUTER JOIN pg_range ON (pg_range.rngtypid = a.oid)\n                WHERE\n                  a.typtype IN ('b', 'r', 'e', 'd') OR         /* Base, range, enum, domain */\n                  (a.typtype = 'c' AND cls.relkind='c') OR /* User-defined free-standing composites (not table composites) by default */\n                  (pg_proc.proname='array_recv' AND (\n                    b.typtype IN ('b', 'r', 'e', 'd') OR       /* Array of base, range, enum, domain */\n                    (b.typtype = 'p' AND b.typname IN ('record', 'void')) OR /* Arrays of special supported pseudo-types */\n                    (b.typtype = 'c' AND elemcls.relkind='c')  /* Array of user-defined free-standing composites (not table composites) */\n                  )) OR\n                  (a.typtype = 'p' AND a.typname IN ('record', 'void'))  /* Some special supported pseudo-types */\n                /* changed for stable sort ORDER BY ord */\n                ORDER BY a.typname\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
-+------------+-----------+------+----------+-------------+------+---------+-----+
-| nspname    | typname   | oid  | typrelid | typbasetype | type | elemoid | ord |
-+------------+-----------+------+----------+-------------+------+---------+-----+
-| pg_catalog | bool      | 16   | 0        | 0           | b    | 0       | 0   |
-| pg_catalog | float4    | 700  | 0        | 0           | b    | 0       | 0   |
-| pg_catalog | float8    | 701  | 0        | 0           | b    | 0       | 0   |
-| pg_catalog | int4      | 23   | 0        | 0           | b    | 0       | 0   |
-| pg_catalog | int8      | 20   | 0        | 0           | b    | 0       | 0   |
-| pg_catalog | numeric   | 1700 | 0        | 0           | b    | 0       | 0   |
-| pg_catalog | text      | 25   | 0        | 0           | b    | 0       | 0   |
-| pg_catalog | timestamp | 1114 | 0        | 0           | b    | 0       | 0   |
-| pg_catalog | varchar   | 1043 | 0        | 0           | b    | 0       | 0   |
-+------------+-----------+------+----------+-------------+------+---------+-----+
++------------+----------------------------+-------+----------+-------------+------+---------+-----+
+| nspname    | typname                    | oid   | typrelid | typbasetype | type | elemoid | ord |
++------------+----------------------------+-------+----------+-------------+------+---------+-----+
+| public     | _KibanaSampleDataEcommerce | 18002 | 0        | 0           | a    | 18001   | 3   |
+| public     | _Logs                      | 18016 | 0        | 0           | a    | 18015   | 3   |
+| pg_catalog | _aclitem                   | 1034  | 0        | 0           | a    | 1033    | 3   |
+| pg_catalog | _bool                      | 1000  | 0        | 0           | a    | 16      | 3   |
+| pg_catalog | _bytea                     | 1001  | 0        | 0           | a    | 17      | 3   |
+| pg_catalog | _float4                    | 1021  | 0        | 0           | a    | 700     | 3   |
+| pg_catalog | _float8                    | 1022  | 0        | 0           | a    | 701     | 3   |
+| pg_catalog | _int2                      | 1005  | 0        | 0           | a    | 21      | 3   |
+| pg_catalog | _int4                      | 1007  | 0        | 0           | a    | 23      | 3   |
+| pg_catalog | _int8                      | 1016  | 0        | 0           | a    | 20      | 3   |
+| pg_catalog | _text                      | 1009  | 0        | 0           | a    | 25      | 3   |
+| pg_catalog | bool                       | 16    | 0        | 0           | b    | 0       | 0   |
+| pg_catalog | float4                     | 700   | 0        | 0           | b    | 0       | 0   |
+| pg_catalog | float8                     | 701   | 0        | 0           | b    | 0       | 0   |
+| pg_catalog | int2                       | 21    | 0        | 0           | b    | 0       | 0   |
+| pg_catalog | int4                       | 23    | 0        | 0           | b    | 0       | 0   |
+| pg_catalog | int8                       | 20    | 0        | 0           | b    | 0       | 0   |
+| pg_catalog | numeric                    | 1700  | 0        | 0           | b    | 0       | 0   |
+| pg_catalog | text                       | 25    | 0        | 0           | b    | 0       | 0   |
+| pg_catalog | timestamp                  | 1114  | 0        | 0           | b    | 0       | 0   |
+| pg_catalog | varchar                    | 1043  | 0        | 0           | b    | 0       | 0   |
++------------+----------------------------+-------+----------+-------------+------+---------+-----+

@@ -17,9 +17,9 @@ use datafusion::{
 use super::utils::{new_boolean_array_with_placeholder, new_string_array_with_placeholder};
 
 struct PgCatalogTablesBuilder {
-    schemanames: StringBuilder,
-    tablenames: StringBuilder,
-    tableowners: StringBuilder,
+    schemaname: StringBuilder,
+    tablename: StringBuilder,
+    tableowner: StringBuilder,
 }
 
 impl PgCatalogTablesBuilder {
@@ -27,9 +27,9 @@ impl PgCatalogTablesBuilder {
         let capacity = 10;
 
         Self {
-            schemanames: StringBuilder::new(capacity),
-            tablenames: StringBuilder::new(capacity),
-            tableowners: StringBuilder::new(capacity),
+            schemaname: StringBuilder::new(capacity),
+            tablename: StringBuilder::new(capacity),
+            tableowner: StringBuilder::new(capacity),
         }
     }
 
@@ -39,37 +39,46 @@ impl PgCatalogTablesBuilder {
         tablename: impl AsRef<str>,
         tableowner: impl AsRef<str>,
     ) {
-        self.schemanames.append_value(schemaname.as_ref()).unwrap();
-        self.tablenames.append_value(tablename.as_ref()).unwrap();
-        self.tableowners.append_value(tableowner.as_ref()).unwrap();
+        self.schemaname.append_value(schemaname).unwrap();
+        self.tablename.append_value(tablename).unwrap();
+        self.tableowner.append_value(tableowner).unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
         let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.schemanames.finish()));
-        columns.push(Arc::new(self.tablenames.finish()));
+        columns.push(Arc::new(self.schemaname.finish()));
+        columns.push(Arc::new(self.tablename.finish()));
 
-        let tablesowners = self.tableowners.finish();
+        let tablesowners = self.tableowner.finish();
         let total = tablesowners.len();
         columns.push(Arc::new(tablesowners));
 
         // tablespace
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, None)));
 
         // hasindexes
-        columns.push(Arc::new(new_boolean_array_with_placeholder(total, true)));
+        columns.push(Arc::new(new_boolean_array_with_placeholder(
+            total,
+            Some(true),
+        )));
 
         // hasrules
-        columns.push(Arc::new(new_boolean_array_with_placeholder(total, false)));
+        columns.push(Arc::new(new_boolean_array_with_placeholder(
+            total,
+            Some(false),
+        )));
 
         // hastriggers
-        columns.push(Arc::new(new_boolean_array_with_placeholder(total, false)));
+        columns.push(Arc::new(new_boolean_array_with_placeholder(
+            total,
+            Some(false),
+        )));
 
         // rowsecurity
-        columns.push(Arc::new(new_boolean_array_with_placeholder(total, false)));
+        columns.push(Arc::new(new_boolean_array_with_placeholder(
+            total,
+            Some(false),
+        )));
 
         columns
     }
@@ -80,11 +89,15 @@ pub struct PgCatalogTableProvider {
 }
 
 impl PgCatalogTableProvider {
-    pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(cubes: &Vec<V1CubeMeta>, user: Option<String>) -> Self {
         let mut builder = PgCatalogTablesBuilder::new();
 
         for cube in cubes {
-            builder.add_table("public", cube.name.clone(), "db");
+            builder.add_table(
+                "public",
+                cube.name.clone(),
+                user.clone().unwrap_or("postgres".to_string()),
+            );
         }
 
         Self {
@@ -108,7 +121,7 @@ impl TableProvider for PgCatalogTableProvider {
             Field::new("schemaname", DataType::Utf8, false),
             Field::new("tablename", DataType::Utf8, false),
             Field::new("tableowner", DataType::Utf8, false),
-            Field::new("tablespace", DataType::Utf8, false),
+            Field::new("tablespace", DataType::Utf8, true),
             Field::new("hasindexes", DataType::Boolean, false),
             Field::new("hasrules", DataType::Boolean, false),
             Field::new("hastriggers", DataType::Boolean, false),

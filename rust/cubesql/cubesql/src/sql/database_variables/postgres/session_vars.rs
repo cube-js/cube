@@ -37,7 +37,7 @@ pub fn defaults() -> DatabaseVariables {
         "extra_float_digits".to_string(),
         DatabaseVariable::system(
             "extra_float_digits".to_string(),
-            ScalarValue::UInt32(Some(1)),
+            ScalarValue::Int32(Some(1)),
             None,
         ),
     );
@@ -55,7 +55,7 @@ pub fn defaults() -> DatabaseVariables {
         "max_allowed_packet".to_string(),
         DatabaseVariable::system(
             "max_allowed_packet".to_string(),
-            ScalarValue::UInt32(Some(67108864)),
+            ScalarValue::Int32(Some(67108864)),
             None,
         ),
     );
@@ -64,7 +64,7 @@ pub fn defaults() -> DatabaseVariables {
         "max_index_keys".to_string(),
         DatabaseVariable::system(
             "max_index_keys".to_string(),
-            ScalarValue::UInt32(Some(32)),
+            ScalarValue::Int32(Some(32)),
             None,
         ),
     );

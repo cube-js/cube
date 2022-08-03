@@ -44,10 +44,10 @@ impl TableProvider for InfoSchemaReferentialConstraintsProvider {
         Arc::new(Schema::new(vec![
             Field::new("CONSTRAINT_CATALOG", DataType::Utf8, false),
             Field::new("CONSTRAINT_SCHEMA", DataType::Utf8, false),
-            Field::new("CONSTRAINT_NAME", DataType::Utf8, false),
+            Field::new("CONSTRAINT_NAME", DataType::Utf8, true),
             Field::new("UNIQUE_CONSTRAINT_CATALOG", DataType::Utf8, false),
             Field::new("UNIQUE_CONSTRAINT_SCHEMA", DataType::Utf8, false),
-            Field::new("UNIQUE_CONSTRAINT_NAME", DataType::Utf8, false),
+            Field::new("UNIQUE_CONSTRAINT_NAME", DataType::Utf8, true),
             Field::new("MATCH_OPTION", DataType::Utf8, false),
             Field::new("UPDATE_RULE", DataType::Utf8, false),
             Field::new("DELETE_RULE", DataType::Utf8, false),
@@ -63,50 +63,17 @@ impl TableProvider for InfoSchemaReferentialConstraintsProvider {
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let mut data: Vec<Arc<dyn Array>> = vec![];
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
-        data.push(Arc::new(new_string_array_with_placeholder(
-            0,
-            Some("".to_string()),
-        )));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
+        data.push(Arc::new(new_string_array_with_placeholder(0, Some(""))));
 
         let batch = RecordBatch::try_new(self.schema(), data)?;
 

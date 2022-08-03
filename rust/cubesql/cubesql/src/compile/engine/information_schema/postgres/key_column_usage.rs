@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, Int32Builder, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -21,8 +21,8 @@ struct InfoSchemaKeyColumnUsageBuilder {
     table_schema: StringBuilder,
     table_name: StringBuilder,
     column_name: StringBuilder,
-    ordinal_position: UInt32Builder,
-    position_in_unique_constraint: UInt32Builder,
+    ordinal_position: Int32Builder,
+    position_in_unique_constraint: Int32Builder,
 }
 
 impl InfoSchemaKeyColumnUsageBuilder {
@@ -37,8 +37,8 @@ impl InfoSchemaKeyColumnUsageBuilder {
             table_schema: StringBuilder::new(capacity),
             table_name: StringBuilder::new(capacity),
             column_name: StringBuilder::new(capacity),
-            ordinal_position: UInt32Builder::new(capacity),
-            position_in_unique_constraint: UInt32Builder::new(capacity),
+            ordinal_position: Int32Builder::new(capacity),
+            position_in_unique_constraint: Int32Builder::new(capacity),
         }
     }
 
@@ -91,8 +91,8 @@ impl TableProvider for InfoSchemaKeyColumnUsageProvider {
             Field::new("table_schema", DataType::Utf8, false),
             Field::new("table_name", DataType::Utf8, false),
             Field::new("column_name", DataType::Utf8, false),
-            Field::new("ordinal_position", DataType::UInt32, false),
-            Field::new("position_in_unique_constraint", DataType::UInt32, true),
+            Field::new("ordinal_position", DataType::Int32, false),
+            Field::new("position_in_unique_constraint", DataType::Int32, true),
         ]))
     }
 

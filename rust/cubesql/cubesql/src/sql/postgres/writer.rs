@@ -14,7 +14,7 @@ use chrono::{
 use datafusion::arrow::{
     array::{
         Array, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array, Int32Array,
-        Int64Array, Int8Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+        Int64Array, Int8Array, StringArray,
     },
     datatypes::DataType,
 };
@@ -150,11 +150,6 @@ impl ToProtocolValue for ListValue {
             DataType::Int16 => write_native_array_to_buffer!(self.v, values, Int16Array),
             DataType::Int32 => write_native_array_to_buffer!(self.v, values, Int32Array),
             DataType::Int64 => write_native_array_to_buffer!(self.v, values, Int64Array),
-            // PG doesnt support i8, casting to i16
-            DataType::UInt8 => write_native_array_to_buffer!(self.v, values, UInt8Array),
-            DataType::UInt16 => write_native_array_to_buffer!(self.v, values, UInt16Array),
-            DataType::UInt32 => write_native_array_to_buffer!(self.v, values, UInt32Array),
-            DataType::UInt64 => write_native_array_to_buffer!(self.v, values, UInt64Array),
             DataType::Boolean => write_native_array_to_buffer!(self.v, values, BooleanArray),
             DataType::Utf8 => write_native_array_to_buffer!(self.v, values, StringArray),
             dt => {
@@ -186,11 +181,11 @@ impl ToProtocolValue for ListValue {
         column_data.put_i32(1);
         // has_nulls
         column_data.put_i32((self.v.null_count() > 0) as i32);
-        column_data.put_u32(df_type_to_pg_tid(self.v.data_type())? as u32);
-        column_data.put_u32(self.v.len() as u32);
+        column_data.put_i32(df_type_to_pg_tid(self.v.data_type())? as i32);
+        column_data.put_i32(self.v.len() as i32);
 
         // row2 from the comment
-        column_data.put_u32(1);
+        column_data.put_i32(1);
 
         macro_rules! write_native_array_as_binary {
             ($ARRAY:expr, $ARRAY_TYPE: ident, $NATIVE: tt) => {{
@@ -216,11 +211,6 @@ impl ToProtocolValue for ListValue {
             DataType::Int16 => write_native_array_as_binary!(self.v, Int16Array, i16),
             DataType::Int32 => write_native_array_as_binary!(self.v, Int32Array, i32),
             DataType::Int64 => write_native_array_as_binary!(self.v, Int64Array, i64),
-            // PG doesnt support i8, casting to i16
-            DataType::UInt8 => write_native_array_as_binary!(self.v, UInt8Array, i16),
-            DataType::UInt16 => write_native_array_as_binary!(self.v, UInt16Array, i16),
-            DataType::UInt32 => write_native_array_as_binary!(self.v, UInt32Array, i32),
-            DataType::UInt64 => write_native_array_as_binary!(self.v, UInt64Array, i64),
             DataType::Boolean => write_native_array_as_binary!(self.v, BooleanArray, bool),
             DataType::Utf8 => {
                 let arr = self.v.as_any().downcast_ref::<StringArray>().unwrap();

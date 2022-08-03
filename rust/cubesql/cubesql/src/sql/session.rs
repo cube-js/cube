@@ -1,5 +1,6 @@
 use datafusion::scalar::ScalarValue;
 use log::trace;
+use pg_srv::Oid;
 use rand::Rng;
 use std::sync::{Arc, RwLock as RwLockSync};
 use tokio_util::sync::CancellationToken;
@@ -55,7 +56,7 @@ lazy_static! {
 pub enum TransactionState {
     None,
     // Right now, it's 1 for all the time.
-    Active(u64),
+    Active(i64),
 }
 
 #[derive(Debug)]
@@ -70,9 +71,9 @@ pub enum QueryState {
 #[derive(Debug)]
 pub struct SessionState {
     // connection id, immutable
-    pub connection_id: u32,
+    pub connection_id: i32,
     // secret for this session
-    pub secret: u32,
+    pub secret: i32,
     // client address, immutable
     pub host: String,
     // client protocol, mysql/postgresql, immutable
@@ -94,7 +95,7 @@ pub struct SessionState {
 
 impl SessionState {
     pub fn new(
-        connection_id: u32,
+        connection_id: i32,
         host: String,
         protocol: DatabaseProtocol,
         auth_context: Option<AuthContextRef>,
@@ -208,7 +209,7 @@ impl SessionState {
         cancel
     }
 
-    pub fn end_transaction(&self) -> Option<u64> {
+    pub fn end_transaction(&self) -> Option<i64> {
         let mut guard = self
             .transaction
             .write()
@@ -370,8 +371,7 @@ impl Session {
             oid: self.state.connection_id,
             datname: self.state.database(),
             pid: self.state.connection_id,
-            leader_pid: None,
-            usesysid: 0,
+            usesysid: 10,
             usename: self.state.user(),
             application_name,
             client_addr: None,
@@ -394,7 +394,7 @@ impl Session {
 
 #[derive(Debug)]
 pub struct SessionProcessList {
-    pub id: u32,
+    pub id: i32,
     pub user: Option<String>,
     pub host: String,
     pub database: Option<String>,
@@ -402,15 +402,14 @@ pub struct SessionProcessList {
 
 #[derive(Debug)]
 pub struct SessionStatActivity {
-    pub oid: u32,
+    pub oid: Oid,
     pub datname: Option<String>,
-    pub pid: u32,
-    pub leader_pid: Option<u32>,
-    pub usesysid: u32,
+    pub pid: i32,
+    pub usesysid: Oid,
     pub usename: Option<String>,
     pub application_name: Option<String>,
     pub client_addr: Option<String>,
     pub client_hostname: Option<String>,
-    pub client_port: Option<String>,
+    pub client_port: Option<i32>,
     pub query: Option<String>,
 }

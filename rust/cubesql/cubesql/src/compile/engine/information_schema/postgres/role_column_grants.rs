@@ -15,6 +15,8 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{yes_no, ExtDataType, YesNoBuilder};
+
 struct InfoSchemaRoleColumnGrantsBuilder {
     grantor: StringBuilder,
     grantee: StringBuilder,
@@ -23,7 +25,7 @@ struct InfoSchemaRoleColumnGrantsBuilder {
     table_name: StringBuilder,
     column_name: StringBuilder,
     privilege_type: StringBuilder,
-    is_grantable: StringBuilder,
+    is_grantable: YesNoBuilder,
 }
 
 impl InfoSchemaRoleColumnGrantsBuilder {
@@ -36,7 +38,7 @@ impl InfoSchemaRoleColumnGrantsBuilder {
             table_name: StringBuilder::new(capacity),
             column_name: StringBuilder::new(capacity),
             privilege_type: StringBuilder::new(capacity),
-            is_grantable: StringBuilder::new(capacity),
+            is_grantable: YesNoBuilder::new(capacity),
         }
     }
 
@@ -50,13 +52,13 @@ impl InfoSchemaRoleColumnGrantsBuilder {
         privilege_type: impl AsRef<str>,
     ) {
         self.grantor.append_value(&user).unwrap();
-        self.grantee.append_value(&user).unwrap();
-        self.table_catalog.append_value(&table_catalog).unwrap();
-        self.table_schema.append_value(&table_schema).unwrap();
-        self.table_name.append_value(&table_name).unwrap();
-        self.column_name.append_value(&column_name).unwrap();
-        self.privilege_type.append_value(&privilege_type).unwrap();
-        self.is_grantable.append_value(&"YES").unwrap();
+        self.grantee.append_value(user).unwrap();
+        self.table_catalog.append_value(table_catalog).unwrap();
+        self.table_schema.append_value(table_schema).unwrap();
+        self.table_name.append_value(table_name).unwrap();
+        self.column_name.append_value(column_name).unwrap();
+        self.privilege_type.append_value(privilege_type).unwrap();
+        self.is_grantable.append_value(yes_no(true)).unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -79,18 +81,22 @@ pub struct InfoSchemaRoleColumnGrantsProvider {
 }
 
 impl InfoSchemaRoleColumnGrantsProvider {
-    pub fn new(current_user: String, cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(
+        current_user: impl AsRef<str>,
+        database: impl AsRef<str>,
+        cubes: &Vec<V1CubeMeta>,
+    ) -> Self {
         let mut builder = InfoSchemaRoleColumnGrantsBuilder::new(cubes.len());
 
         for cube in cubes {
             for column in cube.get_columns() {
                 builder.add_column(
                     &current_user,
-                    "db",
+                    &database,
                     "public",
                     cube.name.clone(),
-                    &column.get_name(),
-                    &"SELECT",
+                    column.get_name(),
+                    "SELECT",
                 );
             }
         }
@@ -120,7 +126,7 @@ impl TableProvider for InfoSchemaRoleColumnGrantsProvider {
             Field::new("table_name", DataType::Utf8, false),
             Field::new("column_name", DataType::Utf8, false),
             Field::new("privilege_type", DataType::Utf8, false),
-            Field::new("is_grantable", DataType::Utf8, false),
+            Field::new("is_grantable", ExtDataType::YesNo.into(), false),
         ]))
     }
 

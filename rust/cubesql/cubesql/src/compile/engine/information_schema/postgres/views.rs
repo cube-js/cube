@@ -13,20 +13,22 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-struct InformationSchemaViewsBuilder {
+use super::utils::{ExtDataType, YesNoBuilder};
+
+struct InfoSchemaViewsBuilder {
     table_catalog: StringBuilder,
     table_schema: StringBuilder,
     table_name: StringBuilder,
     view_definition: StringBuilder,
     check_option: StringBuilder,
-    is_updatable: StringBuilder,
-    is_insertable_into: StringBuilder,
-    is_trigger_updatable: StringBuilder,
-    is_trigger_deletable: StringBuilder,
-    is_trigger_insertable_into: StringBuilder,
+    is_updatable: YesNoBuilder,
+    is_insertable_into: YesNoBuilder,
+    is_trigger_updatable: YesNoBuilder,
+    is_trigger_deletable: YesNoBuilder,
+    is_trigger_insertable_into: YesNoBuilder,
 }
 
-impl InformationSchemaViewsBuilder {
+impl InfoSchemaViewsBuilder {
     fn new() -> Self {
         let capacity = 1;
 
@@ -36,11 +38,11 @@ impl InformationSchemaViewsBuilder {
             table_name: StringBuilder::new(capacity),
             view_definition: StringBuilder::new(capacity),
             check_option: StringBuilder::new(capacity),
-            is_updatable: StringBuilder::new(capacity),
-            is_insertable_into: StringBuilder::new(capacity),
-            is_trigger_updatable: StringBuilder::new(capacity),
-            is_trigger_deletable: StringBuilder::new(capacity),
-            is_trigger_insertable_into: StringBuilder::new(capacity),
+            is_updatable: YesNoBuilder::new(capacity),
+            is_insertable_into: YesNoBuilder::new(capacity),
+            is_trigger_updatable: YesNoBuilder::new(capacity),
+            is_trigger_deletable: YesNoBuilder::new(capacity),
+            is_trigger_insertable_into: YesNoBuilder::new(capacity),
         }
     }
 
@@ -67,7 +69,7 @@ pub struct InfoSchemaViewsProvider {
 
 impl InfoSchemaViewsProvider {
     pub fn new() -> Self {
-        let builder = InformationSchemaViewsBuilder::new();
+        let builder = InfoSchemaViewsBuilder::new();
 
         Self {
             data: Arc::new(builder.finish()),
@@ -92,11 +94,15 @@ impl TableProvider for InfoSchemaViewsProvider {
             Field::new("table_name", DataType::Utf8, false),
             Field::new("view_definition", DataType::Utf8, false),
             Field::new("check_option", DataType::Utf8, false),
-            Field::new("is_updatable", DataType::Utf8, false),
-            Field::new("is_insertable_into", DataType::Utf8, false),
-            Field::new("is_trigger_updatable", DataType::Utf8, false),
-            Field::new("is_trigger_deletable", DataType::Utf8, false),
-            Field::new("is_trigger_insertable_into", DataType::Utf8, false),
+            Field::new("is_updatable", ExtDataType::YesNo.into(), false),
+            Field::new("is_insertable_into", ExtDataType::YesNo.into(), false),
+            Field::new("is_trigger_updatable", ExtDataType::YesNo.into(), false),
+            Field::new("is_trigger_deletable", ExtDataType::YesNo.into(), false),
+            Field::new(
+                "is_trigger_insertable_into",
+                ExtDataType::YesNo.into(),
+                false,
+            ),
         ]))
     }
 

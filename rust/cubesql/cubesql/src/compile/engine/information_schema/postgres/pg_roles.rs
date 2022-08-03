@@ -5,7 +5,7 @@ use datafusion::{
     arrow::{
         array::{
             Array, ArrayRef, BooleanBuilder, Int32Builder, ListBuilder, StringBuilder,
-            TimestampNanosecondBuilder, UInt32Builder,
+            TimestampNanosecondBuilder,
         },
         datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
         record_batch::RecordBatch,
@@ -15,6 +15,8 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
+
+use super::utils::{ExtDataType, OidBuilder};
 
 struct PgCatalogRolesBuilder {
     rolname: StringBuilder,
@@ -29,7 +31,7 @@ struct PgCatalogRolesBuilder {
     rolvaliduntil: TimestampNanosecondBuilder,
     rolbypassrls: BooleanBuilder,
     rolconfig: ListBuilder<StringBuilder>,
-    oid: UInt32Builder,
+    oid: OidBuilder,
 }
 
 impl PgCatalogRolesBuilder {
@@ -47,16 +49,16 @@ impl PgCatalogRolesBuilder {
             rolvaliduntil: TimestampNanosecondBuilder::new(capacity),
             rolbypassrls: BooleanBuilder::new(capacity),
             rolconfig: ListBuilder::new(StringBuilder::new(capacity)),
-            oid: UInt32Builder::new(capacity),
+            oid: OidBuilder::new(capacity),
         }
     }
 
-    fn add_role(&mut self, rolname: &str) {
+    fn add_role(&mut self, rolname: impl AsRef<str>) {
         self.rolname.append_value(rolname).unwrap();
         self.rolsuper.append_value(true).unwrap();
         self.rolinherit.append_value(true).unwrap();
         self.rolcreaterole.append_value(false).unwrap();
-        self.rolcreatedb.append_value(true).unwrap();
+        self.rolcreatedb.append_value(false).unwrap();
         self.rolcanlogin.append_value(true).unwrap();
         self.rolreplication.append_value(false).unwrap();
         self.rolconnlimit.append_value(-1).unwrap();
@@ -94,7 +96,8 @@ pub struct PgCatalogRolesProvider {
 impl PgCatalogRolesProvider {
     pub fn new(role: &str) -> Self {
         let mut builder = PgCatalogRolesBuilder::new(1);
-        builder.add_role(&role);
+
+        builder.add_role(role);
 
         Self {
             data: Arc::new(builder.finish()),
@@ -122,7 +125,7 @@ impl TableProvider for PgCatalogRolesProvider {
             Field::new("rolcanlogin", DataType::Boolean, false),
             Field::new("rolreplication", DataType::Boolean, false),
             Field::new("rolconnlimit", DataType::Int32, false),
-            Field::new("rolpassword", DataType::Utf8, false),
+            Field::new("rolpassword", DataType::Utf8, true),
             Field::new(
                 "rolvaliduntil",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
@@ -134,7 +137,7 @@ impl TableProvider for PgCatalogRolesProvider {
                 DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
-            Field::new("oid", DataType::UInt32, false),
+            Field::new("oid", ExtDataType::Oid.into(), false),
         ]))
     }
 

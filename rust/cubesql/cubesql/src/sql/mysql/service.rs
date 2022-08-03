@@ -280,7 +280,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
     }
 
     fn connection_id(&self) -> u32 {
-        self.session.state.connection_id
+        self.session.state.connection_id as u32
     }
 
     async fn on_prepare<'a>(

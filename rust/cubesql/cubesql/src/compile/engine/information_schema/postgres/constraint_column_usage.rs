@@ -13,7 +13,7 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-struct InformationSchemaConstraintColumnUsageBuilder {
+struct InfoSchemaConstraintColumnUsageBuilder {
     table_catalog: StringBuilder,
     table_schema: StringBuilder,
     table_name: StringBuilder,
@@ -23,7 +23,7 @@ struct InformationSchemaConstraintColumnUsageBuilder {
     constraint_name: StringBuilder,
 }
 
-impl InformationSchemaConstraintColumnUsageBuilder {
+impl InfoSchemaConstraintColumnUsageBuilder {
     fn new() -> Self {
         let capacity = 1;
 
@@ -58,7 +58,7 @@ pub struct InfoSchemaConstraintColumnUsageProvider {
 
 impl InfoSchemaConstraintColumnUsageProvider {
     pub fn new() -> Self {
-        let builder = InformationSchemaConstraintColumnUsageBuilder::new();
+        let builder = InfoSchemaConstraintColumnUsageBuilder::new();
 
         Self {
             data: Arc::new(builder.finish()),

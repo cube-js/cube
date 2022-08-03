@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt32Builder, UInt64Builder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -15,7 +15,13 @@ use datafusion::{
 
 use crate::transport::{CubeColumn, MetaContext, V1CubeMetaExt};
 
-use super::{ext::CubeColumnMySqlExt, utils::new_string_array_with_placeholder};
+use super::{
+    ext::CubeColumnMySqlExt,
+    utils::{
+        new_string_array_with_placeholder, new_uint32_array_with_placeholder, yes_no, ExtDataType,
+        YesNoBuilder,
+    },
+};
 use crate::compile::engine::provider::TableName;
 
 struct InformationSchemaColumnsBuilder {
@@ -25,13 +31,13 @@ struct InformationSchemaColumnsBuilder {
     column_names: StringBuilder,
     ordinal_positions: UInt32Builder,
     column_default: StringBuilder,
-    is_nullable: StringBuilder,
+    is_nullable: YesNoBuilder,
     data_type: StringBuilder,
-    char_max_length: UInt32Builder,
-    char_octet_length: UInt32Builder,
+    char_max_length: Int64Builder,
+    char_octet_length: Int64Builder,
     column_type: StringBuilder,
-    numeric_scale: UInt32Builder,
-    numeric_precision: UInt32Builder,
+    numeric_scale: UInt64Builder,
+    numeric_precision: UInt64Builder,
     datetime_precision: UInt32Builder,
 }
 
@@ -46,13 +52,13 @@ impl InformationSchemaColumnsBuilder {
             column_names: StringBuilder::new(capacity),
             ordinal_positions: UInt32Builder::new(capacity),
             column_default: StringBuilder::new(capacity),
-            is_nullable: StringBuilder::new(capacity),
+            is_nullable: YesNoBuilder::new(capacity),
             data_type: StringBuilder::new(capacity),
-            char_max_length: UInt32Builder::new(capacity),
-            char_octet_length: UInt32Builder::new(capacity),
+            char_max_length: Int64Builder::new(capacity),
+            char_octet_length: Int64Builder::new(capacity),
             column_type: StringBuilder::new(capacity),
-            numeric_precision: UInt32Builder::new(capacity),
-            numeric_scale: UInt32Builder::new(capacity),
+            numeric_precision: UInt64Builder::new(capacity),
+            numeric_scale: UInt64Builder::new(capacity),
             datetime_precision: UInt32Builder::new(capacity),
         }
     }
@@ -65,31 +71,21 @@ impl InformationSchemaColumnsBuilder {
         column: &CubeColumn,
         ordinal_position: u32,
     ) {
-        self.catalog_names
-            .append_value(catalog_name.as_ref())
-            .unwrap();
-        self.schema_names
-            .append_value(schema_name.as_ref())
-            .unwrap();
-        self.table_names.append_value(table_name.as_ref()).unwrap();
+        self.catalog_names.append_value(catalog_name).unwrap();
+        self.schema_names.append_value(schema_name).unwrap();
+        self.table_names.append_value(table_name).unwrap();
         self.column_names.append_value(column.get_name()).unwrap();
         self.ordinal_positions
             .append_value(ordinal_position)
             .unwrap();
         self.column_default.append_value("").unwrap();
         self.is_nullable
-            .append_value(if column.sql_can_be_null() {
-                "YES"
-            } else {
-                "NO"
-            })
+            .append_value(yes_no(column.sql_can_be_null()))
             .unwrap();
-
         self.data_type.append_value(column.get_data_type()).unwrap();
         self.column_type
             .append_value(column.get_mysql_column_type())
             .unwrap();
-
         self.char_max_length.append_null().unwrap();
         self.char_octet_length.append_null().unwrap();
         self.numeric_precision.append_null().unwrap();
@@ -118,30 +114,15 @@ impl InformationSchemaColumnsBuilder {
         columns.push(Arc::new(self.datetime_precision.finish()));
 
         // COLUMN_KEY
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
         // EXTRA
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
         // COLUMN_COMMENT
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
         // GENERATION_EXPRESSION
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_string_array_with_placeholder(total, Some(""))));
         // SRS_ID
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(new_uint32_array_with_placeholder(total, None)));
 
         columns
     }
@@ -190,22 +171,22 @@ impl TableProvider for InfoSchemaColumnsProvider {
             Field::new("TABLE_CATALOG", DataType::Utf8, false),
             Field::new("TABLE_SCHEMA", DataType::Utf8, false),
             Field::new("TABLE_NAME", DataType::Utf8, false),
-            Field::new("COLUMN_NAME", DataType::Utf8, false),
+            Field::new("COLUMN_NAME", DataType::Utf8, true),
             Field::new("ORDINAL_POSITION", DataType::UInt32, false),
             Field::new("COLUMN_DEFAULT", DataType::Utf8, true),
-            Field::new("IS_NULLABLE", DataType::Utf8, false),
-            Field::new("DATA_TYPE", DataType::Utf8, false),
-            Field::new("CHARACTER_MAXIMUM_LENGTH", DataType::UInt32, true),
-            Field::new("CHARACTER_OCTET_LENGTH", DataType::UInt32, true),
+            Field::new("IS_NULLABLE", ExtDataType::YesNo.into(), false),
+            Field::new("DATA_TYPE", DataType::Utf8, true),
+            Field::new("CHARACTER_MAXIMUM_LENGTH", DataType::Int64, true),
+            Field::new("CHARACTER_OCTET_LENGTH", DataType::Int64, true),
             Field::new("COLUMN_TYPE", DataType::Utf8, false),
-            Field::new("NUMERIC_PRECISION", DataType::UInt32, true),
-            Field::new("NUMERIC_SCALE", DataType::UInt32, true),
+            Field::new("NUMERIC_PRECISION", DataType::UInt64, true),
+            Field::new("NUMERIC_SCALE", DataType::UInt64, true),
             Field::new("DATETIME_PRECISION", DataType::UInt32, true),
             Field::new("COLUMN_KEY", DataType::Utf8, false),
-            Field::new("EXTRA", DataType::Utf8, false),
+            Field::new("EXTRA", DataType::Utf8, true),
             Field::new("COLUMN_COMMENT", DataType::Utf8, false),
             Field::new("GENERATION_EXPRESSION", DataType::Utf8, false),
-            Field::new("SRS_ID", DataType::Utf8, true),
+            Field::new("SRS_ID", DataType::UInt32, true),
         ]))
     }
 

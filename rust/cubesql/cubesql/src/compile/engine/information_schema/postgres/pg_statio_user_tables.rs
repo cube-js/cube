@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt32Builder},
+        array::{Array, ArrayRef, Int64Builder, StringBuilder},
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
     },
@@ -14,10 +14,12 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use super::utils::{ExtDataType, Oid, OidBuilder};
+
 use crate::compile::CubeMetaTable;
 
 struct PgCatalogStatioUserTablesBuilder {
-    relid: UInt32Builder,
+    relid: OidBuilder,
     schemaname: StringBuilder,
     relname: StringBuilder,
     heap_blks_read: Int64Builder,
@@ -33,7 +35,7 @@ struct PgCatalogStatioUserTablesBuilder {
 impl PgCatalogStatioUserTablesBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            relid: UInt32Builder::new(capacity),
+            relid: OidBuilder::new(capacity),
             schemaname: StringBuilder::new(capacity),
             relname: StringBuilder::new(capacity),
             heap_blks_read: Int64Builder::new(capacity),
@@ -47,7 +49,7 @@ impl PgCatalogStatioUserTablesBuilder {
         }
     }
 
-    fn add_table(&mut self, relid: u32, schemaname: impl AsRef<str>, relname: impl AsRef<str>) {
+    fn add_table(&mut self, relid: Oid, schemaname: impl AsRef<str>, relname: impl AsRef<str>) {
         self.relid.append_value(relid).unwrap();
         self.schemaname.append_value(schemaname).unwrap();
         self.relname.append_value(relname).unwrap();
@@ -110,7 +112,7 @@ impl TableProvider for PgCatalogStatioUserTablesProvider {
 
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
-            Field::new("relid", DataType::UInt32, false),
+            Field::new("relid", ExtDataType::Oid.into(), false),
             Field::new("schemaname", DataType::Utf8, false),
             Field::new("relname", DataType::Utf8, false),
             Field::new("heap_blks_read", DataType::Int64, false),

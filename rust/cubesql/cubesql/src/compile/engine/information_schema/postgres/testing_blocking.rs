@@ -24,7 +24,7 @@ impl TableProvider for InfoSchemaTestingBlockingProvider {
     }
 
     fn schema(&self) -> SchemaRef {
-        Arc::new(Schema::new(vec![Field::new("id", DataType::UInt32, false)]))
+        Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]))
     }
 
     fn table_type(&self) -> TableType {
