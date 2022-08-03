@@ -31,6 +31,10 @@ export type Query = {
   preAggregationsLoadCacheByDataSource?: any;
   renewQuery?: boolean;
 };
+export type LambdaInfo = {
+  sqlAndParams: QueryWithParams,
+  cacheKeyQueries: any[],
+};
 
 type CacheEntry = {
   time: number;
@@ -247,7 +251,7 @@ export class QueryCache {
             ...q
           });
           if (q.useCsvQuery) {
-            return this.lambdaQuery(client, q);
+            return this.csvQuery(client, q);
           } else {
             return client.query(q.query, q.values, q);
           }
@@ -265,7 +269,7 @@ export class QueryCache {
     return this.queue[dataSource];
   }
 
-  private async lambdaQuery(client, q) {
+  private async csvQuery(client, q) {
     const tableData = await client.stream(q.query, q.values, q);
     const headers = tableData.types.map(c => c.name);
     const writer = csvWriter({
@@ -274,7 +278,9 @@ export class QueryCache {
     });
     const errors = [];
     const csvPipeline = await pipeline(tableData.rowStream, writer, (err) => {
-      errors.push(err);
+      if (err) {
+        errors.push(err);
+      }
     });
     const lines = await streamToArray(csvPipeline);
     if (tableData.release) {
@@ -386,6 +392,7 @@ export class QueryCache {
     skipRefreshKeyWaitForRenew?: boolean,
     external?: boolean,
     dataSource: string,
+    useCsvQuery?: boolean,
   }) {
     options = options || { dataSource: 'default' };
     return Promise.all(
@@ -413,6 +420,7 @@ export class QueryCache {
               external: options.external,
               requestId: options.requestId,
               dataSource: options.dataSource,
+              useCsvQuery: options.useCsvQuery,
             }
           ),
           refreshKeyValues: cacheKeyQueryResults,

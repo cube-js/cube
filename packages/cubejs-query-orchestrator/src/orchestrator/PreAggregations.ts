@@ -10,13 +10,13 @@ import {
   TO_PARTITION_RANGE,
   BUILD_RANGE_START_LOCAL,
   BUILD_RANGE_END_LOCAL,
-  utcToLocalTimeZone, timeSnap,
+  utcToLocalTimeZone,
 } from '@cubejs-backend/shared';
 
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
-import { Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
+import { LambdaInfo, Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
@@ -1113,7 +1113,7 @@ export class PreAggregationPartitionRangeLoader {
 
   protected requestId: string;
 
-  protected lambdaSql: QueryWithParams;
+  protected lambda: LambdaInfo;
 
   protected dataSource: string;
 
@@ -1131,7 +1131,7 @@ export class PreAggregationPartitionRangeLoader {
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
-    this.lambdaSql = options.lambdaSql;
+    this.lambda = options.lambda;
     this.dataSource = preAggregation.dataSource;
   }
 
@@ -1282,7 +1282,7 @@ export class PreAggregationPartitionRangeLoader {
       let lastUpdatedAt = getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt));
       let lambdaTable: InlineTable;
 
-      if (this.lambdaSql && loadResults.length > 0) {
+      if (this.lambda && loadResults.length > 0) {
         const { buildRangeEnd } = loadResults[loadResults.length - 1];
         lambdaTable = await this.downloadLambdaTable(buildRangeEnd);
         allTableTargetNames.push(lambdaTable.name);
@@ -1318,35 +1318,33 @@ export class PreAggregationPartitionRangeLoader {
    * Downloads the lambda table from the source DB.
    */
   private async downloadLambdaTable(fromDate: string): Promise<InlineTable> {
-    const [_, highNow] = timeSnap(this.preAggregation.granularity, this.now());
-    const [query, params] = this.lambdaSql;
+    const { sqlAndParams, cacheKeyQueries } = this.lambda;
+    const [query, params] = sqlAndParams;
     const values = params.map((p) => {
       if (p === FROM_PARTITION_RANGE) {
         return fromDate;
       }
       return p;
     });
-    const result = await this.queryCache.cacheQueryResult(
+    const { data } = await this.queryCache.renewQuery(
       query,
       values,
-      [query, values, highNow],
+      cacheKeyQueries,
       60 * 60,
+      [query, values],
+      undefined,
       {
-        renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold || 2 * 60,
-        renewalKey: [query, values],
-        waitForRenew: false,
-        priority: 10,
         requestId: this.requestId,
+        skipRefreshKeyWaitForRenew: false,
         dataSource: this.dataSource,
-        useInMemory: true,
+        external: false,
         useCsvQuery: true,
-        external: false
       }
     );
     return {
       name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
-      columns: result.types,
-      csvRows: result.csvRows,
+      columns: data.types,
+      csvRows: data.csvRows,
     };
   }
 
@@ -1601,7 +1599,7 @@ export class PreAggregations {
           requestId: queryBody.requestId,
           metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
-          lambdaSql: (queryBody.lambdaSql ?? {})[p.preAggregationId],
+          lambda: (queryBody.lambda ?? {})[p.preAggregationId],
           externalRefresh: this.externalRefresh
         }
       );

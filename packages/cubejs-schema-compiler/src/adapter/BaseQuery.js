@@ -558,7 +558,7 @@ class BaseQuery {
    * TODO(cristipp) Add support for subqueries and joins.
    * @returns {Record<string, Array<string>>}
    */
-  buildLambdaSqlAndParams() {
+  buildLambda() {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
     const result = {};
     if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
@@ -586,7 +586,12 @@ class BaseQuery {
           preAggregationQuery: true,
         }
       );
-      result[this.preAggregations.preAggregationId(preAggForQuery)] = lambdaQuery.buildSqlAndParams();
+      const sqlAndParams = lambdaQuery.buildSqlAndParams();
+      const cacheKeyQueries = this.evaluateSymbolSqlWithContext(
+        () => this.refreshKeysByCubes([preAggForQuery.cube]),
+        { preAggregationQuery: true }
+      );
+      result[this.preAggregations.preAggregationId(preAggForQuery)] = { sqlAndParams, cacheKeyQueries };
     }
     return result;
   }

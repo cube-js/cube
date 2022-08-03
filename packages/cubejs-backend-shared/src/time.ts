@@ -38,11 +38,6 @@ export const timeSeries = (granularity: string, dateRange: QueryDateRange): Quer
   return TIME_SERIES[granularity](range);
 };
 
-export const timeSnap = (granularity: string, date: string): QueryDateRange => {
-  const series = timeSeries(granularity, [date, date]);
-  return series[0];
-};
-
 export const FROM_PARTITION_RANGE = '__FROM_PARTITION_RANGE';
 
 export const TO_PARTITION_RANGE = '__TO_PARTITION_RANGE';
