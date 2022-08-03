@@ -19,8 +19,7 @@ table HttpTable {
     name: string;
     columns: [string];
     types: [string];
-    // Either rows or csv_rows.
-    rows: [HttpRow];
+    // csv format to replicate the usual csv import path.
     csv_rows: string;
 }
 

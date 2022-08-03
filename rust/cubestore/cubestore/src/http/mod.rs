@@ -7,13 +7,13 @@ use warp::{Filter, Rejection, Reply};
 use crate::codegen::http_message_generated::{
     get_root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
     HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
-    HttpRowArgs, HttpTable, HttpTableArgs,
+    HttpRowArgs,
 };
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
 use crate::sql::{SqlQueryContext, SqlService};
 use crate::store::DataFrame;
-use crate::table::{Row, TableValue};
+use crate::table::TableValue;
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use async_std::fs::File;
@@ -400,38 +400,15 @@ impl HttpMessage {
                 } => {
                     let query_offset = builder.create_string(&query);
                     let trace_obj_offset = trace_obj.as_ref().map(|o| builder.create_string(o));
-                    let mut inline_tables_offsets = Vec::with_capacity(inline_tables.len());
-                    for (name, inline_table) in inline_tables.iter() {
-                        let name_offset = builder.create_string(&name);
-                        let columns_vec =
-                            HttpMessage::build_columns(&mut builder, inline_table.get_columns());
-                        let types_vec =
-                            HttpMessage::build_types(&mut builder, inline_table.get_columns());
-                        let rows_vec = HttpMessage::build_rows(&mut builder, inline_table.clone());
-                        let inline_table_offset = HttpTable::create(
-                            &mut builder,
-                            &HttpTableArgs {
-                                name: Some(name_offset),
-                                columns: Some(columns_vec),
-                                types: Some(types_vec),
-                                csv_rows: None,
-                                rows: Some(rows_vec),
-                            },
-                        );
-                        inline_tables_offsets.push(inline_table_offset);
+                    if !inline_tables.is_empty() {
+                        panic!("Not implemented")
                     }
-                    let inline_tables_offset =
-                        builder.create_vector(inline_tables_offsets.as_slice());
                     Some(
                         HttpQuery::create(
                             &mut builder,
                             &HttpQueryArgs {
                                 query: Some(query_offset),
-                                inline_tables: if inline_tables.is_empty() {
-                                    None
-                                } else {
-                                    Some(inline_tables_offset)
-                                },
+                                inline_tables: None,
                                 trace_obj: trace_obj_offset,
                             },
                         )
@@ -484,19 +461,6 @@ impl HttpMessage {
             .collect::<Vec<_>>();
         let columns_vec = builder.create_vector_of_strings(columns.as_slice());
         columns_vec
-    }
-
-    fn build_types<'a: 'ma, 'ma>(
-        builder: &'ma mut FlatBufferBuilder<'a>,
-        columns: &Vec<Column>,
-    ) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
-        let types = columns
-            .iter()
-            .map(|c| c.get_column_type().to_string())
-            .collect::<Vec<_>>();
-        let str_types = types.iter().map(|t| t.as_str()).collect::<Vec<_>>();
-        let types_vec = builder.create_vector_of_strings(str_types.as_slice());
-        types_vec
     }
 
     fn build_rows<'a: 'ma, 'ma>(
@@ -582,30 +546,7 @@ impl HttpMessage {
                                 .enumerate()
                                 .map(|(i, name)| Column::new(name.to_string(), types[i].clone(), i))
                                 .collect::<Vec<_>>();
-                            let rows = if inline_table.rows().is_some() {
-                                inline_table
-                                    .rows()
-                                    .unwrap()
-                                    .iter()
-                                    .map(|r| {
-                                        let values = r
-                                            .values()
-                                            .unwrap()
-                                            .iter()
-                                            .enumerate()
-                                            .map(|(i, v)| {
-                                                v.string_value().map_or(Ok(TableValue::Null), |v| {
-                                                    ImportFormat::parse_column_value_str(
-                                                        &columns[i],
-                                                        v,
-                                                    )
-                                                })
-                                            })
-                                            .collect::<Result<Vec<_>, CubeError>>();
-                                        values.map(|values| Row::new(values))
-                                    })
-                                    .collect::<Result<Vec<_>, CubeError>>()?
-                            } else if inline_table.csv_rows().is_some() {
+                            let rows = if inline_table.csv_rows().is_some() {
                                 let csv_rows = inline_table.csv_rows().unwrap().to_owned();
                                 let csv_reader = Box::pin(BufReader::new(csv_rows.as_bytes()));
                                 let mut rows_stream = ImportFormat::CSVNoHeader
@@ -652,6 +593,20 @@ mod tests {
     use crate::table::{Row, TableValue};
     use indoc::indoc;
     use std::sync::Arc;
+    use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
+
+    fn build_types<'a: 'ma, 'ma>(
+        builder: &'ma mut FlatBufferBuilder<'a>,
+        columns: &Vec<Column>,
+    ) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
+        let types = columns
+            .iter()
+            .map(|c| c.get_column_type().to_string())
+            .collect::<Vec<_>>();
+        let str_types = types.iter().map(|t| t.as_str()).collect::<Vec<_>>();
+        let types_vec = builder.create_vector_of_strings(str_types.as_slice());
+        types_vec
+    }
 
     #[tokio::test]
     async fn query_test() {
@@ -670,58 +625,6 @@ mod tests {
 
     #[tokio::test]
     async fn inline_tables_query_test() {
-        let columns = vec![
-            Column::new("ID".to_string(), ColumnType::Int, 0),
-            Column::new("LastName".to_string(), ColumnType::String, 1),
-            Column::new("FirstName".to_string(), ColumnType::String, 2),
-            Column::new("Timestamp".to_string(), ColumnType::Timestamp, 3),
-        ];
-        let rows = vec![
-            Row::new(vec![
-                TableValue::Null,
-                TableValue::String("Last 1".to_string()),
-                TableValue::String("First 1".to_string()),
-                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
-            ]),
-            Row::new(vec![
-                TableValue::Int(2),
-                TableValue::Null,
-                TableValue::String("First 2".to_string()),
-                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
-            ]),
-            Row::new(vec![
-                TableValue::Int(3),
-                TableValue::String("Last 3".to_string()),
-                TableValue::String("First 3".to_string()),
-                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
-            ]),
-            Row::new(vec![
-                TableValue::Int(4),
-                TableValue::String("Last 4".to_string()),
-                TableValue::String("First 4".to_string()),
-                TableValue::Null,
-            ]),
-        ];
-        let data = Arc::new(DataFrame::new(columns, rows.clone()));
-
-        let message = HttpMessage {
-            message_id: 1234,
-            command: HttpCommand::Query {
-                query: "test query".to_string(),
-                inline_tables: vec![
-                    ("table0".to_string(), data.clone()),
-                    ("table1".to_string(), data.clone()),
-                ],
-                trace_obj: Some("test trace".to_string()),
-            },
-        };
-        let bytes = message.bytes();
-        let output_message = HttpMessage::read(bytes).await.unwrap();
-        assert_eq!(message, output_message);
-    }
-
-    #[tokio::test]
-    async fn csv_rows_test() {
         let columns = vec![
             Column::new("A".to_string(), ColumnType::Int, 0),
             Column::new("B".to_string(), ColumnType::String, 1),
@@ -760,7 +663,7 @@ mod tests {
         let mut inline_tables_offsets = Vec::with_capacity(1);
         let name_offset = builder.create_string("table");
         let columns_vec = HttpMessage::build_columns(&mut builder, &columns);
-        let types_vec = HttpMessage::build_types(&mut builder, &columns);
+        let types_vec = build_types(&mut builder, &columns);
         let csv_rows_value = builder.create_string(csv_rows);
         let inline_table_offset = HttpTable::create(
             &mut builder,
@@ -768,7 +671,6 @@ mod tests {
                 name: Some(name_offset),
                 columns: Some(columns_vec),
                 types: Some(types_vec),
-                rows: None,
                 csv_rows: Some(csv_rows_value),
             },
         );
