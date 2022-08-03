@@ -2,15 +2,15 @@ use crate::{
     compile::{
         engine::provider::CubeContext,
         rewrite::{
-            analysis::LogicalPlanAnalysis, binary_expr, cast_expr, column_expr, fun_expr,
-            literal_expr, literal_string, negative_expr, rewrite, rewriter::RewriteRules,
-            to_day_interval_expr, transforming_rewrite, udf_expr, LiteralExprValue,
-            LogicalPlanLanguage,
+            agg_fun_expr, analysis::LogicalPlanAnalysis, binary_expr, cast_expr, column_expr,
+            fun_expr, literal_expr, literal_string, negative_expr, rewrite, rewriter::RewriteRules,
+            to_day_interval_expr, transforming_rewrite, udf_expr, CastExprDataType,
+            LiteralExprValue, LogicalPlanLanguage,
         },
     },
     var, var_iter,
 };
-use datafusion::scalar::ScalarValue;
+use datafusion::{arrow::datatypes::DataType, scalar::ScalarValue};
 use egg::{EGraph, Rewrite, Subst};
 use std::sync::Arc;
 
@@ -323,6 +323,16 @@ impl RewriteRules for DateRules {
                     vec!["?granularity".to_string(), column_expr("?column")],
                 ),
             ),
+            transforming_rewrite(
+                "unwrap-cast-to-date",
+                agg_fun_expr(
+                    "?aggr_fun",
+                    vec![cast_expr(column_expr("?column"), "?data_type")],
+                    "?distinct",
+                ),
+                agg_fun_expr("?aggr_fun", vec![column_expr("?column")], "?distinct"),
+                self.unwrap_cast_to_date("?data_type"),
+            ),
         ]
     }
 }
@@ -345,6 +355,28 @@ impl DateRules {
                     ScalarValue::IntervalYearMonth(_)
                     | ScalarValue::IntervalDayTime(_)
                     | ScalarValue::IntervalMonthDayNano(_) => return true,
+                    _ => (),
+                }
+            }
+
+            false
+        }
+    }
+
+    fn unwrap_cast_to_date(
+        &self,
+        data_type_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let data_type_var = var!(data_type_var);
+        move |egraph, subst| {
+            for node in egraph[subst[data_type_var]].nodes.iter() {
+                match node {
+                    LogicalPlanLanguage::CastExprDataType(expr) => match expr {
+                        CastExprDataType(DataType::Date32) | CastExprDataType(DataType::Date64) => {
+                            return true
+                        }
+                        _ => (),
+                    },
                     _ => (),
                 }
             }

@@ -628,13 +628,13 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "between-move-interval-beyond-equal-sign",
                 between_expr(
-                    binary_expr(column_expr("?column"), "+", "?interval"),
+                    binary_expr("?expr", "+", "?interval"),
                     "?negated",
                     "?low",
                     "?high",
                 ),
                 between_expr(
-                    column_expr("?column"),
+                    "?expr",
                     "?negated",
                     binary_expr("?low", "-", "?interval"),
                     binary_expr("?high", "-", "?interval"),
@@ -1566,7 +1566,9 @@ impl FilterRules {
                 members_var,
                 table_name_var,
             ) {
-                if let Some(_) = cube.lookup_dimension_by_member_name(&member_name) {
+                if cube.lookup_measure_by_member_name(&member_name).is_some()
+                    || cube.lookup_dimension_by_member_name(&member_name).is_some()
+                {
                     for negated in var_iter!(egraph[subst[negated_var]], BetweenExprNegated) {
                         let negated = *negated;
                         if let Some(ConstantFolding::Scalar(low)) =
@@ -1645,7 +1647,9 @@ impl FilterRules {
                 members_var,
                 table_name_var,
             ) {
-                if let Some(_) = cube.lookup_dimension_by_member_name(&member_name) {
+                if cube.lookup_measure_by_member_name(&member_name).is_some()
+                    || cube.lookup_dimension_by_member_name(&member_name).is_some()
+                {
                     for negated in var_iter!(egraph[subst[negated_var]], BetweenExprNegated) {
                         match cube.member_type(&member_name) {
                             Some(MemberType::Number) if &is_negated == negated => return true,
