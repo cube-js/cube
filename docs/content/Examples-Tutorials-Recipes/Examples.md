@@ -1,5 +1,6 @@
 ---
-title: Overview
+title: Examples Overview
+menuTitle: Overview
 permalink: /examples
 category: Examples & Tutorials
 redirect_from:

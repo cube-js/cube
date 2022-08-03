@@ -1,5 +1,6 @@
 ---
-title: Introduction
+title: Introduction to Frontend Integrations
+menuTitle: Introduction
 frameworkOfChoice: vanilla
 permalink: /frontend-introduction
 category: Frontend Integrations
