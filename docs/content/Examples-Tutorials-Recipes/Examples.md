@@ -3,7 +3,7 @@ title: Overview
 permalink: /examples
 category: Examples & Tutorials
 redirect_from:
-  - /tutorials/
+  - /tutorials
 ---
 
 Below you can find tutorials to help you get started with Cube.js.
