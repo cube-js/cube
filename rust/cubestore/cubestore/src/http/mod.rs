@@ -591,9 +591,9 @@ mod tests {
     use crate::sql::timestamp_from_string;
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
+    use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
     use indoc::indoc;
     use std::sync::Arc;
-    use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 
     fn build_types<'a: 'ma, 'ma>(
         builder: &'ma mut FlatBufferBuilder<'a>,
