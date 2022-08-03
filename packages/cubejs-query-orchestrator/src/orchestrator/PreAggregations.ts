@@ -1113,7 +1113,7 @@ export class PreAggregationPartitionRangeLoader {
 
   protected requestId: string;
 
-  protected lambda: LambdaInfo;
+  protected lambdaInfo: LambdaInfo;
 
   protected dataSource: string;
 
@@ -1131,7 +1131,7 @@ export class PreAggregationPartitionRangeLoader {
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
-    this.lambda = options.lambda;
+    this.lambdaInfo = options.lambdaInfo;
     this.dataSource = preAggregation.dataSource;
   }
 
@@ -1282,7 +1282,7 @@ export class PreAggregationPartitionRangeLoader {
       let lastUpdatedAt = getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt));
       let lambdaTable: InlineTable;
 
-      if (this.lambda && loadResults.length > 0) {
+      if (this.lambdaInfo && loadResults.length > 0) {
         const { buildRangeEnd } = loadResults[loadResults.length - 1];
         lambdaTable = await this.downloadLambdaTable(buildRangeEnd);
         allTableTargetNames.push(lambdaTable.name);
@@ -1318,7 +1318,7 @@ export class PreAggregationPartitionRangeLoader {
    * Downloads the lambda table from the source DB.
    */
   private async downloadLambdaTable(fromDate: string): Promise<InlineTable> {
-    const { sqlAndParams, cacheKeyQueries } = this.lambda;
+    const { sqlAndParams, cacheKeyQueries } = this.lambdaInfo;
     const [query, params] = sqlAndParams;
     const values = params.map((p) => {
       if (p === FROM_PARTITION_RANGE) {
@@ -1599,7 +1599,7 @@ export class PreAggregations {
           requestId: queryBody.requestId,
           metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
-          lambda: (queryBody.lambda ?? {})[p.preAggregationId],
+          lambdaInfo: (queryBody.lambdaInfo ?? {})[p.preAggregationId],
           externalRefresh: this.externalRefresh
         }
       );

@@ -558,7 +558,7 @@ class BaseQuery {
    * TODO(cristipp) Add support for subqueries and joins.
    * @returns {Record<string, Array<string>>}
    */
-  buildLambda() {
+  buildLambdaInfo() {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
     const result = {};
     if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
