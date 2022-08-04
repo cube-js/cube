@@ -77,6 +77,7 @@ describe('lambda', () => {
       },
       {
         schemaDir: 'lambda/schema',
+        cubejsConfig: 'lambda/cube.js',
       }
     );
     client = cubejs(async () => 'test', {

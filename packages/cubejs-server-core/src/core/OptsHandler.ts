@@ -109,17 +109,7 @@ export class OptsHandler {
   private assertDriverFactoryResult(
     val: DriverConfig | BaseDriver,
   ) {
-    let isDriverInstance = val instanceof BaseDriver;
-    if (!isDriverInstance && val && val.constructor) {
-      let end = false;
-      let obj = val.constructor;
-      while (!isDriverInstance && !end) {
-        obj = Object.getPrototypeOf(obj);
-        end = !obj;
-        isDriverInstance = obj && obj.name ? obj.name === 'BaseDriver' : false;
-      }
-    }
-    if (isDriverInstance) {
+    if (val instanceof BaseDriver) {
       // TODO (buntarb): these assertions should be restored after dbType
       // deprecation period will be passed.
       //
@@ -149,7 +139,7 @@ export class OptsHandler {
       }
       return <BaseDriver>val;
     } else if (
-      val && (<DriverConfig>val).type && typeof (<DriverConfig>val).type === 'string'
+      val && val.type && typeof val.type === 'string'
     ) {
       if (!this.driverFactoryType) {
         this.driverFactoryType = 'DriverConfig';
@@ -694,12 +684,13 @@ export class OptsHandler {
     // pre-aggs external refresh flag (force to run pre-aggs build flow first if
     // pre-agg is not exists/updated at the query moment). Initially the default
     // was equal to [rollupOnlyMode && !scheduledRefreshTimer].
-    if (clone.preAggregationsOptions.externalRefresh === undefined) {
-      clone.preAggregationsOptions.externalRefresh =
-        this.isPreAggsBuilder()
-          ? false
-          : clone.rollupOnlyMode && !this.configuredForScheduledRefresh();
-    }
+    clone.preAggregationsOptions.externalRefresh =
+      clone.preAggregationsOptions.externalRefresh !== undefined
+        ? clone.preAggregationsOptions.externalRefresh
+        : (
+          !this.isPreAggsBuilder() ||
+          clone.rollupOnlyMode && !this.configuredForScheduledRefresh()
+        );
 
     return clone;
   }
