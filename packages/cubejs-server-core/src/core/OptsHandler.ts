@@ -694,13 +694,12 @@ export class OptsHandler {
     // pre-aggs external refresh flag (force to run pre-aggs build flow first if
     // pre-agg is not exists/updated at the query moment). Initially the default
     // was equal to [rollupOnlyMode && !scheduledRefreshTimer].
-    clone.preAggregationsOptions.externalRefresh =
-      clone.preAggregationsOptions.externalRefresh !== undefined
-        ? clone.preAggregationsOptions.externalRefresh
-        : (
-          !this.isPreAggsBuilder() ||
-          clone.rollupOnlyMode && !this.configuredForScheduledRefresh()
-        );
+    if (clone.preAggregationsOptions.externalRefresh === undefined) {
+      clone.preAggregationsOptions.externalRefresh =
+        this.isPreAggsBuilder()
+          ? false
+          : clone.rollupOnlyMode && !this.configuredForScheduledRefresh();
+    }
 
     return clone;
   }
