@@ -52,6 +52,8 @@ use super::information_schema::postgres::{
     PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
+use super::information_schema::redshift::RedshiftSvvTablesTableProvider;
+
 #[derive(Clone)]
 pub struct CubeContext {
     /// Internal state for the context (default)
@@ -322,6 +324,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_statio_user_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogSequenceProvider>() {
             "pg_catalog.pg_sequence".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
+            "public.svv_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
             "information_schema.constraint_column_usage".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaViewsProvider>() {
@@ -385,7 +389,18 @@ impl DatabaseProtocol {
                 {
                     return Some(Arc::new(CubeTableProvider::new(cube.clone())));
                     // TODO .clone()
-                }
+                };
+
+                // TODO: Move to pg_catalog, support SEARCH PATH.
+                // Redshift
+                match table.as_str() {
+                    "svv_tables" => {
+                        return Some(Arc::new(RedshiftSvvTablesTableProvider::new(
+                            &context.meta.cubes,
+                        )))
+                    }
+                    _ => {}
+                };
             }
             "information_schema" => match table.as_str() {
                 "columns" => {
