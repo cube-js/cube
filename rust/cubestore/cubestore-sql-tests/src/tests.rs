@@ -2218,7 +2218,7 @@ async fn create_table_with_location_and_hyperloglog_space_separated(service: Box
     let paths = {
         let dir = env::temp_dir();
 
-        let path_1 = dir.clone().join("hyperloglog-pg.csv");
+        let path_1 = dir.clone().join("hyperloglog-ssep.csv");
         let mut file = File::create(path_1.clone()).unwrap();
 
         file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
@@ -2245,7 +2245,7 @@ async fn create_table_with_location_and_hyperloglog_space_separated(service: Box
         .await
         .unwrap();
     let _ = service
-        .exec_query(&format!("CREATE TABLE hll.locations_pg (id int, hll varbinary, hll_base varbinary) LOCATION {}", 
+        .exec_query(&format!("CREATE TABLE hll.locations_ssep (id int, hll varbinary, hll_base varbinary) LOCATION {}", 
             paths
                 .into_iter()
                 .map(|p| format!("'{}'", p.to_string_lossy()))
@@ -2255,7 +2255,7 @@ async fn create_table_with_location_and_hyperloglog_space_separated(service: Box
         .unwrap();
 
     let res = service
-        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_pg GROUP BY id")
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_ssep GROUP BY id")
         .await
         .unwrap();
     assert_eq!(
@@ -2266,7 +2266,7 @@ async fn create_table_with_location_and_hyperloglog_space_separated(service: Box
         ]
     );
     let res = service
-        .exec_query("SELECT hll, hll_base FROM hll.locations_pg")
+        .exec_query("SELECT hll, hll_base FROM hll.locations_ssep")
         .await
         .unwrap();
     for r in to_rows(&res).iter() {
