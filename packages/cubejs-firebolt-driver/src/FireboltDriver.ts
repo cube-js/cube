@@ -52,6 +52,9 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
         username: <string>process.env.CUBEJS_DB_USER,
         password: <string>process.env.CUBEJS_DB_PASS,
         database: <string>process.env.CUBEJS_DB_NAME,
+        account: <string>process.env.CUBEJS_FIREBOLT_ACCOUNT,
+        engineName: <string>process.env.CUBEJS_FIREBOLT_ENGINE_NAME,
+        // engineEndpoint was deprecated in favor of engineName + account
         engineEndpoint: <string>process.env.CUBEJS_FIREBOLT_ENGINE_ENDPOINT,
         ...(config.connection || {}),
       },
@@ -157,43 +160,77 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
     query: string,
     parameters: unknown[]
   ): Promise<StreamTableData> {
-    const connection = await this.getConnection();
+    return this.streamResponse(query, parameters);
+  }
 
-    const statement = await connection.execute(query, {
-      settings: { output_format: OutputFormat.JSON },
-      parameters,
-      response: { hydrateRow: this.hydrateRow }
-    });
+  private async streamResponse(
+    query: string,
+    parameters: unknown[],
+    retry = true
+  ): Promise<StreamTableData> {
+    try {
+      const connection = await this.getConnection();
 
-    const { data: rowStream, meta: metaPromise } =
-      await statement.streamResult();
-    const meta = await metaPromise;
+      const statement = await connection.execute(query, {
+        settings: { output_format: OutputFormat.JSON },
+        parameters,
+        response: { hydrateRow: this.hydrateRow }
+      });
 
-    const types = meta.map(({ type, name }) => ({
-      name,
-      type: this.toGenericType(type),
-    }));
+      const { data: rowStream, meta: metaPromise } =
+        await statement.streamResult();
+      const meta = await metaPromise;
 
-    return {
-      rowStream,
-      types,
-    };
+      const types = meta.map(({ type, name }) => ({
+        name,
+        type: this.toGenericType(type),
+      }));
+
+      return {
+        rowStream,
+        types,
+      };
+    } catch (error) {
+      if (error.status === 404 && retry) {
+        await this.ensureEngineRunning();
+        return this.streamResponse(query, parameters, false);
+      }
+      throw error;
+    }
   }
 
   public async unload(): Promise<DownloadTableCSVData> {
     throw new Error('Unload is not supported');
   }
 
-  private async queryResponse(query: string, parameters?: unknown[]) {
-    const connection = await this.getConnection();
+  private async ensureEngineRunning() {
+    if (this.config.connection.engineName) {
+      const engine = await this.firebolt.resourceManager.engine.getByName(this.config.connection.engineName);
+      await engine.startAndWait();
+    }
+  }
 
-    const statement = await connection.execute(query, {
-      settings: { output_format: OutputFormat.JSON },
-      parameters,
-      response: { hydrateRow: this.hydrateRow }
-    });
-    const response = await statement.fetchResult();
-    return response;
+  private async queryResponse(query: string, parameters?: unknown[], retry = true): Promise<{
+    data: Row[];
+    meta: Meta[];
+  }> {
+    try {
+      const connection = await this.getConnection();
+
+      const statement = await connection.execute(query, {
+        settings: { output_format: OutputFormat.JSON },
+        parameters,
+        response: { hydrateRow: this.hydrateRow }
+      });
+      const response = await statement.fetchResult();
+      return response;
+    } catch (error) {
+      if (error.status === 404 && retry) {
+        await this.ensureEngineRunning();
+        return this.queryResponse(query, parameters, false);
+      }
+      throw error;
+    }
   }
 
   /* eslint-disable camelcase */
