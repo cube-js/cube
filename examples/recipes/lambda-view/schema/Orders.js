@@ -48,9 +48,6 @@ cube(`Orders`, {
             buildRangeEnd: {
                 sql: `SELECT DATE('2020-06-7')`,
             },
-            refreshKey: {
-                every: 'never',
-            },
         },
     },
 });

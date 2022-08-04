@@ -2,12 +2,11 @@ import WebSocket from 'ws';
 import { flatbuffers } from 'flatbuffers';
 import { InlineTables } from '@cubejs-backend/query-orchestrator';
 import {
-  HttpColumnValue,
   HttpCommand,
   HttpError,
   HttpMessage,
   HttpQuery,
-  HttpResultSet, HttpRow,
+  HttpResultSet,
   HttpTable
 } from '../codegen/HttpMessage';
 

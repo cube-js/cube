@@ -71,8 +71,9 @@ describe('lambda', () => {
         CUBEJS_DB_PASS: 'test',
         CUBEJS_PLAYGROUND_AUTH_SECRET: 'SECRET',
         CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'true',
-        CUBEJS_REFRESH_WORKER: 'true',
         CUBEJS_ROLLUP_ONLY: 'true',
+        CUBEJS_REFRESH_WORKER: 'false',
+        CUBEJS_PRE_AGGREGATIONS_BUILDER: 'true',
       },
       {
         schemaDir: 'lambda/schema',

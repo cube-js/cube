@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
-import { parse } from 'csv-parse';
 import LRUCache from 'lru-cache';
 import { pipeline } from 'stream';
 import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
