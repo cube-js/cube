@@ -236,7 +236,7 @@ pub(crate) fn parse_space_separated_binstring<'a>(
 
 fn parse_binary_data(value: &str) -> Result<Vec<u8>, CubeError> {
     let mut data = Vec::new();
-    
+
     if value.contains(' ') {
         parse_space_separated_binstring(&mut data, value)?;
     } else {
