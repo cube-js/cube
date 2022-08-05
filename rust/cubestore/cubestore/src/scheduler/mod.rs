@@ -278,13 +278,7 @@ impl SchedulerImpl {
             self.meta_store.all_inactive_not_uploaded_chunks().await?;
 
         for chunk in all_inactive_not_uploaded_chunks.iter() {
-            let seconds = if chunk.get_row().in_memory() {
-                //TODO Config. It is also necessary to study whether this does not lead to inconsistency when executing queries
-                30
-            } else {
-                self.config.import_job_timeout()
-            };
-            let deadline = Instant::now() + Duration::from_secs(seconds);
+            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
             self.gc_loop
                 .send(GCTimedTask {
                     deadline,
@@ -300,7 +294,13 @@ impl SchedulerImpl {
         let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
 
         for chunk in all_inactive_chunks.iter() {
-            let deadline = Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+            let seconds = if chunk.get_row().in_memory() {
+                //TODO Config. It is also necessary to study whether this does not lead to inconsistency when executing queries
+                30
+            } else {
+                self.config.not_used_timeout()
+            };
+            let deadline = Instant::now() + Duration::from_secs(seconds);
             self.gc_loop
                 .send(GCTimedTask {
                     deadline,
