@@ -444,7 +444,6 @@ impl ChunkDataStore for ChunkStore {
             return Ok(());
         }
 
-
         new_chunks.append(
             &mut self
                 .partition_rows(partition.get_row().get_index_id(), columns, in_memory)
