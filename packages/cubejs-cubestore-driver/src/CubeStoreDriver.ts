@@ -9,7 +9,7 @@ import {
   DownloadTableCSVData,
   DownloadTableMemoryData, DriverInterface, IndexesSQL,
   StreamTableData,
-  StreamingSourceTableData, QueryOptions, InlineTable,
+  StreamingSourceTableData, QueryOptions,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv } from '@cubejs-backend/shared';
 import { format as formatSql } from 'sqlstring';
