@@ -386,11 +386,19 @@ impl ChunkDataStore for ChunkStore {
                     &batches.iter().map(|b| b.column(i).as_ref()).collect_vec(),
                 )?)
             }
-            new_chunks.append(
-                &mut self
-                    .partition_rows(partition.get_row().get_index_id(), columns, false)
-                    .await?,
-            );
+            if columns.len() == 0 {
+                self.meta_store.deactivate_chunk(chunk_id).await?;
+            } else {
+                new_chunks.append(
+                    &mut self
+                        .partition_rows(partition.get_row().get_index_id(), columns, false)
+                        .await?,
+                );
+            }
+        }
+
+        if new_chunks.len() == 0 {
+            return Ok(());
         }
 
         let new_chunk_ids: Result<Vec<(u64, Option<u64>)>, CubeError> = join_all(new_chunks)
