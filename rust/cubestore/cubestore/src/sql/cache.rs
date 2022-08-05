@@ -1,4 +1,5 @@
 use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::sql::InlineTables;
 use crate::store::DataFrame;
 use crate::CubeError;
 use futures::Future;
@@ -6,7 +7,6 @@ use log::trace;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::{watch, RwLock};
-use crate::sql::InlineTables;
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub struct SqlResultCacheKey {
@@ -117,6 +117,7 @@ mod tests {
     use crate::queryplanner::serialized_plan::SerializedPlan;
     use crate::queryplanner::PlanningMeta;
     use crate::sql::cache::SqlResultCache;
+    use crate::sql::InlineTables;
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
     use crate::CubeError;
@@ -128,7 +129,6 @@ mod tests {
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
     use std::time::Duration;
-    use crate::sql::InlineTables;
 
     #[tokio::test]
     async fn simple() -> Result<(), CubeError> {

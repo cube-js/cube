@@ -5,7 +5,7 @@ use async_compression::tokio::write::GzipEncoder;
 use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
-use cubestore::sql::{timestamp_from_string, SqlQueryContext, InlineTable};
+use cubestore::sql::{timestamp_from_string, InlineTable, SqlQueryContext};
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;

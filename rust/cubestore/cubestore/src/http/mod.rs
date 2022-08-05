@@ -561,7 +561,10 @@ impl HttpMessage {
                             } else {
                                 vec![]
                             };
-                            inline_tables.push(InlineTable::new(name, Arc::new(DataFrame::new(columns, rows))));
+                            inline_tables.push(InlineTable::new(
+                                name,
+                                Arc::new(DataFrame::new(columns, rows)),
+                            ));
                         }
                     };
                     HttpCommand::Query {
@@ -588,7 +591,7 @@ mod tests {
     };
     use crate::http::{HttpCommand, HttpMessage};
     use crate::metastore::{Column, ColumnType};
-    use crate::sql::{InlineTable, timestamp_from_string};
+    use crate::sql::{timestamp_from_string, InlineTable};
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
     use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};

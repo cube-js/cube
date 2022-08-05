@@ -138,7 +138,7 @@ impl SqlQueryContext {
 
     pub fn with_inline_tables(&self, inline_tables: &InlineTables) -> Self {
         let mut res = self.clone();
-res.inline_tables = inline_tables.clone();
+        res.inline_tables = inline_tables.clone();
         res
     }
 
@@ -602,10 +602,7 @@ impl SqlServiceImpl {
 
         let query_plan = self
             .query_planner
-            .logical_plan(
-                DFStatement::Statement(statement),
-                &InlineTables::new(),
-            )
+            .logical_plan(DFStatement::Statement(statement), &InlineTables::new())
             .await?;
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
@@ -1070,28 +1067,37 @@ impl SqlService for SqlServiceImpl {
                         timeout(
                             self.query_timeout,
                             self.cache
-                                .get(query, &context.inline_tables, serialized, async move |plan| {
-                                    let records;
-                                    if workers.len() == 0 {
-                                        records =
-                                            executor.execute_router_plan(plan, cluster).await?.1;
-                                    } else {
-                                        // Pick one of the workers to run as main for the request.
-                                        let i = thread_rng().sample(Uniform::new(0, workers.len()));
-                                        let rs = cluster.route_select(&workers[i], plan).await?.1;
-                                        records = rs
-                                            .into_iter()
-                                            .map(|r| r.read())
-                                            .collect::<Result<Vec<_>, _>>()?;
-                                    }
-                                    Ok(cube_ext::spawn_blocking(
-                                        move || -> Result<DataFrame, CubeError> {
-                                            let df = batch_to_dataframe(&records)?;
-                                            Ok(df)
-                                        },
-                                    )
-                                    .await??)
-                                })
+                                .get(
+                                    query,
+                                    &context.inline_tables,
+                                    serialized,
+                                    async move |plan| {
+                                        let records;
+                                        if workers.len() == 0 {
+                                            records = executor
+                                                .execute_router_plan(plan, cluster)
+                                                .await?
+                                                .1;
+                                        } else {
+                                            // Pick one of the workers to run as main for the request.
+                                            let i =
+                                                thread_rng().sample(Uniform::new(0, workers.len()));
+                                            let rs =
+                                                cluster.route_select(&workers[i], plan).await?.1;
+                                            records = rs
+                                                .into_iter()
+                                                .map(|r| r.read())
+                                                .collect::<Result<Vec<_>, _>>()?;
+                                        }
+                                        Ok(cube_ext::spawn_blocking(
+                                            move || -> Result<DataFrame, CubeError> {
+                                                let df = batch_to_dataframe(&records)?;
+                                                Ok(df)
+                                            },
+                                        )
+                                        .await??)
+                                    },
+                                )
                                 .with_current_subscriber(),
                         )
                         .await??
