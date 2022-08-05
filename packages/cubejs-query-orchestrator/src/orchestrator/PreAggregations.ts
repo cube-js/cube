@@ -1109,11 +1109,16 @@ export class PreAggregationPartitionRangeLoader {
 
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
     const [query, values, queryOptions]: QueryTuple = rangeQuery;
+    const invalidate =
+      this.preAggregation.invalidateKeyQueries &&
+      this.preAggregation.invalidateKeyQueries[0]
+        ? this.preAggregation.invalidateKeyQueries[0].slice(0, 2)
+        : false;
 
     return this.queryCache.cacheQueryResult(
       query,
       values,
-      QueryCache.queryCacheKey({ query, values }),
+      QueryCache.queryCacheKey({ query, values, invalidate }),
       24 * 60 * 60,
       {
         renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold

@@ -190,7 +190,15 @@ export class QueryCache {
   }
 
   public static queryCacheKey(queryBody) {
-    return [queryBody.query, queryBody.values, (queryBody.preAggregations || []).map(p => p.loadSql)];
+    const key = [
+      queryBody.query,
+      queryBody.values,
+      (queryBody.preAggregations || []).map(p => p.loadSql)
+    ];
+    if (queryBody.invalidate) {
+      key.push(queryBody.invalidate);
+    }
+    return key;
   }
 
   protected static replaceAll(replaceThis, withThis, inThis) {
