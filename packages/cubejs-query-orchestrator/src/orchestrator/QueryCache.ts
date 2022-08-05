@@ -289,6 +289,7 @@ export class QueryCache {
       throw new Error(`Lambda query errors ${errors.join(', ')}`);
     }
     const csvRows = lines.join('');
+    console.log('QQQ rows', q.query, q.values, csvRows);
     return {
       types: tableData.types,
       csvRows,

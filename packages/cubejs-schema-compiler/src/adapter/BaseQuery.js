@@ -582,7 +582,7 @@ class BaseQuery {
               : [],
           ],
           order: [],
-          rowLimit: undefined,
+          rowLimit: 1000000,
           preAggregationQuery: true,
         }
       );

@@ -6,6 +6,8 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
+import {PostgresDriver} from "@cubejs-backend/postgres-driver";
+import {pausePromise} from "@cubejs-backend/shared";
 
 const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
 
@@ -41,9 +43,9 @@ async function checkCubestoreState(cubestore: any) {
   ]);
   expect(table.build_range_end).toEqual('2020-05-07T00:00:00.000Z');
   rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name}`, []);
-  expect(rows.length).toEqual(171);
+  expect(rows.length).toEqual(18);
   rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name} WHERE orders__completed_at_day < to_timestamp('${table.build_range_end}')`, []);
-  expect(rows.length).toEqual(171);
+  expect(rows.length).toEqual(18);
   rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name} WHERE orders__completed_at_day >= to_timestamp('${table.build_range_end}')`, []);
   expect(rows.length).toEqual(0);
 }
@@ -54,6 +56,7 @@ describe('lambda', () => {
   let db: StartedTestContainer;
   let birdbox: BirdBox;
   let client: CubejsApi;
+  let postgres: any;
   let cubestore: any;
 
   beforeAll(async () => {
@@ -83,6 +86,13 @@ describe('lambda', () => {
     client = cubejs(async () => 'test', {
       apiUrl: birdbox.configuration.apiUrl,
     });
+    postgres = new PostgresDriver({
+      host: db.getHost(),
+      port: db.getMappedPort(5432),
+      database: 'test',
+      user: 'test',
+      password: 'test',
+    });
     // TS compiler is confused: the ctor is the module, but the TS type is inside the module.
     // @ts-ignore
     cubestore = new CubeStoreDriver({
@@ -106,7 +116,6 @@ describe('lambda', () => {
       timeDimensions: [
         {
           dimension: 'Orders.completedAt',
-          dateRange: ['2020-01-01', '2020-12-31'],
           granularity: 'day'
         }
       ],
@@ -134,37 +143,52 @@ describe('lambda', () => {
     expect(response.rawData()).toEqual(
       [
         {
-          'Orders.completedAt': '2020-12-31T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
-          'Orders.count': '11',
+          'Orders.completedAt': '2021-01-07T00:00:00.000',
+          'Orders.completedAt.day': '2021-01-07T00:00:00.000',
+          'Orders.count': '1',
           'Orders.status': 'shipped',
         },
         {
-          'Orders.completedAt': '2020-12-30T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-30T00:00:00.000',
-          'Orders.count': '8',
+          'Orders.completedAt': '2021-01-06T00:00:00.000',
+          'Orders.completedAt.day': '2021-01-06T00:00:00.000',
+          'Orders.count': '2',
           'Orders.status': 'shipped',
         },
         {
-          'Orders.completedAt': '2020-12-29T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-29T00:00:00.000',
-          'Orders.count': '10',
+          'Orders.completedAt': '2021-01-05T00:00:00.000',
+          'Orders.completedAt.day': '2021-01-05T00:00:00.000',
+          'Orders.count': '2',
           'Orders.status': 'shipped',
         },
       ]
     );
 
     await checkCubestoreState(cubestore);
-  });
 
-  test('query with 2 dimensions', async () => {
-    const response = await client.load({
+    // add a row to (2021-01-06T00:00:00.000, shipped)
+    // add a row to (2021-12-30T00:00:00.000, shipped)
+    // add 2 rows to (_, completed), should not be visible in the results
+    await postgres.query(`
+      INSERT INTO public.Orders
+        (id, user_id, number, status, completed_at, created_at, product_id)
+      VALUES
+        (1000000, 123, 321, 'shipped', '2021-01-06T09:00:00.000', '2021-01-05T09:00:00.000', 25),
+        (1000001, 123, 321, 'completed', '2021-01-06T09:00:00.000', '2021-01-05T09:00:00.000', 25),
+        (1000002, 123, 321, 'shipped', '2021-12-30T09:00:00.000', '2021-12-20T09:00:00.000', 25),
+        (1000003, 123, 321, 'completed', '2021-12-30T09:00:00.000', '2021-12-20T09:00:00.000', 25);
+    `);
+
+    console.log('RRR', await postgres.query(`SELECT * FROM public.Orders ORDER BY completed_at DESC LIMIT 30`));
+
+    // wait past refreshKey: { every: '1 second' } to invalidate the cached lambda query
+    await pausePromise(2000);
+
+    const response2 = await client.load({
       measures: ['Orders.count'],
-      dimensions: ['Orders.status', 'Orders.userId'],
+      dimensions: ['Orders.status'],
       timeDimensions: [
         {
           dimension: 'Orders.completedAt',
-          dateRange: ['2020-01-01', '2020-12-31'],
           granularity: 'day'
         }
       ],
@@ -183,43 +207,93 @@ describe('lambda', () => {
       limit: 3
     });
 
-    // @ts-ignore
-    expect(Object.keys(response.loadResponse.results[0].usedPreAggregations)).toEqual([
-      'dev_pre_aggregations.orders_orders_by_completed_at'
-    ]);
-
-    // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
-    expect(response.rawData()).toEqual(
+    expect(response2.rawData()).toEqual(
       [
         {
-          'Orders.completedAt': '2020-12-31T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
+          'Orders.completedAt': '2021-12-30T00:00:00.000',
+          'Orders.completedAt.day': '2021-12-30T00:00:00.000',
           'Orders.count': '1',
           'Orders.status': 'shipped',
-          'Orders.userId': '31',
         },
         {
-          'Orders.completedAt': '2020-12-31T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
+          'Orders.completedAt': '2021-01-07T00:00:00.000',
+          'Orders.completedAt.day': '2021-01-07T00:00:00.000',
           'Orders.count': '1',
           'Orders.status': 'shipped',
-          'Orders.userId': '111',
         },
         {
-          'Orders.completedAt': '2020-12-31T00:00:00.000',
-          'Orders.completedAt.day': '2020-12-31T00:00:00.000',
-          'Orders.count': '1',
+          'Orders.completedAt': '2021-01-06T00:00:00.000',
+          'Orders.completedAt.day': '2021-01-06T00:00:00.000',
+          'Orders.count': '3',
           'Orders.status': 'shipped',
-          'Orders.userId': '140',
         },
       ]
     );
-
-    await checkCubestoreState(cubestore);
   });
 
-  test('refresh', async () => {
-    await client.runScheduledRefresh();
-    await checkCubestoreState(cubestore);
-  });
+  // test('query with 2 dimensions', async () => {
+  //   const response = await client.load({
+  //     measures: ['Orders.count'],
+  //     dimensions: ['Orders.status', 'Orders.userId'],
+  //     timeDimensions: [
+  //       {
+  //         dimension: 'Orders.completedAt',
+  //         dateRange: ['2020-01-01', '2020-12-31'],
+  //         granularity: 'day'
+  //       }
+  //     ],
+  //     filters: [
+  //       {
+  //         member: 'Orders.status',
+  //         operator: 'equals',
+  //         values: ['shipped']
+  //       }
+  //     ],
+  //     order: {
+  //       'Orders.status': 'asc',
+  //       'Orders.completedAt': 'desc',
+  //       'Orders.userId': 'asc',
+  //     },
+  //     limit: 3
+  //   });
+  //
+  //   // @ts-ignore
+  //   expect(Object.keys(response.loadResponse.results[0].usedPreAggregations)).toEqual([
+  //     'dev_pre_aggregations.orders_orders_by_completed_at'
+  //   ]);
+  //
+  //   // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
+  //   expect(response.rawData()).toEqual(
+  //     [
+  //       {
+  //         'Orders.completedAt': '2020-12-31T00:00:00.000',
+  //         'Orders.completedAt.day': '2020-12-31T00:00:00.000',
+  //         'Orders.count': '1',
+  //         'Orders.status': 'shipped',
+  //         'Orders.userId': '31',
+  //       },
+  //       {
+  //         'Orders.completedAt': '2020-12-31T00:00:00.000',
+  //         'Orders.completedAt.day': '2020-12-31T00:00:00.000',
+  //         'Orders.count': '1',
+  //         'Orders.status': 'shipped',
+  //         'Orders.userId': '111',
+  //       },
+  //       {
+  //         'Orders.completedAt': '2020-12-31T00:00:00.000',
+  //         'Orders.completedAt.day': '2020-12-31T00:00:00.000',
+  //         'Orders.count': '1',
+  //         'Orders.status': 'shipped',
+  //         'Orders.userId': '140',
+  //       },
+  //     ]
+  //   );
+  //
+  //   await checkCubestoreState(cubestore);
+  // });
+  //
+  // test('refresh', async () => {
+  //   await client.runScheduledRefresh();
+  //   await checkCubestoreState(cubestore);
+  // });
 });
