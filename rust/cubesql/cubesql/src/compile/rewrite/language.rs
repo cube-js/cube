@@ -395,6 +395,8 @@ macro_rules! variant_field_struct {
                 Operator::IsNotDistinctFrom => "IS_NOT_DISTINCT_FROM",
                 Operator::BitwiseAnd => "&",
                 Operator::BitwiseOr => "|",
+                Operator::BitwiseShiftRight => ">>",
+                Operator::BitwiseShiftLeft => "<<",
                 Operator::StringConcat => "||",
             }
         );
