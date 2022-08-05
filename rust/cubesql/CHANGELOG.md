@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.45](https://github.com/cube-js/cube.js/compare/v0.30.44...v0.30.45) (2022-08-05)
+
+
+### Features
+
+* **cubesql:** Support binary bitwise operators (>>, <<) ([7363879](https://github.com/cube-js/cube.js/commit/7363879184395b3c499f9b678da7152362226ea0))
+* **cubesql:** Support svv_tables table (Redshift) ([#5060](https://github.com/cube-js/cube.js/issues/5060)) ([d3ed3ac](https://github.com/cube-js/cube.js/commit/d3ed3aca798d41fe4e1919c9fde2f7610435168c))
+
+
+
+
+
 ## [0.30.44](https://github.com/cube-js/cube.js/compare/v0.30.43...v0.30.44) (2022-08-01)
 
 

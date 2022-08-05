@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/sqlite-driver",
   "description": "Cube.js Sqlite database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.43",
+  "version": "0.30.45",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -17,7 +17,7 @@
     "lint": "eslint **/*.js"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.30.43",
+    "@cubejs-backend/query-orchestrator": "^0.30.45",
     "sqlite3": "^5.0.2"
   },
   "license": "Apache-2.0",

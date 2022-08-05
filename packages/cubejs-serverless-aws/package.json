@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/serverless-aws",
   "description": "Cube.js Serverless AWS support",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.44",
+  "version": "0.30.45",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,7 +13,7 @@
   },
   "main": "index.js",
   "dependencies": {
-    "@cubejs-backend/serverless": "^0.30.44",
+    "@cubejs-backend/serverless": "^0.30.45",
     "aws-sdk": "^2.404.0"
   },
   "devDependencies": {

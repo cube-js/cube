@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/templates",
-  "version": "0.30.43",
+  "version": "0.30.45",
   "description": "Cube.js Templates helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -26,7 +26,7 @@
     "extends": "../cubejs-linter"
   },
   "dependencies": {
-    "@cubejs-backend/shared": "^0.30.43",
+    "@cubejs-backend/shared": "^0.30.45",
     "cross-spawn": "^7.0.3",
     "decompress": "^4.2.1",
     "decompress-targz": "^4.1.1",
