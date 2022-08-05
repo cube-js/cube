@@ -109,7 +109,17 @@ export class OptsHandler {
   private assertDriverFactoryResult(
     val: DriverConfig | BaseDriver,
   ) {
-    if (val instanceof BaseDriver) {
+    let isDriverInstance = val instanceof BaseDriver;
+    if (!isDriverInstance && val && val.constructor) {
+      let end = false;
+      let obj = val.constructor;
+      while (!isDriverInstance && !end) {
+        obj = Object.getPrototypeOf(obj);
+        end = !obj;
+        isDriverInstance = obj && obj.name ? obj.name === 'BaseDriver' : false;
+      }
+    }
+    if (isDriverInstance) {
       // TODO (buntarb): these assertions should be restored after dbType
       // deprecation period will be passed.
       //
@@ -139,7 +149,7 @@ export class OptsHandler {
       }
       return <BaseDriver>val;
     } else if (
-      val && val.type && typeof val.type === 'string'
+      val && (<DriverConfig>val).type && typeof (<DriverConfig>val).type === 'string'
     ) {
       if (!this.driverFactoryType) {
         this.driverFactoryType = 'DriverConfig';

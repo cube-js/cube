@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { flatbuffers } from 'flatbuffers';
-import { InlineTables } from '@cubejs-backend/query-orchestrator';
+import { InlineTable } from '@cubejs-backend/query-orchestrator';
 import {
   HttpCommand,
   HttpError,
@@ -153,7 +153,7 @@ export class WebSocketConnection {
     });
   }
 
-  public async query(query: string, inlineTables: InlineTables, queryTracingObj?: any): Promise<any[]> {
+  public async query(query: string, inlineTables: InlineTable[], queryTracingObj?: any): Promise<any[]> {
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
     let traceObjOffset: number | null = null;

@@ -1116,6 +1116,7 @@ interface PreAggsPartiotionRangeLoaderOpts {
   forceBuild?: boolean;
   metadata?: any;
   orphanedTimeout?: number;
+  lambdaInfo?: LambdaInfo;
 }
 
 export class PreAggregationPartitionRangeLoader {
