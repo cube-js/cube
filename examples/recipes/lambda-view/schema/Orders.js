@@ -23,11 +23,6 @@ cube(`Orders`, {
             type: `string`,
         },
 
-        userId: {
-            sql: `user_id`,
-            type: `number`,
-        },
-
         completedAt: {
             sql: `completed_at`,
             type: `time`,
@@ -38,7 +33,7 @@ cube(`Orders`, {
         ordersByCompletedAt: {
             unionWithSourceData: true,
             measures: [count, count2],
-            dimensions: [status, userId],
+            dimensions: [status],
             timeDimension: completedAt,
             granularity: `day`,
             partitionGranularity: `month`,

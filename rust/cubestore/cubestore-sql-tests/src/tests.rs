@@ -5,7 +5,7 @@ use async_compression::tokio::write::GzipEncoder;
 use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
-use cubestore::sql::{timestamp_from_string, SqlQueryContext};
+use cubestore::sql::{timestamp_from_string, SqlQueryContext, InlineTable};
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
@@ -5534,16 +5534,16 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]),
     ];
     let data = Arc::new(DataFrame::new(columns, rows.clone()));
-    let inline_tables = vec![("Persons".to_string(), data)];
+    let inline_tables = vec![InlineTable::new("Persons".to_string(), data)];
 
-    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
         .exec_query_with_context(context, "SELECT * FROM Persons")
         .await
         .unwrap();
     assert_eq!(result.get_rows(), &rows);
 
-    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
         .exec_query_with_context(context, "SELECT LastName, Timestamp FROM Persons")
         .await
@@ -5570,7 +5570,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]
     );
 
-    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
         .exec_query_with_context(
             context,

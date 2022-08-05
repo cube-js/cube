@@ -109,12 +109,23 @@ pub struct QueryPlans {
     pub worker: Arc<dyn ExecutionPlan>,
 }
 
-pub type InlineTables = HashMap<String, Arc<DataFrame>>;
+#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug)]
+pub struct InlineTable {
+    pub name: String,
+    pub data: Arc<DataFrame>,
+}
+pub type InlineTables = Vec<InlineTable>;
+
+impl InlineTable {
+    pub fn new(name: String, data: Arc<DataFrame>) -> Self {
+        Self { name, data }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
-    pub inline_tables: Arc<InlineTables>,
+    pub inline_tables: InlineTables,
     pub trace_obj: Option<String>,
 }
 
@@ -125,9 +136,9 @@ impl SqlQueryContext {
         res
     }
 
-    pub fn with_inline_tables(&self, inline_tables: Vec<(String, Arc<DataFrame>)>) -> Self {
+    pub fn with_inline_tables(&self, inline_tables: &InlineTables) -> Self {
         let mut res = self.clone();
-        res.inline_tables = Arc::new(HashMap::from_iter(inline_tables.iter().cloned()));
+res.inline_tables = inline_tables.clone();
         res
     }
 
@@ -521,7 +532,7 @@ impl SqlServiceImpl {
             .query_planner
             .logical_plan(
                 DFStatement::Statement(Statement::Query(q)),
-                Arc::new(InlineTables::new()),
+                &InlineTables::new(),
             )
             .await?;
 
@@ -593,7 +604,7 @@ impl SqlServiceImpl {
             .query_planner
             .logical_plan(
                 DFStatement::Statement(statement),
-                Arc::new(InlineTables::new()),
+                &InlineTables::new(),
             )
             .await?;
         let res = match query_plan {
@@ -1043,7 +1054,7 @@ impl SqlService for SqlServiceImpl {
                     .query_planner
                     .logical_plan(
                         DFStatement::Statement(Statement::Query(q)),
-                        context.inline_tables.clone(),
+                        &context.inline_tables,
                     )
                     .await?;
                 // TODO distribute and combine
@@ -1059,7 +1070,7 @@ impl SqlService for SqlServiceImpl {
                         timeout(
                             self.query_timeout,
                             self.cache
-                                .get(query, serialized, async move |plan| {
+                                .get(query, &context.inline_tables, serialized, async move |plan| {
                                     let records;
                                     if workers.len() == 0 {
                                         records =
@@ -1126,7 +1137,7 @@ impl SqlService for SqlServiceImpl {
                     .query_planner
                     .logical_plan(
                         DFStatement::Statement(Statement::Query(q)),
-                        context.inline_tables.clone(),
+                        &context.inline_tables,
                     )
                     .await?;
                 match logical_plan {

@@ -11,7 +11,7 @@ use crate::codegen::http_message_generated::{
 };
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
-use crate::sql::{SqlQueryContext, SqlService};
+use crate::sql::{InlineTable, InlineTables, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::TableValue;
 use crate::util::WorkerLoop;
@@ -96,7 +96,7 @@ impl HttpServer {
                     match res {
                         Ok(user) => Ok(SqlQueryContext {
                             user,
-                            inline_tables: Arc::new(HashMap::new()),
+                            inline_tables: InlineTables::new(),
                             trace_obj: None,
                         }),
                         Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
@@ -316,7 +316,7 @@ impl HttpServer {
                     .exec_query_with_context(
                         sql_query_context
                             .with_trace_obj(trace_obj)
-                            .with_inline_tables(inline_tables),
+                            .with_inline_tables(&inline_tables),
                         &query,
                     )
                     .await?,
@@ -365,7 +365,7 @@ pub struct HttpMessage {
 pub enum HttpCommand {
     Query {
         query: String,
-        inline_tables: Vec<(String, Arc<DataFrame>)>,
+        inline_tables: InlineTables,
         trace_obj: Option<String>,
     },
     ResultSet {
@@ -561,7 +561,7 @@ impl HttpMessage {
                             } else {
                                 vec![]
                             };
-                            inline_tables.push((name, Arc::new(DataFrame::new(columns, rows))));
+                            inline_tables.push(InlineTable::new(name, Arc::new(DataFrame::new(columns, rows))));
                         }
                     };
                     HttpCommand::Query {
@@ -588,7 +588,7 @@ mod tests {
     };
     use crate::http::{HttpCommand, HttpMessage};
     use crate::metastore::{Column, ColumnType};
-    use crate::sql::timestamp_from_string;
+    use crate::sql::{InlineTable, timestamp_from_string};
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
     use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
@@ -700,7 +700,7 @@ mod tests {
                 message_id: 1234,
                 command: HttpCommand::Query {
                     query: "query".to_string(),
-                    inline_tables: vec![(
+                    inline_tables: vec![InlineTable::new(
                         "table".to_string(),
                         Arc::new(DataFrame::new(columns, rows.clone()))
                     )],

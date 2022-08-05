@@ -1,13 +1,13 @@
 import R from 'ramda';
 import { StartedTestContainer } from 'testcontainers';
+import { PostgresDriver } from '@cubejs-backend/postgres-driver';
+import { pausePromise } from '@cubejs-backend/shared';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
-import {PostgresDriver} from "@cubejs-backend/postgres-driver";
-import {pausePromise} from "@cubejs-backend/shared";
 
 const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
 
@@ -110,7 +110,7 @@ describe('lambda', () => {
   });
 
   test('query', async () => {
-    const response = await client.load({
+    const query: Query = {
       measures: ['Orders.count'],
       dimensions: ['Orders.status'],
       timeDimensions: [
@@ -129,10 +129,10 @@ describe('lambda', () => {
       order: {
         'Orders.status': 'asc',
         'Orders.completedAt': 'desc',
-        'Orders.userId': 'asc',
       },
       limit: 3
-    });
+    };
+    const response = await client.load(query);
 
     // @ts-ignore
     expect(Object.keys(response.loadResponse.results[0].usedPreAggregations)).toEqual([
@@ -178,34 +178,10 @@ describe('lambda', () => {
         (1000003, 123, 321, 'completed', '2021-12-30T09:00:00.000', '2021-12-20T09:00:00.000', 25);
     `);
 
-    console.log('RRR', await postgres.query(`SELECT * FROM public.Orders ORDER BY completed_at DESC LIMIT 30`));
-
     // wait past refreshKey: { every: '1 second' } to invalidate the cached lambda query
     await pausePromise(2000);
 
-    const response2 = await client.load({
-      measures: ['Orders.count'],
-      dimensions: ['Orders.status'],
-      timeDimensions: [
-        {
-          dimension: 'Orders.completedAt',
-          granularity: 'day'
-        }
-      ],
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'equals',
-          values: ['shipped']
-        }
-      ],
-      order: {
-        'Orders.status': 'asc',
-        'Orders.completedAt': 'desc',
-        'Orders.userId': 'asc',
-      },
-      limit: 3
-    });
+    const response2 = await client.load(query);
 
     expect(response2.rawData()).toEqual(
       [
