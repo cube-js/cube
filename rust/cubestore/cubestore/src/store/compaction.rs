@@ -445,7 +445,7 @@ impl CompactionService for CompactionServiceImpl {
         let mut size = 0;
         let mut count = 0;
         // Get all in_memory and active chunks
-        let chunks = self
+        let mut chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?
@@ -465,6 +465,15 @@ impl CompactionService for CompactionServiceImpl {
                         })
                         .unwrap_or(true)
             })
+            .collect::<Vec<_>>();
+        chunks.sort_by(|a, b| {
+            a.get_row()
+                .get_row_count()
+                .partial_cmp(&b.get_row().get_row_count())
+                .unwrap()
+        });
+        let chunks = chunks
+            .into_iter()
             .take_while(|c| {
                 if count < 2 {
                     size += c.get_row().get_row_count();
