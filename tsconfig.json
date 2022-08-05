@@ -50,6 +50,9 @@
       "path": "packages/cubejs-materialize-driver"
     },
     {
+      "path": "packages/cubejs-crate-driver"
+    },
+    {
       "path": "packages/cubejs-mongobi-driver"
     },
     {

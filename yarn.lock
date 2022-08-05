@@ -21558,7 +21558,7 @@ pg@8.7.1, pg@^8.6.0:
     pg-types "^2.1.0"
     pgpass "1.x"
 
-pg@^8.7.0:
+pg@^8.7.0, pg@^8.7.1:
   version "8.7.3"
   resolved "https://registry.yarnpkg.com/pg/-/pg-8.7.3.tgz#8a5bdd664ca4fda4db7997ec634c6e5455b27c44"
   integrity sha512-HPmH4GH4H3AOprDJOazoIcpI49XFsHCe8xlrjHkWiapdbHK+HLtbm/GQzXYAZwmPju/kzKhjaSfMACG+8cgJcw==
@@ -26803,7 +26803,7 @@ test-exclude@^6.0.0:
     glob "^7.1.4"
     minimatch "^3.0.4"
 
-testcontainers@7.12.1, testcontainers@^7.11.1, testcontainers@^7.5.0, testcontainers@^7.6.2, testcontainers@^7.9.0, testcontainers@^8.4.0:
+testcontainers@7.12.1, testcontainers@^7.11.1, testcontainers@^7.12.1, testcontainers@^7.5.0, testcontainers@^7.6.2, testcontainers@^7.9.0, testcontainers@^8.4.0:
   version "7.12.1"
   resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-7.12.1.tgz#8ca81eadf559ee2ab648d64623e350a13d681d09"
   integrity sha512-iqUBvEChe7+Z1Q4ChInx21g1vm/Q5mxFnu4B4Y8RgXdaOmLN4eNAbJj0ZbYtR70waFrqJQHBZrODLQzc4uYo5Q==

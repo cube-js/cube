@@ -9,6 +9,7 @@ module.exports = {
   bigquery: '@cubejs-backend/bigquery-driver',
   redshift: '@cubejs-backend/redshift-driver',
   clickhouse: '@cubejs-backend/clickhouse-driver',
+  crate: '@cubejs-backend/crate-driver',
   firebolt: '@cubejs-backend/firebolt-driver',
   hive: '@cubejs-backend/hive-driver',
   snowflake: '@cubejs-backend/snowflake-driver',
