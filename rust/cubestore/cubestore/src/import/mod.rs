@@ -160,28 +160,18 @@ impl ImportFormat {
                 value,
                 u8::try_from(t.target_scale()).unwrap(),
             )?),
-            ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
+            ColumnType::Bytes => TableValue::Bytes(parse_binary_data(value)?),
             ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
                 let hll = HllSketch::read_snowflake(value)?;
                 TableValue::Bytes(hll.write())
             }
             ColumnType::HyperLogLog(HllFlavour::Postgres) => {
-                let mut data = Vec::new();
-                if value.contains(' ') {
-                    parse_space_separated_binstring(&mut data, value)?;
-                } else {
-                    base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
-                };
+                let data = parse_binary_data(value)?;
                 let hll = HllSketch::read_hll_storage_spec(&data)?;
                 TableValue::Bytes(hll.write())
             }
             ColumnType::HyperLogLog(f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch)) => {
-                let mut data = Vec::new();
-                if value.contains(' ') {
-                    parse_space_separated_binstring(&mut data, value)?;
-                } else {
-                    base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
-                };
+                let data = parse_binary_data(value)?;
                 is_valid_plain_binary_hll(&data, *f)?;
                 TableValue::Bytes(data)
             }
@@ -242,6 +232,17 @@ pub(crate) fn parse_space_separated_binstring<'a>(
         })
         .try_collect()?;
     Ok(buffer.as_slice())
+}
+
+fn parse_binary_data(value: &str) -> Result<Vec<u8>, CubeError> {
+    let mut data = Vec::new();
+
+    if value.contains(' ') {
+        parse_space_separated_binstring(&mut data, value)?;
+    } else {
+        base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
+    };
+    Ok(data)
 }
 
 struct CsvLineParser<'a> {
