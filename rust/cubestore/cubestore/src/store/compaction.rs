@@ -483,6 +483,7 @@ impl CompactionService for CompactionServiceImpl {
                     size += c.get_row().get_row_count();
                     count += 1;
                     size <= self.config.compaction_in_memory_chunks_total_size_limit()
+                        && count <= self.config.compaction_chunks_count_threshold()
                 }
             })
             .collect::<Vec<_>>();
