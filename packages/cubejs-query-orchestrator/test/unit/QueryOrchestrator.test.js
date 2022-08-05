@@ -162,6 +162,7 @@ describe('QueryOrchestrator', () => {
           }),
         },
         preAggregationsOptions: {
+          maxPartitions: 32,
           queueOptions: () => ({
             executionTimeout: 2,
             concurrency: 2,
@@ -909,6 +910,46 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     expect(mockDriver.executedQueries.filter(q => q.match(/NOW/)).length).toEqual(nowQueries);
+  });
+
+  test('range partitions exceed maximum number', async () => {
+    const query = {
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        indexesSql: [{
+          sql: ['CREATE INDEX orders_d_main ON stb_pre_aggregations.orders_d ("orders__created_at")', []],
+          indexName: 'orders_d_main'
+        }],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT MAX(timestamp) FROM orders', []],
+        ],
+        partitionGranularity: 'hour',
+        timezone: 'UTC'
+      }],
+      requestId: 'range partitions',
+    };
+    await expect(async () => {
+      await queryOrchestrator.fetchQuery(query);
+    }).rejects.toThrow(
+      'The maximum number of partitions (32) was reached for the pre-aggregation'
+    );
   });
 
   test('empty partitions', async () => {

@@ -702,6 +702,11 @@ export class OptsHandler {
           clone.rollupOnlyMode && !this.configuredForScheduledRefresh()
         );
 
+    clone.preAggregationsOptions.maxPartitions =
+      clone.preAggregationsOptions.maxPartitions !== undefined
+        ? clone.preAggregationsOptions.maxPartitions
+        : getEnv('maxPartitionsPerCube');
+
     return clone;
   }
 }

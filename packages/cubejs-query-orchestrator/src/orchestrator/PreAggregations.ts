@@ -1083,6 +1083,16 @@ export class PreAggregationLoader {
   }
 }
 
+interface PreAggsPartiotionRangeLoaderOpts {
+  maxPartitions: number;
+  waitForRenew?: boolean;
+  requestId?: string;
+  externalRefresh?: boolean;
+  forceBuild?: boolean;
+  metadata?: any;
+  orphanedTimeout?: number;
+}
+
 export class PreAggregationPartitionRangeLoader {
   protected waitForRenew: boolean;
 
@@ -1100,7 +1110,9 @@ export class PreAggregationPartitionRangeLoader {
     private readonly preAggregation: PreAggregationDescription,
     private readonly preAggregationsTablesToTempTables: any,
     private readonly loadCache: any,
-    private readonly options: any = {}
+    private readonly options: PreAggsPartiotionRangeLoaderOpts = {
+      maxPartitions: 10000,
+    },
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
@@ -1299,10 +1311,18 @@ export class PreAggregationPartitionRangeLoader {
       // use last partition so outer query can receive expected table structure.
       dateRange = [buildRange[1], buildRange[1]];
     }
-    return PreAggregationPartitionRangeLoader.timeSeries(
+    const range = PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       dateRange,
     );
+    if (range.length > this.options.maxPartitions) {
+      throw new Error(
+        `The maximum number of partitions (${
+          this.options.maxPartitions
+        }) was reached for the pre-aggregation`
+      );
+    }
+    return range;
   }
 
   public async loadBuildRange(): Promise<QueryDateRange> {
@@ -1406,6 +1426,7 @@ export class PreAggregationPartitionRangeLoader {
 }
 
 type PreAggregationsOptions = {
+  maxPartitions: number;
   preAggregationsSchemaCacheExpire?: number;
   loadCacheQueueOptions?: any;
   queueOptions?: (dataSource: string) => Promise<{
@@ -1445,7 +1466,7 @@ export class PreAggregations {
     private readonly driverFactory: DriverFactoryByDataSource,
     private readonly logger: any,
     private readonly queryCache: QueryCache,
-    options
+    options,
   ) {
     this.options = options || {};
 
@@ -1516,6 +1537,7 @@ export class PreAggregations {
         preAggregationsTablesToTempTables,
         getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
+          maxPartitions: this.options.maxPartitions,
           waitForRenew: queryBody.renewQuery,
           // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
           forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,
@@ -1523,7 +1545,7 @@ export class PreAggregations {
           metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
           externalRefresh: this.externalRefresh
-        }
+        },
       );
 
       const preAggregationPromise = () => loader.loadPreAggregations().then(async loadResult => {
@@ -1603,10 +1625,11 @@ export class PreAggregations {
         [],
         getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
+          maxPartitions: this.options.maxPartitions,
           waitForRenew: queryBody.renewQuery,
           requestId: queryBody.requestId,
-          externalRefresh: this.externalRefresh
-        }
+          externalRefresh: this.externalRefresh,
+        },
       );
 
       return loader.partitionPreAggregations();
