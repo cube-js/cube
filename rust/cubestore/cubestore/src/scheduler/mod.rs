@@ -416,8 +416,13 @@ impl SchedulerImpl {
                         self.schedule_repartition(&partition).await?;
                     }
                 } else {
-                    let deadline =
-                        Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+                    let seconds = if chunk.get_row().in_memory() {
+                        //TODO Config. It is also necessary to study whether this does not lead to inconsistency when executing queries
+                        30
+                    } else {
+                        self.config.not_used_timeout()
+                    };
+                    let deadline = Instant::now() + Duration::from_secs(seconds);
                     self.gc_loop
                         .send(GCTimedTask {
                             deadline,
