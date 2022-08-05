@@ -208,15 +208,4 @@ export class WebSocketConnection {
       this.webSocket.close();
     }
   }
-
-  public static stringValue(value: any): string {
-    if (typeof value === 'string') {
-      return value;
-    } else if (value instanceof Date) {
-      const result = JSON.stringify(value);
-      return result.slice(1, -1); // remove quotes
-    } else {
-      return value.toString();
-    }
-  }
 }

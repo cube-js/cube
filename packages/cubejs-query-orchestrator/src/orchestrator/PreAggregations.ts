@@ -1108,6 +1108,16 @@ export class PreAggregationLoader {
   }
 }
 
+interface PreAggsPartiotionRangeLoaderOpts {
+  maxPartitions: number;
+  waitForRenew?: boolean;
+  requestId?: string;
+  externalRefresh?: boolean;
+  forceBuild?: boolean;
+  metadata?: any;
+  orphanedTimeout?: number;
+}
+
 export class PreAggregationPartitionRangeLoader {
   protected waitForRenew: boolean;
 
@@ -1127,7 +1137,9 @@ export class PreAggregationPartitionRangeLoader {
     private readonly preAggregation: PreAggregationDescription,
     private readonly preAggregationsTablesToTempTables: any,
     private readonly loadCache: any,
-    private readonly options: any = {}
+    private readonly options: PreAggsPartiotionRangeLoaderOpts = {
+      maxPartitions: 10000,
+    },
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
@@ -1137,11 +1149,16 @@ export class PreAggregationPartitionRangeLoader {
 
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
     const [query, values, queryOptions]: QueryTuple = rangeQuery;
+    const invalidate =
+      this.preAggregation.invalidateKeyQueries &&
+      this.preAggregation.invalidateKeyQueries[0]
+        ? this.preAggregation.invalidateKeyQueries[0].slice(0, 2)
+        : false;
 
     return this.queryCache.cacheQueryResult(
       query,
       values,
-      QueryCache.queryCacheKey({ query, values }),
+      QueryCache.queryCacheKey({ query, values, invalidate }),
       24 * 60 * 60,
       {
         renewalThreshold: this.queryCache.options.refreshKeyRenewalThreshold
@@ -1375,6 +1392,13 @@ export class PreAggregationPartitionRangeLoader {
       this.preAggregation.partitionGranularity,
       dateRange,
     );
+    if (partitionRanges.length > this.options.maxPartitions) {
+      throw new Error(
+        `The maximum number of partitions (${
+          this.options.maxPartitions
+        }) was reached for the pre-aggregation`
+      );
+    }
     return { buildRange: dateRange, partitionRanges };
   }
 
@@ -1483,6 +1507,7 @@ export class PreAggregationPartitionRangeLoader {
 }
 
 type PreAggregationsOptions = {
+  maxPartitions: number;
   preAggregationsSchemaCacheExpire?: number;
   loadCacheQueueOptions?: any;
   queueOptions?: (dataSource: string) => Promise<{
@@ -1522,7 +1547,7 @@ export class PreAggregations {
     private readonly driverFactory: DriverFactoryByDataSource,
     private readonly logger: any,
     private readonly queryCache: QueryCache,
-    options
+    options,
   ) {
     this.options = options || {};
 
@@ -1593,6 +1618,7 @@ export class PreAggregations {
         preAggregationsTablesToTempTables,
         getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
+          maxPartitions: this.options.maxPartitions,
           waitForRenew: queryBody.renewQuery,
           // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
           forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,
@@ -1601,7 +1627,7 @@ export class PreAggregations {
           orphanedTimeout: queryBody.orphanedTimeout,
           lambdaInfo: (queryBody.lambdaInfo ?? {})[p.preAggregationId],
           externalRefresh: this.externalRefresh
-        }
+        },
       );
 
       const preAggregationPromise = async () => {
@@ -1682,10 +1708,11 @@ export class PreAggregations {
         [],
         getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
+          maxPartitions: this.options.maxPartitions,
           waitForRenew: queryBody.renewQuery,
           requestId: queryBody.requestId,
-          externalRefresh: this.externalRefresh
-        }
+          externalRefresh: this.externalRefresh,
+        },
       );
 
       return loader.partitionPreAggregations();

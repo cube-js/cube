@@ -112,6 +112,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_location_and_hyperloglog_postgress",
             create_table_with_location_and_hyperloglog_postgress,
         ),
+        t(
+            "create_table_with_location_and_hyperloglog_space_separated",
+            create_table_with_location_and_hyperloglog_space_separated,
+        ),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
@@ -2210,6 +2214,66 @@ async fn create_table_with_location_and_hyperloglog_postgress(service: Box<dyn S
     );
 }
 
+async fn create_table_with_location_and_hyperloglog_space_separated(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog-ssep.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!("0,02 0c 01 00 05 05 7b cf,{}\n", base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])).as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,02 0c 01 00 15 15 7b ff,{}\n",
+                base64::encode(vec![
+                               0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations_ssep (id int, hll varbinary, hll_base varbinary) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_ssep GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+    let res = service
+        .exec_query("SELECT hll, hll_base FROM hll.locations_ssep")
+        .await
+        .unwrap();
+    for r in to_rows(&res).iter() {
+        assert_eq!(r[0], r[1]);
+    }
+    println!("res {:?}", res);
+}
 async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
