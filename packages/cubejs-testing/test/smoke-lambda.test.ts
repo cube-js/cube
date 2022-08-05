@@ -1,6 +1,5 @@
 import R from 'ramda';
 import { StartedTestContainer } from 'testcontainers';
-import { PostgresDriver } from '@cubejs-backend/postgres-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
@@ -10,6 +9,7 @@ import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
 
 const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
+const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 async function checkCubestoreState(cubestore: any) {
   let rows = await cubestore.query('SELECT table_schema, table_name, build_range_end FROM information_schema.tables ORDER BY table_name', []);
