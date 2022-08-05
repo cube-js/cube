@@ -9169,6 +9169,21 @@ ORDER BY \"COUNT(count)\" DESC"
         Ok(())
     }
 
+    // This tests asserts that our DF fork contains support for >> && <<
+    #[tokio::test]
+    async fn df_is_bitwise_shit() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_bitwise_shit",
+            execute_query(
+                "SELECT 2 << 10 as t1, 2048 >> 10 as t2;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
     // This tests asserts that our DF fork contains support for escaped single quoted strings
     #[tokio::test]
     async fn df_escaped_strings() -> Result<(), CubeError> {
