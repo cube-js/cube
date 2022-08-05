@@ -475,15 +475,20 @@ impl CompactionService for CompactionServiceImpl {
         let chunks = chunks
             .into_iter()
             .take_while(|c| {
-                if count < 2 {
+                if count < 1 {
                     size += c.get_row().get_row_count();
                     count += 1;
                     true
                 } else {
-                    size += c.get_row().get_row_count();
+                    let chunk_size = c.get_row().get_row_count();
+                    //TODO config for magic numbers
+                    if chunk_size > 2000 && chunk_size > size * 4 {
+                        return false;
+                    }
+
+                    size += chunk_size;
                     count += 1;
                     size <= self.config.compaction_in_memory_chunks_total_size_limit()
-                        && count <= self.config.compaction_chunks_count_threshold()
                 }
             })
             .collect::<Vec<_>>();
