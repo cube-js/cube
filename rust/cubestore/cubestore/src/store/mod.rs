@@ -386,7 +386,7 @@ impl ChunkDataStore for ChunkStore {
                     &batches.iter().map(|b| b.column(i).as_ref()).collect_vec(),
                 )?)
             }
-            if columns.len() == 0 {
+            if columns.len() == 0 || columns[0].data().len() == 0 {
                 self.meta_store.deactivate_chunk(chunk_id).await?;
             } else {
                 new_chunks.append(
@@ -447,7 +447,7 @@ impl ChunkDataStore for ChunkStore {
         }
 
         //There is no data in the chunk, so we just deactivate it
-        if columns.len() == 0 {
+        if columns.len() == 0 || columns[0].data().len() == 0 {
             self.meta_store.deactivate_chunk(chunk_id).await?;
             return Ok(());
         }
