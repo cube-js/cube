@@ -415,6 +415,7 @@ impl ChunkDataStore for ChunkStore {
             log::debug!("Skipping repartition of inactive chunk: {:?}", chunk);
             return Ok(());
         }
+        let in_memory = chunk.get_row().in_memory();
         let partition = self
             .meta_store
             .get_partition(chunk.get_row().get_partition_id())
@@ -436,9 +437,17 @@ impl ChunkDataStore for ChunkStore {
                 &batches.iter().map(|b| b.column(i).as_ref()).collect_vec(),
             )?)
         }
+
+        //There is no data in the chunk, so we just deactivate it
+        if columns.len() == 0 {
+            self.meta_store.deactivate_chunk(chunk_id).await?;
+            return Ok(());
+        }
+
+
         new_chunks.append(
             &mut self
-                .partition_rows(partition.get_row().get_index_id(), columns, false)
+                .partition_rows(partition.get_row().get_index_id(), columns, in_memory)
                 .await?,
         );
 
