@@ -14,24 +14,22 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
-use super::utils::new_string_array_with_placeholder;
-
-struct InformationSchemaTablesBuilder {
+struct RedshiftSvvTablesBuilder {
     catalog_names: StringBuilder,
     schema_names: StringBuilder,
     table_names: StringBuilder,
     table_types: StringBuilder,
+    remarks: StringBuilder,
 }
 
-impl InformationSchemaTablesBuilder {
-    fn new() -> Self {
-        let capacity = 10;
-
+impl RedshiftSvvTablesBuilder {
+    fn new(capacity: usize) -> Self {
         Self {
             catalog_names: StringBuilder::new(capacity),
             schema_names: StringBuilder::new(capacity),
             table_names: StringBuilder::new(capacity),
             table_types: StringBuilder::new(capacity),
+            remarks: StringBuilder::new(capacity),
         }
     }
 
@@ -50,6 +48,7 @@ impl InformationSchemaTablesBuilder {
             .unwrap();
         self.table_names.append_value(table_name.as_ref()).unwrap();
         self.table_types.append_value(table_type.as_ref()).unwrap();
+        self.remarks.append_null().unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -57,77 +56,23 @@ impl InformationSchemaTablesBuilder {
         columns.push(Arc::new(self.catalog_names.finish()));
         columns.push(Arc::new(self.schema_names.finish()));
         columns.push(Arc::new(self.table_names.finish()));
-
-        let tables_types = self.table_types.finish();
-        let total = tables_types.len();
-        columns.push(Arc::new(tables_types));
-
-        // self_referencing_column_name
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-
-        // reference_generation
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-
-        // user_defined_type_catalog
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-
-        // user_defined_type_schema
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-
-        // user_defined_type_name
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
-
-        // is_insertable_into
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("NO".to_string()),
-        )));
-
-        // is_typed
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("NO".to_string()),
-        )));
-
-        // commit_action
-        columns.push(Arc::new(new_string_array_with_placeholder(
-            total,
-            Some("".to_string()),
-        )));
+        columns.push(Arc::new(self.table_types.finish()));
+        columns.push(Arc::new(self.remarks.finish()));
 
         columns
     }
 }
 
-pub struct InfoSchemaTableProvider {
+pub struct RedshiftSvvTablesTableProvider {
     data: Arc<Vec<ArrayRef>>,
 }
 
-impl InfoSchemaTableProvider {
+impl RedshiftSvvTablesTableProvider {
     pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
-        let mut builder = InformationSchemaTablesBuilder::new();
-        // information_schema
-        builder.add_table("db", "information_schema", "tables", "VIEW");
-        builder.add_table("db", "information_schema", "columns", "VIEW");
-        builder.add_table("db", "information_schema", "pg_tables", "VIEW");
+        let mut builder = RedshiftSvvTablesBuilder::new(cubes.len());
 
         for cube in cubes {
-            builder.add_table("db", "public", &cube.name, "BASE TABLE");
+            builder.add_table("db", "public", &cube.name, "TABLE");
         }
 
         Self {
@@ -137,7 +82,7 @@ impl InfoSchemaTableProvider {
 }
 
 #[async_trait]
-impl TableProvider for InfoSchemaTableProvider {
+impl TableProvider for RedshiftSvvTablesTableProvider {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -152,14 +97,7 @@ impl TableProvider for InfoSchemaTableProvider {
             Field::new("table_schema", DataType::Utf8, false),
             Field::new("table_name", DataType::Utf8, false),
             Field::new("table_type", DataType::Utf8, false),
-            Field::new("self_referencing_column_name", DataType::Utf8, false),
-            Field::new("reference_generation", DataType::Utf8, false),
-            Field::new("user_defined_type_catalog", DataType::Utf8, false),
-            Field::new("user_defined_type_schema", DataType::Utf8, false),
-            Field::new("user_defined_type_name", DataType::Utf8, false),
-            Field::new("is_insertable_into", DataType::Utf8, false),
-            Field::new("is_typed", DataType::Utf8, false),
-            Field::new("commit_action", DataType::Utf8, false),
+            Field::new("remarks", DataType::Utf8, true),
         ]))
     }
 
