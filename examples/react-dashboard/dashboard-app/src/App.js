@@ -1,5 +1,6 @@
 import React from "react";
-import { withRouter } from "react-router";
+import { useLocation, withRouter } from "react-router";
+import { Route, Routes, Outlet } from "react-router-dom";
 import { Layout } from "antd";
 import { ApolloProvider as ApolloHooksProvider } from "@apollo/react-hooks";
 import { ApolloProvider } from "react-apollo";
@@ -8,6 +9,8 @@ import { CubeProvider } from "@cubejs-client/react";
 import client from "./graphql/client";
 
 import Header from './components/Header';
+import ExplorePage from "./pages/ExplorePage";
+import DashboardPage from "./pages/DashboardPage";
 // import aws_exports from './aws-exports';
 
 const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2MDY1OTA0NjEsImV4cCI6MTkyMjE2NjQ2MX0.DdY7GaiHsQWyTH_xkslHb17Cbc3yLFfMFwoEpx89JiA'
@@ -37,21 +40,47 @@ const cubejsApi = cubejs(token, {
 //   }
 // });
 
+// const AppLayout = ({ location, children }) => (
+//   <Layout style={{ height: "100%" }}>
+//     <Header location={location} />
+//     <Layout.Content>{children}</Layout.Content>
+//   </Layout>
+// );
+
+// const App = withRouter(({ location, children }) => (
+//   <CubeProvider cubejsApi={cubejsApi}>
+//     <ApolloProvider client={client}>
+//       <ApolloHooksProvider client={client}>
+//           <AppLayout location={location}>{children}</AppLayout>
+//       </ApolloHooksProvider>
+//     </ApolloProvider>
+//   </CubeProvider>
+// ));
+
 const AppLayout = ({ location, children }) => (
   <Layout style={{ height: "100%" }}>
     <Header location={location} />
-    <Layout.Content>{children}</Layout.Content>
+    <Outlet />
   </Layout>
 );
 
-const App = withRouter(({ location, children }) => (
-  <CubeProvider cubejsApi={cubejsApi}>
-    <ApolloProvider client={client}>
-      <ApolloHooksProvider client={client}>
-          <AppLayout location={location}>{children}</AppLayout>
-      </ApolloHooksProvider>
-    </ApolloProvider>
-  </CubeProvider>
-));
+const App = ({ children }) => {
+  const location = useLocation();
+
+  return (
+    <CubeProvider cubejsApi={cubejsApi}>
+      <ApolloProvider client={client}>
+        <ApolloHooksProvider client={client}>
+          <Routes>
+            <Route path="/" element={<AppLayout location={location}/>}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/explore" element={<ExplorePage />} />
+            </Route>
+          </Routes>
+        </ApolloHooksProvider>
+      </ApolloProvider>
+    </CubeProvider>
+  );
+};
 
 export default App;

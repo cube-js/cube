@@ -1,8 +1,9 @@
 import React from 'react';
 import * as PropTypes from 'prop-types';
 import {
-  Menu, Icon, Dropdown
+  Menu, Dropdown
 } from 'antd';
+import Icon from '@ant-design/icons';
 
 import styled from 'styled-components';
 

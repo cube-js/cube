@@ -1,5 +1,5 @@
 import React from 'react';
-import { Icon } from 'antd'; import { ReactComponent as PlusIconSvg } from './plus-icon.svg';
+import Icon from '@ant-design/icons'; import { ReactComponent as PlusIconSvg } from './plus-icon.svg';
 
 import styled from 'styled-components';
 

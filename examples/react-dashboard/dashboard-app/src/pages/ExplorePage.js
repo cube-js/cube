@@ -1,15 +1,17 @@
 import React, { useState } from "react";
 import { Alert, Button, Spin } from "antd";
 import { useQuery } from "@apollo/react-hooks";
-import { withRouter } from "react-router-dom";
+import { useLocation, withRouter, useNavigate } from "react-router-dom";
 import ExploreQueryBuilder from "../components/QueryBuilder/ExploreQueryBuilder";
 import { GET_DASHBOARD_ITEM } from "../graphql/queries";
 import TitleModal from "../components/TitleModal.js";
-import { isQueryPresent } from "@cubejs-client/react";
+import { isQueryPresent } from "@cubejs-client/core";
 import PageHeader from "../components/PageHeader.js";
 import ExploreTitle from "../components/ExploreTitle.js";
 
-const ExplorePage = withRouter(({ history, location }) => {
+const ExplorePage = () => {
+  const navigate  = useNavigate();
+  const location = useLocation();
   const [addingToDashboard, setAddingToDashboard] = useState(false);
   const params = new URLSearchParams(location.search);
   const itemId = params.get("itemId");
@@ -42,7 +44,7 @@ const ExplorePage = withRouter(({ history, location }) => {
   return (
     <div>
       <TitleModal
-        history={history}
+        navigate={navigate}
         itemId={itemId}
         titleModalVisible={titleModalVisible}
         setTitleModalVisible={setTitleModalVisible}
@@ -71,5 +73,5 @@ const ExplorePage = withRouter(({ history, location }) => {
       />
     </div>
   );
-});
+};
 export default ExplorePage;
