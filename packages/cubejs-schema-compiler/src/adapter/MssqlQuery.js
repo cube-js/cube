@@ -98,6 +98,11 @@ export class MssqlQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
+  aggregateSubQueryGroupByClause() {
+    const dimensionColumns = this.dimensionColumns(this.escapeColumnName('keys'));
+    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
+  }
+
   overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
     const forGroupBy = this.timeDimensions.map(
       (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`

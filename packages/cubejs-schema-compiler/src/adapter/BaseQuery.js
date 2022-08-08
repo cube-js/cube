@@ -1237,7 +1237,7 @@ class BaseQuery {
       ...subQueryJoins
     ]);
     return `SELECT ${columnsForSelect} FROM ${joinSql}` +
-      (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
+      (!this.safeEvaluateSymbolContext().ungrouped && this.aggregateSubQueryGroupByClause() || '');
   }
 
   checkShouldBuildJoinForMeasureSelect(measures, keyCubeName) {
@@ -1393,6 +1393,10 @@ class BaseQuery {
       fn,
       context
     );
+  }
+
+  aggregateSubQueryGroupByClause() {
+    return this.groupByClause();
   }
 
   groupByClause() {
