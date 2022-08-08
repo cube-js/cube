@@ -153,6 +153,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             rolling_window_query_timestamps,
         ),
         t(
+            "rolling_window_query_timestamps_exceeded",
+            rolling_window_query_timestamps_exceeded,
+        ),
+        t(
             "rolling_window_extra_aggregate",
             rolling_window_extra_aggregate,
         ),
@@ -4430,6 +4434,57 @@ async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn rolling_window_query_timestamps_exceeded(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day int, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         (4, 'john', 10), \
+                         (4, 'sara', 7), \
+                         (5, 'sara', 3), \
+                         (5, 'john', 9), \
+                         (6, 'john', 11), \
+                         (7, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.data GROUP BY 1, 2) base \
+             ROLLING_WINDOW DIMENSION day PARTITION BY name \
+               FROM -5 \
+               TO 5 \
+               EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            to_rows(&r),
+            rows(&[
+             (-5, None, None),
+             (-4, None, None),
+             (-3, None, None),
+             (-2, None, None),
+             (-1, None, None),
+             (0, None, None),
+             (1, None, None),
+             (2, None, None),
+             (3, None, None),
+             (4, Some("john"), Some(10)),
+             (4, Some("sara"), Some(7)),
+             (5, Some("john"), Some(19)),
+             (5, Some("sara"), Some(10))
+        ])
+        );
+}
 async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
