@@ -24,7 +24,7 @@
     "tsc:watch": "tsc --build --watch",
     "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}",
     "postinstall": "lerna link && patch-package",
-    "link:dev": "cd packages/cubejs-backend-shared && cd ../cubejs-backend-shared && npm link && cd ../cubejs-backend-cloud && npm link && cd ../cubejs-backend-native && npm link && cd ../cubejs-server && npm link && cd ../cubejs-server-core && npm link && cd ../cubejs-api-gateway && npm link && cd ../cubejs-schema-compiler && npm link && cd ../cubejs-query-orchestrator && npm link && cd ../cubejs-athena-driver && npm link && cd ../cubejs-bigquery-driver && npm link && cd ../cubejs-postgres-driver && npm link && cd ../cubejs-databricks-jdbc-driver && npm link && cd ../cubejs-templates && npm link && cd ../cubejs-client-core && npm link && cd ../cubejs-client-ws-transport && npm link && cd ../cubejs-playground && npm link"
+    "link:dev": "cd packages/cubejs-backend-shared && cd ../cubejs-backend-shared && npm link && cd ../cubejs-backend-cloud && npm link && cd ../cubejs-backend-native && npm link && cd ../cubejs-server && npm link && cd ../cubejs-server-core && npm link && cd ../cubejs-api-gateway && npm link && cd ../cubejs-schema-compiler && npm link && cd ../cubejs-query-orchestrator && npm link && cd ../cubejs-athena-driver && npm link && cd ../cubejs-bigquery-driver && npm link && cd ../cubejs-postgres-driver && npm link && cd ../cubejs-databricks-jdbc-driver && npm link && cd ../cubejs-templates && npm link && cd ../cubejs-client-core && npm link && cd ../cubejs-client-ws-transport && npm link && cd ../cubejs-playground && npm link && cd ../cubejs-templates && npm link"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
