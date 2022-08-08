@@ -267,12 +267,12 @@ crate::plan_to_language! {
         },
         MemberReplacer {
             members: Vec<LogicalPlan>,
-            alias_to_cube: Vec<(String, String)>,
+            alias_to_cube: Vec<((String, String), String)>,
         },
         MemberPushdownReplacer {
             members: Vec<LogicalPlan>,
             old_members: Arc<LogicalPlan>,
-            alias_to_cube: Vec<(String, String)>,
+            alias_to_cube: Vec<((String, String), String)>,
         },
         ListConcatPushdownReplacer {
             members: Arc<LogicalPlan>,
