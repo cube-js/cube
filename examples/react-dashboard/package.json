@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "./node_modules/.bin/cubejs-server"
   },
-  "devDependencies":  {
-    "@cubejs-backend/cubestore-driver": "^0.24.2",
-    "@cubejs-backend/postgres-driver": "^0.24.2",
-    "@cubejs-backend/server": "^0.24.2"
+  "devDependencies": {
+    "@cubejs-backend/cubestore-driver": "^0.30.39",
+    "@cubejs-backend/postgres-driver": "^0.30.39",
+    "@cubejs-backend/server": "^0.30.42"
   }
 }
