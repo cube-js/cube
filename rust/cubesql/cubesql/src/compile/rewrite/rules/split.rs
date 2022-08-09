@@ -604,6 +604,66 @@ impl RewriteRules for SplitRules {
                     false,
                 ),
             ),
+            transforming_chain_rewrite(
+                "split-push-down-aggr-fun-with-date-trunc-inner-aggr-replacer",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec!["?expr".to_string()], "?distinct"),
+                    "?cube",
+                ),
+                vec![(
+                    "?expr",
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![
+                            literal_expr("?rewritten_granularity"),
+                            column_expr("?column"),
+                        ],
+                    ),
+                    "?alias",
+                ),
+                MemberRules::transform_original_expr_nested_date_trunc(
+                    "?expr",
+                    "?granularity",
+                    "?granularity",
+                    "?rewritten_granularity",
+                    "?alias_column",
+                    Some("?alias"),
+                    true,
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-aggr-fun-with-date-trunc-outer-aggr-replacer",
+                outer_aggregate_split_replacer(
+                    agg_fun_expr("?fun", vec!["?expr".to_string()], "?distinct"),
+                    "?cube",
+                ),
+                vec![(
+                    "?expr",
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
+                    ),
+                )],
+                agg_fun_expr(
+                    "?fun",
+                    vec![alias_expr("?alias_column", "?alias")],
+                    "?distinct",
+                ),
+                MemberRules::transform_original_expr_date_trunc(
+                    "?expr",
+                    "?granularity",
+                    "?granularity",
+                    "?alias_column",
+                    Some("?alias"),
+                    false,
+                ),
+            ),
             // Aggregate function
             transforming_rewrite(
                 "split-push-down-aggr-fun-inner-replacer",

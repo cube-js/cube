@@ -10915,6 +10915,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn datastudio_date_aggregations() {
+        init_logger();
+
         let supported_granularities = vec![
             // date
             [
@@ -11010,7 +11012,50 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_datastudio_min_max_date() {
+        init_logger();
+
+        for fun in vec!["Max", "Min"].iter() {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "
+                SELECT 
+                    CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\", 
+                    {}(Date_trunc('SECOND', \"order_date\")) AS \"qt_d3yqo2towc\"
+                FROM  KibanaSampleDataEcommerce
+                GROUP BY \"qt_m3uskv6gwc\"
+                ",
+                    fun
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("second".to_string()),
+                        date_range: None,
+                    },]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                }
+            )
+        }
+    }
+
+    #[tokio::test]
     async fn test_extract_date_trunc_week() {
+        init_logger();
+
         let supported_granularities = vec![
             (
                 "EXTRACT(WEEK FROM DATE_TRUNC('MONTH', \"order_date\"))::integer",
@@ -11055,6 +11100,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_metabase_unwrap_date_cast() {
+        init_logger();
+
         let logical_plan = convert_select_to_query_plan(
             "SELECT max(CAST(\"KibanaSampleDataEcommerce\".\"order_date\" AS date)) AS \"max\" FROM \"KibanaSampleDataEcommerce\"".to_string(), 
             DatabaseProtocol::PostgreSQL
