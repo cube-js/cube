@@ -642,6 +642,7 @@ impl RewriteRules for FilterRules {
                     binary_expr("?high", "-", "?interval"),
                 ),
             ),
+            // TODO: second is minimum cube granularity, so we can unwrap it until cube has smaller granularity
             transforming_rewrite(
                 "between-unwrap-datetrunc",
                 filter_replacer(
