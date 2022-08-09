@@ -431,7 +431,9 @@ class BaseQuery {
   }
 
   /**
-   * Wrap cpecified column with the double quote.
+   * Wrap specified column/table name with the double quote.
+   * @param {string} name
+   * @returns {string}
    */
   escapeColumnName(name) {
     return `"${name}"`;
@@ -1180,6 +1182,13 @@ class BaseQuery {
     (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
 
+  /**
+   * Returns SQL query for the "aggregating on top of sub-queries" uses cases.
+   * @param {string} keyCubeName
+   * @param {Array<BaseMeasure>} measures
+   * @param {Array<BaseFilter>} filters
+   * @returns {string}
+   */
   aggregateSubQuery(keyCubeName, measures, filters) {
     filters = filters || this.allFilters;
     const primaryKeyDimensions = this.primaryKeyNames(keyCubeName).map((k) => this.newDimension(k));
@@ -1215,29 +1224,41 @@ class BaseQuery {
         ungroupedAliases: R.fromPairs(measures.map(m => [m.measure, m.aliasName()]))
       }
     ) : measureSelectFn();
-    const columnsForSelect =
-      this.dimensionColumns(this.escapeColumnName('keys')).concat(selectedMeasures).filter(s => !!s).join(', ');
+    const columnsForSelect = this
+      .dimensionColumns(this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS))
+      .concat(selectedMeasures)
+      .filter(s => !!s)
+      .join(', ');
 
-    const primaryKeyJoinConditions = primaryKeyDimensions.map(
-      (pkd) => `${this.escapeColumnName('keys')}.${pkd.aliasName()} = ${shouldBuildJoinForMeasureSelect ?
-        `${this.cubeAlias(keyCubeName)}.${pkd.aliasName()}` :
-        this.dimensionSql(pkd)}`
-    ).join(' AND ');
+    const primaryKeyJoinConditions = primaryKeyDimensions.map((pkd) => (
+      `${
+        this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS)
+      }.${
+        pkd.aliasName()
+      } = ${
+        shouldBuildJoinForMeasureSelect
+          ? `${this.cubeAlias(keyCubeName)}.${pkd.aliasName()}`
+          : this.dimensionSql(pkd)
+      }`
+    )).join(' AND ');
 
     const subQueryJoins =
       shouldBuildJoinForMeasureSelect ? [] : measureSubQueryDimensions.map(d => this.subQueryJoin(d));
     const joinSql = this.joinSql([
-      { sql: `(${this.keysQuery(primaryKeyDimensions, filters)})`, alias: this.escapeColumnName('keys') },
+      {
+        sql: `(${this.keysQuery(primaryKeyDimensions, filters)})`,
+        alias: this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS),
+      },
       {
         sql: keyCubeSql,
         alias: keyCubeAlias,
         on: `${primaryKeyJoinConditions}
-             ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}`
+             ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}`,
       },
       ...subQueryJoins
     ]);
     return `SELECT ${columnsForSelect} FROM ${joinSql}` +
-      (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
+      (!this.safeEvaluateSymbolContext().ungrouped && this.aggregateSubQueryGroupByClause() || '');
   }
 
   checkShouldBuildJoinForMeasureSelect(measures, keyCubeName) {
@@ -1395,6 +1416,19 @@ class BaseQuery {
     );
   }
 
+  /**
+   * Returns `GROUP BY` clause for the "aggregating on top of sub-queries" uses
+   * cases. By the default returns the result of the `groupByClause` method.
+   * @returns {string}
+   */
+  aggregateSubQueryGroupByClause() {
+    return this.groupByClause();
+  }
+
+  /**
+   * Returns `GROUP BY` clause for the basic uses cases.
+   * @returns {string}
+   */
   groupByClause() {
     if (this.ungrouped) {
       return '';
@@ -1463,10 +1497,20 @@ class BaseQuery {
     return ` ORDER BY ${orderByString}`;
   }
 
+  /**
+   * Returns a complete list of the aliased dimensions, including time
+   * dimensions.
+   * @returns {Array<string>}
+   */
   dimensionAliasNames() {
     return R.flatten(this.dimensionsForSelect().map(d => d.aliasName()).filter(d => !!d));
   }
 
+  /**
+   * Returns an array of column names correlated to the specified cube dimensions.
+   * @param {string} cubeAlias
+   * @returns {Array<string>}
+   */
   dimensionColumns(cubeAlias) {
     return this.dimensionAliasNames().map(alias => `${cubeAlias && `${cubeAlias}.` || ''}${alias}`);
   }
@@ -1495,6 +1539,10 @@ class BaseQuery {
     return this.dimensionsForSelect().concat(this.measures);
   }
 
+  /**
+   * Returns a complete list of the dimensions, including time dimensions.
+   * @returns {Array<BaseDimension>}
+   */
   dimensionsForSelect() {
     return this.dimensions.concat(this.timeDimensions);
   }
