@@ -10953,11 +10953,10 @@ ORDER BY \"COUNT(count)\" DESC"
             // iso week / iso year / day of year
             ["DATE_TRUNC('SECOND', \"order_date\")", "second"],
             // month, day
-            // TODO: support TO_CHAR aggregation
-            // [
-            //     "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
-            //     "second",
-            // ],
+            [
+                "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
+                "second",
+            ],
             // date, hour, minute
             [
                 "DATE_TRUNC('MINUTE', DATE_TRUNC('SECOND', \"order_date\"))",
