@@ -104,6 +104,8 @@ pub enum CommandCompletion {
     DeclareCursor,
     CloseCursor,
     CloseCursorAll,
+    Deallocate,
+    DeallocateAll,
     Discard(String),
 }
 
@@ -123,6 +125,10 @@ impl CommandCompletion {
             CommandCompletion::CloseCursor => CommandComplete::Plain("CLOSE CURSOR".to_string()),
             CommandCompletion::CloseCursorAll => {
                 CommandComplete::Plain("CLOSE CURSOR ALL".to_string())
+            }
+            CommandCompletion::Deallocate => CommandComplete::Plain("DEALLOCATE".to_string()),
+            CommandCompletion::DeallocateAll => {
+                CommandComplete::Plain("DEALLOCATE ALL".to_string())
             }
             CommandCompletion::Discard(tp) => CommandComplete::Plain(format!("DISCARD {}", tp)),
             // ROWS COUNT
