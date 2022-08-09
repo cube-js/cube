@@ -35,7 +35,7 @@ class IndexPage extends Component<Props> {
         
         <InfoBox>
           <b>Introduction to Cube Cloud</b> workshop on August 31, 2022.<br/> 
-          Here's your opportunity to get hands-on experience with key features of Cube Cloud and hear the latest product updates.<br /> 
+          Here's your opportunity to get hands-on experience with key features of Cube Cloud and hear the latest product updates.🚀<br /> 
           Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/introduction-to-cube-cloud/">event page</a> 👈
         </InfoBox>
         
