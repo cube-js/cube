@@ -306,6 +306,9 @@ declare module '@cubejs-client/core' {
    * Provides a convenient interface for data manipulation.
    */
   export class ResultSet<T = any> {
+
+    loadResponse: LoadResponse<T>;
+    loadResponses: LoadResponse<T>[];
     /**
      * @hidden
      */
