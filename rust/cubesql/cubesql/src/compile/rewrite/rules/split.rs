@@ -949,23 +949,6 @@ impl RewriteRules for SplitRules {
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             rewrite(
-                "split-push-down-to-char-outer-replacer",
-                outer_projection_split_replacer(
-                    udf_expr(
-                        "to_char",
-                        vec!["?expr".to_string(), literal_expr("?format")],
-                    ),
-                    "?cube",
-                ),
-                udf_expr(
-                    "to_char",
-                    vec![
-                        outer_projection_split_replacer("?expr", "?cube"),
-                        literal_expr("?format"),
-                    ],
-                ),
-            ),
-            rewrite(
                 "split-push-down-to-char-outer-aggr-replacer",
                 outer_aggregate_split_replacer(
                     udf_expr(
