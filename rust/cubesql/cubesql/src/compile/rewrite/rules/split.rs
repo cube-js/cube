@@ -1272,7 +1272,6 @@ impl SplitRules {
                     AggregateFunction::Sum => AggregateFunction::Sum,
                     AggregateFunction::Min => AggregateFunction::Min,
                     AggregateFunction::Max => AggregateFunction::Max,
-                    AggregateFunction::Avg => AggregateFunction::Avg,
                     _ => continue,
                 };
 
