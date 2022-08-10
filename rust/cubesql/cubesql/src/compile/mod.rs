@@ -9169,6 +9169,21 @@ ORDER BY \"COUNT(count)\" DESC"
         Ok(())
     }
 
+    // This tests asserts that our DF fork contains support for Coalesce
+    #[tokio::test]
+    async fn df_coalesce() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_coalesce",
+            execute_query(
+                "SELECT COALESCE(null, 1) as t1, COALESCE(null, 1, null, 2) as t2".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
     // This tests asserts that our DF fork contains support for >> && <<
     #[tokio::test]
     async fn df_is_bitwise_shit() -> Result<(), CubeError> {

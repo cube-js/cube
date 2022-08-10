@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 9175
+expression: "execute_query(\"SELECT COALESCE(null, 1) as t1, COALESCE(null, 1, null, 2) as t2\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----+----+
+| t1 | t2 |
++----+----+
+| 1  | 1  |
++----+----+

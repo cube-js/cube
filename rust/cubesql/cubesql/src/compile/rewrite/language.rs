@@ -363,6 +363,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::Trim => "Trim",
                 BuiltinScalarFunction::Upper => "Upper",
                 BuiltinScalarFunction::RegexpMatch => "RegexpMatch",
+                BuiltinScalarFunction::Coalesce => "Coalesce",
             }
         );
     };
