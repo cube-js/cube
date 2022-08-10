@@ -2542,7 +2542,7 @@ mod tests {
             .await
     }
 
-    #[tokio::test]
+    /* #[tokio::test]
     async fn in_memory_compaction() {
         Config::test("inmemory_compaction")
             .update_config(|mut c| {
@@ -2617,7 +2617,7 @@ mod tests {
                 assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 1);
             })
             .await
-    }
+    } */
 
     #[tokio::test]
     async fn cluster() {

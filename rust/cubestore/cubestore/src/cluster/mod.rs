@@ -570,10 +570,26 @@ impl Cluster for ClusterImpl {
     }
 
     async fn schedule_repartition(&self, p: &IdRow<Partition>) -> Result<(), CubeError> {
+        let in_memory_node = self.node_name_by_partition(p);
+        let in_memory_job = self
+            .meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Partitions, p.get_id()),
+                JobType::Repartition,
+                in_memory_node.to_string(),
+            ))
+            .await?;
+        if in_memory_job.is_some() {
+            self.notify_job_runner(in_memory_node).await?;
+        }
+
         let chunks = self
             .meta_store
             .get_chunks_by_partition(p.get_id(), false)
-            .await?;
+            .await?
+            .into_iter()
+            .filter(|c| !c.get_row().in_memory())
+            .collect::<Vec<_>>();
 
         for chunk in chunks {
             let node = self.node_name_for_chunk_repartition(&chunk).await?;

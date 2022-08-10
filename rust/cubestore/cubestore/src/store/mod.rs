@@ -173,7 +173,7 @@ pub struct ChunkStore {
     meta_store: Arc<dyn MetaStore>,
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
-    config: Arc<dyn ConfigObj>,
+    _config: Arc<dyn ConfigObj>,
     memory_chunks: RwLock<HashMap<u64, RecordBatch>>,
     chunk_size: usize,
 }
@@ -220,6 +220,12 @@ pub trait ChunkDataStore: DIService + Send + Sync {
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError>;
     async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
+    async fn add_persistent_chunk(
+        &self,
+        index: IdRow<Index>,
+        partition: IdRow<Partition>,
+        batch: RecordBatch,
+    ) -> Result<(IdRow<Chunk>, Option<u64>), CubeError>;
 }
 
 crate::di_service!(MockChunkDataStore, [ChunkDataStore]);
@@ -296,14 +302,14 @@ impl ChunkStore {
         meta_store: Arc<dyn MetaStore>,
         remote_fs: Arc<dyn RemoteFs>,
         cluster: Arc<dyn Cluster>,
-        config: Arc<dyn ConfigObj>,
+        _config: Arc<dyn ConfigObj>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
         let store = ChunkStore {
             meta_store,
             remote_fs,
             cluster,
-            config,
+            _config,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
         };
@@ -351,25 +357,12 @@ impl ChunkDataStore for ChunkStore {
                 partition
             )));
         }
-        let mut size = 0;
-        let mut count = 0;
         let chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?
             .into_iter()
-            .take_while(|c| {
-                if size == 0 {
-                    size += c.get_row().get_row_count();
-                    count += 1;
-                    true
-                } else {
-                    size += c.get_row().get_row_count();
-                    count += 1;
-                    // TODO config
-                    size <= self.config.compaction_chunks_total_size_threshold() && count < 32
-                }
-            })
+            .filter(|c| c.get_row().in_memory() && c.get_row().active())
             .collect::<Vec<_>>();
         if chunks.is_empty() {
             return Ok(());
@@ -391,7 +384,7 @@ impl ChunkDataStore for ChunkStore {
             } else {
                 new_chunks.append(
                     &mut self
-                        .partition_rows(partition.get_row().get_index_id(), columns, false)
+                        .partition_rows(partition.get_row().get_index_id(), columns, true)
                         .await?,
                 );
             }
@@ -518,6 +511,21 @@ impl ChunkDataStore for ChunkStore {
         let mut memory_chunks = self.memory_chunks.write().await;
         memory_chunks.insert(chunk_id, batch);
         Ok(())
+    }
+    async fn add_persistent_chunk(
+        &self,
+        index: IdRow<Index>,
+        partition: IdRow<Partition>,
+        batch: RecordBatch,
+    ) -> Result<(IdRow<Chunk>, Option<u64>), CubeError> {
+        self.add_chunk_columns(
+            index.clone(),
+            partition.clone(),
+            batch.columns().to_vec(),
+            false,
+        )
+        .await?
+        .await?
     }
 
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError> {

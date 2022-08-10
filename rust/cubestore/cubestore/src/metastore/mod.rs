@@ -692,6 +692,8 @@ pub struct Chunk {
     #[serde(default)]
     oldest_insert_at: Option<DateTime<Utc>>,
     #[serde(default)]
+    deactivated_at: Option<DateTime<Utc>>,
+    #[serde(default)]
     suffix: Option<String>,
     #[serde(default)]
     file_size: Option<u64>

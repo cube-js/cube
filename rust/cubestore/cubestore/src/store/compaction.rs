@@ -4,7 +4,8 @@ use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::AggregateColumn;
 use crate::metastore::{
-    deactivate_table_on_corrupt_data, Chunk, IdRow, IndexType, MetaStore, Partition, PartitionData,
+    deactivate_table_on_corrupt_data, table::Table, Chunk, IdRow, Index, IndexType, MetaStore,
+    Partition, PartitionData,
 };
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::store::{ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
@@ -82,8 +83,201 @@ impl CompactionServiceImpl {
             config,
         })
     }
-}
 
+    async fn compact_chunks_to_memory(
+        &self,
+        mut chunks: Vec<IdRow<Chunk>>,
+        partition: &IdRow<Partition>,
+        index: &IdRow<Index>,
+        table: &IdRow<Table>,
+    ) -> Result<(), CubeError> {
+        if chunks.is_empty() {
+            return Ok(());
+        }
+        let compaction_in_memory_chunks_size_limit =
+            self.config.compaction_in_memory_chunks_size_limit();
+
+        chunks.sort_by(|a, b| {
+            a.get_row()
+                .get_row_count()
+                .partial_cmp(&b.get_row().get_row_count())
+                .unwrap()
+        });
+
+        let mut compact_groups = Vec::new();
+
+        let mut size = 0;
+        let mut count = 0;
+        let mut start = 0;
+
+        let ratio_threshold = self.config.compaction_in_memory_chunks_ratio_threshold();
+        let ratio_check_threshold = self
+            .config
+            .compaction_in_memory_chunks_ratio_check_threshold();
+        for chunk in chunks.iter() {
+            if count > 0 {
+                let chunk_size = chunk.get_row().get_row_count();
+                //TODO config for magic numbers
+                if (chunk_size > ratio_check_threshold && chunk_size > size * ratio_threshold)
+                    || size >= compaction_in_memory_chunks_size_limit
+                {
+                    if count > 1 {
+                        compact_groups.push((start, start + count));
+                        start = start + count;
+                        size = 0;
+                        count = 0;
+                        continue;
+                    }
+                }
+            }
+            size += chunk.get_row().get_row_count();
+            count += 1;
+        }
+        if count > 1 {
+            compact_groups.push((start, start + count));
+        }
+
+        if compact_groups.is_empty() {
+            return Ok(());
+        }
+
+        // Prepare merge params
+        let unique_key = table.get_row().unique_key_columns();
+        let num_columns = index.get_row().columns().len();
+        let key_size = index.get_row().sort_key_size() as usize;
+        let schema = Arc::new(arrow_schema(index.get_row()));
+        // Use empty execution plan for main_table, read only from memory chunks
+        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
+
+        let aggregate_columns = match index.get_row().get_type() {
+            IndexType::Regular => None,
+            IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
+        };
+
+        let mut old_chunk_ids = Vec::new();
+        let mut new_chunk_ids = Vec::new();
+
+        for group in compact_groups.iter() {
+            let group_chunks = &chunks[group.0..group.1];
+            let in_memory_columns =
+                prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, group_chunks)
+                    .await?;
+
+            // Get merged RecordBatch
+            let batches_stream = merge_chunks(
+                key_size,
+                main_table.clone(),
+                in_memory_columns,
+                unique_key.clone(),
+                aggregate_columns.clone(),
+            )
+            .await?;
+            let batches = collect(batches_stream).await?;
+            let batch = RecordBatch::concat(&schema, &batches).unwrap();
+
+            let oldest_insert_at = group_chunks
+                .iter()
+                .filter_map(|c| {
+                    Some(
+                        c.get_row()
+                            .oldest_insert_at()
+                            .clone()
+                            .unwrap_or(c.get_row().created_at().clone().unwrap()),
+                    )
+                })
+                .min();
+
+            let chunk = self
+                .meta_store
+                .create_chunk(partition.get_id(), batch.num_rows(), true)
+                .await?;
+
+            self.meta_store
+                .chunk_update_last_inserted(vec![chunk.get_id()], oldest_insert_at)
+                .await?;
+
+            self.chunk_store
+                .add_memory_chunk(chunk.get_id(), batch)
+                .await?;
+
+            old_chunk_ids.extend(group_chunks.iter().map(|c| c.get_id()));
+            new_chunk_ids.push((chunk.get_id(), None));
+        }
+
+        self.meta_store
+            .swap_chunks_without_check(old_chunk_ids, new_chunk_ids)
+            .await?;
+
+        Ok(())
+    }
+    async fn compact_chunks_to_persistent(
+        &self,
+        chunks: Vec<IdRow<Chunk>>,
+        partition: &IdRow<Partition>,
+        index: &IdRow<Index>,
+        table: &IdRow<Table>,
+    ) -> Result<(), CubeError> {
+        if chunks.is_empty() {
+            return Ok(());
+        }
+
+        // Prepare merge params
+        let unique_key = table.get_row().unique_key_columns();
+        let num_columns = index.get_row().columns().len();
+        let key_size = index.get_row().sort_key_size() as usize;
+        let schema = Arc::new(arrow_schema(index.get_row()));
+        // Use empty execution plan for main_table, read only from memory chunks
+        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
+
+        let aggregate_columns = match index.get_row().get_type() {
+            IndexType::Regular => None,
+            IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
+        };
+
+        let old_chunk_ids = chunks.iter().map(|c| c.get_id()).collect::<Vec<_>>();
+        let oldest_insert_at = chunks
+            .iter()
+            .filter_map(|c| {
+                Some(
+                    c.get_row()
+                        .oldest_insert_at()
+                        .clone()
+                        .unwrap_or(c.get_row().created_at().clone().unwrap()),
+                )
+            })
+            .min();
+
+        let in_memory_columns =
+            prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, &chunks[..])
+                .await?;
+        let batches_stream = merge_chunks(
+            key_size,
+            main_table.clone(),
+            in_memory_columns,
+            unique_key.clone(),
+            aggregate_columns.clone(),
+        )
+        .await?;
+
+        let batches = collect(batches_stream).await?;
+        let batch = RecordBatch::concat(&schema, &batches).unwrap();
+
+        let (chunk, file_size) = self
+            .chunk_store
+            .add_persistent_chunk(index.clone(), partition.clone(), batch)
+            .await?;
+
+        self.meta_store
+            .chunk_update_last_inserted(vec![chunk.get_id()], oldest_insert_at)
+            .await?;
+
+        self.meta_store
+            .swap_chunks_without_check(old_chunk_ids, vec![(chunk.get_id(), file_size)])
+            .await?;
+
+        Ok(())
+    }
+}
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError> {
@@ -116,21 +310,7 @@ impl CompactionService for CompactionServiceImpl {
         let mut size = 0;
         let chunks = all_pending_chunks
             .iter()
-            .filter(|c| {
-                !c.get_row().in_memory()
-                    || c.get_row().get_row_count()
-                        > self.config.compaction_in_memory_chunks_size_limit()
-                    || c.get_row()
-                        .oldest_insert_at()
-                        .map(|m| {
-                            Utc::now().signed_duration_since(m).num_seconds()
-                                > self
-                                    .config
-                                    .compaction_in_memory_chunks_max_lifetime_threshold()
-                                    as i64
-                        })
-                        .unwrap_or(false)
-            })
+            .filter(|c| !c.get_row().in_memory())
             .take_while(|c| {
                 if size == 0 {
                     size += c.get_row().get_row_count();
@@ -443,15 +623,14 @@ impl CompactionService for CompactionServiceImpl {
             self.config.compaction_in_memory_chunks_size_limit();
 
         // Get all in_memory and active chunks
-        let mut chunks = self
+        let (mem_chunks, pesistent_chunks) = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?
             .into_iter()
-            .filter(|c| {
-                c.get_row().in_memory()
-                    && c.get_row().active()
-                    && c.get_row().get_row_count() <= compaction_in_memory_chunks_size_limit
+            .filter(|c| c.get_row().in_memory() && c.get_row().active())
+            .partition(|c| {
+                &&c.get_row().get_row_count() <= &&compaction_in_memory_chunks_size_limit
                     && c.get_row()
                         .oldest_insert_at()
                         .map(|m| {
@@ -462,119 +641,11 @@ impl CompactionService for CompactionServiceImpl {
                                     as i64
                         })
                         .unwrap_or(true)
-            })
-            .collect::<Vec<_>>();
-        chunks.sort_by(|a, b| {
-            a.get_row()
-                .get_row_count()
-                .partial_cmp(&b.get_row().get_row_count())
-                .unwrap()
-        });
-
-        let mut compact_groups = Vec::new();
-
-        let mut size = 0;
-        let mut count = 0;
-        let mut start = 0;
-
-        let ratio_threshold = self.config.compaction_in_memory_chunks_ratio_threshold();
-        let ratio_check_threshold = self
-            .config
-            .compaction_in_memory_chunks_ratio_check_threshold();
-        for chunk in chunks.iter() {
-            if count > 0 {
-                let chunk_size = chunk.get_row().get_row_count();
-                //TODO config for magic numbers
-                if (chunk_size > ratio_check_threshold && chunk_size > size * ratio_threshold)
-                    || size >= compaction_in_memory_chunks_size_limit
-                {
-                    if count > 1 {
-                        compact_groups.push((start, start + count));
-                        start = start + count;
-                        size = 0;
-                        count = 0;
-                        continue;
-                    }
-                }
-            }
-            size += chunk.get_row().get_row_count();
-            count += 1;
-        }
-        if count > 1 {
-            compact_groups.push((start, start + count));
-        }
-
-        if compact_groups.is_empty() {
-            return Ok(());
-        }
-
-        // Prepare merge params
-        let unique_key = table.get_row().unique_key_columns();
-        let num_columns = index.get_row().columns().len();
-        let key_size = index.get_row().sort_key_size() as usize;
-        let schema = Arc::new(arrow_schema(index.get_row()));
-        // Use empty execution plan for main_table, read only from memory chunks
-        let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
-
-        let aggregate_columns = match index.get_row().get_type() {
-            IndexType::Regular => None,
-            IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
-        };
-
-        let mut old_chunk_ids = Vec::new();
-        let mut new_chunk_ids = Vec::new();
-
-        for group in compact_groups.iter() {
-            let group_chunks = &chunks[group.0..group.1];
-            let in_memory_columns =
-                prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, group_chunks)
-                    .await?;
-
-            // Get merged RecordBatch
-            let batches_stream = merge_chunks(
-                key_size,
-                main_table.clone(),
-                in_memory_columns,
-                unique_key.clone(),
-                aggregate_columns.clone(),
-            )
+            });
+        self.compact_chunks_to_memory(mem_chunks, &partition, &index, &table)
             .await?;
-            let batches = collect(batches_stream).await?;
-            let batch = RecordBatch::concat(&schema, &batches).unwrap();
-
-            let oldest_insert_at = group_chunks
-                .iter()
-                .filter_map(|c| {
-                    Some(
-                        c.get_row()
-                            .oldest_insert_at()
-                            .clone()
-                            .unwrap_or(c.get_row().created_at().clone().unwrap()),
-                    )
-                })
-                .min();
-
-            let chunk = self
-                .meta_store
-                .create_chunk(partition_id, batch.num_rows(), true)
-                .await?;
-
-            self.meta_store
-                .chunk_update_last_inserted(vec![chunk.get_id()], oldest_insert_at)
-                .await?;
-
-            self.chunk_store
-                .add_memory_chunk(chunk.get_id(), batch)
-                .await?;
-
-            old_chunk_ids.extend(group_chunks.iter().map(|c| c.get_id()));
-            new_chunk_ids.push((chunk.get_id(), None));
-        }
-
-        self.meta_store
-            .swap_chunks_without_check(old_chunk_ids, new_chunk_ids)
+        self.compact_chunks_to_persistent(pesistent_chunks, &partition, &index, &table)
             .await?;
-
         Ok(())
     }
 
@@ -691,7 +762,7 @@ impl CompactionService for CompactionServiceImpl {
 }
 
 // TODO: re-use it in the compact function?
-async fn prepare_in_memory_columns(
+pub async fn prepare_in_memory_columns(
     chunk_store: &Arc<dyn ChunkDataStore>,
     num_columns: usize,
     key_size: usize,
@@ -1072,7 +1143,7 @@ async fn write_to_files_by_keys(
 }
 
 ///Builds a `SendableRecordBatchStream` containing the result of merging a persistent chunk `l` with an in-memory chunk `r`
-async fn merge_chunks(
+pub async fn merge_chunks(
     key_size: usize,
     l: Arc<dyn ExecutionPlan>,
     r: Vec<ArrayRef>,
