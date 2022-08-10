@@ -78,8 +78,7 @@
   "resolutions": {
     "@types/node": "^12",
     "@types/ramda": "0.27.40",
-    "rc-tree": "4.1.5",
-    "testcontainers": "7.12.1"
+    "rc-tree": "4.1.5"
   },
   "license": "MIT"
 }

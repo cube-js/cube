@@ -32,7 +32,7 @@
     "@cubejs-backend/linter": "^0.30.0",
     "mocha": "^8.1.3",
     "should": "^13.2.3",
-    "testcontainers": "^7.6.2"
+    "testcontainers": "^8.12"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"
