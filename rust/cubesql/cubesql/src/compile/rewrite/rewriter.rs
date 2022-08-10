@@ -370,7 +370,7 @@ impl Rewriter {
             Box::new(FilterRules::new(cube_context.clone())),
             Box::new(DateRules::new(cube_context.clone())),
             Box::new(OrderRules::new(cube_context.clone())),
-            // Box::new(SplitRules::new(cube_context.clone())),
+            Box::new(SplitRules::new(cube_context.clone())),
         ];
         let mut rewrites = Vec::new();
         for r in rules {

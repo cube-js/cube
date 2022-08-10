@@ -9362,6 +9362,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_metabase_substring() -> Result<(), CubeError> {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             "SELECT
                     \"source\".\"substring1\" AS \"substring2\",

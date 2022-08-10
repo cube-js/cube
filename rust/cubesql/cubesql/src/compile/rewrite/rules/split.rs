@@ -107,9 +107,9 @@ impl RewriteRules for SplitRules {
                             "?aliases",
                             "CubeScanSplit:true",
                         ),
-                        "?alias",
+                        "?projection_alias",
                     ),
-                    "?projection_alias",
+                    "?alias",
                 ),
                 self.split_projection_aggregate(
                     "?alias_to_cube",
@@ -1078,6 +1078,8 @@ impl SplitRules {
                     if cube.lookup_measure(&default_count_measure_name).is_none() {
                         return true;
                     }
+                } else {
+                    return true;
                 }
             }
             false
@@ -1382,6 +1384,8 @@ impl SplitRules {
                             if cube.lookup_measure(&default_count_measure_name).is_none() {
                                 return true;
                             }
+                        } else {
+                            return true;
                         }
                     }
                 }

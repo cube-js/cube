@@ -936,6 +936,10 @@ impl MemberRules {
                         "push_down_projection: column_name_to_alias {:?}",
                         column_name_to_alias
                     );
+                    println!(
+                        "push_down_projection: member_name_to_expr {:?}",
+                        egraph.index(subst[members_var]).data.member_name_to_expr
+                    );
                     if let Some(member_name_to_expr) = egraph
                         .index(subst[members_var])
                         .data

@@ -348,7 +348,11 @@ impl ExprRewriter for WithColumnRelation {
         match expr {
             Expr::Column(c) => Ok(Expr::Column(Column {
                 name: c.name.to_string(),
-                relation: c.relation.or_else(|| self.0.clone()),
+                relation: if let Some(rel) = self.0.as_ref() {
+                    c.relation.or_else(|| Some(rel.to_string()))
+                } else {
+                    None
+                },
             })),
             e => Ok(e),
         }
