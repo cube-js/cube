@@ -1,0 +1,51 @@
+---
+title: Connecting with a VPC on Google Cloud
+permalink: /cloud/configuration/connecting-with-a-vpc/gcp
+---
+
+## Prerequisites
+
+- [Google Cloud Project ID][gcp-docs-projects]
+- Google Cloud VPC Network Name
+
+## Setup
+
+### VPC Peering
+
+After receiving the information above, create a [VPC peering
+request][gcp-docs-vpc-peering], either through the [GCP Web
+Console][gcp-console] or an infrastructure-as-code tool. To send a VPC peering
+request through the Google Cloud Console, follow [the instructions
+here][gcp-docs-create-vpc-peering], with the following amendments:
+
+- In Step 6, use the project name `XXXXX` and network name(s) provided by Cube
+  Cloud.
+- In Step 7, ensure **Import custom routes** and **Export custom routes** are
+  selected so that the necessary routes are created.
+
+## Supported Regions
+
+- `northeast1`
+- `europe-west-2`
+- `europe-west-3`
+- `us-central-1`
+
+## Notes
+
+### Cloud SQL
+
+Google Cloud SQL databases [can only be peered to a VPC within the same GCP
+project][gcp-docs-vpc-peering-restrictions]. To work around this limitation, we
+recommend that customers provision a micro VM in their Google Cloud account to
+run the [Cloud SQL Auth Proxy][gcp-cloudsql-auth-proxy].
+
+[gcp-cloudsql-auth-proxy]:
+  https://cloud.google.com/sql/docs/mysql/connect-admin-proxy
+[gcp-docs-vpc-peering-restrictions]:
+  https://cloud.google.com/vpc/docs/vpc-peering#restrictions
+[gcp-console]: https://console.cloud.google.com/
+[gcp-docs-create-vpc-peering]:
+  https://cloud.google.com/vpc/docs/using-vpc-peering#creating_a_peering_configuration
+[gcp-docs-projects]:
+  https://cloud.google.com/resource-manager/docs/creating-managing-projects#before_you_begin
+[gcp-docs-vpc-peering]: https://cloud.google.com/vpc/docs/vpc-peering
