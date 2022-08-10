@@ -558,14 +558,13 @@ class BaseQuery {
    * TODO(cristipp) Add support for subqueries and joins.
    * @returns {Record<string, Array<string>>}
    */
-  buildLambdaInfo() {
+  buildLambdaQueries() {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
     const result = {};
     if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
-      const QueryClass = this.constructor;
+      // TODO(cristipp) Use source query instead of preaggregation references.
       const references = this.cubeEvaluator.evaluatePreAggregationReferences(preAggForQuery.cube, preAggForQuery.preAggregation);
-      const lambdaQuery = new QueryClass(
-        this.compilers,
+      const lambdaQuery = this.newSubQuery(
         {
           ...this.options,
           measures: references.measures,
@@ -582,13 +581,13 @@ class BaseQuery {
               : [],
           ],
           order: [],
-          rowLimit: 1000000,
+          rowLimit: preAggForQuery.preAggregation.unionWithSourceData.maxSourceRows,
           preAggregationQuery: true,
         }
       );
       const sqlAndParams = lambdaQuery.buildSqlAndParams();
       const cacheKeyQueries = this.evaluateSymbolSqlWithContext(
-        () => this.refreshKeysByCubes([preAggForQuery.cube]),
+        () => this.cacheKeyQueries(),
         { preAggregationQuery: true }
       );
       result[this.preAggregations.preAggregationId(preAggForQuery)] = { sqlAndParams, cacheKeyQueries };
@@ -2461,10 +2460,6 @@ class BaseQuery {
       () => {
         const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
         if (preAggregation.refreshKey) {
-          if (preAggregation.refreshKey.every === 'never') {
-            return [];
-          }
-
           if (preAggregation.refreshKey.sql) {
             return [
               this.paramAllocator.buildSqlAndParams(

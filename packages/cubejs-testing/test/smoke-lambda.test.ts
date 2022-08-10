@@ -11,6 +11,15 @@ import { DEFAULT_CONFIG } from './smoke-tests';
 const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
+async function runScheduledRefresh(client: any) {
+  return client.loadMethod(
+    () => client.request('run-scheduled-refresh'),
+    (response: any) => response,
+    {},
+    undefined
+  );
+}
+
 async function checkCubestoreState(cubestore: any) {
   let rows = await cubestore.query('SELECT table_schema, table_name, build_range_end FROM information_schema.tables ORDER BY table_name', []);
   const table = rows[3];
@@ -269,7 +278,7 @@ describe('lambda', () => {
   });
 
   test('refresh', async () => {
-    await client.runScheduledRefresh();
+    await runScheduledRefresh(client);
     await checkCubestoreState(cubestore);
   });
 });

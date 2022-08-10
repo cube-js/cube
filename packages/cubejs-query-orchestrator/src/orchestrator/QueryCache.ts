@@ -30,10 +30,6 @@ export type Query = {
   preAggregationsLoadCacheByDataSource?: any;
   renewQuery?: boolean;
 };
-export type LambdaInfo = {
-  sqlAndParams: QueryWithParams,
-  cacheKeyQueries: any[],
-};
 
 type CacheEntry = {
   time: number;

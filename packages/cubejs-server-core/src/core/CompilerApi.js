@@ -120,7 +120,7 @@ export class CompilerApi {
     const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
       external: sqlGenerator.externalPreAggregationQuery(),
       sql: sqlGenerator.buildSqlAndParams(),
-      lambdaInfo: sqlGenerator.buildLambdaInfo(),
+      lambdaQueries: sqlGenerator.buildLambdaQueries(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
       timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
       order: sqlGenerator.order,
