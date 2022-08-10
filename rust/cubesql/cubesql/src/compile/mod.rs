@@ -11052,6 +11052,50 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_datastudio_between_dates_filter() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT 
+                CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\",
+                COUNT(1) AS \"__record_count\"
+            FROM KibanaSampleDataEcommerce
+            WHERE Date_trunc('SECOND', \"order_date\") 
+                BETWEEN 
+                    CAST('2022-07-11 18:00:00.000000' AS TIMESTAMP) 
+                AND CAST('2022-07-11 19:00:00.000000' AS TIMESTAMP)
+            GROUP BY \"qt_m3uskv6gwc\";
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("second".to_string()),
+                    date_range: Some(json!(vec![
+                        "2022-07-11 18:00:00.000000".to_string(),
+                        "2022-07-11 19:00:00.000000".to_string()
+                    ])),
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_extract_date_trunc_week() {
         init_logger();
 
