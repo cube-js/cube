@@ -10,7 +10,9 @@ availability of your deployment.
 
 ## Single Instance Deployments
 
-Single instance deployments are designed for development use-cases.
+Single Instance deployments are designed for development use-cases only.
+If not used for over an hour, it'll take additional time to process the first request.
+Refresh Worker is active only when a Single Instance serves the workload.
 
 ## Cluster Deployments
 

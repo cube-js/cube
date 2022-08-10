@@ -23,7 +23,7 @@ import {
   OrchestratorInitedOptions,
   QueueOptions,
 } from './types';
-import { lookupDriverClass } from './DriverResolvers';
+import { lookupDriverClass, isDriver } from './DriverResolvers';
 import type { CubejsServerCore } from './server';
 import optionsValidate from './optionsValidate';
 
@@ -109,17 +109,7 @@ export class OptsHandler {
   private assertDriverFactoryResult(
     val: DriverConfig | BaseDriver,
   ) {
-    let isDriverInstance = val instanceof BaseDriver;
-    if (!isDriverInstance && val && val.constructor) {
-      let end = false;
-      let obj = val.constructor;
-      while (!isDriverInstance && !end) {
-        obj = Object.getPrototypeOf(obj);
-        end = !obj;
-        isDriverInstance = obj && obj.name ? obj.name === 'BaseDriver' : false;
-      }
-    }
-    if (isDriverInstance) {
+    if (isDriver(val)) {
       // TODO (buntarb): these assertions should be restored after dbType
       // deprecation period will be passed.
       //

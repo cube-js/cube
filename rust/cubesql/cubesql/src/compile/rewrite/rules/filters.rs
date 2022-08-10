@@ -41,6 +41,8 @@ use datafusion::{
 use egg::{EGraph, Rewrite, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
 
+use super::members::MemberRules;
+
 pub struct FilterRules {
     cube_context: Arc<CubeContext>,
 }
@@ -640,6 +642,31 @@ impl RewriteRules for FilterRules {
                     binary_expr("?high", "-", "?interval"),
                 ),
             ),
+            // TODO: second is minimum cube granularity, so we can unwrap it until cube has smaller granularity
+            transforming_rewrite(
+                "between-unwrap-datetrunc",
+                filter_replacer(
+                    between_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), "?expr".to_string()],
+                        ),
+                        "?negated",
+                        "?low",
+                        "?high",
+                    ),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                filter_replacer(
+                    between_expr("?expr", "?negated", "?low", "?high"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                self.unwrap_datetrunc("?granularity", "second"),
+            ),
             rewrite(
                 "not-expt-like-to-expr-not-like",
                 not_expr(binary_expr("?left", "LIKE", "?right")),
@@ -720,14 +747,9 @@ impl RewriteRules for FilterRules {
             ),
             rewrite(
                 "filter-cast-unwrap-between-push-down",
-                filter_cast_unwrap_replacer(between_expr(
-                    column_expr("?column"),
-                    "?negated",
-                    "?low",
-                    "?high",
-                )),
+                filter_cast_unwrap_replacer(between_expr("?expr", "?negated", "?low", "?high")),
                 between_expr(
-                    column_expr("?column"),
+                    "?expr",
                     "?negated",
                     filter_cast_unwrap_replacer("?low"),
                     filter_cast_unwrap_replacer("?high"),
@@ -1837,6 +1859,28 @@ impl FilterRules {
                             }
                         }
                     }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn unwrap_datetrunc(
+        &self,
+        granularity_var: &'static str,
+        target_granularity: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let granularity_var = var!(granularity_var);
+        move |egraph, subst| {
+            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
+                match MemberRules::parse_granularity(granularity, false) {
+                    Some(granularity)
+                        if granularity.to_lowercase() == target_granularity.to_lowercase() =>
+                    {
+                        return true
+                    }
+                    _ => (),
                 }
             }
 

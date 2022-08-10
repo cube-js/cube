@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.46](https://github.com/cube-js/cube.js/compare/v0.30.45...v0.30.46) (2022-08-10)
+
+
+### Bug Fixes
+
+* **cubestore:** Fix panic in rolling window processing ([#5066](https://github.com/cube-js/cube.js/issues/5066)) ([acf48ed](https://github.com/cube-js/cube.js/commit/acf48ed7473742be2d5660485e4c4d27a53e22c3))
+
+
+
+
+
 ## [0.30.45](https://github.com/cube-js/cube.js/compare/v0.30.44...v0.30.45) (2022-08-05)
 
 

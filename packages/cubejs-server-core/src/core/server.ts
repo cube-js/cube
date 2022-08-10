@@ -26,6 +26,7 @@ import { OptsHandler } from './OptsHandler';
 import {
   driverDependencies,
   lookupDriverClass,
+  isDriver,
   createDriver,
   getDriverMaxPool,
 } from './DriverResolvers';
@@ -44,6 +45,7 @@ import type {
   RequestContext,
   DriverContext,
   LoggerFn,
+  DriverConfig,
 } from './types';
 import { ContextToOrchestratorIdFn } from './types';
 
@@ -738,10 +740,10 @@ export class CubejsServerCore {
   ): Promise<BaseDriver> {
     if (!this.driversStorage.has(context.dataSource)) {
       const val = await this.options.driverFactory(context);
-      if (val instanceof BaseDriver) {
-        this.driversStorage.set(context.dataSource, val);
+      if (isDriver(val)) {
+        this.driversStorage.set(context.dataSource, <BaseDriver>val);
       } else {
-        const { type, ...rest } = val;
+        const { type, ...rest } = <DriverConfig>val;
         const opts = Object.keys(rest).length
           ? rest
           : {

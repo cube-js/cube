@@ -1,0 +1,71 @@
+---
+title: Connecting with a VPC on AWS
+permalink: /cloud/configuration/connecting-with-a-vpc/aws
+---
+
+## Prerequisites
+
+To allow Cube Cloud to connect to a VPC on AWS, the following information is
+required:
+
+- **AWS Account ID:** The AWS account ID of the VPC owner. This can be found in
+  the top-right corner of [the AWS Console][aws-console].
+- **AWS Region:** [The AWS region][aws-docs-regions] that the VPC resides in.
+  Ensure that the region is available in [Supported Regions](#supported-regions)
+  to see if Cube Cloud VPC connectivity is available in your region.
+- **AWS VPC ID:** The ID of the VPC that Cube Cloud will connect to, for example
+  `vpc-0099aazz`
+- **AWS VPC CIDR:** The CIDR block of the VPC that Cube Cloud will connect to,
+  for example `10.0.0.0/16`
+
+## Setup
+
+### VPC Peering Request
+
+After receiving the information above, Cube Cloud will send a [VPC peering
+request][aws-docs-vpc-peering] that must be accepted. This can be done either
+through the [AWS Web Console][aws-console] or through an infrastructure-as-code
+tool.
+
+To accept the VPC peering request through the AWS Web Console, follow [the
+instructions here][aws-docs-vpc-peering-accept] with the following amendments:
+
+- On Step 4, verify the peering request is from Cube Cloud by checking that the
+  AWS account ID, region and VPC IDs match those provided by Support.
+- On Step 5, ensure **Modify my route tables now** is selected so that the
+  necessary routes are created.
+- After Step 5, the security group for any databases within the VPC
+  [may require updating](#updating-security-groups) to allow traffic from Cube
+  Cloud.
+
+### Updating security groups
+
+Often the initial VPC setup will not allow traffic from Cube Cloud; this is
+usually because [the security group][aws-docs-vpc-security-group] for the
+database will need to allow access from the Cube Cloud CIDR block.
+
+This can be achieved by adding a new security group rule:
+
+- **Protocol:** TCP
+- **Port Range:** The database port, usually `3306` for MySQL or `5432` for
+  Postgres.
+- **Source/Destination:** The Cube Cloud CIDR block for the AWS region.
+
+## Supported Regions
+
+- `ca-central-1`
+- `eu-central-1`
+- `eu-west-1`
+- `us-east-1`
+- `us-east-2`
+- `us-west-2`
+
+[aws-console]: https://console.aws.amazon.com/
+[aws-docs-regions]:
+  https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[aws-docs-vpc-peering-accept]:
+  https://docs.aws.amazon.com/vpc/latest/peering/create-vpc-peering-connection.html#accept-vpc-peering-connection
+[aws-docs-vpc-peering]:
+  https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html
+[aws-docs-vpc-security-group]:
+  https://docs.aws.amazon.com/vpc/latest/userguide/VPC_SecurityGroups.html#SecurityGroupRules
