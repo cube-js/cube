@@ -25,7 +25,7 @@
     "@cubejs-backend/schema-compiler": "^0.30.45",
     "@cubejs-backend/shared": "^0.30.45",
     "dedent": "^0.7.0",
-    "testcontainers": "^7.5.0"
+    "testcontainers": "^8.12"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.30.0",
