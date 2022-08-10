@@ -2,6 +2,7 @@ import R from 'ramda';
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { MSSqlDbRunner } from './MSSqlDbRunner';
+import { createJoinedCubesSchema } from '../../unit/utils';
 
 describe('MSSqlPreAggregations', () => {
   jest.setTimeout(200000);
@@ -173,6 +174,8 @@ describe('MSSqlPreAggregations', () => {
       sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`
     })
     `);
+
+  const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
 
   function replaceTableName(query, preAggregation, suffix) {
     const [toReplace, params] = query;
@@ -402,4 +405,71 @@ describe('MSSqlPreAggregations', () => {
         ]);
       });
   }));
+
+  it('aggregating on top of sub-queries without filters', async () => {
+    await joinedSchemaCompilers.compiler.compile();
+    const query = new MssqlQuery({
+      joinGraph: joinedSchemaCompilers.joinGraph,
+      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
+      compiler: joinedSchemaCompilers.compiler,
+    },
+    {
+      dimensions: ['E.eval'],
+      measures: ['B.bval_sum'],
+      order: [{ id: 'B.bval_sum' }],
+    });
+    const sql = query.buildSqlAndParams();
+    return dbRunner
+      .testQuery(sql)
+      .then((res) => {
+        expect(res).toEqual([
+          {
+            e__eval: 'E',
+            b__bval_sum: 20,
+          },
+          {
+            e__eval: 'F',
+            b__bval_sum: 40,
+          },
+          {
+            e__eval: 'G',
+            b__bval_sum: 60,
+          },
+          {
+            e__eval: 'H',
+            b__bval_sum: 80,
+          },
+        ]);
+      });
+  });
+
+  it('aggregating on top of sub-queries with filter', async () => {
+    await joinedSchemaCompilers.compiler.compile();
+    const query = new MssqlQuery({
+      joinGraph: joinedSchemaCompilers.joinGraph,
+      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
+      compiler: joinedSchemaCompilers.compiler,
+    },
+    {
+      dimensions: ['E.eval'],
+      measures: ['B.bval_sum'],
+      filters: [{
+        member: 'E.eval',
+        operator: 'equals',
+        values: ['E'],
+      }],
+      order: [{ id: 'B.bval_sum' }],
+    });
+    const sql = query.buildSqlAndParams();
+    return dbRunner
+      .testQuery(sql)
+      .then((res) => {
+        expect(res).toEqual([
+          {
+            e__eval: 'E',
+            b__bval_sum: 20,
+          },
+        ]);
+      });
+  });
 });

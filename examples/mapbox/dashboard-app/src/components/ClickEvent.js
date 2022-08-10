@@ -4,7 +4,7 @@ import MapGL, { Source, Layer, Popup, NavigationControl } from 'react-map-gl';
 import { Radio, Spin } from "antd";
 import { Scrollbars } from 'react-custom-scrollbars';
 
-export default () => {
+const ClickEvent = () => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
@@ -152,7 +152,7 @@ export default () => {
         onClick={onClickMap}
         interactiveLayerIds={['questions-point']}
         mapStyle='mapbox://styles/kalipsik/ckb2fyfqu123n1ilb5yi7uyns/'
-        mapboxApiAccessToken={process.env.REACT_APP_MAPBOX_KEY}
+        mapboxAccessToken={process.env.REACT_APP_MAPBOX_KEY}
       >
         <div className='mapbox__navi'>
           <NavigationControl />
@@ -191,3 +191,5 @@ export default () => {
     </div>
   )
 }
+
+export default ClickEvent;

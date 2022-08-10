@@ -5952,6 +5952,35 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_redshift_svv_tables() -> Result<(), CubeError> {
+        // This query is used by metabase for introspection
+        insta::assert_snapshot!(
+            "redshift_svv_tables",
+            execute_query(
+                "SELECT * FROM svv_tables ORDER BY table_name DESC".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_introspection() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "thought_spot_tables",
+            execute_query(
+                "SELECT * FROM (SELECT CAST(current_database() AS VARCHAR(124)) AS TABLE_CAT, table_schema AS TABLE_SCHEM, table_name AS TABLE_NAME, CAST( CASE table_type WHEN 'BASE TABLE' THEN CASE WHEN table_schema = 'pg_catalog' OR table_schema = 'information_schema' THEN 'SYSTEM TABLE' WHEN table_schema = 'pg_toast' THEN 'SYSTEM TOAST TABLE' WHEN table_schema ~ '^pg_' AND table_schema != 'pg_toast' THEN 'TEMPORARY TABLE' ELSE 'TABLE' END WHEN 'VIEW' THEN CASE WHEN table_schema = 'pg_catalog' OR table_schema = 'information_schema' THEN 'SYSTEM VIEW' WHEN table_schema = 'pg_toast' THEN NULL WHEN table_schema ~ '^pg_' AND table_schema != 'pg_toast' THEN 'TEMPORARY VIEW' ELSE 'VIEW' END WHEN 'EXTERNAL TABLE' THEN 'EXTERNAL TABLE' END AS VARCHAR(124)) AS TABLE_TYPE, REMARKS, '' as TYPE_CAT, '' as TYPE_SCHEM, '' as TYPE_NAME,  '' AS SELF_REFERENCING_COL_NAME, '' AS REF_GENERATION  FROM svv_tables) WHERE true  AND current_database() = 'dev' AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')  ORDER BY TABLE_TYPE,TABLE_SCHEM,TABLE_NAME ".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_performance_schema_variables() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "performance_schema_session_variables",
@@ -9140,6 +9169,21 @@ ORDER BY \"COUNT(count)\" DESC"
         Ok(())
     }
 
+    // This tests asserts that our DF fork contains support for >> && <<
+    #[tokio::test]
+    async fn df_is_bitwise_shit() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_bitwise_shit",
+            execute_query(
+                "SELECT 2 << 10 as t1, 2048 >> 10 as t2;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
     // This tests asserts that our DF fork contains support for escaped single quoted strings
     #[tokio::test]
     async fn df_escaped_strings() -> Result<(), CubeError> {
@@ -10871,6 +10915,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn datastudio_date_aggregations() {
+        init_logger();
+
         let supported_granularities = vec![
             // date
             [
@@ -10907,11 +10953,10 @@ ORDER BY \"COUNT(count)\" DESC"
             // iso week / iso year / day of year
             ["DATE_TRUNC('SECOND', \"order_date\")", "second"],
             // month, day
-            // TODO: support TO_CHAR aggregation
-            // [
-            //     "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
-            //     "second",
-            // ],
+            [
+                "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
+                "second",
+            ],
             // date, hour, minute
             [
                 "DATE_TRUNC('MINUTE', DATE_TRUNC('SECOND', \"order_date\"))",
@@ -10966,7 +11011,50 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_datastudio_min_max_date() {
+        init_logger();
+
+        for fun in vec!["Max", "Min"].iter() {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "
+                SELECT 
+                    CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\", 
+                    {}(Date_trunc('SECOND', \"order_date\")) AS \"qt_d3yqo2towc\"
+                FROM  KibanaSampleDataEcommerce
+                GROUP BY \"qt_m3uskv6gwc\"
+                ",
+                    fun
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("second".to_string()),
+                        date_range: None,
+                    },]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                }
+            )
+        }
+    }
+
+    #[tokio::test]
     async fn test_extract_date_trunc_week() {
+        init_logger();
+
         let supported_granularities = vec![
             (
                 "EXTRACT(WEEK FROM DATE_TRUNC('MONTH', \"order_date\"))::integer",
@@ -11011,6 +11099,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_metabase_unwrap_date_cast() {
+        init_logger();
+
         let logical_plan = convert_select_to_query_plan(
             "SELECT max(CAST(\"KibanaSampleDataEcommerce\".\"order_date\" AS date)) AS \"max\" FROM \"KibanaSampleDataEcommerce\"".to_string(), 
             DatabaseProtocol::PostgreSQL

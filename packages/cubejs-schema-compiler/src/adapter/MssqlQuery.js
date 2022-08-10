@@ -1,6 +1,7 @@
 import R from 'ramda';
 import moment from 'moment-timezone';
 
+import { QueryAlias } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { ParamAllocator } from './ParamAllocator';
@@ -91,10 +92,29 @@ export class MssqlQuery extends BaseQuery {
     return this.rowLimit === null ? '' : ` TOP ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
   }
 
+  /**
+   * Overrides `BaseQuery#groupByClause` method and returns `GROUP BY` clause
+   * with the column names instead of column numeric sequences as MSSQL does
+   * not support this format.
+   * @returns {string}
+   * @override
+   */
   groupByClause() {
     const dimensionsForSelect = this.dimensionsForSelect();
-    const dimensionColumns = R.flatten(dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql()))
-      .filter(s => !!s);
+    const dimensionColumns = R.flatten(
+      dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())
+    ).filter(s => !!s);
+    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
+  }
+
+  /**
+   * Overrides `BaseQuery#aggregateSubQueryGroupByClause` method and returns
+   * `GROUP BY` clause for the "aggregating on top of sub-queries" uses cases.
+   * @returns {string}
+   * @override
+   */
+  aggregateSubQueryGroupByClause() {
+    const dimensionColumns = this.dimensionColumns(this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS));
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 

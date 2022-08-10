@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/mongobi-driver",
   "description": "Cube.js MongoBI driver",
   "author": "krunalsabnis@gmail.com",
-  "version": "0.30.43",
+  "version": "0.30.45",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -25,7 +25,7 @@
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.30.43",
+    "@cubejs-backend/query-orchestrator": "^0.30.45",
     "@types/node": "^10.17.60",
     "generic-pool": "^3.6.0",
     "moment": "^2.29.1",
