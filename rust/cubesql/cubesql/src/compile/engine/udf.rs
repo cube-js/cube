@@ -2519,6 +2519,12 @@ pub fn create_regexp_substr_udf() -> ScalarUDF {
             None
         };
 
+        if args.len() > 3 {
+            return Err(DataFusionError::NotImplemented(
+                "regexp_substr does not support occurrence and parameters (flags)".to_string(),
+            ));
+        }
+
         let mut patterns: HashMap<String, Regex> = HashMap::new();
         let mut builder = StringBuilder::new(source_arr.len());
 
