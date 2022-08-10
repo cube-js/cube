@@ -9282,7 +9282,20 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "regexp_substr",
             execute_query(
-                "SELECT regexp_substr('test@test.com', '@[^.]*') as match, regexp_substr(null, '@[^.]*') as source_null, regexp_substr('test@test.com', null) as pattern_null".to_string(),
+                "SELECT
+                    regexp_substr('test@test.com', '@[^.]*') as match_dot,
+                    regexp_substr('12345', '[0-9]+') as match_number,
+                    regexp_substr('12345', '[0-9]+', 2) as match_number_pos_2,
+                    regexp_substr(null, '@[^.]*') as source_null,
+                    regexp_substr('test@test.com', null) as pattern_null,
+                    regexp_substr('test@test.com', '@[^.]*', 1) as position_default,
+                    regexp_substr('test@test.com', '@[^.]*', 5) as position_no_skip,
+                    regexp_substr('test@test.com', '@[^.]*', 6) as position_skip,
+                    regexp_substr('test@test.com', '@[^.]*', 0) as position_zero,
+                    regexp_substr('test@test.com', '@[^.]*', -1) as position_negative,
+                    regexp_substr('test@test.com', '@[^.]*', 100) as position_more_then_input
+                "
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

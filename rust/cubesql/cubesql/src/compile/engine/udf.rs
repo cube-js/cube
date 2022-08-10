@@ -2539,13 +2539,15 @@ pub fn create_regexp_substr_udf() -> ScalarUDF {
 
                             continue;
                         } else {
-                            let pos = position.value(idx) as usize;
-                            if pos > s.len() {
+                            let pos = position.value(idx);
+                            if pos <= 1 {
+                                s
+                            } else if (pos as usize) > s.len() {
                                 builder.append_value(&"")?;
 
                                 continue;
                             } else {
-                                &s[(pos - 1)..]
+                                &s[((pos as usize) - 1)..]
                             }
                         }
                     } else {
