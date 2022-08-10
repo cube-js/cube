@@ -21,16 +21,20 @@ CUBEJS_DB_TYPE=databricks-jdbc
 CUBEJS_DB_NAME=default
 # You can find this inside the cluster's configuration
 CUBEJS_DB_DATABRICKS_URL=jdbc:spark://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/XXXXX/XXXXX;AuthMech=3;UID=token;PWD=XXXXX
+# You can specify the personal access token separately from `CUBEJS_DB_DATABRICKS_URL` by doing this:
+CUBEJS_DB_DATABRICKS_TOKEN=XXXXX
 ```
 
 ## Environment Variables
 
-| Environment Variable                 | Description                                                               | Possible Values       | Required |
-| ------------------------------------ | ------------------------------------------------------------------------- | --------------------- | :------: |
-| `CUBEJS_DB_NAME`                     | The name of the database to connect to                                    | A valid database name |    ✅    |
-| `CUBEJS_DB_DATABRICKS_URL`           | The URL for a JDBC connection                                             | A valid JDBC URL      |    ✅    |
-| `CUBEJS_DB_DATABRICKS_ACCEPT_POLICY` | Whether or not to accept the license terms for the Databricks JDBC driver | `true`, `false`       |    ✅    |
-| `CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`  | The path for the [Databricks DBFS mount][databricks-docs-dbfs]            | A valid mount path    |    ❌    |
+| Environment Variable                 | Description                                                                                            | Possible Values           | Required |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------- | :------: |
+| `CUBEJS_DB_NAME`                     | The name of the database to connect to                                                                 | A valid database name     |    ✅    |
+| `CUBEJS_DB_DATABRICKS_URL`           | The URL for a JDBC connection                                                                          | A valid JDBC URL          |    ✅    |
+| `CUBEJS_DB_DATABRICKS_ACCEPT_POLICY` | Whether or not to accept the license terms for the Databricks JDBC driver                              | `true`, `false`           |    ✅    |
+| `CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`  | The path for the [Databricks DBFS mount][databricks-docs-dbfs]                                         | A valid mount path        |    ❌    |
+| `CUBEJS_DB_DATABRICKS_AGENT`         | The user agent string used for the Databricks connection. Default is `Cube+OS/${version} (Databricks)` | A valid user agent string |    ❌    |
+| `CUBEJS_DB_DATABRICKS_TOKEN`         | The [personal access token][databricks-docs-pat] used to authenticate the Databricks connection        | A valid token             |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
@@ -126,6 +130,8 @@ bucket][self-preaggs-export-bucket] **must be** configured.
   https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#access-s3-buckets-through-dbfs
 [databricks-docs-jdbc-url]:
   https://docs.databricks.com/integrations/bi/jdbc-odbc-bi.html#get-server-hostname-port-http-path-and-jdbc-url
+[databricks-docs-pat]:
+  https://docs.databricks.com/dev-tools/api/latest/authentication.html#token-management
 [gh-cubejs-jdbc-install]:
   https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
 [ref-caching-large-preaggs]: /caching/using-pre-aggregations#export-bucket
