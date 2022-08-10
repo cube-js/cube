@@ -437,6 +437,7 @@ impl ChunkDataStore for ChunkStore {
         let mut new_chunks = Vec::new();
         let mut old_chunks = Vec::new();
         let chunk_id = chunk.get_id();
+        let oldest_insert_at = chunk.get_row().oldest_insert_at().clone();
         old_chunks.push(chunk_id);
         let batches = self.get_chunk_columns(chunk).await?;
         let mut columns = Vec::new();
@@ -458,17 +459,19 @@ impl ChunkDataStore for ChunkStore {
                 .await?,
         );
 
-        let new_chunk_ids: Result<Vec<(u64, Option<u64>)>, CubeError> = join_all(new_chunks)
+        let new_chunk_ids: Vec<(u64, Option<u64>)> = join_all(new_chunks)
             .await
             .into_iter()
             .map(|c| {
                 let (c, file_size) = c??;
                 Ok((c.get_id(), file_size))
             })
-            .collect();
+            .collect::<Result<Vec<_>, CubeError>>()?;
+        
+        self.meta_store.chunk_update_last_inserted(new_chunk_ids.iter().map(|c| c.0).collect(), oldest_insert_at).await?;
 
         self.meta_store
-            .swap_chunks(old_chunks, new_chunk_ids?)
+            .swap_chunks(old_chunks, new_chunk_ids)
             .await?;
 
         Ok(())

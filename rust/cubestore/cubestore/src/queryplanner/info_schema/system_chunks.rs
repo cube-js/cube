@@ -114,6 +114,26 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                 }),
             ),
             (
+                Field::new(
+                    "oldest_insert_at",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Box::new(|chunks| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        chunks
+                            .iter()
+                            .map(|row| {
+                                row.get_row()
+                                    .oldest_insert_at()
+                                    .as_ref()
+                                    .map(|t| t.timestamp_nanos())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
                 Field::new("file_size", DataType::UInt64, true),
                 Box::new(|chunks| {
                     Arc::new(UInt64Array::from(

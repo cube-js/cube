@@ -25,6 +25,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use warp::hyper::body::Bytes;
+#[cfg(debug_assertions)]
+use stream_debug::MockStreamingSource;
 
 #[async_trait]
 pub trait StreamingService: DIService + Send + Sync {
@@ -60,6 +62,12 @@ impl StreamingServiceImpl {
                 location
             )));
         }
+
+        #[cfg(debug_assertions)]
+        if location_url.host_str() == Some("mockstream") {
+            return Ok(Arc::new(MockStreamingSource{}));
+        }
+
         let meta_source = self
             .meta_store
             .get_source_by_name(
@@ -453,5 +461,81 @@ impl StreamingSource for KSqlStreamingSource {
                     }),
             ),
         )
+    }
+}
+
+#[cfg(debug_assertions)]
+mod stream_debug {
+    use super::*;
+    use async_std::task::{Context, Poll};
+    use chrono::{DateTime, Utc};
+
+    struct MockRowStream {
+        last_id: i64,
+        last_readed: DateTime<Utc>,
+    }
+
+    impl MockRowStream {
+        fn new() -> Self {
+            Self{last_id:0, last_readed: Utc::now()}
+        }
+    }
+
+
+
+    impl Stream for MockRowStream {
+        type Item = Result<Vec<Row>, CubeError>;
+
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+
+            /* if Utc::now().signed_duration_since(self.last_readed).num_milliseconds() < 10 {
+               return Poll::Pending;
+               } */
+
+            let mut res = Vec::new();
+
+            let mut last_id = self.last_id;
+            let count = rand::random::<u64>() % 200;
+            for _ in 0..count {
+
+                last_id += 1;
+                let row = Row::new(
+                    vec![
+                    TableValue::Int(last_id),
+                    TableValue::Int(last_id % 10),
+                    TableValue::Int(last_id % 100),
+                    TableValue::Int(last_id),
+                    ]
+                    );
+                res.push(row);
+
+            }
+            unsafe {
+                let self_mut = self.get_unchecked_mut();
+
+                self_mut.last_id = last_id;
+                self_mut.last_readed = Utc::now();
+            }
+            std::thread::sleep(Duration::from_millis(500));
+            Poll::Ready(Some(Ok(res)))
+
+        }
+    }
+
+    pub struct MockStreamingSource {
+
+    }
+
+    #[async_trait]
+    impl StreamingSource for MockStreamingSource {
+        async fn row_stream(
+            &self,
+            _columns: Vec<Column>,
+            _seq_column: Column,
+            _initial_seq_value: u64,
+            ) -> Result<Pin<Box<dyn Stream<Item = Result<Vec<Row>, CubeError>> + Send>>, CubeError> {
+            Ok(Box::pin(MockRowStream::new()))
+        }
+
     }
 }
