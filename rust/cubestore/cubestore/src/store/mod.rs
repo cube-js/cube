@@ -467,8 +467,13 @@ impl ChunkDataStore for ChunkStore {
                 Ok((c.get_id(), file_size))
             })
             .collect::<Result<Vec<_>, CubeError>>()?;
-        
-        self.meta_store.chunk_update_last_inserted(new_chunk_ids.iter().map(|c| c.0).collect(), oldest_insert_at).await?;
+
+        self.meta_store
+            .chunk_update_last_inserted(
+                new_chunk_ids.iter().map(|c| c.0).collect(),
+                oldest_insert_at,
+            )
+            .await?;
 
         self.meta_store
             .swap_chunks(old_chunks, new_chunk_ids)

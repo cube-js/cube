@@ -1046,7 +1046,11 @@ pub trait MetaStore: DIService + Send + Sync {
         include_inactive: bool,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn chunk_uploaded(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
-    async fn chunk_update_last_inserted(&self, chunk_ids: Vec<u64>, last_inserted_at: Option<DateTime<Utc>>) -> Result<(), CubeError>;
+    async fn chunk_update_last_inserted(
+        &self,
+        chunk_ids: Vec<u64>,
+        last_inserted_at: Option<DateTime<Utc>>,
+    ) -> Result<(), CubeError>;
     async fn deactivate_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
     async fn swap_chunks(
         &self,
@@ -3626,7 +3630,7 @@ impl MetaStore for RocksMetaStore {
                 vec![(new_chunk, Some(new_chunk_file_size))],
                 db,
                 pipe,
-                false
+                false,
             )?;
             Ok(true)
         })
@@ -4305,8 +4309,11 @@ impl MetaStore for RocksMetaStore {
         })
         .await
     }
-    async fn chunk_update_last_inserted(&self, chunk_ids: Vec<u64>, last_inserted_at: Option<DateTime<Utc>>) -> Result<(), CubeError>
-    {
+    async fn chunk_update_last_inserted(
+        &self,
+        chunk_ids: Vec<u64>,
+        last_inserted_at: Option<DateTime<Utc>>,
+    ) -> Result<(), CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let table = ChunkRocksTable::new(db_ref.clone());
             for chunk_id in chunk_ids {
@@ -4316,13 +4323,12 @@ impl MetaStore for RocksMetaStore {
                     row.get_row().set_oldest_insert_at(last_inserted_at),
                     row.get_row(),
                     batch_pipe,
-                    )?;
+                )?;
             }
 
             Ok(())
         })
         .await
-
     }
 
     async fn deactivate_chunk(&self, chunk_id: u64) -> Result<(), CubeError> {
@@ -4421,7 +4427,7 @@ impl MetaStore for RocksMetaStore {
                 uploaded_ids_and_sizes,
                 db_ref,
                 batch_pipe,
-                true
+                true,
             )
         })
         .await
@@ -4444,11 +4450,10 @@ impl MetaStore for RocksMetaStore {
                 uploaded_ids_and_sizes,
                 db_ref,
                 batch_pipe,
-                false
+                false,
             )
         })
         .await
-
     }
 
     async fn delete_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError> {
@@ -6517,7 +6522,7 @@ impl RocksMetaStore {
         uploaded_ids_and_sizes: Vec<(u64, Option<u64>)>,
         db_ref: DbTableRef,
         batch_pipe: &mut BatchPipe,
-        check_rows: bool
+        check_rows: bool,
     ) -> Result<(), CubeError> {
         trace!(
             "Swapping chunks: deactivating ({}), activating ({})",

@@ -476,14 +476,18 @@ impl CompactionService for CompactionServiceImpl {
         let mut size = 0;
         let mut count = 0;
         let mut start = 0;
-        
+
         let ratio_threshold = self.config.compaction_in_memory_chunks_ratio_threshold();
-        let ratio_check_threshold = self.config.compaction_in_memory_chunks_ratio_check_threshold();
+        let ratio_check_threshold = self
+            .config
+            .compaction_in_memory_chunks_ratio_check_threshold();
         for chunk in chunks.iter() {
             if count > 0 {
                 let chunk_size = chunk.get_row().get_row_count();
                 //TODO config for magic numbers
-                if (chunk_size > ratio_check_threshold && chunk_size > size * ratio_threshold) || size >= compaction_in_memory_chunks_size_limit{
+                if (chunk_size > ratio_check_threshold && chunk_size > size * ratio_threshold)
+                    || size >= compaction_in_memory_chunks_size_limit
+                {
                     if count > 1 {
                         compact_groups.push((start, start + count));
                         start = start + count;
@@ -492,11 +496,9 @@ impl CompactionService for CompactionServiceImpl {
                         continue;
                     }
                 }
-
             }
             size += chunk.get_row().get_row_count();
             count += 1;
-                    
         }
         if count > 1 {
             compact_groups.push((start, start + count));
@@ -514,7 +516,6 @@ impl CompactionService for CompactionServiceImpl {
         // Use empty execution plan for main_table, read only from memory chunks
         let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
 
-
         let aggregate_columns = match index.get_row().get_type() {
             IndexType::Regular => None,
             IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
@@ -526,7 +527,8 @@ impl CompactionService for CompactionServiceImpl {
         for group in compact_groups.iter() {
             let group_chunks = &chunks[group.0..group.1];
             let in_memory_columns =
-                prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, group_chunks).await?;
+                prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, group_chunks)
+                    .await?;
 
             // Get merged RecordBatch
             let batches_stream = merge_chunks(
@@ -535,8 +537,8 @@ impl CompactionService for CompactionServiceImpl {
                 in_memory_columns,
                 unique_key.clone(),
                 aggregate_columns.clone(),
-                )
-                .await?;
+            )
+            .await?;
             let batches = collect(batches_stream).await?;
             let batch = RecordBatch::concat(&schema, &batches).unwrap();
 
@@ -557,7 +559,9 @@ impl CompactionService for CompactionServiceImpl {
                 .create_chunk(partition_id, batch.num_rows(), true)
                 .await?;
 
-            self.meta_store.chunk_update_last_inserted(vec![chunk.get_id()], oldest_insert_at).await?;
+            self.meta_store
+                .chunk_update_last_inserted(vec![chunk.get_id()], oldest_insert_at)
+                .await?;
 
             self.chunk_store
                 .add_memory_chunk(chunk.get_id(), batch)
@@ -567,12 +571,8 @@ impl CompactionService for CompactionServiceImpl {
             new_chunk_ids.push((chunk.get_id(), None));
         }
 
-
         self.meta_store
-            .swap_chunks_without_check(
-                old_chunk_ids,
-                new_chunk_ids
-            )
+            .swap_chunks_without_check(old_chunk_ids, new_chunk_ids)
             .await?;
 
         Ok(())
