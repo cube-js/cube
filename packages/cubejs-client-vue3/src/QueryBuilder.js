@@ -563,6 +563,9 @@ export default {
     setOffset(offset) {
       this.offset = offset;
     },
+    removeOffset() {
+      this.offset = null;
+    },
     updateChart(chartType) {
       this.chartType = chartType;
     },
