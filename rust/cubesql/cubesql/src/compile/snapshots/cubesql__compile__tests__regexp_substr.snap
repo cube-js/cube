@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 9282
+expression: "execute_query(\"SELECT regexp_substr('test@test.com', '@[^.]*') as match, regexp_substr(null, '@[^.]*') as source_null, regexp_substr('test@test.com', null) as pattern_null\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------+-------------+--------------+
+| match | source_null | pattern_null |
++-------+-------------+--------------+
+| @test | NULL        | NULL         |
++-------+-------------+--------------+

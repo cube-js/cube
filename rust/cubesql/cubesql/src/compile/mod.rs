@@ -61,9 +61,10 @@ use self::{
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
             create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
             create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
-            create_quarter_udf, create_second_udf, create_session_user_udf, create_str_to_date_udf,
-            create_time_format_udf, create_timediff_udf, create_to_char_udf, create_ucase_udf,
-            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
+            create_quarter_udf, create_regexp_substr_udf, create_second_udf,
+            create_session_user_udf, create_str_to_date_udf, create_time_format_udf,
+            create_timediff_udf, create_to_char_udf, create_ucase_udf, create_unnest_udtf,
+            create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -2469,6 +2470,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_cube_regclass_cast_udf());
         ctx.register_udf(create_pg_get_serial_sequence_udf());
         ctx.register_udf(create_json_build_object_udf());
+        ctx.register_udf(create_regexp_substr_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -9267,6 +9269,20 @@ ORDER BY \"COUNT(count)\" DESC"
                 ) e
                 "
                 .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_regexp_substr_udf() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "regexp_substr",
+            execute_query(
+                "SELECT regexp_substr('test@test.com', '@[^.]*') as match, regexp_substr(null, '@[^.]*') as source_null, regexp_substr('test@test.com', null) as pattern_null".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
