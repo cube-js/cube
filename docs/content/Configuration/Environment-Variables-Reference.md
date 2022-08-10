@@ -49,6 +49,7 @@ options][link-config].
 | `CUBEJS_JWT_CLAIMS_NAMESPACE`          | A namespace within the decoded JWT under which any custom claims can be found                                                                                                    | `https://myapp.com`                                                                                                               |
 | `CUBEJS_CUBESTORE_HOST`                | The hostname of the Cube Store deployment                                                                                                                                        | A valid hostname                                                                                                                  |
 | `CUBEJS_CUBESTORE_PORT`                | The port of the Cube Store deployment                                                                                                                                            | A valid port number                                                                                                               |
+| `CUBEJS_MAX_PARTITIONS_PER_CUBE`       | The maximum number of partitions each pre-aggregation in a cube can use. Defaults to `10000`                                                                                     | A valid number                                                                                                                    |
 | `CUBEJS_TOPIC_NAME`                    | The name of the Amazon SNS or Google Cloud Pub/Sub topic (defaults to `<process.env.CUBEJS_APP>-process` if undefined, and finally `cubejs-process`)                             | A valid topic name                                                                                                                |
 | `CUBEJS_GH_API_TOKEN`                  | A Github Personal Token to avoid Github API rate limit at downloading cubestore                                                                                                  | It can be a personal access token, an OAuth token, an installation access token or a JSON Web Token for GitHub App authentication |
 
@@ -89,7 +90,7 @@ please use the [database connection guide][link-connecting-to-db].
 ## SQL API
 
 | Environment variable    | Description                                                            | Possible Values     |
-|-------------------------|------------------------------------------------------------------------|---------------------|
+| ----------------------- | ---------------------------------------------------------------------- | ------------------- |
 | `CUBEJS_SQL_USER`       | Required username to access SQL API                                    | A valid string      |
 | `CUBEJS_SQL_PASSWORD`   | Required password to access SQL API                                    | A valid string      |
 | `CUBEJS_SQL_PORT`       | The port to listen to MySQL compatibility connections on.              | A valid port number |
