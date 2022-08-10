@@ -1,6 +1,6 @@
 /* globals jest, describe, beforeEach, test, expect */
 
-import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import type { BaseDriver as OriginalBaseDriver } from '@cubejs-backend/query-orchestrator';
 import type {
   DatabaseType,
   DbTypeFn,
@@ -34,7 +34,7 @@ const conf = {
     message = msg;
   },
   externalDbType: <DatabaseType>'postgres',
-  externalDriverFactory: async () => <BaseDriver>({
+  externalDriverFactory: async () => <OriginalBaseDriver>({
     testConnection: async () => undefined,
   }),
   orchestratorOptions: () => ({
@@ -357,6 +357,61 @@ describe('OptsHandler class', () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
     core.reloadEnvVariables();
     expect(await core.contextToDbType({} as DriverContext)).toEqual('postgres');
+  });
+
+  test('must determine custom drivers from the cube.js file', async () => {
+    class BaseDriver {
+      public async testConnection() {
+        throw new Error('UT exception');
+      }
+
+      public async release() {
+        //
+      }
+    }
+
+    class CustomDriver extends BaseDriver {
+      //
+    }
+
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+    process.env.NODE_ENV = 'test';
+    process.env.CUBEJS_DEV_MODE = 'true';
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      apiSecret: '44b87d4309471e5d9d18738450db0e49',
+      dbType: () => 'postgres',
+      driverFactory: async () => (new CustomDriver()) as unknown as OriginalBaseDriver,
+      orchestratorOptions: {},
+    });
+
+    expect(core.options.dbType).toBeDefined();
+    expect(typeof core.options.dbType).toEqual('function');
+    expect(await core.options.dbType({} as DriverContext))
+      .toEqual(process.env.CUBEJS_DB_TYPE);
+
+    expect(core.options.driverFactory).toBeDefined();
+    expect(typeof core.options.driverFactory).toEqual('function');
+    expect(
+      JSON.stringify(await core.options.driverFactory({} as DriverContext)),
+    ).toEqual(
+      JSON.stringify(new CustomDriver()),
+    );
+
+    const oapi = (<any>core.getOrchestratorApi(<RequestContext>{}));
+    const opts = oapi.options;
+    const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
+    oapi.seenDataSources = ['default'];
+    
+    expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
+    expect(opts.rollupOnlyMode).toBe(false);
+    expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
+    await expect(async () => {
+      await oapi.testConnection();
+    }).rejects.toThrow('UT exception');
+    expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
+
+    testDriverConnectionSpy.mockRestore();
   });
 
   test(
