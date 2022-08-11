@@ -85,10 +85,6 @@ export class CubeEvaluator extends CubeSymbols {
           preAggregation.refreshRangeEnd = preAggregation.buildRangeEnd;
           delete preAggregation.buildRangeEnd;
         }
-
-        if (preAggregation.unionWithSourceData) {
-          preAggregation.unionWithSourceData.maxSourceRows = preAggregation.unionWithSourceData.maxSourceRows ?? 1000000;
-        }
       }
     }
   }

@@ -7,6 +7,7 @@ import {
   getEnv,
   inDbTimeZone,
   timeSeries,
+  MAX_SOURCE_ROW_LIMIT,
   TO_PARTITION_RANGE,
   BUILD_RANGE_START_LOCAL,
   BUILD_RANGE_END_LOCAL,
@@ -1119,6 +1120,7 @@ export class PreAggregationLoader {
 
 interface PreAggsPartiotionRangeLoaderOpts {
   maxPartitions: number;
+  maxSourceRowLimit: number;
   waitForRenew?: boolean;
   requestId?: string;
   externalRefresh?: boolean;
@@ -1149,6 +1151,7 @@ export class PreAggregationPartitionRangeLoader {
     private readonly loadCache: any,
     private readonly options: PreAggsPartiotionRangeLoaderOpts = {
       maxPartitions: 10000,
+      maxSourceRowLimit: 10000,
     },
   ) {
     this.waitForRenew = options.waitForRenew;
@@ -1351,6 +1354,9 @@ export class PreAggregationPartitionRangeLoader {
       if (p === FROM_PARTITION_RANGE) {
         return fromDate;
       }
+      if (p === MAX_SOURCE_ROW_LIMIT) {
+        return this.options.maxSourceRowLimit;
+      }
       return p;
     });
     const { data } = await this.queryCache.renewQuery(
@@ -1368,6 +1374,9 @@ export class PreAggregationPartitionRangeLoader {
         useCsvQuery: true,
       }
     );
+    if (data.rowCount === this.options.maxSourceRowLimit) {
+      throw new Error(`The maximum number of source rows ${this.options.maxSourceRowLimit} was reached for ${this.preAggregation.preAggregationId}`);
+    }
     return {
       name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
       columns: data.types,
@@ -1518,6 +1527,7 @@ export class PreAggregationPartitionRangeLoader {
 
 type PreAggregationsOptions = {
   maxPartitions: number;
+  maxSourceRowLimit: number;
   preAggregationsSchemaCacheExpire?: number;
   loadCacheQueueOptions?: any;
   queueOptions?: (dataSource: string) => Promise<{
@@ -1629,6 +1639,7 @@ export class PreAggregations {
         getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
           maxPartitions: this.options.maxPartitions,
+          maxSourceRowLimit: this.options.maxSourceRowLimit,
           waitForRenew: queryBody.renewQuery,
           // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
           forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,
@@ -1719,6 +1730,7 @@ export class PreAggregations {
         getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
           maxPartitions: this.options.maxPartitions,
+          maxSourceRowLimit: this.options.maxSourceRowLimit,
           waitForRenew: queryBody.renewQuery,
           requestId: queryBody.requestId,
           externalRefresh: this.externalRefresh,

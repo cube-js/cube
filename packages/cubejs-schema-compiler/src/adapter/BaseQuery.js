@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { FROM_PARTITION_RANGE, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -557,10 +557,9 @@ class BaseQuery {
 
   /**
    * Returns a dictionary mapping each preagregation to its corresponding query fragment.
-   * TODO(cristipp) Add support for subqueries and joins.
    * @returns {Record<string, Array<string>>}
    */
-  buildLambdaQueries() {
+  buildLambdaQuery() {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
     const result = {};
     if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
@@ -568,7 +567,6 @@ class BaseQuery {
       const references = this.cubeEvaluator.evaluatePreAggregationReferences(preAggForQuery.cube, preAggForQuery.preAggregation);
       const lambdaQuery = this.newSubQuery(
         {
-          ...this.options,
           measures: references.measures,
           dimensions: references.dimensions,
           timeDimensions: references.timeDimensions,
@@ -582,8 +580,11 @@ class BaseQuery {
               }
               : [],
           ],
+          segments: this.options.segments,
           order: [],
-          rowLimit: preAggForQuery.preAggregation.unionWithSourceData.maxSourceRows,
+          limit: undefined,
+          offset: undefined,
+          rowLimit: MAX_SOURCE_ROW_LIMIT,
           preAggregationQuery: true,
         }
       );
@@ -1558,7 +1559,14 @@ class BaseQuery {
   }
 
   groupByDimensionLimit() {
-    const limitClause = this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+    let limitClause = '';
+    if (this.rowLimit !== null) {
+      if (this.rowLimit === MAX_SOURCE_ROW_LIMIT) {
+        limitClause = ` LIMIT ${this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT)}`;
+      } else {
+        limitClause = ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+      }
+    }
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
     return `${limitClause}${offsetClause}`;
   }

@@ -150,10 +150,6 @@ const PreAggregationRefreshKeySchema = condition(
   )
 );
 
-const UnionWithSourceData = {
-  maxSourceRows: Joi.number().optional()
-};
-
 const BasePreAggregationWithoutPartitionGranularity = {
   refreshKey: PreAggregationRefreshKeySchema,
   sqlAlias: Joi.string().optional(),
@@ -183,7 +179,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
     sql: Joi.func().required()
   },
   readOnly: Joi.boolean().strict(),
-  unionWithSourceData: UnionWithSourceData,
+  unionWithSourceData: Joi.boolean().strict(),
 };
 
 const BasePreAggregation = {

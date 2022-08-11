@@ -697,6 +697,11 @@ export class OptsHandler {
         ? clone.preAggregationsOptions.maxPartitions
         : getEnv('maxPartitionsPerCube');
 
+    clone.preAggregationsOptions.maxSourceRowLimit =
+      clone.preAggregationsOptions.maxSourceRowLimit !== undefined
+        ? clone.preAggregationsOptions.maxSourceRowLimit
+        : getEnv('maxSourceRowLimit');
+
     return clone;
   }
 }

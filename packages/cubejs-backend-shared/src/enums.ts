@@ -13,3 +13,5 @@ export enum QueryAlias {
   TOTAL_COUNT = 'total_count',
   ORIGINAL_QUERY = 'original_query',
 }
+
+export const MAX_SOURCE_ROW_LIMIT = '__MAX_SOURCE_ROW_LIMIT';
