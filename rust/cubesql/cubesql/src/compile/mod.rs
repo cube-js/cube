@@ -61,9 +61,10 @@ use self::{
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
             create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
             create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
-            create_quarter_udf, create_second_udf, create_session_user_udf, create_str_to_date_udf,
-            create_time_format_udf, create_timediff_udf, create_to_char_udf, create_ucase_udf,
-            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
+            create_quarter_udf, create_regexp_substr_udf, create_second_udf,
+            create_session_user_udf, create_str_to_date_udf, create_time_format_udf,
+            create_timediff_udf, create_to_char_udf, create_ucase_udf, create_unnest_udtf,
+            create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -2469,6 +2470,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_cube_regclass_cast_udf());
         ctx.register_udf(create_pg_get_serial_sequence_udf());
         ctx.register_udf(create_json_build_object_udf());
+        ctx.register_udf(create_regexp_substr_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -9280,6 +9282,48 @@ ORDER BY \"COUNT(count)\" DESC"
                     UNION ALL
                         SELECT str_to_date('2021-08-31 11:05', '%Y-%m-%d %H:%i') x
                 ) e
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_regexp_substr_udf() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "regexp_substr",
+            execute_query(
+                "SELECT
+                    regexp_substr('test@test.com', '@[^.]*') as match_dot,
+                    regexp_substr('12345', '[0-9]+') as match_number,
+                    regexp_substr('12345', '[0-9]+', 2) as match_number_pos_2,
+                    regexp_substr(null, '@[^.]*') as source_null,
+                    regexp_substr('test@test.com', null) as pattern_null,
+                    regexp_substr('test@test.com', '@[^.]*', 1) as position_default,
+                    regexp_substr('test@test.com', '@[^.]*', 5) as position_no_skip,
+                    regexp_substr('test@test.com', '@[^.]*', 6) as position_skip,
+                    regexp_substr('test@test.com', '@[^.]*', 0) as position_zero,
+                    regexp_substr('test@test.com', '@[^.]*', -1) as position_negative,
+                    regexp_substr('test@test.com', '@[^.]*', 100) as position_more_then_input
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "regexp_substr_column",
+            execute_query(
+                "SELECT r.a as input, regexp_substr(r.a, '@[^.]*') as result FROM (
+                    SELECT 'test@test.com' as a
+                    UNION ALL
+                    SELECT 'test'
+                ) as r
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL

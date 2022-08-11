@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 9282
+expression: "execute_query(\"SELECT\n                    regexp_substr('test@test.com', '@[^.]*') as match_dot,\n                    regexp_substr('12345', '[0-9]+') as match_number,\n                    regexp_substr('12345', '[0-9]+', 2) as match_number_pos_2,\n                    regexp_substr(null, '@[^.]*') as source_null,\n                    regexp_substr('test@test.com', null) as pattern_null,\n                    regexp_substr('test@test.com', '@[^.]*', 1) as position_default,\n                    regexp_substr('test@test.com', '@[^.]*', 5) as position_no_skip,\n                    regexp_substr('test@test.com', '@[^.]*', 6) as position_skip,\n                    regexp_substr('test@test.com', '@[^.]*', 0) as position_zero,\n                    regexp_substr('test@test.com', '@[^.]*', -1) as position_negative,\n                    regexp_substr('test@test.com', '@[^.]*', 100) as position_more_then_input\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----------+--------------+--------------------+-------------+--------------+------------------+------------------+---------------+---------------+-------------------+--------------------------+
+| match_dot | match_number | match_number_pos_2 | source_null | pattern_null | position_default | position_no_skip | position_skip | position_zero | position_negative | position_more_then_input |
++-----------+--------------+--------------------+-------------+--------------+------------------+------------------+---------------+---------------+-------------------+--------------------------+
+| @test     | 12345        | 2345               | NULL        | NULL         | @test            | @test            |               | @test         | @test             |                          |
++-----------+--------------+--------------------+-------------+--------------+------------------+------------------+---------------+---------------+-------------------+--------------------------+
