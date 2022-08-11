@@ -64,15 +64,22 @@ export interface LocalOptions extends ContainerOptions {
 /**
  * Birdbox environments for cube.js passed for testcase.
  */
-export interface Env {
+export type Env = {
   CUBEJS_DEV_MODE: string,
   CUBEJS_WEB_SOCKETS: string,
   CUBEJS_EXTERNAL_DEFAULT: string,
   CUBEJS_SCHEDULED_REFRESH_DEFAULT: string,
   CUBEJS_REFRESH_WORKER: string,
   CUBEJS_ROLLUP_ONLY: string,
+  // SQL API
+  CUBEJS_SQL_PORT?: string,
+  CUBEJS_SQL_USER?: string,
+  CUBEJS_PG_SQL_PORT?: string,
+  CUBEJS_SQL_PASSWORD?: string,
+  CUBEJS_SQL_SUPER_USER?: string,
+} & {
   [key: string]: string,
-}
+};
 
 /**
  * List of permanent test data files.
@@ -212,7 +219,7 @@ export async function startBirdBoxFromContainer(
       `[Birdbox] Using ${composeFile} compose file\n`
     );
   }
-  
+
   const env = await dc
     .withStartupTimeout(30 * 1000)
     .withEnv(
@@ -236,7 +243,7 @@ export async function startBirdBoxFromContainer(
         `[Birdbox] Creating a proxy server 4000->${port} for local testing\n`
       );
     }
-    
+
     // As local Playground proxies requests to the 4000 port
     proxyServer = HttpProxy.createProxyServer({
       target: `http://localhost:${port}`
@@ -321,10 +328,11 @@ export async function startBirdBoxFromCli(
   if (!options.schemaDir) {
     options.schemaDir = 'postgresql/schema';
   }
+
   if (!options.cubejsConfig) {
     options.cubejsConfig = 'postgresql/single/cube.js';
   }
-  
+
   if (options.loadScript) {
     db = await PostgresDBRunner.startContainer({
       volumes: [

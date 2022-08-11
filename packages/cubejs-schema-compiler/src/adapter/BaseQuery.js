@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { FROM_PARTITION_RANGE, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -431,7 +431,9 @@ class BaseQuery {
   }
 
   /**
-   * Wrap cpecified column with the double quote.
+   * Wrap specified column/table name with the double quote.
+   * @param {string} name
+   * @returns {string}
    */
   escapeColumnName(name) {
     return `"${name}"`;
@@ -555,19 +557,16 @@ class BaseQuery {
 
   /**
    * Returns a dictionary mapping each preagregation to its corresponding query fragment.
-   * TODO(cristipp) Add support for subqueries and joins.
    * @returns {Record<string, Array<string>>}
    */
-  buildLambdaInfo() {
+  buildLambdaQuery() {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
     const result = {};
     if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
-      const QueryClass = this.constructor;
+      // TODO(cristipp) Use source query instead of preaggregation references.
       const references = this.cubeEvaluator.evaluatePreAggregationReferences(preAggForQuery.cube, preAggForQuery.preAggregation);
-      const lambdaQuery = new QueryClass(
-        this.compilers,
+      const lambdaQuery = this.newSubQuery(
         {
-          ...this.options,
           measures: references.measures,
           dimensions: references.dimensions,
           timeDimensions: references.timeDimensions,
@@ -581,14 +580,17 @@ class BaseQuery {
               }
               : [],
           ],
+          segments: this.options.segments,
           order: [],
-          rowLimit: 1000000,
+          limit: undefined,
+          offset: undefined,
+          rowLimit: MAX_SOURCE_ROW_LIMIT,
           preAggregationQuery: true,
         }
       );
       const sqlAndParams = lambdaQuery.buildSqlAndParams();
       const cacheKeyQueries = this.evaluateSymbolSqlWithContext(
-        () => this.refreshKeysByCubes([preAggForQuery.cube]),
+        () => this.cacheKeyQueries(),
         { preAggregationQuery: true }
       );
       result[this.preAggregations.preAggregationId(preAggForQuery)] = { sqlAndParams, cacheKeyQueries };
@@ -1223,6 +1225,13 @@ class BaseQuery {
     (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
 
+  /**
+   * Returns SQL query for the "aggregating on top of sub-queries" uses cases.
+   * @param {string} keyCubeName
+   * @param {Array<BaseMeasure>} measures
+   * @param {Array<BaseFilter>} filters
+   * @returns {string}
+   */
   aggregateSubQuery(keyCubeName, measures, filters) {
     filters = filters || this.allFilters;
     const primaryKeyDimensions = this.primaryKeyNames(keyCubeName).map((k) => this.newDimension(k));
@@ -1258,29 +1267,41 @@ class BaseQuery {
         ungroupedAliases: R.fromPairs(measures.map(m => [m.measure, m.aliasName()]))
       }
     ) : measureSelectFn();
-    const columnsForSelect =
-      this.dimensionColumns(this.escapeColumnName('keys')).concat(selectedMeasures).filter(s => !!s).join(', ');
+    const columnsForSelect = this
+      .dimensionColumns(this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS))
+      .concat(selectedMeasures)
+      .filter(s => !!s)
+      .join(', ');
 
-    const primaryKeyJoinConditions = primaryKeyDimensions.map(
-      (pkd) => `${this.escapeColumnName('keys')}.${pkd.aliasName()} = ${shouldBuildJoinForMeasureSelect ?
-        `${this.cubeAlias(keyCubeName)}.${pkd.aliasName()}` :
-        this.dimensionSql(pkd)}`
-    ).join(' AND ');
+    const primaryKeyJoinConditions = primaryKeyDimensions.map((pkd) => (
+      `${
+        this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS)
+      }.${
+        pkd.aliasName()
+      } = ${
+        shouldBuildJoinForMeasureSelect
+          ? `${this.cubeAlias(keyCubeName)}.${pkd.aliasName()}`
+          : this.dimensionSql(pkd)
+      }`
+    )).join(' AND ');
 
     const subQueryJoins =
       shouldBuildJoinForMeasureSelect ? [] : measureSubQueryDimensions.map(d => this.subQueryJoin(d));
     const joinSql = this.joinSql([
-      { sql: `(${this.keysQuery(primaryKeyDimensions, filters)})`, alias: this.escapeColumnName('keys') },
+      {
+        sql: `(${this.keysQuery(primaryKeyDimensions, filters)})`,
+        alias: this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS),
+      },
       {
         sql: keyCubeSql,
         alias: keyCubeAlias,
         on: `${primaryKeyJoinConditions}
-             ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}`
+             ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}`,
       },
       ...subQueryJoins
     ]);
     return `SELECT ${columnsForSelect} FROM ${joinSql}` +
-      (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
+      (!this.safeEvaluateSymbolContext().ungrouped && this.aggregateSubQueryGroupByClause() || '');
   }
 
   checkShouldBuildJoinForMeasureSelect(measures, keyCubeName) {
@@ -1438,6 +1459,19 @@ class BaseQuery {
     );
   }
 
+  /**
+   * Returns `GROUP BY` clause for the "aggregating on top of sub-queries" uses
+   * cases. By the default returns the result of the `groupByClause` method.
+   * @returns {string}
+   */
+  aggregateSubQueryGroupByClause() {
+    return this.groupByClause();
+  }
+
+  /**
+   * Returns `GROUP BY` clause for the basic uses cases.
+   * @returns {string}
+   */
   groupByClause() {
     if (this.ungrouped) {
       return '';
@@ -1506,16 +1540,33 @@ class BaseQuery {
     return ` ORDER BY ${orderByString}`;
   }
 
+  /**
+   * Returns a complete list of the aliased dimensions, including time
+   * dimensions.
+   * @returns {Array<string>}
+   */
   dimensionAliasNames() {
     return R.flatten(this.dimensionsForSelect().map(d => d.aliasName()).filter(d => !!d));
   }
 
+  /**
+   * Returns an array of column names correlated to the specified cube dimensions.
+   * @param {string} cubeAlias
+   * @returns {Array<string>}
+   */
   dimensionColumns(cubeAlias) {
     return this.dimensionAliasNames().map(alias => `${cubeAlias && `${cubeAlias}.` || ''}${alias}`);
   }
 
   groupByDimensionLimit() {
-    const limitClause = this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+    let limitClause = '';
+    if (this.rowLimit !== null) {
+      if (this.rowLimit === MAX_SOURCE_ROW_LIMIT) {
+        limitClause = ` LIMIT ${this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT)}`;
+      } else {
+        limitClause = ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+      }
+    }
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
     return `${limitClause}${offsetClause}`;
   }
@@ -1538,6 +1589,10 @@ class BaseQuery {
     return this.dimensionsForSelect().concat(this.measures);
   }
 
+  /**
+   * Returns a complete list of the dimensions, including time dimensions.
+   * @returns {Array<BaseDimension>}
+   */
   dimensionsForSelect() {
     return this.dimensions.concat(this.timeDimensions);
   }
@@ -2461,10 +2516,6 @@ class BaseQuery {
       () => {
         const preAggregationQueryForSql = this.preAggregationQueryForSqlEvaluation(cube, preAggregation);
         if (preAggregation.refreshKey) {
-          if (preAggregation.refreshKey.every === 'never') {
-            return [];
-          }
-
           if (preAggregation.refreshKey.sql) {
             return [
               this.paramAllocator.buildSqlAndParams(

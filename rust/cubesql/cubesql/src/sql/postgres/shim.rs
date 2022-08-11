@@ -1172,6 +1172,38 @@ impl AsyncPostgresShim {
                 )
                 .await?;
             }
+            Statement::Deallocate { name, .. } => {
+                let plan = if name.value.eq_ignore_ascii_case(&"all") {
+                    self.statements = HashMap::new();
+
+                    Ok(QueryPlan::MetaOk(
+                        StatusFlags::empty(),
+                        CommandCompletion::DeallocateAll,
+                    ))
+                } else {
+                    if self.statements.remove(&name.value).is_some() {
+                        Ok(QueryPlan::MetaOk(
+                            StatusFlags::empty(),
+                            CommandCompletion::Deallocate,
+                        ))
+                    } else {
+                        Err(ConnectionError::Protocol(
+                            protocol::ErrorResponse::error(
+                                protocol::ErrorCode::ProtocolViolation,
+                                format!(r#"prepared statement "{}" does not exist"#, name.value),
+                            )
+                            .into(),
+                        ))
+                    }
+                }?;
+
+                self.write_portal(
+                    &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
+                    0,
+                    cancel,
+                )
+                .await?;
+            }
             Statement::Close { cursor } => {
                 let plan = match cursor {
                     CloseCursor::All => {

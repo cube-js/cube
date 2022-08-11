@@ -1117,7 +1117,7 @@ impl LanguageToLogicalPlanConverter {
                                     if let Some(granularity) = &granularity {
                                         fields.push((
                                             DFField::new(
-                                                Some(&table_name),
+                                                None,
                                                 // TODO empty schema
                                                 &expr_name(&expr)?,
                                                 DataType::Timestamp(TimeUnit::Nanosecond, None),

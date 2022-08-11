@@ -61,9 +61,10 @@ use self::{
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
             create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
             create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
-            create_quarter_udf, create_second_udf, create_session_user_udf, create_str_to_date_udf,
-            create_time_format_udf, create_timediff_udf, create_to_char_udf, create_ucase_udf,
-            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
+            create_quarter_udf, create_regexp_substr_udf, create_second_udf,
+            create_session_user_udf, create_str_to_date_udf, create_time_format_udf,
+            create_timediff_udf, create_to_char_udf, create_ucase_udf, create_unnest_udtf,
+            create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -2469,6 +2470,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_cube_regclass_cast_udf());
         ctx.register_udf(create_pg_get_serial_sequence_udf());
         ctx.register_udf(create_json_build_object_udf());
+        ctx.register_udf(create_regexp_substr_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -5952,6 +5954,35 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_redshift_svv_tables() -> Result<(), CubeError> {
+        // This query is used by metabase for introspection
+        insta::assert_snapshot!(
+            "redshift_svv_tables",
+            execute_query(
+                "SELECT * FROM svv_tables ORDER BY table_name DESC".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_introspection() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "thought_spot_tables",
+            execute_query(
+                "SELECT * FROM (SELECT CAST(current_database() AS VARCHAR(124)) AS TABLE_CAT, table_schema AS TABLE_SCHEM, table_name AS TABLE_NAME, CAST( CASE table_type WHEN 'BASE TABLE' THEN CASE WHEN table_schema = 'pg_catalog' OR table_schema = 'information_schema' THEN 'SYSTEM TABLE' WHEN table_schema = 'pg_toast' THEN 'SYSTEM TOAST TABLE' WHEN table_schema ~ '^pg_' AND table_schema != 'pg_toast' THEN 'TEMPORARY TABLE' ELSE 'TABLE' END WHEN 'VIEW' THEN CASE WHEN table_schema = 'pg_catalog' OR table_schema = 'information_schema' THEN 'SYSTEM VIEW' WHEN table_schema = 'pg_toast' THEN NULL WHEN table_schema ~ '^pg_' AND table_schema != 'pg_toast' THEN 'TEMPORARY VIEW' ELSE 'VIEW' END WHEN 'EXTERNAL TABLE' THEN 'EXTERNAL TABLE' END AS VARCHAR(124)) AS TABLE_TYPE, REMARKS, '' as TYPE_CAT, '' as TYPE_SCHEM, '' as TYPE_NAME,  '' AS SELF_REFERENCING_COL_NAME, '' AS REF_GENERATION  FROM svv_tables) WHERE true  AND current_database() = 'dev' AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')  ORDER BY TABLE_TYPE,TABLE_SCHEM,TABLE_NAME ".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_performance_schema_variables() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "performance_schema_session_variables",
@@ -9140,6 +9171,36 @@ ORDER BY \"COUNT(count)\" DESC"
         Ok(())
     }
 
+    // This tests asserts that our DF fork contains support for Coalesce
+    #[tokio::test]
+    async fn df_coalesce() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_coalesce",
+            execute_query(
+                "SELECT COALESCE(null, 1) as t1, COALESCE(null, 1, null, 2) as t2".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    // This tests asserts that our DF fork contains support for >> && <<
+    #[tokio::test]
+    async fn df_is_bitwise_shit() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_bitwise_shit",
+            execute_query(
+                "SELECT 2 << 10 as t1, 2048 >> 10 as t2;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
     // This tests asserts that our DF fork contains support for escaped single quoted strings
     #[tokio::test]
     async fn df_escaped_strings() -> Result<(), CubeError> {
@@ -9221,6 +9282,48 @@ ORDER BY \"COUNT(count)\" DESC"
                     UNION ALL
                         SELECT str_to_date('2021-08-31 11:05', '%Y-%m-%d %H:%i') x
                 ) e
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_regexp_substr_udf() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "regexp_substr",
+            execute_query(
+                "SELECT
+                    regexp_substr('test@test.com', '@[^.]*') as match_dot,
+                    regexp_substr('12345', '[0-9]+') as match_number,
+                    regexp_substr('12345', '[0-9]+', 2) as match_number_pos_2,
+                    regexp_substr(null, '@[^.]*') as source_null,
+                    regexp_substr('test@test.com', null) as pattern_null,
+                    regexp_substr('test@test.com', '@[^.]*', 1) as position_default,
+                    regexp_substr('test@test.com', '@[^.]*', 5) as position_no_skip,
+                    regexp_substr('test@test.com', '@[^.]*', 6) as position_skip,
+                    regexp_substr('test@test.com', '@[^.]*', 0) as position_zero,
+                    regexp_substr('test@test.com', '@[^.]*', -1) as position_negative,
+                    regexp_substr('test@test.com', '@[^.]*', 100) as position_more_then_input
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "regexp_substr_column",
+            execute_query(
+                "SELECT r.a as input, regexp_substr(r.a, '@[^.]*') as result FROM (
+                    SELECT 'test@test.com' as a
+                    UNION ALL
+                    SELECT 'test'
+                ) as r
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
@@ -10871,6 +10974,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn datastudio_date_aggregations() {
+        init_logger();
+
         let supported_granularities = vec![
             // date
             [
@@ -10907,11 +11012,10 @@ ORDER BY \"COUNT(count)\" DESC"
             // iso week / iso year / day of year
             ["DATE_TRUNC('SECOND', \"order_date\")", "second"],
             // month, day
-            // TODO: support TO_CHAR aggregation
-            // [
-            //     "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
-            //     "second",
-            // ],
+            [
+                "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
+                "second",
+            ],
             // date, hour, minute
             [
                 "DATE_TRUNC('MINUTE', DATE_TRUNC('SECOND', \"order_date\"))",
@@ -10966,7 +11070,139 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_datastudio_min_max_date() {
+        init_logger();
+
+        for fun in vec!["Max", "Min"].iter() {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "
+                SELECT 
+                    CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\", 
+                    {}(Date_trunc('SECOND', \"order_date\")) AS \"qt_d3yqo2towc\"
+                FROM  KibanaSampleDataEcommerce
+                GROUP BY \"qt_m3uskv6gwc\"
+                ",
+                    fun
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("second".to_string()),
+                        date_range: None,
+                    },]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                }
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn test_datastudio_between_dates_filter() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT 
+                CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\",
+                COUNT(1) AS \"__record_count\"
+            FROM KibanaSampleDataEcommerce
+            WHERE Date_trunc('SECOND', \"order_date\") 
+                BETWEEN 
+                    CAST('2022-07-11 18:00:00.000000' AS TIMESTAMP) 
+                AND CAST('2022-07-11 19:00:00.000000' AS TIMESTAMP)
+            GROUP BY \"qt_m3uskv6gwc\";
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("second".to_string()),
+                    date_range: Some(json!(vec![
+                        "2022-07-11 18:00:00.000000".to_string(),
+                        "2022-07-11 19:00:00.000000".to_string()
+                    ])),
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_datastudio_string_start_with_filter() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT 
+                CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\",
+                COUNT(1) AS \"__record_count\",
+                \"customer_gender\"
+            FROM  KibanaSampleDataEcommerce
+            WHERE (\"customer_gender\" ~ 'test')
+            GROUP BY \"qt_m3uskv6gwc\", \"customer_gender\";
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("second".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("startsWith".to_string()),
+                    values: Some(vec!["test".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_extract_date_trunc_week() {
+        init_logger();
+
         let supported_granularities = vec![
             (
                 "EXTRACT(WEEK FROM DATE_TRUNC('MONTH', \"order_date\"))::integer",
@@ -11011,6 +11247,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_metabase_unwrap_date_cast() {
+        init_logger();
+
         let logical_plan = convert_select_to_query_plan(
             "SELECT max(CAST(\"KibanaSampleDataEcommerce\".\"order_date\" AS date)) AS \"max\" FROM \"KibanaSampleDataEcommerce\"".to_string(), 
             DatabaseProtocol::PostgreSQL

@@ -30,10 +30,6 @@ export type Query = {
   preAggregationsLoadCacheByDataSource?: any;
   renewQuery?: boolean;
 };
-export type LambdaInfo = {
-  sqlAndParams: QueryWithParams,
-  cacheKeyQueries: any[],
-};
 
 type CacheEntry = {
   time: number;
@@ -296,10 +292,12 @@ export class QueryCache {
     if (errors.length > 0) {
       throw new Error(`Lambda query errors ${errors.join(', ')}`);
     }
+    const rowCount = lines.length;
     const csvRows = lines.join('');
     return {
       types: tableData.types,
       csvRows,
+      rowCount,
     };
   }
 

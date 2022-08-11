@@ -1720,7 +1720,7 @@ impl MemberRules {
         "count".to_string()
     }
 
-    fn parse_granularity(granularity: &ScalarValue, to_normalize: bool) -> Option<String> {
+    pub fn parse_granularity(granularity: &ScalarValue, to_normalize: bool) -> Option<String> {
         match granularity {
             ScalarValue::Utf8(Some(granularity)) => {
                 if to_normalize {

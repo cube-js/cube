@@ -145,6 +145,13 @@ pub fn parse_sql_to_statements(
     let query = query.replace("a.attnum = ANY(cons.conkey)", "1 = 1");
     let query = query.replace("pg_get_constraintdef(cons.oid) as src", "NULL as src");
 
+    // ThoughtSpot (Redshift)
+    // Subquery must have alias, It's a default Postgres behaviour, but Redshift is based on top of old Postgres version...
+    let query = query.replace(
+        "AS REF_GENERATION  FROM svv_tables) WHERE true  AND current_database() = ",
+        "AS REF_GENERATION  FROM svv_tables) as r WHERE true  AND current_database() =",
+    );
+
     // Sigma Computing WITH query workaround
     let query = match SIGMA_WORKAROUND.captures(&query) {
         Some(c) => {

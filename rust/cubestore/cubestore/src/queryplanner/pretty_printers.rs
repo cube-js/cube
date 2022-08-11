@@ -2,6 +2,7 @@
 
 use bigdecimal::ToPrimitive;
 
+use datafusion::cube_ext::alias::LogicalAlias;
 use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::{LogicalPlan, PlanVisitor};
 use datafusion::physical_plan::filter::FilterExec;
@@ -31,6 +32,7 @@ use crate::queryplanner::CubeTableLogical;
 use datafusion::cube_ext::join::CrossJoinExec;
 use datafusion::cube_ext::joinagg::CrossJoinAggExec;
 use datafusion::cube_ext::rolling::RollingWindowAggExec;
+use datafusion::cube_ext::rolling::RollingWindowAggregate;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::memory::MemoryExec;
@@ -203,8 +205,12 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                         }
                     } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
                         self.output += &format!("PanicWorker")
+                    } else if let Some(_) = node.as_any().downcast_ref::<RollingWindowAggregate>() {
+                        self.output += &format!("RollingWindowAggreagate");
+                    } else if let Some(alias) = node.as_any().downcast_ref::<LogicalAlias>() {
+                        self.output += &format!("LogicalAlias, alias: {}", alias.alias);
                     } else {
-                        panic!("unknown extension node");
+                        log::error!("unknown extension node")
                     }
                 }
                 LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {

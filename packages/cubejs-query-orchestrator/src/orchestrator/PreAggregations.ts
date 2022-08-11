@@ -7,6 +7,7 @@ import {
   getEnv,
   inDbTimeZone,
   timeSeries,
+  MAX_SOURCE_ROW_LIMIT,
   TO_PARTITION_RANGE,
   BUILD_RANGE_START_LOCAL,
   BUILD_RANGE_END_LOCAL,
@@ -16,7 +17,7 @@ import {
 import { cancelCombinator, SaveCancelFn } from '../driver/utils';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
-import { LambdaInfo, Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
+import { Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
@@ -129,6 +130,15 @@ type IndexDescription = {
   indexName: string;
 };
 
+export type LambdaOptions = {
+  maxSourceRows: number
+};
+
+export type LambdaQuery = {
+  sqlAndParams: QueryWithParams,
+  cacheKeyQueries: any[],
+};
+
 export type PreAggregationDescription = {
   preAggregationsSchema: string;
   type: 'rollup' | 'originalSql';
@@ -149,7 +159,7 @@ export type PreAggregationDescription = {
   preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
   timestampFormat: string;
   expandedPartition: boolean;
-  unionWithSourceData: boolean;
+  unionWithSourceData: LambdaOptions;
   buildRangeEnd?: string;
 };
 
@@ -1110,13 +1120,14 @@ export class PreAggregationLoader {
 
 interface PreAggsPartiotionRangeLoaderOpts {
   maxPartitions: number;
+  maxSourceRowLimit: number;
   waitForRenew?: boolean;
   requestId?: string;
   externalRefresh?: boolean;
   forceBuild?: boolean;
   metadata?: any;
   orphanedTimeout?: number;
-  lambdaInfo?: LambdaInfo;
+  lambdaQuery?: LambdaQuery;
 }
 
 export class PreAggregationPartitionRangeLoader {
@@ -1124,7 +1135,7 @@ export class PreAggregationPartitionRangeLoader {
 
   protected requestId: string;
 
-  protected lambdaInfo: LambdaInfo;
+  protected lambdaQuery: LambdaQuery;
 
   protected dataSource: string;
 
@@ -1140,11 +1151,12 @@ export class PreAggregationPartitionRangeLoader {
     private readonly loadCache: any,
     private readonly options: PreAggsPartiotionRangeLoaderOpts = {
       maxPartitions: 10000,
+      maxSourceRowLimit: 10000,
     },
   ) {
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
-    this.lambdaInfo = options.lambdaInfo;
+    this.lambdaQuery = options.lambdaQuery;
     this.dataSource = preAggregation.dataSource;
   }
 
@@ -1300,7 +1312,7 @@ export class PreAggregationPartitionRangeLoader {
       let lastUpdatedAt = getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt));
       let lambdaTable: InlineTable;
 
-      if (this.lambdaInfo && loadResults.length > 0) {
+      if (this.lambdaQuery && loadResults.length > 0) {
         const { buildRangeEnd } = loadResults[loadResults.length - 1];
         lambdaTable = await this.downloadLambdaTable(buildRangeEnd);
         allTableTargetNames.push(lambdaTable.name);
@@ -1336,11 +1348,14 @@ export class PreAggregationPartitionRangeLoader {
    * Downloads the lambda table from the source DB.
    */
   private async downloadLambdaTable(fromDate: string): Promise<InlineTable> {
-    const { sqlAndParams, cacheKeyQueries } = this.lambdaInfo;
+    const { sqlAndParams, cacheKeyQueries } = this.lambdaQuery;
     const [query, params] = sqlAndParams;
     const values = params.map((p) => {
       if (p === FROM_PARTITION_RANGE) {
         return fromDate;
+      }
+      if (p === MAX_SOURCE_ROW_LIMIT) {
+        return this.options.maxSourceRowLimit;
       }
       return p;
     });
@@ -1359,6 +1374,9 @@ export class PreAggregationPartitionRangeLoader {
         useCsvQuery: true,
       }
     );
+    if (data.rowCount === this.options.maxSourceRowLimit) {
+      throw new Error(`The maximum number of source rows ${this.options.maxSourceRowLimit} was reached for ${this.preAggregation.preAggregationId}`);
+    }
     return {
       name: `${LAMBDA_TABLE_PREFIX}_${this.preAggregation.tableName.replace('.', '_')}`,
       columns: data.types,
@@ -1509,6 +1527,7 @@ export class PreAggregationPartitionRangeLoader {
 
 type PreAggregationsOptions = {
   maxPartitions: number;
+  maxSourceRowLimit: number;
   preAggregationsSchemaCacheExpire?: number;
   loadCacheQueueOptions?: any;
   queueOptions?: (dataSource: string) => Promise<{
@@ -1620,13 +1639,14 @@ export class PreAggregations {
         getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
           maxPartitions: this.options.maxPartitions,
+          maxSourceRowLimit: this.options.maxSourceRowLimit,
           waitForRenew: queryBody.renewQuery,
           // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
           forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,
           requestId: queryBody.requestId,
           metadata: queryBody.metadata,
           orphanedTimeout: queryBody.orphanedTimeout,
-          lambdaInfo: (queryBody.lambdaInfo ?? {})[p.preAggregationId],
+          lambdaQuery: (queryBody.lambdaQueries ?? {})[p.preAggregationId],
           externalRefresh: this.externalRefresh
         },
       );
@@ -1710,6 +1730,7 @@ export class PreAggregations {
         getLoadCacheByDataSource(p.dataSource, p.preAggregationsSchema),
         {
           maxPartitions: this.options.maxPartitions,
+          maxSourceRowLimit: this.options.maxSourceRowLimit,
           waitForRenew: queryBody.renewQuery,
           requestId: queryBody.requestId,
           externalRefresh: this.externalRefresh,
