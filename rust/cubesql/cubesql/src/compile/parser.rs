@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use sqlparser::{
     ast::Statement,
     dialect::{Dialect, PostgreSqlDialect},
@@ -41,6 +43,8 @@ pub fn parse_sql_to_statements(
     query: &String,
     protocol: DatabaseProtocol,
 ) -> CompilationResult<Vec<Statement>> {
+    let original_query = query.clone();
+
     log::debug!("Parsing SQL: {}", query);
     // @todo Support without workarounds
     // metabase
@@ -241,7 +245,10 @@ pub fn parse_sql_to_statements(
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
     };
 
-    parse_result.map_err(|err| CompilationError::user(format!("Unable to parse: {:?}", err)))
+    parse_result.map_err(|err| {
+        CompilationError::user(format!("Unable to parse: {:?}", err))
+            .with_meta(Some(HashMap::from([("query".to_string(), original_query)])))
+    })
 }
 
 pub fn parse_sql_to_statement(
@@ -265,7 +272,7 @@ pub fn parse_sql_to_statement(
                     ))
                 };
 
-                Err(err)
+                Err(err.with_meta(Some(HashMap::from([("query".to_string(), query.clone())]))))
             }
         }
     }

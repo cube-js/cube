@@ -86,7 +86,18 @@ impl SessionLogger {
 
 impl ContextLogger for SessionLogger {
     fn error(&self, message: &str, props: Option<HashMap<String, String>>) {
-        let mut properties = HashMap::from([("error".to_string(), message.to_string())]);
+        let message = match &props {
+            Some(props) => {
+                let sanitized_query = props.get(&"sanitizedQuery".to_string());
+                match sanitized_query {
+                    Some(sanitized_query) => format!("{} QUERY: {}", message, sanitized_query),
+                    None => message.to_string(),
+                }
+            }
+            None => message.to_string(),
+        };
+
+        let mut properties = HashMap::from([("error".to_string(), message)]);
         properties.extend(props.unwrap_or_default());
         self.log("Cube SQL Error", properties, Level::Error);
     }
