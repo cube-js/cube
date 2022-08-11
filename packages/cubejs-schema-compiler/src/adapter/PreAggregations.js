@@ -157,6 +157,7 @@ export class PreAggregations {
       sql: this.query.preAggregationSql(cube, preAggregation),
       uniqueKeyColumns,
       dataSource: queryForSqlEvaluation.dataSource,
+      granularity: preAggregation.granularity,
       partitionGranularity: preAggregation.partitionGranularity,
       preAggregationStartEndQueries:
         (preAggregation.partitionGranularity || preAggregation.granularity) &&
@@ -182,7 +183,8 @@ export class PreAggregations {
           };
         }
       ),
-      readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation)
+      readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation),
+      unionWithSourceData: preAggregation.unionWithSourceData,
     };
   }
 
@@ -709,7 +711,7 @@ export class PreAggregations {
     }
     if (fromPreAggObj.length > 1) {
       throw new UserError(
-        `Multiple rollups found that can be used for rollup join ${JSON.stringify(join)}: ${fromPreAggObj.map(p => `${p.cube}.${p.preAggregationName}`).join(', ')}`,
+        `Multiple rollups found that can be used for rollup join ${JSON.stringify(join)}: ${fromPreAggObj.map(p => this.preAggregationId(p)).join(', ')}`,
       );
     }
     return fromPreAggObj[0];
@@ -984,5 +986,9 @@ export class PreAggregations {
     return preAggregationForQuery.preAggregation.type === 'autoRollup' ?
       preAggregationForQuery.preAggregation.measures :
       this.evaluateAllReferences(preAggregationForQuery.cube, preAggregationForQuery.preAggregation).measures;
+  }
+
+  preAggregationId(preAggregation) {
+    return `${preAggregation.cube}.${preAggregation.preAggregationName}`;
   }
 }

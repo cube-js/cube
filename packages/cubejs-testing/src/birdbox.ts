@@ -391,6 +391,10 @@ export async function startBirdBoxFromCli(
     fs.removeSync(path.join(testDir, '.cubestore'));
   }
 
+  if (fs.existsSync(path.join(testDir, 'schema'))) {
+    fs.removeSync(path.join(testDir, 'schema'));
+  }
+
   // Ignored if not explicitly required by a schema file.
   fs.copySync(
     path.join(process.cwd(), 'birdbox-fixtures', 'postgresql', 'dbt-project'),

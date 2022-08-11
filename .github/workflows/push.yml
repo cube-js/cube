@@ -336,7 +336,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -365,14 +365,26 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubestore
+          key: ubuntu-20.04
+      - name: Build cubestore
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --manifest-path rust/cubestore/Cargo.toml -j 4
       - name: Run Integration smoke tests
         timeout-minutes: 30
         run: |
+          mkdir -p rust/cubestore/downloaded/latest/bin
+          cp rust/cubestore/target/debug/cubestored rust/cubestore/downloaded/latest/bin/cubestored
           cd packages/cubejs-testing/
           yarn run smoke:crate
           yarn run smoke:materialize
           yarn run smoke:questdb
           yarn run smoke:multidb
+          yarn run smoke:lambda
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
