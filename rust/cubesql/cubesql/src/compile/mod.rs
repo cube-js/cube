@@ -9301,6 +9301,21 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "regexp_substr_column",
+            execute_query(
+                "SELECT r.a as input, regexp_substr(r.a, '@[^.]*') as result FROM (
+                    SELECT 'test@test.com' as a
+                    UNION ALL
+                    SELECT 'test'
+                ) as r
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 

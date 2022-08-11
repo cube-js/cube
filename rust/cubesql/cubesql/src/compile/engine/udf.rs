@@ -2573,10 +2573,10 @@ pub fn create_regexp_substr_udf() -> ScalarUDF {
                             if let Some(m) = caps.get(0) {
                                 builder.append_value(m.as_str())?;
                             } else {
-                                builder.append_null()?
+                                builder.append_value("")?
                             }
                         }
-                        None => builder.append_null()?,
+                        None => builder.append_value("")?,
                     }
                 }
             };
