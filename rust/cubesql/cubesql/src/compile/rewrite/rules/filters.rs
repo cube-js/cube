@@ -1133,6 +1133,8 @@ impl FilterRules {
                                     Operator::Like => "contains",
                                     Operator::ILike => "contains",
                                     Operator::NotLike => "notContains",
+                                    // TODO: support regex totally
+                                    Operator::RegexMatch => "startsWith",
                                     _ => {
                                         continue;
                                     }
@@ -1153,7 +1155,12 @@ impl FilterRules {
 
                                 let value = match literal {
                                     ScalarValue::Utf8(Some(value)) => {
-                                        if op == "contains" || op == "notContains" {
+                                        if op == "startsWith"
+                                            && value.starts_with("^^")
+                                            && value.ends_with(".*$")
+                                        {
+                                            value[2..value.len() - 3].to_string()
+                                        } else if op == "contains" || op == "notContains" {
                                             if value.starts_with("%") && value.ends_with("%") {
                                                 let without_wildcard =
                                                     value[1..value.len() - 1].to_string();
