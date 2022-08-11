@@ -19992,7 +19992,7 @@ ndjson@^1.3.0:
   integrity sha1-rmA7NrE0vOw0e0UkIrC/mNWDLsg=
   dependencies:
     json-stringify-safe "^5.0.1"
-    minimist "^1.2.0"
+    minimist "^1.2.6"
     split2 "^2.1.0"
     through2 "^2.0.3"
 
