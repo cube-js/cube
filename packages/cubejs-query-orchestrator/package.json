@@ -37,7 +37,6 @@
     "generic-pool": "^3.7.1",
     "ioredis": "^4.27.8",
     "lru-cache": "^6.0.0",
-    "minimist": "^1.2.6",
     "moment-range": "^4.0.2",
     "moment-timezone": "^0.5.33",
     "ramda": "^0.27.0",
@@ -70,6 +69,7 @@
     ]
   },
   "resolutions": {
-    "es5-ext": "0.10.53"
+    "es5-ext": "0.10.53",
+    "minimist": "^1.2.6"
   }
 }
