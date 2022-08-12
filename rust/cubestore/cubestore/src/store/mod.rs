@@ -892,7 +892,7 @@ impl ChunkStore {
                         ) > Ordering::Equal)
             });
             if to_write.len() > 0 {
-                let to_write = UInt64Array::from(to_wr  ite);
+                let to_write = UInt64Array::from(to_write);
                 let columns = columns
                     .iter()
                     .map(|c| arrow::compute::take(c.as_ref(), &to_write, None))
