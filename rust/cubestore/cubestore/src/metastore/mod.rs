@@ -1054,6 +1054,7 @@ pub trait MetaStore: DIService + Send + Sync {
         last_inserted_at: Option<DateTime<Utc>>,
     ) -> Result<(), CubeError>;
     async fn deactivate_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
+    async fn deactivate_chunks(&self, chunk_ids: Vec<u64>) -> Result<(), CubeError>;
     async fn swap_chunks(
         &self,
         deactivate_ids: Vec<u64>,
@@ -4340,6 +4341,16 @@ impl MetaStore for RocksMetaStore {
                 |row| row.deactivate(),
                 batch_pipe,
             )?;
+            Ok(())
+        })
+        .await
+    }
+    async fn deactivate_chunks(&self, chunk_ids: Vec<u64>) -> Result<(), CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let table = ChunkRocksTable::new(db_ref.clone());
+            for chunk_id in chunk_ids {
+                table.update_with_fn(chunk_id, |row| row.deactivate(), batch_pipe)?;
+            }
             Ok(())
         })
         .await

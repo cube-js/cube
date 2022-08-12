@@ -260,6 +260,10 @@ impl CompactionServiceImpl {
         .await?;
 
         let batches = collect(batches_stream).await?;
+        if batches.is_empty() {
+            self.meta_store.deactivate_chunks(old_chunk_ids).await?;
+            return Ok(());
+        }
         let batch = RecordBatch::concat(&schema, &batches).unwrap();
 
         let (chunk, file_size) = self
@@ -630,7 +634,7 @@ impl CompactionService for CompactionServiceImpl {
             .into_iter()
             .filter(|c| c.get_row().in_memory() && c.get_row().active())
             .partition(|c| {
-                &&c.get_row().get_row_count() <= &&compaction_in_memory_chunks_size_limit
+                c.get_row().get_row_count() <= compaction_in_memory_chunks_size_limit
                     && c.get_row()
                         .oldest_insert_at()
                         .map(|m| {

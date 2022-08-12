@@ -433,6 +433,10 @@ impl ChunkDataStore for ChunkStore {
         let oldest_insert_at = chunk.get_row().oldest_insert_at().clone();
         old_chunks.push(chunk_id);
         let batches = self.get_chunk_columns(chunk).await?;
+        if batches.is_empty() {
+            self.meta_store.deactivate_chunk(chunk_id).await?;
+            return Ok(());
+        }
         let mut columns = Vec::new();
         for i in 0..batches[0].num_columns() {
             columns.push(arrow::compute::concat(
