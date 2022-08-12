@@ -52,9 +52,9 @@ const Header = ({ location }) => (
       <MenuItemStyled key="/explore">
         <Link to="/explore">Explore</Link>
       </MenuItemStyled>
-      <MenuItemStyled key="/">
+      {/* <MenuItemStyled key="/">
         <Link to="/">Dashboard</Link>
-      </MenuItemStyled>
+      </MenuItemStyled> */}
     </StyledMenu>
   </StyledHeader>
 );

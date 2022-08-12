@@ -2,8 +2,9 @@ import React from "react";
 import { useLocation, withRouter } from "react-router";
 import { Route, Routes, Outlet } from "react-router-dom";
 import { Layout } from "antd";
-import { ApolloProvider as ApolloHooksProvider } from "@apollo/react-hooks";
-import { ApolloProvider } from "react-apollo";
+// import { ApolloProvider as ApolloHooksProvider } from "@apollo/react-hooks";
+// import { ApolloProvider } from "react-apollo";
+import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
 import cubejs from "@cubejs-client/core";
 import { CubeProvider } from "@cubejs-client/react";
 import client from "./graphql/client";
@@ -60,7 +61,9 @@ const cubejsApi = cubejs(token, {
 const AppLayout = ({ location, children }) => (
   <Layout style={{ height: "100%" }}>
     <Header location={location} />
-    <Outlet />
+    <Layout.Content>
+      <Outlet/>
+    </Layout.Content>
   </Layout>
 );
 
@@ -69,16 +72,20 @@ const App = ({ children }) => {
 
   return (
     <CubeProvider cubejsApi={cubejsApi}>
-      <ApolloProvider client={client}>
-        <ApolloHooksProvider client={client}>
+      {/* <ApolloProvider client={client}> */}
+        {/* <ApolloHooksProvider client={client}> */}
+        <ApolloProvider client={client} >
           <Routes>
             <Route path="/" element={<AppLayout location={location}/>}>
+              {/* <Route path="/" element={<div>DashboardPage</div>} />
+              <Route path="/explore" element={<div>ExplorePage</div>} /> */}
               <Route path="/" element={<DashboardPage />} />
               <Route path="/explore" element={<ExplorePage />} />
             </Route>
           </Routes>
-        </ApolloHooksProvider>
-      </ApolloProvider>
+          </ApolloProvider>
+        {/* </ApolloHooksProvider> */}
+      {/* </ApolloProvider> */}
     </CubeProvider>
   );
 };

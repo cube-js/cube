@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@apollo/client": "^3.6.9",
     "@apollo/react-hooks": "^4.0.0",
     "@babel/core": "7.18.9",
     "@cube-dev/example-wrapper": "^1.1.9",
     "@cubejs-client/core": "^0.30.29",
     "@cubejs-client/react": "^0.30.40",
+    "@graphql-tools/schema": "^9.0.1",
     "@svgr/webpack": "6.3.1",
     "@typescript-eslint/eslint-plugin": "5.31.0",
     "@typescript-eslint/parser": "5.31.0",
@@ -110,7 +112,7 @@
     ]
   },
   "resolutions": {
-    "apollo-client": "2.6.3"
+    "apollo-client": "2.6.10"
   },
   "jest": {
     "collectCoverageFrom": [
@@ -163,7 +165,12 @@
     ]
   },
   "devDependencies": {
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.5.7",
+    "css-minimizer-webpack-plugin": "^4.0.0",
     "eslint-webpack-plugin": "^3.2.0",
-    "netlify-cli": "^10.13.0"
+    "netlify-cli": "^10.13.0",
+    "react-refresh": "^0.14.0",
+    "resolve-url-loader": "^5.0.0",
+    "source-map-loader": "^4.0.0"
   }
 }
