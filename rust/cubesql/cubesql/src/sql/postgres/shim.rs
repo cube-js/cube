@@ -111,8 +111,8 @@ impl ConnectionError {
     /// Return Backtrace from any variant of Enum
     pub fn backtrace(&self) -> Option<&Backtrace> {
         match &self {
-            ConnectionError::Cube(_) => None,
-            ConnectionError::CompilationError(e) => e.clone().backtrace(),
+            ConnectionError::Cube(e) => e.backtrace(),
+            ConnectionError::CompilationError(e) => e.backtrace(),
             ConnectionError::Protocol(e) => e.backtrace(),
         }
     }
