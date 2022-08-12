@@ -31,7 +31,7 @@ use crate::{
 };
 use cubeclient::models::V1CubeMetaMeasure;
 use datafusion::{
-    logical_plan::{Column, DFSchema, Expr},
+    logical_plan::{exp, Column, DFSchema, Expr},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
 };
@@ -979,7 +979,7 @@ impl MemberRules {
                                     egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
                                         CubeScanAliasToCube(replaced_alias_to_cube.clone()),
                                     ));
-                                subst.insert(new_alias_to_cube_var, new_alias_to_cube);
+                                subst.insert(new_alias_to_cube_var, new_alias_to_cube.clone());
 
                                 let member_pushdown_replacer_alias_to_cube = egraph.add(
                                     LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
@@ -994,6 +994,15 @@ impl MemberRules {
                                 subst.insert(
                                     member_pushdown_replacer_alias_to_cube_var,
                                     member_pushdown_replacer_alias_to_cube,
+                                );
+
+                                println!(
+                                    "push_down_projection success: new_alias_to_cube {:?} member_pushdown_replacer_alias_to_cube {:?}",
+                                    new_alias_to_cube,
+                                    Self::member_replacer_alias_to_cube(
+                                        &alias_to_cube,
+                                        &projection_alias,
+                                    ),
                                 );
 
                                 return true;
@@ -1232,7 +1241,7 @@ impl MemberRules {
                         "'{}' expression can't be coerced to any members of following cubes: {}. It may be this type of expression is not supported.",
                         expr_name,
                         alias_to_cube.iter().map(|(_, cube)| cube).join(", ")
-                    ), 0);
+                    ), 0, subst[expr_var]);
                     subst.insert(member_error_var, member_error);
                     return true;
                 }
@@ -1631,6 +1640,7 @@ impl MemberRules {
                                             alias,
                                             measure_out_var,
                                             Some(cube_alias.to_string()),
+                                            subst[original_expr_var],
                                         );
                                         return true;
                                     }
@@ -1708,6 +1718,7 @@ impl MemberRules {
                                             alias,
                                             measure_out_var,
                                             Some(cube_alias),
+                                            subst[aggr_expr_var],
                                         );
                                     }
 
@@ -1721,7 +1732,7 @@ impl MemberRules {
                                             "Dimension '{}' was used with the aggregate function '{}()'. Please use a measure instead",
                                             dimension.get_real_name(),
                                             call_agg_type.unwrap_or("MEASURE".to_string()).to_uppercase(),
-                                        ), 1),
+                                        ), 1, subst[aggr_expr_var]),
                                     );
 
                                     return true;
@@ -1744,6 +1755,7 @@ impl MemberRules {
         measure_out_var: Var,
         // TODO Remove Option
         cube_alias: Option<String>,
+        expr: Id,
     ) {
         if call_agg_type.is_some() && !measure.is_same_agg_type(call_agg_type.as_ref().unwrap()) {
             subst.insert(
@@ -1753,7 +1765,7 @@ impl MemberRules {
                     measure.get_real_name(),
                     measure.agg_type.as_ref().unwrap_or(&"unknown".to_string()).to_uppercase(),
                     call_agg_type.unwrap().to_uppercase(),
-                ), 1),
+                ), 1, expr),
             );
         } else {
             let measure_name = egraph.add(LogicalPlanLanguage::MeasureName(MeasureName(
@@ -1886,6 +1898,7 @@ pub fn add_member_error(
     egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     member_error: String,
     priority: usize,
+    expr: Id,
 ) -> Id {
     let member_error = egraph.add(LogicalPlanLanguage::MemberErrorError(MemberErrorError(
         member_error,
@@ -1898,6 +1911,7 @@ pub fn add_member_error(
     egraph.add(LogicalPlanLanguage::MemberError([
         member_error,
         member_priority,
+        expr,
     ]))
 }
 

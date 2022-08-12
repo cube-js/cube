@@ -251,6 +251,7 @@ crate::plan_to_language! {
         MemberError {
             error: String,
             priority: usize,
+            expr: Arc<Expr>,
         },
         FilterOp {
             filters: Vec<LogicalPlan>,
