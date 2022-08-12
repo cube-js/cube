@@ -182,6 +182,13 @@ pub fn parse_sql_to_statements(
         None => query,
     };
 
+    // Metabase
+    // TODO: To Support InSubquery Node.
+    let query = query.replace(
+        "WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e)",
+        "WHERE t.oid = 0",
+    );
+
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
