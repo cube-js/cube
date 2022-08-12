@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.47](https://github.com/cube-js/cube.js/compare/v0.30.46...v0.30.47) (2022-08-12)
+
+
+### Features
+
+* **cubesql:** Datastudio - string startWith filter support ([#5093](https://github.com/cube-js/cube.js/issues/5093)) ([3c21986](https://github.com/cube-js/cube.js/commit/3c21986044732c218ff0c04798cd3bc2fbc6b43c))
+* **cubesql:** Metabase v0.44 support ([#5097](https://github.com/cube-js/cube.js/issues/5097)) ([1b2f53b](https://github.com/cube-js/cube.js/commit/1b2f53b8bbff655fa418763534e0ac88f896afcf))
+* **cubesql:** Support COALESCE function ([199c775](https://github.com/cube-js/cube.js/commit/199c775d607a70d26c9afa473f397b0f3d1c6e20))
+* **cubesql:** Support REGEXP_SUBSTR function (Redshift) ([#5090](https://github.com/cube-js/cube.js/issues/5090)) ([3c9f024](https://github.com/cube-js/cube.js/commit/3c9f024226f6e29f2bedabe7fb88d3fb124e55c7))
+
+
+
+
+
 ## [0.30.46](https://github.com/cube-js/cube.js/compare/v0.30.45...v0.30.46) (2022-08-10)
 
 

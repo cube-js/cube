@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.47](https://github.com/cube-js/cube.js/compare/v0.30.46...v0.30.47) (2022-08-12)
+
+
+### Bug Fixes
+
+* **mssql-driver:** datetime2 mapping ([#5057](https://github.com/cube-js/cube.js/issues/5057)) ([769104e](https://github.com/cube-js/cube.js/commit/769104e305a585710f1aa7c0bccf1d94472132ef))
+* **server-core:** determining custom drivers from the cube.js file ([#5088](https://github.com/cube-js/cube.js/issues/5088)) ([23688db](https://github.com/cube-js/cube.js/commit/23688dbcc65ccb89b927c6dbca0c1fe715fa7eca))
+
+
+### Features
+
+* **cubejs:** LambdaView: hybrid query of source tables and pre-aggregation tables. ([#4718](https://github.com/cube-js/cube.js/issues/4718)) ([4ae826b](https://github.com/cube-js/cube.js/commit/4ae826b4d27afbfce366830150e130f29c7fcbbf))
+* **cubesql:** Datastudio - string startWith filter support ([#5093](https://github.com/cube-js/cube.js/issues/5093)) ([3c21986](https://github.com/cube-js/cube.js/commit/3c21986044732c218ff0c04798cd3bc2fbc6b43c))
+* **cubesql:** Metabase v0.44 support ([#5097](https://github.com/cube-js/cube.js/issues/5097)) ([1b2f53b](https://github.com/cube-js/cube.js/commit/1b2f53b8bbff655fa418763534e0ac88f896afcf))
+* **cubesql:** Support COALESCE function ([199c775](https://github.com/cube-js/cube.js/commit/199c775d607a70d26c9afa473f397b0f3d1c6e20))
+* **cubesql:** Support REGEXP_SUBSTR function (Redshift) ([#5090](https://github.com/cube-js/cube.js/issues/5090)) ([3c9f024](https://github.com/cube-js/cube.js/commit/3c9f024226f6e29f2bedabe7fb88d3fb124e55c7))
+
+
+
+
+
 ## [0.30.46](https://github.com/cube-js/cube.js/compare/v0.30.45...v0.30.46) (2022-08-10)
 
 

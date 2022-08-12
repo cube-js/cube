@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.47](https://github.com/cube-js/cube.js/compare/v0.30.46...v0.30.47) (2022-08-12)
+
+
+### Bug Fixes
+
+* **mssql-driver:** datetime2 mapping ([#5057](https://github.com/cube-js/cube.js/issues/5057)) ([769104e](https://github.com/cube-js/cube.js/commit/769104e305a585710f1aa7c0bccf1d94472132ef))
+
+
+
+
+
 ## [0.30.46](https://github.com/cube-js/cube.js/compare/v0.30.45...v0.30.46) (2022-08-10)
 
 **Note:** Version bump only for package @cubejs-backend/mssql-driver
