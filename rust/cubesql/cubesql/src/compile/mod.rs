@@ -9847,6 +9847,26 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_metabase_type_in_subquery_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_type_in_subquery_query",
+            execute_query(
+                "
+                SELECT nspname, typname 
+                FROM pg_type t 
+                JOIN pg_namespace n ON n.oid = t.typnamespace 
+                WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e);
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_sigma_computing_ilike_query() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "sigma_computing_ilike_query",
