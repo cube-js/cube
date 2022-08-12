@@ -9,7 +9,7 @@ services:
     environment:
       - CUBEJS_REFRESH_WORKER=false
       - CUBEJS_ROLLUP_ONLY=true
-      # - CUBEJS_DEV_MODE=true
+      - CUBEJS_DEV_MODE=true
 
       - CUBEJS_DB_TYPE=bigquery
       - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
@@ -26,35 +26,8 @@ services:
     volumes:
       - .:/cube/conf
     depends_on:
-      - refresh_worker
       - cubestore
       - redis
-
-  refresh_worker:
-    image: cubejs/cube:latest
-    environment:
-      - CUBEJS_REFRESH_WORKER=true
-
-      - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
-      - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
-      - CUBEJS_DB_EXPORT_BUCKET=${CUBEJS_DB_EXPORT_BUCKET}
-
-      - CUBEJS_EXT_DB_TYPE=cubestore
-      - CUBEJS_EXT_DB_HOST=cubestore
-      - CUBEJS_EXT_DB_PORT=3030
-
-      - CUBEJS_REDIS_URL=redis://redis:6379
-      
-      - CUBEJS_API_SECRET=SECRET
-    volumes:
-      - .:/cube/conf
-    depends_on:
-      - redis
-      - cubestore_worker_1
-      - cubestore_worker_2
-      - cubestore_worker_3
-      - cubestore_worker_4
 
   cubestore:
     image: cubejs/cubestore:latest

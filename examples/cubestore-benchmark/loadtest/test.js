@@ -18,24 +18,28 @@ export let options = {
   setupTimeout: '300s',
   teardownTimeout: '300s',
   scenarios: {
-    cubestore: Object.assign(
+    // cubestore: Object.assign(
+    //   Object.assign({}, defaultScenario),
+    //   { exec: 'cubestore' },
+    // ),
+    // postgres: Object.assign(
+    //   Object.assign({}, defaultScenario),
+    //   { exec: 'postgres' },
+    // ),
+    lambda: Object.assign(
       Object.assign({}, defaultScenario),
-      { exec: 'cubestore' },
-    ),
-    postgres: Object.assign(
-      Object.assign({}, defaultScenario),
-      { exec: 'postgres' },
+      { exec: 'lambda' },
     ),
   },
 };
 
 
-let cubestoreLantency = new Trend('Latency (Cube.js with Cube Store)', true);
+let cubestoreLatency = new Trend('Latency (Cube.js with Cube Store)', true);
 
 export function cubestore() {
     let res = http.get(`${RELAY_URL}/cubestore`);
 
-    cubestoreLantency.add(res.timings.duration);
+    cubestoreLatency.add(res.timings.duration);
 
     check(res, {
       'is status 200': res => res.status === 200,
@@ -43,14 +47,26 @@ export function cubestore() {
 }
 
 
-let postgresLantency = new Trend('Latency (Cube.js with Postgres)', true);
+let postgresLatency = new Trend('Latency (Cube.js with Postgres)', true);
 
 export function postgres() {
     let res = http.get(`${RELAY_URL}/postgres`);
 
-    postgresLantency.add(res.timings.duration);
+    postgresLatency.add(res.timings.duration);
 
     check(res, {
       'is status 200': res => res.status === 200,
+    });
+}
+
+let lambdaLatency = new Trend('Latency (Cube.js with Cubestore & Lambda)', true);
+
+export function lambda() {
+    let res = http.get(`${RELAY_URL}/lambda`);
+
+    lambdaLatency.add(res.timings.duration);
+
+    check(res, {
+        'is status 200': res => res.status === 200,
     });
 }
