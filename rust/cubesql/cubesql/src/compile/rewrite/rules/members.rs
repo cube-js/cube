@@ -754,39 +754,6 @@ impl MemberRules {
         }
     }
 
-    pub fn transform_original_expr_alias(
-        original_expr_var: &'static str,
-        alias_expr_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let original_expr_var = original_expr_var.parse().unwrap();
-        let alias_expr_var = alias_expr_var.parse().unwrap();
-        move |egraph, subst| {
-            let original_expr_id = subst[original_expr_var];
-            let res =
-                egraph[original_expr_id]
-                    .data
-                    .original_expr
-                    .as_ref()
-                    .ok_or(CubeError::internal(format!(
-                        "Original expr wasn't prepared for {:?}",
-                        original_expr_id
-                    )));
-            if let Ok(expr) = res {
-                // TODO unwrap
-                let name = expr.name(&DFSchema::empty()).unwrap();
-                let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(
-                    Column::from_name(name),
-                )));
-                subst.insert(
-                    alias_expr_var,
-                    egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
-                );
-                return true;
-            }
-            false
-        }
-    }
-
     pub fn transform_original_expr_nested_date_trunc(
         original_expr_var: &'static str,
         // Original granularity from date_part/date_trunc

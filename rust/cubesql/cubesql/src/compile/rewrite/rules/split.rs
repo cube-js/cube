@@ -16,14 +16,15 @@ use crate::{
         },
     },
     transport::V1CubeMetaExt,
-    var, var_iter,
+    var, var_iter, CubeError,
 };
 use datafusion::{
-    logical_plan::{Column, Operator},
+    logical_plan::{Column, DFSchema, Operator},
     physical_plan::aggregates::AggregateFunction,
+    prelude::col,
     scalar::ScalarValue,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::{EGraph, Id, Rewrite, Subst};
 use std::sync::Arc;
 
 pub struct SplitRules {
@@ -356,7 +357,7 @@ impl RewriteRules for SplitRules {
             ),
             transforming_chain_rewrite(
                 "split-push-down-date-trunc-outer-aggr-replacer",
-                outer_aggregate_split_replacer("?expr", "?cube"),
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
                     fun_expr(
@@ -365,11 +366,21 @@ impl RewriteRules for SplitRules {
                     ),
                 )],
                 "?alias".to_string(),
-                MemberRules::transform_original_expr_alias("?expr", "?alias"),
+                self.transform_original_expr_alias(
+                    |egraph, id| {
+                        var_iter!(egraph[id], OuterAggregateSplitReplacerAliasToCube)
+                            .cloned()
+                            .collect()
+                    },
+                    "?expr",
+                    "?column",
+                    "?alias_to_cube",
+                    "?alias",
+                ),
             ),
             transforming_chain_rewrite(
                 "split-push-down-date-trunc-outer-replacer",
-                outer_projection_split_replacer("?expr", "?cube"),
+                outer_projection_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
                     fun_expr(
@@ -378,7 +389,17 @@ impl RewriteRules for SplitRules {
                     ),
                 )],
                 "?alias".to_string(),
-                MemberRules::transform_original_expr_alias("?expr", "?alias"),
+                self.transform_original_expr_alias(
+                    |egraph, id| {
+                        var_iter!(egraph[id], OuterProjectionSplitReplacerAliasToCube)
+                            .cloned()
+                            .collect()
+                    },
+                    "?expr",
+                    "?column",
+                    "?alias_to_cube",
+                    "?alias",
+                ),
             ),
             // Date part
             transforming_chain_rewrite(
@@ -962,6 +983,66 @@ impl SplitRules {
     pub fn new(cube_context: Arc<CubeContext>) -> Self {
         Self {
             cube_context: cube_context,
+        }
+    }
+
+    pub fn transform_original_expr_alias(
+        &self,
+        alias_to_cube_fn: fn(
+            &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+            Id,
+        ) -> Vec<Vec<(String, String)>>,
+        original_expr_var: &'static str,
+        column_var: &'static str,
+        alias_to_cube_var: &'static str,
+        alias_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let original_expr_var = var!(original_expr_var);
+        let column_var = var!(column_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let alias_expr_var = var!(alias_expr_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            let original_expr_id = subst[original_expr_var];
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )));
+            if let Ok(expr) = res {
+                for alias_to_cube in alias_to_cube_fn(egraph, subst[alias_to_cube_var]) {
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        if let Some((alias, _)) =
+                            meta_context.find_cube_by_column(&alias_to_cube, &column)
+                        {
+                            // TODO unwrap
+                            let name = expr.name(&DFSchema::empty()).unwrap();
+                            let column1 = Column {
+                                relation: Some(alias),
+                                name: name.to_string(),
+                            };
+                            let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                ColumnExprColumn(column1),
+                            ));
+                            let alias_name = egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                                AliasExprAlias(name.to_string()),
+                            ));
+                            let column = egraph.add(LogicalPlanLanguage::ColumnExpr([alias]));
+                            // TODO re-aliasing underlying column as it'll be fully qualified which will break outer alias in case date_trunc is wrapped in some other function
+                            // TODO alias in plans should be generally no-op however there's no place in datafusion where it's used like that
+                            let alias =
+                                egraph.add(LogicalPlanLanguage::AliasExpr([column, alias_name]));
+                            subst.insert(alias_expr_var, alias);
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
         }
     }
 
