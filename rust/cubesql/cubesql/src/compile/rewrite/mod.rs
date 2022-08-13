@@ -681,6 +681,10 @@ fn filter(expr: impl Display, input: impl Display) -> String {
     format!("(Filter {} {})", expr, input)
 }
 
+fn cross_join(left: impl Display, right: impl Display) -> String {
+    format!("(CrossJoin {} {})", left, right)
+}
+
 fn member_replacer(members: impl Display, aliases: impl Display) -> String {
     format!("(MemberReplacer {} {})", members, aliases)
 }

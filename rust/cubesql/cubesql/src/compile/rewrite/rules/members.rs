@@ -6,7 +6,7 @@ use crate::{
             aggr_group_expr_empty_tail, aggregate, alias_expr,
             analysis::LogicalPlanAnalysis,
             binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_vec,
-            cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
+            cross_join, cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
             cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
             expr_column_name, expr_column_name_with_relation, fun_expr, limit,
             list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
@@ -478,6 +478,47 @@ impl RewriteRules for MemberRules {
                 "binary-expr-multi-assoc",
                 binary_expr(binary_expr("?a", "*", "?b"), "*", "?c"),
                 binary_expr("?a", "*", binary_expr("?b", "*", "?c")),
+            ),
+            // Join
+            transforming_rewrite(
+                "push-down-cross-join-to-empty-scan",
+                cross_join(
+                    cube_scan(
+                        "?left_alias_to_cube",
+                        cube_scan_members_empty_tail(),
+                        cube_scan_filters_empty_tail(),
+                        cube_scan_order_empty_tail(),
+                        "?limit",
+                        "?offset",
+                        "?aliases",
+                        "CubeScanSplit:false",
+                    ),
+                    cube_scan(
+                        "?right_alias_to_cube",
+                        cube_scan_members_empty_tail(),
+                        cube_scan_filters_empty_tail(),
+                        cube_scan_order_empty_tail(),
+                        "?limit",
+                        "?offset",
+                        "?aliases",
+                        "CubeScanSplit:false",
+                    ),
+                ),
+                cube_scan(
+                    "?joined_alias_to_cube",
+                    cube_scan_members_empty_tail(),
+                    cube_scan_filters_empty_tail(),
+                    cube_scan_order_empty_tail(),
+                    "?limit",
+                    "?offset",
+                    "?aliases",
+                    "CubeScanSplit:false",
+                ),
+                self.push_down_cross_join_to_empty_scan(
+                    "?left_alias_to_cube",
+                    "?right_alias_to_cube",
+                    "?joined_alias_to_cube",
+                ),
             ),
         ];
 
@@ -1857,6 +1898,40 @@ impl MemberRules {
                 }
             }
             _ => None,
+        }
+    }
+
+    fn push_down_cross_join_to_empty_scan(
+        &self,
+        left_alias_to_cube_var: &'static str,
+        right_alias_to_cube_var: &'static str,
+        joined_alias_to_cube_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let left_alias_to_cube_var = var!(left_alias_to_cube_var);
+        let right_alias_to_cube_var = var!(right_alias_to_cube_var);
+        let joined_alias_to_cube_var = var!(joined_alias_to_cube_var);
+        move |egraph, subst| {
+            for left_alias_to_cube in
+                var_iter!(egraph[subst[left_alias_to_cube_var]], CubeScanAliasToCube).cloned()
+            {
+                for right_alias_to_cube in
+                    var_iter!(egraph[subst[right_alias_to_cube_var]], CubeScanAliasToCube).cloned()
+                {
+                    let joined_alias_to_cube = egraph.add(
+                        LogicalPlanLanguage::CubeScanAliasToCube(CubeScanAliasToCube(
+                            left_alias_to_cube
+                                .into_iter()
+                                .chain(right_alias_to_cube.into_iter())
+                                .collect(),
+                        )),
+                    );
+                    subst.insert(joined_alias_to_cube_var, joined_alias_to_cube);
+
+                    return true;
+                }
+            }
+
+            false
         }
     }
 }
