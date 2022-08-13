@@ -593,9 +593,15 @@ impl MemberRules {
                 member_pushdown_replacer(
                     column_expr,
                     "?terminal_member",
-                    "?member_pushdown_replacer_alias_to_cube",
+                    "?filtered_member_pushdown_replacer_alias_to_cube",
                 ),
-                self.find_matching_old_member("?column", "?old_members", "?terminal_member"),
+                self.find_matching_old_member(
+                    "?member_pushdown_replacer_alias_to_cube",
+                    "?column",
+                    "?old_members",
+                    "?terminal_member",
+                    "?filtered_member_pushdown_replacer_alias_to_cube",
+                ),
             )
         };
 
@@ -1508,37 +1514,72 @@ impl MemberRules {
 
     fn find_matching_old_member(
         &self,
+        member_pushdown_replacer_alias_to_cube_var: &'static str,
         column_var: &'static str,
         old_members_var: &'static str,
         terminal_member: &'static str,
+        filtered_member_pushdown_replacer_alias_to_cube_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let member_pushdown_replacer_alias_to_cube_var =
+            var!(member_pushdown_replacer_alias_to_cube_var);
         let column_var = var!(column_var);
         let old_members_var = var!(old_members_var);
         let terminal_member = var!(terminal_member);
+        let filtered_member_pushdown_replacer_alias_to_cube_var =
+            var!(filtered_member_pushdown_replacer_alias_to_cube_var);
         move |egraph, subst| {
-            for alias_column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
-                let alias_name = expr_column_name(Expr::Column(alias_column), &None);
-
-                if let Some(left_member_name_to_expr) = egraph
-                    .index(subst[old_members_var])
-                    .data
-                    .member_name_to_expr
-                    .clone()
+            for alias_to_cube in var_iter!(
+                egraph[subst[member_pushdown_replacer_alias_to_cube_var]],
+                MemberPushdownReplacerAliasToCube
+            )
+            .cloned()
+            {
+                for alias_column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned()
                 {
-                    let column_name_to_member = column_name_to_member_vec(left_member_name_to_expr);
-                    if let Some((index, _)) = column_name_to_member
-                        .iter()
-                        .find_position(|(member_alias, _)| member_alias == &alias_name)
-                    {
-                        // Members are represented in pairs: fully qualified name and unqualified name
-                        let index = index / 2;
-                        for old_members in
-                            var_list_iter!(egraph[subst[old_members_var]], CubeScanMembers).cloned()
-                        {
-                            subst.insert(terminal_member, old_members[index]);
-                        }
+                    let alias_name = expr_column_name(Expr::Column(alias_column), &None);
 
-                        return true;
+                    if let Some(left_member_name_to_expr) = egraph
+                        .index(subst[old_members_var])
+                        .data
+                        .member_name_to_expr
+                        .clone()
+                    {
+                        let column_name_to_member =
+                            column_name_to_member_vec(left_member_name_to_expr);
+                        if let Some((index, member)) = column_name_to_member
+                            .iter()
+                            .find_position(|(member_alias, _)| member_alias == &alias_name)
+                        {
+                            println!("find_matching_old_member: {:?} {:?}", alias_to_cube, member);
+                            let filtered_alias_to_cube = alias_to_cube
+                                .into_iter()
+                                // TODO does it matter which cube will be referenced by __user?
+                                .filter(|(_, cube)| {
+                                    cube == member.1.split(".").next().unwrap()
+                                        || member.1 == "__user"
+                                })
+                                .collect();
+                            // Members are represented in pairs: fully qualified name and unqualified name
+                            let index = index / 2;
+                            for old_members in
+                                var_list_iter!(egraph[subst[old_members_var]], CubeScanMembers)
+                                    .cloned()
+                            {
+                                subst.insert(terminal_member, old_members[index]);
+                            }
+
+                            let filtered_member_pushdown_replacer_alias_to_cube =
+                                egraph.add(LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
+                                    MemberPushdownReplacerAliasToCube(filtered_alias_to_cube),
+                                ));
+
+                            subst.insert(
+                                filtered_member_pushdown_replacer_alias_to_cube_var,
+                                filtered_member_pushdown_replacer_alias_to_cube,
+                            );
+
+                            return true;
+                        }
                     }
                 }
             }
@@ -1768,7 +1809,7 @@ impl MemberRules {
             .cloned()
             {
                 for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
-                    // TODO
+                    // alias_to_cube at this point is already filtered to a single cube
                     let alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
                     let alias_expr =
                         Self::add_alias_column(egraph, column.name.to_string(), Some(alias));
@@ -1798,7 +1839,7 @@ impl MemberRules {
             .cloned()
             {
                 for alias in var_iter!(egraph[subst[alias_var]], AliasExprAlias).cloned() {
-                    // TODO
+                    // alias_to_cube at this point is already filtered to a single cube
                     let cube_alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
                     let alias_expr =
                         Self::add_alias_column(egraph, alias.to_string(), Some(cube_alias));

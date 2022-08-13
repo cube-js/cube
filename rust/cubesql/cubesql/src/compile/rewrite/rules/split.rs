@@ -1183,7 +1183,7 @@ impl SplitRules {
             {
                 subst.insert(
                     projection_alias_var,
-                    // TODO None
+                    // Do not put alias on inner projection so table name from cube scan can be reused
                     egraph.add(LogicalPlanLanguage::ProjectionAlias(ProjectionAlias(None))),
                 );
 
@@ -1223,7 +1223,7 @@ impl SplitRules {
             {
                 subst.insert(
                     projection_alias_var,
-                    // TODO None
+                    // Do not put alias on inner projection so table name from cube scan can be reused
                     egraph.add(LogicalPlanLanguage::ProjectionAlias(ProjectionAlias(None))),
                 );
 
