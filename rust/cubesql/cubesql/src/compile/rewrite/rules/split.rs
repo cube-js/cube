@@ -21,7 +21,6 @@ use crate::{
 use datafusion::{
     logical_plan::{Column, DFSchema, Operator},
     physical_plan::aggregates::AggregateFunction,
-    prelude::col,
     scalar::ScalarValue,
 };
 use egg::{EGraph, Id, Rewrite, Subst};

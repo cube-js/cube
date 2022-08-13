@@ -1434,7 +1434,6 @@ impl FilterRules {
         for alias_to_cube in var_iter!(egraph[subst[alias_to_cube_var]], FilterReplacerAliasToCube)
         {
             for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
-                println!("filter_member_name: {:?} {:?}", alias_to_cube, column);
                 let alias_name = expr_column_name(Expr::Column(column.clone()), &None);
                 let member_name = member_name_by_alias(egraph, subst[members_var], &alias_name);
                 if let Some(member_name) = member_name {

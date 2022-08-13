@@ -31,7 +31,7 @@ use crate::{
 };
 use cubeclient::models::V1CubeMetaMeasure;
 use datafusion::{
-    logical_plan::{exp, Column, DFSchema, Expr},
+    logical_plan::{Column, DFSchema, Expr},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
 };
@@ -930,7 +930,6 @@ impl MemberRules {
             if let Some(expr_to_alias) =
                 &egraph.index(subst[projection_expr_var]).data.expr_to_alias
             {
-                println!("push_down_projection: expr_to_alias {:?}", expr_to_alias);
                 for alias_to_cube in
                     var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
                 {
@@ -940,14 +939,6 @@ impl MemberRules {
                         .into_iter()
                         .map(|(e, a)| (expr_column_name_with_relation(e, &mut relation), a))
                         .collect::<Vec<_>>();
-                    println!(
-                        "push_down_projection: column_name_to_alias {:?}",
-                        column_name_to_alias
-                    );
-                    println!(
-                        "push_down_projection: member_name_to_expr {:?}",
-                        egraph.index(subst[members_var]).data.member_name_to_expr
-                    );
                     if let Some(member_name_to_expr) = egraph
                         .index(subst[members_var])
                         .data
@@ -956,11 +947,6 @@ impl MemberRules {
                     {
                         let column_name_to_member_name =
                             column_name_to_member_vec(member_name_to_expr);
-
-                        println!(
-                            "push_down_projection: column_name_to_member_name {:?}",
-                            column_name_to_member_name
-                        );
 
                         for projection_alias in
                             var_iter!(egraph[subst[alias_var]], ProjectionAlias).cloned()
@@ -1002,15 +988,6 @@ impl MemberRules {
                                 subst.insert(
                                     member_pushdown_replacer_alias_to_cube_var,
                                     member_pushdown_replacer_alias_to_cube,
-                                );
-
-                                println!(
-                                    "push_down_projection success: new_alias_to_cube {:?} member_pushdown_replacer_alias_to_cube {:?}",
-                                    new_alias_to_cube,
-                                    Self::member_replacer_alias_to_cube(
-                                        &alias_to_cube,
-                                        &projection_alias,
-                                    ),
                                 );
 
                                 return true;
@@ -1112,10 +1089,6 @@ impl MemberRules {
                 {
                     let replaced_alias_to_cube =
                         Self::replace_alias(&alias_to_cube, &projection_alias);
-                    println!(
-                        "push_down_projection_to_empty_scan: {:?} -> {:?}",
-                        alias_to_cube, replaced_alias_to_cube
-                    );
                     let new_alias_to_cube = egraph.add(LogicalPlanLanguage::CubeScanAliasToCube(
                         CubeScanAliasToCube(replaced_alias_to_cube.clone()),
                     ));
@@ -1292,10 +1265,6 @@ impl MemberRules {
         move |egraph, subst| {
             for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                 for alias_to_cube in var_iter!(egraph[subst[cube_var]], MemberReplacerAliasToCube) {
-                    println!(
-                        "transform_projection_member: {:?} {:?}",
-                        column, alias_to_cube
-                    );
                     if let Some(((_, cube_alias), cube)) =
                         meta_context.find_cube_by_column_for_replacer(&alias_to_cube, &column)
                     {
@@ -1557,10 +1526,6 @@ impl MemberRules {
                     .clone()
                 {
                     let column_name_to_member = column_name_to_member_vec(left_member_name_to_expr);
-                    println!(
-                        "find_matching_old_member: {:?} in {:?}",
-                        alias_name, column_name_to_member
-                    );
                     if let Some((index, _)) = column_name_to_member
                         .iter()
                         .find_position(|(member_alias, _)| member_alias == &alias_name)
@@ -1570,7 +1535,6 @@ impl MemberRules {
                         for old_members in
                             var_list_iter!(egraph[subst[old_members_var]], CubeScanMembers).cloned()
                         {
-                            println!("find_matching_old_member: found {:?}", old_members[index]);
                             subst.insert(terminal_member, old_members[index]);
                         }
 
@@ -1625,7 +1589,6 @@ impl MemberRules {
                                 })
                                 .unwrap_or(vec![false])
                             {
-                                println!("pushdown_measure pre alias_to_cube: {:?}", measure_name);
                                 for alias_to_cube in var_iter!(
                                     egraph[subst[member_pushdown_replacer_alias_to_cube_var]],
                                     MemberPushdownReplacerAliasToCube
@@ -1633,12 +1596,10 @@ impl MemberRules {
                                 .cloned()
                                 {
                                     let measure_cube_name = measure_name.split(".").next().unwrap();
-                                    println!("pushdown_measure: {:?}", measure_name);
                                     if let Some(((_, cube_alias), _)) = alias_to_cube
                                         .iter()
                                         .find(|(_, cube)| cube == measure_cube_name)
                                     {
-                                        println!("pushdown_measure pass: {:?}", measure_name);
                                         let call_agg_type = Self::get_agg_type(fun, distinct);
                                         Self::measure_output(
                                             egraph,
@@ -1799,21 +1760,16 @@ impl MemberRules {
             var!(member_pushdown_replacer_alias_to_cube_var);
         let column_var = var!(column_var);
         let output_column_var = var!(output_column_var);
-        let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
-            println!("transform_column_alias");
             for alias_to_cube in var_iter!(
                 egraph[subst[member_pushdown_replacer_alias_to_cube_var]],
                 MemberPushdownReplacerAliasToCube
             )
             .cloned()
             {
-                println!("transform_column_alias alias_to_cube: {:?}", alias_to_cube);
-
                 for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                     // TODO
                     let alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
-                    println!("transform_column_alias: {}.{}", alias, column.name);
                     let alias_expr =
                         Self::add_alias_column(egraph, column.name.to_string(), Some(alias));
                     subst.insert(output_column_var, alias_expr);
@@ -1834,20 +1790,16 @@ impl MemberRules {
             var!(member_pushdown_replacer_alias_to_cube_var);
         let alias_var = var!(alias_var);
         let output_column_var = var!(output_column_var);
-        let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
-            println!("transform_alias");
             for alias_to_cube in var_iter!(
                 egraph[subst[member_pushdown_replacer_alias_to_cube_var]],
                 MemberPushdownReplacerAliasToCube
             )
             .cloned()
             {
-                println!("transform_alias: {:?}", alias_to_cube);
                 for alias in var_iter!(egraph[subst[alias_var]], AliasExprAlias).cloned() {
                     // TODO
                     let cube_alias = alias_to_cube.iter().next().unwrap().0 .1.to_string();
-                    println!("transform_alias: {}.{}", cube_alias, alias);
                     let alias_expr =
                         Self::add_alias_column(egraph, alias.to_string(), Some(cube_alias));
                     subst.insert(output_column_var, alias_expr);
