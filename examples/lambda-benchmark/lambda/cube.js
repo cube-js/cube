@@ -5,5 +5,9 @@ module.exports = {
         concurrency: 20
       }
     },
+
+    preAggregationsOptions: {
+      externalRefresh: false,
+    },
   }
 }

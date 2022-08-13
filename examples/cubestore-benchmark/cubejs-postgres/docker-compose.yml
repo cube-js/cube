@@ -9,7 +9,34 @@ services:
     environment:
       - CUBEJS_REFRESH_WORKER=false
       - CUBEJS_ROLLUP_ONLY=true
-      - CUBEJS_DEV_MODE=true
+      # - CUBEJS_DEV_MODE=true
+
+      - CUBEJS_DB_TYPE=bigquery
+      - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
+      - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
+      - CUBEJS_DB_EXPORT_BUCKET=${CUBEJS_DB_EXPORT_BUCKET}
+
+      - CUBEJS_EXT_DB_TYPE=postgres
+      - CUBEJS_EXT_DB_HOST=postgres
+      - CUBEJS_EXT_DB_PORT=5432
+      - CUBEJS_EXT_DB_NAME=postgres
+      - CUBEJS_EXT_DB_USER=postgres
+      - CUBEJS_EXT_DB_PASS=postgres
+
+      - CUBEJS_REDIS_URL=redis://redis:6379
+      
+      - CUBEJS_API_SECRET=SECRET
+    volumes:
+      - .:/cube/conf
+    depends_on:
+      - refresh_worker
+      - postgres
+      - redis
+
+  refresh_worker:
+    image: cubejs/cube:latest
+    environment:
+      - CUBEJS_REFRESH_WORKER=true
 
       - CUBEJS_DB_TYPE=bigquery
       - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}

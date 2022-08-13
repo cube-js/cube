@@ -10,7 +10,7 @@ function pad(n, width, z) {
 
 export default [
   {
-    name: 'commits-count-by-day and repo',
+    name: 'order-count-by-created-at-by-day',
 
     data: () => {
       const year = getRandomInRange(2019, 2021)
@@ -27,17 +27,19 @@ export default [
 
     query: ({ year1, year2, month1, month2, day1, day2 }) => ({
       "order": {
-        "GithubCommits.count": "desc"
+        "Mobility.grocery": "desc"
       },
       "measures": [
-        "GithubCommits.count",
+        "Mobility.grocery",
+        "Mobility.park",
+        "Mobility.residential",
       ],
       "dimensions": [
-        "GithubCommits.repo"
+        "Mobility.country"
       ],
       "timeDimensions": [
         {
-          "dimension": "GithubCommits.date",
+          "dimension": "Mobility.date",
           "granularity": "day",
           "dateRange": [
             `${year1}-${month1}-${day1}`,
