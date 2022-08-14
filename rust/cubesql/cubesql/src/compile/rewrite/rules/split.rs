@@ -10,20 +10,20 @@ use crate::{
             projection_expr, projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
             rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
             udf_expr, AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, ColumnExprColumn,
-            CubeScanTableName, InnerAggregateSplitReplacerCube, LiteralExprValue,
-            LogicalPlanLanguage, OuterAggregateSplitReplacerCube, OuterProjectionSplitReplacerCube,
-            ProjectionAlias, TableScanSourceTableName,
+            CubeScanAliasToCube, InnerAggregateSplitReplacerAliasToCube, LiteralExprValue,
+            LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
+            OuterProjectionSplitReplacerAliasToCube, ProjectionAlias,
         },
     },
     transport::V1CubeMetaExt,
-    var, var_iter,
+    var, var_iter, CubeError,
 };
 use datafusion::{
-    logical_plan::{Column, Operator},
+    logical_plan::{Column, DFSchema, Operator},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::{EGraph, Id, Rewrite, Subst};
 use std::sync::Arc;
 
 pub struct SplitRules {
@@ -37,14 +37,13 @@ impl RewriteRules for SplitRules {
                 "split-projection-aggregate",
                 aggregate(
                     cube_scan(
-                        "?source_table_name",
+                        "?alias_to_cube",
                         "?members",
                         "?filters",
                         "?orders",
                         "?limit",
                         "?offset",
                         "?aliases",
-                        "?table_name",
                         "CubeScanSplit:false",
                     ),
                     "?group_expr",
@@ -57,14 +56,13 @@ impl RewriteRules for SplitRules {
                     ),
                     aggregate(
                         cube_scan(
-                            "?source_table_name",
+                            "?alias_to_cube",
                             "?members",
                             "?filters",
                             "?orders",
                             "?limit",
                             "?offset",
                             "?aliases",
-                            "?table_name",
                             "CubeScanSplit:true",
                         ),
                         inner_aggregate_split_replacer("?group_expr", "?inner_aggregate_cube"),
@@ -73,10 +71,9 @@ impl RewriteRules for SplitRules {
                     "?projection_alias",
                 ),
                 self.split_projection_aggregate(
-                    "?source_table_name",
+                    "?alias_to_cube",
                     "?inner_aggregate_cube",
                     "?outer_projection_cube",
-                    "?table_name",
                     "?projection_alias",
                 ),
             ),
@@ -85,14 +82,13 @@ impl RewriteRules for SplitRules {
                 projection(
                     "?expr",
                     cube_scan(
-                        "?source_table_name",
+                        "?alias_to_cube",
                         "?members",
                         "?filters",
                         "?orders",
                         "?limit",
                         "?offset",
                         "?aliases",
-                        "?table_name",
                         "CubeScanSplit:false",
                     ),
                     "?alias",
@@ -102,25 +98,23 @@ impl RewriteRules for SplitRules {
                     projection(
                         inner_aggregate_split_replacer("?expr", "?inner_aggregate_cube"),
                         cube_scan(
-                            "?source_table_name",
+                            "?alias_to_cube",
                             "?members",
                             "?filters",
                             "?orders",
                             "?limit",
                             "?offset",
                             "?aliases",
-                            "?table_name",
                             "CubeScanSplit:true",
                         ),
-                        "?alias",
+                        "?projection_alias",
                     ),
-                    "?projection_alias",
+                    "?alias",
                 ),
                 self.split_projection_aggregate(
-                    "?source_table_name",
+                    "?alias_to_cube",
                     "?inner_aggregate_cube",
                     "?outer_projection_cube",
-                    "?table_name",
                     "?projection_alias",
                 ),
             ),
@@ -130,14 +124,13 @@ impl RewriteRules for SplitRules {
                 projection(
                     "?expr",
                     cube_scan(
-                        "?source_table_name",
+                        "?alias_to_cube",
                         "?members",
                         "?filters",
                         "?orders",
                         "?limit",
                         "?offset",
                         "?aliases",
-                        "?table_name",
                         "CubeScanSplit:false",
                     ),
                     "?alias",
@@ -147,14 +140,13 @@ impl RewriteRules for SplitRules {
                     projection(
                         inner_aggregate_split_replacer("?expr", "?inner_aggregate_cube"),
                         cube_scan(
-                            "?source_table_name",
+                            "?alias_to_cube",
                             "?members",
                             "?filters",
                             "?orders",
                             "?limit",
                             "?offset",
                             "?aliases",
-                            "?table_name",
                             "CubeScanSplit:true",
                         ),
                         "?projection_alias",
@@ -162,10 +154,9 @@ impl RewriteRules for SplitRules {
                     "?alias",
                 ),
                 self.split_projection_projection_aggregate(
-                    "?source_table_name",
+                    "?alias_to_cube",
                     "?inner_aggregate_cube",
                     "?outer_aggregate_cube",
-                    "?table_name",
                     "?projection_alias",
                 ),
             ),
@@ -173,14 +164,13 @@ impl RewriteRules for SplitRules {
                 "split-aggregate-aggregate",
                 aggregate(
                     cube_scan(
-                        "?source_table_name",
+                        "?alias_to_cube",
                         "?members",
                         "?filters",
                         "?orders",
                         "?limit",
                         "?offset",
                         "?aliases",
-                        "?table_name",
                         "CubeScanSplit:false",
                     ),
                     "?group_expr",
@@ -189,14 +179,13 @@ impl RewriteRules for SplitRules {
                 aggregate(
                     aggregate(
                         cube_scan(
-                            "?source_table_name",
+                            "?alias_to_cube",
                             "?members",
                             "?filters",
                             "?orders",
                             "?limit",
                             "?offset",
                             "?aliases",
-                            "?table_name",
                             "CubeScanSplit:true",
                         ),
                         inner_aggregate_split_replacer("?group_expr", "?inner_aggregate_cube"),
@@ -206,7 +195,7 @@ impl RewriteRules for SplitRules {
                     outer_aggregate_split_replacer("?aggr_expr", "?outer_aggregate_cube"),
                 ),
                 self.split_aggregate_aggregate(
-                    "?source_table_name",
+                    "?alias_to_cube",
                     "?inner_aggregate_cube",
                     "?outer_aggregate_cube",
                 ),
@@ -367,7 +356,7 @@ impl RewriteRules for SplitRules {
             ),
             transforming_chain_rewrite(
                 "split-push-down-date-trunc-outer-aggr-replacer",
-                outer_aggregate_split_replacer("?expr", "?cube"),
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
                     fun_expr(
@@ -376,11 +365,21 @@ impl RewriteRules for SplitRules {
                     ),
                 )],
                 "?alias".to_string(),
-                MemberRules::transform_original_expr_alias("?expr", "?alias"),
+                self.transform_original_expr_alias(
+                    |egraph, id| {
+                        var_iter!(egraph[id], OuterAggregateSplitReplacerAliasToCube)
+                            .cloned()
+                            .collect()
+                    },
+                    "?expr",
+                    "?column",
+                    "?alias_to_cube",
+                    "?alias",
+                ),
             ),
             transforming_chain_rewrite(
                 "split-push-down-date-trunc-outer-replacer",
-                outer_projection_split_replacer("?expr", "?cube"),
+                outer_projection_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
                     fun_expr(
@@ -389,7 +388,17 @@ impl RewriteRules for SplitRules {
                     ),
                 )],
                 "?alias".to_string(),
-                MemberRules::transform_original_expr_alias("?expr", "?alias"),
+                self.transform_original_expr_alias(
+                    |egraph, id| {
+                        var_iter!(egraph[id], OuterProjectionSplitReplacerAliasToCube)
+                            .cloned()
+                            .collect()
+                    },
+                    "?expr",
+                    "?column",
+                    "?alias_to_cube",
+                    "?alias",
+                ),
             ),
             // Date part
             transforming_chain_rewrite(
@@ -976,6 +985,66 @@ impl SplitRules {
         }
     }
 
+    pub fn transform_original_expr_alias(
+        &self,
+        alias_to_cube_fn: fn(
+            &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+            Id,
+        ) -> Vec<Vec<(String, String)>>,
+        original_expr_var: &'static str,
+        column_var: &'static str,
+        alias_to_cube_var: &'static str,
+        alias_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let original_expr_var = var!(original_expr_var);
+        let column_var = var!(column_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let alias_expr_var = var!(alias_expr_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            let original_expr_id = subst[original_expr_var];
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )));
+            if let Ok(expr) = res {
+                for alias_to_cube in alias_to_cube_fn(egraph, subst[alias_to_cube_var]) {
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        if let Some((alias, _)) =
+                            meta_context.find_cube_by_column(&alias_to_cube, &column)
+                        {
+                            // TODO unwrap
+                            let name = expr.name(&DFSchema::empty()).unwrap();
+                            let column1 = Column {
+                                relation: Some(alias),
+                                name: name.to_string(),
+                            };
+                            let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                ColumnExprColumn(column1),
+                            ));
+                            let alias_name = egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                                AliasExprAlias(name.to_string()),
+                            ));
+                            let column = egraph.add(LogicalPlanLanguage::ColumnExpr([alias]));
+                            // TODO re-aliasing underlying column as it'll be fully qualified which will break outer alias in case date_trunc is wrapped in some other function
+                            // TODO alias in plans should be generally no-op however there's no place in datafusion where it's used like that
+                            let alias =
+                                egraph.add(LogicalPlanLanguage::AliasExpr([column, alias_name]));
+                            subst.insert(alias_expr_var, alias);
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
     fn transform_min_max_dimension(
         &self,
         cube_expr_var: &'static str,
@@ -992,17 +1061,19 @@ impl SplitRules {
         let alias_var = var!(alias_var);
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
-            for cube in var_iter!(
+            for alias_to_cube in var_iter!(
                 egraph[subst[cube_expr_var]],
-                InnerAggregateSplitReplacerCube
+                InnerAggregateSplitReplacerAliasToCube
             )
             .cloned()
             {
                 for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun).cloned()
                 {
                     if fun == AggregateFunction::Min || fun == AggregateFunction::Max {
-                        if let Some(cube) = meta.find_cube_with_name(&cube) {
-                            for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
+                        for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
+                            if let Some((_, cube)) =
+                                meta.find_cube_by_column(&alias_to_cube, &column)
+                            {
                                 if let Some(dimension) = cube.lookup_dimension(&column.name) {
                                     if is_time_dimension && dimension._type == "time"
                                         || !is_time_dimension && dimension._type != "time"
@@ -1039,22 +1110,24 @@ impl SplitRules {
         let column_var = column_var.map(|column_var| var!(column_var));
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
-            for cube in var_iter!(
+            for alias_to_cube in var_iter!(
                 egraph[subst[cube_expr_var]],
-                InnerAggregateSplitReplacerCube
+                InnerAggregateSplitReplacerAliasToCube
             )
             .cloned()
             {
-                if let Some(cube) = meta.find_cube_with_name(&cube) {
-                    for column in column_var
-                        .map(|column_var| {
-                            var_iter!(egraph[subst[column_var]], ColumnExprColumn)
-                                .map(|c| c.name.to_string())
-                                .collect()
-                        })
-                        .unwrap_or(vec![MemberRules::default_count_measure_name()])
-                    {
-                        if cube.lookup_measure(&column).is_some() {
+                for column in column_var
+                    .map(|column_var| {
+                        var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                            .map(|c| c.clone())
+                            .collect()
+                    })
+                    .unwrap_or(vec![Column::from_name(
+                        MemberRules::default_count_measure_name(),
+                    )])
+                {
+                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                        if cube.lookup_measure(&column.name).is_some() {
                             return true;
                         }
                     }
@@ -1071,19 +1144,22 @@ impl SplitRules {
         let cube_expr_var = var!(cube_expr_var);
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
-            for cube in var_iter!(
+            for alias_to_cube in var_iter!(
                 egraph[subst[cube_expr_var]],
-                InnerAggregateSplitReplacerCube
+                InnerAggregateSplitReplacerAliasToCube
             )
             .cloned()
             {
-                if let Some(cube) = meta.find_cube_with_name(&cube) {
-                    if cube
-                        .lookup_measure(&MemberRules::default_count_measure_name())
-                        .is_none()
-                    {
+                let default_count_measure_name = MemberRules::default_count_measure_name();
+                if let Some((_, cube)) = meta.find_cube_by_column(
+                    &alias_to_cube,
+                    &Column::from_name(default_count_measure_name.to_string()),
+                ) {
+                    if cube.lookup_measure(&default_count_measure_name).is_none() {
                         return true;
                     }
+                } else {
+                    return true;
                 }
             }
             false
@@ -1092,44 +1168,39 @@ impl SplitRules {
 
     fn split_projection_projection_aggregate(
         &self,
-        cube_expr_var: &'static str,
+        alias_to_cube_var: &'static str,
         inner_aggregate_cube_expr_var: &'static str,
         outer_aggregate_cube_expr_var: &'static str,
-        table_name_var: &'static str,
         projection_alias_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let cube_expr_var = var!(cube_expr_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
         let inner_aggregate_cube_expr_var = var!(inner_aggregate_cube_expr_var);
         let outer_aggregate_cube_expr_var = var!(outer_aggregate_cube_expr_var);
-        let table_name_var = var!(table_name_var);
         let projection_alias_var = var!(projection_alias_var);
         move |egraph, subst| {
-            for cube in var_iter!(egraph[subst[cube_expr_var]], TableScanSourceTableName).cloned() {
-                for table_name in
-                    var_iter!(egraph[subst[table_name_var]], CubeScanTableName).cloned()
-                {
-                    subst.insert(
-                        projection_alias_var,
-                        egraph.add(LogicalPlanLanguage::ProjectionAlias(ProjectionAlias(Some(
-                            table_name.to_string(),
-                        )))),
-                    );
+            for alias_to_cube in
+                var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
+            {
+                subst.insert(
+                    projection_alias_var,
+                    // Do not put alias on inner projection so table name from cube scan can be reused
+                    egraph.add(LogicalPlanLanguage::ProjectionAlias(ProjectionAlias(None))),
+                );
 
-                    subst.insert(
-                        inner_aggregate_cube_expr_var,
-                        egraph.add(LogicalPlanLanguage::InnerAggregateSplitReplacerCube(
-                            InnerAggregateSplitReplacerCube(cube.to_string()),
-                        )),
-                    );
+                subst.insert(
+                    inner_aggregate_cube_expr_var,
+                    egraph.add(LogicalPlanLanguage::InnerAggregateSplitReplacerAliasToCube(
+                        InnerAggregateSplitReplacerAliasToCube(alias_to_cube.clone()),
+                    )),
+                );
 
-                    subst.insert(
-                        outer_aggregate_cube_expr_var,
-                        egraph.add(LogicalPlanLanguage::OuterAggregateSplitReplacerCube(
-                            OuterAggregateSplitReplacerCube(cube.to_string()),
-                        )),
-                    );
-                    return true;
-                }
+                subst.insert(
+                    outer_aggregate_cube_expr_var,
+                    egraph.add(LogicalPlanLanguage::OuterAggregateSplitReplacerAliasToCube(
+                        OuterAggregateSplitReplacerAliasToCube(alias_to_cube.clone()),
+                    )),
+                );
+                return true;
             }
             false
         }
@@ -1137,44 +1208,41 @@ impl SplitRules {
 
     fn split_projection_aggregate(
         &self,
-        cube_expr_var: &'static str,
+        alias_to_cube_var: &'static str,
         inner_aggregate_cube_expr_var: &'static str,
         outer_projection_cube_expr_var: &'static str,
-        table_name_var: &'static str,
         projection_alias_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let cube_expr_var = var!(cube_expr_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
         let inner_aggregate_cube_expr_var = var!(inner_aggregate_cube_expr_var);
         let outer_projection_cube_expr_var = var!(outer_projection_cube_expr_var);
-        let table_name_var = var!(table_name_var);
         let projection_alias_var = var!(projection_alias_var);
         move |egraph, subst| {
-            for cube in var_iter!(egraph[subst[cube_expr_var]], TableScanSourceTableName).cloned() {
-                for table_name in
-                    var_iter!(egraph[subst[table_name_var]], CubeScanTableName).cloned()
-                {
-                    subst.insert(
-                        projection_alias_var,
-                        egraph.add(LogicalPlanLanguage::ProjectionAlias(ProjectionAlias(Some(
-                            table_name.to_string(),
-                        )))),
-                    );
+            for alias_to_cube in
+                var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
+            {
+                subst.insert(
+                    projection_alias_var,
+                    // Do not put alias on inner projection so table name from cube scan can be reused
+                    egraph.add(LogicalPlanLanguage::ProjectionAlias(ProjectionAlias(None))),
+                );
 
-                    subst.insert(
-                        inner_aggregate_cube_expr_var,
-                        egraph.add(LogicalPlanLanguage::InnerAggregateSplitReplacerCube(
-                            InnerAggregateSplitReplacerCube(cube.to_string()),
-                        )),
-                    );
+                subst.insert(
+                    inner_aggregate_cube_expr_var,
+                    egraph.add(LogicalPlanLanguage::InnerAggregateSplitReplacerAliasToCube(
+                        InnerAggregateSplitReplacerAliasToCube(alias_to_cube.clone()),
+                    )),
+                );
 
-                    subst.insert(
-                        outer_projection_cube_expr_var,
-                        egraph.add(LogicalPlanLanguage::OuterProjectionSplitReplacerCube(
-                            OuterProjectionSplitReplacerCube(cube.to_string()),
-                        )),
-                    );
-                    return true;
-                }
+                subst.insert(
+                    outer_projection_cube_expr_var,
+                    egraph.add(
+                        LogicalPlanLanguage::OuterProjectionSplitReplacerAliasToCube(
+                            OuterProjectionSplitReplacerAliasToCube(alias_to_cube.clone()),
+                        ),
+                    ),
+                );
+                return true;
             }
             false
         }
@@ -1245,26 +1313,28 @@ impl SplitRules {
 
     fn split_aggregate_aggregate(
         &self,
-        cube_expr_var: &'static str,
+        alias_to_cube_var: &'static str,
         inner_aggregate_cube_expr_var: &'static str,
         outer_aggregate_cube_expr_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let cube_expr_var = var!(cube_expr_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
         let inner_aggregate_cube_expr_var = var!(inner_aggregate_cube_expr_var);
         let outer_aggregate_cube_expr_var = var!(outer_aggregate_cube_expr_var);
         move |egraph, subst| {
-            for cube in var_iter!(egraph[subst[cube_expr_var]], TableScanSourceTableName).cloned() {
+            for alias_to_cube in
+                var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
+            {
                 subst.insert(
                     inner_aggregate_cube_expr_var,
-                    egraph.add(LogicalPlanLanguage::InnerAggregateSplitReplacerCube(
-                        InnerAggregateSplitReplacerCube(cube.to_string()),
+                    egraph.add(LogicalPlanLanguage::InnerAggregateSplitReplacerAliasToCube(
+                        InnerAggregateSplitReplacerAliasToCube(alias_to_cube.clone()),
                     )),
                 );
 
                 subst.insert(
                     outer_aggregate_cube_expr_var,
-                    egraph.add(LogicalPlanLanguage::OuterAggregateSplitReplacerCube(
-                        OuterAggregateSplitReplacerCube(cube.to_string()),
+                    egraph.add(LogicalPlanLanguage::OuterAggregateSplitReplacerAliasToCube(
+                        OuterAggregateSplitReplacerAliasToCube(alias_to_cube.clone()),
                     )),
                 );
 
@@ -1304,66 +1374,63 @@ impl SplitRules {
                     _ => continue,
                 };
 
-                for cube in
-                    var_iter!(egraph[subst[cube_var]], OuterAggregateSplitReplacerCube).cloned()
+                for alias_to_cube in var_iter!(
+                    egraph[subst[cube_var]],
+                    OuterAggregateSplitReplacerAliasToCube
+                )
+                .cloned()
                 {
-                    let (name, cube) = match (
-                        original_expr_name(egraph, subst[original_expr_var]),
-                        meta.find_cube_with_name(&cube),
-                    ) {
-                        (Some(name), Some(cube)) => (name, cube),
-                        _ => continue,
-                    };
+                    for column in column_var
+                        .map(|column_var| {
+                            var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                                .cloned()
+                                .collect()
+                        })
+                        .unwrap_or(vec![Column::from_name(
+                            MemberRules::default_count_measure_name(),
+                        )])
+                    {
+                        let (name, cube) = match (
+                            original_expr_name(egraph, subst[original_expr_var]),
+                            meta.find_cube_by_column(&alias_to_cube, &column),
+                        ) {
+                            (Some(name), Some((_, cube))) => (name, cube),
+                            _ => continue,
+                        };
 
-                    let inner_and_outer_alias: Option<(String, String)> = if column_var.is_none() {
-                        if cube
-                            .lookup_measure(&MemberRules::default_count_measure_name())
-                            .is_some()
-                        {
-                            Some((name.to_string(), name.to_string()))
-                        } else {
-                            None
-                        }
-                    } else {
-                        let mut aliases = None;
-                        for column in
-                            var_iter!(egraph[subst[column_var.unwrap()]], ColumnExprColumn).cloned()
-                        {
+                        let inner_and_outer_alias: Option<(String, String)> =
                             if cube.lookup_measure(&column.name).is_some() {
-                                aliases = Some((name.to_string(), name.to_string()));
-                                break;
+                                Some((name.to_string(), name.to_string()))
                             } else if cube.lookup_dimension(&column.name).is_some() {
-                                aliases = original_expr_name(egraph, subst[arg_var])
-                                    .map(|inner| (inner, name.to_string()));
-                                break;
-                            }
+                                original_expr_name(egraph, subst[arg_var])
+                                    .map(|inner| (inner, name.to_string()))
+                            } else {
+                                None
+                            };
+
+                        if let Some((inner_alias, outer_alias)) = inner_and_outer_alias {
+                            let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                ColumnExprColumn(Column::from_name(inner_alias.to_string())),
+                            ));
+                            subst.insert(
+                                alias_expr_var,
+                                egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
+                            );
+                            subst.insert(
+                                outer_alias_expr_var,
+                                egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                                    outer_alias.to_string(),
+                                ))),
+                            );
+                            subst.insert(
+                                output_fun_var,
+                                egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
+                                    AggregateFunctionExprFun(output_fun),
+                                )),
+                            );
+
+                            return true;
                         }
-
-                        aliases
-                    };
-
-                    if let Some((inner_alias, outer_alias)) = inner_and_outer_alias {
-                        let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                            ColumnExprColumn(Column::from_name(inner_alias.to_string())),
-                        ));
-                        subst.insert(
-                            alias_expr_var,
-                            egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
-                        );
-                        subst.insert(
-                            outer_alias_expr_var,
-                            egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
-                                outer_alias.to_string(),
-                            ))),
-                        );
-                        subst.insert(
-                            output_fun_var,
-                            egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
-                                AggregateFunctionExprFun(output_fun),
-                            )),
-                        );
-
-                        return true;
                     }
                 }
             }
@@ -1383,16 +1450,22 @@ impl SplitRules {
         move |egraph, subst| {
             for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
                 if fun == &AggregateFunction::Count || fun == &AggregateFunction::Sum {
-                    for cube in
-                        var_iter!(egraph[subst[cube_var]], OuterAggregateSplitReplacerCube).cloned()
+                    for alias_to_cube in var_iter!(
+                        egraph[subst[cube_var]],
+                        OuterAggregateSplitReplacerAliasToCube
+                    )
+                    .cloned()
                     {
-                        if let Some(cube) = meta.find_cube_with_name(&cube) {
-                            if cube
-                                .lookup_measure(&MemberRules::default_count_measure_name())
-                                .is_none()
-                            {
+                        let default_count_measure_name = MemberRules::default_count_measure_name();
+                        if let Some((_, cube)) = meta.find_cube_by_column(
+                            &alias_to_cube,
+                            &Column::from_name(default_count_measure_name.to_string()),
+                        ) {
+                            if cube.lookup_measure(&default_count_measure_name).is_none() {
                                 return true;
                             }
+                        } else {
+                            return true;
                         }
                     }
                 }
@@ -1414,13 +1487,15 @@ impl SplitRules {
         let alias_expr_var = var!(alias_expr_var);
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
-            for cube in var_iter!(egraph[subst[cube_var]], OuterAggregateSplitReplacerCube).cloned()
+            for alias_to_cube in var_iter!(
+                egraph[subst[cube_var]],
+                OuterAggregateSplitReplacerAliasToCube
+            )
+            .cloned()
             {
                 if let Some(name) = original_expr_name(egraph, subst[original_expr_var]) {
-                    if let Some(cube) = meta.find_cube_with_name(&cube) {
-                        for column in
-                            var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned()
-                        {
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
                             if cube.lookup_measure(&column.name).is_some() {
                                 let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
                                     ColumnExprColumn(Column::from_name(name.to_string())),
