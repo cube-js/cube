@@ -1650,7 +1650,7 @@ impl MemberRules {
                                             call_agg_type,
                                             alias,
                                             measure_out_var,
-                                            Some(cube_alias.to_string()),
+                                            cube_alias.to_string(),
                                             subst[original_expr_var],
                                             alias_to_cube.clone(),
                                         );
@@ -1730,7 +1730,7 @@ impl MemberRules {
                                             call_agg_type,
                                             alias,
                                             measure_out_var,
-                                            Some(cube_alias),
+                                            cube_alias,
                                             subst[aggr_expr_var],
                                             alias_to_cube,
                                         );
@@ -1768,8 +1768,7 @@ impl MemberRules {
         call_agg_type: Option<String>,
         alias: String,
         measure_out_var: Var,
-        // TODO Remove Option
-        cube_alias: Option<String>,
+        cube_alias: String,
         expr: Id,
         alias_to_cube: Vec<((String, String), String)>,
     ) {
@@ -1788,7 +1787,7 @@ impl MemberRules {
                 measure.name.to_string(),
             )));
 
-            let alias_expr = Self::add_alias_column(egraph, alias, cube_alias);
+            let alias_expr = Self::add_alias_column(egraph, alias, Some(cube_alias));
 
             subst.insert(
                 measure_out_var,
