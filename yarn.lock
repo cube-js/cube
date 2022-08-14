@@ -27787,6 +27787,21 @@ uuid@^3.0.1, uuid@^3.1.0, uuid@^3.3.2:
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.4.0.tgz#b23e4358afa8a202fe7a100af1f5f883f02007ee"
   integrity sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==
 
+v-connection-string@1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/v-connection-string/-/v-connection-string-1.0.0.tgz#84d22a22b65223d198a352d088577d5f85ab6639"
+  integrity sha512-vbXmdI6Zhk+xcObmBz8T0/WGtkzuf84iTcE4XoV60Mq3/Lgue2BlC9RcWxaW2rExSrOVquSNxnbkkKO07fCx+Q==
+
+v-pool@1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/v-pool/-/v-pool-1.0.0.tgz#25efd01e79a1a39e402da1dfb59ca1b1895b98db"
+  integrity sha512-n1vUR3oRA3qYhYYo2W8rmGi+wXCY8QJtfGV4hpVgHP28sMMhGiBPsMoC0uTp0hufUiBcNrX3HfCV4YycKyLnSw==
+
+v-protocol@1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/v-protocol/-/v-protocol-1.0.0.tgz#b5eee0be666b2a291f9363f5c11cd4c11a9322e5"
+  integrity sha512-yM9yvMS5FOSoV8MZiVpGGieFmXSGakE4ttwnEv61T3xjqK9DWM61id0g5YNIwsXSIHSLllNI8/hUCv/AHu7nKA==
+
 v8-compile-cache@^2.0.3:
   version "2.3.0"
   resolved "https://registry.yarnpkg.com/v8-compile-cache/-/v8-compile-cache-2.3.0.tgz#2de19618c66dc247dcfb6f99338035d8245a2cee"
@@ -27839,6 +27854,19 @@ verror@1.10.0:
     assert-plus "^1.0.0"
     core-util-is "1.0.2"
     extsprintf "^1.2.0"
+
+vertica-nodejs@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/vertica-nodejs/-/vertica-nodejs-1.0.0.tgz#f4b9c3ea19de1919cdaf2311b8a4d0e9a054374e"
+  integrity sha512-/H/AmgALkWeg2MpRAPlgPPjMrcbT39jJ8khhR/jglwhMh6zU0erO1Dij5kAYy3JDIgeF8kA4Amiwf8ejusZo+Q==
+  dependencies:
+    buffer-writer "2.0.0"
+    packet-reader "1.0.0"
+    pg-types "^2.1.0"
+    pgpass "1.x"
+    v-connection-string "1.0.0"
+    v-pool "1.0.0"
+    v-protocol "1.0.0"
 
 vm-browserify@^1.0.1:
   version "1.1.2"
