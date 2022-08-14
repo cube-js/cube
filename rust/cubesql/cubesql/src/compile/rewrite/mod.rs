@@ -227,6 +227,7 @@ crate::plan_to_language! {
             expr: Arc<Expr>,
         },
         ChangeUser {
+            cube: String,
             expr: Arc<Expr>,
         },
         LiteralMember {
@@ -252,6 +253,7 @@ crate::plan_to_language! {
             error: String,
             priority: usize,
             expr: Arc<Expr>,
+            alias_to_cube: Vec<((String, String), String)>,
         },
         FilterOp {
             filters: Vec<LogicalPlan>,
@@ -819,8 +821,8 @@ fn segment_expr(name: impl Display, expr: impl Display) -> String {
     format!("(Segment {} {})", name, expr)
 }
 
-fn change_user_expr(expr: impl Display) -> String {
-    format!("(ChangeUser {})", expr)
+fn change_user_expr(cube: impl Display, expr: impl Display) -> String {
+    format!("(ChangeUser {} {})", cube, expr)
 }
 
 fn literal_member(value: impl Display, expr: impl Display) -> String {

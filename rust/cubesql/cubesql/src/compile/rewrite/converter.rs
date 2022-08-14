@@ -1166,7 +1166,7 @@ impl LanguageToLogicalPlanConverter {
                                     ));
                                 }
                                 LogicalPlanLanguage::ChangeUser(params) => {
-                                    let expr = self.to_expr(params[0])?;
+                                    let expr = self.to_expr(params[1])?;
                                     fields.push((
                                         DFField::new(
                                             expr_relation(&expr),

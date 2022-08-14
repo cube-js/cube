@@ -11332,4 +11332,33 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_user_with_join() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT aliased.count as c, aliased.user_1 as u1, aliased.user_2 as u2 FROM (SELECT \"KibanaSampleDataEcommerce\".count as count, \"KibanaSampleDataEcommerce\".__user as user_1, Logs.__user as user_2 FROM \"KibanaSampleDataEcommerce\" CROSS JOIN Logs WHERE __user = 'foo') aliased".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await
+            .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        assert_eq!(cube_scan.options.change_user, Some("foo".to_string()))
+    }
 }

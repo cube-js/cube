@@ -17,13 +17,13 @@ use crate::{
             rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules},
             segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
             transforming_rewrite, udaf_expr, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn, CubeScanAliasToCube,
-            CubeScanAliases, CubeScanLimit, DimensionName, LimitN, LiteralExprValue,
-            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError,
-            MemberErrorPriority, MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube,
-            ProjectionAlias, SegmentName, TableScanSourceTableName, TableScanTableName,
-            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
-            WithColumnRelation,
+            AggregateFunctionExprFun, AliasExprAlias, ChangeUserCube, ColumnExprColumn,
+            CubeScanAliasToCube, CubeScanAliases, CubeScanLimit, DimensionName, LimitN,
+            LiteralExprValue, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
+            MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
+            MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias,
+            SegmentName, TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, WithColumnRelation,
         },
     },
     transport::{V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
@@ -660,7 +660,9 @@ impl MemberRules {
         );
         rules
             .extend(self.member_column_pushdown("segment", |column| segment_expr("?name", column)));
-        rules.extend(self.member_column_pushdown("change-user", |column| change_user_expr(column)));
+        rules.extend(self.member_column_pushdown("change-user", |column| {
+            change_user_expr("?change_user_cube", column)
+        }));
         rules.extend(self.member_column_pushdown("time-dimension", |column| {
             time_dimension_expr("?name", "?granularity", "?date_range", column)
         }));
@@ -702,7 +704,7 @@ impl MemberRules {
         ));
         rules.push(list_concat_terminal(
             "change-user",
-            change_user_expr("?expr"),
+            change_user_expr("?change_user_cube", "?expr"),
         ));
         rules.push(list_concat_terminal(
             "time-dimension",
@@ -1224,11 +1226,12 @@ impl MemberRules {
                 var_iter!(egraph[subst[cube_var]], MemberReplacerAliasToCube).cloned()
             {
                 if let Some(expr_name) = original_expr_name(egraph, subst[expr_var]) {
+                    let alias_to_cube = alias_to_cube.clone();
                     let member_error = add_member_error(egraph, format!(
                         "'{}' expression can't be coerced to any members of following cubes: {}. It may be this type of expression is not supported.",
                         expr_name,
                         alias_to_cube.iter().map(|(_, cube)| cube).join(", ")
-                    ), 0, subst[expr_var]);
+                    ), 0, subst[expr_var], alias_to_cube);
                     subst.insert(member_error_var, member_error);
                     return true;
                 }
@@ -1363,7 +1366,7 @@ impl MemberRules {
                                 return true;
                             }
 
-                            if column_name.eq_ignore_ascii_case(&"__user") {
+                            if column.name.eq_ignore_ascii_case(&"__user") {
                                 let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
                                     ColumnExprColumn(Column {
                                         relation: Some(cube_alias),
@@ -1372,9 +1375,12 @@ impl MemberRules {
                                 ));
                                 let alias_expr =
                                     egraph.add(LogicalPlanLanguage::ColumnExpr([alias]));
+                                let cube = egraph.add(LogicalPlanLanguage::ChangeUserCube(
+                                    ChangeUserCube(cube.name.to_string()),
+                                ));
                                 subst.insert(
                                     member_var,
-                                    egraph.add(LogicalPlanLanguage::ChangeUser([alias_expr])),
+                                    egraph.add(LogicalPlanLanguage::ChangeUser([cube, alias_expr])),
                                 );
                                 return true;
                             }
@@ -1550,14 +1556,9 @@ impl MemberRules {
                             .iter()
                             .find_position(|(member_alias, _)| member_alias == &alias_name)
                         {
-                            println!("find_matching_old_member: {:?} {:?}", alias_to_cube, member);
                             let filtered_alias_to_cube = alias_to_cube
                                 .into_iter()
-                                // TODO does it matter which cube will be referenced by __user?
-                                .filter(|(_, cube)| {
-                                    cube == member.1.split(".").next().unwrap()
-                                        || member.1 == "__user"
-                                })
+                                .filter(|(_, cube)| cube == member.1.split(".").next().unwrap())
                                 .collect();
                             // Members are represented in pairs: fully qualified name and unqualified name
                             let index = index / 2;
@@ -1651,6 +1652,7 @@ impl MemberRules {
                                             measure_out_var,
                                             Some(cube_alias.to_string()),
                                             subst[original_expr_var],
+                                            alias_to_cube.clone(),
                                         );
                                         return true;
                                     }
@@ -1720,6 +1722,7 @@ impl MemberRules {
                                     if let Some(alias) =
                                         original_expr_name(egraph, subst[aggr_expr_var])
                                     {
+                                        let alias_to_cube = alias_to_cube.clone();
                                         Self::measure_output(
                                             egraph,
                                             subst,
@@ -1729,6 +1732,7 @@ impl MemberRules {
                                             measure_out_var,
                                             Some(cube_alias),
                                             subst[aggr_expr_var],
+                                            alias_to_cube,
                                         );
                                     }
 
@@ -1736,13 +1740,14 @@ impl MemberRules {
                                 }
 
                                 if let Some(dimension) = cube.lookup_dimension(&column.name) {
+                                    let alias_to_cube = alias_to_cube.clone();
                                     subst.insert(
                                         measure_out_var,
                                         add_member_error(egraph, format!(
                                             "Dimension '{}' was used with the aggregate function '{}()'. Please use a measure instead",
                                             dimension.get_real_name(),
                                             call_agg_type.unwrap_or("MEASURE".to_string()).to_uppercase(),
-                                        ), 1, subst[aggr_expr_var]),
+                                        ), 1, subst[aggr_expr_var], alias_to_cube),
                                     );
 
                                     return true;
@@ -1766,6 +1771,7 @@ impl MemberRules {
         // TODO Remove Option
         cube_alias: Option<String>,
         expr: Id,
+        alias_to_cube: Vec<((String, String), String)>,
     ) {
         if call_agg_type.is_some() && !measure.is_same_agg_type(call_agg_type.as_ref().unwrap()) {
             subst.insert(
@@ -1775,7 +1781,7 @@ impl MemberRules {
                     measure.get_real_name(),
                     measure.agg_type.as_ref().unwrap_or(&"unknown".to_string()).to_uppercase(),
                     call_agg_type.unwrap().to_uppercase(),
-                ), 1, expr),
+                ), 1, expr, alias_to_cube),
             );
         } else {
             let measure_name = egraph.add(LogicalPlanLanguage::MeasureName(MeasureName(
@@ -1934,6 +1940,7 @@ pub fn add_member_error(
     member_error: String,
     priority: usize,
     expr: Id,
+    alias_to_cube: Vec<((String, String), String)>,
 ) -> Id {
     let member_error = egraph.add(LogicalPlanLanguage::MemberErrorError(MemberErrorError(
         member_error,
@@ -1943,10 +1950,17 @@ pub fn add_member_error(
         MemberErrorPriority(priority),
     ));
 
+    // We need this so MemberError can be unique within specific CubeScan.
+    // Otherwise it'll provide transitive equivalence bridge between CubeScan members
+    let alias_to_cube = egraph.add(LogicalPlanLanguage::MemberErrorAliasToCube(
+        MemberErrorAliasToCube(alias_to_cube),
+    ));
+
     egraph.add(LogicalPlanLanguage::MemberError([
         member_error,
         member_priority,
         expr,
+        alias_to_cube,
     ]))
 }
 
