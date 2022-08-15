@@ -1,6 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { expect } from '@jest/globals';
-import { CubejsApi } from '@cubejs-client/core';
+import { CubejsApi, LoadMethodOptions, Query } from '@cubejs-client/core';
 
 export const DEFAULT_CONFIG = {
   CUBEJS_DEV_MODE: 'true',
@@ -19,3 +19,40 @@ export async function testQueryMeasure(client: CubejsApi) {
   });
   expect(response.rawData()).toMatchSnapshot('query');
 }
+
+export type TestCase = {
+  query: Query,
+  options?: LoadMethodOptions,
+  rows: any[],
+};
+
+export const TEST_CASES: Record<string, TestCase> = {
+  basicPA: {
+    query: {
+      measures: [
+        'OrdersPA.totalAmount',
+      ],
+      dimensions: [
+        'OrdersPA.status',
+      ],
+      order: {
+        'OrdersPA.status': 'asc',
+      },
+      limit: 3
+    },
+    rows: [
+      {
+        'OrdersPA.status': 'new',
+        'OrdersPA.totalAmount': '300',
+      },
+      {
+        'OrdersPA.status': 'processed',
+        'OrdersPA.totalAmount': '800',
+      },
+      {
+        'OrdersPA.status': 'shipped',
+        'OrdersPA.totalAmount': '600',
+      },
+    ]
+  }
+};

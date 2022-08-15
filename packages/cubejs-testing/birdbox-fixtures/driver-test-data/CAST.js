@@ -20,6 +20,7 @@ export const DB_CAST = {
     SELECT_SUFFIX: ')\nselect * from tmp_tbl',
   },
 };
+
 export const DATE_CAST = {
   athena: {
     DATE_PREFIX: 'date_parse(',
@@ -27,6 +28,10 @@ export const DATE_CAST = {
   },
   bigquery: {
     DATE_PREFIX: 'parse_date(\'%Y-%m-%d\', ',
+    DATE_SUFFIX: ')',
+  },
+  bigquery2: {
+    DATE_PREFIX: 'parse_timestamp(\'%Y-%m-%d\', ',
     DATE_SUFFIX: ')',
   },
   firebolt: {

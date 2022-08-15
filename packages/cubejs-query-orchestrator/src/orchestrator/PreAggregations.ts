@@ -1312,7 +1312,7 @@ export class PreAggregationPartitionRangeLoader {
       let lastUpdatedAt = getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt));
       let lambdaTable: InlineTable;
 
-      if (this.lambdaQuery && loadResults.length > 0) {
+      if (this.preAggregation.unionWithSourceData && this.lambdaQuery && loadResults.length > 0) {
         const { buildRangeEnd } = loadResults[loadResults.length - 1];
         lambdaTable = await this.downloadLambdaTable(buildRangeEnd);
         allTableTargetNames.push(lambdaTable.name);
@@ -1374,7 +1374,7 @@ export class PreAggregationPartitionRangeLoader {
         useCsvQuery: true,
       }
     );
-    if (data.rowCount === this.options.maxSourceRowLimit) {
+    if (data.rowCount >= this.options.maxSourceRowLimit) {
       throw new Error(`The maximum number of source rows ${this.options.maxSourceRowLimit} was reached for ${this.preAggregation.preAggregationId}`);
     }
     return {
