@@ -1,6 +1,6 @@
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { afterAll, beforeAll, jest } from '@jest/globals';
+import { afterAll, beforeAll, jest, expect } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
@@ -17,7 +17,7 @@ describe('firebolt', () => {
         ...DEFAULT_CONFIG
       },
       {
-        schemaDir: 'questdb/schema',
+        schemaDir: 'firebolt/schema',
       }
     );
     client = cubejs(async () => 'test', {
@@ -30,4 +30,18 @@ describe('firebolt', () => {
   });
 
   test('query measure', () => testQueryMeasure(client));
+
+  test('query dimensions', async () => {
+    const response = await client.load({
+      measures: ['Orders.count'],
+      timeDimensions: [
+        {
+          dimension: 'Orders.createdAt',
+          granularity: 'day',
+        },
+      ],
+    });
+
+    expect(response.rawData()).toMatchSnapshot('dimensions');
+  });
 });

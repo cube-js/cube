@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 5957
+expression: "execute_query(\"SELECT * FROM svv_tables ORDER BY table_name DESC\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------+--------------+---------------------------+------------+---------+
+| table_catalog | table_schema | table_name                | table_type | remarks |
++---------------+--------------+---------------------------+------------+---------+
+| db            | public       | Logs                      | TABLE      | NULL    |
+| db            | public       | KibanaSampleDataEcommerce | TABLE      | NULL    |
++---------------+--------------+---------------------------+------------+---------+

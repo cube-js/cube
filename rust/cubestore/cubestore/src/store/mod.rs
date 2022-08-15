@@ -48,7 +48,7 @@ use tokio::task::JoinHandle;
 
 pub const ROW_GROUP_SIZE: usize = 16384; // TODO config
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Hash, Eq, PartialEq, Debug)]
 pub struct DataFrame {
     columns: Vec<Column>,
     data: Vec<Row>,
@@ -603,6 +603,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -684,6 +685,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -782,6 +784,7 @@ mod tests {
                     None,
                     vec![ind],
                     true,
+                    None,
                     None,
                     Some(vec![("sum".to_string(), "sum_int".to_string())]),
                     None,

@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 7265
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_sequence\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------+----------+----------+--------------+--------+--------+----------+----------+
+| seqrelid | seqtypid | seqstart | seqincrement | seqmax | seqmin | seqcache | seqcycle |
++----------+----------+----------+--------------+--------+--------+----------+----------+
++----------+----------+----------+--------------+--------+--------+----------+----------+

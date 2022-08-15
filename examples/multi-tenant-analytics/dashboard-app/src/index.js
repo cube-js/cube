@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { HashRouter as Router, Route } from 'react-router-dom';
 import { Auth0Provider } from "@auth0/auth0-react";
-import createExampleWrapper from "cube-example-wrapper";
+import createExampleWrapper from "@cube-dev/example-wrapper";
 import ExplorePage from './pages/ExplorePage';
 import DashboardPage from './pages/DashboardPage';
 import App from './App';

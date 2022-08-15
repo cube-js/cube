@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.46](https://github.com/cube-js/cube.js/compare/v0.30.45...v0.30.46) (2022-08-10)
+
+
+### Bug Fixes
+
+* **@cubejs-client/vue3:** fix removeOffset warning ([#5082](https://github.com/cube-js/cube.js/issues/5082)) ([#5083](https://github.com/cube-js/cube.js/issues/5083)) ([e1d427b](https://github.com/cube-js/cube.js/commit/e1d427b84aa0b484c9d255b536a4a0b2abab6054))
+
+
+
+
+
 ## [0.30.29](https://github.com/cube-js/cube.js/compare/v0.30.28...v0.30.29) (2022-07-01)
 
 **Note:** Version bump only for package @cubejs-client/vue3

@@ -9,7 +9,8 @@ const GenericTypeToMSSql = {
 };
 
 const MSSqlToGenericType = {
-  uniqueidentifier: 'uuid'
+  uniqueidentifier: 'uuid',
+  datetime2: 'timestamp'
 }
 
 class MSSqlDriver extends BaseDriver {

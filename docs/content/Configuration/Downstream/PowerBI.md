@@ -10,7 +10,7 @@ point.
 
 </WarningBox>
 
-You can connect to Cube from Power BI, interactive data visualization software product developed by Microsof, using the [Cube SQL
+You can connect to Cube from Power BI, interactive data visualization software product developed by Microsoft, using the [Cube SQL
 API][ref-sql-api].
 
 ## Enable Cube SQL API
@@ -39,13 +39,13 @@ your connection credentials:
 ### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Apache Superset
+These credentials will be required to connect to Cube from PowerBI
 later.
 
 ```dotenv
 CUBEJS_PG_SQL_PORT=5432
-CUBE_SQL_USERNAME=myusername
-CUBE_SQL_PASSWORD=mypassword
+CUBEJS_SQL_USER=myusername
+CUBEJS_SQL_PASSWORD=mypassword
 ```
 
 ## Connecting from Power BI

@@ -1,6 +1,6 @@
 /* globals jest, describe, beforeEach, test, expect */
 
-import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import type { BaseDriver as OriginalBaseDriver } from '@cubejs-backend/query-orchestrator';
 import type {
   DatabaseType,
   DbTypeFn,
@@ -34,7 +34,7 @@ const conf = {
     message = msg;
   },
   externalDbType: <DatabaseType>'postgres',
-  externalDriverFactory: async () => <BaseDriver>({
+  externalDriverFactory: async () => <OriginalBaseDriver>({
     testConnection: async () => undefined,
   }),
   orchestratorOptions: () => ({
@@ -359,6 +359,61 @@ describe('OptsHandler class', () => {
     expect(await core.contextToDbType({} as DriverContext)).toEqual('postgres');
   });
 
+  test('must determine custom drivers from the cube.js file', async () => {
+    class BaseDriver {
+      public async testConnection() {
+        throw new Error('UT exception');
+      }
+
+      public async release() {
+        //
+      }
+    }
+
+    class CustomDriver extends BaseDriver {
+      //
+    }
+
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+    process.env.NODE_ENV = 'test';
+    process.env.CUBEJS_DEV_MODE = 'true';
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      apiSecret: '44b87d4309471e5d9d18738450db0e49',
+      dbType: () => 'postgres',
+      driverFactory: async () => (new CustomDriver()) as unknown as OriginalBaseDriver,
+      orchestratorOptions: {},
+    });
+
+    expect(core.options.dbType).toBeDefined();
+    expect(typeof core.options.dbType).toEqual('function');
+    expect(await core.options.dbType({} as DriverContext))
+      .toEqual(process.env.CUBEJS_DB_TYPE);
+
+    expect(core.options.driverFactory).toBeDefined();
+    expect(typeof core.options.driverFactory).toEqual('function');
+    expect(
+      JSON.stringify(await core.options.driverFactory({} as DriverContext)),
+    ).toEqual(
+      JSON.stringify(new CustomDriver()),
+    );
+
+    const oapi = (<any>core.getOrchestratorApi(<RequestContext>{}));
+    const opts = oapi.options;
+    const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
+    oapi.seenDataSources = ['default'];
+    
+    expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
+    expect(opts.rollupOnlyMode).toBe(false);
+    expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
+    await expect(async () => {
+      await oapi.testConnection();
+    }).rejects.toThrow('UT exception');
+    expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
+
+    testDriverConnectionSpy.mockRestore();
+  });
+
   test(
     'must configure queueOptions without orchestratorOptions, ' +
     'without CUBEJS_CONCURRENCY and without default driver concurrency',
@@ -646,7 +701,7 @@ describe('OptsHandler class', () => {
   );
 
   test(
-    'must set preAggregationsOptions.externalRefresh to true and doesn`t ' +
+    'must set preAggregationsOptions.externalRefresh to true and ' +
     'test driver connection for dev server with preAggregationsOptions.' +
     'externalRefresh set to true',
     async () => {
@@ -676,17 +731,17 @@ describe('OptsHandler class', () => {
       expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
-      expect(async () => {
+      await expect(async () => {
         await oapi.testConnection();
-      }).not.toThrow();
-      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+      }).rejects.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
 
       testDriverConnectionSpy.mockRestore();
     }
   );
 
   test(
-    'must set preAggregationsOptions.externalRefresh to false and doesn`t ' +
+    'must set preAggregationsOptions.externalRefresh to false and doesn\'t' +
     'test driver connection for dev server with rollupOnlyMode set to true',
     async () => {
       process.env.NODE_ENV = 'test';
@@ -713,10 +768,10 @@ describe('OptsHandler class', () => {
       expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
       expect(opts.rollupOnlyMode).toBe(true);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
-      await expect(async () => {
+      expect(async () => {
         await oapi.testConnection();
-      }).rejects.toThrow();
-      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
+      }).not.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
 
       testDriverConnectionSpy.mockRestore();
     }
@@ -795,7 +850,7 @@ describe('OptsHandler class', () => {
   );
 
   test(
-    'must set preAggregationsOptions.externalRefresh to true and do not test ' +
+    'must set preAggregationsOptions.externalRefresh to true and test ' +
     'driver connection for api worker in the production mode if specified in' +
     'preAggregationsOptions.externalRefresh',
     async () => {
@@ -830,17 +885,17 @@ describe('OptsHandler class', () => {
       expect(core.optsHandler.configuredForScheduledRefresh()).toBe(false);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
-      expect(async () => {
+      await expect(async () => {
         await oapi.testConnection();
-      }).not.toThrow();
-      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+      }).rejects.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
 
       testDriverConnectionSpy.mockRestore();
     }
   );
 
   test(
-    'must set preAggregationsOptions.externalRefresh to true and do not test ' +
+    'must set preAggregationsOptions.externalRefresh to true and test ' +
     'driver connection for api worker if CUBEJS_PRE_AGGREGATIONS_BUILDER is unset',
     async () => {
       process.env.NODE_ENV = 'production';
@@ -867,10 +922,10 @@ describe('OptsHandler class', () => {
       expect(core.optsHandler.configuredForScheduledRefresh()).toBe(false);
       expect(opts.rollupOnlyMode).toBe(false);
       expect(opts.preAggregationsOptions.externalRefresh).toBe(true);
-      expect(async () => {
+      await expect(async () => {
         await oapi.testConnection();
-      }).not.toThrow();
-      expect(testDriverConnectionSpy.mock.calls.length).toEqual(1);
+      }).rejects.toThrow();
+      expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
 
       testDriverConnectionSpy.mockRestore();
     }

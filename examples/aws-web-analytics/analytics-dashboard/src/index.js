@@ -3,14 +3,12 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
 import * as serviceWorker from './serviceWorker';
-import CubeExampleWrapper from "@cube-dev/example-wrapper";
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
-const r = new CubeExampleWrapper({
+createExampleWrapper({
     title: "AWS Web Analytics Dashboard",
     text: `This example project contains a web analytics POC built with Cube<br>from the <a href="https://cube.dev/blog/building-open-source-google-analytics-from-scratch/">Building Open Source Google Analytics from Scratch</a>`
 });
-
-r.render();
 
 ReactDOM.render(<App />, document.getElementById('root'));
 

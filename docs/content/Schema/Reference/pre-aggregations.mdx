@@ -122,8 +122,18 @@ cube(`Orders`, {
 As the name suggests, it persists the results of the `sql` property of the cube.
 Pre-aggregations of type `originalSql` should **only** be used when the cube's
 `sql` is a complex query (i.e. nested, window functions and/or multiple joins).
-We **strongly** recommend only persisting results of `originalSql` back to the
-source database. They often do not provide much in the way of performance
+We **strongly** recommend persisting results of `originalSql` only back to the
+source database.
+
+<WarningBox>
+
+`originalSql` pre-aggregations **must only** be used when [storing
+pre-aggregations in the source database][ref-caching-using-preaggs-internal].
+While you can set `external: true` for `originalSql` pre-aggregation, this is not recommended or generally supported.
+
+</WarningBox>
+
+They often do not provide much in the way of performance
 directly, but there are two specific applications:
 
 1. They can be used in tandem with the
@@ -679,7 +689,7 @@ underlying SQL calculations every time it builds new rollup tables.
 <WarningBox>
 
 `originalSql` pre-aggregations **must only** be used when [storing
-pre-aggregations on the source database][ref-caching-using-preaggs-internal].
+pre-aggregations in the source database][ref-caching-using-preaggs-internal].
 This also means that `originalSql` pre-aggregations require `readOnly: false` to
 be set on their respective database driver.
 

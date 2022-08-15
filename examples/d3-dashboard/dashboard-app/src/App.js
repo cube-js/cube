@@ -19,7 +19,7 @@ const AppLayout = ({ children }) => {
   const classes = useStyles();
   return (
     <div className={classes.root}>
-      <div>{children}</div>
+      <div className="App">{children}</div>
     </div>
   );
 };

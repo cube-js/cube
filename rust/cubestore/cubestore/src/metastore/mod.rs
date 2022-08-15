@@ -407,6 +407,7 @@ impl ColumnType {
             match s {
                 "text" => Ok(ColumnType::String),
                 "int" => Ok(ColumnType::Int),
+                "bigint" => Ok(ColumnType::Int),
                 "bytes" => Ok(ColumnType::Bytes),
                 "hyperloglog" => Ok(ColumnType::HyperLogLog(HllFlavour::Airlift)),
                 "hyperloglogpp" => Ok(ColumnType::HyperLogLog(HllFlavour::ZetaSketch)),
@@ -877,6 +878,7 @@ pub trait MetaStore: DIService + Send + Sync {
         import_format: Option<ImportFormat>,
         indexes: Vec<IndexDef>,
         is_ready: bool,
+        build_range_end: Option<DateTime<Utc>>,
         unique_key_column_names: Option<Vec<String>>,
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
@@ -3210,6 +3212,7 @@ impl MetaStore for RocksMetaStore {
         import_format: Option<ImportFormat>,
         indexes: Vec<IndexDef>,
         is_ready: bool,
+        build_range_end: Option<DateTime<Utc>>,
         unique_key_column_names: Option<Vec<String>>,
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
@@ -3300,6 +3303,7 @@ impl MetaStore for RocksMetaStore {
                 locations,
                 import_format,
                 is_ready,
+                build_range_end,
                 unique_key_column_indices,
                 aggregate_column_indices,
                 seq_column_index,
@@ -5482,6 +5486,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -5495,6 +5500,7 @@ mod tests {
                 None,
                 vec![],
                 true,
+                None,
                 None,
                 None,
                 None,
@@ -5609,6 +5615,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5624,6 +5631,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -5708,6 +5716,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5785,6 +5794,7 @@ mod tests {
                     vec![aggr_index_def.clone()],
                     true,
                     None,
+                    None,
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
                         ("max".to_string(), "aggr_col1".to_string()),
@@ -5850,6 +5860,7 @@ mod tests {
                     None,
                     vec![aggr_index_def.clone()],
                     true,
+                    None,
                     Some(vec!["col2".to_string(), "col1".to_string()]),
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
@@ -5869,6 +5880,7 @@ mod tests {
                     None,
                     vec![aggr_index_def.clone()],
                     true,
+                    None,
                     Some(vec!["col1".to_string()]),
                     None,
                     None,
@@ -5885,6 +5897,7 @@ mod tests {
                     None,
                     vec![aggr_index_def.clone()],
                     true,
+                    None,
                     Some(vec!["col1".to_string()]),
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
@@ -6134,6 +6147,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -6252,6 +6266,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,

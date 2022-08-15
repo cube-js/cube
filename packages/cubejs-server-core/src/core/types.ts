@@ -7,6 +7,7 @@ import {
   UserBackgroundContext,
   QueryRewriteFn,
   CheckSQLAuthFn,
+  CanSwitchSQLUserFn,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
@@ -27,9 +28,19 @@ export interface QueryCacheOptions {
   externalQueueOptions?: QueueOptions;
 }
 
+/**
+ * This interface describes properties users could use to configure
+ * pre-aggregations in the cube.js file.
+ */
 export interface PreAggregationsOptions {
   queueOptions?: QueueOptions | ((dataSource: string) => QueueOptions);
   externalRefresh?: boolean;
+
+  /**
+   * The maximum number of partitions that pre-aggregation can have. Uses
+   * CUBEJS_MAX_PARTITIONS_PER_CUBE environment variable as the default value.
+   */
+  maxPartitions?: number;
 }
 
 export interface OrchestratorOptions {
@@ -90,6 +101,7 @@ export type DatabaseType =
   | 'athena'
   | 'bigquery'
   | 'clickhouse'
+  | 'crate'
   | 'druid'
   | 'jdbc'
   | 'firebolt'
@@ -161,6 +173,7 @@ export interface CreateOptions {
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   checkSqlAuth?: CheckSQLAuthFn;
+  canSwitchSqlUser?: CanSwitchSQLUserFn;
   jwt?: JWTOptions;
   // @deprecated Please use queryRewrite
   queryTransformer?: QueryRewriteFn;

@@ -1,5 +1,4 @@
-const createExampleWrapper = require("cube-example-wrapper").default
-
+const createExampleWrapper = require("@cube-dev/example-wrapper").default
 
 createExampleWrapper({
     title: "Google Charts Dashboard",

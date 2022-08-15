@@ -1,3 +1,5 @@
+# This image has been deprecated!
+
 FROM node:14.18.2-alpine3.14
 
 ARG IMAGE_VERSION=dev

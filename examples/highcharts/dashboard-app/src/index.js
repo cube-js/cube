@@ -4,7 +4,7 @@ import "./index.css";
 import App from "./App";
 import { HashRouter as Router } from "react-router-dom";
 
-import createExampleWrapper from 'cube-example-wrapper'
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
 const exampleDescription = {
   title: "E-commerce dashboard with Highcharts",
@@ -17,9 +17,9 @@ const exampleDescription = {
     to learn more.
   </p>
   `
-}
+};
 
-createExampleWrapper(exampleDescription)
+createExampleWrapper(exampleDescription);
 
 ReactDOM.render(
   <React.StrictMode>

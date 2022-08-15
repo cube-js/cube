@@ -12,7 +12,7 @@ use chrono::format::Item::{Fixed, Literal, Numeric, Space};
 use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
-use chrono::{ParseResult, Utc};
+use chrono::{DateTime, ParseResult, TimeZone, Utc};
 use datafusion::cube_ext;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -109,12 +109,23 @@ pub struct QueryPlans {
     pub worker: Arc<dyn ExecutionPlan>,
 }
 
-pub type InlineTables = HashMap<String, Arc<DataFrame>>;
+#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug)]
+pub struct InlineTable {
+    pub name: String,
+    pub data: Arc<DataFrame>,
+}
+pub type InlineTables = Vec<InlineTable>;
+
+impl InlineTable {
+    pub fn new(name: String, data: Arc<DataFrame>) -> Self {
+        Self { name, data }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
-    pub inline_tables: Arc<InlineTables>,
+    pub inline_tables: InlineTables,
     pub trace_obj: Option<String>,
 }
 
@@ -125,9 +136,9 @@ impl SqlQueryContext {
         res
     }
 
-    pub fn with_inline_tables(&self, inline_tables: Vec<(String, Arc<DataFrame>)>) -> Self {
+    pub fn with_inline_tables(&self, inline_tables: &InlineTables) -> Self {
         let mut res = self.clone();
-        res.inline_tables = Arc::new(HashMap::from_iter(inline_tables.iter().cloned()));
+        res.inline_tables = inline_tables.clone();
         res
     }
 
@@ -205,6 +216,7 @@ impl SqlServiceImpl {
         external: bool,
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
+        build_range_end: Option<DateTime<Utc>>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
         aggregates: Option<Vec<(Ident, Ident)>>,
@@ -287,6 +299,7 @@ impl SqlServiceImpl {
                     None,
                     indexes_to_create,
                     true,
+                    build_range_end,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                     aggregates.map(|keys| {
                         keys.iter()
@@ -342,6 +355,7 @@ impl SqlServiceImpl {
                 import_format,
                 indexes_to_create,
                 false,
+                build_range_end,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 aggregates.map(|keys| {
                     keys.iter()
@@ -518,7 +532,7 @@ impl SqlServiceImpl {
             .query_planner
             .logical_plan(
                 DFStatement::Statement(Statement::Query(q)),
-                Arc::new(InlineTables::new()),
+                &InlineTables::new(),
             )
             .await?;
 
@@ -588,10 +602,7 @@ impl SqlServiceImpl {
 
         let query_plan = self
             .query_planner
-            .logical_plan(
-                DFStatement::Statement(statement),
-                Arc::new(InlineTables::new()),
-            )
+            .logical_plan(DFStatement::Statement(statement), &InlineTables::new())
             .await?;
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
@@ -821,17 +832,31 @@ impl SqlService for SqlServiceImpl {
                                 match input_format.as_str() {
                                     "csv" => Result::Ok(ImportFormat::CSV),
                                     "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
-                                    _ => Err(CubeError::user(format!(
-                                        "Bad input format {}",
+                                    _ => Result::Err(CubeError::user(format!(
+                                        "Bad input_format {}",
                                         option.value
                                     ))),
                                 }
                             }
-                            _ => Err(CubeError::user(format!(
+                            _ => Result::Err(CubeError::user(format!(
                                 "Bad input format {}",
                                 option.value
                             ))),
                         }
+                    })?;
+                let build_range_end = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "build_range_end")
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(build_range_end) => {
+                            let ts = timestamp_from_string(build_range_end)?;
+                            let utc = Utc.timestamp_nanos(ts.get_time_stamp());
+                            Result::Ok(Some(utc))
+                        }
+                        _ => Result::Err(CubeError::user(format!(
+                            "Bad build_range_end {}",
+                            option.value
+                        ))),
                     })?;
 
                 let res = self
@@ -842,6 +867,7 @@ impl SqlService for SqlServiceImpl {
                         external,
                         locations,
                         Some(import_format),
+                        build_range_end,
                         indexes,
                         unique_key,
                         aggregates,
@@ -1025,7 +1051,7 @@ impl SqlService for SqlServiceImpl {
                     .query_planner
                     .logical_plan(
                         DFStatement::Statement(Statement::Query(q)),
-                        context.inline_tables.clone(),
+                        &context.inline_tables,
                     )
                     .await?;
                 // TODO distribute and combine
@@ -1041,28 +1067,37 @@ impl SqlService for SqlServiceImpl {
                         timeout(
                             self.query_timeout,
                             self.cache
-                                .get(query, serialized, async move |plan| {
-                                    let records;
-                                    if workers.len() == 0 {
-                                        records =
-                                            executor.execute_router_plan(plan, cluster).await?.1;
-                                    } else {
-                                        // Pick one of the workers to run as main for the request.
-                                        let i = thread_rng().sample(Uniform::new(0, workers.len()));
-                                        let rs = cluster.route_select(&workers[i], plan).await?.1;
-                                        records = rs
-                                            .into_iter()
-                                            .map(|r| r.read())
-                                            .collect::<Result<Vec<_>, _>>()?;
-                                    }
-                                    Ok(cube_ext::spawn_blocking(
-                                        move || -> Result<DataFrame, CubeError> {
-                                            let df = batch_to_dataframe(&records)?;
-                                            Ok(df)
-                                        },
-                                    )
-                                    .await??)
-                                })
+                                .get(
+                                    query,
+                                    &context.inline_tables,
+                                    serialized,
+                                    async move |plan| {
+                                        let records;
+                                        if workers.len() == 0 {
+                                            records = executor
+                                                .execute_router_plan(plan, cluster)
+                                                .await?
+                                                .1;
+                                        } else {
+                                            // Pick one of the workers to run as main for the request.
+                                            let i =
+                                                thread_rng().sample(Uniform::new(0, workers.len()));
+                                            let rs =
+                                                cluster.route_select(&workers[i], plan).await?.1;
+                                            records = rs
+                                                .into_iter()
+                                                .map(|r| r.read())
+                                                .collect::<Result<Vec<_>, _>>()?;
+                                        }
+                                        Ok(cube_ext::spawn_blocking(
+                                            move || -> Result<DataFrame, CubeError> {
+                                                let df = batch_to_dataframe(&records)?;
+                                                Ok(df)
+                                            },
+                                        )
+                                        .await??)
+                                    },
+                                )
                                 .with_current_subscriber(),
                         )
                         .await??
@@ -1108,7 +1143,7 @@ impl SqlService for SqlServiceImpl {
                     .query_planner
                     .logical_plan(
                         DFStatement::Statement(Statement::Query(q)),
-                        context.inline_tables.clone(),
+                        &context.inline_tables,
                     )
                     .await?;
                 match logical_plan {
@@ -1754,6 +1789,7 @@ mod tests {
                 TableValue::String("false".to_string()),
                 TableValue::String("true".to_string()),
                 TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),

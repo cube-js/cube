@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 9033
 expression: "execute_query(\"\n                SELECT\n                    a.attrelid,\n                    a.attname,\n                    t.typname,\n                    information_schema._pg_truetypid(a.*, t.*) typid,\n                    information_schema._pg_truetypmod(a.*, t.*) typmod,\n                    information_schema._pg_numeric_precision(\n                        information_schema._pg_truetypid(a.*, t.*),\n                        information_schema._pg_truetypmod(a.*, t.*)\n                    ) as_arg\n                FROM pg_attribute a\n                JOIN pg_type t ON t.oid = a.atttypid\n                ORDER BY a.attrelid ASC, a.attnum ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +----------+--------------------+-----------+-------+--------+--------+
@@ -15,6 +16,8 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | 18000    | has_subscription   | bool      | 16    | -1     | NULL   |
 | 18000    | is_male            | bool      | 16    | -1     | NULL   |
 | 18000    | is_female          | bool      | 16    | -1     | NULL   |
-| 18013    | agentCount         | int8      | 20    | -1     | 64     |
-| 18013    | agentCountApprox   | int8      | 20    | -1     | 64     |
+| 18000    | __user             | text      | 25    | -1     | NULL   |
+| 18014    | agentCount         | int8      | 20    | -1     | 64     |
+| 18014    | agentCountApprox   | int8      | 20    | -1     | 64     |
+| 18014    | __user             | text      | 25    | -1     | NULL   |
 +----------+--------------------+-----------+-------+--------+--------+

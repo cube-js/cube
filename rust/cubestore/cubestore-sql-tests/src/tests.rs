@@ -5,7 +5,7 @@ use async_compression::tokio::write::GzipEncoder;
 use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
-use cubestore::sql::{timestamp_from_string, SqlQueryContext};
+use cubestore::sql::{timestamp_from_string, InlineTable, SqlQueryContext};
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
@@ -112,6 +112,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_location_and_hyperloglog_postgress",
             create_table_with_location_and_hyperloglog_postgress,
         ),
+        t(
+            "create_table_with_location_and_hyperloglog_space_separated",
+            create_table_with_location_and_hyperloglog_space_separated,
+        ),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
@@ -138,6 +142,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("planning_topk_having", planning_topk_having),
         t("planning_topk_hll", planning_topk_hll),
         t("topk_hll", topk_hll),
+        t("topk_hll_with_nulls", topk_hll_with_nulls),
         t("offset", offset),
         t("having", having),
         t("rolling_window_join", rolling_window_join),
@@ -146,6 +151,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t(
             "rolling_window_query_timestamps",
             rolling_window_query_timestamps,
+        ),
+        t(
+            "rolling_window_query_timestamps_exceeded",
+            rolling_window_query_timestamps_exceeded,
         ),
         t(
             "rolling_window_extra_aggregate",
@@ -193,6 +202,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("aggregate_index_hll", aggregate_index_hll),
         t("aggregate_index_errors", aggregate_index_errors),
         t("inline_tables", inline_tables),
+        t("build_range_end", build_range_end),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -2208,6 +2218,66 @@ async fn create_table_with_location_and_hyperloglog_postgress(service: Box<dyn S
     );
 }
 
+async fn create_table_with_location_and_hyperloglog_space_separated(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog-ssep.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!("0,02 0c 01 00 05 05 7b cf,{}\n", base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])).as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,02 0c 01 00 15 15 7b ff,{}\n",
+                base64::encode(vec![
+                               0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations_ssep (id int, hll varbinary, hll_base varbinary) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_ssep GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+    let res = service
+        .exec_query("SELECT hll, hll_base FROM hll.locations_ssep")
+        .await
+        .unwrap();
+    for r in to_rows(&res).iter() {
+        assert_eq!(r[0], r[1]);
+    }
+    println!("res {:?}", res);
+}
 async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
@@ -2981,10 +3051,11 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
     );
 
     let p = service
-        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 and a > 5 and a < 10 GROUP BY 1")
+        .plan_query(
+            "SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 and a > 5 and a < 10 GROUP BY 1",
+        )
         .await
         .unwrap();
-
 
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
@@ -3002,7 +3073,6 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
         \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [a, b, c, amount]\
         \n              Empty"
     );
-
 }
 
 async fn planning_joins(service: Box<dyn SqlClient>) {
@@ -3377,7 +3447,7 @@ async fn topk_having(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("y", 80), ("c", 48), ("d", 44)]));
-    
+
     service
         .exec_query("CREATE TABLE s.Data21(url text, hits int, hits_2 int)")
         .await
@@ -3409,7 +3479,6 @@ async fn topk_having(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("b", 55), ("d", 43)]));
-
 }
 
 async fn topk_decimals(service: Box<dyn SqlClient>) {
@@ -3490,7 +3559,7 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
         \n              MergeSort\
         \n                Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
         \n                  Empty"
-        );
+    );
 
     let p = service
         .plan_query(
@@ -3525,7 +3594,6 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
         );
 }
 async fn planning_topk_hll(service: Box<dyn SqlClient>) {
-
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
         .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
@@ -3565,7 +3633,7 @@ async fn planning_topk_hll(service: Box<dyn SqlClient>) {
          \n              MergeSort\
          \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
          \n                  Empty"
-        );
+    );
 
     let p = service
         .plan_query(
@@ -3645,10 +3713,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("d", 10383), ("b", 9722), ("c", 171)])
-    ); 
+    assert_eq!(to_rows(&r), rows(&[("d", 10383), ("b", 9722), ("c", 171)]));
 
     let r = service
         .exec_query(
@@ -3663,10 +3728,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("b", 9722), ("c", 171), ("h", 164)])
-    ); 
+    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("c", 171), ("h", 164)]));
     let r = service
         .exec_query(
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
@@ -3680,11 +3742,55 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("h", 164)])
-    ); 
+    assert_eq!(to_rows(&r), rows(&[("h", 164)]));
+}
 
+async fn topk_hll_with_nulls(service: Box<dyn SqlClient>) {
+    let hlls = vec![
+        "X'118b7f'",
+        "X'128b7fee22c470691a8134'",
+        "X'138b7f04a10642078507c308e309230a420ac10c2510a2114511611363138116811848188218a119411a821ae11f0122e223a125a126632685276327a328e2296129e52b812fe23081320132c133e335a53641368236a23721374237e1382138e13a813c243e6140e341854304434148a24a034f8150c1520152e254e155a1564157e158e35ac25b265b615c615fc1620166a368226a416a626c016c816d677163728275817a637a817ac37b617c247c427d677f6180e18101826382e1846184e18541858287e1880189218a418b818bc38e018ea290a19244938295e4988198c299e29b239b419c419ce49da1a1e1a321a381a4c1aa61acc2ae01b0a1b101b142b161b443b801bd02bd61bf61c263c4a3c501c7a1caa1cb03cd03cf03cf42d123d4c3d662d744d901dd01df81e001e0a2e641e7e3edc1f0a2f1c1f203f484f5c4f763fc84fdc1fe02fea1'",
+        "X'148b7f21083288a4320a12086719c65108c1088422884511063388232904418c8520484184862886528c65198832106328c83114e6214831108518d03208851948511884188441908119083388661842818c43190c320ce4210a50948221083084a421c8328c632104221c4120d01284e20902318ca5214641942319101294641906228483184e128c43188e308882204a538c8328903288642102220c64094631086330c832106320c46118443886329062118a230c63108a320c23204a11852419c6528c85210a318c6308c41088842086308ce7110a418864190650884210ca631064108642a1022186518c8509862109020a0a4318671144150842400e5090631a0811848320c821888120c81114a220880290622906310d0220c83090a118c433106128c221902210cc23106029044114841104409862190c43188111063104c310c6728c8618c62290441102310c23214440882438ca2110a32908548c432110329462188a43946328842114640944320884190c928c442084228863318a2190a318c6618ca3114651886618c44190c5108e2110612144319062284641908428882314862106419883310421988619ca420cc511442104633888218c4428465288651910730c81118821088218c6418c45108452106519ce410d841904218863308622086211483198c710c83104a328c620906218864118623086418c8711423094632186420c4620c41104620a441108e40882628c6311c212046428c8319021104672888428ca320c431984418c4209043084451886510c641108310c4c20c66188472146310ca71084820c621946218c8228822190e2410861904411c27288621144328c6440c6311063190813086228ca710c2218c4718865188c2114850888608864404a3194e22882310ce53088619ca31904519503188e1118c4214cb2948110c6119c2818c843108520c43188c5204821186528c871908311086214c630c4218c8418cc3298a31888210c63110a121042198622886531082098c419c4210c6210c8338c25294610944518c442104610884104424206310c8311462288873102308c2440c451082228824310440982220c4240c622084310c642850118c641148430d0128c8228c2120c221884428863208c21a0a4190a4404c21186548865204633906308ca32086211c8319ce22146520c6120803318a518c840084519461208c21908538cc428c2110844384e40906320c44014a3204e62042408c8328c632146318c812004310c41318e3208a5308a511827104a4188c51048421446090a7088631102231484104473084318c41210860906919083190652906129c4628c45310652848221443114420084500865184a618c81198c32906418c63190e320c231882728484184671888309465188a320c83208632144318c6331c642988108c61218812144328d022844021022184a31908328c6218c2328c4528cc541428190641046418c84108443146230c6419483214232184411863290a210824318c220868194631106618c43188821048230c4128c6310c0330462094241106330c42188c321043118863046438823110a041464108e3190e4209a11902439c43188631104321008090441106218c6419064294a229463594622244320cc71184510902924421908218c62308641044328ca328882111012884120ca52882428c62184442086718c4221c8211082208a321023115270086218c4218c6528ce400482310a520c43104a520c44210811884118c4310864198263942331822'",
+    ];
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data1(url, hits) VALUES ('a', {}), ('b', {}), ('c', {}), ('d', {}), ('k', {}) ",
+                "Null", hlls[1], hlls[2], hlls[3], hlls[3]
+            ))
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data2(url, hits) VALUES ('b', {}), ('c', {}), ('e', {}), ('d', {}), ('h', {})",
+                hlls[3], "Null", hlls[1], hlls[2], hlls[2]
+                )
+                )
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 ASC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("a", 0), ("e", 1), ("c", 164)]));
 }
 
 async fn offset(service: Box<dyn SqlClient>) {
@@ -4312,6 +4418,57 @@ async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn rolling_window_query_timestamps_exceeded(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day int, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         (4, 'john', 10), \
+                         (4, 'sara', 7), \
+                         (5, 'sara', 3), \
+                         (5, 'john', 9), \
+                         (6, 'john', 11), \
+                         (7, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.data GROUP BY 1, 2) base \
+             ROLLING_WINDOW DIMENSION day PARTITION BY name \
+               FROM -5 \
+               TO 5 \
+               EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            to_rows(&r),
+            rows(&[
+             (-5, None, None),
+             (-4, None, None),
+             (-3, None, None),
+             (-2, None, None),
+             (-1, None, None),
+             (0, None, None),
+             (1, None, None),
+             (2, None, None),
+             (3, None, None),
+             (4, Some("john"), Some(10)),
+             (4, Some("sara"), Some(7)),
+             (5, Some("john"), Some(19)),
+             (5, Some("sara"), Some(10))
+        ])
+        );
+}
 async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -5496,16 +5653,16 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]),
     ];
     let data = Arc::new(DataFrame::new(columns, rows.clone()));
-    let inline_tables = vec![("Persons".to_string(), data)];
+    let inline_tables = vec![InlineTable::new("Persons".to_string(), data)];
 
-    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
         .exec_query_with_context(context, "SELECT * FROM Persons")
         .await
         .unwrap();
     assert_eq!(result.get_rows(), &rows);
 
-    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
         .exec_query_with_context(context, "SELECT LastName, Timestamp FROM Persons")
         .await
@@ -5532,7 +5689,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]
     );
 
-    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
         .exec_query_with_context(
             context,
@@ -5565,6 +5722,64 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
             Row::new(vec![
                 TableValue::Null,
                 TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+        ]
+    );
+}
+
+async fn build_range_end(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.t0(x string)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.t1(x string) WITH(build_range_end = '2020-01-01T00:00:00.000')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT table_schema, table_name, build_range_end FROM system.tables")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t0".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
+            ]),
+        ]
+    );
+
+    let r = service
+        .exec_query(
+            "SELECT table_schema, table_name, build_range_end FROM information_schema.tables",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t0".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
             ]),
         ]
     );

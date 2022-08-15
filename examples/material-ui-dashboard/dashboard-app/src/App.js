@@ -12,8 +12,7 @@ const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
 
 const useStyles = makeStyles((theme) => ({
   root: {
-    flexGrow: 1,
-    height: '50vh'
+    padding: 32
   },
 }));
 

@@ -23,10 +23,10 @@ const ExplorePage = withRouter(({
     skip: !itemId
   });
   const [vizState, setVizState] = useState(null);
-  const finalVizState = vizState || itemId && !loading && data && JSON.parse(data.dashboardItem.vizState) || {};
+  const finalVizState = vizState || (itemId && !loading && data && JSON.parse(data.dashboardItem.vizState)) || {};
   const [titleModalVisible, setTitleModalVisible] = useState(false);
   const [title, setTitle] = useState(null);
-  const finalTitle = title != null ? title : itemId && !loading && data && data.dashboardItem.name || 'New Chart';
+  const finalTitle = title != null ? title : (itemId && !loading && data && data.dashboardItem.name) || 'New Chart';
 
   if (loading) {
     return <Spin />;

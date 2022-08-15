@@ -463,6 +463,338 @@ impl SerializedLogicalPlan {
             },
         })
     }
+    fn is_empty_relation(&self) -> Option<DFSchemaRef> {
+        match self {
+            SerializedLogicalPlan::EmptyRelation {
+                produce_one_row,
+                schema,
+            } => {
+                if !produce_one_row {
+                    Some(schema.clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+    fn remove_unused_tables(
+        &self,
+        partition_ids_to_execute: &Vec<(u64, RowFilter)>,
+    ) -> SerializedLogicalPlan {
+        debug_assert!(partition_ids_to_execute
+            .iter()
+            .is_sorted_by_key(|(id, _)| id));
+        match self {
+            SerializedLogicalPlan::Projection {
+                expr,
+                input,
+                schema,
+            } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+                if input.is_empty_relation().is_some() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Projection {
+                        expr: expr.clone(),
+                        input: Arc::new(input),
+                        schema: schema.clone(),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Filter { predicate, input } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+
+                if let Some(schema) = input.is_empty_relation() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Filter {
+                        predicate: predicate.clone(),
+                        input: Arc::new(input),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Aggregate {
+                input,
+                group_expr,
+                aggr_expr,
+                schema,
+            } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+                SerializedLogicalPlan::Aggregate {
+                    input: Arc::new(input),
+                    group_expr: group_expr.clone(),
+                    aggr_expr: aggr_expr.clone(),
+                    schema: schema.clone(),
+                }
+            }
+            SerializedLogicalPlan::Sort { expr, input } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+
+                if let Some(schema) = input.is_empty_relation() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Sort {
+                        expr: expr.clone(),
+                        input: Arc::new(input),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Union {
+                inputs,
+                schema,
+                alias,
+            } => {
+                let inputs = inputs
+                    .iter()
+                    .filter_map(|i| {
+                        let i = i.remove_unused_tables(partition_ids_to_execute);
+                        if i.is_empty_relation().is_some() {
+                            None
+                        } else {
+                            Some(Arc::new(i))
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                SerializedLogicalPlan::Union {
+                    inputs,
+                    schema: schema.clone(),
+                    alias: alias.clone(),
+                }
+            }
+            SerializedLogicalPlan::TableScan {
+                table_name,
+                source,
+                projection,
+                projected_schema,
+                filters,
+                alias,
+                limit,
+            } => {
+                let is_empty = match source {
+                    SerializedTableSource::CubeTable(table) => {
+                        !table.has_partitions(partition_ids_to_execute)
+                    }
+                    _ => false,
+                };
+                if is_empty {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: projected_schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::TableScan {
+                        table_name: table_name.clone(),
+                        source: source.clone(),
+                        projection: projection.clone(),
+                        projected_schema: projected_schema.clone(),
+                        filters: filters.clone(),
+                        alias: alias.clone(),
+                        limit: limit.clone(),
+                    }
+                }
+            }
+            SerializedLogicalPlan::EmptyRelation {
+                produce_one_row,
+                schema,
+            } => SerializedLogicalPlan::EmptyRelation {
+                produce_one_row: *produce_one_row,
+                schema: schema.clone(),
+            },
+            SerializedLogicalPlan::Limit { n, input } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+
+                if let Some(schema) = input.is_empty_relation() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Limit {
+                        n: *n,
+                        input: Arc::new(input),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Skip { n, input } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+
+                if let Some(schema) = input.is_empty_relation() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Skip {
+                        n: *n,
+                        input: Arc::new(input),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Join {
+                left,
+                right,
+                on,
+                join_type,
+                join_constraint,
+                schema,
+            } => {
+                let left = left.remove_unused_tables(partition_ids_to_execute);
+                let right = right.remove_unused_tables(partition_ids_to_execute);
+
+                SerializedLogicalPlan::Join {
+                    left: Arc::new(left),
+                    right: Arc::new(right),
+                    on: on.clone(),
+                    join_type: join_type.clone(),
+                    join_constraint: *join_constraint,
+                    schema: schema.clone(),
+                }
+            }
+            SerializedLogicalPlan::Repartition {
+                input,
+                partitioning_scheme,
+            } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+
+                if let Some(schema) = input.is_empty_relation() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Repartition {
+                        input: Arc::new(input),
+                        partitioning_scheme: partitioning_scheme.clone(),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Alias {
+                input,
+                alias,
+                schema,
+            } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+
+                if input.is_empty_relation().is_some() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Alias {
+                        input: Arc::new(input),
+                        alias: alias.clone(),
+                        schema: schema.clone(),
+                    }
+                }
+            }
+            SerializedLogicalPlan::ClusterSend { input, snapshots } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+                SerializedLogicalPlan::ClusterSend {
+                    input: Arc::new(input),
+                    snapshots: snapshots.clone(),
+                }
+            }
+            SerializedLogicalPlan::ClusterAggregateTopK {
+                limit,
+                input,
+                group_expr,
+                aggregate_expr,
+                sort_columns,
+                having_expr,
+                schema,
+                snapshots,
+            } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+                SerializedLogicalPlan::ClusterAggregateTopK {
+                    limit: *limit,
+                    input: Arc::new(input),
+                    group_expr: group_expr.clone(),
+                    aggregate_expr: aggregate_expr.clone(),
+                    sort_columns: sort_columns.clone(),
+                    having_expr: having_expr.clone(),
+                    schema: schema.clone(),
+                    snapshots: snapshots.clone(),
+                }
+            }
+            SerializedLogicalPlan::CrossJoin {
+                left,
+                right,
+                on,
+                join_schema,
+            } => {
+                let left = left.remove_unused_tables(partition_ids_to_execute);
+                let right = right.remove_unused_tables(partition_ids_to_execute);
+
+                SerializedLogicalPlan::CrossJoin {
+                    left: Arc::new(left),
+                    right: Arc::new(right),
+                    on: on.clone(),
+                    join_schema: join_schema.clone(),
+                }
+            }
+            SerializedLogicalPlan::CrossJoinAgg {
+                left,
+                right,
+                on,
+                join_schema,
+                group_expr,
+                agg_expr,
+                schema,
+            } => {
+                let left = left.remove_unused_tables(partition_ids_to_execute);
+                let right = right.remove_unused_tables(partition_ids_to_execute);
+
+                SerializedLogicalPlan::CrossJoinAgg {
+                    left: Arc::new(left),
+                    right: Arc::new(right),
+                    on: on.clone(),
+                    join_schema: join_schema.clone(),
+                    group_expr: group_expr.clone(),
+                    agg_expr: agg_expr.clone(),
+                    schema: schema.clone(),
+                }
+            }
+            SerializedLogicalPlan::RollingWindowAgg {
+                schema,
+                input,
+                dimension,
+                partition_by,
+                from,
+                to,
+                every,
+                rolling_aggs,
+                group_by_dimension,
+                aggs,
+            } => {
+                let input = input.remove_unused_tables(partition_ids_to_execute);
+                SerializedLogicalPlan::RollingWindowAgg {
+                    schema: schema.clone(),
+                    input: Arc::new(input),
+                    dimension: dimension.clone(),
+                    partition_by: partition_by.clone(),
+                    from: from.clone(),
+                    to: to.clone(),
+                    every: every.clone(),
+                    rolling_aggs: rolling_aggs.clone(),
+                    group_by_dimension: group_by_dimension.clone(),
+                    aggs: aggs.clone(),
+                }
+            }
+            SerializedLogicalPlan::Panic {} => SerializedLogicalPlan::Panic {},
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -670,7 +1002,10 @@ impl SerializedPlan {
         partition_ids_to_execute: Vec<(u64, RowFilter)>,
     ) -> Self {
         Self {
-            logical_plan: self.logical_plan.clone(),
+            logical_plan: Arc::new(
+                self.logical_plan
+                    .remove_unused_tables(&partition_ids_to_execute),
+            ),
             schema_snapshot: self.schema_snapshot.clone(),
             partition_ids_to_execute,
         }

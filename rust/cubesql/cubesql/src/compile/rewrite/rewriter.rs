@@ -12,7 +12,7 @@ use crate::{
             LogicalPlanLanguage,
         },
     },
-    sql::AuthContext,
+    sql::AuthContextRef,
     CubeError,
 };
 use datafusion::{logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner};
@@ -277,10 +277,11 @@ impl Rewriter {
     pub async fn find_best_plan(
         &mut self,
         root: Id,
-        auth_context: Arc<AuthContext>,
+        auth_context: AuthContextRef,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
+
         tokio::task::spawn_blocking(move || {
             let rules = Self::rewrite_rules(cube_context.clone());
             let runner = Self::rewrite_runner(cube_context.clone(), egraph);

@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 5729
+assertion_line: 5902
 expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+
@@ -16,6 +16,8 @@ expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants
 | ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | has_subscription   | SELECT         | YES          |
 | ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | is_male            | SELECT         | YES          |
 | ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | is_female          | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | __user             | SELECT         | YES          |
 | ovr     | ovr     | db            | public       | Logs                      | agentCount         | SELECT         | YES          |
 | ovr     | ovr     | db            | public       | Logs                      | agentCountApprox   | SELECT         | YES          |
+| ovr     | ovr     | db            | public       | Logs                      | __user             | SELECT         | YES          |
 +---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+

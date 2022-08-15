@@ -143,6 +143,9 @@ const variables: Record<string, (...args: any) => any> = {
     const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
     return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
   },
+  maxPartitionsPerCube: () => get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
+    .default('10000')
+    .asInt(),
   // Common db options
   dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
     .required(required)
@@ -195,6 +198,10 @@ const variables: Record<string, (...args: any) => any> = {
   // Databricks
   databrickUrl: () => get('CUBEJS_DB_DATABRICKS_URL')
     .required()
+    .asString(),
+  databrickAgent: () => get('CUBEJS_DB_DATABRICKS_AGENT')
+    .asString(),
+  databrickToken: () => get('CUBEJS_DB_DATABRICKS_TOKEN')
     .asString(),
   databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
     .asString(),
@@ -346,6 +353,7 @@ const variables: Record<string, (...args: any) => any> = {
   },
   sqlUser: () => get('CUBEJS_SQL_USER').asString(),
   sqlPassword: () => get('CUBEJS_SQL_PASSWORD').asString(),
+  sqlSuperUser: () => get('CUBEJS_SQL_SUPER_USER').asString(),
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('true')
@@ -365,6 +373,9 @@ const variables: Record<string, (...args: any) => any> = {
   batchingRowSplitCount: () => get('CUBEJS_BATCHING_ROW_SPLIT_COUNT')
     .default(256 * 1024)
     .asInt(),
+  maxSourceRowLimit: () => get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
+    .default(200000)
+    .asInt()
 };
 
 type Vars = typeof variables;

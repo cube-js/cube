@@ -3,10 +3,11 @@ import { isQueryPresent, areQueriesEqual } from '@cubejs-client/core';
 
 import CubeContext from '../CubeContext';
 import useDeepCompareMemoize from './deep-compare-memoize';
+import { useIsMounted } from './is-mounted';
 
 export function useCubeQuery(query, options = {}) {
   const mutexRef = useRef({});
-  const isMounted = useRef(true);
+  const isMounted = useIsMounted();
   const [currentQuery, setCurrentQuery] = useState(null);
   const [isLoading, setLoading] = useState(false);
   const [resultSet, setResultSet] = useState(null);
@@ -40,28 +41,22 @@ export function useCubeQuery(query, options = {}) {
         progressCallback,
       });
 
-      if (isMounted.current) {
+      if (isMounted()) {
         setResultSet(response);
         setProgress(null);
       }
     } catch (error) {
-      if (isMounted.current) {
+      if (isMounted()) {
         setError(error);
         setResultSet(null);
         setProgress(null);
       }
     }
 
-    if (isMounted.current) {
+    if (isMounted()) {
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
 
   useEffect(() => {
     const { skip = false, resetResultSetOnChange } = options;
@@ -99,7 +94,7 @@ export function useCubeQuery(query, options = {}) {
                 progressCallback,
               },
               (e, result) => {
-                if (isMounted.current) {
+                if (isMounted()) {
                   if (e) {
                     setError(e);
                   } else {
@@ -114,7 +109,7 @@ export function useCubeQuery(query, options = {}) {
             await fetch();
           }
         } catch (e) {
-          if (isMounted.current) {
+          if (isMounted()) {
             setError(e);
             setResultSet(null);
             setLoading(false);

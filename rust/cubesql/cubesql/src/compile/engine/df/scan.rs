@@ -1,6 +1,5 @@
 use std::{
     any::Any,
-    collections::HashMap,
     fmt,
     sync::Arc,
     task::{Context, Poll},
@@ -27,8 +26,8 @@ use futures::Stream;
 use log::warn;
 
 use crate::{
-    sql::AuthContext,
-    transport::{TransportService, TransportServiceMetaFields},
+    sql::AuthContextRef,
+    transport::{LoadRequestMeta, TransportService},
 };
 use chrono::{TimeZone, Utc};
 use datafusion::{
@@ -45,11 +44,17 @@ pub enum MemberField {
 }
 
 #[derive(Debug, Clone)]
+pub struct CubeScanOptions {
+    pub change_user: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct CubeScanNode {
     pub schema: DFSchemaRef,
     pub member_fields: Vec<MemberField>,
     pub request: V1LoadRequestQuery,
-    pub auth_context: Arc<AuthContext>,
+    pub auth_context: AuthContextRef,
+    pub options: CubeScanOptions,
 }
 
 impl CubeScanNode {
@@ -57,13 +62,15 @@ impl CubeScanNode {
         schema: DFSchemaRef,
         member_fields: Vec<MemberField>,
         request: V1LoadRequestQuery,
-        auth_context: Arc<AuthContext>,
+        auth_context: AuthContextRef,
+        options: CubeScanOptions,
     ) -> Self {
         Self {
             schema,
             member_fields,
             request,
             auth_context,
+            options,
         }
     }
 }
@@ -106,6 +113,7 @@ impl UserDefinedLogicalNode for CubeScanNode {
             member_fields: self.member_fields.clone(),
             request: self.request.clone(),
             auth_context: self.auth_context.clone(),
+            options: self.options.clone(),
         })
     }
 }
@@ -114,7 +122,7 @@ impl UserDefinedLogicalNode for CubeScanNode {
 //  the logical plan node.
 pub struct CubeScanExtensionPlanner {
     pub transport: Arc<dyn TransportService>,
-    pub meta_fields: Option<HashMap<String, String>>,
+    pub meta: LoadRequestMeta,
 }
 
 impl ExtensionPlanner for CubeScanExtensionPlanner {
@@ -139,7 +147,8 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     transport: self.transport.clone(),
                     request: scan_node.request.clone(),
                     auth_context: scan_node.auth_context.clone(),
-                    meta_fields: self.meta_fields.clone(),
+                    options: scan_node.options.clone(),
+                    meta: self.meta.clone(),
                 }))
             } else {
                 None
@@ -154,11 +163,12 @@ struct CubeScanExecutionPlan {
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
     request: V1LoadRequestQuery,
-    auth_context: Arc<AuthContext>,
+    auth_context: AuthContextRef,
+    options: CubeScanOptions,
     // Shared references which will be injected by extension planner
     transport: Arc<dyn TransportService>,
-    // Fields passing to cube (for now using to pass app_name and protocol for telemetry)
-    meta_fields: TransportServiceMetaFields,
+    // injected by extension planner
+    meta: LoadRequestMeta,
 }
 
 macro_rules! build_column {
@@ -423,13 +433,12 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                 data,
             )
         } else {
+            let mut meta = self.meta.clone();
+            meta.set_change_user(self.options.change_user.clone());
+
             let result = self
                 .transport
-                .load(
-                    self.request.clone(),
-                    self.auth_context.clone(),
-                    self.meta_fields.clone(),
-                )
+                .load(self.request.clone(), self.auth_context.clone(), meta)
                 .await;
 
             let mut response = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
@@ -519,7 +528,11 @@ impl RecordBatchStream for CubeScanMemoryStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{compile::MetaContext, CubeError};
+    use crate::{
+        compile::MetaContext,
+        sql::{session::DatabaseProtocol, HttpAuthContext},
+        CubeError,
+    };
     use cubeclient::models::V1LoadResponse;
     use datafusion::{
         arrow::{
@@ -535,6 +548,14 @@ mod tests {
     };
     use std::{collections::HashMap, result::Result};
 
+    fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
+        LoadRequestMeta::new(
+            protocol.to_string(),
+            "sql".to_string(),
+            Some("SQL API Unit Testing".to_string()),
+        )
+    }
+
     fn get_test_transport() -> Arc<dyn TransportService> {
         #[derive(Debug)]
         struct TestConnectionTransport {}
@@ -542,7 +563,7 @@ mod tests {
         #[async_trait]
         impl TransportService for TestConnectionTransport {
             // Load meta information about cubes
-            async fn meta(&self, _ctx: Arc<AuthContext>) -> Result<Arc<MetaContext>, CubeError> {
+            async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
                 panic!("It's a fake transport");
             }
 
@@ -550,8 +571,8 @@ mod tests {
             async fn load(
                 &self,
                 _query: V1LoadRequestQuery,
-                _ctx: Arc<AuthContext>,
-                _meta_fields: Option<HashMap<String, String>>,
+                _ctx: AuthContextRef,
+                _meta_fields: LoadRequestMeta,
             ) -> Result<V1LoadResponse, CubeError> {
                 let response = r#"
                     {
@@ -628,12 +649,13 @@ mod tests {
                 offset: None,
                 filters: None,
             },
-            auth_context: Arc::new(AuthContext {
+            auth_context: Arc::new(HttpAuthContext {
                 access_token: "access_token".to_string(),
                 base_path: "base_path".to_string(),
             }),
+            options: CubeScanOptions { change_user: None },
             transport: get_test_transport(),
-            meta_fields: None,
+            meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),
         };
 
         let runtime = Arc::new(

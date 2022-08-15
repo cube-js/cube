@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 5589
+assertion_line: 6952
 expression: "execute_query(\"explain KibanaSampleDataEcommerce;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +--------------------+--------------+------+-----+---------+-------+
@@ -16,4 +16,5 @@ expression: "execute_query(\"explain KibanaSampleDataEcommerce;\".to_string(),\n
 | has_subscription   | tinyint(1)   | YES  |     | NULL    |       |
 | is_male            | tinyint(1)   | NO   |     | NULL    |       |
 | is_female          | tinyint(1)   | NO   |     | NULL    |       |
+| __user             | varchar(255) | YES  |     | NULL    |       |
 +--------------------+--------------+------+-----+---------+-------+

@@ -84,6 +84,16 @@ please use the [database connection guide][link-connecting-to-db].
 | `CUBEJS_DB_EXPORT_GCS_CREDENTIALS`     | A Base64 encoded JSON key file for connecting to Google Cloud                                | A valid Google Cloud JSON key file encoded as a Base64 string    |
 | `CUBEJS_DB_EXPORT_INTEGRATION`         | The name of the integration used in the database. Only required when using Snowflake and GCS | A valid string matching the name of the integration in Snowflake |
 
+## SQL API
+
+| Environment variable    | Description                                                            | Possible Values     |
+|-------------------------|------------------------------------------------------------------------|---------------------|
+| `CUBEJS_SQL_USER`       | Required username to access SQL API                                    | A valid string      |
+| `CUBEJS_SQL_PASSWORD`   | Required password to access SQL API                                    | A valid string      |
+| `CUBEJS_SQL_PORT`       | The port to listen to MySQL compatibility connections on.              | A valid port number |
+| `CUBEJS_PG_SQL_PORT`    | The port to listen to PostgreSQL compatibility connections on.         | A valid port number |
+| `CUBEJS_SQL_SUPER_USER` | A name of specific user who will be allowed to change security context | A valid string      |
+
 ## Cube Store
 
 | Environment variable            | Description                                                                                                                                                                   | Possible Values                                             |

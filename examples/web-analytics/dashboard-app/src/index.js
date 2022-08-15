@@ -16,7 +16,7 @@ import CustomReportPage from "./pages/CustomReportPage";
 import CustomReportsOverviewPage from "./pages/CustomReportsOverviewPage";
 import CustomReportsBuilderPage from "./pages/CustomReportsBuilderPage";
 
-import createExampleWrapper from "cube-example-wrapper";
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
 const exampleDescription = {
   title: "Web Analytics app",

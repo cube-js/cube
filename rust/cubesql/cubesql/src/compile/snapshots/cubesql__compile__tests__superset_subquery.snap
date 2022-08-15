@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 8198
 expression: "execute_query(\"\n                SELECT\n                    a.attname,\n                    pg_catalog.format_type(a.atttypid, a.atttypmod),\n                    (\n                        SELECT pg_catalog.pg_get_expr(d.adbin, d.adrelid)\n                        FROM pg_catalog.pg_attrdef d\n                        WHERE\n                            d.adrelid = a.attrelid AND\n                            d.adnum = a.attnum AND\n                            a.atthasdef\n                    ) AS DEFAULT,\n                    a.attnotnull,\n                    a.attnum,\n                    a.attrelid as table_oid,\n                    pgd.description as comment,\n                    a.attgenerated as generated\n                FROM pg_catalog.pg_attribute a\n                LEFT JOIN pg_catalog.pg_description pgd ON (\n                    pgd.objoid = a.attrelid AND\n                    pgd.objsubid = a.attnum\n                )\n                WHERE\n                    a.attrelid = 18000\n                    AND a.attnum > 0\n                    AND NOT a.attisdropped\n                ORDER BY a.attnum\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +--------------------+-------------------------------------+---------+------------+--------+-----------+---------+-----------+
@@ -15,4 +16,5 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | has_subscription   | boolean                             | NULL    | false      | 8      | 18000     | NULL    |           |
 | is_male            | boolean                             | NULL    | true       | 9      | 18000     | NULL    |           |
 | is_female          | boolean                             | NULL    | true       | 10     | 18000     | NULL    |           |
+| __user             | text                                | NULL    | false      | 11     | 18000     | NULL    |           |
 +--------------------+-------------------------------------+---------+------------+--------+-----------+---------+-----------+

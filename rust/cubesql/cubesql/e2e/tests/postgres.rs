@@ -643,6 +643,44 @@ impl PostgresIntegrationTestSuite {
 
         Ok(())
     }
+
+    // Hightouch uses it
+    async fn test_simple_query_prepare(&self) -> RunResult<()> {
+        self.test_simple_query("PREPARE simple_query AS SELECT 1".to_string(), |_| {})
+            .await?;
+
+        self.test_simple_query(
+            "PREPARE simple_query_parens AS (SELECT 1)".to_string(),
+            |_| {},
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn test_simple_query_deallocate_specific(&self) -> RunResult<()> {
+        self.test_simple_query("PREPARE simple_query AS SELECT 1".to_string(), |_| {})
+            .await?;
+
+        self.test_simple_query("DEALLOCATE simple_query".to_string(), |_| {})
+            .await?;
+
+        // TODO: Check select * from pg_catalog.pg_prepared_statements
+
+        Ok(())
+    }
+
+    async fn test_simple_query_deallocate_all(&self) -> RunResult<()> {
+        self.test_simple_query("PREPARE simple_query AS SELECT 1".to_string(), |_| {})
+            .await?;
+
+        self.test_simple_query("DEALLOCATE ALL".to_string(), |_| {})
+            .await?;
+
+        // TODO: Check select * from pg_catalog.pg_prepared_statements
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -664,12 +702,15 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_simple_cursors_without_hold().await?;
         self.test_simple_cursors_close_specific().await?;
         self.test_simple_cursors_close_all().await?;
+        self.test_simple_query_prepare().await?;
         self.test_snapshot_execute_query(
             "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
             None,
             false,
         )
         .await?;
+        self.test_simple_query_deallocate_specific().await?;
+        self.test_simple_query_deallocate_all().await?;
 
         // PostgreSQL doesn't support unsigned integers in the protocol, it's a constraint only
         self.test_snapshot_execute_query(

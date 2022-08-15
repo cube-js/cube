@@ -6,7 +6,7 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { layout, content } from './index.module.less';
 import "./index.less";
-import createExampleWrapper from "cube-example-wrapper";
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
 const exampleDescription = {
   title: "Cube + Muze.js",

@@ -85,6 +85,7 @@ url = "2.2.2"
 pin-project = "1.0.8"
 tokio-tungstenite = { version = "0.16.0", features = ["native-tls"] }
 deflate = "1.0.0"
+indoc = "1.0"
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"

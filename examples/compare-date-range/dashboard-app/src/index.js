@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
 
-import createExampleWrapper from 'cube-example-wrapper'
+import createExampleWrapper from "@cube-dev/example-wrapper";
 
 const exampleDescription = {
   title: "Compare Date Range",
@@ -21,7 +21,7 @@ const exampleDescription = {
     </p>
   `
 };
-createExampleWrapper(exampleDescription)
+createExampleWrapper(exampleDescription);
 
 ReactDOM.render(
   <React.StrictMode>

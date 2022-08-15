@@ -26,6 +26,7 @@ import { OptsHandler } from './OptsHandler';
 import {
   driverDependencies,
   lookupDriverClass,
+  isDriver,
   createDriver,
   getDriverMaxPool,
 } from './DriverResolvers';
@@ -44,6 +45,7 @@ import type {
   RequestContext,
   DriverContext,
   LoggerFn,
+  DriverConfig,
 } from './types';
 import { ContextToOrchestratorIdFn } from './types';
 
@@ -261,6 +263,7 @@ export class CubejsServerCore {
             ...(params.apiType ? { apiType: params.apiType } : {}),
             ...(params.protocol ? { protocol: params.protocol } : {}),
             ...(params.appName ? { appName: params.appName } : {}),
+            ...(params.sanitizedQuery ? { query: params.sanitizedQuery } : {}),
           };
 
           this.event(msg, props);
@@ -289,6 +292,7 @@ export class CubejsServerCore {
             apiType: params.apiType,
             protocol: params.protocol,
             ...(params.appName ? { appName: params.appName } : {}),
+            ...(params.sanitizedQuery ? { query: params.sanitizedQuery } : {}),
           };
           this.event(msg, props);
         }
@@ -736,10 +740,10 @@ export class CubejsServerCore {
   ): Promise<BaseDriver> {
     if (!this.driversStorage.has(context.dataSource)) {
       const val = await this.options.driverFactory(context);
-      if (val instanceof BaseDriver) {
-        this.driversStorage.set(context.dataSource, val);
+      if (isDriver(val)) {
+        this.driversStorage.set(context.dataSource, <BaseDriver>val);
       } else {
-        const { type, ...rest } = val;
+        const { type, ...rest } = <DriverConfig>val;
         const opts = Object.keys(rest).length
           ? rest
           : {

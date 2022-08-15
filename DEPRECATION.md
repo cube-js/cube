@@ -51,7 +51,8 @@ features:
 | Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)                             | v0.27.0    |           |
 | Deprecated | [Node.js 12](#nodejs-12)                                                                                                          | v0.29.0    |           |
 | Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default) | v0.30.0    |           |
-| Deprecated | [`Using external databases for pre-aggregations`](#using-external-databases-for-pre-aggregations)                                 | v0.30.0    |           |
+| Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                   | v0.30.0    |           |
+| Deprecated | [`dbType`](#dbtype)                                                                                                               | v0.30.30   |           |
 
 ### Node.js 8
 
@@ -325,3 +326,11 @@ Using external databases for pre-aggregations is now deprecated, and we strongly
 recommend [using Cube Store as a solution][ref-caching-in-prod].
 
 [ref-caching-in-prod]: https://cube.dev/docs/caching/running-in-production
+
+### dbType
+
+**Deprecated in Release: v0.30.30**
+
+Using `dbType` is now deprecated, and we recommend using
+[`driverFactory`][self-driver-factory] to return a `DriverConfig` object
+instead.

@@ -2,17 +2,20 @@ const native = require('../dist/js/index');
 const meta_fixture = require('./meta');
 
 (async () => {
-    const load = async (extra) => {
+    const load = async ({ request, session, query }) => {
       console.log('[js] load',  {
-        extra,
+        request,
+        session,
+        query ,
       });
 
       throw new Error('Unsupported');
     };
 
-    const meta = async (extra) => {
+    const meta = async ({ request, session }) => {
         console.log('[js] meta',  {
-          extra
+          request,
+          session
         });
 
         return meta_fixture;
@@ -26,15 +29,23 @@ const meta_fixture = require('./meta');
 
       if (user) {
         // without password
-        if (user == 'wp') {
+        if (user === 'wp') {
           return {
             password: null,
-            // securityContext: {}
+            superuser: false,
+          };
+        }
+
+        if (user === 'admin') {
+          return {
+            password: null,
+            superuser: true,
           };
         }
 
         return {
           password: 'test',
+          superuser: false,
         }
       }
 

@@ -51,13 +51,13 @@ export async function downloadJDBCDriver(isCli: boolean = false): Promise<string
       'https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/2.6.17/SimbaSparkJDBC42-2.6.17.1021.zip',
       {
         showProgress: true,
-        cwd: path.resolve(path.join(__dirname, '..', '..', 'download')),
+        cwd: path.resolve(path.join(__dirname, '..', 'download')),
       }
     );
 
     console.log('Release notes: https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/2.6.17/docs/release-notes.txt');
 
-    return path.resolve(path.join(__dirname, '..', '..', 'download', 'SparkJDBC42.jar'));
+    return path.resolve(path.join(__dirname, '..', 'download', 'SparkJDBC42.jar'));
   }
 
   return null;

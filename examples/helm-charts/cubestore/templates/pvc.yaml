@@ -1,4 +1,4 @@
-{{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+{{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:

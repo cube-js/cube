@@ -1,5 +1,5 @@
 import React from 'react'
-import { Layout, Row } from 'antd'
+import { Layout } from 'antd'
 import Header from "../Header"
 import Indicator from "../Indicator"
 import styles from "./App.module.css"

@@ -5,6 +5,7 @@ use datafusion::{scalar::ScalarValue, variable::VarType};
 pub mod mysql;
 pub mod postgres;
 
+pub type DatabaseVariablesToUpdate = Vec<DatabaseVariable>;
 pub type DatabaseVariables = HashMap<String, DatabaseVariable>;
 
 #[derive(Debug, Clone)]

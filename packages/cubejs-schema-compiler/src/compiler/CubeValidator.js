@@ -180,6 +180,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
     sql: Joi.func().required()
   },
   readOnly: Joi.boolean().strict(),
+  unionWithSourceData: Joi.boolean().strict(),
 };
 
 const BasePreAggregation = {

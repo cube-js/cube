@@ -380,6 +380,11 @@ impl Accumulator for HllMergeAccumulator {
             )
             .into());
         }
+
+        // empty state is ok, this means an empty sketch.
+        if data.len() == 0 {
+            return Ok(());
+        }
         return self.merge_sketch(read_sketch(&data)?);
     }
 

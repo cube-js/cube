@@ -71,7 +71,7 @@ impl SessionLogger {
     fn log(&self, target: &str, props: HashMap<String, String>, level: Level) {
         // TODO: MySQL app_name
         let mut meta_fields = props;
-        if let Some(name) = self.session_state.all_variables().get("application_name") {
+        if let Some(name) = self.session_state.get_variable("application_name") {
             meta_fields.insert("appName".to_string(), name.value.to_string());
         }
         let protocol = self.session_state.protocol.to_string();

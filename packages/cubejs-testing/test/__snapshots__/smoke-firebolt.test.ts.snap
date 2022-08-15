@@ -1,9 +1,24 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`firebolt query dimensions: dimensions 1`] = `
+Array [
+  Object {
+    "Orders.count": "4",
+    "Orders.createdAt": "2017-01-01T00:00:00.000",
+    "Orders.createdAt.day": "2017-01-01T00:00:00.000",
+  },
+  Object {
+    "Orders.count": "1",
+    "Orders.createdAt": "2017-02-01T00:00:00.000",
+    "Orders.createdAt.day": "2017-02-01T00:00:00.000",
+  },
+]
+`;
+
 exports[`firebolt query measure: query 1`] = `
 Array [
   Object {
-    "Orders.totalAmount": 1700,
+    "Orders.totalAmount": "1700",
   },
 ]
 `;

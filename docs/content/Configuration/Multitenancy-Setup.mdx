@@ -5,9 +5,9 @@ category: Configuration
 menuOrder: 4
 ---
 
-Cube.js supports multitenancy out of the box, both on database and data schema
+Cube supports multitenancy out of the box, both on database and data schema
 levels. Multiple drivers are also supported, meaning that you can have one
-customer’s data in MongoDB and others in Postgres with one Cube.js instance.
+customer’s data in MongoDB and others in Postgres with one Cube instance.
 
 There are 6 [configuration options][ref-config-opts] you can leverage to make
 your multitenancy setup. You can use all of them or just a couple, depending on
@@ -15,18 +15,17 @@ your specific case. The options are:
 
 - `contextToAppId`
 - `contextToOrchestratorId`
-- `dbType`
 - `driverFactory`
 - `repositoryFactory`
 - `preAggregationsSchema`
 - `queryRewrite`
 
-All of the above options are functions, which you provide to Cube.js in the
+All of the above options are functions, which you provide to Cube in the
 [`cube.js` configuration file][ref-config]. The functions accept one argument -
 a context object, which has a [`securityContext`][ref-config-security-ctx]
 property where you can provide all the necessary data to identify a user e.g.,
 organization, app, etc. By default, the
-[`securityContext`][ref-config-security-ctx] is defined by [Cube.js API
+[`securityContext`][ref-config-security-ctx] is defined by [Cube API
 Token][ref-security].
 
 There are several multitenancy setup scenarios that can be achieved by using
@@ -34,7 +33,7 @@ combinations of these configuration options.
 
 ### <--{"id" : "Multitenancy"}--> Multitenancy vs Multiple Data Sources
 
-In cases where your Cube.js schema is spread across multiple different databases
+In cases where your Cube schema is spread across multiple different databases
 you may consider using the [`dataSource` cube property][ref-cube-datasource]
 instead of multitenancy. Multitenancy is designed for cases where you need to
 serve different datasets for multiple users, or tenants which aren't related to
@@ -81,40 +80,38 @@ module.exports = {
 };
 ```
 
-A more advanced example with additional configuration of
-[`dbType`][ref-config-dbtype] could look like:
+A more advanced example that uses multiple [data sources][ref-config-db] could
+look like:
 
 **cube.js:**
 
 ```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-const AthenaDriver = require('@cubejs-backend/athena-driver');
-const BigQueryDriver = require('@cubejs-backend/bigquery-driver');
-
 module.exports = {
-  dbType: ({ dataSource } = {}) => {
-    if (dataSource === 'web') {
-      return 'athena';
-    } else if (dataSource === 'googleAnalytics') {
-      return 'bigquery';
-    } else {
-      return 'postgres';
-    }
-  },
   driverFactory: ({ dataSource } = {}) => {
     if (dataSource === 'web') {
-      return new AthenaDriver();
+      return {
+        type: 'athena',
+        database: dataSource,
+        ...,
+      };
     } else if (dataSource === 'googleAnalytics') {
-      return new BigQueryDriver();
+      return {
+        type: 'bigquery',
+        ...,
+      };
     } else if (dataSource === 'financials') {
-      return new PostgresDriver({
+      return {
+        type: 'postgres',
         database: 'financials',
         host: 'financials-db.acme.com',
         user: process.env.FINANCIALS_DB_USER,
         password: process.env.FINANCIALS_DB_PASS,
-      });
+      };
     } else {
-      return new PostgresDriver();
+      return {
+        type: 'postgres',
+        ...,
+      };
     }
   },
 };
@@ -198,7 +195,7 @@ Let's consider an example where we store data for different users in different
 databases, but on the same Postgres host. The database name format is
 `my_app_<APP_ID>_<USER_ID>`, so `my_app_1_2` is a valid database name.
 
-To make it work with Cube.js, first we need to pass the `appId` and `userId` as
+To make it work with Cube, first we need to pass the `appId` and `userId` as
 context to every query. We should first ensure our JWTs contain those properties
 so we can access them through the [security context][ref-config-security-ctx].
 
@@ -214,10 +211,10 @@ const cubejsToken = jwt.sign({ appId: '1', userId: '2' }, CUBE_API_SECRET, {
 Now, we can access them through the [`securityContext`][ref-config-security-ctx]
 property inside the context object. Let's use
 [`contextToAppId`][ref-config-ctx-to-appid] and
-[`contextToOrchestratorId`][ref-config-ctx-to-orch-id] to create a dynamic
-Cube.js App ID and Orchestrator ID for every combination of `appId` and
-`userId`, as well as defining [`driverFactory`][ref-config-driverfactory] to
-dynamically select the database, based on the `appId` and `userId`:
+[`contextToOrchestratorId`][ref-config-ctx-to-orch-id] to create a dynamic Cube
+App ID and Orchestrator ID for every combination of `appId` and `userId`, as
+well as defining [`driverFactory`][ref-config-driverfactory] to dynamically
+select the database, based on the `appId` and `userId`:
 
 <WarningBox>
 
@@ -273,9 +270,8 @@ What if for application with ID 3, the data is stored not in Postgres, but in
 MongoDB?
 
 We can instruct Cube to connect to MongoDB in that case, instead of Postgres. To
-do this, we'll use the [`dbType`][ref-config-dbtype] option to dynamically set
-database type. We will also need to modify our
-[`driverFactory`][ref-config-driverfactory] as well as use
+do this, we'll use the [`driverFactory`][ref-config-driverfactory] option to
+dynamically set database type. We will also need to modify our
 [`securityContext`][ref-config-security-ctx] to determine which tenant is
 requesting data. Finally, we want to have separate data schemas for every
 application. We can use the [`repositoryFactory`][ref-config-repofactory] option
@@ -292,23 +288,18 @@ module.exports = {
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
   contextToOrchestratorId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
-  dbType: ({ securityContext }) => {
-    if (securityContext.appId === 3) {
-      return 'mongobi';
-    } else {
-      return 'postgres';
-    }
-  },
   driverFactory: ({ securityContext }) => {
     if (securityContext.appId === 3) {
-      return new MongoBIDriver({
+      return {
+        type: 'mongobi',
         database: `my_app_${securityContext.appId}_${securityContext.userId}`,
         port: 3307,
-      });
+      };
     } else {
-      return new PostgresDriver({
+      return {
+        type: 'postgres',
         database: `my_app_${securityContext.appId}_${securityContext.userId}`,
-      });
+      };
     }
   },
   repositoryFactory: ({ securityContext }) =>
@@ -318,7 +309,7 @@ module.exports = {
 
 ## Serverless Deployment
 
-If you are deploying Cube.js to AWS Lambda with the [Serverless
+If you are deploying Cube to AWS Lambda with the [Serverless
 template][ref-deployment-sls], you need to use `AWSHandlers` from the
 [`@cubejs-backend/serverless-aws`][npm-cubejs-sls-aws] package.
 
@@ -352,15 +343,15 @@ need to configure [`scheduledRefreshTimeZones`][ref-config-refresh-tz].
 
 Leaving [`scheduledRefreshContexts`][ref-config-refresh-ctx] unconfigured will
 lead to issues where the security context will be `undefined`. This is because
-there is no way for Cube.js to know how to generate a context without the
-required input.
+there is no way for Cube to know how to generate a context without the required
+input.
 
 </WarningBox>
 
 ## Connecting to Redis
 
-When configured for multitenancy, Cube.js uses a separate connection pool for
-each configured tenant. This means that the `CUBEJS_REDIS_POOL_MIN` and
+When configured for multitenancy, Cube uses a separate connection pool for each
+configured tenant. This means that the `CUBEJS_REDIS_POOL_MIN` and
 `CUBEJS_REDIS_POOL_MAX` environment variables specify the minimum and maximum
 number of Redis connections **per-tenant**.
 
@@ -368,7 +359,7 @@ number of Redis connections **per-tenant**.
   https://www.npmjs.com/package/@cubejs-backend/serverless-aws
 [ref-config]: /config
 [ref-config-opts]: /config#options-reference
-[ref-config-dbtype]: /config#db-type
+[ref-config-db]: /config/databases
 [ref-config-driverfactory]: /config#driver-factory
 [ref-config-repofactory]: /config#repository-factory
 [ref-config-preagg-schema]: /config#pre-aggregations-schema

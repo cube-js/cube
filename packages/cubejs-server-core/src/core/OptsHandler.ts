@@ -23,7 +23,7 @@ import {
   OrchestratorInitedOptions,
   QueueOptions,
 } from './types';
-import { lookupDriverClass } from './DriverResolvers';
+import { lookupDriverClass, isDriver } from './DriverResolvers';
 import type { CubejsServerCore } from './server';
 import optionsValidate from './optionsValidate';
 
@@ -109,7 +109,7 @@ export class OptsHandler {
   private assertDriverFactoryResult(
     val: DriverConfig | BaseDriver,
   ) {
-    if (val instanceof BaseDriver) {
+    if (isDriver(val)) {
       // TODO (buntarb): these assertions should be restored after dbType
       // deprecation period will be passed.
       //
@@ -139,7 +139,7 @@ export class OptsHandler {
       }
       return <BaseDriver>val;
     } else if (
-      val && val.type && typeof val.type === 'string'
+      val && (<DriverConfig>val).type && typeof (<DriverConfig>val).type === 'string'
     ) {
       if (!this.driverFactoryType) {
         this.driverFactoryType = 'DriverConfig';
@@ -466,9 +466,9 @@ export class OptsHandler {
         parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
       preAggregationsSchema:
         getEnv('preAggregationsSchema') ||
-        this.isDevMode()
+        (this.isDevMode()
           ? 'dev_pre_aggregations'
-          : 'prod_pre_aggregations',
+          : 'prod_pre_aggregations'),
       schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
       sqlCache: true,
@@ -691,6 +691,16 @@ export class OptsHandler {
           !this.isPreAggsBuilder() ||
           clone.rollupOnlyMode && !this.configuredForScheduledRefresh()
         );
+
+    clone.preAggregationsOptions.maxPartitions =
+      clone.preAggregationsOptions.maxPartitions !== undefined
+        ? clone.preAggregationsOptions.maxPartitions
+        : getEnv('maxPartitionsPerCube');
+
+    clone.preAggregationsOptions.maxSourceRowLimit =
+      clone.preAggregationsOptions.maxSourceRowLimit !== undefined
+        ? clone.preAggregationsOptions.maxSourceRowLimit
+        : getEnv('maxSourceRowLimit');
 
     return clone;
   }

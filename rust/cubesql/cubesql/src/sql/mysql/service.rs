@@ -22,6 +22,7 @@ use tokio::{
 use crate::{
     compile::{convert_sql_to_cube_query, parser::parse_sql_to_statement},
     config::processing_loop::ProcessingLoop,
+    sql::statement::SensitiveDataSanitizer,
     telemetry::{ContextLogger, SessionLogger},
     CubeErrorCauseType,
 };
@@ -31,7 +32,8 @@ use crate::{
         dataframe::{self, batch_to_dataframe},
         session::DatabaseProtocol,
         statement::{MySQLStatementParamsFinder, MysqlStatementParamsBinder},
-        AuthContext, ColumnFlags, ColumnType, QueryResponse, Session, SessionManager, StatusFlags,
+        AuthContextRef, ColumnFlags, ColumnType, QueryResponse, Session, SessionManager,
+        StatusFlags,
     },
     CubeError,
 };
@@ -91,7 +93,20 @@ impl MySqlConnection {
                     }
                 };
 
-                self.logger.error(message.as_str(), props);
+                let query = query.to_string();
+                let mut props = props.unwrap_or_default();
+                if let Ok(statement) = parse_sql_to_statement(&query, DatabaseProtocol::PostgreSQL)
+                {
+                    props.insert(
+                        "sanitizedQuery".to_string(),
+                        SensitiveDataSanitizer::new()
+                            .replace(&statement)
+                            .to_string(),
+                    );
+                }
+                props.insert("query".to_string(), query);
+
+                self.logger.error(message.as_str(), Some(props));
 
                 if let Some(bt) = e.backtrace() {
                     trace!("{}", bt);
@@ -248,12 +263,11 @@ impl MySqlConnection {
         }
     }
 
-    pub(crate) fn auth_context(&self) -> Result<Arc<AuthContext>, CubeError> {
-        if let Some(ctx) = self.session.state.auth_context() {
-            Ok(Arc::new(ctx))
-        } else {
-            Err(CubeError::internal("must be auth".to_string()))
-        }
+    pub(crate) fn auth_context(&self) -> Result<AuthContextRef, CubeError> {
+        self.session
+            .state
+            .auth_context()
+            .ok_or(CubeError::internal("must be auth".to_string()))
     }
 }
 

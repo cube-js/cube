@@ -4,51 +4,45 @@ import commonjs from '@rollup/plugin-commonjs';
 import alias from '@rollup/plugin-alias';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 
-const extensions = ['.js', '.jsx', '.ts', '.tsx'];
-const resolvePlugin = resolve({
-  extensions,
-  mainFields: ['browser', 'module', 'main'],
-});
-const basePlugins = [
-  commonjs({
-    include: '**/node_modules/**',
-  }),
-  babel({
-    extensions,
-    exclude: '**/node_modules/**',
-    babelHelpers: 'runtime',
-    presets: [
-      '@babel/preset-react',
-      '@babel/preset-typescript',
-      [
-        '@babel/preset-env',
-        {
-          shippedProposals: true,
-          useBuiltIns: 'usage',
-          corejs: 3,
-        },
-      ],
-    ],
-    plugins: [
-      [
-        '@babel/plugin-transform-runtime',
-        {
-          corejs: false,
-          helpers: true,
-          regenerator: true,
-          useESModules: false,
-        },
-      ],
-    ],
-  }),
-];
-
 const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) => {
   const baseUmdConfig = {
     ...(umdConfig || baseConfig),
     plugins: [
-      resolvePlugin,
-      ...basePlugins,
+      commonjs({
+        extensions: ['.js'],
+      }),
+      resolve({
+        extensions: ['.ts', '.js', '.json'],
+        mainFields: ['browser', 'module', 'main'],
+      }),
+      babel({
+        extensions: ['.js', '.jsx', '.ts', '.tsx'],
+        exclude: ['node_modules/**', /\/core-js\//],
+        babelHelpers: 'runtime',
+        presets: [
+          '@babel/preset-react',
+          '@babel/preset-typescript',
+          [
+            '@babel/preset-env',
+            {
+              shippedProposals: true,
+              useBuiltIns: 'usage',
+              corejs: 3,
+            },
+          ],
+        ],
+        plugins: [
+          [
+            '@babel/plugin-transform-runtime',
+            {
+              corejs: false,
+              helpers: true,
+              regenerator: true,
+              useESModules: false,
+            },
+          ],
+        ],
+      }),
       alias({
         entries: {
           '@cubejs-client/core': '../cubejs-client-core/src/index.js',
@@ -66,9 +60,8 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
           file: `packages/${name}/dist/${name}.umd.js`,
           format: 'umd',
           name: globalName,
-          exports: 'named',
+          exports: 'auto',
           sourcemap: true,
-          globals,
         },
       ],
     },
@@ -85,14 +78,39 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       ...baseConfig,
       plugins: [
         peerDepsExternal(),
-        resolvePlugin,
-        ...basePlugins,
+        babel({
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
+          exclude: 'node_modules/**',
+          babelHelpers: 'runtime',
+          presets: [
+            '@babel/preset-react',
+            '@babel/preset-typescript',
+            [
+              '@babel/preset-env',
+              {
+                shippedProposals: true,
+                useBuiltIns: 'usage',
+                corejs: 3,
+              },
+            ],
+          ],
+          plugins: [
+            [
+              '@babel/plugin-transform-runtime',
+              {
+                corejs: false,
+                helpers: true,
+                regenerator: true,
+                useESModules: false,
+              },
+            ],
+          ],
+        }),
       ],
       output: [
         {
           file: `packages/${name}/dist/${name}.js`,
           format: 'cjs',
-          exports: 'named',
           sourcemap: true,
         }
       ],
@@ -102,7 +120,34 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       ...baseConfig,
       plugins: [
         peerDepsExternal(),
-        ...basePlugins,
+        babel({
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
+          exclude: 'node_modules/**',
+          babelHelpers: 'runtime',
+          presets: [
+            '@babel/preset-react',
+            '@babel/preset-typescript',
+            [
+              '@babel/preset-env',
+              {
+                shippedProposals: true,
+                useBuiltIns: 'usage',
+                corejs: 3,
+              },
+            ],
+          ],
+          plugins: [
+            [
+              '@babel/plugin-transform-runtime',
+              {
+                corejs: false,
+                helpers: true,
+                regenerator: true,
+                useESModules: false,
+              },
+            ],
+          ],
+        }),
       ],
       output: [
         {
@@ -116,38 +161,42 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
   ];
 };
 
-export default [
-  ...bundle('cubejs-client-core', 'cubejs', {
+export default bundle(
+  'cubejs-client-core',
+  'cubejs',
+  {
     input: 'packages/cubejs-client-core/src/index.js',
-  }, {
+  },
+  {
     input: 'packages/cubejs-client-core/src/index.umd.js',
-  }),
-
-  ...bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
-    input: 'packages/cubejs-client-ws-transport/src/index.ts',
-  }),
-
-  ...bundle('cubejs-client-react', 'cubejsReact', {
-    input: 'packages/cubejs-client-react/src/index.js',
-    external: ['react', 'prop-types'],
-    globals: {
-      react: 'React',
-    },
-  }),
-
-  ...bundle('cubejs-client-vue', 'cubejsVue', {
-    input: 'packages/cubejs-client-vue/src/index.js',
-    external: ['vue'],
-    globals: {
-      vue: 'Vue',
-    },
-  }),
-
-  ...bundle('cubejs-client-vue3', 'cubejsVue3', {
-    input: 'packages/cubejs-client-vue3/src/index.js',
-    external: ['vue'],
-    globals: {
-      vue: 'Vue',
-    },
-  }),
-];
+  }
+)
+  .concat(
+    bundle('cubejs-client-ws-transport', 'CubejsWebSocketTransport', {
+      input: 'packages/cubejs-client-ws-transport/src/index.ts',
+    })
+  )
+  .concat(
+    bundle('cubejs-client-react', 'cubejsReact', {
+      input: 'packages/cubejs-client-react/src/index.js',
+      external: ['react', 'prop-types'],
+    })
+  )
+  .concat(
+    bundle('cubejs-client-vue', 'cubejsVue', {
+      input: 'packages/cubejs-client-vue/src/index.js',
+      external: ['vue'],
+      globals: {
+        vue: 'Vue',
+      },
+    })
+  )
+  .concat(
+    bundle('cubejs-client-vue3', 'cubejsVue3', {
+      input: 'packages/cubejs-client-vue3/src/index.js',
+      external: ['vue'],
+      globals: {
+        vue: 'Vue',
+      },
+    })
+  );

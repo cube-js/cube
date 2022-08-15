@@ -95,6 +95,7 @@ impl StatusFlags {
 #[derive(Debug, Clone)]
 pub enum CommandCompletion {
     Begin,
+    Prepare,
     Commit,
     Use,
     Rollback,
@@ -103,6 +104,8 @@ pub enum CommandCompletion {
     DeclareCursor,
     CloseCursor,
     CloseCursorAll,
+    Deallocate,
+    DeallocateAll,
     Discard(String),
 }
 
@@ -111,6 +114,7 @@ impl CommandCompletion {
         match self {
             // IDENTIFIER ONLY
             CommandCompletion::Begin => CommandComplete::Plain("BEGIN".to_string()),
+            CommandCompletion::Prepare => CommandComplete::Plain("PREPARE".to_string()),
             CommandCompletion::Commit => CommandComplete::Plain("COMMIT".to_string()),
             CommandCompletion::Rollback => CommandComplete::Plain("ROLLBACK".to_string()),
             CommandCompletion::Set => CommandComplete::Plain("SET".to_string()),
@@ -121,6 +125,10 @@ impl CommandCompletion {
             CommandCompletion::CloseCursor => CommandComplete::Plain("CLOSE CURSOR".to_string()),
             CommandCompletion::CloseCursorAll => {
                 CommandComplete::Plain("CLOSE CURSOR ALL".to_string())
+            }
+            CommandCompletion::Deallocate => CommandComplete::Plain("DEALLOCATE".to_string()),
+            CommandCompletion::DeallocateAll => {
+                CommandComplete::Plain("DEALLOCATE ALL".to_string())
             }
             CommandCompletion::Discard(tp) => CommandComplete::Plain(format!("DISCARD {}", tp)),
             // ROWS COUNT

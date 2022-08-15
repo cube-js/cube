@@ -19,7 +19,8 @@ table HttpTable {
     name: string;
     columns: [string];
     types: [string];
-    rows: [HttpRow];
+    // csv format to replicate the usual csv import path.
+    csv_rows: string;
 }
 
 table HttpError {

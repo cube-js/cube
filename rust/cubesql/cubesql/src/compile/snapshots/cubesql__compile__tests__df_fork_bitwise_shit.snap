@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 9175
+expression: "execute_query(\"SELECT 2 << 10 as t1, 2048 >> 10 as t2;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------+----+
+| t1   | t2 |
++------+----+
+| 2048 | 2  |
++------+----+

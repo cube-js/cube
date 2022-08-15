@@ -3,21 +3,22 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             analysis::{ConstantFolding, LogicalPlanAnalysis},
-            between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, column_expr,
-            cube_scan, cube_scan_filters, cube_scan_members, dimension_expr, expr_column_name,
-            filter, filter_cast_unwrap_replacer, filter_member, filter_op, filter_op_filters,
-            filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
-            is_null_expr, limit, literal_expr, literal_string, measure_expr, member_name_by_alias,
-            not_expr, projection, rewrite,
+            between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
+            column_expr, cube_scan, cube_scan_filters, cube_scan_members, dimension_expr,
+            expr_column_name, filter, filter_cast_unwrap_replacer, filter_member, filter_op,
+            filter_op_filters, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
+            is_not_null_expr, is_null_expr, limit, literal_expr, literal_string, measure_expr,
+            member_name_by_alias, not_expr, projection, rewrite,
             rewriter::RewriteRules,
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_rewrite,
-            BetweenExprNegated, BinaryExprOp, ColumnExprColumn, CubeScanLimit, CubeScanTableName,
-            FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterReplacerCube,
-            FilterReplacerTableName, InListExprNegated, LimitN, LiteralExprValue,
-            LogicalPlanLanguage, SegmentMemberMember, TableScanSourceTableName,
-            TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
-            TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
+            BetweenExprNegated, BinaryExprOp, ChangeUserMemberValue, ColumnExprColumn,
+            CubeScanLimit, CubeScanTableName, FilterMemberMember, FilterMemberOp,
+            FilterMemberValues, FilterReplacerCube, FilterReplacerTableName, InListExprNegated,
+            LimitN, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
+            TableScanSourceTableName, TimeDimensionDateRange,
+            TimeDimensionDateRangeReplacerDateRange, TimeDimensionDateRangeReplacerMember,
+            TimeDimensionGranularity, TimeDimensionName,
         },
     },
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
@@ -39,6 +40,8 @@ use datafusion::{
 };
 use egg::{EGraph, Rewrite, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
+
+use super::members::MemberRules;
 
 pub struct FilterRules {
     cube_context: Arc<CubeContext>,
@@ -238,6 +241,17 @@ impl RewriteRules for FilterRules {
                     "?segment",
                 ),
             ),
+            transforming_rewrite(
+                "change-user-replacer",
+                filter_replacer(
+                    binary_expr(column_expr("?column"), "?op", literal_expr("?literal")),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                change_user_member("?user"),
+                self.transform_change_user("?column", "?op", "?literal", "?user"),
+            ),
             rewrite(
                 "filter-in-place-filter-to-true-filter",
                 filter_replacer(column_expr("?column"), "?cube", "?members", "?table_name"),
@@ -398,7 +412,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer("?expr", "?cube", "?members", "?table_name"),
             ),
             transforming_rewrite(
-                "filter-replacer-between",
+                "filter-replacer-between-dates",
                 filter_replacer(
                     between_expr(column_expr("?column"), "?negated", "?low", "?high"),
                     "?cube",
@@ -406,7 +420,7 @@ impl RewriteRules for FilterRules {
                     "?table_name",
                 ),
                 filter_member("?filter_member", "?filter_op", "?filter_values"),
-                self.transform_between(
+                self.transform_between_dates(
                     "?column",
                     "?negated",
                     "?low",
@@ -417,6 +431,60 @@ impl RewriteRules for FilterRules {
                     "?filter_member",
                     "?filter_op",
                     "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-replacer-between-numbers",
+                filter_replacer(
+                    between_expr(column_expr("?column"), "?negated", "?low", "?high"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(column_expr("?column"), ">=", "?low"),
+                        "AND",
+                        binary_expr(column_expr("?column"), "<=", "?high"),
+                    ),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                self.transform_between_numbers(
+                    "?column",
+                    "?negated",
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                    false,
+                ),
+            ),
+            transforming_rewrite(
+                "filter-replacer-not-between-numbers",
+                filter_replacer(
+                    between_expr(column_expr("?column"), "?negated", "?low", "?high"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(column_expr("?column"), "<", "?low"),
+                        "OR",
+                        binary_expr(column_expr("?column"), ">", "?high"),
+                    ),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                self.transform_between_numbers(
+                    "?column",
+                    "?negated",
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                    true,
                 ),
             ),
             rewrite(
@@ -449,6 +517,21 @@ impl RewriteRules for FilterRules {
                         filter_replacer("?right", "?cube", "?members", "?table_name"),
                     ),
                     "or",
+                ),
+            ),
+            rewrite(
+                "filter-replacer-lower-str",
+                filter_replacer(
+                    binary_expr(fun_expr("Lower", vec!["?lower_param"]), "?op", "?right"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                filter_replacer(
+                    binary_expr("?lower_param", "?op", "?right"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
                 ),
             ),
             // TODO define zero
@@ -547,17 +630,47 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "between-move-interval-beyond-equal-sign",
                 between_expr(
-                    binary_expr(column_expr("?column"), "+", "?interval"),
+                    binary_expr("?expr", "+", "?interval"),
                     "?negated",
                     "?low",
                     "?high",
                 ),
                 between_expr(
-                    column_expr("?column"),
+                    "?expr",
                     "?negated",
                     binary_expr("?low", "-", "?interval"),
                     binary_expr("?high", "-", "?interval"),
                 ),
+            ),
+            // TODO: second is minimum cube granularity, so we can unwrap it until cube has smaller granularity
+            transforming_rewrite(
+                "between-unwrap-datetrunc",
+                filter_replacer(
+                    between_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), "?expr".to_string()],
+                        ),
+                        "?negated",
+                        "?low",
+                        "?high",
+                    ),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                filter_replacer(
+                    between_expr("?expr", "?negated", "?low", "?high"),
+                    "?cube",
+                    "?members",
+                    "?table_name",
+                ),
+                self.unwrap_datetrunc("?granularity", "second"),
+            ),
+            rewrite(
+                "not-expt-like-to-expr-not-like",
+                not_expr(binary_expr("?left", "LIKE", "?right")),
+                binary_expr("?left", "NOT_LIKE", "?right"),
             ),
             // Every expression should be handled by filter cast unwrap replacer otherwise other rules just won't work
             rewrite(
@@ -634,14 +747,9 @@ impl RewriteRules for FilterRules {
             ),
             rewrite(
                 "filter-cast-unwrap-between-push-down",
-                filter_cast_unwrap_replacer(between_expr(
-                    column_expr("?column"),
-                    "?negated",
-                    "?low",
-                    "?high",
-                )),
+                filter_cast_unwrap_replacer(between_expr("?expr", "?negated", "?low", "?high")),
                 between_expr(
-                    column_expr("?column"),
+                    "?expr",
                     "?negated",
                     filter_cast_unwrap_replacer("?low"),
                     filter_cast_unwrap_replacer("?high"),
@@ -1011,7 +1119,7 @@ impl FilterRules {
                         table_name_var,
                     ) {
                         if let Some(member_type) = cube.member_type(&member_name) {
-                            // Segments are handled by separate rule
+                            // Segments + __user are handled by separate rule
                             if cube.lookup_measure_by_member_name(&member_name).is_some()
                                 || cube.lookup_dimension_by_member_name(&member_name).is_some()
                             {
@@ -1025,6 +1133,8 @@ impl FilterRules {
                                     Operator::Like => "contains",
                                     Operator::ILike => "contains",
                                     Operator::NotLike => "notContains",
+                                    // TODO: support regex totally
+                                    Operator::RegexMatch => "startsWith",
                                     _ => {
                                         continue;
                                     }
@@ -1045,7 +1155,12 @@ impl FilterRules {
 
                                 let value = match literal {
                                     ScalarValue::Utf8(Some(value)) => {
-                                        if op == "contains" {
+                                        if op == "startsWith"
+                                            && value.starts_with("^^")
+                                            && value.ends_with(".*$")
+                                        {
+                                            value[2..value.len() - 3].to_string()
+                                        } else if op == "contains" || op == "notContains" {
                                             if value.starts_with("%") && value.ends_with("%") {
                                                 let without_wildcard =
                                                     value[1..value.len() - 1].to_string();
@@ -1168,6 +1283,48 @@ impl FilterRules {
                                         segment_member_var,
                                         egraph.add(LogicalPlanLanguage::SegmentMemberMember(
                                             SegmentMemberMember(member_name.to_string()),
+                                        )),
+                                    );
+
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_change_user(
+        &self,
+        column_var: &'static str,
+        op_var: &'static str,
+        literal_var: &'static str,
+        change_user_member_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = column_var.parse().unwrap();
+        let op_var = op_var.parse().unwrap();
+        let literal_var = literal_var.parse().unwrap();
+        let change_user_member_var = change_user_member_var.parse().unwrap();
+
+        move |egraph, subst| {
+            for expr_op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                    if expr_op == &Operator::Eq {
+                        if let ScalarValue::Utf8(Some(change_user)) = literal {
+                            let specified_user = change_user.clone();
+
+                            for column in
+                                var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned()
+                            {
+                                if column.name.eq_ignore_ascii_case("__user") {
+                                    subst.insert(
+                                        change_user_member_var,
+                                        egraph.add(LogicalPlanLanguage::ChangeUserMemberValue(
+                                            ChangeUserMemberValue(specified_user),
                                         )),
                                     );
 
@@ -1404,7 +1561,7 @@ impl FilterRules {
         None
     }
 
-    fn transform_between(
+    fn transform_between_dates(
         &self,
         column_var: &'static str,
         negated_var: &'static str,
@@ -1438,7 +1595,9 @@ impl FilterRules {
                 members_var,
                 table_name_var,
             ) {
-                if let Some(_) = cube.lookup_dimension_by_member_name(&member_name) {
+                if cube.lookup_measure_by_member_name(&member_name).is_some()
+                    || cube.lookup_dimension_by_member_name(&member_name).is_some()
+                {
                     for negated in var_iter!(egraph[subst[negated_var]], BetweenExprNegated) {
                         let negated = *negated;
                         if let Some(ConstantFolding::Scalar(low)) =
@@ -1447,6 +1606,10 @@ impl FilterRules {
                             if let Some(ConstantFolding::Scalar(high)) =
                                 &egraph[subst[high_var]].data.constant
                             {
+                                match cube.member_type(&member_name) {
+                                    Some(MemberType::Time) => (),
+                                    _ => continue,
+                                }
                                 let values = vec![
                                     FilterRules::scalar_to_value(&low),
                                     FilterRules::scalar_to_value(&high),
@@ -1479,6 +1642,47 @@ impl FilterRules {
 
                                 return true;
                             }
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_between_numbers(
+        &self,
+        column_var: &'static str,
+        negated_var: &'static str,
+        cube_var: &'static str,
+        members_var: &'static str,
+        table_name_var: &'static str,
+        is_negated: bool,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = var!(column_var);
+        let negated_var = var!(negated_var);
+        let cube_var = var!(cube_var);
+        let members_var = var!(members_var);
+        let table_name_var = var!(table_name_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            if let Some((member_name, cube)) = Self::filter_member_name(
+                egraph,
+                subst,
+                &meta_context,
+                cube_var,
+                column_var,
+                members_var,
+                table_name_var,
+            ) {
+                if cube.lookup_measure_by_member_name(&member_name).is_some()
+                    || cube.lookup_dimension_by_member_name(&member_name).is_some()
+                {
+                    for negated in var_iter!(egraph[subst[negated_var]], BetweenExprNegated) {
+                        match cube.member_type(&member_name) {
+                            Some(MemberType::Number) if &is_negated == negated => return true,
+                            _ => continue,
                         }
                     }
                 }
@@ -1662,6 +1866,28 @@ impl FilterRules {
                             }
                         }
                     }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn unwrap_datetrunc(
+        &self,
+        granularity_var: &'static str,
+        target_granularity: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let granularity_var = var!(granularity_var);
+        move |egraph, subst| {
+            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
+                match MemberRules::parse_granularity(granularity, false) {
+                    Some(granularity)
+                        if granularity.to_lowercase() == target_granularity.to_lowercase() =>
+                    {
+                        return true
+                    }
+                    _ => (),
                 }
             }
 
