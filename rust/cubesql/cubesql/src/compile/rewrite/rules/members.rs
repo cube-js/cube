@@ -846,7 +846,8 @@ impl MemberRules {
         column_expr_var: &'static str,
         alias_expr_var: Option<&'static str>,
         inner_replacer: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool + Copy
+    {
         let original_expr_var = var!(original_expr_var);
         let outer_granularity_var = var!(outer_granularity_var);
         let inner_granularity_var = var!(inner_granularity_var);
@@ -940,7 +941,8 @@ impl MemberRules {
         column_expr_var: &'static str,
         alias_expr_var: Option<&'static str>,
         inner_replacer: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool + Copy
+    {
         Self::transform_original_expr_nested_date_trunc(
             original_expr_var,
             granularity_var,

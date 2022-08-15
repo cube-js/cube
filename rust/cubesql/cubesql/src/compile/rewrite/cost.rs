@@ -86,6 +86,8 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::InnerAggregateSplitReplacer(_) => 1,
             LogicalPlanLanguage::OuterProjectionSplitReplacer(_) => 1,
             LogicalPlanLanguage::OuterAggregateSplitReplacer(_) => 1,
+            LogicalPlanLanguage::GroupExprSplitReplacer(_) => 1,
+            LogicalPlanLanguage::GroupAggregateSplitReplacer(_) => 1,
             LogicalPlanLanguage::MemberPushdownReplacer(_) => 1,
             _ => 0,
         };
