@@ -6,15 +6,18 @@ use crate::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
             binary_expr, cast_expr, cast_expr_explicit, column_expr, cube_scan, fun_expr,
+            group_aggregate_split_replacer, group_expr_split_replacer,
             inner_aggregate_split_replacer, is_not_null_expr, is_null_expr, literal_expr,
             literal_number, literal_string, original_expr_name, outer_aggregate_split_replacer,
             outer_projection_split_replacer, projection, projection_expr,
             projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
             rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
-            udf_expr, AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, ColumnExprColumn,
-            CubeScanAliasToCube, InnerAggregateSplitReplacerAliasToCube, LiteralExprValue,
-            LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
-            OuterProjectionSplitReplacerAliasToCube, ProjectionAlias,
+            udf_expr, AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
+            BinaryExprOp, ColumnExprColumn, CubeScanAliasToCube,
+            GroupAggregateSplitReplacerAliasToCube, GroupExprSplitReplacerAliasToCube,
+            InnerAggregateSplitReplacerAliasToCube, LiteralExprValue, LogicalPlanLanguage,
+            OuterAggregateSplitReplacerAliasToCube, OuterProjectionSplitReplacerAliasToCube,
+            ProjectionAlias,
         },
     },
     transport::V1CubeMetaExt,
@@ -27,7 +30,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{EGraph, Id, Rewrite, Subst};
-use std::sync::Arc;
+use std::{fmt::Display, ops::Index, sync::Arc};
 
 pub struct SplitRules {
     cube_context: Arc<CubeContext>,
@@ -35,7 +38,7 @@ pub struct SplitRules {
 
 impl RewriteRules for SplitRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-        vec![
+        let mut rules = vec![
             transforming_rewrite(
                 "split-projection-aggregate",
                 aggregate(
@@ -121,9 +124,8 @@ impl RewriteRules for SplitRules {
                     "?projection_alias",
                 ),
             ),
-            // TODO: Aggregation on top of Projection to re-aggregate results after projection modifying
             transforming_rewrite(
-                "split-projection-projection-aggr",
+                "split-reaggregate-projection",
                 projection(
                     "?expr",
                     cube_scan(
@@ -139,27 +141,34 @@ impl RewriteRules for SplitRules {
                     "?alias",
                 ),
                 projection(
-                    outer_aggregate_split_replacer("?expr", "?outer_aggregate_cube"),
-                    projection(
-                        inner_aggregate_split_replacer("?expr", "?inner_aggregate_cube"),
-                        cube_scan(
-                            "?alias_to_cube",
-                            "?members",
-                            "?filters",
-                            "?orders",
-                            "?limit",
-                            "?offset",
-                            "?aliases",
-                            "CubeScanSplit:true",
+                    "?new_expr",
+                    aggregate(
+                        projection(
+                            inner_aggregate_split_replacer("?expr", "?inner_aggregate_cube"),
+                            cube_scan(
+                                "?alias_to_cube",
+                                "?members",
+                                "?filters",
+                                "?orders",
+                                "?limit",
+                                "?offset",
+                                "?aliases",
+                                "CubeScanSplit:true",
+                            ),
+                            "?projection_alias",
                         ),
-                        "?projection_alias",
+                        group_expr_split_replacer("?expr", "?group_expr_cube"),
+                        group_aggregate_split_replacer("?expr", "?group_aggregate_cube"),
                     ),
                     "?alias",
                 ),
-                self.split_projection_projection_aggregate(
+                self.split_reaggregate_projection(
+                    "?expr",
                     "?alias_to_cube",
                     "?inner_aggregate_cube",
-                    "?outer_aggregate_cube",
+                    "?group_expr_cube",
+                    "?group_aggregate_cube",
+                    "?new_expr",
                     "?projection_alias",
                 ),
             ),
@@ -324,6 +333,34 @@ impl RewriteRules for SplitRules {
                 "split-push-down-projection-outer-aggr-replacer-tail",
                 outer_aggregate_split_replacer(projection_expr_empty_tail(), "?cube"),
                 projection_expr_empty_tail(),
+            ),
+            // Reaggregate replacers -- group expr
+            rewrite(
+                "split-push-down-reaggregate-group-expr-replacer",
+                group_expr_split_replacer(projection_expr("?left", "?right"), "?cube"),
+                aggr_group_expr(
+                    group_expr_split_replacer("?left", "?cube"),
+                    group_expr_split_replacer("?right", "?cube"),
+                ),
+            ),
+            rewrite(
+                "split-push-down-reaggregate-group-expr-replacer-tail",
+                group_expr_split_replacer(projection_expr_empty_tail(), "?cube"),
+                aggr_group_expr_empty_tail(),
+            ),
+            // Reaggregate replacers -- group aggregate
+            rewrite(
+                "split-push-down-reaggregate-group-aggregate-replacer",
+                group_aggregate_split_replacer(projection_expr("?left", "?right"), "?cube"),
+                aggr_aggr_expr(
+                    group_aggregate_split_replacer("?left", "?cube"),
+                    group_aggregate_split_replacer("?right", "?cube"),
+                ),
+            ),
+            rewrite(
+                "split-push-down-reaggregate-group-aggregate-replacer-tail",
+                group_aggregate_split_replacer(projection_expr_empty_tail(), "?cube"),
+                aggr_aggr_expr_empty_tail(),
             ),
             // Members
             // Column rules
@@ -1281,6 +1318,21 @@ impl RewriteRules for SplitRules {
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             rewrite(
+                "split-push-down-substr-outer-replacer",
+                outer_projection_split_replacer(
+                    fun_expr("Substr", vec!["?expr", "?from", "?to"]),
+                    "?cube",
+                ),
+                fun_expr(
+                    "Substr",
+                    vec![
+                        outer_projection_split_replacer("?expr", "?cube"),
+                        "?from".to_string(),
+                        "?to".to_string(),
+                    ],
+                ),
+            ),
+            rewrite(
                 "split-push-down-substr-outer-aggr-replacer",
                 outer_aggregate_split_replacer(
                     fun_expr("Substr", vec!["?expr", "?from", "?to"]),
@@ -1310,6 +1362,26 @@ impl RewriteRules for SplitRules {
                 "split-push-down-alias-outer-aggr-replacer",
                 outer_aggregate_split_replacer(alias_expr("?expr", "?alias"), "?cube"),
                 alias_expr(outer_aggregate_split_replacer("?expr", "?cube"), "?alias"),
+            ),
+            rewrite(
+                "split-push-down-alias-group-expr-replacer",
+                group_expr_split_replacer(alias_expr("?expr", "?alias"), "?cube"),
+                alias_expr(group_expr_split_replacer("?expr", "?cube"), "?alias"),
+            ),
+            rewrite(
+                "split-push-down-alias-group-aggregate-replacer",
+                group_aggregate_split_replacer(alias_expr("?expr", "?alias"), "?cube"),
+                alias_expr(group_aggregate_split_replacer("?expr", "?cube"), "?alias"),
+            ),
+            rewrite(
+                "split-push-down-alias-aggr-group-tail-replacer",
+                alias_expr(aggr_group_expr_empty_tail(), "?alias"),
+                aggr_group_expr_empty_tail(),
+            ),
+            rewrite(
+                "split-push-down-alias-aggr-aggr-tail-replacer",
+                alias_expr(aggr_aggr_expr_empty_tail(), "?alias"),
+                aggr_aggr_expr_empty_tail(),
             ),
             // Trunc
             rewrite(
@@ -1375,6 +1447,17 @@ impl RewriteRules for SplitRules {
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             rewrite(
+                "split-push-down-char-length-outer-replacer",
+                outer_projection_split_replacer(
+                    fun_expr("CharacterLength", vec!["?expr"]),
+                    "?cube",
+                ),
+                fun_expr(
+                    "CharacterLength",
+                    vec![outer_projection_split_replacer("?expr", "?cube")],
+                ),
+            ),
+            rewrite(
                 "split-push-down-char-length-outer-aggr-replacer",
                 outer_aggregate_split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube"),
                 fun_expr(
@@ -1384,26 +1467,100 @@ impl RewriteRules for SplitRules {
             ),
             // IS NULL, IS NOT NULL
             rewrite(
-                "split-push-down-is-null-replacer",
+                "split-push-down-is-null-inner-replacer",
                 inner_aggregate_split_replacer(is_null_expr("?expr"), "?cube"),
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             rewrite(
-                "split-push-down-is-null-aggr-replacer",
+                "split-push-down-is-null-outer-replacer",
+                outer_projection_split_replacer(is_null_expr("?expr"), "?cube"),
+                is_null_expr(outer_projection_split_replacer("?expr", "?cube")),
+            ),
+            rewrite(
+                "split-push-down-is-null-outer-aggr-replacer",
                 outer_aggregate_split_replacer(is_null_expr("?expr"), "?cube"),
                 is_null_expr(outer_aggregate_split_replacer("?expr", "?cube")),
             ),
             rewrite(
-                "split-push-down-is-not-null-replacer",
+                "split-push-down-is-not-null-inner-replacer",
                 inner_aggregate_split_replacer(is_not_null_expr("?expr"), "?cube"),
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             rewrite(
-                "split-push-down-is-not-null-aggr-replacer",
+                "split-push-down-is-not-null-outer-replacer",
+                outer_projection_split_replacer(is_not_null_expr("?expr"), "?cube"),
+                is_not_null_expr(outer_projection_split_replacer("?expr", "?cube")),
+            ),
+            rewrite(
+                "split-push-down-is-not-null-outer-aggr-replacer",
                 outer_aggregate_split_replacer(is_not_null_expr("?expr"), "?cube"),
                 is_not_null_expr(outer_aggregate_split_replacer("?expr", "?cube")),
             ),
-        ]
+        ];
+
+        rules.append(&mut self.outer_aggr_group_expr_aggr_combinator_rewrite(
+            "split-push-down-column-replacer",
+            |split_replacer| split_replacer(column_expr("?column"), "?cube"),
+            |_| vec![],
+            |_| column_expr("?column"),
+            |_, _| true,
+            true,
+            true,
+        ));
+        rules.append(&mut self.outer_aggr_group_expr_aggr_combinator_rewrite(
+            "split-push-down-date-part-replacer",
+            |split_replacer| {
+                split_replacer(
+                    fun_expr(
+                        "DatePart",
+                        vec![literal_expr("?granularity"), "?expr".to_string()],
+                    ),
+                    "?cube",
+                )
+            },
+            |_| vec![("?expr", column_expr("?column"))],
+            |_| {
+                fun_expr(
+                    "DatePart",
+                    vec![
+                        literal_expr("?granularity"),
+                        alias_expr("?alias_column", "?alias"),
+                    ],
+                )
+            },
+            MemberRules::transform_original_expr_date_trunc(
+                "?expr",
+                "?granularity",
+                "?granularity",
+                "?alias_column",
+                Some("?alias"),
+                false,
+            ),
+            true,
+            true,
+        ));
+        rules.append(&mut self.outer_aggr_group_expr_aggr_combinator_rewrite(
+            "split-push-down-substr-replacer",
+            |split_replacer| {
+                split_replacer(fun_expr("Substr", vec!["?expr", "?from", "?to"]), "?cube")
+            },
+            |_| vec![("?expr", column_expr("?column"))],
+            |split_replacer| {
+                fun_expr(
+                    "Substr",
+                    vec![
+                        split_replacer("?expr".to_string(), "?cube"),
+                        "?from".to_string(),
+                        "?to".to_string(),
+                    ],
+                )
+            },
+            |_, _| true,
+            true,
+            true,
+        ));
+
+        rules
     }
 }
 
@@ -1412,6 +1569,102 @@ impl SplitRules {
         Self {
             cube_context: cube_context,
         }
+    }
+
+    /// Returns a vec with rules for outer aggregate, group expr and group aggregate split replacers.
+    ///
+    /// Subst prerequisites:
+    /// - `?cube` is a required subst for split replacer `alias_to_cube` parameter;
+    /// - `?column` subst must appear in either searcher or chain;
+    /// - `?output_fun` and `?distinct` are reserved, do not use in any of the parameters.
+    ///
+    /// For searcher, chain, and applier, the only parameter for closure is a split replacer generator function.
+    /// For instance, in `|split_replacer| split_replacer("?expr", "?cube")` closure,
+    /// `split_replacer` will be replaced with the correct replacer for the respective rule.
+    ///
+    /// The latter two parameters, `is_measure` and `is_dimension`, are two flags to enable
+    /// the generation of measure-related and dimension-related rules respectively.
+    pub fn outer_aggr_group_expr_aggr_combinator_rewrite<'a, M, C, A, T, D: Display, DD: Display>(
+        &self,
+        base_name: &str,
+        main_searcher: M,
+        chain: C,
+        applier: A,
+        transform_fn: T,
+        is_measure: bool,
+        is_dimension: bool,
+    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>
+    where
+        M: Fn(fn(D, DD) -> String) -> String,
+        C: Fn(fn(D, DD) -> String) -> Vec<(&'a str, String)>,
+        A: Fn(fn(D, DD) -> String) -> String,
+        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+            + Sync
+            + Send
+            + Copy
+            + 'static,
+    {
+        let mut rules = vec![transforming_chain_rewrite(
+            &format!("{}-outer-aggr", base_name),
+            main_searcher(outer_aggregate_split_replacer),
+            chain(outer_aggregate_split_replacer),
+            applier(outer_aggregate_split_replacer),
+            transform_fn,
+        )];
+
+        if is_measure {
+            rules.append(&mut vec![
+                // Group expr -- skip measures
+                transforming_chain_rewrite(
+                    &format!("{}-group-expr-measure", base_name),
+                    main_searcher(group_expr_split_replacer),
+                    chain(group_expr_split_replacer),
+                    aggr_group_expr_empty_tail(),
+                    self.transform_group_expr_measure("?cube", "?column"),
+                ),
+                // Group aggr -- keep & wrap measures
+                transforming_chain_rewrite(
+                    &format!("{}-group-aggr-measure", base_name),
+                    main_searcher(group_aggregate_split_replacer),
+                    chain(group_aggregate_split_replacer),
+                    agg_fun_expr(
+                        "?output_fun",
+                        vec![applier(group_aggregate_split_replacer)],
+                        "?distinct",
+                    ),
+                    self.transform_group_aggregate_measure(
+                        "?cube",
+                        "?column",
+                        "?output_fun",
+                        "?distinct",
+                        transform_fn,
+                    ),
+                ),
+            ]);
+        }
+
+        if is_dimension {
+            rules.append(&mut vec![
+                // Group expr -- keep dimensions
+                transforming_chain_rewrite(
+                    &format!("{}-group-expr-dimension", base_name),
+                    main_searcher(group_expr_split_replacer),
+                    chain(group_expr_split_replacer),
+                    applier(group_expr_split_replacer),
+                    self.transform_group_expr_dimension("?cube", "?column", transform_fn),
+                ),
+                // Group aggr -- skip dimensions
+                transforming_chain_rewrite(
+                    &format!("{}-group-aggr-dimension", base_name),
+                    main_searcher(group_aggregate_split_replacer),
+                    chain(group_aggregate_split_replacer),
+                    aggr_aggr_expr_empty_tail(),
+                    self.transform_group_aggregate_dimension("?cube", "?column"),
+                ),
+            ]);
+        }
+
+        rules
     }
 
     pub fn transform_original_expr_to_alias_and_column(
@@ -1641,41 +1894,232 @@ impl SplitRules {
         }
     }
 
-    fn split_projection_projection_aggregate(
+    fn transform_group_expr_measure(
         &self,
         alias_to_cube_var: &'static str,
-        inner_aggregate_cube_expr_var: &'static str,
-        outer_aggregate_cube_expr_var: &'static str,
-        projection_alias_var: &'static str,
+        column_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let inner_aggregate_cube_expr_var = var!(inner_aggregate_cube_expr_var);
-        let outer_aggregate_cube_expr_var = var!(outer_aggregate_cube_expr_var);
+        let column_var = var!(column_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                GroupExprSplitReplacerAliasToCube
+            )
+            .cloned()
+            {
+                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                        if cube.lookup_measure(&column.name).is_some() {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_group_expr_dimension<T>(
+        &self,
+        alias_to_cube_var: &'static str,
+        column_var: &'static str,
+        original_transform_fn: T,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+    where
+        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let column_var = var!(column_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            if !original_transform_fn(egraph, subst) {
+                return false;
+            }
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                GroupExprSplitReplacerAliasToCube
+            )
+            .cloned()
+            {
+                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                        if cube.lookup_dimension(&column.name).is_some() {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_group_aggregate_measure<T>(
+        &self,
+        alias_to_cube_var: &'static str,
+        column_var: &'static str,
+        output_fun_var: &'static str,
+        distinct_var: &'static str,
+        original_transform_fn: T,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+    where
+        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let column_var = var!(column_var);
+        let output_fun_var = var!(output_fun_var);
+        let distinct_var = var!(distinct_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            if !original_transform_fn(egraph, subst) {
+                return false;
+            }
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                GroupAggregateSplitReplacerAliasToCube
+            )
+            .cloned()
+            {
+                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                        if let Some(measure) = cube.lookup_measure(&column.name) {
+                            if measure.agg_type.is_none() {
+                                continue;
+                            }
+
+                            let output_fun = match measure.agg_type.as_ref().unwrap().as_str() {
+                                "count" => AggregateFunction::Sum,
+                                "sum" => AggregateFunction::Sum,
+                                "min" => AggregateFunction::Min,
+                                "max" => AggregateFunction::Max,
+                                _ => continue,
+                            };
+                            subst.insert(
+                                output_fun_var,
+                                egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
+                                    AggregateFunctionExprFun(output_fun),
+                                )),
+                            );
+                            subst.insert(
+                                distinct_var,
+                                egraph.add(LogicalPlanLanguage::AggregateFunctionExprDistinct(
+                                    AggregateFunctionExprDistinct(false),
+                                )),
+                            );
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_group_aggregate_dimension(
+        &self,
+        alias_to_cube_var: &'static str,
+        column_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let column_var = var!(column_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                GroupAggregateSplitReplacerAliasToCube
+            )
+            .cloned()
+            {
+                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                        if cube.lookup_dimension(&column.name).is_some() {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn split_reaggregate_projection(
+        &self,
+        projection_expr_var: &'static str,
+        alias_to_cube_var: &'static str,
+        inner_aggregate_cube_var: &'static str,
+        group_expr_cube_var: &'static str,
+        group_aggregate_cube_var: &'static str,
+        new_expr_var: &'static str,
+        projection_alias_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let projection_expr_var = var!(projection_expr_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let inner_aggregate_cube_var = var!(inner_aggregate_cube_var);
+        let group_expr_cube_var = var!(group_expr_cube_var);
+        let group_aggregate_cube_var = var!(group_aggregate_cube_var);
+        let new_expr_var = var!(new_expr_var);
         let projection_alias_var = var!(projection_alias_var);
         move |egraph, subst| {
-            for alias_to_cube in
-                var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
+            if let Some(expr_to_alias) =
+                &egraph.index(subst[projection_expr_var]).data.expr_to_alias
             {
-                subst.insert(
-                    projection_alias_var,
-                    // Do not put alias on inner projection so table name from cube scan can be reused
-                    egraph.add(LogicalPlanLanguage::ProjectionAlias(ProjectionAlias(None))),
-                );
+                for alias_to_cube in
+                    var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
+                {
+                    // Replace outer projection columns with unqualified variants
+                    let expr = expr_to_alias
+                        .clone()
+                        .into_iter()
+                        .map(|(_, a)| {
+                            let column = Column::from_name(a);
+                            let column_expr_column = egraph.add(
+                                LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(column)),
+                            );
+                            egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]))
+                        })
+                        .collect::<Vec<_>>();
+                    let mut projection_expr =
+                        egraph.add(LogicalPlanLanguage::ProjectionExpr(vec![]));
+                    for i in expr.into_iter().rev() {
+                        projection_expr = egraph.add(LogicalPlanLanguage::ProjectionExpr(vec![
+                            i,
+                            projection_expr,
+                        ]));
+                    }
+                    subst.insert(new_expr_var, projection_expr);
 
-                subst.insert(
-                    inner_aggregate_cube_expr_var,
-                    egraph.add(LogicalPlanLanguage::InnerAggregateSplitReplacerAliasToCube(
-                        InnerAggregateSplitReplacerAliasToCube(alias_to_cube.clone()),
-                    )),
-                );
+                    subst.insert(
+                        projection_alias_var,
+                        // Do not put alias on inner projection so table name from cube scan can be reused
+                        egraph.add(LogicalPlanLanguage::ProjectionAlias(ProjectionAlias(None))),
+                    );
 
-                subst.insert(
-                    outer_aggregate_cube_expr_var,
-                    egraph.add(LogicalPlanLanguage::OuterAggregateSplitReplacerAliasToCube(
-                        OuterAggregateSplitReplacerAliasToCube(alias_to_cube.clone()),
-                    )),
-                );
-                return true;
+                    subst.insert(
+                        inner_aggregate_cube_var,
+                        egraph.add(LogicalPlanLanguage::InnerAggregateSplitReplacerAliasToCube(
+                            InnerAggregateSplitReplacerAliasToCube(alias_to_cube.clone()),
+                        )),
+                    );
+
+                    subst.insert(
+                        group_expr_cube_var,
+                        egraph.add(LogicalPlanLanguage::GroupExprSplitReplacerAliasToCube(
+                            GroupExprSplitReplacerAliasToCube(alias_to_cube.clone()),
+                        )),
+                    );
+
+                    subst.insert(
+                        group_aggregate_cube_var,
+                        egraph.add(LogicalPlanLanguage::GroupAggregateSplitReplacerAliasToCube(
+                            GroupAggregateSplitReplacerAliasToCube(alias_to_cube.clone()),
+                        )),
+                    );
+
+                    return true;
+                }
             }
             false
         }
