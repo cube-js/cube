@@ -9,7 +9,7 @@ services:
     environment:
       - CUBEJS_REFRESH_WORKER=false
       - CUBEJS_ROLLUP_ONLY=true
-      - CUBEJS_DEV_MODE=true
+      # - CUBEJS_DEV_MODE=true
 
       - CUBEJS_DB_TYPE=bigquery
       - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
@@ -17,7 +17,7 @@ services:
       - CUBEJS_DB_EXPORT_BUCKET=${CUBEJS_DB_EXPORT_BUCKET}
 
       - CUBEJS_EXT_DB_TYPE=cubestore
-      - CUBEJS_EXT_DB_HOST=cubestore
+      - CUBEJS_EXT_DB_HOST=cubestore_router
       - CUBEJS_EXT_DB_PORT=3030
 
       - CUBEJS_REDIS_URL=redis://redis:6379
@@ -26,18 +26,18 @@ services:
     volumes:
       - .:/cube/conf
     depends_on:
-      - cubestore
+      - cubestore_router
       - redis
 
-  cubestore:
+  cubestore_router:
     image: cubejs/cubestore:latest
     environment:
       - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002,cubestore_worker_3:10003,cubestore_worker_4:10004
       - CUBESTORE_REMOTE_DIR=/cube/data
       - CUBESTORE_META_PORT=9999
-      - CUBESTORE_SERVER_NAME=cubestore:9999
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
     volumes:
-      - .cubestore:/cube/data
+      - .cubestore/router:/cube/data
 
   cubestore_worker_1:
     image: cubejs/cubestore:latest
@@ -46,11 +46,11 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_worker_1:10001
       - CUBESTORE_WORKER_PORT=10001
       - CUBESTORE_REMOTE_DIR=/cube/data
-      - CUBESTORE_META_ADDR=cubestore:9999
+      - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore:/cube/data
+      - .cubestore/worker_1:/cube/data
     depends_on:
-      - cubestore
+      - cubestore_router
 
   cubestore_worker_2:
     image: cubejs/cubestore:latest
@@ -59,11 +59,11 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_worker_2:10002
       - CUBESTORE_WORKER_PORT=10002
       - CUBESTORE_REMOTE_DIR=/cube/data
-      - CUBESTORE_META_ADDR=cubestore:9999
+      - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore:/cube/data
+      - .cubestore/worker_2:/cube/data
     depends_on:
-      - cubestore
+      - cubestore_router
 
   cubestore_worker_3:
     image: cubejs/cubestore:latest
@@ -72,11 +72,11 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_worker_3:10003
       - CUBESTORE_WORKER_PORT=10003
       - CUBESTORE_REMOTE_DIR=/cube/data
-      - CUBESTORE_META_ADDR=cubestore:9999
+      - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore:/cube/data
+      - .cubestore/worker_3:/cube/data
     depends_on:
-      - cubestore
+      - cubestore_router
 
   cubestore_worker_4:
     image: cubejs/cubestore:latest
@@ -85,11 +85,11 @@ services:
       - CUBESTORE_SERVER_NAME=cubestore_worker_4:10004
       - CUBESTORE_WORKER_PORT=10004
       - CUBESTORE_REMOTE_DIR=/cube/data
-      - CUBESTORE_META_ADDR=cubestore:9999
+      - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore:/cube/data
+      - .cubestore/worker_4:/cube/data
     depends_on:
-      - cubestore
+      - cubestore_router
 
   redis:
     image: bitnami/redis:latest

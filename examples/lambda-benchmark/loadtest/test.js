@@ -35,7 +35,7 @@ let basicLatency = new Trend('Latency (Cube.js basic)', true);
 export function basic() {
     let res = http.get(`${RELAY_URL}/basic`);
 
-    cubestoreLatency.add(res.timings.duration);
+    basicLatency.add(res.timings.duration);
 
     check(res, {
       'is status 200': res => res.status === 200,

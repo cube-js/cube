@@ -12,19 +12,14 @@ export const githubCommits = {
   name: 'commits-count-by-day and repo',
 
   data: () => {
-    const year = getRandomInRange(2019, 2021)
-
     return {
-      year1: year,
-      year2: year + 1,
+      year1: 2019,
       month1: pad(getRandomInRange(1, 12), 2),
-      month2: pad(getRandomInRange(1, 12), 2),
       day1: pad(getRandomInRange(1, 28), 2),
-      day2: pad(getRandomInRange(1, 28), 2),
     }
   },
 
-  query: ({ year1, year2, month1, month2, day1, day2 }) => ({
+  query: ({ year1, month1, day1 }) => ({
     "order": {
       "GithubCommits.count": "desc"
     },
@@ -40,7 +35,7 @@ export const githubCommits = {
         "granularity": "day",
         "dateRange": [
           `${year1}-${month1}-${day1}`,
-          `${year2}-${month2}-${day2}`,
+          `2022-01-01`
         ]
       }
     ]

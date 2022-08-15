@@ -3,7 +3,7 @@ cube(`GithubCommits`, {
       SELECT *
       FROM \`bigquery-public-data.github_repos.commits\` AS commits
       CROSS JOIN UNNEST(commits.repo_name) AS repo
-      WHERE TIMESTAMP_SECONDS(author.time_sec) < CURRENT_TIMESTAMP()
+      WHERE TIMESTAMP_SECONDS(author.time_sec) BETWEEN TIMESTAMP("2019-01-01") AND TIMESTAMP("2020-01-01")
   `,
 
   refreshKey: {
