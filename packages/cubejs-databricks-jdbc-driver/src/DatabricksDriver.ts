@@ -19,7 +19,6 @@ import {
 } from '@cubejs-backend/jdbc-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { DatabricksQuery } from './DatabricksQuery';
-import { downloadJDBCDriver } from './installer';
 
 const { version } = require('../../package.json');
 
@@ -64,28 +63,37 @@ const DatabricksToGenericType: Record<string, string> = {
   'decimal(10,0)': 'bigint',
 };
 
-const jdbcDriverResolver: Promise<string> | null = null;
+let asserted: boolean = false;
 
-async function resolveJDBCDriver(): Promise<string> {
-  if (jdbcDriverResolver) {
-    return jdbcDriverResolver;
+/**
+ * Determines whether license terms & conditions are accepted or not.
+ */
+function assertAcception(): boolean {
+  const acceptStatus = getEnv('databrickAcceptPolicy');
+  if (acceptStatus) {
+    console.log(
+      'Databricks driver is using JDBC driver from Databricks. ' +
+      'You accepted the Terms & Conditions for the JDBC driver from Databricks ' +
+      '(https://databricks.com/jdbc-odbc-driver-license) by the CUBEJS_DB_DATABRICKS_ACCEPT_POLICY ' +
+      'environment variable set to true.'
+    );
   }
-  return fileExistsOr(
-    path.join(process.cwd(), 'SparkJDBC42.jar'),
-    async () => fileExistsOr(
-      path.join(__dirname, '..', '..', 'download', 'SparkJDBC42.jar'),
-      async () => {
-        const pathOrNull = await downloadJDBCDriver(false);
-        if (pathOrNull) {
-          return pathOrNull;
-        }
-        throw new Error(
-          'Please download and place SparkJDBC42.jar inside your ' +
-          'project directory'
-        );
-      }
-    )
-  );
+  if (!acceptStatus) {
+    throw new Error(
+      'Databricks driver is using JDBC driver from Databricks. ' +
+      'You declined the Terms & Conditions for the JDBC driver from Databricks ' +
+      '(https://databricks.com/jdbc-odbc-driver-license) by the CUBEJS_DB_DATABRICKS_ACCEPT_POLICY ' +
+      'environment variable set to false or by ignoring it.'
+    );
+  }
+  return acceptStatus;
+}
+
+function resolveJDBCDriver(): string {
+  if (!asserted) {
+    asserted = assertAcception();
+  }
+  return path.join(__dirname, '..', '..', 'bin', 'SparkJDBC42.jar');
 }
 
 /**
