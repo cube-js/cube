@@ -162,7 +162,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
     }),
     Joi.object().keys({
       columns: Joi.func().required(),
-      type: Joi.any().valid('regular', 'aggregate').required().default('regular'),
+      type: Joi.any().valid('regular', 'aggregate'),
     })
   )),
   // refreshRange was deprecated

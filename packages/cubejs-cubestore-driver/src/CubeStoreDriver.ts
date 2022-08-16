@@ -79,10 +79,11 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
   }
 
-  public createTableWithOptions(tableName, columns, options: CreateTableOptions) {
+  public createTableSqlWithOptions(tableName, columns, options: CreateTableOptions) {
     let sql = this.createTableSql(tableName, columns);
     const params: string[] = [];
     const withEntries: string[] = [];
+
     if (options.inputFormat) {
       withEntries.push(`input_format = '${options.inputFormat}'`);
     }
@@ -96,13 +97,23 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       sql = `${sql} UNIQUE KEY ${options.uniqueKey}`;
     }
     if (options.aggregations) {
-        sql = `${sql} $(options.aggregations)`
+      sql = `${sql} ${options.aggregations}`;
     }
     if (options.indexes) {
       sql = `${sql} ${options.indexes}`;
     }
     if (options.files) {
       sql = `${sql} LOCATION ${options.files.map(() => '?').join(', ')}`;
+      params.push(...options.files);
+    }
+    return sql;
+  }
+
+  public createTableWithOptions(tableName, columns, options: CreateTableOptions) {
+    const sql = this.createTableSqlWithOptions(tableName, columns, options);
+    const params: string[] = [];
+
+    if (options.files) {
       params.push(...options.files);
     }
 
@@ -150,9 +161,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[], aggregatesColumns?: string[], createTableIndexes?: CreateTableIndex[], queryTracingObj?: any) {
+  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[], queryTracingObj?: any, aggregationsColumns?: string[], createTableIndexes?: CreateTableIndex[]) {
     const indexes = createTableIndexes && createTableIndexes.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
-    const aggregations = aggregatesColumns && aggregatesColumns.length ? ` AGGREGATIONS (${aggregatesColumns.join(', ')})` : '';
+    const aggregations = aggregationsColumns && aggregationsColumns.length ? ` AGGREGATIONS (${aggregationsColumns.join(', ')})` : '';
 
     if (tableData.rowStream) {
       await this.importStream(columns, tableData, table, indexes, aggregations, queryTracingObj);
@@ -175,17 +186,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return `${prefix}INDEX ${index.indexName} (${index.columns.join(',')})`;
   }
 
-  private async importRows(table: string, columns: Column[], indexes: any, aggregations: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
-    const createTableSql = this.createTableSql(table, columns);
-    const createTableSqlWithIndexes = `${createTableSql}${aggregations} ${indexes}`;
-
-    await this.query(createTableSqlWithIndexes, [], queryTracingObj).catch(e => {
-      e.message = `Error during create table: ${createTableSql}: ${e.message}`;
-      throw e;
-    });
-
-  private async importRows(table: string, columns: Column[], indexesSql: any,  aggregations: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
-    await this.createTableWithOptions(table, columns, { indexes: indexesSql, aggregations: aggregations, buildRangeEnd: queryTracingObj?.buildRangeEnd });
+  private async importRows(table: string, columns: Column[], indexesSql: any, aggregations: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
+    await this.createTableWithOptions(table, columns, { indexes: indexesSql, aggregations, buildRangeEnd: queryTracingObj?.buildRangeEnd });
     try {
       const batchSize = 2000; // TODO make dynamic?
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
@@ -233,12 +235,18 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       const filePromises: Promise<string>[] = [];
       let currentFileStream: { stream: NodeJS.WritableStream, tempFile: string } | null = null;
 
+      const options: CreateTableOptions = {
+        buildRangeEnd: queryTracingObj?.buildRangeEnd,
+        indexes,
+        aggregations
+      };
+
       const { baseUrl } = this;
       let fileCounter = 0;
 
       const createTableSql = this.createTableSql(table, columns);
       // eslint-disable-next-line no-unused-vars
-      const createTableSqlWithoutLocation = `${createTableSql}${aggregations}${indexes ? ` ${indexes}` : ''}`;
+      const createTableSqlWithoutLocation = this.createTableSqlWithOptions(table, columns, options);
 
       const getFileStream = () => {
         if (!currentFileStream) {
@@ -313,10 +321,6 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
       await Promise.all(pipelinePromises);
 
-      const options: CreateTableOptions = {
-        buildRangeEnd: queryTracingObj?.buildRangeEnd,
-        indexes
-      };
       const files = await Promise.all(filePromises);
       if (files.length > 0) {
         options.files = files.map(fileName => `temp://${fileName}`);

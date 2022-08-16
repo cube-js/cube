@@ -1019,9 +1019,9 @@ export class PreAggregationLoader {
         tableData,
         this.prepareIndexesSql(newVersionEntry, queryOptions),
         this.preAggregation.uniqueKeyColumns,
-        this.preAggregation.aggregatesColumns,
+        queryOptions,
+        this.preAggregation.aggregationsColumns,
         this.prepareCreateTableIndexes(newVersionEntry, queryOptions),
-        queryOptions
       )
     ).catch((error: any) => {
       this.logger('Uploading external pre-aggregation error', { ...queryOptions, error: error?.stack || error?.message });

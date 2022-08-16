@@ -118,7 +118,9 @@ export class PreAggregations {
     return this.hasCumulativeMeasuresValue;
   }
 
-  aggregatesColumns(cube, preAggregation) {
+  // Return array of `aggregations` columns descriptions in form `<func>(<column>)`
+  // Aggregations used in CubeStore create table for describe measures in CubeStore side
+  aggregationsColumns(cube, preAggregation) {
     if (preAggregation.type === 'rollup') {
       return this.query
         .preAggregationQueryForSqlEvaluation(cube, preAggregation)
@@ -163,7 +165,7 @@ export class PreAggregations {
       originalSql: () => preAggregation.uniqueKeyColumns || null
     }[preAggregation.type] || uniqueKeyColumnsDefault)();
 
-    const aggregatesColumns = this.aggregatesColumns(cube, preAggregation);
+    const aggregationsColumns = this.aggregationsColumns(cube, preAggregation);
     
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
@@ -178,7 +180,7 @@ export class PreAggregations {
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
       uniqueKeyColumns,
-      aggregatesColumns,
+      aggregationsColumns,
       dataSource: queryForSqlEvaluation.dataSource,
       granularity: preAggregation.granularity,
       partitionGranularity: preAggregation.partitionGranularity,
