@@ -31,24 +31,6 @@ services:
       - cubestore_router
       - redis
 
-  cube-basic:
-    <<: *cube
-    profiles:
-      - basic
-    ports:
-      - 4001:4000
-      - 3001:3000
-
-  cube-lambda:
-    <<: *cube
-    profiles:
-      - lambda
-    ports:
-      - 4002:4000
-      - 3002:3000
-    environment:
-      - CUBEJS_TEST_USE_PREAGGREGATION=1
-
   cubestore_router:
     image: cubejs/cubestore:latest
     environment:
@@ -57,7 +39,7 @@ services:
       - CUBESTORE_META_PORT=9999
       - CUBESTORE_SERVER_NAME=cubestore_router:9999
     volumes:
-      - .cubestore/router:/cube/data
+      - .cubestore/${CUBESTORE_DIR}/router:/cube/data
 
   cubestore_worker_1:
     image: cubejs/cubestore:latest
@@ -68,7 +50,7 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
       - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore/worker_1:/cube/data
+      - .cubestore/${CUBESTORE_DIR}/worker_1:/cube/data
     depends_on:
       - cubestore_router
 
@@ -81,7 +63,7 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
       - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore/worker_2:/cube/data
+      - .cubestore/${CUBESTORE_DIR}/worker_2:/cube/data
     depends_on:
       - cubestore_router
 
@@ -94,7 +76,7 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
       - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore/worker_3:/cube/data
+      - .cubestore/${CUBESTORE_DIR}/worker_3:/cube/data
     depends_on:
       - cubestore_router
 
@@ -107,7 +89,7 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
       - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore/worker_4:/cube/data
+      - .cubestore/${CUBESTORE_DIR}/worker_4:/cube/data
     depends_on:
       - cubestore_router
 
