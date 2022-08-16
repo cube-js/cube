@@ -12,15 +12,6 @@ cube(`OrdersPA`, {
   `,
 
   preAggregations: {
-    ordersById: {
-      unionWithSourceData: true,
-      measures: [CUBE.count, CUBE.totalAmount],
-      dimensions: [CUBE.id],
-      refreshKey: {
-        every: `1 hour`,
-      }
-    },
-
     ordersByStatus: {
       measures: [CUBE.count, CUBE.totalAmount],
       dimensions: [CUBE.status],

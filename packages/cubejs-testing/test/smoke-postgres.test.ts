@@ -103,42 +103,4 @@ describe('postgres pa', () => {
     })).json();
     expect(preview.preview).toBeDefined();
   });
-
-  test('preview lambda', async () => {
-    const id = 'OrdersPA.ordersById';
-
-    const partitions = await (await fetch(`${birdbox.configuration.systemUrl}/pre-aggregations/partitions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: {
-          preAggregations: [
-            {
-              id
-            }
-          ]
-        }
-      }),
-    })).json();
-
-    console.log('QQQ', partitions);
-
-    const partition = partitions.preAggregationPartitions[0].partitions[0];
-    const { timezone } = partition;
-    const versionEntry = partition.versionEntries[0];
-    expect(versionEntry.build_range_end).toBeDefined();
-
-    const preview = await (await fetch(`${birdbox.configuration.systemUrl}/pre-aggregations/preview`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: {
-          preAggregationId: id,
-          timezone,
-          versionEntry,
-        }
-      }),
-    })).json();
-    expect(preview.preview).toBeDefined();
-  });
 });
