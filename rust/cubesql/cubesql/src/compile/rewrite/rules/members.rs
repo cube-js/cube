@@ -17,9 +17,9 @@ use crate::{
             rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules},
             segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
             transforming_rewrite, udaf_expr, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AliasExprAlias, ChangeUserCube, ColumnExprColumn,
-            CubeScanAliasToCube, CubeScanAliases, CubeScanLimit, DimensionName, LimitN,
-            LiteralExprValue, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
+            AggregateFunctionExprFun, AliasExprAlias, CastExprDataType, ChangeUserCube,
+            ColumnExprColumn, CubeScanAliasToCube, CubeScanAliases, CubeScanLimit, DimensionName,
+            LimitN, LiteralExprValue, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
             MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
             MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias,
             SegmentName, TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
@@ -31,6 +31,7 @@ use crate::{
 };
 use cubeclient::models::V1CubeMetaMeasure;
 use datafusion::{
+    arrow::datatypes::DataType,
     logical_plan::{Column, DFSchema, Expr},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
@@ -116,6 +117,7 @@ impl RewriteRules for MemberRules {
                 None,
                 Some("?distinct"),
                 Some("?aggr_fun"),
+                None,
             ),
             self.measure_rewrite(
                 "named",
@@ -123,11 +125,30 @@ impl RewriteRules for MemberRules {
                 Some("?column"),
                 Some("?distinct"),
                 Some("?aggr_fun"),
+                None,
+            ),
+            // TODO There're two approaches for CAST arg problem: push down to CubeScan and remove casts / cast inside CubeScan or
+            // TODO split it and implement limit, order, filter, etc. pushdown to projection nodes with casts.
+            // TODO First approach is simpler and much faster compute-wise.
+            // TODO Second approach is much more generalized.
+            // TODO We need to weigh in on generalization vs performance tradeoffs here.
+            self.measure_rewrite(
+                "with-cast",
+                agg_fun_expr(
+                    "?aggr_fun",
+                    vec![cast_expr(column_expr("?column"), "?data_type")],
+                    "?distinct",
+                ),
+                Some("?column"),
+                Some("?distinct"),
+                Some("?aggr_fun"),
+                Some("?data_type"),
             ),
             self.measure_rewrite(
                 "measure-fun",
                 udaf_expr("?aggr_fun", vec![column_expr("?column")]),
                 Some("?column"),
+                None,
                 None,
                 None,
             ),
@@ -631,6 +652,15 @@ impl MemberRules {
         rules.push(find_matching_old_member(
             "agg-fun",
             agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+        ));
+        rules.push(find_matching_old_member(
+            "agg-fun-with-cast",
+            // TODO need to check data_type if we can remove the cast
+            agg_fun_expr(
+                "?fun_name",
+                vec![cast_expr(column_expr("?column"), "?data_type")],
+                "?distinct",
+            ),
         ));
         rules.push(transforming_chain_rewrite(
             "member-pushdown-replacer-agg-fun",
@@ -1501,6 +1531,7 @@ impl MemberRules {
         measure_var: Option<&'static str>,
         distinct_var: Option<&'static str>,
         fun_var: Option<&'static str>,
+        cast_data_type_var: Option<&'static str>,
     ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
         transforming_chain_rewrite(
             &format!("measure-{}", name),
@@ -1512,6 +1543,7 @@ impl MemberRules {
                 measure_var,
                 distinct_var,
                 fun_var,
+                cast_data_type_var,
                 "?aggr_expr",
                 "?measure",
             ),
@@ -1672,6 +1704,7 @@ impl MemberRules {
         measure_var: Option<&'static str>,
         distinct_var: Option<&'static str>,
         fun_var: Option<&'static str>,
+        cast_data_type_var: Option<&'static str>,
         aggr_expr_var: &'static str,
         measure_out_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
@@ -1680,6 +1713,7 @@ impl MemberRules {
         let fun_var = fun_var.map(|var| var.parse().unwrap());
         let measure_var = measure_var.map(|var| var.parse().unwrap());
         let aggr_expr_var = aggr_expr_var.parse().unwrap();
+        let cast_data_type_var = cast_data_type_var.map(|var| var!(var));
         let measure_out_var = measure_out_var.parse().unwrap();
         let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
@@ -1723,20 +1757,35 @@ impl MemberRules {
                                         original_expr_name(egraph, subst[aggr_expr_var])
                                     {
                                         let alias_to_cube = alias_to_cube.clone();
-                                        Self::measure_output(
-                                            egraph,
-                                            subst,
-                                            measure,
-                                            call_agg_type,
-                                            alias,
-                                            measure_out_var,
-                                            cube_alias,
-                                            subst[aggr_expr_var],
-                                            alias_to_cube,
-                                        );
-                                    }
+                                        let can_remove_cast = cast_data_type_var
+                                            .map(|cast_data_type_var| {
+                                                var_iter!(
+                                                    egraph[subst[cast_data_type_var]],
+                                                    CastExprDataType
+                                                )
+                                                .any(|dt| match dt {
+                                                    DataType::Decimal(_, _) => true,
+                                                    _ => false,
+                                                })
+                                            })
+                                            .unwrap_or(true);
 
-                                    return true;
+                                        if can_remove_cast {
+                                            Self::measure_output(
+                                                egraph,
+                                                subst,
+                                                measure,
+                                                call_agg_type,
+                                                alias,
+                                                measure_out_var,
+                                                cube_alias,
+                                                subst[aggr_expr_var],
+                                                alias_to_cube,
+                                            );
+
+                                            return true;
+                                        }
+                                    }
                                 }
 
                                 if let Some(dimension) = cube.lookup_dimension(&column.name) {
