@@ -1,5 +1,3 @@
-/* eslint-disable no-restricted-syntax */
-import fs from 'fs';
 import path from 'path';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -22,32 +20,21 @@ import { DatabricksQuery } from './DatabricksQuery';
 
 const { version } = require('../../package.json');
 
-export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
-  {
-    readOnly?: boolean,
-    maxPoolSize?: number,
-    // common bucket config
-    bucketType?: string,
-    exportBucket?: string,
-    exportBucketMountDir?: string,
-    pollInterval?: number,
-    // AWS bucket config
-    awsKey?: string,
-    awsSecret?: string,
-    awsRegion?: string,
-    // Azure export bucket
-    azureKey?: string,
-  };
-
-async function fileExistsOr(
-  fsPath: string,
-  fn: () => Promise<string>,
-): Promise<string> {
-  if (fs.existsSync(fsPath)) {
-    return fsPath;
-  }
-  return fn();
-}
+export type DatabricksDriverConfiguration = JDBCDriverConfiguration & {
+  readOnly?: boolean,
+  maxPoolSize?: number,
+  // common bucket config
+  bucketType?: string,
+  exportBucket?: string,
+  exportBucketMountDir?: string,
+  pollInterval?: number,
+  // AWS bucket config
+  awsKey?: string,
+  awsSecret?: string,
+  awsRegion?: string,
+  // Azure export bucket
+  azureKey?: string,
+};
 
 type ShowTableRow = {
   database: string,
