@@ -1,8 +1,8 @@
+import { CUBEJS_QUERY_TYPE } from '../env';
 import { DATE_CAST } from './CAST';
 
-// TODO(cristipp) Use test-time db type instead of hardcoded value.
-const DB_TYPE = 'bigquery2';
-const { DATE_PREFIX, DATE_SUFFIX } = DATE_CAST[DB_TYPE];
+// TODO(cristipp) Use CUBEJS_DB_TYPE instead, once DATE_CAST['bigquery'] gets fixed.
+const { DATE_PREFIX, DATE_SUFFIX } = DATE_CAST[CUBEJS_QUERY_TYPE];
 
 cube(`OrdersPA`, {
   sql: `

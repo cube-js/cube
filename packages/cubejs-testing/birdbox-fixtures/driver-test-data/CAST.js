@@ -30,6 +30,8 @@ export const DATE_CAST = {
     DATE_PREFIX: 'parse_date(\'%Y-%m-%d\', ',
     DATE_SUFFIX: ')',
   },
+  // The default range queries for `refreshKey: every '...'` use `DATETIME(timestamp, tz)`.
+  // parse_date returns a DATE instead of a TIMESTAMP, and refresh queries fail with
   bigquery2: {
     DATE_PREFIX: 'parse_timestamp(\'%Y-%m-%d\', ',
     DATE_SUFFIX: ')',

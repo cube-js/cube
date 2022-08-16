@@ -38,7 +38,6 @@ export const TEST_CASES: Record<string, TestCase> = {
       order: {
         'OrdersPA.status': 'asc',
       },
-      limit: 3
     },
     rows: [
       {
