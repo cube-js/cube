@@ -60,6 +60,7 @@
     "smoke:questdb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-questdb.test.js",
     "smoke:multidb": "jest --verbose -i dist/test/smoke-multidb.test.js",
     "smoke:multidb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-multidb.test.js",
+    "smoke:postgres": "jest --verbose -i dist/test/smoke-postgres.test.js",
     "smoke:redshift": "jest --verbose -i dist/test/smoke-redshift.test.js",
     "smoke:redshift:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-redshift.test.js",
     "smoke:cubesql": "jest --verbose --forceExit -i dist/test/smoke-cubesql.test.js",
