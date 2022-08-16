@@ -5,7 +5,7 @@ import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { StartedTestContainer } from 'testcontainers';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
-
+import fetch from "node-fetch";
 
 describe('postgres pa', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -46,13 +46,99 @@ describe('postgres pa', () => {
 
   test('basic pa', async () => {
     const query: Query = {
-      measures: ['Orders.totalAmount'],
-      dimensions: ['Orders.status'],
+      measures: ['OrdersPA.count'],
+      dimensions: ['OrdersPA.status'],
       order: {
-        'Orders.status': 'asc',
+        'OrdersPA.status': 'asc',
       },
     };
     const result = await client.load(query, {});
-    expect(result.rawData()).toEqual([]);
+    expect(result.rawData()).toEqual([
+      {
+        'OrdersPA.count': '2',
+        'OrdersPA.status': 'new',
+      },
+      {
+        'OrdersPA.count': '2',
+        'OrdersPA.status': 'processed',
+      },
+      {
+        'OrdersPA.count': '1',
+        'OrdersPA.status': 'shipped',
+      },
+    ]);
+  });
+
+  test('preview', async () => {
+    const id = 'OrdersPA.ordersByStatus';
+
+    const partitions = await (await fetch(`${birdbox.configuration.systemUrl}/pre-aggregations/partitions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: {
+          preAggregations: [
+            {
+              id
+            }
+          ]
+        }
+      }),
+    })).json();
+    const partition = partitions.preAggregationPartitions[0].partitions[0];
+    const { timezone } = partition;
+    const versionEntry = partition.versionEntries[0];
+    expect(versionEntry.build_range_end).not.toBeDefined();
+
+    const preview = await (await fetch(`${birdbox.configuration.systemUrl}/pre-aggregations/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: {
+          preAggregationId: id,
+          timezone,
+          versionEntry,
+        }
+      }),
+    })).json();
+    expect(preview.preview).toBeDefined();
+  });
+
+  test('preview lambda', async () => {
+    const id = 'OrdersPA.ordersById';
+
+    const partitions = await (await fetch(`${birdbox.configuration.systemUrl}/pre-aggregations/partitions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: {
+          preAggregations: [
+            {
+              id
+            }
+          ]
+        }
+      }),
+    })).json();
+
+    console.log('QQQ', partitions);
+
+    const partition = partitions.preAggregationPartitions[0].partitions[0];
+    const { timezone } = partition;
+    const versionEntry = partition.versionEntries[0];
+    expect(versionEntry.build_range_end).toBeDefined();
+
+    const preview = await (await fetch(`${birdbox.configuration.systemUrl}/pre-aggregations/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: {
+          preAggregationId: id,
+          timezone,
+          versionEntry,
+        }
+      }),
+    })).json();
+    expect(preview.preview).toBeDefined();
   });
 });

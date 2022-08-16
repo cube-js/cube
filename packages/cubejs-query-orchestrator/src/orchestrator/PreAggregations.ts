@@ -176,7 +176,6 @@ const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry
       table_name: `${schema}.${match[1]}`,
       content_version: match[2],
       structure_version: match[3],
-      build_range_end: table.build_range_end,
     };
 
     if (match[4].length < 13) {
@@ -184,6 +183,10 @@ const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry
       entity.naming_version = 2;
     } else {
       entity.last_updated_at = parseInt(match[4], 10);
+    }
+
+    if (table.build_range_end) {
+      entity.build_range_end = table.build_range_end;
     }
 
     return entity;
