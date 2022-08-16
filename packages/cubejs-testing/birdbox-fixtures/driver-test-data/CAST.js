@@ -32,6 +32,7 @@ export const DATE_CAST = {
   },
   // The default range queries for `refreshKey: every '...'` use `DATETIME(timestamp, tz)`.
   // parse_date returns a DATE instead of a TIMESTAMP, and refresh queries fail with
+  // "Error: Could not cast literal "UTC" to type TIME"
   bigquery2: {
     DATE_PREFIX: 'parse_timestamp(\'%Y-%m-%d\', ',
     DATE_SUFFIX: ')',
