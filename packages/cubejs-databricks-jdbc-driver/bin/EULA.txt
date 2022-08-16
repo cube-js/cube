@@ -1,0 +1,295 @@
+END-USER LICENSE AGREEMENT (EULA) 
+
+IMPORTANT – READ CAREFULLY: THIS END-USER LICENSE AGREEMENT (THIS "AGREEMENT") 
+IS A LEGAL AGREEMENT BETWEEN YOU AND SIMBA (HEREINAFTER DEFINED). PLEASE READ 
+THIS AGREEMENT CAREFULLY BEFORE DOWNLOADING, INSTALLING OR USING THE PROGRAM 
+(HEREINAFTER DEFINED). THE PROGRAM MAY INCLUDE PRODUCT ACTIVATION AND OTHER 
+TECHNOLOGY DESIGNED TO PREVENT UNAUTHORIZED USE AND COPYING. BY INSTALLING OR 
+USING THE PROGRAM YOU CONSENT TO THE TRANSMISSION OF CERTAIN COMPUTER 
+INFORMATION REQUIRED FOR ACTIVATION AND/OR VALIDATION. 
+
+EFFECT OF PURCHASE ORDERS; ORDERING DOCUMENTATION. SIMBA WILL NOT BE BOUND BY, 
+AND SPECIFICALLY OBJECTS TO, ANY TERM, CONDITION OR OTHER PROVISION THAT IS 
+DIFFERENT FROM OR IN ADDITION TO THE SALES ORDER ASSOCIATED HEREWITH AND/OR 
+THIS AGREEMENT THAT IS PROFFERED BY YOU IN ANY RECEIPT, ACCEPTANCE, 
+CONFIRMATION, CORRESPONDENCE, OR OTHERWISE. FURTHER, ALL PREPRINTED CLAUSES ON 
+ANY ORDER FORM PROVIDED BY YOU ARE DEEMED DELETED OR SUPERSEDED BY SAID SALES 
+ORDER AND/OR THIS AGREEMENT. 
+
+OTHER CONTRACTS. THE TERMS AND CONDITIONS OF THIS AGREEMENT MAY BE MODIFIED BY 
+A SEPARATE SOFTWARE LICENSE AGREEMENT BETWEEN SIMBA AND THE PROGRAM’S END 
+USER. 
+
+USE CONSENT. YOU ARE DEEMED TO CONSENT TO BE BOUND BY THE TERMS AND CONDITIONS 
+OF THIS AGREEMENT BY INSTALLING, COPYING, OR OTHERWISE USING THE PROGRAM. 
+FUTHERMORE, THIS AGREEMENT IS ENFORCEABLE AGAINST YOU AND ANY PERSON THAT 
+OBTAINED THE PROGRAM AND ON WHOSE BEHALF IT IS USED. 
+
+ELECTRONIC SIGNATURE. YOU AGREE TO THE USE OF ELECTRONIC COMMUNICATION TO 
+ENTER INTO THIS AGREEMENT AND HEREBY WAIVE ANY RIGHTS OR REQUIREMENTS UNDER 
+ANY LAWS OR REGULATIONS IN ANY JURISDICTION THAT REQUIRE AN ORIGINAL 
+(NON-ELECTRONIC) SIGNATURE OR DELIVERY OR RETENTION OF NON-ELECTRONIC RECORDS 
+TO THE EXTENT PERMITTED UNDER APPLICABLE LAW. IF YOU DO NOT AGREE TO THE TERMS 
+AND CONDITIONS OR THIS AGREEMENT, DO NOT PROCEED WITH THE DOWNLOAD, 
+INSTALLATION OR USE OF THE PROGRAM. 
+
+1. GENERAL TERMS; AUTHORITY. This Agreement governs your use of the 
+accompanying computer software program or technology (the "Program"), which 
+Program is owned or controlled by Simba Technologies Incorporated, or one of 
+its subsidiaries or affiliates (collectively referred to herein as "Simba"). 
+You represent and warrant that you have authorized the download and 
+installation of the Program, or the owner of the computer or server on which 
+it will be installed has authorized you to do so. Your rights to use and 
+reproduce the Program are expressly set out in this Agreement. 
+
+2. USE INDEMNIFICATION. You agree to defend, indemnify and hold harmless 
+Simba, its suppliers and its resellers from and against liabilities, costs, 
+damages and expenses (including settlement costs and reasonable attorney fees) 
+arising from any claims from anybody that result from or relate to your use, 
+reproduction or distribution of the Program. 
+
+3. OWNERSHIP RIGHTS. The Program is licensed and not sold. The Program is 
+protected by Canadian and United States copyright laws and international 
+treaty provisions. Simba owns and retains all right, title, and interest in 
+and to the Program, including all copyrights, patents, trade secret rights, 
+trademarks, and other Intellectual Property Rights therein. Nothing in this 
+Agreement, including the possession, installation, or use of the Program 
+assigns or transfers to any person any title, right or interest to the 
+Intellectual Property Rights in the Program, except as explicitly specified in 
+this Agreement. For purposes of this Agreement, the sale of the Program shall 
+mean and confer only the license right to use the Software as specified in 
+this Agreement. "Intellectual Property Rights" means patents, rights to 
+inventions, copyright and related rights, trademarks, trade names and domain 
+names, rights in get-up, rights in goodwill or to sue for passing off, rights 
+in designs, rights in computer software, database rights, rights in 
+confidential information (including know-how and trade secrets) and any other 
+intellectual property rights, in each case whether registered or unregistered 
+and including all applications (or rights to apply) for, and renewals or 
+extensions of, such rights and all similar or equivalent rights or forms of 
+protection which may now or in the future subsist in any part of the world. 
+
+4. LICENSE GRANT. Subject to the terms and conditions of this Agreement, Simba 
+grants a limited, non-exclusive, non-transferable, and non-sub-licensable 
+right to you to download, install and use the Program for the term and as 
+otherwise indicated on the invoice associated with your purchase of the 
+relevant Program(s) (the "License"). You will immediately inform Simba if the 
+Program is intended to be used outside the scope of the License. A separate 
+license for any use outside the scope of this Agreement must be obtained from 
+Simba in writing in advance of any such use. Notwithstanding anything to the 
+contrary contained herein, an upgrade to new versions/releases of the 
+Program(s) is outside the scope of the License and such upgrade(s) must be 
+licensed separately. 
+
+5. SUBSCRIPTION FEES; EFFECT OF NON-PAYMENT. Unless the License is perpetual, 
+the License shall be limited, non-perpetual and granted on a subscription-fee 
+basis requiring annual renewal. Failure to renew and pay the subscription fee 
+will cancel and terminate your rights to use the Program. You have the 
+obligation to pay and remit the subscription fee on a timely basis and in 
+advance. 
+
+6. TRANSFER AND USE RESTRICTIONS. You may not sell, license, sub-license, 
+lend, rent, share, lease, transmit, telecommunicate, distribute, embed, assign 
+or otherwise transfer the Program to others. You must comply with all 
+applicable Canadian, United States and other export control laws related to 
+your use of the Program. Except as expressly permitted above, you may not 
+modify, reverse engineer, decompile, decrypt, extract or otherwise disassemble 
+the Program. The License does not permit you to distribute or make the Program 
+available over any network where it could be used by multiple devices at the 
+same time. The License does not permit you to directly or indirectly, reverse 
+engineer, adapt, modify, decompile, disassemble, translate the Program or 
+create derivative works based on the Program in any way including without 
+limitation, removal of the installer program, electronic end user license 
+agreement, "About" screen, or any copyright or other proprietary notice that 
+appears in the Program, or otherwise attempt to discover the source code of 
+the Program. In addition, the License does not permit you to remove or alter 
+any proprietary notices or labels on the Program. There shall be no rights 
+implied to you or any person using the Program. The license rights granted 
+under this Agreement shall terminate immediately in the event of a breach of 
+any provisions of this Agreement. 
+
+7. TERMINATION. Simba may terminate this Agreement immediately and without 
+prior notice if you breach any term, or otherwise fail to strictly comply with 
+this Agreement. In the event of termination for any reason, you agree to 
+immediately destroy and/or erase the original and all copies of the Program 
+and to discontinue its use, and you will not otherwise retain or store the 
+Program or any copies thereof, in any form or medium. You also agree to 
+provide to Simba proof of confirmation of your discontinuance and non-use upon 
+request. 
+
+8. WARRANTIES. Simba warrants for a period of ninety (90) days from the date 
+the Program is delivered to you that the Program shall substantially conform 
+to Simba’s documented specifications. In the event of any alleged breach of 
+the above express warranties, you shall report the details of such alleged 
+breach in writing to Simba within the specified ninety (90) day warranty 
+period. If such alleged breach is reported as required and substantiated by 
+Simba, your exclusive remedies shall be, at Simba’s sole option, for Simba to 
+promptly repair or replace the Program or any portion thereof necessary to 
+remedy the breach, or to refund the fees actually received by Simba for the 
+License. EXCEPT AS SET FORTH ABOVE, YOU EXPRESSLY ACKNOWLEDGE AND AGREE THAT 
+THE USE OF THE PROGRAM IS AT YOUR SOLE RISK. SIMBA PROVIDES THE PROGRAM 
+(INCLUDING, BUT NOT LIMITED TO, ANY DOCUMENTATION AND SUPPORT) ON AN "AS IS", 
+"WHERE IS" BASIS WITHOUT ANY WARRANTY OF ANY KIND, EITHER EXPRESS, IMPLIED OR 
+STATUORY, INCLUDING, BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF 
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, NON-INFRINGEMENT, 
+OR CONDITION ARISING FROM COURSE OF PERFORMANCE, COURSE OF DEALING OR USAGE OF 
+TRADE. SIMBA DOES NOT WARRANT THAT THE FUNCTIONS CONTAINED IN THE PROGRAM WILL 
+MEET YOUR REQUIREMENTS, OR THAT THE OPERATION OF THE PROGRAM WILL BE ERROR 
+FREE OR UNINTERRUPTED, OR THAT DEFECTS IN PROGRAM WILL BE CORRECTED. 
+FURTHERMORE, SIMBA DOES NOT WARRANT OR MAKE ANY REPRESENTATIONS REGARDING THE 
+USE OR THE RESULTS OF THE USE OF THE PROGRAM IN TERMS OF ITS CORRECTNESS, 
+ACCURACY, RELIABILITY, OR OTHERWISE. NO ORAL OR WRITTEN INFORMATION OR ADVICE 
+GIVEN BY SIMBA OR ITS AUTHORIZED REPRESENTATIVES SHALL CREATE A WARRANTY OR IN 
+ANY WAY INCREASE THE SCOPE OF THIS WARRANTY. 
+
+9. DISCLAIMER & RELEASE. EXCEPT RELATED TO THE EXPRESS WARRANTIES AND 
+INDEMNITIES SET FORTH HEREIN, YOU HEREBY WAIVE, RELEASE AND DISCLAIM, ALL 
+WARRANTIES, CONDITIONS, INDEMNITIES, OBLIGATIONS AND LIABILITIES OF SIMBA AND 
+ALL OTHER REMEDIES, RIGHTS, CAUSES OF ACTION AND CLAIMS AGAINST SIMBA WITH 
+RESPECT TO THE PROGRAM, ALL RELATED DOCUMENTATION AND ANY SERVICES FURNISHED 
+UNDER THIS AGREEMENT, INCLUDING, BUT NOT LIMITED TO, ANY OBLIGATION, 
+LIABILITY, RIGHT, REMEDY OR CLAIM IN CONTRACT, INCLUDING FUNDAMENTAL BREACH, 
+TORT, NOTWITHSTANDING ANY FAULT, NEGLIGENCE, STRICT LIABILITY OR PRODUCT 
+LIABILITY OF SIMBA (WHETHER ACTIVE, PASSIVE OR IMPUTED) AND ANY OBLIGATION, 
+LIABILITY, REMEDY, RIGHT OR CLAIM FOR INFRINGEMENT. YOU ACKNOWLEDGE THE 
+PROGRAM IS NOT DESIGNED OR LICENSED FOR USE IN HAZARDOUS ENVIRONMENTS 
+REQUIRING FAIL-SAFE CONTROLS, INCLUDING, BUT NOT LIMITED TO, OPERATION OF 
+NUCLEAR FACILITIES, AIRCRAFT NAVIGATION OR COMMUNICATION SYSTEMS, AIR TRAFFIC 
+CONTROL, LIFE SUPPORT OR WEAPONS SYSTEMS. WITHOUT LIMITING THE GENERALITY OF 
+THE FOREGOING, SIMBA EXPRESSLY DISCLAIMS ANY EXPRESS OR IMPLIED WARRANTY OR 
+CONDITION OF FITNESS FOR SUCH PURPOSES. YOU ACKNOWLEDGE THAT SIMBA IS ONLY 
+WILLING TO ENTER INTO THIS AGREEMENT ON THE CONDITION THAT YOU AGREE TO BE 
+BOUND BY THE LIMITATIONS SET FORTH IN THIS AGREEMENT. 
+
+10. LIMITATION OF LIABILITY. SIMBA WILL HAVE NO LIABILITY OR OBLIGATION FOR 
+ANY DAMAGES OR REMEDIES, INCLUDING, WITHOUT LIMITATION, THE COST OF SUBSTITUTE 
+GOODS, LOST OR CORRUPTION OF DATA, LOST PROFITS, LOST REVENUES OR ANY OTHER 
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, GENERAL, PUNITIVE, CONSEQUENTIAL OR 
+EXEMPLARY DAMAGES, ARISING OUT OF THIS AGREEMENT OR THE USE OR INABILITY TO 
+USE THE PROGRAM. IN NO EVENT WILL SIMBA’S TOTAL AGGREGATE LIABILITY (WHETHER 
+IN CONTRACT (INCLUDING FUNDAMENTAL BREACH), WARRANTY, TORT (INCLUDING 
+NEGLIGENCE), PRODUCT LIABILITY, INTELLECTUAL PROPERTY INFRINGEMENT OR OTHER 
+LEGAL THEORY WITH REGARD TO THE PROGRAM AND/OR THIS AGREEMENT EXCEED THE FEES 
+ACTUALLY RECEIVED BY SIMBA DIRECTLY ATTRIBUTABLE TO THIS LICENSE OR ONE 
+HUNDRED DOLLARS ($100.00), WHICHEVER IS LESSER. Furthermore, Simba will not be 
+liable for any delay or failure to perform its obligations under this 
+Agreement as a result of any causes or conditions beyond Simba’s reasonable 
+control as determined in its sole discretion. 
+
+11. INTELLECTUAL PROPERTY CLAIMS. Subject to Section 10 hereof, Simba will 
+indemnify and hold you harmless against any damages resulting from use of the 
+Program finally awarded against you pursuant to a judicial proceeding, to the 
+extent such proceeding is based upon an infringement of any valid U.S. or 
+Canadian patent issued prior to the date you receive the Program from Simba, 
+or any valid U.S. or Canadian copyright by the Program, provided that you: (i) 
+promptly give written notice of the claim to Simba; (ii) give Simba sole 
+control of the defense and settlement of the claim; (iii) provide to Simba all 
+available information and assistance; and (iv) have not compromised or settled 
+such claim. If the Program is found to infringe or in Simba’s opinion is 
+likely to infringe, Simba may at its sole discretion elect to: (i) obtain for 
+you the right to use the Program; (ii) replace or modify the Program so that 
+it is non-infringing; or (iii) remove the Program and refund fees paid by you 
+to Simba for the Program. Simba will have no obligation under this Section 11 
+for any claims which result from: (i) use of the Program in combination with 
+any non-Simba provided software (including any portion of the Program not 
+authored by Simba); (ii) Simba’s compliance with your designs or 
+specifications; (iii) modification of the Program by you or anyone other than 
+Simba; or (iv) use of an allegedly infringing version of the Program, if the 
+alleged infringement could be avoided by the use of a different version made 
+available to you by Simba. This Section 11 sets forth the entire liability of 
+Simba and your exclusive remedies for claims of infringement involving the 
+Program. 
+
+12. CONFIDENTIAL INFORMATION. You acknowledge that the Program and its 
+associated materials constitute confidential information of Simba that is 
+proprietary and valuable to Simba and its licensors and you will use the same 
+level of care as a reasonable and prudent businessperson would to protect and 
+safeguard the confidentiality of such confidential information while it is in 
+your possession or control. You will not use or reproduce the Program for any 
+purpose not expressly set out herein and will not disclose to or grant any 
+other party access to the Program for any purpose, other than as expressly 
+permitted herein. You acknowledge and agree that you will not publish or make 
+public any performance details or information about the Program without the 
+prior written permission of Simba. You acknowledge and agree that performance 
+and testing results are confidential information and will only be shared with 
+those within your organization who have a need to know. If you breach your 
+confidentiality covenants herein, then in addition to any other remedies Simba 
+may be entitled to, Simba will be entitled to apply to a court of competent 
+equitable jurisdiction for and obtain injunctive relief, including an 
+interlocutory injunction, to enjoin such breach or any anticipated breach. You 
+acknowledge that other remedies will not adequately compensate Simba in the 
+event of your breach or anticipated breach of your confidentiality covenants 
+herein. Your confidentiality covenants in this Section 12 will not apply to 
+information which you can conclusively prove: (i) was developed independently 
+by you without the use of the Program; (ii) is generally available to the 
+public; or (iii) is available to you on a non-confidential basis from other 
+lawful sources. 
+
+13. U.S. GOVERNMENT RESTRICTED RIGHTS LEGEND. If the Program is acquired by 
+any agency or other part of the U.S. government in a transaction subject to 
+the Federal Acquisition Regulations or the Defense Federal Acquisition 
+Regulations, the Program is furnished with Restricted Rights. Use, 
+duplication, or disclosure of the Program by the U.S. government is subject to 
+all applicable restrictions set forth in such Regulations, as amended from 
+time to time, including subparagraphs (c)(1) and (2) of the Commercial 
+Computer Software-Restricted Rights clause at Section 48 C.F.R. 52.227-19. 
+
+14. SURVIVAL. Sections 2, 3, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18 and 20, 
+and all other provisions of this Agreement which may reasonably be interpreted 
+as surviving termination of this Agreement, shall survive the termination of 
+this Agreement. 
+
+15. ENTIRE AGREEMENT. This Agreement constitutes the entire agreement between 
+you and Simba regarding the Program. If any provision is found to be invalid 
+by a court of competent jurisdiction, the balance of the provisions will 
+remain in full force and effect. This Agreement will be governed by and 
+construed in accordance with the laws of the State of Texas, United States, 
+excluding its conflict of laws rules. The parties hereby attorn to the 
+jurisdiction of the courts located within the city of Austin, State of Texas, 
+United States, in the event of any dispute hereunder. The provisions of the 
+U.N. Convention on Contracts For The International Sale of Goods (1980) and 
+the American Law Institute’s Principles of the Law of Software Contracts 
+("Principles") are expressly excluded. The parties agree that (i) the 
+Principles shall have no application whatsoever to the interpretation or 
+enforcement of this Agreement, and (ii) neither party shall invoke the 
+Principles in whole or in part in any proceeding relating to this Agreement. 
+Notwithstanding the foregoing, Simba may bring suit in any appropriate forum 
+or court of competent jurisdiction for any breach of this Agreement or 
+misappropriation of its intellectual property rights, including claims for 
+equitable and injunctive relief. 
+
+16. ENUREMENT. The rights, restrictions, limitations, disclaimers and remedies 
+granted to, retained by, or for the benefit of Simba will enure to the benefit 
+of and will be enforceable by Simba and its licensors, successors and assigns. 
+The obligations, covenants and rights, which apply to you, will enure to your 
+benefit and will be binding on you and your permitted successors and assigns. 
+
+17. PUBLICITY. You agree that Simba may, at its option, refer to you in its 
+marketing and promotional materials as a licensee of the Program, unless you 
+advise Simba to the contrary in writing within thirty (30) days of the date 
+you receive the Program. 
+
+18. NON-PERSONAL DATA. You agree that Simba may collect, maintain, process and 
+use diagnostic, technical and related information, including information 
+related to your device, computer, system, application software, peripherals to 
+facilitate the provision of software update, product support and compliance 
+verification, and otherwise to improve the Program and other software products 
+and delivery of related services. 
+
+19. TAXES. You certify that you are not resident in Canada for purposes of the 
+Excise Tax Act and that you are not registered under that Act. Where 
+applicable, you agree to advise Simba in the event there is any change to your 
+residence status or should you become registered for the purposes of the 
+Excise Tax Act. 
+
+20. FORCE MAJEURE. Simba shall not be liable hereunder for any failure or 
+delay in the performance of its obligations under this Agreement if such 
+failure or delay is on account of causes beyond its control, including labor 
+disputes, civil commotion, war, fires, floods, inclement weather, governmental 
+regulations or controls, casualty, government authority, strikes, or acts of 
+God, in which event Simba shall be excused from its obligations for the period 
+of the delay and for a reasonable time thereafter. 
+
+v.2017.01 
+
+Page 2 of 5 
+

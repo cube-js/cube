@@ -71,6 +71,7 @@ COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/pa
 COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/package.json
 COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
 COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
+COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 # Skip
 # COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
 # COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
@@ -89,14 +90,9 @@ RUN yarn policies set-version v1.22.5
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
-FROM base as prod_base_dependencies
+FROM base as prod_dependencies
 RUN npm install -g lerna patch-package
 RUN yarn install --prod
-
-FROM prod_base_dependencies as prod_dependencies
-COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
-COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
-RUN yarn install --prod --ignore-scripts
 
 FROM base as build
 

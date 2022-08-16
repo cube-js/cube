@@ -204,7 +204,7 @@ const variables: Record<string, (...args: any) => any> = {
   databrickToken: () => get('CUBEJS_DB_DATABRICKS_TOKEN')
     .asString(),
   databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
-    .asString(),
+    .asBool(),
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
     .default('2')
