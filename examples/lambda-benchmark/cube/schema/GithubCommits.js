@@ -1,3 +1,5 @@
+import { env } from '../env'
+
 cube(`GithubCommits`, {
   sql: `
       SELECT *
@@ -29,17 +31,17 @@ cube(`GithubCommits`, {
   },
 
   preAggregations: {
-    main: {
-      type: `rollup`,
-      external: true,
-      scheduledRefresh: true,
-      refreshKey: { every: '1 hour' },
-      measureReferences: [ count ],
-      dimensionReferences: [ repo ],
-      timeDimensionReference: date,
-      granularity: 'day',
-      partitionGranularity: 'month',
-      unionWithSourceData: false,
+      main: {
+        type: `rollup`,
+        external: true,
+        scheduledRefresh: true,
+        refreshKey: { every: '1 hour' },
+        measureReferences: [ count ],
+        dimensionReferences: [ repo ],
+        timeDimensionReference: date,
+        granularity: 'day',
+        partitionGranularity: 'month',
+        unionWithSourceData: env.CUBEJS_TEST_USE_LAMBDA,
+      },
     },
-  },
 });

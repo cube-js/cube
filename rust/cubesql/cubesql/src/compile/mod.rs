@@ -9362,6 +9362,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_metabase_substring() -> Result<(), CubeError> {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             "SELECT
                     \"source\".\"substring1\" AS \"substring2\",
@@ -11291,5 +11293,72 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_select_asterisk_cross_join() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT * FROM \"KibanaSampleDataEcommerce\" CROSS JOIN Logs".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                    "Logs.agentCount".to_string(),
+                    "Logs.agentCountApprox".to_string(),
+                ]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_user_with_join() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT aliased.count as c, aliased.user_1 as u1, aliased.user_2 as u2 FROM (SELECT \"KibanaSampleDataEcommerce\".count as count, \"KibanaSampleDataEcommerce\".__user as user_1, Logs.__user as user_2 FROM \"KibanaSampleDataEcommerce\" CROSS JOIN Logs WHERE __user = 'foo') aliased".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await
+            .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        assert_eq!(cube_scan.options.change_user, Some("foo".to_string()))
     }
 }

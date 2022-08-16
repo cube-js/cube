@@ -4,17 +4,19 @@ services:
   cube:
     image: cubejs/cube:latest
     ports:
-      - 4001:4000
-      - 3001:3000
+      - ${CUBEJS_TEST_PORT}:4000
+      - ${CUBESTORE_TEST_PORT}:3000
     environment:
       - CUBEJS_REFRESH_WORKER=false
       - CUBEJS_ROLLUP_ONLY=true
       # - CUBEJS_DEV_MODE=true
 
+      - CUBEJS_TEST_USE_LAMBDA
+
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
-      - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
-      - CUBEJS_DB_EXPORT_BUCKET=${CUBEJS_DB_EXPORT_BUCKET}
+      - CUBEJS_DB_BQ_PROJECT_ID
+      - CUBEJS_DB_BQ_CREDENTIALS
+      - CUBEJS_DB_EXPORT_BUCKET
 
       - CUBEJS_EXT_DB_TYPE=cubestore
       - CUBEJS_EXT_DB_HOST=cubestore_router
@@ -28,6 +30,24 @@ services:
     depends_on:
       - cubestore_router
       - redis
+
+  cube-basic:
+    <<: *cube
+    profiles:
+      - basic
+    ports:
+      - 4001:4000
+      - 3001:3000
+
+  cube-lambda:
+    <<: *cube
+    profiles:
+      - lambda
+    ports:
+      - 4002:4000
+      - 3002:3000
+    environment:
+      - CUBEJS_TEST_USE_PREAGGREGATION=1
 
   cubestore_router:
     image: cubejs/cubestore:latest
