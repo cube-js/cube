@@ -72,7 +72,7 @@ impl RedshiftSvvTablesTableProvider {
         let mut builder = RedshiftSvvTablesBuilder::new(cubes.len());
 
         for cube in cubes {
-            builder.add_table("db", "public", &cube.name, "TABLE");
+            builder.add_table("db", "public", &cube.name, "BASE TABLE");
         }
 
         Self {

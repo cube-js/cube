@@ -52,7 +52,10 @@ use super::information_schema::postgres::{
     PgCatalogTableProvider, PgCatalogTypeProvider,
 };
 
-use super::information_schema::redshift::RedshiftSvvTablesTableProvider;
+use super::information_schema::redshift::{
+    RedshiftLateBindingViewUnpackedTableProvider, RedshiftSvvExternalSchemasTableProvider,
+    RedshiftSvvTablesTableProvider,
+};
 
 #[derive(Clone)]
 pub struct CubeContext {
@@ -326,6 +329,10 @@ impl DatabaseProtocol {
             "pg_catalog.pg_sequence".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
             "public.svv_tables".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftSvvExternalSchemasTableProvider>() {
+            "public.svv_external_schemas".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftLateBindingViewUnpackedTableProvider>() {
+            "public.get_late_binding_view_cols_unpacked".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
             "information_schema.constraint_column_usage".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaViewsProvider>() {
@@ -398,6 +405,12 @@ impl DatabaseProtocol {
                         return Some(Arc::new(RedshiftSvvTablesTableProvider::new(
                             &context.meta.cubes,
                         )))
+                    }
+                    "svv_external_schemas" => {
+                        return Some(Arc::new(RedshiftSvvExternalSchemasTableProvider::new()))
+                    }
+                    "get_late_binding_view_cols_unpacked" => {
+                        return Some(Arc::new(RedshiftLateBindingViewUnpackedTableProvider::new()))
                     }
                     _ => {}
                 };
