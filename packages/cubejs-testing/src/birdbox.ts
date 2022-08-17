@@ -495,7 +495,7 @@ export async function startBirdBoxFromCli(
     configuration: {
       playgroundUrl: 'http://127.0.0.1:4000',
       apiUrl: 'http://127.0.0.1:4000/cubejs-api/v1',
-      systemUrl: `http://127.0.0.1:4000/cubejs-system/v1`,
+      systemUrl: 'http://127.0.0.1:4000/cubejs-system/v1',
       wsUrl: 'ws://127.0.0.1:4000',
     },
   };

@@ -1,11 +1,11 @@
-import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
-import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
+import fetch from 'node-fetch';
+import { StartedTestContainer } from 'testcontainers';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
-import { StartedTestContainer } from 'testcontainers';
+import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
+import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
-import fetch from "node-fetch";
 
 describe('postgres pa', () => {
   jest.setTimeout(60 * 5 * 1000);
