@@ -9218,6 +9218,25 @@ ORDER BY \"COUNT(count)\" DESC"
         Ok(())
     }
 
+    // This tests asserts that our DF fork works correct with types
+    #[tokio::test]
+    async fn df_switch_case_coerc() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_case_fixes",
+            execute_query(
+                "SELECT
+                    CASE 'test' WHEN 'int4' THEN NULL ELSE 100 END as null_in_then,
+                    CASE true WHEN 'false' THEN 'yes' ELSE 'no' END as bool_utf8_cast,
+                    CASE true WHEN 'false' THEN 'yes' WHEN 'true' THEN true ELSE 'no' END as then_diff_types
+                ".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
     // This tests asserts that our DF fork contains support for >> && <<
     #[tokio::test]
     async fn df_is_bitwise_shit() -> Result<(), CubeError> {
