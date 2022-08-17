@@ -9,9 +9,7 @@ function pad(n, width, z) {
 }
 
 export const queries = {
-  githubCommits: {
-    name: 'commits-count-by-day-and-repo',
-
+  GithubCommits: {
     data: () => {
       return {
         year1: 2019,
@@ -32,9 +30,8 @@ export const queries = {
       ],
       "timeDimensions": [
         {
-          "dimension": "GithubCommits.date",
+          "dimension": "GithubCommits.time",
           "granularity": "day",
-          // "granularity": "week",
           "dateRange": [
             `${year1}-${month1}-${day1}`,
             `2022-01-01`
@@ -42,5 +39,37 @@ export const queries = {
         }
       ]
     }),
-  }
+  },
+
+  GdeltEvents: {
+    data: () => {
+      return {
+        year1: 2019,
+        month1: pad(getRandomInRange(1, 12), 2),
+        day1: pad(getRandomInRange(1, 28), 2),
+      }
+    },
+
+    query: ({year1, month1, day1}) => ({
+      "order": {
+        "GdeltEvents.count": "desc"
+      },
+      "measures": [
+        "GdeltEvents.count",
+      ],
+      "dimensions": [
+        "GdeltEvents.code"
+      ],
+      "timeDimensions": [
+        {
+          "dimension": "GdeltEvents.time",
+          "granularity": "day",
+          "dateRange": [
+            `${year1}-${month1}-${day1}`,
+            `2022-01-01`
+          ]
+        }
+      ]
+    }),
+  },
 };

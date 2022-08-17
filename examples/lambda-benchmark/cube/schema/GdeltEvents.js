@@ -1,17 +1,13 @@
 import { env } from '../env'
 
-cube(`GithubCommits`, {
+cube(`GdeltEvents`, {
   sql: `
-      SELECT time, repo
+      SELECT time, code
       FROM (
         SELECT 
-          TIMESTAMP_SECONDS(author.time_sec) AS time,
-          -- SUBSTR(repo, 0, 10): 12 x 400k
-          -- SUBSTR(repo, 0, 2): 12 x 40k
-          -- SUBSTR(repo, 0, 1): 12 x 2k
-          SUBSTR(repo, 0, 2) AS repo
-        FROM \`bigquery-public-data.github_repos.commits\` AS commits
-        CROSS JOIN UNNEST(commits.repo_name) AS repo
+          PARSE_TIMESTAMP("%Y%m%d", CAST(SQLDATE AS STRING)) AS time,
+          EventCode AS code
+        FROM \`gdelt-bq.gdeltv2.events\` AS commits
       )
       WHERE time BETWEEN TIMESTAMP("2019-01-01") AND TIMESTAMP("2020-01-01")
   `,
@@ -27,8 +23,8 @@ cube(`GithubCommits`, {
   },
 
   dimensions: {
-    repo: {
-      sql: `repo`,
+    code: {
+      sql: `code`,
       type: `string`
     },
 
@@ -45,7 +41,7 @@ cube(`GithubCommits`, {
         scheduledRefresh: true,
         refreshKey: { every: '1 hour' },
         measureReferences: [ count ],
-        dimensionReferences: [ repo ],
+        dimensionReferences: [ code ],
         timeDimensionReference: time,
         granularity: 'day',
         partitionGranularity: 'month',
