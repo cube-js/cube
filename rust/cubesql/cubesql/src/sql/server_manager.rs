@@ -72,7 +72,7 @@ impl ServerManager {
                 .mysql_variables
                 .read()
                 .expect("failed to unlock variables for reading"),
-            DatabaseProtocol::PostgreSQL => self
+            DatabaseProtocol::PostgreSQL | DatabaseProtocol::Redshift => self
                 .postgres_variables
                 .read()
                 .expect("failed to unlock variables for reading"),
@@ -88,7 +88,7 @@ impl ServerManager {
                 .mysql_variables
                 .write()
                 .expect("failed to unlock variables for reading"),
-            DatabaseProtocol::PostgreSQL => self
+            DatabaseProtocol::PostgreSQL | DatabaseProtocol::Redshift => self
                 .postgres_variables
                 .write()
                 .expect("failed to unlock variables for reading"),

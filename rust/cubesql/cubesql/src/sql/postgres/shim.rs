@@ -489,6 +489,10 @@ impl AsyncPostgresShim {
             parameters.insert("database".to_string(), "db".to_string());
         }
 
+        if parameters.contains_key("dd") {
+            self.session.state.protocol
+        }
+
         self.write(protocol::Authentication::new(
             protocol::AuthenticationRequest::CleartextPassword,
         ))

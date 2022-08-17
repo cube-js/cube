@@ -134,6 +134,7 @@ impl DatabaseProtocol {
         match self {
             DatabaseProtocol::MySQL => self.get_mysql_provider(context, tr),
             DatabaseProtocol::PostgreSQL => self.get_postgres_provider(context, tr),
+            DatabaseProtocol::Redshift => self.get_redshift_provider(context, tr),
         }
     }
 
@@ -144,6 +145,7 @@ impl DatabaseProtocol {
         match self {
             DatabaseProtocol::MySQL => self.get_mysql_table_name(table_provider),
             DatabaseProtocol::PostgreSQL => self.get_postgres_table_name(table_provider),
+            DatabaseProtocol::Redshift => self.get_postgres_table_name(table_provider),
         }
     }
 
@@ -349,12 +351,11 @@ impl DatabaseProtocol {
         })
     }
 
-    fn get_postgres_provider(
+    fn extract_postgres_path_from_table_reference(
         &self,
-        context: &CubeContext,
         tr: datafusion::catalog::TableReference,
-    ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
-        let (_, schema, table) = match tr {
+    ) -> (String, String, String) {
+        match tr {
             datafusion::catalog::TableReference::Partial { schema, table, .. } => (
                 "db".to_string(),
                 schema.to_ascii_lowercase(),
@@ -384,21 +385,18 @@ impl DatabaseProtocol {
                     )
                 }
             }
-        };
+        }
+    }
+
+    fn get_redshift_provider(
+        &self,
+        context: &CubeContext,
+        tr: datafusion::catalog::TableReference,
+    ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
+        let (_, schema, table) = self.extract_postgres_path_from_table_reference(tr);
 
         match schema.as_str() {
             "public" => {
-                if let Some(cube) = context
-                    .meta
-                    .cubes
-                    .iter()
-                    .find(|c| c.name.eq_ignore_ascii_case(&table))
-                {
-                    return Some(Arc::new(CubeTableProvider::new(cube.clone())));
-                    // TODO .clone()
-                };
-
-                // TODO: Move to pg_catalog, support SEARCH PATH.
                 // Redshift
                 match table.as_str() {
                     "svv_tables" => {
@@ -412,7 +410,30 @@ impl DatabaseProtocol {
                     "get_late_binding_view_cols_unpacked" => {
                         return Some(Arc::new(RedshiftLateBindingViewUnpackedTableProvider::new()))
                     }
-                    _ => {}
+                    _ => self.get_postgres_provider(context, tr)
+                }
+            },
+            _ => self.get_postgres_provider(context, tr)
+        }
+    }
+
+    fn get_postgres_provider(
+        &self,
+        context: &CubeContext,
+        tr: datafusion::catalog::TableReference,
+    ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
+        let (_, schema, table) = self.extract_postgres_path_from_table_reference(tr);
+
+        match schema.as_str() {
+            "public" => {
+                if let Some(cube) = context
+                    .meta
+                    .cubes
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(&table))
+                {
+                    // TODO .clone()
+                    return Some(Arc::new(CubeTableProvider::new(cube.clone())));
                 };
             }
             "information_schema" => match table.as_str() {

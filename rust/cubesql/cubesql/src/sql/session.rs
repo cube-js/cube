@@ -23,11 +23,14 @@ extern crate lazy_static;
 pub enum DatabaseProtocol {
     MySQL,
     PostgreSQL,
+    // Redshift is based on top of PostgreSQL, but it's uses an old version with some additions
+    Redshift,
 }
 
 impl DatabaseProtocol {
     pub fn to_string(&self) -> String {
         match &self {
+            DatabaseProtocol::Redshift => "redshift".to_string(),
             DatabaseProtocol::PostgreSQL => "postgres".to_string(),
             DatabaseProtocol::MySQL => "mysql".to_string(),
         }
@@ -283,7 +286,7 @@ impl SessionState {
             Some(vars) => vars,
             _ => match self.protocol {
                 DatabaseProtocol::MySQL => return MYSQL_DEFAULT_VARIABLES.clone(),
-                DatabaseProtocol::PostgreSQL => return POSTGRES_DEFAULT_VARIABLES.clone(),
+                DatabaseProtocol::PostgreSQL | DatabaseProtocol::Redshift => return POSTGRES_DEFAULT_VARIABLES.clone(),
             },
         }
     }
@@ -298,7 +301,7 @@ impl SessionState {
             Some(vars) => vars.get(name).map(|v| v.clone()),
             _ => match self.protocol {
                 DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).map(|v| v.clone()),
-                DatabaseProtocol::PostgreSQL => {
+                DatabaseProtocol::PostgreSQL | DatabaseProtocol::Redshift => {
                     POSTGRES_DEFAULT_VARIABLES.get(name).map(|v| v.clone())
                 }
             },

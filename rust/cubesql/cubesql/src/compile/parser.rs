@@ -211,6 +211,8 @@ pub fn parse_sql_to_statements(
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
+        // TODO: Redshift dialect?
+        DatabaseProtocol::Redshift => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
     };
 
     parse_result.map_err(|err| CompilationError::user(format!("Unable to parse: {:?}", err)))
