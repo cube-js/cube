@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing-shared",
-  "version": "0.30.50",
+  "version": "0.30.51",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -21,8 +21,8 @@
   ],
   "dependencies": {
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/query-orchestrator": "^0.30.50",
-    "@cubejs-backend/schema-compiler": "^0.30.50",
+    "@cubejs-backend/query-orchestrator": "^0.30.51",
+    "@cubejs-backend/schema-compiler": "^0.30.51",
     "@cubejs-backend/shared": "^0.30.50",
     "dedent": "^0.7.0",
     "node-fetch": "^2.6.7",

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.51](https://github.com/cube-js/cube.js/compare/v0.30.50...v0.30.51) (2022-08-17)
+
+
+### Bug Fixes
+
+* **cubejs:** Fixes build_range_end for preaggregatons REST API  ([#5110](https://github.com/cube-js/cube.js/issues/5110)) ([a1482e5](https://github.com/cube-js/cube.js/commit/a1482e55ca459859914a49e2726fc7c0fea2ce87))
+
+
+
+
+
 ## [0.30.50](https://github.com/cube-js/cube.js/compare/v0.30.49...v0.30.50) (2022-08-16)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway
