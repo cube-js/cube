@@ -12,14 +12,9 @@ cube(`OrdersPA`, {
   `,
 
   preAggregations: {
-    orderStatus: {
-      measures: [CUBE.totalAmount],
+    ordersByStatus: {
+      measures: [CUBE.count, CUBE.totalAmount],
       dimensions: [CUBE.status],
-      indexes: {
-        categoryIndex: {
-          columns: [CUBE.status],
-        },
-      },
       refreshKey: {
         every: `1 hour`,
       }
@@ -27,6 +22,10 @@ cube(`OrdersPA`, {
   },
 
   measures: {
+    count: {
+      type: `count`,
+    },
+
     totalAmount: {
       sql: `amount`,
       type: `sum`,
@@ -34,6 +33,11 @@ cube(`OrdersPA`, {
   },
 
   dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+    },
+
     status: {
       sql: `status`,
       type: `string`,
