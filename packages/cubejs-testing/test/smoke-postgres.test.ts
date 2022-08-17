@@ -26,8 +26,6 @@ describe('postgres pa', () => {
         CUBEJS_DB_PASS: 'test',
         CUBEJS_ROLLUP_ONLY: 'true',
         CUBEJS_REFRESH_WORKER: 'false',
-        // CUBEJS_SCHEDULED_REFRESH_DEFAULT: 'true',
-        // CUBEJS_PRE_AGGREGATIONS_BUILDER: 'true',
       },
       {
         schemaDir: 'smoke/schema',
