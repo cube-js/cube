@@ -14,8 +14,10 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class SqliteFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param) {
-    return `${column}${not ? ' NOT' : ''} LIKE '%' || ${this.allocateParam(param)} || '%' COLLATE NOCASE`;
+  likeIgnoreCase(column, not, param, type) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
+    return `${column}${not ? ' NOT' : ''} LIKE ${p}${this.allocateParam(param)}${s} COLLATE NOCASE`;
   }
 }
 

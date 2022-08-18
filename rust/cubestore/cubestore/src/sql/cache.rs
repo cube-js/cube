@@ -1,4 +1,5 @@
 use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::sql::InlineTables;
 use crate::store::DataFrame;
 use crate::CubeError;
 use futures::Future;
@@ -10,12 +11,13 @@ use tokio::sync::{watch, RwLock};
 #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub struct SqlResultCacheKey {
     query: String,
+    inline_tables: InlineTables,
     partition_ids: Vec<u64>,
     chunk_ids: Vec<u64>,
 }
 
 impl SqlResultCacheKey {
-    pub fn from_plan(query: &str, plan: &SerializedPlan) -> Self {
+    pub fn from_plan(query: &str, inline_tables: &InlineTables, plan: &SerializedPlan) -> Self {
         let mut partition_ids = HashSet::new();
         let mut chunk_ids = HashSet::new();
         for index in plan.index_snapshots().iter() {
@@ -32,6 +34,7 @@ impl SqlResultCacheKey {
         chunk_ids.sort();
         Self {
             query: query.to_string(),
+            inline_tables: (*inline_tables).clone(),
             partition_ids,
             chunk_ids,
         }
@@ -57,13 +60,14 @@ impl SqlResultCache {
     pub async fn get<F>(
         &self,
         query: &str,
+        inline_tables: &InlineTables,
         plan: SerializedPlan,
         exec: impl FnOnce(SerializedPlan) -> F,
     ) -> Result<Arc<DataFrame>, CubeError>
     where
         F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
     {
-        let key = SqlResultCacheKey::from_plan(query, &plan);
+        let key = SqlResultCacheKey::from_plan(query, inline_tables, &plan);
         let (sender, mut receiver) = {
             let key = key.clone();
             let mut cache = self.cache.write().await;
@@ -113,6 +117,7 @@ mod tests {
     use crate::queryplanner::serialized_plan::SerializedPlan;
     use crate::queryplanner::PlanningMeta;
     use crate::sql::cache::SqlResultCache;
+    use crate::sql::InlineTables;
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
     use crate::CubeError;
@@ -150,12 +155,13 @@ mod tests {
                 )])],
             ))
         };
+        let inline_tables = InlineTables::new();
         let futures = vec![
-            cache.get("SELECT 1", plan.clone(), exec.clone()),
-            cache.get("SELECT 2", plan.clone(), exec.clone()),
-            cache.get("SELECT 3", plan.clone(), exec.clone()),
-            cache.get("SELECT 1", plan.clone(), exec.clone()),
-            cache.get("SELECT 1", plan, exec),
+            cache.get("SELECT 1", &inline_tables, plan.clone(), exec.clone()),
+            cache.get("SELECT 2", &inline_tables, plan.clone(), exec.clone()),
+            cache.get("SELECT 3", &inline_tables, plan.clone(), exec.clone()),
+            cache.get("SELECT 1", &inline_tables, plan.clone(), exec.clone()),
+            cache.get("SELECT 1", &inline_tables, plan, exec),
         ];
 
         let res = join_all(futures)

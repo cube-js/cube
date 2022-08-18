@@ -1,4 +1,8 @@
-use sqlparser::{ast::Statement, dialect::Dialect, dialect::PostgreSqlDialect, parser::Parser};
+use sqlparser::{
+    ast::Statement,
+    dialect::{Dialect, PostgreSqlDialect},
+    parser::Parser,
+};
 
 use crate::{compile::CompilationError, sql::session::DatabaseProtocol};
 
@@ -29,10 +33,15 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 }
 
-pub fn parse_sql_to_statement(
+lazy_static! {
+    static ref SIGMA_WORKAROUND: regex::Regex = regex::Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s(?P<nspname>'[^']+'|\$\d+).*\),\s+tbl\sas\s\(.*relname\s=\s(?P<relname>'[^']+'|\$\d+).*\).*$"#).unwrap();
+}
+
+pub fn parse_sql_to_statements(
     query: &String,
     protocol: DatabaseProtocol,
-) -> CompilationResult<Statement> {
+) -> CompilationResult<Vec<Statement>> {
+    log::debug!("Parsing SQL: {}", query);
     // @todo Support without workarounds
     // metabase
     let query = query.clone().replace("IF(TABLE_TYPE='BASE TABLE' or TABLE_TYPE='SYSTEM VERSIONED', 'TABLE', TABLE_TYPE) as TABLE_TYPE", "TABLE_TYPE");
@@ -45,29 +54,190 @@ pub fn parse_sql_to_statement(
     let query = query.replace("unsigned integer", "bigint");
     let query = query.replace("UNSIGNED INTEGER", "bigint");
 
+    // DBEver
+    let query = query.replace(
+        "SELECT db.oid,db.* FROM pg_catalog.pg_database db",
+        "SELECT db.oid as _oid,db.* FROM pg_catalog.pg_database db",
+    );
+    let query = query.replace(
+        "SELECT t.oid,t.*,c.relkind",
+        "SELECT t.oid as _oid,t.*,c.relkind",
+    );
+    let query = query.replace(
+        "SELECT n.oid,n.*,d.description FROM",
+        "SELECT n.oid as _oid,n.*,d.description FROM",
+    );
+
+    // TODO support these introspection Superset queries
+    let query = query.replace(
+        "(SELECT pg_catalog.pg_get_expr(d.adbin, d.adrelid)\
+\n                FROM pg_catalog.pg_attrdef d\
+\n               WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum\
+\n               AND a.atthasdef)\
+\n              AS DEFAULT",
+        "NULL AS DEFAULT",
+    );
+
+    let query = query.replace(
+        "SELECT\
+\n                  i.relname as relname,\
+\n                  ix.indisunique, ix.indexprs, ix.indpred,\
+\n                  a.attname, a.attnum, c.conrelid, ix.indkey::varchar,\
+\n                  ix.indoption::varchar, i.reloptions, am.amname,\
+\n                  ix.indnkeyatts as indnkeyatts\
+\n              FROM\
+\n                  pg_class t\
+\n                        join pg_index ix on t.oid = ix.indrelid\
+\n                        join pg_class i on i.oid = ix.indexrelid\
+\n                        left outer join\
+\n                            pg_attribute a\
+\n                            on t.oid = a.attrelid and a.attnum = ANY(ix.indkey)\
+\n                        left outer join\
+\n                            pg_constraint c\
+\n                            on (ix.indrelid = c.conrelid and\
+\n                                ix.indexrelid = c.conindid and\
+\n                                c.contype in ('p', 'u', 'x'))\
+\n                        left outer join\
+\n                            pg_am am\
+\n                            on i.relam = am.oid\
+\n              WHERE\
+\n                  t.relkind IN ('r', 'v', 'f', 'm', 'p')",
+        "SELECT\
+\n                  i.relname as relname,\
+\n                  ix.indisunique, ix.indexprs, ix.indpred,\
+\n                  a.attname, a.attnum, c.conrelid, ix.indkey,\
+\n                  ix.indoption, i.reloptions, am.amname,\
+\n                  ix.indnkeyatts as indnkeyatts\
+\n              FROM\
+\n                  pg_class t\
+\n                        join pg_index ix on t.oid = ix.indrelid\
+\n                        join pg_class i on i.oid = ix.indexrelid\
+\n                        left outer join\
+\n                            pg_attribute a\
+\n                            on t.oid = a.attrelid\
+\n                        left outer join\
+\n                            pg_constraint c\
+\n                            on (ix.indrelid = c.conrelid and\
+\n                                ix.indexrelid = c.conindid and\
+\n                                c.contype in ('p', 'u', 'x'))\
+\n                        left outer join\
+\n                            pg_am am\
+\n                            on i.relam = am.oid\
+\n              WHERE\
+\n                  t.relkind IN ('r', 'v', 'f', 'm', 'p')",
+    );
+
+    let query = query.replace(
+        "and ix.indisprimary = 'f'\
+\n              ORDER BY\
+\n                  t.relname,\
+\n                  i.relname",
+        "and ix.indisprimary = false",
+    );
+
+    // TODO: Quick workaround for Tableau Desktop (ODBC), waiting for DF rebase...
+    // Right now, our fork of DF doesn't support ON conditions with this filter
+    let query = query.replace(
+        "left outer join pg_attrdef d on a.atthasdef and",
+        "left outer join pg_attrdef d on",
+    );
+
+    let query = query.replace("a.attnum = ANY(cons.conkey)", "1 = 1");
+    let query = query.replace("pg_get_constraintdef(cons.oid) as src", "NULL as src");
+
+    // ThoughtSpot (Redshift)
+    // Subquery must have alias, It's a default Postgres behaviour, but Redshift is based on top of old Postgres version...
+    let query = query.replace(
+        // Subquery must have alias
+        "AS REF_GENERATION  FROM svv_tables) WHERE true  AND current_database() = ",
+        "AS REF_GENERATION  FROM svv_tables) as svv_tables WHERE current_database() =",
+    );
+    let query = query.replace("AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')", "");
+    let query = query.replace(
+        // REGEXP_REPLACE
+        // Subquery must have alias
+        // Incorrect alias for subquery
+        "FROM (select lbv_cols.schemaname, lbv_cols.tablename, lbv_cols.columnname,REGEXP_REPLACE(REGEXP_REPLACE(lbv_cols.columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, lbv_cols.columnnum from pg_get_late_binding_view_cols() lbv_cols( schemaname name, tablename name, columnname name, columntype text, columnnum int)) lbv_columns   WHERE",
+        "FROM (select schemaname, tablename, columnname,columntype as columntype_rep,columntype, columnnum from get_late_binding_view_cols_unpacked) as lbv_columns   WHERE",
+    );
+    let query = query.replace(
+        // Subquery must have alias
+        "ORDER BY TABLE_SCHEM,c.relname,attnum )  UNION ALL SELECT current_database()::VARCHAR(128) AS TABLE_CAT",
+        "ORDER BY TABLE_SCHEM,c.relname,attnum ) as t  UNION ALL SELECT current_database()::VARCHAR(128) AS TABLE_CAT",
+    );
+    let query = query.replace(
+        // Reusage of new column in another column
+        "END AS IS_AUTOINCREMENT, IS_AUTOINCREMENT AS IS_GENERATEDCOLUMN",
+        "END AS IS_AUTOINCREMENT, false AS IS_GENERATEDCOLUMN",
+    );
+
+    // Sigma Computing WITH query workaround
+    let query = match SIGMA_WORKAROUND.captures(&query) {
+        Some(c) => {
+            let nspname = c.name("nspname").unwrap().as_str();
+            let relname = c.name("relname").unwrap().as_str();
+            format!(
+                "
+                select
+                    attname,
+                    typname,
+                    description
+                from pg_attribute a
+                join pg_type on atttypid = pg_type.oid
+                left join pg_description on
+                    attrelid = objoid and
+                    attnum = objsubid
+                join pg_catalog.pg_namespace nsp ON nspname = {}
+                join pg_catalog.pg_class tbl ON relname = {} and relnamespace = nsp.oid
+                where
+                    attnum > 0 and
+                    attrelid = tbl.oid
+                order by attnum
+                ;
+                ",
+                nspname, relname
+            )
+        }
+        None => query,
+    };
+
+    // Metabase
+    // TODO: To Support InSubquery Node.
+    let query = query.replace(
+        "WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e)",
+        "WHERE t.oid = 0",
+    );
+
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
     };
 
-    match parse_result {
-        Err(error) => Err(CompilationError::User(format!(
-            "Unable to parse: {:?}",
-            error
-        ))),
-        Ok(stmts) => {
+    parse_result.map_err(|err| CompilationError::user(format!("Unable to parse: {:?}", err)))
+}
+
+pub fn parse_sql_to_statement(
+    query: &String,
+    protocol: DatabaseProtocol,
+) -> CompilationResult<Statement> {
+    match parse_sql_to_statements(query, protocol)? {
+        stmts => {
             if stmts.len() == 1 {
                 Ok(stmts[0].clone())
-            } else if stmts.is_empty() {
-                Err(CompilationError::User(format!(
-                    "Invalid query, no statements was specified: {}",
-                    &query
-                )))
             } else {
-                Err(CompilationError::Unsupported(format!(
-                    "Multiple statements was specified in one query: {}",
-                    &query
-                )))
+                let err = if stmts.is_empty() {
+                    CompilationError::user(format!(
+                        "Invalid query, no statements was specified: {}",
+                        &query
+                    ))
+                } else {
+                    CompilationError::unsupported(format!(
+                        "Multiple statements was specified in one query: {}",
+                        &query
+                    ))
+                };
+
+                Err(err)
             }
         }
     }

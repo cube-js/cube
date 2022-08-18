@@ -5,23 +5,25 @@ pub mod language;
 mod rewriter;
 mod rules;
 
-use crate::compile::rewrite::analysis::LogicalPlanAnalysis;
-use crate::CubeError;
-use datafusion::arrow::datatypes::DataType;
-use datafusion::error::DataFusionError;
-use datafusion::logical_plan::window_frames::WindowFrame;
-use datafusion::logical_plan::{Column, ExprRewritable, ExprRewriter};
-use datafusion::logical_plan::{DFSchema, Expr, JoinConstraint, JoinType, Operator};
-use datafusion::physical_plan::aggregates::AggregateFunction;
-use datafusion::physical_plan::functions::BuiltinScalarFunction;
-use datafusion::physical_plan::window_functions::WindowFunction;
-use datafusion::scalar::ScalarValue;
-use egg::{rewrite, Applier, Pattern, PatternAst, SearchMatches, Searcher, Subst, Symbol, Var};
-use egg::{EGraph, Id, Rewrite};
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::slice::Iter;
-use std::str::FromStr;
+use crate::{compile::rewrite::analysis::LogicalPlanAnalysis, CubeError};
+use datafusion::{
+    arrow::datatypes::DataType,
+    error::DataFusionError,
+    logical_plan::{
+        window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable, ExprRewriter,
+        JoinConstraint, JoinType, Operator,
+    },
+    physical_plan::{
+        aggregates::AggregateFunction, functions::BuiltinScalarFunction,
+        window_functions::WindowFunction,
+    },
+    scalar::ScalarValue,
+};
+use egg::{
+    rewrite, Applier, EGraph, Id, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
+    Symbol, Var,
+};
+use std::{fmt::Display, ops::Index, slice::Iter, str::FromStr};
 
 // trace_macros!(true);
 
@@ -69,6 +71,11 @@ crate::plan_to_language! {
         Repartition {
             input: Arc<LogicalPlan>,
         },
+        Subquery {
+            input: Arc<LogicalPlan>,
+            subqueries: Vec<LogicalPlan>,
+            schema: DFSchemaRef,
+        },
         Union {
             inputs: Vec<LogicalPlan>,
             schema: DFSchemaRef,
@@ -90,6 +97,11 @@ crate::plan_to_language! {
             n: usize,
             input: Arc<LogicalPlan>,
         },
+        TableUDFs {
+            expr: Vec<Expr>,
+            input: Arc<LogicalPlan>,
+            schema: DFSchemaRef,
+        },
         CreateExternalTable {
             schema: DFSchemaRef,
             name: String,
@@ -107,12 +119,21 @@ crate::plan_to_language! {
         ColumnExpr {
             column: Column,
         },
+        OuterColumnExpr {
+            data_type: DataType,
+            column: Column,
+        },
         ScalarVariableExpr {
             data_type: DataType,
             variable: Vec<String>,
         },
         LiteralExpr { value: ScalarValue, },
         BinaryExpr {
+            left: Box<Expr>,
+            op: Operator,
+            right: Box<Expr>,
+        },
+        AnyExpr {
             left: Box<Expr>,
             op: Operator,
             right: Box<Expr>,
@@ -169,22 +190,29 @@ crate::plan_to_language! {
             fun: Arc<AggregateUDF>,
             args: Vec<Expr>,
         },
+        TableUDFExpr {
+            fun: Arc<TableUDF>,
+            args: Vec<Expr>,
+        },
         InListExpr {
             expr: Box<Expr>,
             list: Vec<Expr>,
             negated: bool,
         },
         WildcardExpr {},
-
+        GetIndexedFieldExpr {
+            expr: Box<Expr>,
+            key: Box<Expr>,
+        },
         CubeScan {
-            cube: Arc<LogicalPlan>,
+            alias_to_cube: Vec<(String, String)>,
             members: Vec<LogicalPlan>,
             filters: Vec<LogicalPlan>,
             order: Vec<LogicalPlan>,
             limit: Option<usize>,
             offset: Option<usize>,
             aliases: Option<Vec<String>>,
-            table_name: String,
+            split: bool,
         },
         Measure {
             name: String,
@@ -192,6 +220,18 @@ crate::plan_to_language! {
         },
         Dimension {
             name: String,
+            expr: Arc<Expr>,
+        },
+        Segment {
+            name: String,
+            expr: Arc<Expr>,
+        },
+        ChangeUser {
+            cube: String,
+            expr: Arc<Expr>,
+        },
+        LiteralMember {
+            value: ScalarValue,
             expr: Arc<Expr>,
         },
         Order {
@@ -206,8 +246,14 @@ crate::plan_to_language! {
         SegmentMember {
             member: String,
         },
+        ChangeUserMember {
+            value: String,
+        },
         MemberError {
             error: String,
+            priority: usize,
+            expr: Arc<Expr>,
+            alias_to_cube: Vec<((String, String), String)>,
         },
         FilterOp {
             filters: Vec<LogicalPlan>,
@@ -224,7 +270,18 @@ crate::plan_to_language! {
         },
         MemberReplacer {
             members: Vec<LogicalPlan>,
-            cube: Arc<LogicalPlan>,
+            alias_to_cube: Vec<((String, String), String)>,
+        },
+        MemberPushdownReplacer {
+            members: Vec<LogicalPlan>,
+            old_members: Arc<LogicalPlan>,
+            alias_to_cube: Vec<((String, String), String)>,
+        },
+        ListConcatPushdownReplacer {
+            members: Arc<LogicalPlan>,
+        },
+        ListConcatPushupReplacer {
+            members: Arc<LogicalPlan>,
         },
         TimeDimensionDateRangeReplacer {
             members: Vec<LogicalPlan>,
@@ -233,17 +290,27 @@ crate::plan_to_language! {
         },
         FilterReplacer {
             filters: Vec<LogicalPlan>,
-            cube: Option<String>,
+            alias_to_cube: Vec<(String, String)>,
+            members: Vec<LogicalPlan>,
+        },
+        FilterCastUnwrapReplacer {
+            filters: Vec<LogicalPlan>,
         },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
             column_name_to_member: Vec<(String, String)>,
-            cube: Option<String>,
         },
-        ColumnAliasReplacer {
+        InnerAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
-            aliases: Vec<(String, String)>,
-            table_name: Option<String>,
+            alias_to_cube: Vec<(String, String)>,
+        },
+        OuterProjectionSplitReplacer {
+            members: Vec<LogicalPlan>,
+            alias_to_cube: Vec<(String, String)>,
+        },
+        OuterAggregateSplitReplacer {
+            members: Vec<LogicalPlan>,
+            alias_to_cube: Vec<(String, String)>,
         },
     }
 }
@@ -261,42 +328,74 @@ macro_rules! var_iter {
 }
 
 #[macro_export]
+macro_rules! var_list_iter {
+    ($eclass:expr, $field_variant:ident) => {{
+        $eclass.nodes.iter().filter_map(|node| match node {
+            LogicalPlanLanguage::$field_variant(v) => Some(v),
+            _ => None,
+        })
+    }};
+}
+
+#[macro_export]
 macro_rules! var {
     ($var_str:expr) => {
         $var_str.parse().unwrap()
     };
 }
 
-pub struct WithColumnRelation(String);
+pub struct WithColumnRelation(Option<String>);
 
 impl ExprRewriter for WithColumnRelation {
     fn mutate(&mut self, expr: Expr) -> Result<Expr, DataFusionError> {
         match expr {
             Expr::Column(c) => Ok(Expr::Column(Column {
                 name: c.name.to_string(),
-                relation: c.relation.or_else(|| Some(self.0.to_string())),
+                relation: if let Some(rel) = self.0.as_ref() {
+                    c.relation.or_else(|| Some(rel.to_string()))
+                } else {
+                    None
+                },
             })),
             e => Ok(e),
         }
     }
 }
 
-fn column_name_to_member_name(
-    member_name_to_expr: Vec<(String, Expr)>,
-    table_name: String,
-) -> HashMap<String, String> {
-    let mut relation = WithColumnRelation(table_name);
+fn column_name_to_member_vec(member_name_to_expr: Vec<(String, Expr)>) -> Vec<(String, String)> {
+    let mut relation = WithColumnRelation(None);
     member_name_to_expr
         .into_iter()
-        .map(|(member, expr)| (expr_column_name_with_relation(expr, &mut relation), member))
-        .collect::<HashMap<_, _>>()
+        .map(|(member, expr)| {
+            vec![
+                (expr_column_name(expr.clone(), &None), member.to_string()),
+                (expr_column_name_with_relation(expr, &mut relation), member),
+            ]
+        })
+        .flatten()
+        .collect::<Vec<_>>()
 }
 
-fn referenced_columns(referenced_expr: Vec<Expr>, table_name: String) -> Vec<String> {
-    let mut relation = WithColumnRelation(table_name);
+fn member_name_by_alias(
+    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    id: Id,
+    alias: &str,
+) -> Option<String> {
+    if let Some(member_name_to_expr) = egraph.index(id).data.member_name_to_expr.as_ref() {
+        let column_name_to_member = column_name_to_member_vec(member_name_to_expr.clone());
+        column_name_to_member
+            .into_iter()
+            .find(|(cn, _)| cn == alias)
+            .map(|(_, member)| member)
+    } else {
+        None
+    }
+}
+
+fn referenced_columns(referenced_expr: Vec<Expr>) -> Vec<String> {
     referenced_expr
         .into_iter()
-        .map(|expr| expr_column_name_with_relation(expr, &mut relation))
+        .map(|expr| expr_column_name(expr, &None))
         .collect::<Vec<_>>()
 }
 
@@ -309,7 +408,7 @@ fn expr_column_name_with_relation(expr: Expr, relation: &mut WithColumnRelation)
 
 fn expr_column_name(expr: Expr, cube: &Option<String>) -> String {
     if let Some(cube) = cube.as_ref() {
-        expr_column_name_with_relation(expr, &mut WithColumnRelation(cube.to_string()))
+        expr_column_name_with_relation(expr, &mut WithColumnRelation(Some(cube.to_string())))
     } else {
         expr.name(&DFSchema::empty()).unwrap()
     }
@@ -336,6 +435,28 @@ pub fn transforming_rewrite<T>(
 ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
 where
     T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+        + Sync
+        + Send
+        + 'static,
+{
+    Rewrite::new(
+        name.to_string(),
+        searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
+        TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
+            transform_fn(egraph, subst)
+        }),
+    )
+    .unwrap()
+}
+
+pub fn transforming_rewrite_with_root<T>(
+    name: &str,
+    searcher: String,
+    applier: String,
+    transform_fn: T,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
         + Sync
         + Send
         + 'static,
@@ -370,7 +491,9 @@ where
                 .map(|(var, pattern)| (var.parse().unwrap(), pattern.parse().unwrap()))
                 .collect(),
         },
-        TransformingPattern::new(applier.as_str(), transform_fn),
+        TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
+            transform_fn(egraph, subst)
+        }),
     )
     .unwrap()
 }
@@ -392,11 +515,19 @@ fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
 }
 
 fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
-    format!(
-        "(ScalarFunctionExpr {} {})",
-        fun_name,
-        list_expr("ScalarFunctionExprArgs", args)
-    )
+    fun_expr_var_arg(fun_name, list_expr("ScalarFunctionExprArgs", args))
+}
+
+fn fun_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
+    format!("(ScalarFunctionExpr {} {})", fun_name, arg_list)
+}
+
+fn scalar_fun_expr_args(left: impl Display, right: impl Display) -> String {
+    format!("(ScalarFunctionExprArgs {} {})", left, right)
+}
+
+fn scalar_fun_expr_args_empty_tail() -> String {
+    "ScalarFunctionExprArgs".to_string()
 }
 
 fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl Display) -> String {
@@ -481,6 +612,14 @@ fn between_expr(
     format!("(BetweenExpr {} {} {} {})", expr, negated, low, high)
 }
 
+fn negative_expr(expr: impl Display) -> String {
+    format!("(NegativeExpr {})", expr)
+}
+
+fn not_expr(expr: impl Display) -> String {
+    format!("(NotExpr {})", expr)
+}
+
 fn is_null_expr(expr: impl Display) -> String {
     format!("(IsNullExpr {})", expr)
 }
@@ -497,8 +636,35 @@ fn column_expr(column: impl Display) -> String {
     format!("(ColumnExpr {})", column)
 }
 
+fn cast_expr(expr: impl Display, data_type: impl Display) -> String {
+    format!("(CastExpr {} {})", expr, data_type)
+}
+
 fn alias_expr(column: impl Display, alias: impl Display) -> String {
     format!("(AliasExpr {} {})", column, alias)
+}
+
+fn case_expr_var_arg(
+    expr: impl Display,
+    when_then: impl Display,
+    else_expr: impl Display,
+) -> String {
+    format!("(CaseExpr {} {} {})", expr, when_then, else_expr)
+}
+
+fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> String {
+    case_expr_var_arg(
+        "CaseExprExpr",
+        list_expr(
+            "CaseExprWhenThenExpr",
+            when_then
+                .into_iter()
+                .map(|(when, then)| vec![when, then])
+                .flatten()
+                .collect(),
+        ),
+        list_expr("CaseExprElseExpr", vec![else_expr]),
+    )
 }
 
 fn literal_string(literal_str: impl Display) -> String {
@@ -517,16 +683,31 @@ fn filter(expr: impl Display, input: impl Display) -> String {
     format!("(Filter {} {})", expr, input)
 }
 
-fn column_alias_replacer(
-    members: impl Display,
-    aliases: impl Display,
-    cube: impl Display,
-) -> String {
-    format!("(ColumnAliasReplacer {} {} {})", members, aliases, cube)
+fn cross_join(left: impl Display, right: impl Display) -> String {
+    format!("(CrossJoin {} {})", left, right)
 }
 
 fn member_replacer(members: impl Display, aliases: impl Display) -> String {
     format!("(MemberReplacer {} {})", members, aliases)
+}
+
+fn member_pushdown_replacer(
+    members: impl Display,
+    old_members: impl Display,
+    alias_to_cube: impl Display,
+) -> String {
+    format!(
+        "(MemberPushdownReplacer {} {} {})",
+        members, old_members, alias_to_cube
+    )
+}
+
+fn list_concat_pushdown_replacer(members: impl Display) -> String {
+    format!("(ListConcatPushdownReplacer {})", members)
+}
+
+fn list_concat_pushup_replacer(members: impl Display) -> String {
+    format!("(ListConcatPushupReplacer {})", members)
 }
 
 fn time_dimension_date_range_replacer(
@@ -540,12 +721,44 @@ fn time_dimension_date_range_replacer(
     )
 }
 
-fn order_replacer(members: impl Display, aliases: impl Display, cube: impl Display) -> String {
-    format!("(OrderReplacer {} {} {})", members, aliases, cube)
+fn order_replacer(members: impl Display, aliases: impl Display) -> String {
+    format!("(OrderReplacer {} {})", members, aliases)
 }
 
-fn filter_replacer(members: impl Display, cube: impl Display) -> String {
-    format!("(FilterReplacer {} {})", members, cube)
+fn filter_replacer(
+    members: impl Display,
+    alias_to_cube: impl Display,
+    cube_members: impl Display,
+) -> String {
+    format!(
+        "(FilterReplacer {} {} {})",
+        members, alias_to_cube, cube_members
+    )
+}
+
+fn filter_cast_unwrap_replacer(members: impl Display) -> String {
+    format!("(FilterCastUnwrapReplacer {})", members)
+}
+
+fn inner_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
+    format!(
+        "(InnerAggregateSplitReplacer {} {})",
+        members, alias_to_cube
+    )
+}
+
+fn outer_projection_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
+    format!(
+        "(OuterProjectionSplitReplacer {} {})",
+        members, alias_to_cube
+    )
+}
+
+fn outer_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
+    format!(
+        "(OuterAggregateSplitReplacer {} {})",
+        members, alias_to_cube
+    )
 }
 
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {
@@ -592,12 +805,28 @@ fn segment_member(member: impl Display) -> String {
     format!("(SegmentMember {})", member)
 }
 
+fn change_user_member(member: impl Display) -> String {
+    format!("(ChangeUserMember {})", member)
+}
+
 fn measure_expr(measure_name: impl Display, expr: impl Display) -> String {
     format!("(Measure {} {})", measure_name, expr)
 }
 
 fn dimension_expr(name: impl Display, expr: impl Display) -> String {
     format!("(Dimension {} {})", name, expr)
+}
+
+fn segment_expr(name: impl Display, expr: impl Display) -> String {
+    format!("(Segment {} {})", name, expr)
+}
+
+fn change_user_expr(cube: impl Display, expr: impl Display) -> String {
+    format!("(ChangeUser {} {})", cube, expr)
+}
+
+fn literal_member(value: impl Display, expr: impl Display) -> String {
+    format!("(LiteralMember {} {})", value, expr)
 }
 
 fn time_dimension_expr(
@@ -626,19 +855,29 @@ fn table_scan(
 }
 
 fn cube_scan(
-    source_table_name: impl Display,
+    alias_to_cube: impl Display,
     members: impl Display,
     filters: impl Display,
     orders: impl Display,
     limit: impl Display,
     offset: impl Display,
     aliases: impl Display,
-    table_name: impl Display,
+    split: impl Display,
 ) -> String {
     format!(
         "(Extension (CubeScan {} {} {} {} {} {} {} {}))",
-        source_table_name, members, filters, orders, limit, offset, aliases, table_name
+        alias_to_cube, members, filters, orders, limit, offset, aliases, split
     )
+}
+
+pub fn original_expr_name(
+    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    id: Id,
+) -> Option<String> {
+    egraph[id].data.original_expr.as_ref().map(|e| match e {
+        Expr::Column(c) => c.name.to_string(),
+        _ => e.name(&DFSchema::empty()).unwrap(),
+    })
 }
 
 pub struct ChainSearcher {
@@ -746,7 +985,7 @@ impl ChainSearcher {
 
 pub struct TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
 {
     pattern: Pattern<LogicalPlanLanguage>,
     vars_to_substitute: T,
@@ -754,7 +993,7 @@ where
 
 impl<T> TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
 {
     pub fn new(pattern: &str, vars_to_substitute: T) -> Self {
         Self {
@@ -766,7 +1005,7 @@ where
 
 impl<T> Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
 {
     fn apply_one(
         &self,
@@ -777,7 +1016,7 @@ where
         rule_name: Symbol,
     ) -> Vec<Id> {
         let mut new_subst = subst.clone();
-        if (self.vars_to_substitute)(egraph, &mut new_subst) {
+        if (self.vars_to_substitute)(egraph, eclass, &mut new_subst) {
             self.pattern
                 .apply_one(egraph, eclass, &new_subst, searcher_ast, rule_name)
         } else {

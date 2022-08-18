@@ -42,6 +42,7 @@ pub enum Statement {
         indexes: Vec<SQLStatement>,
         locations: Option<Vec<String>>,
         unique_key: Option<Vec<Ident>>,
+        aggregates: Option<Vec<(Ident, Ident)>>,
     },
     CreateSchema {
         schema_name: ObjectName,
@@ -192,10 +193,32 @@ impl<'a> CubeStoreParser<'a> {
                 None
             };
 
+            let aggregates = if self.parse_custom_token("aggregations") {
+                self.parser.expect_token(&Token::LParen)?;
+                let res = self.parser.parse_comma_separated(|p| {
+                    let func = p.parse_identifier()?;
+                    p.expect_token(&Token::LParen)?;
+                    let column = p.parse_identifier()?;
+                    p.expect_token(&Token::RParen)?;
+                    Ok((func, column))
+                })?;
+                self.parser.expect_token(&Token::RParen)?;
+                Some(res)
+            } else {
+                None
+            };
+
             let mut indexes = Vec::new();
 
-            while self.parser.parse_keyword(Keyword::INDEX) {
-                indexes.push(self.parse_with_index(name.clone())?);
+            loop {
+                if self.parse_custom_token("aggregate") {
+                    self.parser.expect_keyword(Keyword::INDEX)?;
+                    indexes.push(self.parse_with_index(name.clone(), true)?);
+                } else if self.parser.parse_keyword(Keyword::INDEX) {
+                    indexes.push(self.parse_with_index(name.clone(), false)?);
+                } else {
+                    break;
+                }
             }
 
             let partitioned_index = if self.parser.parse_keywords(&[
@@ -244,6 +267,7 @@ impl<'a> CubeStoreParser<'a> {
                     like,
                 },
                 indexes,
+                aggregates,
                 partitioned_index,
                 locations,
                 unique_key,
@@ -256,6 +280,7 @@ impl<'a> CubeStoreParser<'a> {
     pub fn parse_with_index(
         &mut self,
         table_name: ObjectName,
+        is_aggregate: bool,
     ) -> Result<SQLStatement, ParserError> {
         let index_name = self.parser.parse_object_name()?;
         self.parser.expect_token(&Token::LParen)?;
@@ -263,11 +288,12 @@ impl<'a> CubeStoreParser<'a> {
             .parser
             .parse_comma_separated(Parser::parse_order_by_expr)?;
         self.parser.expect_token(&Token::RParen)?;
+        //TODO I use unique flag for aggregate index for reusing CreateIndex struct. When adding another type of index, we will need to parse it into a custom structure
         Ok(SQLStatement::CreateIndex {
             name: index_name,
             table_name,
             columns,
-            unique: false,
+            unique: is_aggregate,
             if_not_exists: false,
         })
     }
@@ -295,5 +321,72 @@ impl<'a> CubeStoreParser<'a> {
             credentials,
             source_type,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use sqlparser::ast::Statement as SQLStatement;
+
+    #[test]
+    fn parse_aggregate_index() {
+        let query = "CREATE TABLE foo.Orders (
+            id int,
+            platform varchar(255),
+            age int,
+            gender varchar(2),
+            count int,
+            max_id int
+            )
+            UNIQUE KEY (id, platform, age, gender)
+            AGGREGATIONS(sum(count), max(max_id))
+            INDEX index1 (platform, age)
+            AGGREGATE INDEX aggr_index (platform, age)
+            INDEX index2 (age, platform )
+            ;";
+        let mut parser = CubeStoreParser::new(&query).unwrap();
+        let res = parser.parse_statement().unwrap();
+        match res {
+            Statement::CreateTable {
+                indexes,
+                aggregates,
+                ..
+            } => {
+                assert_eq!(aggregates.as_ref().unwrap()[0].0.value, "sum".to_string());
+                assert_eq!(aggregates.as_ref().unwrap()[0].1.value, "count".to_string());
+                assert_eq!(aggregates.as_ref().unwrap()[1].0.value, "max".to_string());
+                assert_eq!(
+                    aggregates.as_ref().unwrap()[1].1.value,
+                    "max_id".to_string()
+                );
+
+                assert_eq!(indexes.len(), 3);
+
+                let ind = &indexes[0];
+                if let SQLStatement::CreateIndex {
+                    columns, unique, ..
+                } = ind
+                {
+                    assert_eq!(columns.len(), 2);
+                    assert_eq!(unique, &false);
+                } else {
+                    assert!(false);
+                }
+
+                let ind = &indexes[1];
+                if let SQLStatement::CreateIndex {
+                    columns, unique, ..
+                } = ind
+                {
+                    assert_eq!(columns.len(), 2);
+                    assert_eq!(unique, &true);
+                } else {
+                    assert!(false);
+                }
+            }
+            _ => {}
+        }
     }
 }

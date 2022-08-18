@@ -153,14 +153,27 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+      - name: Restore lerna (excluding windows)
         uses: actions/cache@v2
+        if: ${{ !startsWith(matrix.os-version, 'windows') }}
         with:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
             rust/cubesql/node_modules
             packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      # Windows doesn't support links + cache action doesn't support exclude
+      # cache will include rust cache for native, which causes 3GB archive
+      # Right now, GH provides 10 gb for each repository with automatic retention.
+      - name: Restore lerna (Windows only)
+        uses: actions/cache@v2
+        if: ${{ startsWith(matrix.os-version, 'windows') }}
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
@@ -481,14 +494,15 @@ jobs:
             cross: true
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
             strip: false
-            compress: true
+            # UPX is broken, issue https://github.com/cube-js/cube.js/issues/4474
+            compress: false
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-06-22
           target: ${{ matrix.target }}
           override: true
           components: rustfmt

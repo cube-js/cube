@@ -1,5 +1,5 @@
-import './body.css';
 import 'antd/dist/antd.css';
+import './App.css'
 import React from 'react';
 import '@ant-design/compatible';
 import { ApolloProvider } from '@apollo/react-hooks';
@@ -7,8 +7,8 @@ import { Layout } from 'antd';
 import cubejs from '@cubejs-client/core';
 import { CubeProvider } from '@cubejs-client/react';
 import client from './graphql/client';
-import Header from './components/Header';
 import Grid from './components/Grid';
+
 const API_URL = process.env.REACT_APP_API_URL;
 const CUBEJS_TOKEN = process.env.REACT_APP_CUBEJS_TOKEN;
 const cubejsApi = cubejs(CUBEJS_TOKEN, {

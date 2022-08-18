@@ -13,7 +13,7 @@ const FilterInputs = {
     onChange
   }) => <Input key="input" style={{
     width: 300
-  }} onChange={e => onChange([e.target.value])} value={values && values[0] || ''} />
+  }} onChange={e => onChange([e.target.value])} value={(values && values[0]) || ''} />
 };
 FilterInputs.string.propTypes = {
   values: PropTypes.array,

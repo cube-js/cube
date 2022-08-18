@@ -23,6 +23,7 @@ type NodeDefinition = {
   database?: string;
   schema?: string;
   name?: string;
+  alias?: string;
 };
 
 type DbtManifest = {
@@ -51,6 +52,7 @@ type GraphqlModel = {
   name: string;
   database: string;
   schema: string;
+  alias: string;
 };
 
 type GraphqlMetrics = {
@@ -81,6 +83,7 @@ query LoadModels($jobId: Int!) {
     name
     database
     schema
+    alias
   }
   metrics(jobId: $jobId) {
     uniqueId
@@ -187,7 +190,7 @@ export class Dbt extends AbstractExtension {
         [modelDef.uniqueId]: {
           database: modelDef.database,
           schema: modelDef.schema,
-          name: modelDef.name,
+          name: modelDef.alias ?? modelDef.name,
         }
       })).reduce((a, b) => ({ ...a, ...b }), {}),
     };

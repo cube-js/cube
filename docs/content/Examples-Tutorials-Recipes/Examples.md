@@ -1,16 +1,11 @@
 ---
-title: Overview
+title: Examples Overview
+menuTitle: Overview
 permalink: /examples
 category: Examples & Tutorials
 redirect_from:
-  - /tutorials/
+  - /tutorials
 ---
-
-<InfoBox>
-  Learn how you can build a modern data Stack during the "Building Data Applications with Cube"<br />workshop on May 18th at 9-10:30 am PT! 
-  <br />
-  You can register for the workshop at <a href="https://cube.dev/events/building-data-app/">the event page</a>. 👈
-</InfoBox>
 
 Below you can find tutorials to help you get started with Cube.js.
 
@@ -84,4 +79,5 @@ Have a look at some demo applications you can build with Cube.js:
 | Application                                          | Story                                                                                                                          |
 | :--------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
 | [Hacktoberfest 2020](https://hacktoberfest.cube.dev) | [Hacktoberfest 2020 in insights and statistics](https://dev.to/igorlukanin/hacktoberfest-2020-in-insights-and-statistics-3m57) |
-| [Slack Vibe](https://slack-vibe-demo.cube.dev)       | [Slack Vibe, the Open Source Analytics for Slack](https://dev.to/cubejs/slack-vibe-the-open-source-analytics-for-slack-2khl)   |
+
+Cube integrates with all kinds of [data sources](https://cube.dev/docs/config/databases) and data [visualization tools](https://cube.dev/docs/config/downstream). You can [find](https://cube.dev/for) more easy-step guides to get started with Cube.

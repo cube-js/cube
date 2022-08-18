@@ -178,6 +178,8 @@ const BasePreAggregationWithoutPartitionGranularity = {
   buildRangeEnd: {
     sql: Joi.func().required()
   },
+  readOnly: Joi.boolean().strict(),
+  unionWithSourceData: Joi.boolean().strict(),
 };
 
 const BasePreAggregation = {
@@ -198,16 +200,19 @@ const OriginalSqlSchema = condition(
       type: Joi.any().valid('originalSql').required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
       timeDimensionReference: Joi.func().required(),
+      allowNonStrictDateRangeMatch: Joi.bool(),
     }),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
       timeDimension: Joi.func().required(),
+      allowNonStrictDateRangeMatch: Joi.bool(),
     })
   ),
   inherit(BasePreAggregationWithoutPartitionGranularity, {
     type: Joi.any().valid('originalSql').required(),
-  })
+    uniqueKeyColumns: Joi.array().items(Joi.string()),
+  }),
 );
 
 const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'year').required();
@@ -235,7 +240,9 @@ const RollUpJoinSchema = condition(
     (s) => defined(s.rollupReferences) || defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
+      scheduledRefresh: Joi.boolean().valid(false),
       granularity: GranularitySchema,
+      allowNonStrictDateRangeMatch: Joi.bool(),
       timeDimensionReference: Joi.func().required(),
       rollupReferences: Joi.func().required(),
       measureReferences: Joi.func(),
@@ -245,8 +252,10 @@ const RollUpJoinSchema = condition(
     // RollupJoin without references
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
+      scheduledRefresh: Joi.boolean().valid(false),
       granularity: GranularitySchema,
       timeDimension: Joi.func().required(),
+      allowNonStrictDateRangeMatch: Joi.bool(),
       rollups: Joi.func().required(),
       measures: Joi.func(),
       dimensions: Joi.func(),
@@ -257,6 +266,7 @@ const RollUpJoinSchema = condition(
     (s) => defined(s.rollupReferences),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollupJoin').required(),
+      scheduledRefresh: Joi.boolean().valid(false),
       rollupReferences: Joi.func().required(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
@@ -267,6 +277,7 @@ const RollUpJoinSchema = condition(
       (s) => defined(s.rollups),
       inherit(BasePreAggregation, {
         type: Joi.any().valid('rollupJoin').required(),
+        scheduledRefresh: Joi.boolean().valid(false),
         rollups: Joi.func().required(),
         measures: Joi.func(),
         dimensions: Joi.func(),
@@ -285,6 +296,7 @@ const RollUpSchema = condition(
       type: Joi.any().valid('rollup').required(),
       timeDimensionReference: Joi.func().required(),
       granularity: GranularitySchema,
+      allowNonStrictDateRangeMatch: Joi.bool(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
@@ -293,6 +305,7 @@ const RollUpSchema = condition(
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       timeDimension: Joi.func().required(),
+      allowNonStrictDateRangeMatch: Joi.bool(),
       granularity: GranularitySchema,
       measures: Joi.func(),
       dimensions: Joi.func(),

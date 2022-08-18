@@ -62,11 +62,12 @@ By default local dir are not persisted. You can enable persistance on router and
 
 ### Image parameters
 
-| Name               | Description                                          | Value              |
-| ------------------ | ---------------------------------------------------- | ------------------ |
-| `image.repository` | Cubestore image repository                           | `cubejs/cubestore` |
-| `image.tag`        | Cubestore image tag (immutable tags are recommended) | `0.28.26`          |
-| `image.pullPolicy` | Cubestore image pull policy                          | `IfNotPresent`     |
+| Name                | Description                                                                             | Value              |
+| ------------------- | --------------------------------------------------------------------------------------- | ------------------ |
+| `image.repository`  | Cubestore image repository                                                              | `cubejs/cubestore` |
+| `image.tag`         | Cubestore image tag (immutable tags are recommended)                                    | `0.28.26`          |
+| `image.pullPolicy`  | Cubestore image pull policy                                                             | `IfNotPresent`     |
+| `image.pullSecrets` | If defined, uses a Secret to pull an image from a private Docker registry or repository | `[]`               |
 
 ### Global parameters
 
@@ -86,6 +87,8 @@ By default local dir are not persisted. You can enable persistance on router and
 | `remoteDir.persistence.resourcePolicy` | Setting it to "keep" to avoid removing PVCs during a helm delete operation | `keep` |
 | `remoteDir.persistence.size`           | Persistent Volume size                                                     | `10Gi` |
 | `remoteDir.persistence.annotations`    | Additional custom annotations for the PVC                                  | `{}`   |
+| `remoteDir.persistence.accessModes`    | Persistent Volume access modes                                             | [`ReadWriteOnce`] |
+| `remoteDir.persistence.storageClass`   | The storage class to use for the remoteDir pvc                             | `""` |
 
 ### Cloud Storage parameters
 
@@ -103,6 +106,13 @@ By default local dir are not persisted. You can enable persistance on router and
 | `cloudStorage.aws.bucket`                     | The name of a bucket in AWS S3. Required when using AWS S3                                                             |       |
 | `cloudStorage.aws.region`                     | The region of a bucket in AWS S3. Required when using AWS S3                                                           |       |
 | `cloudStorage.aws.subPath`                    | The path in a AWS S3 bucket to store pre-aggregations. Optional                                                        |       |
+| `cloudStorage.minio.accessKeyID`              | The The Access Key ID for minIO. Required when using minIO                                                             |       |
+| `cloudStorage.minio.secretKey`                | The Secret Access Key for minIO. Required when using minIO                                                             |       |
+| `cloudStorage.minio.secretKeyFromSecret.name` | The Secret Access Key for minIO. Required when using minIO (using secret)                                              |       |
+| `cloudStorage.minio.secretKeyFromSecret.key`  | The Secret Access Key for minIO. Required when using minIO (using secret)                                              |       |
+| `cloudStorage.minio.bucket`                   | The name of the bucket that you want to use minIO. Required when using minIO                                           |       |
+| `cloudStorage.minio.region`                   | The region of a bucket in S3 that you want to use minIO. Optional when using minIO                                     |       |
+| `cloudStorage.minio.endpoint`                 | The minIO server endpoint. Required when using minIO                                                                   |       |
 
 ### Router parameters
 
@@ -138,7 +148,7 @@ By default local dir are not persisted. You can enable persistance on router and
 
 | Name                              | Description                                                      | Value             |
 | --------------------------------- | ---------------------------------------------------------------- | ----------------- |
-| `workers.workersCount`            | Number of workers to deploy                                      | `2`               |
+| `workers.workersCount`            | Number of workers to deploy                                      | `1`               |
 | `workers.port`                    | The port for the router node to listen for connections on        | `9001`            |
 | `workers.persistence.enabled`     | Enable persistence for local data using Persistent Volume Claims | `false`           |
 | `workers.persistance.size`        | Persistent Volume size                                           | `10Gi`            |

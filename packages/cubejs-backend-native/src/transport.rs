@@ -5,14 +5,15 @@ use async_trait::async_trait;
 use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::{
     di_service,
-    sql::AuthContext,
-    transport::{MetaContext, TransportService},
+    sql::AuthContextRef,
+    transport::{LoadRequestMeta, MetaContext, TransportService},
     CubeError,
 };
 use serde_derive::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::auth::NativeAuthContext;
 use crate::{auth::TransportRequest, channel::call_js_with_channel_as_callback};
 
 #[derive(Debug)]
@@ -33,29 +34,44 @@ impl NodeBridgeTransport {
 }
 
 #[derive(Debug, Serialize)]
+struct SessionContext {
+    user: Option<String>,
+    superuser: bool,
+}
+
+#[derive(Debug, Serialize)]
 struct LoadRequest {
     request: TransportRequest,
-    user: Option<String>,
     query: V1LoadRequestQuery,
+    session: SessionContext,
 }
 
 #[derive(Debug, Serialize)]
 struct MetaRequest {
     request: TransportRequest,
-    user: Option<String>,
+    session: SessionContext,
 }
 
 #[async_trait]
 impl TransportService for NodeBridgeTransport {
-    async fn meta(&self, ctx: Arc<AuthContext>) -> Result<Arc<MetaContext>, CubeError> {
+    async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
         trace!("[transport] Meta ->");
+
+        let native_auth = ctx
+            .as_any()
+            .downcast_ref::<NativeAuthContext>()
+            .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let request_id = Uuid::new_v4().to_string();
         let extra = serde_json::to_string(&MetaRequest {
             request: TransportRequest {
                 id: format!("{}-span-1", request_id),
+                meta: None,
             },
-            user: Some(ctx.access_token.clone()),
+            session: SessionContext {
+                user: native_auth.user.clone(),
+                superuser: native_auth.superuser,
+            },
         })?;
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
             self.channel.clone(),
@@ -73,9 +89,15 @@ impl TransportService for NodeBridgeTransport {
     async fn load(
         &self,
         query: V1LoadRequestQuery,
-        ctx: Arc<AuthContext>,
+        ctx: AuthContextRef,
+        meta: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError> {
         trace!("[transport] Request ->");
+
+        let native_auth = ctx
+            .as_any()
+            .downcast_ref::<NativeAuthContext>()
+            .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let request_id = Uuid::new_v4().to_string();
         let mut span_counter: u32 = 1;
@@ -84,9 +106,13 @@ impl TransportService for NodeBridgeTransport {
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
                     id: format!("{}-span-{}", request_id, span_counter),
+                    meta: Some(meta.clone()),
                 },
-                user: Some(ctx.access_token.clone()),
                 query: query.clone(),
+                session: SessionContext {
+                    user: native_auth.user.clone(),
+                    superuser: native_auth.superuser,
+                },
             })?;
 
             let response: serde_json::Value = call_js_with_channel_as_callback(

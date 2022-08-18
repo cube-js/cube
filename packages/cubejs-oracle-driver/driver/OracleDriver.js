@@ -34,6 +34,13 @@ const reduceCb = (result, i) => {
 };
 
 class OracleDriver extends BaseDriver {
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
   constructor(config) {
     super();
     this.db = oracledb;
@@ -49,7 +56,7 @@ class OracleDriver extends BaseDriver {
       host: process.env.CUBEJS_DB_HOST,
       port: process.env.CUBEJS_DB_PORT || 1521,
       poolMin: 0,
-      poolMax: 50,
+      poolMax: config.maxPoolSize || 50,
     };
 
     if (!this.config.connectionString) {

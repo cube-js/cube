@@ -1,7 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use crate::compile::engine::provider::TableName;
-use crate::transport::MetaContext;
+use crate::{compile::engine::provider::TableName, transport::MetaContext};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{

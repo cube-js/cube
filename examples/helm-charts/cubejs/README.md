@@ -165,11 +165,12 @@ cubestore:
 
 ### Image parameters
 
-| Name               | Description                                          | Value          |
-| ------------------ | ---------------------------------------------------- | -------------- |
-| `image.repository` | Cubestore image repository                           | `cubejs/cube`  |
-| `image.tag`        | Cubestore image tag (immutable tags are recommended) | `0.28.26`      |
-| `image.pullPolicy` | Cubestore image pull policy                          | `IfNotPresent` |
+| Name                | Description                                                                             | Value          |
+| ------------------- | --------------------------------------------------------------------------------------- | -------------- |
+| `image.repository`  | Cubestore image repository                                                              | `cubejs/cube`  |
+| `image.tag`         | Cubestore image tag (immutable tags are recommended)                                    | `0.28.26`      |
+| `image.pullPolicy`  | Cubestore image pull policy                                                             | `IfNotPresent` |
+| `image.pullSecrets` | If defined, uses a Secret to pull an image from a private Docker registry or repository | `[]`           |
 
 ### Config parameters
 
@@ -177,6 +178,7 @@ cubestore:
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `config.apiPort`                    | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
 | `config.sqlPort`                    | The port for a Cube.js deployment to listen to SQL connections on                                                               |         |
+| `config.pgSqlPort`                  | The port for a Cube.js deployment to listen to Postgres SQL connections on                                                      |         |
 | `config.sqlUser`                    | The username to access the SQL api                                                                                              |         |
 | `config.sqlPassword`                | The password to access the SQL api                                                                                              |         |
 | `config.sqlPasswordFromSecret.name` | The password to access the SQL api (using secret)                                                                               |         |

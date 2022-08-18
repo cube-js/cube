@@ -41,12 +41,11 @@
     "ts-jest": "^26.1.0",
     "tsc-watch": "^4.2.9",
     "tslint": "^6.1.2",
-    "typedoc": "0.17.7",
-    "typescript": "3.9.x"
+    "typedoc": "0.19.2",
+    "typescript": "^4"
   },
   "dependencies": {
     "fs-extra": "^9.0.0",
-    "handlebars": "^4.7.6",
     "inflection": "^1.12.0"
   }
 }

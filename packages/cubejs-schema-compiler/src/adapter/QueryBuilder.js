@@ -8,6 +8,7 @@ import { PrestodbQuery } from './PrestodbQuery';
 import { VerticaQuery } from './VerticaQuery';
 import { SnowflakeQuery } from './SnowflakeQuery';
 import { ClickHouseQuery } from './ClickHouseQuery';
+import { CrateQuery } from './CrateQuery';
 import { HiveQuery } from './HiveQuery';
 import { OracleQuery } from './OracleQuery';
 import { SqliteQuery } from './SqliteQuery';
@@ -28,12 +29,16 @@ const ADAPTERS = {
   vertica: VerticaQuery,
   snowflake: SnowflakeQuery,
   clickhouse: ClickHouseQuery,
+  crate: CrateQuery,
   hive: HiveQuery,
   oracle: OracleQuery,
   sqlite: SqliteQuery,
   awselasticsearch: AWSElasticSearchQuery,
-  elasticsearch: ElasticSearchQuery
+  elasticsearch: ElasticSearchQuery,
+  materialize: PostgresQuery,
 };
+
+export const queryClass = (dbType, dialectClass) => dialectClass || ADAPTERS[dbType];
 
 export const createQuery = (compilers, dbType, queryOptions) => {
   if (!queryOptions.dialectClass && !ADAPTERS[dbType]) {
@@ -50,8 +55,8 @@ export const createQuery = (compilers, dbType, queryOptions) => {
     externalQueryClass = ADAPTERS[queryOptions.externalDbType];
   }
 
-  return new (queryOptions.dialectClass || ADAPTERS[dbType])(compilers, {
+  return new (queryClass(dbType, queryOptions.dialectClass))(compilers, {
     ...queryOptions,
-    externalQueryClass
+    externalQueryClass,
   });
 };

@@ -22,7 +22,15 @@ spec:
       labels:
         app.kubernetes.io/component: router
         {{- include "cubestore.selectorLabels" . | nindent 8 }}
+      {{- if .Values.commonAnnotations }}
+      annotations:
+      {{- toYaml .Values.commonAnnotations | nindent 8 }}
+      {{- end }}
     spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: cubestore
           {{- if .Values.image.tag }}
@@ -69,7 +77,7 @@ spec:
             {{- end }}
             - name: CUBESTORE_DATA_DIR
               value: /cube/.cubestore/data
-            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
             {{- end }}
@@ -108,7 +116,7 @@ spec:
           volumeMounts: 
             - name: datadir
               mountPath: /cube/.cubestore/data
-            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
             - name: remotedir
               mountPath: /cube/data
             {{- end }}
@@ -117,7 +125,7 @@ spec:
         - name: datadir
           emptyDir: {}
       {{- end }}
-      {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+      {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
         - name: remotedir
           persistentVolumeClaim:
             claimName: {{ printf "%s-remote-storage" (include "cubestore.fullname" .) }}
@@ -127,6 +135,14 @@ spec:
         {{- toYaml .Values.router.affinity | nindent 8 }}
       {{- end }}
       {{- if .Values.router.spreadConstraints }}
+      {{- if .Values.router.tolerations }}
+      tolerations:
+        {{- toYaml .Values.router.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.router.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.router.nodeSelector | nindent 8 }}
+      {{- end }}
       topologySpreadConstraints:
         {{- toYaml .Values.router.spreadConstraints | nindent 8 }}
       {{- end }}

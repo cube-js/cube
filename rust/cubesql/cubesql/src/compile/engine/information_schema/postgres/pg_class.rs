@@ -68,6 +68,9 @@ struct PgCatalogClassBuilder {
     relacl: StringBuilder,
     reloptions: StringBuilder,
     relpartbound: StringBuilder,
+    // This column was removed after PostgreSQL 12, but it's required to support Tableau Desktop with ODBC
+    // True if we generate an OID for each row of the relation
+    relhasoids: BooleanBuilder,
 }
 
 impl PgCatalogClassBuilder {
@@ -108,6 +111,7 @@ impl PgCatalogClassBuilder {
             relacl: StringBuilder::new(capacity),
             reloptions: StringBuilder::new(capacity),
             relpartbound: StringBuilder::new(capacity),
+            relhasoids: BooleanBuilder::new(capacity),
         }
     }
 
@@ -147,6 +151,7 @@ impl PgCatalogClassBuilder {
         self.relacl.append_null().unwrap();
         self.reloptions.append_null().unwrap();
         self.relpartbound.append_null().unwrap();
+        self.relhasoids.append_value(false).unwrap();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -184,6 +189,7 @@ impl PgCatalogClassBuilder {
         columns.push(Arc::new(self.relacl.finish()));
         columns.push(Arc::new(self.reloptions.finish()));
         columns.push(Arc::new(self.relpartbound.finish()));
+        columns.push(Arc::new(self.relhasoids.finish()));
 
         columns
     }
@@ -236,7 +242,7 @@ impl TableProvider for PgCatalogClassProvider {
         Arc::new(Schema::new(vec![
             Field::new("oid", DataType::UInt32, false),
             Field::new("relname", DataType::Utf8, false),
-            // info_schma: 13391; pg_catalog: 11; user defined tables: 2200
+            // info_schma: 13000; pg_catalog: 11; user defined tables: 2200
             Field::new("relnamespace", DataType::UInt32, false),
             Field::new("reltype", DataType::UInt32, false),
             Field::new("reloftype", DataType::UInt32, false),
@@ -278,6 +284,7 @@ impl TableProvider for PgCatalogClassProvider {
             Field::new("relacl", DataType::Utf8, true),
             Field::new("reloptions", DataType::Utf8, true),
             Field::new("relpartbound", DataType::Utf8, true),
+            Field::new("relhasoids", DataType::Boolean, false),
         ]))
     }
 

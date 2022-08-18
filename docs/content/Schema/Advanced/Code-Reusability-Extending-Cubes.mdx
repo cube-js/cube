@@ -31,9 +31,9 @@ dimensions, and a join to the `Users` cube:
 
 <InfoBox>
 
-It’s important to use the `${CUBE}` reference instead of the `${BaseEvents}`
-reference when referencing the extending cube. `${BaseEvents}` would not work in
-this case, when the cube will be extended.
+It’s important to use the `${CUBE}` reference when referencing properties on
+the cube. Not specifying the cube name or using `${BaseEvents}` does not work
+when the cube is extended.
 
 </InfoBox>
 
@@ -93,6 +93,17 @@ cube(`PageViews`, {
 });
 ```
 
+## Usage with FILTER_PARAMS
+
+If the base cube is using [`FILTER_PARAMS`][ref-schema-ref-cube-filter-params]
+in any `sql` property, then extending cubes can do one of two things:
+
+- Override the `sql` property in each target cube.
+
+- Put all filters inside the base cube and reference all specific cubes filters
+  using `AND`. The unused filters will be rendered to `1 = 1` in the SQL query.
+
 [mdn-js-objects]:
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
 [ref-schema-ref-cube-extends]: /schema/reference/cube#extends
+[ref-schema-ref-cube-filter-params]: /schema/reference/cube#filter-params

@@ -9,6 +9,7 @@ import {
   SecurityContextProviderProps,
 } from '../../components/SecurityContext/SecurityContextProvider';
 import {
+  AppContextProps,
   AppContextProvider,
   PlaygroundContext,
 } from '../../components/AppContext';
@@ -23,10 +24,12 @@ type PlaygroundWrapperProps = {
   identifier?: string;
   playgroundContext?: Partial<PlaygroundContext>;
 } & Pick<SecurityContextProps, 'token' | 'onTokenPayloadChange'> &
-  Pick<SecurityContextProviderProps, 'tokenUpdater'>;
+  Pick<SecurityContextProviderProps, 'tokenUpdater'> &
+  Pick<AppContextProps, 'apiUrl'>;
 
 export function PlaygroundWrapper({
   token,
+  apiUrl,
   identifier,
   playgroundContext,
   children,
@@ -38,6 +41,7 @@ export function PlaygroundWrapper({
       <BrowserRouter>
         <AppContextProvider
           token={token}
+          apiUrl={apiUrl}
           identifier={identifier}
           playgroundContext={playgroundContext || {}}
         >

@@ -2,7 +2,7 @@
 name = "cuberpc"
 version = "0.1.0"
 authors = ["Cube Dev, Inc."]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 description = "RPC"
 

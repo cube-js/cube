@@ -56,7 +56,8 @@ export interface MySqlDriverConfiguration extends ConnectionConfig {
   readOnly?: boolean,
   loadPreAggregationWithoutMetaLock?: boolean,
   storeTimezone?: string,
-  pool?: any
+  maxPoolSize?: number,
+  pool?: any,
 }
 
 interface MySQLConnection extends Connection {
@@ -64,6 +65,13 @@ interface MySQLConnection extends Connection {
 }
 
 export class MySqlDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
+
   protected readonly config: MySqlDriverConfiguration;
 
   protected readonly pool: genericPool.Pool<MySQLConnection>;
@@ -115,7 +123,9 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       destroy: (connection) => promisify(connection.end.bind(connection))(),
     }, {
       min: 0,
-      max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
+      max:
+        process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
+        config.maxPoolSize || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

@@ -96,7 +96,9 @@ export class JDBCDriver extends BaseDriver {
       }
     }, {
       min: 0,
-      max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
+      max:
+        process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
+        this.config.maxPoolSize || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
@@ -133,8 +135,19 @@ export class JDBCDriver extends BaseDriver {
    * @public
    * @return {Promise<*>}
    */
-  testConnection() {
-    return this.query('SELECT 1', []);
+  async testConnection() {
+    let err;
+    let connection;
+    try {
+      connection = await this.pool._factory.create();
+    } catch (e) {
+      err = e.message;
+    }
+    if (err) {
+      throw new Error(err);
+    } else {
+      await this.pool._factory.destroy(connection);
+    }
   }
 
   /**

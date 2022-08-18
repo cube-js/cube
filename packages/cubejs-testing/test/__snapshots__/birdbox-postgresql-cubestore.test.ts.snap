@@ -154,6 +154,118 @@ Array [
 ]
 `;
 
+exports[`postgresql-cubestore filters contains #1 Orders.status.contains: ["e"]: #1 Orders.status.contains: ["e"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "5",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters contains #2 Orders.status.contains: ["es"]: #2 Orders.status.contains: ["es"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "2",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters contains #3 Orders.status.contains: ["a"]: #3 Orders.status.contains: ["a"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "0",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters contains #3 Orders.status.contains: ["es", "w"]: #3 Orders.status.contains: ["es", "w"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "4",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters endsWith #1 Orders.status.endsWith: ["a"]: #1 Orders.status.endsWith: ["a"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "0",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters endsWith #2 Orders.status.endsWith: ["w"]: #2 Orders.status.endsWith: ["w"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "2",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters endsWith #3 Orders.status.endsWith: ["sed"]: #3 Orders.status.endsWith: ["sed"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "2",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters endsWith #4 Orders.status.endsWith: ["ped"]: #4 Orders.status.endsWith: ["ped"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "1",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters endsWith #4 Orders.status.endsWith: ["w", "sed", "ped"]: #4 Orders.status.endsWith: ["w", "sed", "ped"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "5",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters startsWith #1 Orders.status.startsWith: ["a"]: #1 Orders.status.startsWith: ["a"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "0",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters startsWith #2 Orders.status.startsWith: ["n"]: #2 Orders.status.startsWith: ["n"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "2",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters startsWith #3 Orders.status.startsWith: ["p"]: #3 Orders.status.startsWith: ["p"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "2",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters startsWith #4 Orders.status.startsWith: ["sh"]: #4 Orders.status.startsWith: ["sh"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "1",
+  },
+]
+`;
+
+exports[`postgresql-cubestore filters startsWith #5 Orders.status.startsWith: ["n", "p", "s"]: #5 Orders.status.startsWith: ["n", "p", "s"] 1`] = `
+Array [
+  Object {
+    "Orders.count": "5",
+  },
+]
+`;
+
 exports[`postgresql-cubestore responseFormat http+responseFormat=compact option#1+2: result-type 1`] = `
 Array [
   Object {

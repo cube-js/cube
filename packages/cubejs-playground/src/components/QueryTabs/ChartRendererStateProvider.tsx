@@ -13,7 +13,8 @@ type QueryStatusContextProps = {
   setResultSetExists: (queryId: string, exists: boolean) => void;
   isQueryLoading: BooleanMap;
   setQueryLoading: (queryId: string, loading: boolean) => void;
-  queryError: Record<string, Error | null>;
+  // todo: client-core RequestError
+  queryError: Record<string, any>;
   setQueryError: (queryId: string, error: Error | null) => void;
   isBuildInProgress: BooleanMap;
   setBuildInProgress: (queryId: string, inProgress: boolean) => void;

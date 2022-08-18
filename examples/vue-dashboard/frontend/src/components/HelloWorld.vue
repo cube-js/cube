@@ -45,7 +45,7 @@ export default {
 };
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 h3 {
   margin: 40px 0 0;
 }

@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
-use datafusion::arrow::datatypes::DataType;
-use datafusion::error::Result;
-use datafusion::variable::VarType;
-use datafusion::{scalar::ScalarValue, variable::VarProvider};
+use datafusion::{
+    arrow::datatypes::DataType,
+    error::Result,
+    scalar::ScalarValue,
+    variable::{VarProvider, VarType},
+};
 use log::warn;
 
-use crate::sql::session::DatabaseProtocol;
-use crate::sql::{ServerManager, SessionState};
+use crate::sql::{session::DatabaseProtocol, ServerManager, SessionState};
 
 pub struct VariablesProvider {
     session: Arc<SessionState>,
@@ -31,7 +32,7 @@ impl VariablesProvider {
             identifier.concat()[1..].to_string()
         };
 
-        if let Some(var) = self.session.all_variables().get(&key) {
+        if let Some(var) = self.session.get_variable(&key) {
             if var.var_type == var_type {
                 return Ok(var.value.clone());
             }
@@ -55,7 +56,11 @@ impl VariablesProvider {
             identifier.concat()[2..].to_string()
         };
 
-        if let Some(var) = self.server.all_variables(DatabaseProtocol::MySQL).get(&key) {
+        if let Some(var) = self
+            .server
+            .read_variables(DatabaseProtocol::MySQL)
+            .get(&key)
+        {
             if var.var_type == VarType::System {
                 return Ok(var.value.clone());
             }

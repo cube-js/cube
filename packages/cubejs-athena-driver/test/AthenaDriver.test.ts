@@ -33,4 +33,8 @@ describe('AthenaDriver', () => {
   test('unload', async () => {
     await tests.testUnload();
   });
+
+  test('unload empty', async () => {
+    await tests.testUnloadEmpty();
+  });
 });

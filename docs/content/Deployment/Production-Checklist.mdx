@@ -70,6 +70,14 @@ configured database][ref-config-connect-db] to set it up.
 
 ## Set up Redis
 
+<WarningBox>
+
+Cube Store [will replace
+Redis][replace-redis] for in-memory cache and queue management in late
+2022.
+
+</WarningBox>
+
 Cube.js requires [Redis](https://redis.io/), an in-memory data structure store,
 to run in production.
 
@@ -168,3 +176,4 @@ deployment's health and be alerted to any issues.
 [ref-config-env-vars-general]: /reference/environment-variables#general
 [ref-api-readyz]: /rest-api#readyz
 [ref-api-livez]: /rest-api#livez
+[replace-redis]: https://cube.dev/blog/replacing-redis-with-cube-store

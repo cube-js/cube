@@ -69,6 +69,14 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
+import {
+  transformCube,
+  transformMeasure,
+  transformDimension,
+  transformSegment,
+  transformJoins,
+  transformPreAggregations,
+} from './helpers/transformMetaExtended';
 
 /**
  * API gateway server class.
@@ -141,6 +149,7 @@ class ApiGateway {
     const userMiddlewares: RequestHandler[] = [
       this.checkAuthMiddleware,
       this.requestContextMiddleware,
+      this.logNetworkUsage,
       this.requestLoggerMiddleware
     ];
 
@@ -167,8 +176,6 @@ class ApiGateway {
         graphiql: getEnv('nodeEnv') !== 'production' ? { headerEditorEnabled: true } : false,
       })(req, res);
     });
-
-    app.use(this.logNetworkUsage);
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
@@ -215,10 +222,17 @@ class ApiGateway {
     }));
 
     app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
-      await this.meta({
-        context: req.context,
-        res: this.resToResultFn(res)
-      });
+      if (req.query.hasOwnProperty('extended')) {
+        await this.metaExtended({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      } else {
+        await this.meta({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      }
     }));
 
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
@@ -380,6 +394,46 @@ class ApiGateway {
           ...cube,
           measures: cube.measures.filter(visibilityFilter),
           dimensions: cube.dimensions.filter(visibilityFilter),
+        }));
+      res({ cubes });
+    } catch (e) {
+      this.handleError({
+        e,
+        context,
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+
+    function visibilityFilter(item) {
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+    }
+
+    try {
+      const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
+        requestId: context.requestId,
+      });
+      const { metaConfig, cubeDefinitions } = metaConfigExtended;
+
+      const cubes = metaConfig
+        .map((meta) => meta.config)
+        .map((cube) => ({
+          ...transformCube(cube, cubeDefinitions),
+          measures: cube.measures?.filter(visibilityFilter).map((measure) => ({
+            ...transformMeasure(measure, cubeDefinitions),
+          })),
+          dimensions: cube.dimensions?.filter(visibilityFilter).map((dimension) => ({
+            ...transformDimension(dimension, cubeDefinitions),
+          })),
+          segments: cube.segments?.map((segment) => ({
+            ...transformSegment(segment, cubeDefinitions),
+          })),
+          joins: transformJoins(cubeDefinitions[cube.name]?.joins),
+          preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
       res({ cubes });
     } catch (e) {
@@ -738,14 +792,14 @@ class ApiGateway {
             .getSql(
               this.coerceForSqlQuery(normalizedQuery, context)
             );
-  
+
           this.log({
             type: 'Load Request SQL',
             duration: this.duration(loadRequestSQLStarted),
             query: normalizedQueries[index],
             sqlQuery
           }, context);
-  
+
           return sqlQuery;
         }
       )
@@ -776,6 +830,7 @@ class ApiGateway {
       normalizedTotal.totalQuery = true;
       normalizedTotal.limit = null;
       normalizedTotal.rowLimit = null;
+      normalizedTotal.offset = null;
       const [totalQuery] = await this.getSqlQueriesInternal(
         context,
         [normalizedTotal],
@@ -816,16 +871,16 @@ class ApiGateway {
     sqlQuery: any,
     annotation: {
       measures: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
       dimensions: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
       segments: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
       timeDimensions: {
-          [index: string]: unknown;
+        [index: string]: unknown;
       };
     },
     response: any,
@@ -848,7 +903,7 @@ class ApiGateway {
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
       ...(
         getEnv('devMode') ||
-        context.signedWithPlaygroundAuthSecret
+          context.signedWithPlaygroundAuthSecret
           ? {
             refreshKeyValues: response.refreshKeyValues,
             usedPreAggregations: response.usedPreAggregations,
@@ -897,7 +952,7 @@ class ApiGateway {
 
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
-      
+
       const metaConfigResult = await this
         .getCompilerApi(context).metaConfig({
           requestId: context.requestId
@@ -922,7 +977,7 @@ class ApiGateway {
             normalizedQuery,
             sqlQueries[index],
           );
-          
+
           return this.getResultInternal(
             context,
             queryType,
@@ -944,6 +999,7 @@ class ApiGateway {
           isPlayground: Boolean(
             context.signedWithPlaygroundAuthSecret
           ),
+          queries: results.length,
           queriesWithPreAggregations:
             results.filter(
               (r: any) => Object.keys(
@@ -962,8 +1018,7 @@ class ApiGateway {
         props.queryType == null
       ) {
         throw new UserError(
-          `'${
-            queryType
+          `'${queryType
           }' query type is not supported by the client.` +
           'Please update the client.'
         );
@@ -1086,7 +1141,7 @@ class ApiGateway {
       authInfo: securityContext,
       signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
       requestId,
-      ...extensions
+      ...extensions,
     };
   }
 
@@ -1104,6 +1159,8 @@ class ApiGateway {
   public handleError({
     e, context, query, res, requestStarted
   }: any) {
+    const { requestId } = context ?? {};
+    
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
@@ -1111,7 +1168,7 @@ class ApiGateway {
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.message }, { status: e.status });
+      res({ error: e.message, stack: e.stack, requestId }, { status: e.status });
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
@@ -1125,7 +1182,7 @@ class ApiGateway {
         type: 'Orchestrator error',
         query,
         error: e.error,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
       }, context);
       res(e, { status: 400 });
     } else if (e.type === 'UserError') {
@@ -1138,7 +1195,9 @@ class ApiGateway {
       res(
         {
           type: e.type,
-          error: e.message
+          error: e.message,
+          stack: e.stack,
+          requestId
         },
         { status: 400 }
       );
@@ -1149,7 +1208,7 @@ class ApiGateway {
         error: e.stack || e.toString(),
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.toString() }, { status: 500 });
+      res({ error: e.toString(), stack: e.stack, requestId }, { status: 500 });
     }
   }
 
@@ -1369,16 +1428,20 @@ class ApiGateway {
       if (next) {
         next();
       }
-    } catch (e) {
+    } catch (e: unknown) {
       if (e instanceof CubejsHandlerError) {
         res.status(e.status).json({ error: e.message });
-      } else {
+      } else if (e instanceof Error) {
         this.log({
           type: 'Auth Error',
           token,
-          error: (e as Error).stack || (e as Error).toString()
+          error: e.stack || e.toString()
         }, <any>req);
-        res.status(500).json({ error: (e as Error).toString() });
+
+        res.status(500).json({
+          error: e.toString(),
+          stack: e.stack
+        });
       }
     }
   }
@@ -1413,12 +1476,14 @@ class ApiGateway {
       type: 'Incoming network usage',
       service: 'api-http',
       bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
+      path: req.path,
     }, req.context);
     res.on('finish', () => {
       this.log({
         type: 'Outgoing network usage',
         service: 'api-http',
         bytes: Number(res.get('content-length')) || 0,
+        path: req.path,
       }, req.context);
     });
     if (next) {
@@ -1469,7 +1534,10 @@ class ApiGateway {
       ...restParams,
       ...(!context ? undefined : {
         securityContext: context.securityContext,
-        requestId: context.requestId
+        requestId: context.requestId,
+        ...(!context.appName ? undefined : { appName: context.appName }),
+        ...(!context.protocol ? undefined : { protocol: context.protocol }),
+        ...(!context.apiType ? undefined : { apiType: context.apiType }),
       })
     });
   }

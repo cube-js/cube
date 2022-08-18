@@ -1,9 +1,0 @@
----
-source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"SELECT format_type(1184, 5);\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
----
-+-----------------------------------+
-| format_type(Int64(1184),Int64(5)) |
-+-----------------------------------+
-| timestamp(5) with time zone       |
-+-----------------------------------+

@@ -49,9 +49,9 @@ describe('QuestDriver', () => {
     const tableData = await driver.query('select * from query_test', []);
 
     expect(tableData).toEqual([
-      { id: "1", created: '2020-01-01T00:00:00.000', price: 100.5 },
-      { id: "2", created: '2020-01-02T00:00:00.000', price: 200.5 },
-      { id: "3", created: '2020-01-03T00:00:00.000', price: 300.5 }
+      { id: '1', created: '2020-01-01T00:00:00.000', price: 100.5 },
+      { id: '2', created: '2020-01-02T00:00:00.000', price: 200.5 },
+      { id: '3', created: '2020-01-03T00:00:00.000', price: 300.5 }
     ]);
   });
 
@@ -65,5 +65,62 @@ describe('QuestDriver', () => {
         'table does not exist [name=random_name_for_table_that_doesnot_exist_sql_must_fail]'
       );
     }
+  });
+
+  test('schema', async () => {
+    const schema = await driver.tablesSchema();
+
+    expect(schema['']).toEqual({
+        'query_test': [
+          {
+            name: 'id',
+            type: 'LONG',
+          },
+          {
+            name: 'created',
+            type: 'date',
+          },
+          {
+            name: 'price',
+            type: 'DOUBLE',
+          },
+        ],
+        'telemetry': [
+          {
+            name: 'created',
+            type: 'TIMESTAMP',
+          },
+          {
+            name: 'event',
+            type: 'SHORT',
+          },
+          {
+            name: 'origin',
+            type: 'SHORT',
+          },
+        ],
+        'telemetry_config': [
+          {
+            name: 'id',
+            type: 'LONG256',
+          },
+          {
+            name: 'enabled',
+            type: 'boolean',
+          },
+          {
+            name: 'version',
+            type: 'SYMBOL',
+          },
+          {
+            name: 'os',
+            type: 'SYMBOL',
+          },
+          {
+            name: 'package',
+            type: 'SYMBOL',
+          },
+        ],
+    });
   });
 });

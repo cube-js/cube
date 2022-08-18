@@ -1,7 +1,14 @@
 import crypto from 'crypto';
-import { createQuery, compile, PreAggregations } from '@cubejs-backend/schema-compiler';
+import R from 'ramda';
+import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
 
 export class CompilerApi {
+  /**
+   * Class constructor.
+   * @param {SchemaFileRepository} repository
+   * @param {DbTypeAsyncFn} dbType
+   * @param {*} options
+   */
   constructor(repository, dbType, options) {
     this.repository = repository;
     this.dbType = dbType;
@@ -46,25 +53,38 @@ export class CompilerApi {
         version: compilerVersion,
         requestId
       });
-      // TODO check if saving this promise can produce memory leak?
-      this.compilers = compile(this.repository, {
+      this.compilers = await compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
         compileContext: this.compileContext,
         allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
-        standalone: this.standalone
+        standalone: this.standalone,
       });
       this.compilerVersion = compilerVersion;
+      this.queryFactory = await this.createQueryFactory(this.compilers);
     }
 
     return this.compilers;
   }
 
-  getDbType(dataSource = 'default') {
-    if (typeof this.dbType === 'function') {
-      return this.dbType({ dataSource, });
-    }
+  async createQueryFactory(compilers) {
+    const { cubeEvaluator } = compilers;
 
-    return this.dbType;
+    const cubeToQueryClass = R.fromPairs(
+      await Promise.all(
+        cubeEvaluator.cubeNames().map(async cube => {
+          const dataSource = cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default';
+          const dbType = await this.getDbType(dataSource);
+          const dialectClass = this.getDialectClass(dataSource, dbType);
+          return [cube, queryClass(dbType, dialectClass)];
+        })
+      )
+    );
+    return new QueryFactory(cubeToQueryClass);
+  }
+
+  async getDbType(dataSource = 'default') {
+    const res = await this.dbType({ dataSource, });
+    return res;
   }
 
   getDialectClass(dataSource = 'default', dbType) {
@@ -74,32 +94,33 @@ export class CompilerApi {
   async getSql(query, options = {}) {
     const { includeDebugInfo } = options;
 
-    const dbType = this.getDbType();
+    const dbType = await this.getDbType();
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = this.createQueryByDataSource(compilers, query);
+    let sqlGenerator = await this.createQueryByDataSource(compilers, query);
 
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
     }
 
     const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
-
-    if (dataSource !== 'default' && dbType !== this.getDbType(dataSource)) {
+    const _dbType = await this.getDbType(dataSource);
+    if (dataSource !== 'default' && dbType !== _dbType) {
       // TODO consider more efficient way than instantiating query
-      sqlGenerator = this.createQueryByDataSource(
+      sqlGenerator = await this.createQueryByDataSource(
         compilers,
         query,
         dataSource
       );
 
       if (!sqlGenerator) {
-        throw new Error(`Can't find dialect for '${dataSource}' data source: ${this.getDbType(dataSource)}`);
+        throw new Error(`Can't find dialect for '${dataSource}' data source: ${_dbType}`);
       }
     }
 
     const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
       external: sqlGenerator.externalPreAggregationQuery(),
       sql: sqlGenerator.buildSqlAndParams(),
+      lambdaQueries: sqlGenerator.buildLambdaQuery(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
       timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
       order: sqlGenerator.order,
@@ -132,8 +153,8 @@ export class CompilerApi {
     return cubeEvaluator.scheduledPreAggregations();
   }
 
-  createQueryByDataSource(compilers, query, dataSource) {
-    const dbType = this.getDbType(dataSource);
+  async createQueryByDataSource(compilers, query, dataSource) {
+    const dbType = await this.getDbType(dataSource);
 
     return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
   }
@@ -141,19 +162,29 @@ export class CompilerApi {
   createQuery(compilers, dbType, dialectClass, query) {
     return createQuery(
       compilers,
-      dbType, {
+      dbType,
+      {
         ...query,
         dialectClass,
         externalDialectClass: this.options.externalDialectClass,
         externalDbType: this.options.externalDbType,
         preAggregationsSchema: this.preAggregationsSchema,
-        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey
+        allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
+        queryFactory: this.queryFactory,
       }
     );
   }
 
   async metaConfig(options) {
     return (await this.getCompilers(options)).metaTransformer.cubes;
+  }
+
+  async metaConfigExtended(options) {
+    const { metaTransformer } = await this.getCompilers(options);
+    return {
+      metaConfig: metaTransformer?.cubes,
+      cubeDefinitions: metaTransformer?.cubeEvaluator?.cubeDefinitions,
+    };
   }
 
   canUsePreAggregationForTransformedQuery(transformedQuery, refs) {

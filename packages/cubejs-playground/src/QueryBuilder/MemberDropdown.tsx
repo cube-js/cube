@@ -80,11 +80,10 @@ export default function MemberMenu({
   ...buttonProps
 }: MemberDropdownProps) {
   const searchInputRef = useRef<Input | null>(null);
-  const flexSearch = useRef(FlexSearch.create<string>({ encode: 'advanced' }));
+  const index = useRef(new FlexSearch.Index({ tokenize: 'forward' })).current;
   const [search, setSearch] = useState<string>('');
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
 
-  const index = flexSearch.current;
   const hasMembers = availableCubes.some(
     (cube) => cube.members.filter(visibilityFilter).length > 0
   );
@@ -106,8 +105,8 @@ export default function MemberMenu({
       if (currentSearch !== search) {
         return;
       }
-
-      setFilteredKeys(results);
+      
+      setFilteredKeys(results as string[]);
     })();
 
     return () => {

@@ -29,6 +29,11 @@ image:
   ##
   pullPolicy: IfNotPresent
 
+  ## Specify a imagePullSecrets
+  ## ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+  ##
+  pullSecrets: []
+
 config:
   ## The logging level for Cube Store.
   ##
@@ -73,6 +78,19 @@ remoteDir:
     ##
     annotations: {}
 
+    ## Persistent Volume access modes
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+    ## @param remoteDir.persistence.storageClass The storage class to use for the remoteDir pvc
+    ## If defined, storageClassName: <storageClass>
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    storageClass:
+
 cloudStorage:
   gcp:
     ## A Base64 encoded JSON key file for connecting to Google Cloud. Required when using Google Cloud Storage
@@ -113,6 +131,30 @@ cloudStorage:
     ## The path in a AWS S3 bucket to store pre-aggregations. Optional
     ##
     subPath:
+
+  minio:
+    ## The Access Key ID for minIO. Required when using minIO
+    ##
+    accessKeyID:
+
+    ## The Secret Access Key for minIO. Required when using minIO
+    ##
+    secretKey:
+    # secretKeyFromSecret:
+    #   name:
+    #   key:
+
+    ## The name of the bucket that you want to use minIO. Required when using minIO
+    ##
+    bucket:
+
+    ## The region of a bucket in S3 that you want to use minIO. Optional when using minIO
+    ##
+    region:
+
+    ## The minIO server endpoint. Required when using minIO
+    ##
+    endpoint:
 
 router:
   ## The port for Cube Store to listen to HTTP connections on
@@ -194,10 +236,18 @@ router:
   ##
   customReadinessProbe: {}
 
+  ## Tolerations for pod assignment
+  ##
+  tolerations: {}
+
+  ## Node selector for pod assignment
+  ##
+  nodeSelector: {}
+
 workers:
   ## Number of workers to deploy
   ##
-  workersCount: 2
+  workersCount: 1
 
   ## The port for Cube Store workers to listen to connections on
   ##
@@ -235,3 +285,11 @@ workers:
   ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
   ##
   resources: {}
+
+  ## Tolerations for pod assignment
+  ##
+  tolerations: {}
+
+  ## Node selector for pod assignment
+  ##
+  nodeSelector: {}

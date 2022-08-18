@@ -400,6 +400,11 @@ impl SchedulerImpl {
                     .await?;
                 if chunk.get_row().active() {
                     if partition.get_row().is_active() {
+                        if chunk.get_row().in_memory() {
+                            self.schedule_compaction_in_memory_chunks_if_needed(&partition)
+                                .await
+                                .unwrap();
+                        }
                         self.schedule_compaction_if_needed(&partition).await?;
                     } else {
                         self.schedule_repartition(&partition).await?;
@@ -557,22 +562,71 @@ impl SchedulerImpl {
             .collect::<Vec<_>>();
         let min_in_memory_created_at = in_memory_chunks
             .iter()
-            .filter_map(|c| c.get_row().created_at().clone())
+            .filter_map(|c| c.get_row().oldest_insert_at().clone())
             .min();
-        let max_created_at = chunks
+        let min_created_at = chunks
             .iter()
             .filter_map(|c| c.get_row().created_at().clone())
-            .max();
+            .min();
         let check_row_counts = partition.get_row().multi_partition_id().is_none();
         if check_row_counts && chunk_sizes > self.config.compaction_chunks_total_size_threshold()
-            || chunks.len()
-            > self.config.compaction_chunks_count_threshold() as usize
-            // TODO config
-            || in_memory_chunks.len() > 100
-            || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 60).unwrap_or(false)
-            || max_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 600).unwrap_or(false)
+            || chunks.len() > self.config.compaction_chunks_count_threshold() as usize
+            // Force compaction if in_memory chunks were created far ago
+            || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_in_memory_chunks_max_lifetime_threshold()  as i64).unwrap_or(false)
+            // Force compaction if other chunks were created far ago
+            || min_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_chunks_max_lifetime_threshold() as i64).unwrap_or(false)
         {
             self.schedule_partition_to_compact(partition).await?;
+        }
+        Ok(())
+    }
+
+    async fn schedule_compaction_in_memory_chunks_if_needed(
+        &self,
+        partition: &IdRow<Partition>,
+    ) -> Result<(), CubeError> {
+        let compaction_in_memory_chunks_count_threshold =
+            self.config.compaction_in_memory_chunks_count_threshold();
+        let compaction_in_memory_chunks_size_limit =
+            self.config.compaction_in_memory_chunks_size_limit();
+
+        let partition_id = partition.get_id();
+
+        let chunks = self
+            .meta_store
+            .get_chunks_by_partition(partition_id, false)
+            .await?
+            .into_iter()
+            .filter(|c| {
+                c.get_row().in_memory()
+                    && c.get_row().active()
+                    && c.get_row().get_row_count() < compaction_in_memory_chunks_size_limit
+                    && c.get_row()
+                        .oldest_insert_at()
+                        .map(|m| {
+                            Utc::now().signed_duration_since(m).num_seconds()
+                                < self
+                                    .config
+                                    .compaction_in_memory_chunks_max_lifetime_threshold()
+                                    as i64
+                        })
+                        .unwrap_or(true)
+            })
+            .collect::<Vec<_>>();
+
+        if chunks.len() > compaction_in_memory_chunks_count_threshold {
+            let node = self.cluster.node_name_by_partition(partition);
+            let job = self
+                .meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, partition_id),
+                    JobType::InMemoryChunksCompaction,
+                    node.to_string(),
+                ))
+                .await?;
+            if job.is_some() {
+                self.cluster.notify_job_runner(node).await?;
+            }
         }
         Ok(())
     }

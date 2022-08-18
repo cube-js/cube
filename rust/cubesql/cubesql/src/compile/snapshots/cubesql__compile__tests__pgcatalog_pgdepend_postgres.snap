@@ -2,6 +2,7 @@
 source: cubesql/src/compile/mod.rs
 expression: "execute_query(\"SELECT * FROM pg_catalog.pg_depend ORDER BY refclassid ASC, refobjid ASC\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
-++
-++
-++
++---------+-------+----------+------------+----------+-------------+---------+
+| classid | objid | objsubid | refclassid | refobjid | refobjsubid | deptype |
++---------+-------+----------+------------+----------+-------------+---------+
++---------+-------+----------+------------+----------+-------------+---------+

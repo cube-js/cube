@@ -57,7 +57,7 @@ interface Query {
   filters?: (QueryFilter | LogicalAndFilter | LogicalOrFilter)[];
   timeDimensions?: QueryTimeDimension[];
   segments?: Member[];
-  limit?: number;
+  limit?: null | number;
   offset?: number;
   total?: boolean;
   totalQuery?: boolean;
@@ -80,7 +80,7 @@ interface NormalizedQueryFilter extends QueryFilter {
  */
 interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
-  rowLimit?: number;
+  rowLimit?: null | number;
 }
 
 export {

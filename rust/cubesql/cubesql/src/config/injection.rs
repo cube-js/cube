@@ -1,12 +1,13 @@
 use crate::CubeError;
 
-use std::any::{type_name, TypeId};
-use std::collections::HashMap;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::{Arc, Weak};
-use tokio::sync::Mutex;
-use tokio::sync::RwLock;
+use std::{
+    any::{type_name, TypeId},
+    collections::HashMap,
+    future::Future,
+    pin::Pin,
+    sync::{Arc, Weak},
+};
+use tokio::sync::{Mutex, RwLock};
 
 pub struct Injector {
     this: Weak<Injector>,

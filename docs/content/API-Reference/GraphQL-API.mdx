@@ -96,7 +96,7 @@ The equivalent query to the REST API endpoint would look like this:
 }
 ```
 
-### Modifying time dimension granularity
+### <--{"id" : "Getting started"}--> Modifying time dimension granularity
 
 The granularity for a time dimension can easily be changed by specifying it in
 the query:
@@ -131,7 +131,7 @@ you prefer to not specify a granularity, then use `value`:
 [ref-schema-ref-preagg-granularity]:
   /schema/reference/pre-aggregations#granularity
 
-### Specifying filters and ranges
+### <--{"id" : "Getting started"}--> Specifying filters and ranges
 
 Filters can be set on the load query or on a specific cube. Specifying the
 filter on the load query applies it to all cubes in the query. Filters can be
@@ -171,7 +171,7 @@ query GetOrders($byStatus: Boolean) {
 }
 ```
 
-### Querying multiple cubes
+### <--{"id" : "Getting started"}--> Querying multiple cubes
 
 Using the same `Orders` cube as before, let's try and get the numbers of
 products for each order status too. We can do this by adding the `Products` cube
@@ -196,7 +196,7 @@ to our query as follows:
 
 ## Reference
 
-### cube
+### <--{"id" : "Reference"}--> cube
 
 ```
 query {
@@ -213,7 +213,7 @@ query {
 | `cubeQueryArgs` | [`CubeQueryArgs`](#cube-query-args) | Options that apply to the entire query     |
 | `cubeArgs`      | [`CubeArgs`](#cube-args)            | Options that apply only to a specific cube |
 
-### CubeQueryArgs
+### <--{"id" : "Reference"}--> CubeQueryArgs
 
 | Key          | Schema                                | Description                                                                                                                                         |
 | ------------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -223,7 +223,7 @@ query {
 | `timezone`   | `String`                              | The timezone to use for the query. The default value is `UTC`                                                                                       |
 | `renewQuery` | `Boolean`                             | If `renewQuery` is set to `true`, Cube.js will renew all `refreshKey` for queries and query results in the foreground. The default value is `false` |
 
-### RootWhereInput
+### <--{"id" : "Reference"}--> RootWhereInput
 
 | Key          | Schema                                   | Description |
 | ------------ | ---------------------------------------- | ----------- |
@@ -231,14 +231,14 @@ query {
 | `OR`         | [`[RootWhereInput!]`](#root-where-input) |             |
 | `<cubeName>` | [`CubeWhereInput`](#cube-where-input)    |             |
 
-### CubeArgs
+### <--{"id" : "Reference"}--> CubeArgs
 
 | Key       | Schema                                | Description |
 | --------- | ------------------------------------- | ----------- |
 | `where`   | [`CubeWhereInput`](#cube-where-input) |             |
 | `orderBy` | `CubeOrderByInput`                    |             |
 
-### CubeWhereInput
+### <--{"id" : "Reference"}--> CubeWhereInput
 
 | Key            | Schema                                   | Description |
 | -------------- | ---------------------------------------- | ----------- |
@@ -246,18 +246,18 @@ query {
 | `OR`           | [`[RootWhereInput!]`](#root-where-input) |             |
 | `<cubeMember>` | [`Filter`](#filter)                      |             |
 
-### CubeOrderByInput
+### <--{"id" : "Reference"}--> CubeOrderByInput
 
 | Key            | Schema                 | Description |
 | -------------- | ---------------------- | ----------- |
 | `<cubeMember>` | [`OrderBy`](#order-by) |             |
 
-### Filter
+### <--{"id" : "Reference"}--> Filter
 
 [`DateTimeFilter`](#date-time-filter) | [`FloatFilter`](#float-time-filter) |
 [`StringFilter`](#string-time-filter)
 
-### DateTimeFilter
+### <--{"id" : "Reference"}--> DateTimeFilter
 
 | Key              | Schema     | Description |
 | ---------------- | ---------- | ----------- |
@@ -271,7 +271,7 @@ query {
 | `afterDate`      | `String`   |             |
 | `set`            | `Boolean`  |             |
 
-### FloatFilter
+### <--{"id" : "Reference"}--> FloatFilter
 
 | Key         | Schema    | Description |
 | ----------- | --------- | ----------- |
@@ -281,7 +281,7 @@ query {
 | `notIn`     | `[Float]` |             |
 | `set`       | `Boolean` |             |
 
-### StringFilter
+### <--{"id" : "Reference"}--> StringFilter
 
 | Key           | Schema     | Description |
 | ------------- | ---------- | ----------- |
@@ -293,6 +293,6 @@ query {
 | `notContains` | `String`   |             |
 | `set`         | `Boolean`  |             |
 
-### OrderBy
+### <--{"id" : "Reference"}--> OrderBy
 
 `asc` | `desc`

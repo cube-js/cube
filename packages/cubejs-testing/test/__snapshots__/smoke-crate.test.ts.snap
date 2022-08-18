@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`crate query measure: query 1`] = `
+Array [
+  Object {
+    "Orders.totalAmount": "1700",
+  },
+]
+`;

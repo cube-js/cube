@@ -90,7 +90,7 @@ their orders in any of these statuses. In terms of the EAV model:
 
 Let's explore some possible ways to model that.
 
-### Static attributes
+### <--{"id" : "Data schema"}--> Static attributes
 
 We already know that the following statuses are present in the dataset:
 `completed`, `processing`, and `shipped`. Let's assume this set of statuses is
@@ -174,7 +174,7 @@ The drawback is that when the set of statuses changes, we'll need to amend the
 cube definition in several places: update selected values and joins in SQL as
 well as update the dimensions. Let's see how to work around that.
 
-### Static attributes, DRY version
+### <--{"id" : "Data schema"}--> Static attributes, DRY version
 
 We can embrace the
 [Don't Repeat Yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)
@@ -235,7 +235,7 @@ The new `UsersStatuses_DRY` cube is functionally identical to the
 data. However, there's still a static list of statuses present in the cube's
 source code. Let's work around that next.
 
-### Dynamic attributes
+### <--{"id" : "Data schema"}--> Dynamic attributes
 
 We can eliminate the list of statuses from the cube's code by loading this list
 from an external source, e.g., the data source. Here's the code from the

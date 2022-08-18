@@ -2,8 +2,8 @@ use crate::metastore::table::TablePath;
 use crate::metastore::MetaStore;
 use crate::queryplanner::InfoSchemaTableDef;
 use crate::CubeError;
-use arrow::array::{ArrayRef, StringArray};
-use arrow::datatypes::{DataType, Field};
+use arrow::array::{ArrayRef, StringArray, TimestampNanosecondArray};
+use arrow::datatypes::{DataType, Field, TimeUnit};
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -37,6 +37,27 @@ impl InfoSchemaTableDef for TablesInfoSchemaTableDef {
                         tables
                             .iter()
                             .map(|row| row.table.get_row().get_table_name().as_str())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new(
+                    "build_range_end",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Box::new(|tables| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        tables
+                            .iter()
+                            .map(|row| {
+                                row.table
+                                    .get_row()
+                                    .build_range_end()
+                                    .as_ref()
+                                    .map(|t| t.timestamp_nanos())
+                            })
                             .collect::<Vec<_>>(),
                     ))
                 }),

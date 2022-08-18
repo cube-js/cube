@@ -10,11 +10,8 @@ import {
   DatePicker,
   Radio,
   Switch,
-  Menu,
-  Icon
 } from "antd";
 import "antd/dist/antd.css";
-import "./index.css";
 import cubejs from "@cubejs-client/core";
 import { QueryRenderer } from "@cubejs-client/react";
 import { Chart, Axis, Tooltip, Geom, Coord, Legend, Label } from "bizcharts";
@@ -29,47 +26,6 @@ const colors = ["#7DB3FF", "#49457B", "#FF7C78"];
 
 const AppLayout = ({ children }) => (
   <Layout>
-    <Layout.Header>
-      <div
-        style={{
-          float: "left"
-        }}
-      >
-        <h2
-          style={{
-            color: "#fff",
-            margin: 0,
-            marginRight: "1em"
-          }}
-        >
-          Cube Pre-Aggregations Example
-        </h2>
-      </div>
-      <div
-        style={{
-          float: "right"
-        }}
-      >
-        <Menu
-          theme="dark"
-          mode="horizontal"
-          style={{ lineHeight: '64px' }}
-        >
-          <Menu.Item key="1">
-            <a href="https://github.com/cube-js/cube.js">
-              <Icon type="github" />
-              GitHub
-            </a>
-          </Menu.Item>
-          <Menu.Item key="2">
-            <a href="https://slack.cube.dev">
-              <Icon type="slack" />
-              Slack
-            </a>
-          </Menu.Item>
-        </Menu>
-      </div>
-    </Layout.Header>
     <Layout.Content
       style={{
         padding: "0 25px 25px 25px",

@@ -15,7 +15,7 @@ import {
   getLocalHostnameByOs,
   PostgresDBRunner,
 } from '@cubejs-backend/testing-shared';
-import { REQ_ENV_VARS } from './REQ_ENV_VARS';
+import { REQUIRED_ENV_VARS } from './REQUIRED_ENV_VARS';
 
 /**
  * Logging options defined in CLI.
@@ -30,7 +30,7 @@ enum Log {
  */
 enum Mode {
   CLI = 'cli',
-  LOC = 'local',
+  LOCAL = 'local',
   DOCKER = 'docker',
 }
 
@@ -55,29 +55,36 @@ export interface ContainerOptions {
 /**
  * Birdbox options for local/cli mode.
  */
-export interface LocalOptions
-  extends ContainerOptions {
-  cubejsConfig?: string;
-  useCubejsServerBinary?: boolean;
+export interface LocalOptions extends ContainerOptions {
+  schemaDir?: string
+  cubejsConfig?: string
+  useCubejsServerBinary?: boolean
 }
 
 /**
  * Birdbox environments for cube.js passed for testcase.
  */
-export interface Env {
+export type Env = {
   CUBEJS_DEV_MODE: string,
   CUBEJS_WEB_SOCKETS: string,
   CUBEJS_EXTERNAL_DEFAULT: string,
   CUBEJS_SCHEDULED_REFRESH_DEFAULT: string,
   CUBEJS_REFRESH_WORKER: string,
   CUBEJS_ROLLUP_ONLY: string,
+  // SQL API
+  CUBEJS_SQL_PORT?: string,
+  CUBEJS_SQL_USER?: string,
+  CUBEJS_PG_SQL_PORT?: string,
+  CUBEJS_SQL_PASSWORD?: string,
+  CUBEJS_SQL_SUPER_USER?: string,
+} & {
   [key: string]: string,
-}
+};
 
 /**
  * List of permanent test data files.
  */
-const files = [
+const FILES = [
   'CAST.js',
   'Customers.sql.js',
   'ECommerce.sql.js',
@@ -87,7 +94,7 @@ const files = [
 /**
  * List of test schemas needs to be patched for certain datasource.
  */
-const schemas = [
+const SCHEMAS = [
   'Customers.js',
   'ECommerce.js',
   'Products.js',
@@ -96,7 +103,7 @@ const schemas = [
 /**
  * Test data files source folder.
  */
-const source = path.join(
+const SOURCE = path.join(
   process.cwd(),
   'birdbox-fixtures',
   'driver-test-data',
@@ -105,7 +112,7 @@ const source = path.join(
 /**
  * Test data files target source.
  */
-const target = path.join(
+const TARGET = path.join(
   process.cwd(),
   'birdbox-fixtures',
   'postgresql',
@@ -116,9 +123,9 @@ const target = path.join(
  * Remove test data files from target directory.
  */
 function clearTestData() {
-  files.concat(schemas).forEach((name) => {
-    if (fs.existsSync(path.join(target, name))) {
-      fs.removeSync(path.join(target, name));
+  FILES.concat(SCHEMAS).forEach((name) => {
+    if (fs.existsSync(path.join(TARGET, name))) {
+      fs.removeSync(path.join(TARGET, name));
     }
   });
 }
@@ -128,17 +135,17 @@ function clearTestData() {
  */
 function prepareTestData(type: string) {
   clearTestData();
-  files.forEach((name) => {
+  FILES.forEach((name) => {
     fs.copySync(
-      path.join(source, name),
-      path.join(target, name),
+      path.join(SOURCE, name),
+      path.join(TARGET, name),
     );
   });
-  schemas.forEach((name) => {
+  SCHEMAS.forEach((name) => {
     fs.writeFileSync(
-      path.join(target, name),
+      path.join(TARGET, name),
       fs.readFileSync(
-        path.join(source, name), 'utf8'
+        path.join(SOURCE, name), 'utf8'
       ).replace('_type_', type)
     );
   });
@@ -152,6 +159,7 @@ export interface BirdBox {
   configuration: {
     playgroundUrl: string;
     apiUrl: string;
+    systemUrl: string;
     wsUrl: string;
     env?: Record<string, string>;
   };
@@ -174,28 +182,19 @@ export async function startBirdBoxFromContainer(
       configuration: {
         playgroundUrl: `http://${host}:${port}`,
         apiUrl: `http://${host}:${port}/cubejs-api/v1`,
+        systemUrl: `http://${host}:${port}/cubejs-system/v1`,
         wsUrl: `ws://${host}:${port}`,
       },
     };
   }
 
-  if (process.env.BIRDBOX_CUBEJS_REGISTRY_PATH === undefined) {
-    process.env.BIRDBOX_CUBEJS_REGISTRY_PATH = 'localhost:5000/';
-  }
-
   if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
     process.env.BIRDBOX_CUBEJS_VERSION = 'latest';
-    const tag = `${
-      process.env.BIRDBOX_CUBEJS_REGISTRY_PATH
-    }cubejs/cube:${
-      process.env.BIRDBOX_CUBEJS_VERSION
-    }`;
+    const tag = `${process.env.BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${process.env.BIRDBOX_CUBEJS_VERSION}`;
     if (
       execInDir(
         '../..',
-        `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${
-          tag
-        }`
+        `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${tag}`
       ) !== 0
     ) {
       throw new Error('[Birdbox] Docker build failed.');
@@ -222,7 +221,7 @@ export async function startBirdBoxFromContainer(
       `[Birdbox] Using ${composeFile} compose file\n`
     );
   }
-  
+
   const env = await dc
     .withStartupTimeout(30 * 1000)
     .withEnv(
@@ -243,20 +242,16 @@ export async function startBirdBoxFromContainer(
   if (process.env.TEST_PLAYGROUND_PORT) {
     if (options.log === Log.PIPE) {
       process.stdout.write(
-        `[Birdbox] Creating a proxy server 4000->${
-          port
-        } for local testing\n`
+        `[Birdbox] Creating a proxy server 4000->${port} for local testing\n`
       );
     }
-    
+
     // As local Playground proxies requests to the 4000 port
     proxyServer = HttpProxy.createProxyServer({
       target: `http://localhost:${port}`
     }).listen(4000);
     proxyServer.on('error', async (err, req, res) => {
-      if (options.log === Log.PIPE) {
-        process.stderr.write(`[Proxy Server] error: ${err}\n`);
-      }
+      process.stderr.write(`[Proxy Server] error: ${err}\n`);
       if (!res.headersSent) {
         res.writeHead(500, { 'content-type': 'application/json' });
       }
@@ -287,15 +282,11 @@ export async function startBirdBoxFromContainer(
     } else {
       if (options.log === Log.PIPE) {
         process.stdout.write(`${output}\n`);
-        process.stderr.write(
-          `[Birdbox] Script ${
-            loadScript
-          } finished with error: ${
-            exitCode
-          }\n`
-        );
       }
       await env.down();
+      process.stderr.write(
+        `[Birdbox] Script ${loadScript} finished with error: ${exitCode}\n`
+      );
       process.exit(1);
     }
   }
@@ -315,6 +306,7 @@ export async function startBirdBoxFromContainer(
     configuration: {
       playgroundUrl: `http://${host}:${playgroundPort}`,
       apiUrl: `http://${host}:${port}/cubejs-api/v1`,
+      systemUrl: `http://${host}:${port}/cubejs-system/v1`,
       wsUrl: `ws://${host}:${port}`,
       env: {
         ...(
@@ -335,29 +327,25 @@ export async function startBirdBoxFromCli(
 ): Promise<BirdBox> {
   let db: StartedTestContainer;
   let cli: ChildProcess;
+
+  if (!options.schemaDir) {
+    options.schemaDir = 'postgresql/schema';
+  }
+
+  if (!options.cubejsConfig) {
+    options.cubejsConfig = 'postgresql/single/cube.js';
+  }
+
   if (options.loadScript) {
     db = await PostgresDBRunner.startContainer({
       volumes: [
         {
-          source: path.join(
-            __dirname,
-            '..',
-            '..',
-            'birdbox-fixtures',
-            'datasets'
-          ),
+          source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'datasets'),
           target: '/data',
           bindMode: 'ro',
         },
         {
-          source: path.join(
-            __dirname,
-            '..',
-            '..',
-            'birdbox-fixtures',
-            'postgresql',
-            'scripts'
-          ),
+          source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'postgresql', 'scripts'),
           target: '/scripts',
           bindMode: 'ro',
         },
@@ -371,29 +359,31 @@ export async function startBirdBoxFromCli(
     const loadScript = `/scripts/${options.loadScript}`;
     const { output, exitCode } = await db.exec([loadScript]);
 
-    if (exitCode === 0 && options.log === Log.PIPE) {
-      process.stdout.write(
-        `[Birdbox] Script ${
-          loadScript
-        } finished successfully\n`
-      );
-    } else {
+    if (exitCode !== 0) {
       if (options.log === Log.PIPE) {
         process.stdout.write(`${output}\n`);
-        process.stdout.write(
-          `[Birdbox] Script ${
-            loadScript
-          } finished with error: ${
-            exitCode
-          }\n`
-        );
       }
       await db.stop();
+      process.stderr.write(
+        `[Birdbox] Script ${loadScript} finished with error: ${exitCode}\n`
+      );
       process.exit(1);
+    }
+    if (options.log === Log.PIPE) {
+      process.stdout.write(
+        `[Birdbox] Script ${loadScript} finished successfully\n`
+      );
     }
   }
 
   const testDir = path.join(process.cwd(), 'birdbox-test-project');
+
+  if (!options.useCubejsServerBinary) {
+    // cli mode, using a project created via cli
+    if (!fs.existsSync(testDir)) {
+      execInDir('.', 'npx cubejs-cli create birdbox-test-project -d postgres');
+    }
+  }
 
   // Do not remove whole dir as it contains node_modules
   if (fs.existsSync(path.join(testDir, '.env'))) {
@@ -404,22 +394,49 @@ export async function startBirdBoxFromCli(
     fs.removeSync(path.join(testDir, '.cubestore'));
   }
 
+  if (fs.existsSync(path.join(testDir, 'schema'))) {
+    fs.removeSync(path.join(testDir, 'schema'));
+  }
+
+  // Ignored if not explicitly required by a schema file.
   fs.copySync(
-    path.join(process.cwd(), 'birdbox-fixtures', 'postgresql'),
-    path.join(testDir)
+    path.join(process.cwd(), 'birdbox-fixtures', 'postgresql', 'dbt-project'),
+    path.join(testDir, 'dbt-project')
   );
+
+  if (options.schemaDir) {
+    fs.copySync(
+      path.join(process.cwd(), 'birdbox-fixtures', options.schemaDir),
+      path.join(testDir, 'schema')
+    );
+  }
 
   if (options.cubejsConfig) {
     fs.copySync(
-      path.join(
-        process.cwd(),
-        'birdbox-fixtures',
-        'postgresql',
-        options.cubejsConfig
-      ),
+      path.join(process.cwd(), 'birdbox-fixtures', options.cubejsConfig),
       path.join(testDir, 'cube.js')
     );
   }
+
+  const env = {
+    ...process.env,
+    CUBEJS_DB_TYPE: options.type === 'postgresql'
+      ? 'postgres'
+      : options.type,
+    CUBEJS_DEV_MODE: 'true',
+    CUBEJS_API_SECRET: 'mysupersecret',
+    CUBEJS_WEB_SOCKETS: 'true',
+    CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
+    ...options.env
+      ? options.env
+      : {
+        CUBEJS_DB_HOST: db!.getHost(),
+        CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,
+        CUBEJS_DB_NAME: 'test',
+        CUBEJS_DB_USER: 'test',
+        CUBEJS_DB_PASS: 'test',
+      }
+  };
 
   try {
     cli = spawn(
@@ -438,25 +455,7 @@ export async function startBirdBoxFromCli(
           options.log,
           options.log,
         ],
-        env: {
-          ...process.env,
-          CUBEJS_DB_TYPE: options.type === 'postgresql'
-            ? 'postgres'
-            : options.type,
-          CUBEJS_DEV_MODE: 'true',
-          CUBEJS_API_SECRET: 'mysupersecret',
-          CUBEJS_WEB_SOCKETS: 'true',
-          CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
-          ...options.env
-            ? options.env
-            : {
-              CUBEJS_DB_HOST: db!.getHost(),
-              CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,
-              CUBEJS_DB_NAME: 'test',
-              CUBEJS_DB_USER: 'test',
-              CUBEJS_DB_PASS: 'test',
-            }
-        },
+        env,
       }
     );
     if (cli.stdout) {
@@ -471,9 +470,11 @@ export async function startBirdBoxFromCli(
     }
     await pausePromise(10 * 1000);
   } catch (e) {
+    process.stdout.write(`Error spawning cube: ${e}\n`);
     // @ts-ignore
     db.stop();
   }
+
   return {
     stop: async () => {
       clearTestData();
@@ -494,9 +495,17 @@ export async function startBirdBoxFromCli(
     configuration: {
       playgroundUrl: 'http://127.0.0.1:4000',
       apiUrl: 'http://127.0.0.1:4000/cubejs-api/v1',
+      systemUrl: 'http://127.0.0.1:4000/cubejs-system/v1',
       wsUrl: 'ws://127.0.0.1:4000',
     },
   };
+}
+
+export interface BirdboxOptions {
+   // Schema directory. LOCAL mode.
+  schemaDir?: string,
+  // Config file. LOCAL mode.
+  cubejsConfig?: string,
 }
 
 /**
@@ -505,7 +514,13 @@ export async function startBirdBoxFromCli(
 export async function getBirdbox(
   type: string,
   env: Env,
+  options?: BirdboxOptions,
 ) {
+  // default options
+  if (!options) {
+    options = {};
+  }
+
   // extract mode
   const args: Args = yargs(process.argv.slice(2))
     .exitProcess(false)
@@ -514,10 +529,10 @@ export async function getBirdbox(
         describe: 'Determines Birdbox mode.',
         choices: [
           Mode.CLI,
-          Mode.LOC,
+          Mode.LOCAL,
           Mode.DOCKER,
         ],
-        default: Mode.LOC,
+        default: Mode.LOCAL,
       },
       log: {
         describe: 'Determines Birdbox logging.',
@@ -532,23 +547,19 @@ export async function getBirdbox(
   const { mode, log } = args;
 
   // extract/assert env variables
-  if (REQ_ENV_VARS[type] === undefined) {
+  if (REQUIRED_ENV_VARS[type] === undefined) {
     if (log === Log.PIPE) {
       process.stderr.write(
-        `List of required environment variables is missing for ${
-          type
-        }\n`
+        `Error: list of required environment variables is missing for ${type}\n`
       );
     }
     process.exit(1);
   } else {
-    REQ_ENV_VARS[type].forEach((key: string) => {
+    REQUIRED_ENV_VARS[type].forEach((key: string) => {
       if (process.env[key] === undefined) {
-        if (log === Log.PIPE) {
-          process.stderr.write(
-            `${key} is required environment variable for ${type}\n`
-          );
-        }
+        process.stderr.write(
+          `Error: ${key} is required environment variable for ${type}\n`
+        );
         process.exit(1);
       } else {
         // @ts-ignore
@@ -565,13 +576,14 @@ export async function getBirdbox(
   try {
     switch (mode) {
       case Mode.CLI:
-      case Mode.LOC: {
+      case Mode.LOCAL: {
         birdbox = await startBirdBoxFromCli({
           type,
           env,
           log,
-          cubejsConfig: 'single/cube.js',
-          useCubejsServerBinary: mode === Mode.LOC,
+          cubejsConfig: options.cubejsConfig,
+          schemaDir: options.schemaDir,
+          useCubejsServerBinary: mode === Mode.LOCAL,
         });
         break;
       }
@@ -579,24 +591,20 @@ export async function getBirdbox(
         birdbox = await startBirdBoxFromContainer({
           type: type === 'postgres' ? 'postgresql' : type,
           log,
-          env
+          env,
         });
         break;
       }
       default: {
-        if (log === Log.PIPE) {
-          process.stderr.write(
-            `Unsupported Birdbox mode: ${mode}\n`
-          );
-        }
+        process.stderr.write(
+          `Error: unsupported Birdbox mode: ${mode}\n`
+        );
         process.exit(1);
       }
     }
   } catch (e) {
-    if (log === Log.PIPE) {
-      process.stderr.write(e as string);
-    }
     clearTestData();
+    process.stderr.write(e.toString());
     process.exit(1);
   }
   return birdbox;

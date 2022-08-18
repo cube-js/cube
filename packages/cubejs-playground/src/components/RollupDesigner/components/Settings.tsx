@@ -217,6 +217,7 @@ export function Settings({
                     <GranularitySelect
                       data-testid="rd-select-every-granularity"
                       disabled={!values['refreshKey.checked.every'] || isCron}
+                      excludedGranularities={['year', 'quarter', 'month']}
                     />
                   </Form.Item>
                 </Space>

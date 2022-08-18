@@ -16,8 +16,8 @@ import crypto from 'crypto';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
-import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
-import { ExternalDbTypeFn } from './types';
+import { CubejsServerCore } from './server';
+import { ExternalDbTypeFn, ServerCoreInitializedOptions } from './types';
 import DriverDependencies from './DriverDependencies';
 
 const repo = {
@@ -464,7 +464,6 @@ export class DevServer {
         variables.CUBEJS_API_SECRET = options.apiSecret;
       }
 
-      // CUBEJS_EXTERNAL_DEFAULT will be default in next major version, let's test it with docker too
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables.CUBEJS_DEV_MODE = 'true';
@@ -477,6 +476,19 @@ export class DevServer {
       }
 
       fs.writeFileSync(path.join(process.cwd(), '.env'), variables.join('\n'));
+
+      if (!fs.existsSync(path.join(process.cwd(), 'package.json'))) {
+        fs.writeFileSync(
+          path.join(process.cwd(), 'package.json'),
+          JSON.stringify({
+            name: 'cube-docker',
+            version: '0.0.1',
+            private: true,
+            createdAt: new Date().toJSON(),
+            dependencies: {}
+          }, null, 2)
+        );
+      }
 
       dotenv.config({ override: true });
 

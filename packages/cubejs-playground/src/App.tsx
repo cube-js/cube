@@ -2,7 +2,7 @@
 import { Component, useEffect } from 'react';
 import '@ant-design/compatible/assets/index.css';
 import { Layout, Alert } from 'antd';
-import { RouteComponentProps, withRouter } from 'react-router';
+import { RouteComponentProps, withRouter } from 'react-router-dom';
 import styled from 'styled-components';
 
 import Header from './components/Header/Header';

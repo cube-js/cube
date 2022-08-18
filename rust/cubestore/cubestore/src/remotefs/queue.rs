@@ -162,7 +162,7 @@ impl QueueRemoteFs {
                         match self.remote_fs.list_with_metadata(&remote_path).await {
                             Ok(list) => {
                                 let list_res = list.iter().next().ok_or(CubeError::internal(
-                                    format!("File {} can't be listed after upload", remote_path),
+                                    format!("File {} can't be listed after upload. Either there's Cube Store cluster misconfiguration, or storage can't provide the required consistency.", remote_path),
                                 ));
                                 match list_res {
                                     Ok(file) => {

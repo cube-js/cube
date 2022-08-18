@@ -35,6 +35,8 @@ const projects = [
   },
 ];
 
+let failure = false;
+
 projects.forEach(({ name, docsPath, outputDir }) => {
   const tmpDir = path.join(outputDir, 'tmp');
   const project = app.convert(app.expandInputFiles([docsPath]));
@@ -55,5 +57,8 @@ projects.forEach(({ name, docsPath, outputDir }) => {
     }
   } else {
     console.error(`Error while generating '${name}' docs`);
+    failure = true;
   }
 });
+
+process.exit(failure ? 1 : 0);

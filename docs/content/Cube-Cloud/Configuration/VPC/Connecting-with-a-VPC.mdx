@@ -1,0 +1,40 @@
+---
+title: Connecting with a VPC
+permalink: /cloud/configuration/connecting-with-a-vpc
+category: Configuration
+menuOrder: 5
+---
+
+<InfoBox>
+
+To enable VPC support for your account, please [contact Sales][cube-contact].
+
+</InfoBox>
+
+For improved stability and security, Cube Cloud also supports connecting to one
+or more VPCs in your AWS or Google Cloud accounts. A Cube Cloud VPC connection
+improves stability through dedicated infrastructure for a deployment, and
+improves security by preventing your database traffic from being routed through
+the public Internet.
+
+<Grid imageSize={[56, 56]} cols={2}>
+  <GridItem
+    url="connecting-with-a-vpc/aws"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Configuration/VPC/aws.svg"
+    title="AWS"
+  />
+  {/*
+    <GridItem
+      url="#"
+      imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Configuration/VPC/azure.svg"
+      title="Azure"
+    />
+  */}
+  <GridItem
+    url="connecting-with-a-vpc/gcp"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Configuration/VPC/gcp.svg"
+    title="Google Cloud"
+  />
+</Grid>
+
+[cube-contact]: https://cube.dev/contact/

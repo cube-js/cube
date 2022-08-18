@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -294,7 +294,7 @@ class BaseQuery {
   get dataSource() {
     const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
-      throw new UserError(`To join across data sources use rollupJoin with Cube Store. Note: this is an experimental feature for different data source types. Found data sources: ${dataSources.join(', ')}`);
+      throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
     return dataSources[0];
   }
@@ -431,7 +431,9 @@ class BaseQuery {
   }
 
   /**
-   * Wrap cpecified column with the double quote.
+   * Wrap specified column/table name with the double quote.
+   * @param {string} name
+   * @returns {string}
    */
   escapeColumnName(name) {
     return `"${name}"`;
@@ -551,6 +553,49 @@ class BaseQuery {
         { cache: this.queryCache }
       )
     );
+  }
+
+  /**
+   * Returns a dictionary mapping each preagregation to its corresponding query fragment.
+   * @returns {Record<string, Array<string>>}
+   */
+  buildLambdaQuery() {
+    const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
+    const result = {};
+    if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
+      // TODO(cristipp) Use source query instead of preaggregation references.
+      const references = this.cubeEvaluator.evaluatePreAggregationReferences(preAggForQuery.cube, preAggForQuery.preAggregation);
+      const lambdaQuery = this.newSubQuery(
+        {
+          measures: references.measures,
+          dimensions: references.dimensions,
+          timeDimensions: references.timeDimensions,
+          filters: [
+            ...this.options.filters ?? [],
+            references.timeDimensions.length > 0
+              ? {
+                member: references.timeDimensions[0].dimension,
+                operator: 'afterDate',
+                values: [FROM_PARTITION_RANGE]
+              }
+              : [],
+          ],
+          segments: this.options.segments,
+          order: [],
+          limit: undefined,
+          offset: undefined,
+          rowLimit: MAX_SOURCE_ROW_LIMIT,
+          preAggregationQuery: true,
+        }
+      );
+      const sqlAndParams = lambdaQuery.buildSqlAndParams();
+      const cacheKeyQueries = this.evaluateSymbolSqlWithContext(
+        () => this.cacheKeyQueries(),
+        { preAggregationQuery: true }
+      );
+      result[this.preAggregations.preAggregationId(preAggForQuery)] = { sqlAndParams, cacheKeyQueries };
+    }
+    return result;
   }
 
   externalQuery() {
@@ -1180,6 +1225,13 @@ class BaseQuery {
     (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
 
+  /**
+   * Returns SQL query for the "aggregating on top of sub-queries" uses cases.
+   * @param {string} keyCubeName
+   * @param {Array<BaseMeasure>} measures
+   * @param {Array<BaseFilter>} filters
+   * @returns {string}
+   */
   aggregateSubQuery(keyCubeName, measures, filters) {
     filters = filters || this.allFilters;
     const primaryKeyDimensions = this.primaryKeyNames(keyCubeName).map((k) => this.newDimension(k));
@@ -1215,29 +1267,41 @@ class BaseQuery {
         ungroupedAliases: R.fromPairs(measures.map(m => [m.measure, m.aliasName()]))
       }
     ) : measureSelectFn();
-    const columnsForSelect =
-      this.dimensionColumns(this.escapeColumnName('keys')).concat(selectedMeasures).filter(s => !!s).join(', ');
+    const columnsForSelect = this
+      .dimensionColumns(this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS))
+      .concat(selectedMeasures)
+      .filter(s => !!s)
+      .join(', ');
 
-    const primaryKeyJoinConditions = primaryKeyDimensions.map(
-      (pkd) => `${this.escapeColumnName('keys')}.${pkd.aliasName()} = ${shouldBuildJoinForMeasureSelect ?
-        `${this.cubeAlias(keyCubeName)}.${pkd.aliasName()}` :
-        this.dimensionSql(pkd)}`
-    ).join(' AND ');
+    const primaryKeyJoinConditions = primaryKeyDimensions.map((pkd) => (
+      `${
+        this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS)
+      }.${
+        pkd.aliasName()
+      } = ${
+        shouldBuildJoinForMeasureSelect
+          ? `${this.cubeAlias(keyCubeName)}.${pkd.aliasName()}`
+          : this.dimensionSql(pkd)
+      }`
+    )).join(' AND ');
 
     const subQueryJoins =
       shouldBuildJoinForMeasureSelect ? [] : measureSubQueryDimensions.map(d => this.subQueryJoin(d));
     const joinSql = this.joinSql([
-      { sql: `(${this.keysQuery(primaryKeyDimensions, filters)})`, alias: this.escapeColumnName('keys') },
+      {
+        sql: `(${this.keysQuery(primaryKeyDimensions, filters)})`,
+        alias: this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS),
+      },
       {
         sql: keyCubeSql,
         alias: keyCubeAlias,
         on: `${primaryKeyJoinConditions}
-             ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}`
+             ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}`,
       },
       ...subQueryJoins
     ]);
     return `SELECT ${columnsForSelect} FROM ${joinSql}` +
-      (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
+      (!this.safeEvaluateSymbolContext().ungrouped && this.aggregateSubQueryGroupByClause() || '');
   }
 
   checkShouldBuildJoinForMeasureSelect(measures, keyCubeName) {
@@ -1395,6 +1459,19 @@ class BaseQuery {
     );
   }
 
+  /**
+   * Returns `GROUP BY` clause for the "aggregating on top of sub-queries" uses
+   * cases. By the default returns the result of the `groupByClause` method.
+   * @returns {string}
+   */
+  aggregateSubQueryGroupByClause() {
+    return this.groupByClause();
+  }
+
+  /**
+   * Returns `GROUP BY` clause for the basic uses cases.
+   * @returns {string}
+   */
   groupByClause() {
     if (this.ungrouped) {
       return '';
@@ -1463,16 +1540,33 @@ class BaseQuery {
     return ` ORDER BY ${orderByString}`;
   }
 
+  /**
+   * Returns a complete list of the aliased dimensions, including time
+   * dimensions.
+   * @returns {Array<string>}
+   */
   dimensionAliasNames() {
     return R.flatten(this.dimensionsForSelect().map(d => d.aliasName()).filter(d => !!d));
   }
 
+  /**
+   * Returns an array of column names correlated to the specified cube dimensions.
+   * @param {string} cubeAlias
+   * @returns {Array<string>}
+   */
   dimensionColumns(cubeAlias) {
     return this.dimensionAliasNames().map(alias => `${cubeAlias && `${cubeAlias}.` || ''}${alias}`);
   }
 
   groupByDimensionLimit() {
-    const limitClause = this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+    let limitClause = '';
+    if (this.rowLimit !== null) {
+      if (this.rowLimit === MAX_SOURCE_ROW_LIMIT) {
+        limitClause = ` LIMIT ${this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT)}`;
+      } else {
+        limitClause = ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+      }
+    }
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
     return `${limitClause}${offsetClause}`;
   }
@@ -1495,6 +1589,10 @@ class BaseQuery {
     return this.dimensionsForSelect().concat(this.measures);
   }
 
+  /**
+   * Returns a complete list of the dimensions, including time dimensions.
+   * @returns {Array<BaseDimension>}
+   */
   dimensionsForSelect() {
     return this.dimensions.concat(this.timeDimensions);
   }
@@ -1987,20 +2085,29 @@ class BaseQuery {
 
   newSubQuery(options) {
     const QueryClass = this.constructor;
-    return new QueryClass(
-      this.compilers,
-      Object.assign({
-        paramAllocator: this.paramAllocator,
-        timezone: this.timezone,
-        preAggregationQuery: this.options.preAggregationQuery,
-        useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
-        contextSymbols: this.contextSymbols,
-        preAggregationsSchema: this.preAggregationsSchemaOption,
-        cubeLatticeCache: this.options.cubeLatticeCache,
-        historyQueries: this.options.historyQueries,
-        externalQueryClass: this.options.externalQueryClass,
-      }, options)
-    );
+    return new QueryClass(this.compilers, this.subQueryOptions(options));
+  }
+
+  newSubQueryForCube(cube, options) {
+    return this.options.queryFactory
+      ? this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options))
+      : this.newSubQuery(options);
+  }
+
+  subQueryOptions(options) {
+    return {
+      paramAllocator: this.paramAllocator,
+      timezone: this.timezone,
+      preAggregationQuery: this.options.preAggregationQuery,
+      useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
+      contextSymbols: this.contextSymbols,
+      preAggregationsSchema: this.preAggregationsSchemaOption,
+      cubeLatticeCache: this.options.cubeLatticeCache,
+      historyQueries: this.options.historyQueries,
+      externalQueryClass: this.options.externalQueryClass,
+      queryFactory: this.options.queryFactory,
+      ...options,
+    };
   }
 
   cacheKeyQueries(transformFn) { // TODO collect sub queries
@@ -2176,6 +2283,10 @@ class BaseQuery {
       },
       { inputProps: { collectOriginalSqlPreAggregations: [] }, cache: this.queryCache }
     );
+  }
+
+  preAggregationReadOnly(_cube, _preAggregation) {
+    return false;
   }
 
   // eslint-disable-next-line consistent-return

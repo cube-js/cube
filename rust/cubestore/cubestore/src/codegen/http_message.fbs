@@ -12,6 +12,15 @@ table HttpMessage {
 table HttpQuery {
     query: string;
     trace_obj: string;
+    inline_tables: [HttpTable];
+}
+
+table HttpTable {
+    name: string;
+    columns: [string];
+    types: [string];
+    // csv format to replicate the usual csv import path.
+    csv_rows: string;
 }
 
 table HttpError {

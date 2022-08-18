@@ -8,7 +8,9 @@ import {
   isQueryPresent,
   moveItemInArray,
   movePivotItem,
-  ResultSet
+  validateQuery,
+  ResultSet,
+  removeEmptyQueryFields
 } from '@cubejs-client/core';
 
 import QueryRenderer from './QueryRenderer.jsx';
@@ -146,18 +148,21 @@ export default class QueryBuilder extends React.Component {
 
     let meta;
     let metaError = null;
+    let metaErrorStack = null;
 
     try {
       this.setState({ isFetchingMeta: true });
       meta = await this.cubejsApi().meta();
     } catch (error) {
       metaError = error;
+      metaErrorStack = error.response?.stack?.replace(error.message || '', '') || '';
     }
 
     this.setState(
       {
         meta,
         metaError: metaError ? new Error(generateAnsiHTML(metaError.message || metaError.toString())) : null,
+        metaErrorStack,
         isFetchingMeta: false,
       },
       () => {
@@ -197,6 +202,7 @@ export default class QueryBuilder extends React.Component {
 
   prepareRenderProps(queryRendererProps) {
     const getName = (member) => member.name;
+    
     const toTimeDimension = (member) => {
       const rangeSelection = member.compareDateRange
         ? { compareDateRange: member.compareDateRange }
@@ -208,6 +214,7 @@ export default class QueryBuilder extends React.Component {
         ...rangeSelection,
       });
     };
+    
     const toFilter = (member) => ({
       member: member.member?.name || member.dimension?.name,
       operator: member.operator,
@@ -249,6 +256,7 @@ export default class QueryBuilder extends React.Component {
       missingMembers,
       isFetchingMeta,
       dryRunResponse,
+      metaErrorStack
     } = this.state;
 
     const flatFilters = uniqBy((filter) => `${prop('member', filter)}${prop('operator', filter)}`,
@@ -331,6 +339,7 @@ export default class QueryBuilder extends React.Component {
     return {
       meta,
       metaError,
+      metaErrorStack,
       query,
       error: queryError, // Match same name as QueryRenderer prop
       validatedQuery,
@@ -415,10 +424,10 @@ export default class QueryBuilder extends React.Component {
     const { query } = this.state;
 
     this.updateVizState({
-      query: {
+      query: removeEmptyQueryFields({
         ...query,
         ...queryUpdate,
-      },
+      }),
     });
   }
 
@@ -520,10 +529,7 @@ export default class QueryBuilder extends React.Component {
   validatedQuery(state) {
     const { query } = state || this.state;
 
-    return {
-      ...query,
-      filters: (query.filters || []).filter((f) => f.operator),
-    };
+    return validateQuery(query);
   }
 
   defaultHeuristics(newState) {

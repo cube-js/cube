@@ -1,5 +1,5 @@
 import inflection from 'inflection';
-import { CubeDescriptor, CubeDescriptorMember, DatabaseSchema, MemberType, ScaffoldingSchema, TableName } from './ScaffoldingSchema';
+import { CubeDescriptor, CubeDescriptorMember, DatabaseSchema, MemberType, ScaffoldingSchema, TableName, TableSchema } from './ScaffoldingSchema';
 import { UserError } from '../compiler';
 import { ValueWithComments } from './ValueWithComments';
 
@@ -50,8 +50,9 @@ export class ScaffoldingTemplate {
     const tableNames = cubeDescriptors.map(({ tableName }) => tableName);
     const generatedSchemaForTables = this.scaffoldingSchema.generateForTables(tableNames.map(n => this.resolveTableName(n)));
 
-    const schemaForTables = cubeDescriptors.map((descriptor) => {
+    const schemaForTables = cubeDescriptors.map<TableSchema>((descriptor) => {
       const generatedDescriptor = generatedSchemaForTables.find(({ cube }) => cube === descriptor.cube);
+      
       const cubeMembers = descriptor.members.reduce<CubeMembers>((memo, member) => ({
         measures: [...memo.measures].concat(member.memberType === MemberType.Measure ? [member] : []),
         dimensions: [...memo.dimensions].concat(member.memberType === MemberType.Dimension ? [member] : []),
@@ -59,11 +60,14 @@ export class ScaffoldingTemplate {
         measures: [],
         dimensions: []
       });
+      
+      const dimensionNames = cubeMembers.dimensions.filter((d) => d.included || d.included == null).map((d) => d.name);
 
       return {
         ...generatedDescriptor,
         ...descriptor,
-        ...cubeMembers
+        ...cubeMembers,
+        drillMembers: generatedDescriptor?.drillMembers?.filter((dm) => dimensionNames.includes(dm.name))
       };
     });
     
@@ -104,7 +108,7 @@ export class ScaffoldingTemplate {
     throw new UserError('Table names should be in <table> or <schema>.<table> format');
   }
 
-  public schemaDescriptorForTable(tableSchema, schemaContext: SchemaContext = {}) {
+  public schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
     return {
       cube: tableSchema.cube,
       sql: `SELECT * FROM ${tableSchema.schema && tableSchema.schema.length ? `${this.escapeName(tableSchema.schema)}.` : ''}${this.escapeName(tableSchema.table)}`, // TODO escape
@@ -127,7 +131,7 @@ export class ScaffoldingTemplate {
       })).reduce((a, b) => ({ ...a, ...b }), {
         count: {
           type: 'count',
-          drillMembers: tableSchema.drillMembers.map(m => new MemberReference(this.memberName(m)))
+          drillMembers: (tableSchema.drillMembers || []).map(m => new MemberReference(this.memberName(m)))
         }
       }),
       dimensions: tableSchema.dimensions.map(m => ({

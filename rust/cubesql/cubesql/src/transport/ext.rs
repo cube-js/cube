@@ -25,6 +25,12 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
 
                 agg_type.eq(&"countDistinct".to_string())
                     || agg_type.eq(&"countDistinctApprox".to_string())
+            } else if expect_agg_type.eq(&"sum".to_string()) {
+                let agg_type = self.agg_type.as_ref().unwrap();
+
+                agg_type.eq(&"sum".to_string())
+                    || agg_type.eq(&"count".to_string())
+                    || agg_type.eq(&"number".to_string())
             } else {
                 self.agg_type.as_ref().unwrap().eq(expect_agg_type)
             }
@@ -108,6 +114,7 @@ impl V1CubeMetaDimensionExt for V1CubeMetaDimension {
 #[derive(Debug)]
 pub struct CubeColumn {
     name: String,
+    description: Option<String>,
     column_type: ColumnType,
     can_be_null: bool,
 }
@@ -115,6 +122,10 @@ pub struct CubeColumn {
 impl CubeColumn {
     pub fn get_name(&self) -> &String {
         &self.name
+    }
+
+    pub fn get_description(&self) -> &Option<String> {
+        &self.description
     }
 
     pub fn sql_can_be_null(&self) -> bool {
@@ -133,7 +144,17 @@ pub trait V1CubeMetaExt {
 
     fn contains_member(&self, member_name: &str) -> bool;
 
-    fn lookup_dimension(&self, member_name: &str) -> Option<&V1CubeMetaDimension>;
+    fn member_name(&self, column_name: &str) -> String;
+
+    fn lookup_dimension(&self, column_name: &str) -> Option<&V1CubeMetaDimension>;
+
+    fn lookup_dimension_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaDimension>;
+
+    fn lookup_measure(&self, column_name: &str) -> Option<&V1CubeMetaMeasure>;
+
+    fn lookup_measure_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaMeasure>;
+
+    fn lookup_segment(&self, column_name: &str) -> Option<&V1CubeMetaSegment>;
 
     fn df_data_type(&self, member_name: &str) -> Option<DataType>;
 
@@ -154,6 +175,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for measure in &self.measures {
             columns.push(CubeColumn {
                 name: measure.get_real_name(),
+                description: None,
                 column_type: measure.get_sql_type(),
                 can_be_null: false,
             });
@@ -162,6 +184,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for dimension in &self.dimensions {
             columns.push(CubeColumn {
                 name: dimension.get_real_name(),
+                description: None,
                 column_type: dimension.get_sql_type(),
                 can_be_null: dimension.sql_can_be_null(),
             });
@@ -170,10 +193,18 @@ impl V1CubeMetaExt for V1CubeMeta {
         for segment in &self.segments {
             columns.push(CubeColumn {
                 name: segment.get_real_name(),
-                column_type: ColumnType::Blob,
+                description: None,
+                column_type: ColumnType::Boolean,
                 can_be_null: false,
             });
         }
+
+        columns.push(CubeColumn {
+            name: "__user".to_string(),
+            description: Some("Virtual column for security context switching".to_string()),
+            column_type: ColumnType::String,
+            can_be_null: true,
+        });
 
         columns
     }
@@ -184,6 +215,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for measure in &self.measures {
             columns.push(CubeColumn {
                 name: measure.get_real_name(),
+                description: None,
                 column_type: measure.get_sql_type(),
                 can_be_null: false,
             });
@@ -192,6 +224,7 @@ impl V1CubeMetaExt for V1CubeMeta {
         for dimension in &self.dimensions {
             columns.push(CubeColumn {
                 name: dimension.get_real_name(),
+                description: None,
                 column_type: dimension.get_sql_type(),
                 can_be_null: dimension.sql_can_be_null(),
             });
@@ -210,10 +243,37 @@ impl V1CubeMetaExt for V1CubeMeta {
                 .any(|m| m.name.eq_ignore_ascii_case(member_name))
     }
 
-    fn lookup_dimension(&self, member_name: &str) -> Option<&V1CubeMetaDimension> {
+    fn member_name(&self, column_name: &str) -> String {
+        format!("{}.{}", self.name, column_name)
+    }
+
+    fn lookup_measure(&self, column_name: &str) -> Option<&V1CubeMetaMeasure> {
+        let member_name = self.member_name(column_name);
+        self.lookup_measure_by_member_name(&member_name)
+    }
+
+    fn lookup_measure_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaMeasure> {
+        self.measures
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(&member_name))
+    }
+
+    fn lookup_dimension(&self, column_name: &str) -> Option<&V1CubeMetaDimension> {
+        let member_name = self.member_name(column_name);
+        self.lookup_dimension_by_member_name(&member_name)
+    }
+
+    fn lookup_dimension_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaDimension> {
         self.dimensions
             .iter()
-            .find(|m| m.name.eq_ignore_ascii_case(member_name))
+            .find(|m| m.name.eq_ignore_ascii_case(&member_name))
+    }
+
+    fn lookup_segment(&self, column_name: &str) -> Option<&V1CubeMetaSegment> {
+        let member_name = self.member_name(column_name);
+        self.segments
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case(&member_name))
     }
 
     fn df_data_type(&self, member_name: &str) -> Option<DataType> {

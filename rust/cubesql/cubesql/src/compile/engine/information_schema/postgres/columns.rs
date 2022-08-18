@@ -316,10 +316,12 @@ impl InfoSchemaColumnsProvider {
         let mut builder = InformationSchemaColumnsBuilder::new();
 
         for cube in cubes {
-            let position = 0;
+            let mut position = 1;
 
             for column in cube.get_columns() {
-                builder.add_column("def", "db", cube.name.clone(), &column, position)
+                builder.add_column("db", "public", cube.name.clone(), &column, position);
+
+                position += 1;
             }
         }
 

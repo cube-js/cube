@@ -489,6 +489,258 @@ impl PgCatalogProcProvider {
             prosrc: "multirange_unnest".to_string(),
         });
 
+        builder.add_proc(&PgProc {
+            oid: 2400,
+            proname: "array_recv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "s".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 3,
+            prorettype: 2277,
+            proargtypes: "2281 26 23".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "array_recv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2404,
+            proname: "int2recv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "s".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 1,
+            prorettype: 21,
+            proargtypes: "2281".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "int2recv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2406,
+            proname: "int4recv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "i".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 1,
+            prorettype: 23,
+            proargtypes: "2281".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "int4recv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2408,
+            proname: "int8recv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "i".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 1,
+            prorettype: 20,
+            proargtypes: "2281".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "int8recv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2414,
+            proname: "textrecv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "s".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 1,
+            prorettype: 25,
+            proargtypes: "2281".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "textrecv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2424,
+            proname: "float4recv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "i".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 1,
+            prorettype: 700,
+            proargtypes: "2281".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "float4recv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2426,
+            proname: "float8recv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "i".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 1,
+            prorettype: 701,
+            proargtypes: "2281".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "float8recv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2432,
+            proname: "varcharrecv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "s".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 3,
+            prorettype: 1043,
+            proargtypes: "2281 26 23".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "varcharrecv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2460,
+            proname: "numeric_recv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "i".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 3,
+            prorettype: 1700,
+            proargtypes: "2281 26 23".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "numeric_recv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2474,
+            proname: "timestamp_recv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "i".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 3,
+            prorettype: 1114,
+            proargtypes: "2281 26 23".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "timestamp_recv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2436,
+            proname: "boolrecv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "s".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 1,
+            prorettype: 16,
+            proargtypes: "2281".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "boolrecv".to_string(),
+        });
+
+        builder.add_proc(&PgProc {
+            oid: 2420,
+            proname: "oidvectorrecv".to_string(),
+            prokind: "f".to_string(),
+            proleakproof: false,
+            proisstrict: true,
+            proretset: false,
+            provolatile: "i".to_string(),
+            proparallel: "s".to_string(),
+            pronargs: 1,
+            prorettype: 30,
+            proargtypes: "2281".to_string(),
+            // TODO: NULL
+            proallargtypes: "".to_string(),
+            // TODO: NULL
+            proargmodes: "".to_string(),
+            // TODO: NULL
+            proargnames: "".to_string(),
+            prosrc: "oidvectorrecv".to_string(),
+        });
+
         Self {
             data: Arc::new(builder.finish()),
         }

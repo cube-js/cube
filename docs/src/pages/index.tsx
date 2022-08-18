@@ -27,13 +27,16 @@ class IndexPage extends Component<Props> {
   render() {
     return (
       <div className={styles.docContent}>
-        <Helmet title="Main | Cube Docs" />
+        <Helmet>
+          <title>Main | Cube Docs</title>
+          <meta name="description" content={"Main | Documentation for working with Cube, the open-source analytics framework"}></meta>
+        </Helmet>
         <h1>Documentation</h1>
-
+        
         <InfoBox>
-          Learn how you can build a modern data Stack during the "Building Data Applications with Cube"<br />workshop on May 18th at 9-10:30 am PT! 
-          <br />
-          You can register for the workshop at <a href="https://cube.dev/events/building-data-app/">the event page</a>. 👈
+          <b>Introduction to Cube Cloud</b> workshop on August 31, 2022.<br/> 
+          Here's your opportunity to get hands-on experience with key features of Cube Cloud and hear the latest product updates.🚀<br /> 
+          Check out the agenda and resigter for the workshop today on the <a href="https://cube.dev/events/introduction-to-cube-cloud/">event page</a> 👈
         </InfoBox>
         
         <Row>

@@ -29,13 +29,13 @@ const COMPLETEDORDERS = gql`
 
 const GenerateChart = () => {
   const { data, loading, error } = useQuery(COMPLETEDORDERS);
-  
+
   if (loading) {
     return <div>loading</div>;
   }
 
   if (error) {
-    return <div>{error}</div>;
+    return <div>{error.message}</div>;
   }
 
   if (!data) {

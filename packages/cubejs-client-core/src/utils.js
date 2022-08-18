@@ -1,4 +1,4 @@
-import { indexBy, prop, clone, equals } from 'ramda';
+import { indexBy, prop, clone, equals, fromPairs, toPairs } from 'ramda';
 
 export const DEFAULT_GRANULARITY = 'day';
 
@@ -14,10 +14,52 @@ export const GRANULARITIES = [
   { name: 'year', title: 'Year' },
 ];
 
+export function removeEmptyQueryFields(_query) {
+  const query = _query || {};
+  
+  return fromPairs(
+    toPairs(query)
+      .map(([key, value]) => {
+        if (
+          ['measures', 'dimensions', 'segments', 'timeDimensions', 'filters'].includes(key)
+        ) {
+          if (Array.isArray(value) && value.length === 0) {
+            return null;
+          }
+        }
+        
+        if (key === 'order' && value) {
+          if (Array.isArray(value) && !value.length) {
+            return null;
+          } else if (!Object.keys(value).length) {
+            return null;
+          }
+        }
+
+        return [key, value];
+      })
+      .filter(Boolean)
+  );
+}
+
+export function validateQuery(_query) {
+  const query = _query || {};
+  
+  return removeEmptyQueryFields({
+    ...query,
+    filters: (query.filters || []).filter((f) => f.operator),
+    timeDimensions: (query.timeDimensions || []).filter(
+      (td) => !(!td.dateRange && !td.granularity)
+    ),
+  });
+}
+
 export function areQueriesEqual(query1 = {}, query2 = {}) {
   return (
-    equals(Object.entries((query1 && query1.order) || {}), Object.entries((query2 && query2.order) || {})) &&
-    equals(query1, query2)
+    equals(
+      Object.entries((query1 && query1.order) || {}),
+      Object.entries((query2 && query2.order) || {})
+    ) && equals(query1, query2)
   );
 }
 
@@ -28,7 +70,10 @@ export function defaultOrder(query) {
     return {
       [granularity.dimension]: 'asc',
     };
-  } else if ((query.measures || []).length > 0 && (query.dimensions || []).length > 0) {
+  } else if (
+    (query.measures || []).length > 0 &&
+    (query.dimensions || []).length > 0
+  ) {
     return {
       [query.measures[0]]: 'desc',
     };
@@ -65,7 +110,8 @@ export function defaultHeuristics(newState, oldQuery = {}, options) {
       (oldQuery.timeDimensions || []).length === 1 &&
       (newQuery.timeDimensions || []).length === 1 &&
       newQuery.timeDimensions[0].granularity &&
-      oldQuery.timeDimensions[0].granularity !== newQuery.timeDimensions[0].granularity
+      oldQuery.timeDimensions[0].granularity !==
+        newQuery.timeDimensions[0].granularity
     ) {
       state = {
         ...state,
@@ -74,13 +120,16 @@ export function defaultHeuristics(newState, oldQuery = {}, options) {
     }
 
     if (
-      ((oldQuery.measures || []).length === 0 && (newQuery.measures || []).length > 0) ||
+      ((oldQuery.measures || []).length === 0 &&
+        (newQuery.measures || []).length > 0) ||
       ((oldQuery.measures || []).length === 1 &&
         (newQuery.measures || []).length === 1 &&
         oldQuery.measures[0] !== newQuery.measures[0])
     ) {
       const [td] = newQuery.timeDimensions || [];
-      const defaultTimeDimension = meta.defaultTimeDimensionNameFor(newQuery.measures[0]);
+      const defaultTimeDimension = meta.defaultTimeDimensionNameFor(
+        newQuery.measures[0]
+      );
       newQuery = {
         ...newQuery,
         timeDimensions: defaultTimeDimension
@@ -103,10 +152,16 @@ export function defaultHeuristics(newState, oldQuery = {}, options) {
       };
     }
 
-    if ((oldQuery.dimensions || []).length === 0 && (newQuery.dimensions || []).length > 0) {
+    if (
+      (oldQuery.dimensions || []).length === 0 &&
+      (newQuery.dimensions || []).length > 0
+    ) {
       newQuery = {
         ...newQuery,
-        timeDimensions: (newQuery.timeDimensions || []).map((td) => ({ ...td, granularity: undefined })),
+        timeDimensions: (newQuery.timeDimensions || []).map((td) => ({
+          ...td,
+          granularity: undefined,
+        })),
       };
 
       return {
@@ -118,7 +173,10 @@ export function defaultHeuristics(newState, oldQuery = {}, options) {
       };
     }
 
-    if ((oldQuery.dimensions || []).length > 0 && (newQuery.dimensions || []).length === 0) {
+    if (
+      (oldQuery.dimensions || []).length > 0 &&
+      (newQuery.dimensions || []).length === 0
+    ) {
       newQuery = {
         ...newQuery,
         timeDimensions: (newQuery.timeDimensions || []).map((td) => ({
@@ -137,7 +195,8 @@ export function defaultHeuristics(newState, oldQuery = {}, options) {
     }
 
     if (
-      ((oldQuery.dimensions || []).length > 0 || (oldQuery.measures || []).length > 0) &&
+      ((oldQuery.dimensions || []).length > 0 ||
+        (oldQuery.measures || []).length > 0) &&
       (newQuery.dimensions || []).length === 0 &&
       (newQuery.measures || []).length === 0
     ) {
@@ -177,7 +236,9 @@ export function defaultHeuristics(newState, oldQuery = {}, options) {
     }
 
     if (
-      (newChartType === 'pie' || newChartType === 'table' || newChartType === 'number') &&
+      (newChartType === 'pie' ||
+        newChartType === 'table' ||
+        newChartType === 'number') &&
       (oldQuery.timeDimensions || []).length === 1 &&
       oldQuery.timeDimensions[0].granularity
     ) {
@@ -209,7 +270,13 @@ export function isQueryPresent(query) {
   );
 }
 
-export function movePivotItem(pivotConfig, sourceIndex, destinationIndex, sourceAxis, destinationAxis) {
+export function movePivotItem(
+  pivotConfig,
+  sourceIndex,
+  destinationIndex,
+  sourceAxis,
+  destinationAxis
+) {
   const nextPivotConfig = {
     ...pivotConfig,
     x: [...pivotConfig.x],
@@ -220,7 +287,10 @@ export function movePivotItem(pivotConfig, sourceIndex, destinationIndex, source
 
   if (id === 'measures') {
     destinationIndex = lastIndex + 1;
-  } else if (destinationIndex >= lastIndex && nextPivotConfig[destinationAxis][lastIndex] === 'measures') {
+  } else if (
+    destinationIndex >= lastIndex &&
+    nextPivotConfig[destinationAxis][lastIndex] === 'measures'
+  ) {
     destinationIndex = lastIndex - 1;
   }
 
@@ -290,7 +360,11 @@ export function getOrderMembersFromOrder(orderMembers, order) {
 export function aliasSeries(values, index, pivotConfig, duplicateMeasures) {
   const nonNullValues = values.filter((value) => value != null);
 
-  if (pivotConfig && pivotConfig.aliasSeries && pivotConfig.aliasSeries[index]) {
+  if (
+    pivotConfig &&
+    pivotConfig.aliasSeries &&
+    pivotConfig.aliasSeries[index]
+  ) {
     return [pivotConfig.aliasSeries[index], ...nonNullValues];
   } else if (duplicateMeasures.has(nonNullValues[0])) {
     return [index, ...nonNullValues];

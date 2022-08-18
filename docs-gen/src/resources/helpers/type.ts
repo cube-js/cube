@@ -61,10 +61,10 @@ export function type(
 function getReferenceType(model: ReferenceType) {
   const md = [];
 
-  md.push(model.reflection ? LinkPlugin.toLink(model.name, model.reflection) : model.name);
+  md.push(model.name);
 
   if (model.typeArguments) {
-    md.push(`‹${model.typeArguments.map((typeArgument) => `${type.call(typeArgument)}`).join(', ')}›`);
+    md.push(`<${model.typeArguments.map((typeArgument) => `${type.call(typeArgument)}`).join(', ')}>`);
   }
 
   return md.join('');

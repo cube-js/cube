@@ -59,14 +59,14 @@ export function SecurityContext() {
   async function handleTokenSave(values) {
     try {
       setSubmitting(true);
-      saveToken(
+      await saveToken(
         await onTokenPayloadChange(
           jwtDecode(values?.token),
           values?.token || null
         )
       );
     } catch (_) {
-      saveToken(values?.token || null);
+      await saveToken(values?.token || null);
     } finally {
       setEditingToken(false);
       setIsModalOpen(false);
@@ -97,7 +97,7 @@ export function SecurityContext() {
       setSubmitting(true);
 
       try {
-        saveToken(
+        await saveToken(
           await onTokenPayloadChange(JSON.parse(tmpPayload || '{}'), null)
         );
       } catch (error) {
@@ -106,7 +106,7 @@ export function SecurityContext() {
 
       setSubmitting(false);
     } else if (!tmpPayload) {
-      saveToken(null);
+      await saveToken(null);
     }
 
     setIsModalOpen(false);

@@ -4,6 +4,13 @@ import './index.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import createExampleWrapper from "@cube-dev/example-wrapper";
+
+const exampleDescription = {
+  title: "Multitenancy Workshop",
+};
+
+createExampleWrapper(exampleDescription);
 
 ReactDOM.render(
   <React.StrictMode>

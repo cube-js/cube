@@ -119,8 +119,15 @@ export class CubeEvaluator extends CubeSymbols {
         const preAggregations = this.preAggregationsForCube(cube);
         return Object.keys(preAggregations)
           .filter(
-            preAggregationName => (!scheduled || preAggregations[preAggregationName].scheduledRefresh) &&
-              (!preAggregationIds || preAggregationIds.includes(idFactory({ cube, preAggregationName })))
+            preAggregationName => (
+              !scheduled ||
+              preAggregations[preAggregationName].scheduledRefresh
+            ) && (
+              !preAggregationIds ||
+              preAggregationIds.includes(idFactory({
+                cube, preAggregationName
+              }))
+            )
           )
           .map(preAggregationName => {
             const { indexes, refreshKey } = preAggregations[preAggregationName];
@@ -270,6 +277,7 @@ export class CubeEvaluator extends CubeSymbols {
       granularity: aggregation.granularity
     }] : [];
     return {
+      allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:
         (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || [])
           .concat(

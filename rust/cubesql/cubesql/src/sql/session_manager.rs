@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use crate::CubeError;
+use crate::{sql::session::SessionStatActivity, CubeError};
 
 use super::{
     server_manager::ServerManager,
@@ -57,11 +57,23 @@ impl SessionManager {
         session_ref
     }
 
+    pub fn stat_activity(self: &Arc<Self>) -> Vec<SessionStatActivity> {
+        let guard = self
+            .sessions
+            .read()
+            .expect("failed to unlock sessions for stat_activity");
+
+        guard
+            .values()
+            .map(Session::to_stat_activity)
+            .collect::<Vec<SessionStatActivity>>()
+    }
+
     pub fn process_list(self: &Arc<Self>) -> Vec<SessionProcessList> {
         let guard = self
             .sessions
             .read()
-            .expect("failed to unlock sessions for reading process list");
+            .expect("failed to unlock sessions for process_list");
 
         guard
             .values()
@@ -69,11 +81,20 @@ impl SessionManager {
             .collect::<Vec<SessionProcessList>>()
     }
 
+    pub fn get_session(&self, connection_id: u32) -> Option<Arc<Session>> {
+        let guard = self
+            .sessions
+            .read()
+            .expect("failed to unlock sessions for get_session session");
+
+        guard.get(&connection_id).map(|s| s.clone())
+    }
+
     pub fn drop_session(&self, connection_id: u32) {
         let mut guard = self
             .sessions
             .write()
-            .expect("failed to unlock sessions for droping session");
+            .expect("failed to unlock sessions for drop_session session");
         guard.remove(&connection_id);
     }
 }

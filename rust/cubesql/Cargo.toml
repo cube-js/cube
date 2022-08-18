@@ -2,5 +2,6 @@
 resolver = "2"
 members = [
     "cubesql",
-    "cubeclient"
+    "cubeclient",
+    "pg-srv"
 ]

@@ -31,6 +31,12 @@ jobs:
           toolchain: nightly-2022-03-08
           override: true
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubesql
+          # default key
+          key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Lint CubeSQL
         run: cd rust/cubesql/cubesql && cargo fmt --all -- --check
       - name: Lint Native
@@ -44,7 +50,7 @@ jobs:
   unit:
     runs-on: ubuntu-20.04
     timeout-minutes: 40
-    name: Unit
+    name: Unit (Rewrite Engine)
 
     steps:
       - name: Checkout
@@ -64,16 +70,11 @@ jobs:
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
           sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-      - name: Install tarpaulin@0.19.1
-        uses: actions-rs/cargo@v1
+      - name: Install tarpaulin@0.20.1
+        uses: baptiste0928/cargo-install@v1
         with:
-          command: install
-          args: cargo-tarpaulin --version 0.19.1
-      - name: Unit tests
-        env:
-          CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
-          CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
-        run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
+          crate: cargo-tarpaulin
+          version: "0.20.1"
       - name: Unit tests (Rewrite Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
@@ -88,8 +89,37 @@ jobs:
           flags: cubesql
           fail_ci_if_error: true
 
+  unit_legacy:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 40
+    name: Unit (Legacy)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          # pulls all commits (needed for codecov)
+          fetch-depth: 2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-03-08
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubesql
+          # default key
+          key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+      - name: Unit tests (Legacy Engine)
+        env:
+          CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
+          CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
+        run: cd rust/cubesql && cargo test
+
   native_linux:
-    needs: [lint,unit]
+    needs: [lint,unit,unit_legacy]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }}
@@ -144,14 +174,19 @@ jobs:
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cd packages/cubejs-backend-native && yarn run native:build
-      - name: Test native
+      - name: Test native (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
         run: cd packages/cubejs-backend-native && yarn run test:unit
+      - name: Run E2E Smoke testing over whole Cube (GNU only)
+        if: (matrix.target == 'x86_64-unknown-linux-gnu')
+        env:
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+        run: yarn tsc && cd packages/cubejs-testing && yarn smoke:cubesql
 
   native:
-    needs: [lint,unit]
+    needs: [lint,unit,unit_legacy]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
@@ -182,14 +217,27 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+      - name: Restore lerna (excluding Windows)
         uses: actions/cache@v2
+        if: ${{ !startsWith(matrix.os-version, 'windows') }}
         with:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
             node_modules
             rust/cubesql/node_modules
             packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      # Windows doesn't support links + cache action doesn't support exclude
+      # cache will include rust cache for native, which causes 3GB archive
+      # Right now, GH provides 10 gb for each repository with automatic retention.
+      - name: Restore lerna (Windows only)
+        uses: actions/cache@v2
+        if: ${{ startsWith(matrix.os-version, 'windows') }}
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
