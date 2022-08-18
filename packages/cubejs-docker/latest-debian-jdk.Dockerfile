@@ -1,4 +1,4 @@
-FROM node:14.18.2-buster-slim
+FROM node:14.20.0-bullseye-slim
 
 ARG IMAGE_VERSION=unknown
 
@@ -14,7 +14,8 @@ ENV TERM rxvt-unicode
 ENV NODE_ENV production
 
 WORKDIR /cube
-COPY . .
+COPY ./packages/cubejs-docker .
+COPY ./yarn.lock .
 
 RUN yarn policies set-version v1.22.5
 
