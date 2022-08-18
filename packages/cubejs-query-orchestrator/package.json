@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.51",
+  "version": "0.30.53",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -31,7 +31,7 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/shared": "^0.30.50",
+    "@cubejs-backend/shared": "^0.30.53",
     "csv-write-stream": "^2.0.0",
     "es5-ext": "0.10.53",
     "generic-pool": "^3.7.1",
