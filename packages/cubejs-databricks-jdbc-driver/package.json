@@ -19,7 +19,8 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "lint:fix": "eslint --fix src/* --ext .ts",
+    "postinstall": "node bin/post-install"
   },
   "files": [
     "README.md",
