@@ -1,7 +1,5 @@
 import { env } from '../env'
 
-console.log('QQQ', env);
-
 cube(`GithubCommits`, {
   sql: `
       SELECT time, repo
