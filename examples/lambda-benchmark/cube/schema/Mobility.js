@@ -1,15 +1,15 @@
 import { env } from '../env'
 
-cube(`GdeltEvents`, {
+cube(`Mobility`, {
   sql: `
-      SELECT time, code
+      SELECT time, country
       FROM (
         SELECT 
-          PARSE_TIMESTAMP("%Y%m%d", CAST(SQLDATE AS STRING)) AS time,
-          EventCode AS code
-        FROM \`gdelt-bq.gdeltv2.events\`
+          TIMESTAMP(date) AS time,
+          country_region AS country
+        FROM \`bigquery-public-data.covid19_google_mobility.mobility_report\`
       )
-      WHERE time BETWEEN TIMESTAMP("2019-01-01") AND TIMESTAMP("2020-01-01")
+      WHERE time BETWEEN TIMESTAMP("2021-01-01") AND TIMESTAMP("2022-01-01")
   `,
 
   refreshKey: {
@@ -23,8 +23,8 @@ cube(`GdeltEvents`, {
   },
 
   dimensions: {
-    code: {
-      sql: `code`,
+    country: {
+      sql: `country`,
       type: `string`
     },
 
@@ -41,7 +41,7 @@ cube(`GdeltEvents`, {
         scheduledRefresh: true,
         refreshKey: { every: '1 hour' },
         measureReferences: [ count ],
-        dimensionReferences: [ code ],
+        dimensionReferences: [ country ],
         timeDimensionReference: time,
         granularity: 'day',
         partitionGranularity: 'month',

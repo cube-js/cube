@@ -72,4 +72,36 @@ export const queries = {
       ]
     }),
   },
+
+  Mobility: {
+    data: () => {
+      return {
+        year1: 2021,
+        month1: pad(getRandomInRange(1, 12), 2),
+        day1: pad(getRandomInRange(1, 28), 2),
+      }
+    },
+
+    query: ({year1, month1, day1}) => ({
+      "order": {
+        "Mobility.count": "desc"
+      },
+      "measures": [
+        "Mobility.count",
+      ],
+      "dimensions": [
+        "Mobility.country"
+      ],
+      "timeDimensions": [
+        {
+          "dimension": "Mobility.time",
+          "granularity": "day",
+          "dateRange": [
+            `${year1}-${month1}-${day1}`,
+            `2022-01-01`
+          ]
+        }
+      ]
+    }),
+  },
 };
