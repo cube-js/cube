@@ -1,5 +1,7 @@
 import { env } from '../env'
 
+console.log('QQQ', env);
+
 cube(`GithubCommits`, {
   sql: `
       SELECT time, repo
@@ -49,7 +51,7 @@ cube(`GithubCommits`, {
         timeDimensionReference: time,
         granularity: 'day',
         partitionGranularity: 'month',
-        unionWithSourceData: env.CUBEJS_TEST_USE_LAMBDA,
+        unionWithSourceData: !!env.CUBEJS_TEST_USE_LAMBDA,
       },
     },
 });

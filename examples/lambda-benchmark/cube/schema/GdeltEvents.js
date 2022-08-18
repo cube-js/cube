@@ -45,7 +45,7 @@ cube(`GdeltEvents`, {
         timeDimensionReference: time,
         granularity: 'day',
         partitionGranularity: 'month',
-        unionWithSourceData: env.CUBEJS_TEST_USE_LAMBDA,
+        unionWithSourceData: !!env.CUBEJS_TEST_USE_LAMBDA,
       },
     },
 });

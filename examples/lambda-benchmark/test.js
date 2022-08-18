@@ -18,14 +18,14 @@ export const options = {
   setupTimeout: '300s',
   teardownTimeout: '300s',
   scenarios: {
-    basic: Object.assign(
-      Object.assign({}, defaultScenario),
-      { exec: 'basic' },
-    ),
-    // lambda: Object.assign(
+    // basic: Object.assign(
     //   Object.assign({}, defaultScenario),
-    //   { exec: 'lambda' },
+    //   { exec: 'basic' },
     // ),
+    lambda: Object.assign(
+      Object.assign({}, defaultScenario),
+      { exec: 'lambda' },
+    ),
   },
 };
 
