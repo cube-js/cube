@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.52](https://github.com/cube-js/cube.js/compare/v0.30.51...v0.30.52) (2022-08-18)
+
+
+### Bug Fixes
+
+* **cubesql:** SUM(CAST(rows.col AS Decimal(38, 10))) expression can't be coerced in Power BI ([#5107](https://github.com/cube-js/cube.js/issues/5107)) ([0037fb4](https://github.com/cube-js/cube.js/commit/0037fb416c68b47e055e846d724ce276b1675879))
+* **cubesql:** Type coercion for CASE WHEN THEN ([88b124d](https://github.com/cube-js/cube.js/commit/88b124d2d0549e4d55678fddef73f4a5796c4ada))
+
+
+### Features
+
+* **cubesql:** Support Redshift connection (ThoughtSpot) ([b244d59](https://github.com/cube-js/cube.js/commit/b244d595487503c3597dc63b6aedca85170e7424))
+
+
+
+
+
 ## [0.30.48](https://github.com/cube-js/cube.js/compare/v0.30.47...v0.30.48) (2022-08-14)
 
 
