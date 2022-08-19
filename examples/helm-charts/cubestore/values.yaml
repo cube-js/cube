@@ -157,6 +157,14 @@ cloudStorage:
     endpoint:
 
 router:
+  ## Service account for cubestore router to use
+  ##
+  serviceAccount:
+    create: false
+    name: ""
+    automountServiceAccountToken: true
+    annotations: {}
+
   ## The port for Cube Store to listen to HTTP connections on
   ##
   httpPort: 3030
@@ -245,6 +253,14 @@ router:
   nodeSelector: {}
 
 workers:
+  ## Service account for cubestore workers to use
+  ##
+  serviceAccount:
+    create: false
+    name: ""
+    automountServiceAccountToken: true
+    annotations: {}
+
   ## Number of workers to deploy
   ##
   workersCount: 1
