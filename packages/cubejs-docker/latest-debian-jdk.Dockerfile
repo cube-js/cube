@@ -14,8 +14,7 @@ ENV TERM rxvt-unicode
 ENV NODE_ENV production
 
 WORKDIR /cube
-COPY ./packages/cubejs-docker .
-COPY ./yarn.lock .
+COPY . .
 
 RUN yarn policies set-version v1.22.5
 
