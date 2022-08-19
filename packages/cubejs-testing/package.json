@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.30.53",
+  "version": "0.30.54",
   "description": "Cube.js e2e tests",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -71,7 +71,7 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
-    "@cubejs-backend/cubestore-driver": "^0.30.53",
+    "@cubejs-backend/cubestore-driver": "^0.30.54",
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/postgres-driver": "^0.30.53",
     "@cubejs-backend/query-orchestrator": "^0.30.53",

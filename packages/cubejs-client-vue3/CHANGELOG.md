@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.54](https://github.com/cube-js/cube.js/compare/v0.30.53...v0.30.54) (2022-08-19)
+
+
+### Bug Fixes
+
+* **@cubejs-client/vue3:** avoid setQuery Vue3 warnings ([#5084](https://github.com/cube-js/cube.js/issues/5084)) ([#5120](https://github.com/cube-js/cube.js/issues/5120)) ([d380da4](https://github.com/cube-js/cube.js/commit/d380da4e2db09c3eccd8d175287db314568638b1))
+
+
+### Features
+
+* **@cubejs-client/vue3:** support logical operator filters ([#2950](https://github.com/cube-js/cube.js/issues/2950)) ([#5119](https://github.com/cube-js/cube.js/issues/5119)) ([077bb75](https://github.com/cube-js/cube.js/commit/077bb75ac529bf2c32a1e525ba23724a15733aa1))
+
+
+
+
+
 ## [0.30.46](https://github.com/cube-js/cube.js/compare/v0.30.45...v0.30.46) (2022-08-10)
 
 

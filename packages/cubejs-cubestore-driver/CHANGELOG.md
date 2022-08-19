@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.54](https://github.com/cube-js/cube.js/compare/v0.30.53...v0.30.54) (2022-08-19)
+
+
+### Bug Fixes
+
+* **cubejs:** Fixes CubeStoreDriver user/password auth ([#5123](https://github.com/cube-js/cube.js/issues/5123)) ([8f93347](https://github.com/cube-js/cube.js/commit/8f93347f9cb1c8206b61fe9a472e1805489e0d13))
+
+
+
+
+
 ## [0.30.53](https://github.com/cube-js/cube.js/compare/v0.30.52...v0.30.53) (2022-08-18)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

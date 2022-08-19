@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.54](https://github.com/cube-js/cube.js/compare/v0.30.53...v0.30.54) (2022-08-19)
+
+
+### Features
+
+* **cubesql:** Catch panic on Portal (DF.stream) - return error to the client ([a80cdc7](https://github.com/cube-js/cube.js/commit/a80cdc7a8ed9c66d1ad8d5c7e261e23b10d6d5d0))
+
+
+
+
+
 ## [0.30.52](https://github.com/cube-js/cube.js/compare/v0.30.51...v0.30.52) (2022-08-18)
 
 
