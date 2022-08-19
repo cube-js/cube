@@ -203,6 +203,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("aggregate_index_errors", aggregate_index_errors),
         t("inline_tables", inline_tables),
         t("build_range_end", build_range_end),
+        t("columns_json", columns_json),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -5780,6 +5781,31 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
                 TableValue::String("s".to_string()),
                 TableValue::String("t1".to_string()),
                 TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
+            ]),
+        ]
+    );
+}
+
+async fn columns_json(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.t0(x string)")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT table_schema, table_name, columns_json FROM system.tables")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t0".to_string()),
+                TableValue::String("[{\"name\":\"x\",\"column_type\":\"String\",\"column_index\":0}]".to_string()),
             ]),
         ]
     );

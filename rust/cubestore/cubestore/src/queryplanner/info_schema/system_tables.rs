@@ -75,6 +75,20 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 }),
             ),
             (
+                Field::new("columns_json", DataType::Utf8, false),
+                Box::new(|tables| {
+                    Arc::new(StringArray::from(
+                        tables
+                            .iter()
+                            .map(|row| match serde_json::to_string(row.table.get_row().get_columns()) {
+                                Ok(json) => json,
+                                Err(err) => format!("{{\"error\": \"{}\"}}", err)
+                            })
+                            .collect::<Vec<_>>()
+                    ))
+                }),
+            ),
+            (
                 Field::new("locations", DataType::Utf8, false),
                 Box::new(|tables| {
                     Arc::new(StringArray::from(
