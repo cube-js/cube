@@ -79,7 +79,6 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   public createTableWithOptions(tableName, columns, options: CreateTableOptions, queryTracingObj: any) {
-    console.log('####');
     let sql = this.createTableSql(tableName, columns);
     const params: string[] = [];
     const withEntries: string[] = [];
