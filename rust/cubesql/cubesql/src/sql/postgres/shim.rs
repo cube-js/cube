@@ -148,6 +148,12 @@ impl ConnectionError {
     }
 }
 
+impl From<tokio::task::JoinError> for ConnectionError {
+    fn from(e: tokio::task::JoinError) -> Self {
+        ConnectionError::Cube(e.into())
+    }
+}
+
 impl From<datafusion::error::DataFusionError> for ConnectionError {
     fn from(e: datafusion::error::DataFusionError) -> Self {
         ConnectionError::Cube(e.into())
