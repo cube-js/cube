@@ -169,7 +169,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build native
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
@@ -242,9 +250,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Yarn install
+        uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
-        run: yarn install --frozen-lockfile
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build native
         env:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
