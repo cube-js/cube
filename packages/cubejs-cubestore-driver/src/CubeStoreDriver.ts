@@ -57,7 +57,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       user: config?.user || getEnv('cubeStoreUser'),
       password: config?.password || getEnv('cubeStorePass'),
     };
-    this.baseUrl = (this.config.url || `ws://${this.config.host || 'localhost'}:${this.config.port || '3030'}/`).replace(/\/ws$/, '/').replace(/\/$/, '');
+    const baseUrl = this.config.url || (this.config.user && this.config.password)
+      ? `ws://${this.config.user}:${this.config.password}@${this.config.host || 'localhost'}:${this.config.port || '3030'}/`
+      : `ws://${this.config.host || 'localhost'}:${this.config.port || '3030'}/`;
+    this.baseUrl = baseUrl.replace(/\/ws$/, '/').replace(/\/$/, '');
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);
   }
 
