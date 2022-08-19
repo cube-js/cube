@@ -14,7 +14,7 @@ use std::fmt;
 
 use crate::sql::shim::{ConnectionError, QueryPlanExt};
 use datafusion::{dataframe::DataFrame as DFDataFrame, physical_plan::SendableRecordBatchStream};
-use futures::StreamExt;
+use futures::*;
 use pg_srv::protocol::{PortalCompletion, PortalSuspended};
 
 #[derive(Debug)]
@@ -332,68 +332,77 @@ impl Portal {
         writer: &mut BatchWriter,
         max_rows: usize,
     ) -> Result<protocol::PortalCompletion, ConnectionError> {
-        if let Some(state) = self.state.take() {
-            match state {
-                PortalState::Prepared(state) => {
-                    let description = state.plan.to_row_description(self.format)?;
-                    match state.plan {
-                        QueryPlan::MetaOk(_, completion) => {
-                            self.state = Some(PortalState::Finished(FinishedState { description }));
+        let state = self
+            .state
+            .take()
+            .ok_or_else(|| CubeError::internal("Unable to take portal state".to_string()))?;
+        match state {
+            PortalState::Prepared(state) => {
+                let description = state.plan.to_row_description(self.format)?;
+                match state.plan {
+                    QueryPlan::MetaOk(_, completion) => {
+                        self.state = Some(PortalState::Finished(FinishedState { description }));
 
-                            Ok(PortalCompletion::Complete(
-                                completion.clone().to_pg_command(),
-                            ))
-                        }
-                        QueryPlan::MetaTabular(_, batch) => {
-                            let new_state = InExecutionFrameState::new(*batch, description);
-                            let (next_state, complete) = self
-                                .hand_execution_frame_state(writer, new_state, max_rows)
-                                .await?;
+                        Ok(PortalCompletion::Complete(
+                            completion.clone().to_pg_command(),
+                        ))
+                    }
+                    QueryPlan::MetaTabular(_, batch) => {
+                        let new_state = InExecutionFrameState::new(*batch, description);
+                        let (next_state, complete) = self
+                            .hand_execution_frame_state(writer, new_state, max_rows)
+                            .await?;
 
-                            self.state = Some(next_state);
+                        self.state = Some(next_state);
 
-                            Ok(complete)
-                        }
-                        QueryPlan::DataFusionSelect(_, plan, ctx) => {
-                            let df = DFDataFrame::new(ctx.state.clone(), &plan);
-                            let stream = df.execute_stream().await?;
+                        Ok(complete)
+                    }
+                    QueryPlan::DataFusionSelect(_, plan, ctx) => {
+                        let df = DFDataFrame::new(ctx.state.clone(), &plan);
+                        let safe_stream = async move {
+                            std::panic::AssertUnwindSafe(df.execute_stream())
+                                .catch_unwind()
+                                .await
+                        };
+                        match safe_stream.await {
+                            Ok(sendable_batch) => {
+                                let new_state =
+                                    InExecutionStreamState::new(sendable_batch?, description);
+                                let (next_state, complete) = self
+                                    .hand_execution_stream_state(writer, new_state, max_rows)
+                                    .await?;
+                                self.state = Some(next_state);
 
-                            let new_state = InExecutionStreamState::new(stream, description);
-                            let (next_state, complete) = self
-                                .hand_execution_stream_state(writer, new_state, max_rows)
-                                .await?;
-                            self.state = Some(next_state);
-
-                            Ok(complete)
+                                Ok(complete)
+                            }
+                            Err(err) => Err(CubeError::panic(err).into()),
                         }
                     }
                 }
-                PortalState::InExecutionFrame(frame_state) => {
-                    let (next_state, complete) = self
-                        .hand_execution_frame_state(writer, frame_state, max_rows)
-                        .await?;
-
-                    self.state = Some(next_state);
-
-                    Ok(complete)
-                }
-                PortalState::InExecutionStream(stream_state) => {
-                    let (next_state, complete) = self
-                        .hand_execution_stream_state(writer, stream_state, max_rows)
-                        .await?;
-
-                    self.state = Some(next_state);
-
-                    Ok(complete)
-                }
-                PortalState::Finished(finish_state) => {
-                    self.state = Some(PortalState::Finished(finish_state));
-
-                    Ok(self.new_portal_completion(0, false))
-                }
             }
-        } else {
-            unreachable!();
+            PortalState::InExecutionFrame(frame_state) => {
+                let (next_state, complete) = self
+                    .hand_execution_frame_state(writer, frame_state, max_rows)
+                    .await?;
+
+                self.state = Some(next_state);
+
+                Ok(complete)
+            }
+            PortalState::InExecutionStream(stream_state) => {
+                let (next_state, complete) = self
+                    .hand_execution_stream_state(writer, stream_state, max_rows)
+                    .await?;
+
+                self.state = Some(next_state);
+
+                Ok(complete)
+            }
+            PortalState::Finished(finish_state) => {
+                self.state = Some(PortalState::Finished(finish_state));
+
+                Ok(self.new_portal_completion(0, false))
+            }
         }
     }
 }
