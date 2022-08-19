@@ -72,6 +72,8 @@ impl TelemetryTransport for HttpTelemetryTransport {
                 event.insert("sentAt".to_string(), Value::String(sent_at.to_string()));
             }
 
+            log::trace!("sending via http to {} :{:?}", self.endpoint_url, to_send);
+
             let res = self
                 .client
                 .post(&self.endpoint_url)
@@ -166,6 +168,7 @@ impl TelemetryTransport for WsTelemetryTransport {
                 "callbackId".to_string(),
                 Value::String(callback_id.to_string()),
             );
+            log::trace!("sending via ws to {} :{:?}", self.endpoint_url, message);
             let json = deflate_bytes_zlib(serde_json::to_vec(&message)?.as_slice());
 
             self.insert_callback(callback_id.to_string()).await;
@@ -385,18 +388,25 @@ pub async fn stop_track_event_loop() {
 
 pub async fn init_agent_sender() {
     let agent_url = env::var("CUBESTORE_AGENT_ENDPOINT_URL").ok();
+    log::trace!("agent endpoint url: {:?}", agent_url);
     let mut agent_sender = AGENT_SENDER.write().await;
     *agent_sender = if let Some(endpoint_url) = agent_url {
         if let Ok(agent_url_object) = reqwest::Url::parse(endpoint_url.as_str()) {
             match agent_url_object.scheme() {
-                "https" | "http" => Some(Arc::new(EventSender::new(Arc::new(
-                    HttpTelemetryTransport::try_new(endpoint_url).unwrap(),
-                )))),
-                "wss" => Some(Arc::new(EventSender::new(Arc::new(WsTelemetryTransport {
-                    endpoint_url,
-                    socket: RwLock::new(None),
-                    waiting_callbacks: RwLock::new(HashSet::new()),
-                })))),
+                "https" | "http" => {
+                    log::trace!("using http transport for agent enpoint");
+                    Some(Arc::new(EventSender::new(Arc::new(
+                        HttpTelemetryTransport::try_new(endpoint_url).unwrap(),
+                    ))))
+                }
+                "wss" => {
+                    log::trace!("using wss transport for agent enpoint");
+                    Some(Arc::new(EventSender::new(Arc::new(WsTelemetryTransport {
+                        endpoint_url,
+                        socket: RwLock::new(None),
+                        waiting_callbacks: RwLock::new(HashSet::new()),
+                    }))))
+                }
                 _ => {
                     log::error!(
                         "Telemetry endpoint {} with unsupported protocol",
