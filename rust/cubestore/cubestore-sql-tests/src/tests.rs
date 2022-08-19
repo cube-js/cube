@@ -2229,15 +2229,17 @@ async fn create_table_with_location_and_hyperloglog_space_separated(service: Box
         file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
 
         file.write_all(
-            format!("0,02 0c 01 00 05 05 7b cf,{}\n", base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])).as_bytes(),
+            format!(
+                "0,02 0c 01 00 05 05 7b cf,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])
+            )
+            .as_bytes(),
         )
         .unwrap();
         file.write_all(
             format!(
                 "1,02 0c 01 00 15 15 7b ff,{}\n",
-                base64::encode(vec![
-                               0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff
-                ])
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff])
             )
             .as_bytes(),
         )
@@ -4451,24 +4453,24 @@ async fn rolling_window_query_timestamps_exceeded(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-        assert_eq!(
-            to_rows(&r),
-            rows(&[
-             (-5, None, None),
-             (-4, None, None),
-             (-3, None, None),
-             (-2, None, None),
-             (-1, None, None),
-             (0, None, None),
-             (1, None, None),
-             (2, None, None),
-             (3, None, None),
-             (4, Some("john"), Some(10)),
-             (4, Some("sara"), Some(7)),
-             (5, Some("john"), Some(19)),
-             (5, Some("sara"), Some(10))
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (-5, None, None),
+            (-4, None, None),
+            (-3, None, None),
+            (-2, None, None),
+            (-1, None, None),
+            (0, None, None),
+            (1, None, None),
+            (2, None, None),
+            (3, None, None),
+            (4, Some("john"), Some(10)),
+            (4, Some("sara"), Some(7)),
+            (5, Some("john"), Some(19)),
+            (5, Some("sara"), Some(10))
         ])
-        );
+    );
 }
 async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
@@ -5801,13 +5803,13 @@ async fn columns_json(service: Box<dyn SqlClient>) {
 
     assert_eq!(
         r.get_rows(),
-        &vec![
-            Row::new(vec![
-                TableValue::String("s".to_string()),
-                TableValue::String("t0".to_string()),
-                TableValue::String("[{\"name\":\"x\",\"column_type\":\"String\",\"column_index\":0}]".to_string()),
-            ]),
-        ]
+        &vec![Row::new(vec![
+            TableValue::String("s".to_string()),
+            TableValue::String("t0".to_string()),
+            TableValue::String(
+                "[{\"name\":\"x\",\"column_type\":\"String\",\"column_index\":0}]".to_string()
+            ),
+        ]),]
     );
 }
 
