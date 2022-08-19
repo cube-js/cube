@@ -203,7 +203,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("aggregate_index_errors", aggregate_index_errors),
         t("inline_tables", inline_tables),
         t("build_range_end", build_range_end),
-        t("columns_json", columns_json),
+        t("system_table_columns", system_table_columns),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -5788,16 +5788,16 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
     );
 }
 
-async fn columns_json(service: Box<dyn SqlClient>) {
+async fn system_table_columns(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
 
     service
-        .exec_query("CREATE TABLE s.t0(x string)")
+        .exec_query("CREATE TABLE s.t0(x string, y int)")
         .await
         .unwrap();
 
     let r = service
-        .exec_query("SELECT table_schema, table_name, columns_json FROM system.tables")
+        .exec_query("SELECT table_schema, table_name, columns, columns_json FROM system.tables")
         .await
         .unwrap();
 
@@ -5806,8 +5806,9 @@ async fn columns_json(service: Box<dyn SqlClient>) {
         &vec![Row::new(vec![
             TableValue::String("s".to_string()),
             TableValue::String("t0".to_string()),
+            TableValue::String("[Column { name: \"x\", column_type: String, column_index: 0 }, Column { name: \"y\", column_type: Int, column_index: 1 }]".to_string()),
             TableValue::String(
-                "[{\"name\":\"x\",\"column_type\":\"String\",\"column_index\":0}]".to_string()
+                "[{\"name\":\"x\",\"column_type\":\"String\",\"column_index\":0},{\"name\":\"y\",\"column_type\":\"Int\",\"column_index\":1}]".to_string()
             ),
         ]),]
     );
