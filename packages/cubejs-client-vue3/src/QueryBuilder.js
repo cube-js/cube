@@ -184,7 +184,6 @@ export default {
         order,
         orderMembers,
         setOrder: this.setOrder,
-        setQuery: this.setQuery,
         pivotConfig: this.pivotConfig,
         updateOrder: {
           set: (memberId, newOrder) => {
