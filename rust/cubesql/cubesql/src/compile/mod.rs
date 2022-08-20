@@ -14,7 +14,7 @@ use datafusion::{
     },
     logical_plan::{
         plan::{Analyze, Explain, Extension, Projection, ToStringifiedPlan},
-        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, ToDFSchema,
+        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
     },
     prelude::*,
     scalar::ScalarValue,
@@ -2548,6 +2548,15 @@ WHERE `TABLE_SCHEMA` = '{}'",
 
         let rewrite_plan = result?;
 
+        // DF optimizes logical plan (second time) on physical plan creation
+        // It's not safety to use all optimizers from DF for OLAP queries, because it will lead to errors
+        // From another side, 99% optimizers cannot optimize anything
+        if is_olap_query(&rewrite_plan)? {
+            let mut guard = ctx.state.write();
+            // TODO: We should find what optimizers will be safety to use for OLAP queries
+            guard.optimizers = vec![];
+        };
+
         log::debug!("Rewrite: {:#?}", rewrite_plan);
 
         Ok(QueryPlan::DataFusionSelect(
@@ -2556,6 +2565,31 @@ WHERE `TABLE_SCHEMA` = '{}'",
             ctx,
         ))
     }
+}
+
+fn is_olap_query(parent: &LogicalPlan) -> Result<bool, CompilationError> {
+    pub struct FindCubeScanNodeVisitor(bool);
+
+    impl PlanVisitor for FindCubeScanNodeVisitor {
+        type Error = CompilationError;
+
+        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+            if let LogicalPlan::Extension(ext) = plan {
+                if let Some(_) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
+                    self.0 = true;
+
+                    return Ok(false);
+                }
+            }
+
+            Ok(true)
+        }
+    }
+
+    let mut visitor = FindCubeScanNodeVisitor(false);
+    parent.accept(&mut visitor)?;
+
+    Ok(visitor.0)
 }
 
 pub async fn convert_statement_to_cube_query(
@@ -2937,6 +2971,7 @@ mod tests {
         parent.accept(&mut visitor).unwrap();
         visitor.0.expect("No CubeScanNode was found in plan")
     }
+
     trait LogicalPlanTestUtils {
         fn find_projection_schema(&self) -> DFSchemaRef;
 
@@ -2971,6 +3006,28 @@ mod tests {
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                 ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_select_null_if_measure_diff() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT MEASURE(count), NULLIF(MEASURE(count), 0) as t, MEASURE(count) / NULLIF(MEASURE(count), 0) FROM KibanaSampleDataEcommerce;".to_string(),
+        DatabaseProtocol::PostgreSQL).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 time_dimensions: None,
