@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.55](https://github.com/cube-js/cube.js/compare/v0.30.54...v0.30.55) (2022-08-20)
+
+
+### Reverts
+
+* Revert "fix(cubejs): Fixes CubeStoreDriver user/password auth (#5123)" ([3571d5a](https://github.com/cube-js/cube.js/commit/3571d5a0cfaccfa6da3373197ec536055b6e130a)), closes [#5123](https://github.com/cube-js/cube.js/issues/5123)
+
+
+
+
+
 ## [0.30.54](https://github.com/cube-js/cube.js/compare/v0.30.53...v0.30.54) (2022-08-19)
 
 
