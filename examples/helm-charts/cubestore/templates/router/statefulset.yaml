@@ -27,6 +27,7 @@ spec:
       {{- toYaml .Values.commonAnnotations | nindent 8 }}
       {{- end }}
     spec:
+      serviceAccountName: {{ template "cubestore.router.serviceAccountName" . }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -113,7 +114,7 @@ spec:
           resources:
             {{- toYaml .Values.router.resources | nindent 12 }}
           {{- end }}
-          volumeMounts: 
+          volumeMounts:
             - name: datadir
               mountPath: /cube/.cubestore/data
             {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
@@ -146,7 +147,7 @@ spec:
       topologySpreadConstraints:
         {{- toYaml .Values.router.spreadConstraints | nindent 8 }}
       {{- end }}
-  
+
   {{- if .Values.router.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:
