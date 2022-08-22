@@ -11567,4 +11567,44 @@ ORDER BY \"COUNT(count)\" DESC"
 
         assert_eq!(cube_scan.options.change_user, Some("foo".to_string()))
     }
+
+    #[tokio::test]
+    async fn test_power_bi_cast_as_numeric_query() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT \"_\".\"stav\", \"_\".\"a0\" 
+            FROM (
+                SELECT \"rows\".\"taxful_total_price\" AS \"stav\", sum(CAST(\"rows\".\"count\" AS NUMERIC)) AS \"a0\" 
+                FROM \"public\".\"KibanaSampleDataEcommerce\" AS \"rows\" 
+                GROUP BY \"stav\") AS \"_\" 
+            WHERE NOT \"_\".\"a0\" IS NULL 
+            LIMIT 1000001
+            ".to_string(), 
+            DatabaseProtocol::PostgreSQL
+        ).await.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(50000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                }]),
+            }
+        )
+    }
 }

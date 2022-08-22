@@ -974,6 +974,64 @@ impl RewriteRules for SplitRules {
                     ],
                 ),
             ),
+            rewrite(
+                "split-push-down-aggr-fun-cast-inner-replacer",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr(
+                        "?fun",
+                        vec![cast_expr(column_expr("?column"), "?data_type")],
+                        "?distinct",
+                    ),
+                    "?cube",
+                ),
+                agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-aggr-fun-cast-outer-replacer-first-step",
+                outer_projection_split_replacer("?expr", "?cube"),
+                vec![(
+                    "?expr",
+                    agg_fun_expr(
+                        "?fun",
+                        vec![cast_expr(column_expr("?column"), "?data_type")],
+                        "?distinct",
+                    ),
+                )],
+                outer_projection_split_replacer(
+                    alias_expr(
+                        cast_expr(
+                            agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"),
+                            "?data_type",
+                        ),
+                        "?alias",
+                    ),
+                    "?cube",
+                ),
+                self.transform_expr_to_alias("?expr", "?alias"),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-aggr-fun-cast-outer-replacer-second-step",
+                outer_projection_split_replacer(
+                    alias_expr(cast_expr("?expr", "?data_type"), "?alias"),
+                    "?alias_to_cube",
+                ),
+                vec![(
+                    "?expr",
+                    agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"),
+                )],
+                alias_expr(cast_expr("?column_alias", "?data_type"), "?alias"),
+                self.transform_original_expr_alias(
+                    |egraph, id| {
+                        var_iter!(egraph[id], OuterProjectionSplitReplacerAliasToCube)
+                            .cloned()
+                            .collect()
+                    },
+                    "?expr",
+                    "?column",
+                    "?alias_to_cube",
+                    "?column_alias",
+                ),
+            ),
         ]
     }
 }
@@ -1041,6 +1099,46 @@ impl SplitRules {
                     }
                 }
             }
+            false
+        }
+    }
+
+    fn transform_expr_to_alias(
+        &self,
+        expr_var: &'static str,
+        alias_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_expr_var = var!(alias_expr_var);
+        let expr_var = var!(expr_var);
+        move |egraph, subst| {
+            let original_expr_id = subst[expr_var];
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )));
+
+            match res {
+                Ok(expr) => match expr.name(&DFSchema::empty()) {
+                    Ok(name) => {
+                        subst.insert(
+                            alias_expr_var,
+                            egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                                name.clone(),
+                            ))),
+                        );
+
+                        return true;
+                    }
+                    _ => (),
+                },
+                _ => (),
+            }
+
             false
         }
     }

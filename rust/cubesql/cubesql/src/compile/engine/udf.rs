@@ -2081,17 +2081,7 @@ fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
 pub fn create_array_lower_udf() -> ScalarUDF {
     let fun = create_array_lower_upper_fun(false);
 
-    let return_type: ReturnTypeFunction = Arc::new(move |args| {
-        assert!(args.len() >= 1);
-
-        match &args[0] {
-            DataType::List(f) => Ok(Arc::new(f.data_type().clone())),
-            other => Err(DataFusionError::Execution(format!(
-                "anyarray argument must be a List of numeric values, actual: {}",
-                other
-            ))),
-        }
-    });
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
 
     ScalarUDF::new(
         "array_lower",
@@ -2155,17 +2145,7 @@ pub fn create_pg_is_other_temp_schema() -> ScalarUDF {
 pub fn create_array_upper_udf() -> ScalarUDF {
     let fun = create_array_lower_upper_fun(true);
 
-    let return_type: ReturnTypeFunction = Arc::new(move |args| {
-        assert!(args.len() >= 1);
-
-        match &args[0] {
-            DataType::List(f) => Ok(Arc::new(f.data_type().clone())),
-            other => Err(DataFusionError::Execution(format!(
-                "anyarray argument must be a List of numeric values, actual: {}",
-                other
-            ))),
-        }
-    });
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
 
     ScalarUDF::new(
         "array_upper",
