@@ -12,7 +12,7 @@ use pg_srv::{protocol, BindValue, ProtocolError};
 use sqlparser::ast;
 use std::fmt;
 
-use crate::sql::shim::{ConnectionError, QueryPlanExt};
+use crate::sql::server::{ConnectionError, QueryPlanExt};
 use datafusion::{dataframe::DataFrame as DFDataFrame, physical_plan::SendableRecordBatchStream};
 use futures::StreamExt;
 use pg_srv::protocol::{PortalCompletion, PortalSuspended};
@@ -411,7 +411,7 @@ mod tests {
     };
     use pg_srv::protocol::{CommandComplete, Format, PortalCompletion, PortalSuspended};
 
-    use crate::sql::{extended::PortalFrom, shim::ConnectionError};
+    use crate::sql::{extended::PortalFrom, server::ConnectionError};
     use datafusion::prelude::SessionContext;
     use std::sync::Arc;
 

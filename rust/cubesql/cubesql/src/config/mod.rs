@@ -7,7 +7,7 @@ use crate::{
         processing_loop::ProcessingLoop,
     },
     sql::{
-        MySqlServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl,
+        MySqlServer, PostgresServerService, ServerManager, SessionManager, SqlAuthDefaultImpl,
         SqlAuthService,
     },
     transport::{HttpTransport, TransportService},
@@ -67,8 +67,15 @@ impl CubeServices {
             }));
         }
 
-        if self.injector.has_service_typed::<PostgresServer>().await {
-            let mysql_server = self.injector.get_service_typed::<PostgresServer>().await;
+        if self
+            .injector
+            .has_service_typed::<PostgresServerService>()
+            .await
+        {
+            let mysql_server = self
+                .injector
+                .get_service_typed::<PostgresServerService>()
+                .await;
             futures.push(tokio::spawn(async move {
                 if let Err(e) = mysql_server.processing_loop().await {
                     error!("{}", e.to_string());
@@ -90,9 +97,13 @@ impl CubeServices {
                 .await?;
         }
 
-        if self.injector.has_service_typed::<PostgresServer>().await {
+        if self
+            .injector
+            .has_service_typed::<PostgresServerService>()
+            .await
+        {
             self.injector
-                .get_service_typed::<PostgresServer>()
+                .get_service_typed::<PostgresServerService>()
                 .await
                 .stop_processing()
                 .await?;
@@ -257,9 +268,9 @@ impl Config {
 
         if self.config_obj.postgres_bind_address().is_some() {
             self.injector
-                .register_typed::<PostgresServer, _, _, _>(async move |i| {
+                .register_typed::<PostgresServerService, _, _, _>(async move |i| {
                     let config = i.get_service_typed::<dyn ConfigObj>().await;
-                    PostgresServer::new(
+                    PostgresServerService::new(
                         config.postgres_bind_address().as_ref().unwrap().to_string(),
                         i.get_service_typed().await,
                     )

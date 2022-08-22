@@ -1,4 +1,4 @@
-use crate::sql::shim::ConnectionError;
+use crate::sql::server::ConnectionError;
 use itertools::Itertools;
 use log::trace;
 use msql_srv::Column as MysqlColumn;

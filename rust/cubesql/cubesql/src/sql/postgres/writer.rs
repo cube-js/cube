@@ -322,7 +322,7 @@ impl<'a> Serialize for BatchWriter {
 mod tests {
     use crate::sql::{
         dataframe::{Decimal128Value, ListValue, TimestampValue},
-        shim::ConnectionError,
+        server::ConnectionError,
         writer::{BatchWriter, ToProtocolValue},
     };
     use bytes::BytesMut;
