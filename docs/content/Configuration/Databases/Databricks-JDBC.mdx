@@ -35,6 +35,8 @@ CUBEJS_DB_DATABRICKS_TOKEN=XXXXX
 | `CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`  | The path for the [Databricks DBFS mount][databricks-docs-dbfs]                                         | A valid mount path        |    ❌    |
 | `CUBEJS_DB_DATABRICKS_AGENT`         | The user agent string used for the Databricks connection. Default is `Cube+OS/${version} (Databricks)` | A valid user agent string |    ❌    |
 | `CUBEJS_DB_DATABRICKS_TOKEN`         | The [personal access token][databricks-docs-pat] used to authenticate the Databricks connection        | A valid token             |    ❌    |
+| `CUBEJS_CONCURRENCY`                 | The number of concurrent connections each queue has to the database. Default is `2` | A valid number        |    ❌    |
+| `CUBEJS_DB_MAX_POOL`                 | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number        |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
