@@ -42,14 +42,16 @@ CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/my/keyfile.json | base64)
 
 ## Environment Variables
 
-| Environment Variable           | Description                                                      | Possible Values                                                         | Required |
-| ------------------------------ | ---------------------------------------------------------------- | ----------------------------------------------------------------------- | :------: |
-| `CUBEJS_DB_BQ_PROJECT_ID`      | The Google BigQuery project ID to connect to                     | A valid Google BigQuery Project ID                                      |    ✅    |
-| `CUBEJS_DB_BQ_KEY_FILE`        | The path to a JSON key file for connecting to Google BigQuery    | A valid Google BigQuery JSON key file                                   |    ✅    |
-| `CUBEJS_DB_BQ_CREDENTIALS`     | A Base64 encoded JSON key file for connecting to Google BigQuery | A valid Google BigQuery JSON key file encoded as a Base64 string        |    ❌    |
-| `CUBEJS_DB_BQ_LOCATION`        | The Google BigQuery dataset location to connect to               | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ❌    |
-| `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                            | A valid bucket name from cloud storage                                  |    ❌    |
-| `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                    | `gcp`                                                                   |    ❌    |
+| Environment Variable           | Description                                                                          | Possible Values                                                         | Required |
+| ------------------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | :------: |
+| `CUBEJS_DB_BQ_PROJECT_ID`      | The Google BigQuery project ID to connect to                                         | A valid Google BigQuery Project ID                                      |    ✅    |
+| `CUBEJS_DB_BQ_KEY_FILE`        | The path to a JSON key file for connecting to Google BigQuery                        | A valid Google BigQuery JSON key file                                   |    ✅    |
+| `CUBEJS_DB_BQ_CREDENTIALS`     | A Base64 encoded JSON key file for connecting to Google BigQuery                     | A valid Google BigQuery JSON key file encoded as a Base64 string        |    ❌    |
+| `CUBEJS_DB_BQ_LOCATION`        | The Google BigQuery dataset location to connect to                                   | [A valid Google BigQuery regional location][bq-docs-regional-locations] |    ❌    |
+| `CUBEJS_DB_EXPORT_BUCKET`      | The name of a bucket in cloud storage                                                | A valid bucket name from cloud storage                                  |    ❌    |
+| `CUBEJS_DB_EXPORT_BUCKET_TYPE` | The cloud provider where the bucket is hosted                                        | `gcp`                                                                   |    ❌    |
+| `CUBEJS_CONCURRENCY`           | The number of concurrent connections each queue has to the database. Default is `10` | A valid number                                                          |    ❌    |
+| `CUBEJS_DB_MAX_POOL`           | The maximum number of concurrent database connections to pool. Default is `40`       | A valid number                                                          |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
@@ -98,8 +100,8 @@ configuring Cube.js with the following environment variables:
 
 <InfoBox>
 
-When using an export bucket, remember to assign the **BigQuery Data Editor** and **Storage Object Admin**
-role to your BigQuery service account.
+When using an export bucket, remember to assign the **BigQuery Data Editor** and
+**Storage Object Admin** role to your BigQuery service account.
 
 </InfoBox>
 
