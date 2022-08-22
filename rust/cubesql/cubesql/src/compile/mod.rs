@@ -8322,6 +8322,15 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "array_lower_string",
+            execute_query(
+                "SELECT array_lower(ARRAY['a', 'b']) v1".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -8357,6 +8366,15 @@ ORDER BY \"COUNT(count)\" DESC"
                 ) t
                 "
                 .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "array_upper_string",
+            execute_query(
+                "SELECT array_upper(ARRAY['a', 'b']) v1".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
