@@ -98,8 +98,6 @@ export class CubejsServerCore {
 
   protected devServer: DevServer | undefined;
 
-  protected readonly driversStorage: Map<string, BaseDriver> = new Map();
-
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
   protected readonly repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
@@ -738,24 +736,18 @@ export class CubejsServerCore {
     context: DriverContext,
     options?: OrchestratorInitedOptions,
   ): Promise<BaseDriver> {
-    if (!this.driversStorage.has(context.dataSource)) {
-      const val = await this.options.driverFactory(context);
-      if (isDriver(val)) {
-        this.driversStorage.set(context.dataSource, <BaseDriver>val);
-      } else {
-        const { type, ...rest } = <DriverConfig>val;
-        const opts = Object.keys(rest).length
-          ? rest
-          : {
-            maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
-          };
-        this.driversStorage.set(
-          context.dataSource,
-          CubejsServerCore.createDriver(type, opts),
-        );
-      }
+    const val = await this.options.driverFactory(context);
+    if (isDriver(val)) {
+      return <BaseDriver>val;
+    } else {
+      const { type, ...rest } = <DriverConfig>val;
+      const opts = Object.keys(rest).length
+        ? rest
+        : {
+          maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
+        };
+      return CubejsServerCore.createDriver(type, opts);
     }
-    return this.driversStorage.get(context.dataSource);
   }
 
   public async testConnections() {

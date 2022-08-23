@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 9322
+expression: "execute_query(\"SELECT\n                    CASE 'test' WHEN 'int4' THEN NULL ELSE 100 END as null_in_then,\n                    CASE true WHEN 'false' THEN 'yes' ELSE 'no' END as bool_utf8_cast,\n                    CASE true WHEN 'false' THEN 'yes' WHEN 'true' THEN true ELSE 'no' END as then_diff_types\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------------+----------------+-----------------+
+| null_in_then | bool_utf8_cast | then_diff_types |
++--------------+----------------+-----------------+
+| 100          | no             | 1               |
++--------------+----------------+-----------------+

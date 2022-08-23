@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 6014
+expression: "execute_query(\"select 1 from svv_external_schemas where schemaname like 'public'\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------+
+| Int64(1) |
++----------+
++----------+

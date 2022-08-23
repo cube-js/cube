@@ -159,6 +159,7 @@ export interface BirdBox {
   configuration: {
     playgroundUrl: string;
     apiUrl: string;
+    systemUrl: string;
     wsUrl: string;
     env?: Record<string, string>;
   };
@@ -181,6 +182,7 @@ export async function startBirdBoxFromContainer(
       configuration: {
         playgroundUrl: `http://${host}:${port}`,
         apiUrl: `http://${host}:${port}/cubejs-api/v1`,
+        systemUrl: `http://${host}:${port}/cubejs-system/v1`,
         wsUrl: `ws://${host}:${port}`,
       },
     };
@@ -304,6 +306,7 @@ export async function startBirdBoxFromContainer(
     configuration: {
       playgroundUrl: `http://${host}:${playgroundPort}`,
       apiUrl: `http://${host}:${port}/cubejs-api/v1`,
+      systemUrl: `http://${host}:${port}/cubejs-system/v1`,
       wsUrl: `ws://${host}:${port}`,
       env: {
         ...(
@@ -492,6 +495,7 @@ export async function startBirdBoxFromCli(
     configuration: {
       playgroundUrl: 'http://127.0.0.1:4000',
       apiUrl: 'http://127.0.0.1:4000/cubejs-api/v1',
+      systemUrl: 'http://127.0.0.1:4000/cubejs-system/v1',
       wsUrl: 'ws://127.0.0.1:4000',
     },
   };

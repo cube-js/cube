@@ -109,7 +109,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return sql;
   }
 
-  public createTableWithOptions(tableName, columns, options: CreateTableOptions) {
+  public createTableWithOptions(tableName, columns, options: CreateTableOptions, queryTracingObj: any) {
     const sql = this.createTableSqlWithOptions(tableName, columns, options);
     const params: string[] = [];
 
@@ -117,7 +117,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       params.push(...options.files);
     }
 
-    return this.query(sql, params).catch(e => {
+    return this.query(sql, params, queryTracingObj).catch(e => {
       e.message = `Error during create table: ${sql}: ${e.message}`;
       throw e;
     });
@@ -187,7 +187,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   private async importRows(table: string, columns: Column[], indexesSql: any, aggregations: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
-    await this.createTableWithOptions(table, columns, { indexes: indexesSql, aggregations, buildRangeEnd: queryTracingObj?.buildRangeEnd });
+    await this.createTableWithOptions(table, columns, { indexes: indexesSql, aggregations, buildRangeEnd: queryTracingObj?.buildRangeEnd }, queryTracingObj);
     try {
       const batchSize = 2000; // TODO make dynamic?
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
@@ -225,7 +225,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       options.files = files;
     }
 
-    return this.createTableWithOptions(table, columns, options);
+    return this.createTableWithOptions(table, columns, options, queryTracingObj);
   }
 
   private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes: string, aggregations: string, queryTracingObj?: any) {
@@ -325,7 +325,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       if (files.length > 0) {
         options.files = files.map(fileName => `temp://${fileName}`);
       }
-      return this.createTableWithOptions(table, columns, options);
+
+      return this.createTableWithOptions(table, columns, options, queryTracingObj);
     } finally {
       await Promise.all(tempFiles.map(tempFile => unlink(tempFile)));
     }
@@ -350,7 +351,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       indexes,
       files: [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`],
     };
-    return this.createTableWithOptions(table, columns, options);
+    return this.createTableWithOptions(table, columns, options, queryTracingObj);
   }
 
   public static dialectClass() {

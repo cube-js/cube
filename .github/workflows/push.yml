@@ -380,6 +380,7 @@ jobs:
           mkdir -p rust/cubestore/downloaded/latest/bin
           cp rust/cubestore/target/debug/cubestored rust/cubestore/downloaded/latest/bin/cubestored
           cd packages/cubejs-testing/
+          yarn run smoke:postgres
           yarn run smoke:crate
           yarn run smoke:materialize
           yarn run smoke:questdb

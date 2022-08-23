@@ -148,8 +148,27 @@ pub fn parse_sql_to_statements(
     // ThoughtSpot (Redshift)
     // Subquery must have alias, It's a default Postgres behaviour, but Redshift is based on top of old Postgres version...
     let query = query.replace(
+        // Subquery must have alias
         "AS REF_GENERATION  FROM svv_tables) WHERE true  AND current_database() = ",
-        "AS REF_GENERATION  FROM svv_tables) as r WHERE true  AND current_database() =",
+        "AS REF_GENERATION  FROM svv_tables) as svv_tables WHERE current_database() =",
+    );
+    let query = query.replace("AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')", "");
+    let query = query.replace(
+        // REGEXP_REPLACE
+        // Subquery must have alias
+        // Incorrect alias for subquery
+        "FROM (select lbv_cols.schemaname, lbv_cols.tablename, lbv_cols.columnname,REGEXP_REPLACE(REGEXP_REPLACE(lbv_cols.columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, lbv_cols.columnnum from pg_get_late_binding_view_cols() lbv_cols( schemaname name, tablename name, columnname name, columntype text, columnnum int)) lbv_columns   WHERE",
+        "FROM (select schemaname, tablename, columnname,columntype as columntype_rep,columntype, columnnum from get_late_binding_view_cols_unpacked) as lbv_columns   WHERE",
+    );
+    let query = query.replace(
+        // Subquery must have alias
+        "ORDER BY TABLE_SCHEM,c.relname,attnum )  UNION ALL SELECT current_database()::VARCHAR(128) AS TABLE_CAT",
+        "ORDER BY TABLE_SCHEM,c.relname,attnum ) as t  UNION ALL SELECT current_database()::VARCHAR(128) AS TABLE_CAT",
+    );
+    let query = query.replace(
+        // Reusage of new column in another column
+        "END AS IS_AUTOINCREMENT, IS_AUTOINCREMENT AS IS_GENERATEDCOLUMN",
+        "END AS IS_AUTOINCREMENT, false AS IS_GENERATEDCOLUMN",
     );
 
     // Sigma Computing WITH query workaround

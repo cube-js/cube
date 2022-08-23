@@ -5,10 +5,11 @@ use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeBuilder,
-            ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
-            StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
-            TimestampNanosecondArray, TimestampSecondArray, UInt32Builder,
+            Float64Array, GenericStringArray, Int32Builder, Int64Array, Int64Builder,
+            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
+            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
+            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
+            UInt32Builder,
         },
         compute::{cast, concat},
         datatypes::{
@@ -2034,7 +2035,7 @@ fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
             None
         };
 
-        let mut builder = Int64Builder::new(input_arr.len());
+        let mut builder = Int32Builder::new(input_arr.len());
 
         for (idx, element) in input_arr.iter().enumerate() {
             let element_dim = if let Some(d) = dims {
@@ -2061,7 +2062,7 @@ fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
                         if arr.len() == 0 {
                             builder.append_null()?
                         } else if upper {
-                            builder.append_value(arr.len() as i64)?
+                            builder.append_value(arr.len() as i32)?
                         } else {
                             // PostgreSQL allows to define array with n-based arrays,
                             // e.g. '[-7:-5]={1,2,3}'::int[], but it's not possible in the DF
@@ -2081,17 +2082,7 @@ fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
 pub fn create_array_lower_udf() -> ScalarUDF {
     let fun = create_array_lower_upper_fun(false);
 
-    let return_type: ReturnTypeFunction = Arc::new(move |args| {
-        assert!(args.len() >= 1);
-
-        match &args[0] {
-            DataType::List(f) => Ok(Arc::new(f.data_type().clone())),
-            other => Err(DataFusionError::Execution(format!(
-                "anyarray argument must be a List of numeric values, actual: {}",
-                other
-            ))),
-        }
-    });
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
 
     ScalarUDF::new(
         "array_lower",
@@ -2155,17 +2146,7 @@ pub fn create_pg_is_other_temp_schema() -> ScalarUDF {
 pub fn create_array_upper_udf() -> ScalarUDF {
     let fun = create_array_lower_upper_fun(true);
 
-    let return_type: ReturnTypeFunction = Arc::new(move |args| {
-        assert!(args.len() >= 1);
-
-        match &args[0] {
-            DataType::List(f) => Ok(Arc::new(f.data_type().clone())),
-            other => Err(DataFusionError::Execution(format!(
-                "anyarray argument must be a List of numeric values, actual: {}",
-                other
-            ))),
-        }
-    });
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
 
     ScalarUDF::new(
         "array_upper",

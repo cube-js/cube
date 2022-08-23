@@ -1,6 +1,6 @@
 /* globals jest, describe, beforeEach, test, expect */
 
-import type { BaseDriver as OriginalBaseDriver } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver as OriginalBaseDriver } from '@cubejs-backend/query-orchestrator';
 import type {
   DatabaseType,
   DbTypeFn,
@@ -412,6 +412,72 @@ describe('OptsHandler class', () => {
     expect(testDriverConnectionSpy.mock.calls.length).toEqual(2);
 
     testDriverConnectionSpy.mockRestore();
+  });
+
+  test('must determine correcct driver type by the query context', async () => {
+    class Driver1 extends OriginalBaseDriver {
+      public async testConnection() {
+        //
+      }
+
+      public async release() {
+        //
+      }
+    }
+
+    class Driver2 extends OriginalBaseDriver {
+      public async testConnection() {
+        //
+      }
+
+      public async release() {
+        //
+      }
+    }
+
+    process.env.CUBEJS_DB_TYPE = 'postgres';
+    process.env.NODE_ENV = 'test';
+    process.env.CUBEJS_DEV_MODE = 'true';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      apiSecret: '44b87d4309471e5d9d18738450db0e49',
+      dbType: () => 'postgres',
+      contextToOrchestratorId: ({ securityContext }) => (
+        `ID_${securityContext.tenantId}`
+      ),
+      driverFactory: ({ securityContext }) => {
+        if (securityContext.tenantId === 1) {
+          return new Driver1();
+        } else if (securityContext.tenantId === 2) {
+          return new Driver2();
+        } else {
+          return new Driver2();
+        }
+      },
+    });
+
+    const oapi1 = (<any>core.getOrchestratorApi({
+      authInfo: {},
+      securityContext: { tenantId: 1 },
+      requestId: '1',
+    }));
+    oapi1.seenDataSources = ['default'];
+    const driver11 = await oapi1.driverFactory('default');
+    const driver12 = await oapi1.driverFactory('default');
+    expect(driver11 instanceof Driver1).toBeTruthy();
+    expect(driver12 instanceof Driver1).toBeTruthy();
+
+    const oapi2 = (<any>core.getOrchestratorApi({
+      authInfo: {},
+      securityContext: { tenantId: 2 },
+      requestId: '2',
+    }));
+    oapi2.seenDataSources = ['default'];
+    const driver21 = await oapi2.driverFactory('default');
+    const driver22 = await oapi2.driverFactory('default');
+    expect(driver21 instanceof Driver2).toBeTruthy();
+    expect(driver22 instanceof Driver2).toBeTruthy();
   });
 
   test(
