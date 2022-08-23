@@ -181,7 +181,9 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                     .map(|s| match s {
                                         Snapshot::Index(i) => i.index.get_id(),
                                         Snapshot::Inline(i) => i.id,
-                                    }.to_i64().map_or(-1, |i| i))
+                                    }
+                                    .to_i64()
+                                    .map_or(-1, |i| i))
                                     .collect_vec())
                                 .collect_vec()
                         )

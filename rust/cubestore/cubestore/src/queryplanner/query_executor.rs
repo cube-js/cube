@@ -843,8 +843,16 @@ pub struct InlineTableProvider {
 }
 
 impl InlineTableProvider {
-    pub fn new(id: u64, data: Arc<DataFrame>, worker_partition_ids: Vec<(u64, RowFilter)>) -> InlineTableProvider {
-        InlineTableProvider { id, data, worker_partition_ids }
+    pub fn new(
+        id: u64,
+        data: Arc<DataFrame>,
+        worker_partition_ids: Vec<(u64, RowFilter)>,
+    ) -> InlineTableProvider {
+        InlineTableProvider {
+            id,
+            data,
+            worker_partition_ids,
+        }
     }
 
     pub fn get_id(self: &Self) -> u64 {
@@ -940,12 +948,10 @@ impl ClusterSendExec {
                             }
                         }
                     }
-                    Snapshot::Inline(inline) => {
-                        ordinary_partitions.push(IdRow::new(
-                            inline.id,
-                            Partition::new(inline.id, None, None, None),
-                        ))
-                    },
+                    Snapshot::Inline(inline) => ordinary_partitions.push(IdRow::new(
+                        inline.id,
+                        Partition::new(inline.id, None, None, None),
+                    )),
                 }
             }
             if !ordinary_partitions.is_empty() {
@@ -1220,7 +1226,7 @@ impl TableProvider for InlineTableProvider {
             .worker_partition_ids
             .binary_search_by_key(&self.id, |(id, _)| *id);
         if filter.is_err() {
-            return Ok(Arc::new(EmptyExec::new(false, self.schema())))
+            return Ok(Arc::new(EmptyExec::new(false, self.schema())));
         }
 
         let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;

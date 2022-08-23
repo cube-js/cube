@@ -319,7 +319,9 @@ impl SerializedLogicalPlan {
                         worker_context.chunk_id_to_record_batches.clone(),
                         worker_context.parquet_metadata_cache.clone(),
                     )),
-                    SerializedTableSource::InlineTable(v) => Arc::new(v.to_worker_table(worker_context.worker_partition_ids.clone())),
+                    SerializedTableSource::InlineTable(v) => {
+                        Arc::new(v.to_worker_table(worker_context.worker_partition_ids.clone()))
+                    }
                 },
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),

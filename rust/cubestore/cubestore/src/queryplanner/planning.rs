@@ -45,7 +45,9 @@ use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewrite
 use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, InlineTableProvider};
-use crate::queryplanner::serialized_plan::{IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan};
+use crate::queryplanner::serialized_plan::{
+    IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
+};
 use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
@@ -500,13 +502,18 @@ impl ChooseIndex<'_> {
                     let index_schema = source.schema();
                     assert_eq!(table_schema, index_schema);
 
-                    return Ok(
-                        ClusterSendNode::new(Arc::new(p), vec![vec![Snapshot::Index(snapshot)]])
-                            .into_plan(),
-                    );
+                    return Ok(ClusterSendNode::new(
+                        Arc::new(p),
+                        vec![vec![Snapshot::Index(snapshot)]],
+                    )
+                    .into_plan());
                 } else if let Some(table) = source.as_any().downcast_ref::<InlineTableProvider>() {
                     let id = table.get_id();
-                    return Ok(ClusterSendNode::new(Arc::new(p), vec![vec![Snapshot::Inline(InlineSnapshot { id })]]).into_plan());
+                    return Ok(ClusterSendNode::new(
+                        Arc::new(p),
+                        vec![vec![Snapshot::Inline(InlineSnapshot { id })]],
+                    )
+                    .into_plan());
                 } else {
                     panic!("Unexpected table source")
                 }
@@ -909,7 +916,7 @@ fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Snapshot {
     Index(IndexSnapshot),
-    Inline(InlineSnapshot)
+    Inline(InlineSnapshot),
 }
 
 pub type Snapshots = Vec<Snapshot>;
