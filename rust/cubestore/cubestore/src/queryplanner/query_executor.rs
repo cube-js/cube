@@ -6,7 +6,7 @@ use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::optimizations::CubeQueryPlanner;
-use crate::queryplanner::planning::get_worker_plan;
+use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::store::DataFrame;
@@ -836,16 +836,34 @@ impl ExecutionPlan for CubeTableExec {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct InlineTableProvider {
+    id: u64,
     data: Arc<DataFrame>,
+    // Filled in by workers
+    worker_partition_ids: Vec<(u64, RowFilter)>,
 }
 
 impl InlineTableProvider {
-    pub fn new(data: Arc<DataFrame>) -> InlineTableProvider {
-        InlineTableProvider { data }
+    pub fn new(id: u64, data: Arc<DataFrame>, worker_partition_ids: Vec<(u64, RowFilter)>) -> InlineTableProvider {
+        InlineTableProvider { id, data, worker_partition_ids }
+    }
+
+    pub fn get_id(self: &Self) -> u64 {
+        self.id
     }
 
     pub fn get_data(self: &Self) -> Arc<DataFrame> {
         self.data.clone()
+    }
+
+    #[must_use]
+    pub fn to_worker_table(
+        &self,
+        worker_partition_ids: Vec<(u64, RowFilter)>,
+    ) -> InlineTableProvider {
+        debug_assert!(worker_partition_ids.iter().is_sorted_by_key(|(id, _)| id));
+        let mut t = self.clone();
+        t.worker_partition_ids = worker_partition_ids;
+        t
     }
 }
 
@@ -854,8 +872,6 @@ impl Debug for InlineTableProvider {
         f.debug_struct("InlineTable").finish()
     }
 }
-
-pub const INLINE_PARTITION_ID: u64 = 0xffffffff;
 
 pub struct ClusterSendExec {
     schema: SchemaRef,
@@ -875,7 +891,7 @@ impl ClusterSendExec {
         schema: SchemaRef,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
-        union_snapshots: &[Vec<Option<IndexSnapshot>>],
+        union_snapshots: &[Snapshots],
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
     ) -> Self {
@@ -896,7 +912,7 @@ impl ClusterSendExec {
 
     pub(crate) fn distribute_to_workers(
         config: &dyn ConfigObj,
-        snapshots: &[Vec<Option<IndexSnapshot>>],
+        snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Vec<(String, Vec<(u64, RowRange)>)> {
         let partitions = Self::logical_partitions(snapshots, tree);
@@ -904,7 +920,7 @@ impl ClusterSendExec {
     }
 
     fn logical_partitions(
-        snapshots: &[Vec<Option<IndexSnapshot>>],
+        snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
     ) -> Vec<Vec<IdRow<Partition>>> {
         let mut to_multiply = Vec::new();
@@ -913,7 +929,7 @@ impl ClusterSendExec {
             let mut ordinary_partitions = Vec::new();
             for index in union {
                 match index {
-                    Some(index) => {
+                    Snapshot::Index(index) => {
                         for p in &index.partitions {
                             match p.partition.get_row().multi_partition_id() {
                                 Some(id) => multi_partitions
@@ -924,10 +940,12 @@ impl ClusterSendExec {
                             }
                         }
                     }
-                    None => ordinary_partitions.push(IdRow::new(
-                        INLINE_PARTITION_ID,
-                        Partition::new(INLINE_PARTITION_ID, None, None, None),
-                    )),
+                    Snapshot::Inline(inline) => {
+                        ordinary_partitions.push(IdRow::new(
+                            inline.id,
+                            Partition::new(inline.id, None, None, None),
+                        ))
+                    },
                 }
             }
             if !ordinary_partitions.is_empty() {
@@ -1198,8 +1216,15 @@ impl TableProvider for InlineTableProvider {
         _filters: &[Expr],
         _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
+        let filter = self
+            .worker_partition_ids
+            .binary_search_by_key(&self.id, |(id, _)| *id);
+        if filter.is_err() {
+            return Ok(Arc::new(EmptyExec::new(false, self.schema())))
+        }
+
         let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;
-        let schema = self.data.get_schema();
+        let schema = self.schema();
         let projected_schema = if let Some(p) = projection {
             Arc::new(Schema::new(
                 p.iter().map(|i| schema.field(*i).clone()).collect(),

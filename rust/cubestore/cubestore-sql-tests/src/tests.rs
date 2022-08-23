@@ -5653,7 +5653,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]),
     ];
     let data = Arc::new(DataFrame::new(columns, rows.clone()));
-    let inline_tables = vec![InlineTable::new("Persons".to_string(), data)];
+    let inline_tables = vec![InlineTable::new(1000, "Persons".to_string(), data)];
 
     let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service

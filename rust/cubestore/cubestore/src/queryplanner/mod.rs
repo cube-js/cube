@@ -225,13 +225,10 @@ impl ContextProvider for MetaStoreSchemaProvider {
         let (schema, table) = match name {
             TableReference::Partial { schema, table } => (schema, table),
             TableReference::Bare { table } => {
-                return Some(Arc::new(InlineTableProvider::new(
-                    self.inline_tables
-                        .iter()
-                        .find(|inline_table| inline_table.name == table)?
-                        .data
-                        .clone(),
-                )));
+                let table = self.inline_tables
+                    .iter()
+                    .find(|inline_table| inline_table.name == table)?;
+                return Some(Arc::new(InlineTableProvider::new(table.id, table.data.clone(), Vec::new())));
             }
             TableReference::Full { .. } => return None,
         };

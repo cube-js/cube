@@ -127,6 +127,11 @@ impl PartitionSnapshot {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct InlineSnapshot {
+    pub id: u64,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum SerializedLogicalPlan {
     Projection {
         expr: Vec<SerializedExpr>,
@@ -192,7 +197,7 @@ pub enum SerializedLogicalPlan {
     },
     ClusterSend {
         input: Arc<SerializedLogicalPlan>,
-        snapshots: Snapshots,
+        snapshots: Vec<Snapshots>,
     },
     ClusterAggregateTopK {
         limit: usize,
@@ -202,7 +207,7 @@ pub enum SerializedLogicalPlan {
         sort_columns: Vec<SortColumn>,
         having_expr: Option<SerializedExpr>,
         schema: DFSchemaRef,
-        snapshots: Snapshots,
+        snapshots: Vec<Snapshots>,
     },
     CrossJoin {
         left: Arc<SerializedLogicalPlan>,
@@ -314,7 +319,7 @@ impl SerializedLogicalPlan {
                         worker_context.chunk_id_to_record_batches.clone(),
                         worker_context.parquet_metadata_cache.clone(),
                     )),
-                    SerializedTableSource::InlineTable(v) => Arc::new(v.clone()),
+                    SerializedTableSource::InlineTable(v) => Arc::new(v.to_worker_table(worker_context.worker_partition_ids.clone())),
                 },
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),

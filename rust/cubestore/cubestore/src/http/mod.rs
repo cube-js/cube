@@ -37,6 +37,8 @@ use warp::filters::ws::{Message, Ws};
 use warp::http::StatusCode;
 use warp::reject::Reject;
 
+pub const INLINE_PARTITION_ID_BASE: u64 = 0x10000000;
+
 pub struct HttpServer {
     bind_address: String,
     sql_service: Arc<dyn SqlService>,
@@ -562,6 +564,7 @@ impl HttpMessage {
                                 vec![]
                             };
                             inline_tables.push(InlineTable::new(
+                                INLINE_PARTITION_ID_BASE + inline_tables.len() as u64,
                                 name,
                                 Arc::new(DataFrame::new(columns, rows)),
                             ));
@@ -704,6 +707,7 @@ mod tests {
                 command: HttpCommand::Query {
                     query: "query".to_string(),
                     inline_tables: vec![InlineTable::new(
+                        1000,
                         "table".to_string(),
                         Arc::new(DataFrame::new(columns, rows.clone()))
                     )],

@@ -111,14 +111,15 @@ pub struct QueryPlans {
 
 #[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug)]
 pub struct InlineTable {
+    pub id: u64,
     pub name: String,
     pub data: Arc<DataFrame>,
 }
 pub type InlineTables = Vec<InlineTable>;
 
 impl InlineTable {
-    pub fn new(name: String, data: Arc<DataFrame>) -> Self {
-        Self { name, data }
+    pub fn new(id: u64, name: String, data: Arc<DataFrame>) -> Self {
+        Self { id, name, data }
     }
 }
 

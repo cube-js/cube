@@ -58,6 +58,12 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       user: config?.user || getEnv('cubeStoreUser'),
       password: config?.password || getEnv('cubeStorePass'),
     };
+
+    // dev
+    this.config.url = 'ws://dev-1-1-1:911f46ec7ab0922083dd4d94062b6cba84fb20446ed555f91bf257863b1715e1@127.0.0.1:3030';
+    // prod
+    // this.config.url = 'ws://production-7078-1-2:7286b8892d6e3e995e61d2c097cb8eeaf560ad285be8c2f7e238a6c50fef2993@127.0.0.1:3030';
+
     this.baseUrl = (this.config.url || `ws://${this.config.host || 'localhost'}:${this.config.port || '3030'}/`).replace(/\/ws$/, '/').replace(/\/$/, '');
     this.connection = new WebSocketConnection(`${this.baseUrl}/ws`);
   }
