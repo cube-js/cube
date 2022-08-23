@@ -26,9 +26,10 @@ pub struct ServerConfiguration {
 impl Default for ServerConfiguration {
     fn default() -> Self {
         Self {
-            connection_max_prepared_statements: 50,
-            connection_max_cursors: 15,
-            connection_max_portals: 15,
+            connection_max_prepared_statements: 128,
+            connection_max_portals: 64,
+            // by default cursor can be used only inside transaction
+            connection_max_cursors: 16,
         }
     }
 }
