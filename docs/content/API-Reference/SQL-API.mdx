@@ -407,76 +407,122 @@ You can change security context for specific query via virtual filter on:
 SELECT * FROM Orders WHERE __user = 'anotheruser';
 ```
 
-## Limitations
+## Joins
 
-### <--{"id" : "Limitations"}--> Projection
+SQL API currently does not support `INNER JOIN`, `LEFT JOIN`, `RIGHT JOIN` and `FULL OUTER JOIN`. 
+We plan to support these types of joins in future releases.
 
-`SELECT` statements only support the following projections:
+SQL API supports `CROSS JOIN` between cubes.
+When `CROSS JOIN` is being processed by Cube, it generates proper joining conditions for the underlying data backend.
 
-**`*` for all dimensions:**
-
-```sql
-SELECT * FROM Orders;
-```
-
-**A valid expression for a dimension or measure:**
+For example, the following query joins `Orders` and `Products` tables under the hood by `product_id` in `Orders` and `id` in `Products` exactly the same way as the REST API query does:
 
 ```sql
-SELECT COUNT(*) FROM Orders;
+cube=> SELECT * FROM Orders CROSS JOIN Products LIMIT 5;
+ count | avgValue | totalValue | number | value |  status   |         createdAt          |        completedAt         | __user | count |           name            |            description             |         createdAt          | __user 
+-------+----------+------------+--------+-------+-----------+----------------------------+----------------------------+--------+-------+---------------------------+------------------------------------+----------------------------+--------
+     1 |       20 |         20 |     40 |    20 | completed | 2020-10-26 00:00:00.000000 | 2020-11-07 00:00:00.000000 |        |     1 | Incredible Fresh Chicken  | Electronics Generic Fresh Computer | 2020-06-29 00:00:00.000000 | 
+     1 |       20 |         20 |     14 |    20 | completed | 2021-02-07 00:00:00.000000 | 2021-03-02 00:00:00.000000 |        |     1 | Unbranded Wooden Mouse    | Outdoors Incredible Rubber Car     | 2019-07-16 00:00:00.000000 | 
+     1 |       20 |         20 |     23 |    20 | completed | 2022-07-23 00:00:00.000000 | 2022-08-11 00:00:00.000000 |        |     1 | Handcrafted Plastic Chair | Electronics Sleek Rubber Tuna      | 2021-02-27 00:00:00.000000 | 
+     1 |       20 |         20 |     86 |    20 | completed | 2023-04-19 00:00:00.000000 | 2023-04-25 00:00:00.000000 |        |     1 | Practical Metal Chicken   | Toys Awesome Frozen Chips          | 2020-07-24 00:00:00.000000 | 
+     1 |       20 |         20 |     27 |    20 | completed | 2019-06-27 00:00:00.000000 | 2019-07-21 00:00:00.000000 |        |     1 | Sleek Rubber Chair        | Computers Refined Cotton Shirt     | 2021-09-26 00:00:00.000000 | 
+(5 rows)
 ```
 
-**A valid expression as an alias:**
+In the resulting query plan, you won't see any joins as you can't see those for REST API queries either:
 
 ```sql
-SELECT COUNT(*) AS order_count FROM Orders;
+cube=> EXPLAIN SELECT * FROM Orders CROSS JOIN Products LIMIT 5;
+   plan_type   |            plan             
+---------------+-----------------------------
+ logical_plan  | CubeScan: request={        +
+               |   "measures": [            +
+               |     "Orders.count",        +
+               |     "Orders.avgValue",     +
+               |     "Orders.totalValue",   +
+               |     "Orders.number",       +
+               |     "Products.count"       +
+               |   ],                       +
+               |   "dimensions": [          +
+               |     "Orders.value",        +
+               |     "Orders.status",       +
+               |     "Orders.createdAt",    +
+               |     "Orders.completedAt",  +
+               |     "Products.name",       +
+               |     "Products.description",+
+               |     "Products.createdAt"   +
+               |   ],                       +
+               |   "segments": [],          +
+               |   "limit": 5               +
+               | }
+ physical_plan | CubeScanExecutionPlan      +
+               | 
+(2 rows)
 ```
 
-### <--{"id" : "Limitations"}--> Selection
+This feature allows you to `CROSS JOIN` cubes even with transitive joins only.
 
-Cube SQL supports most conditional checks for the `WHERE` clause.
-
-**Comparison operators:**
+Typically in tools that allow defining custom SQL datasets, you'd use joined tables as a dataset SQL.
+For example:
 
 ```sql
-WHERE price > 50
-WHERE price >= 50 AND <= 100
+SELECT o.count as count, p.name as product_name, p.description as product_description FROM Orders o CROSS JOIN Products p
 ```
-
-**Boolean logic:**
+Please note we use aliasing to avoid name clashing between cube members in a resulting data set.
+In this case, wrapped SQL will be properly processed by Cube, pushing down all operations to Cube query:
 
 ```sql
-WHERE isPaid = true
-  AND isCompleted = false
-  OR isReviewed = false
+cube=> SELECT product_name, SUM(count) FROM (
+  SELECT o.count as count, p.name as product_name, p.description as product_description FROM Orders o CROSS JOIN Products p
+) joined
+GROUP BY 1 
+ORDER BY 2 DESC 
+LIMIT 5;
+       product_name       | SUM(joined.count) 
+--------------------------+-------------------
+ Tasty Plastic Mouse      |               121
+ Intelligent Cotton Ball  |               119
+ Ergonomic Steel Tuna     |               116
+ Intelligent Rubber Pants |               116
+ Generic Wooden Gloves    |               116
+(5 rows)
 ```
 
-**`IN` operator:**:
+We can see this by introspecting explain plan for this query:
 
 ```sql
-WHERE status IN ('completed', 'shipped')
-WHERE status NOT IN ('processing')
+cube=> EXPLAIN SELECT product_name, SUM(count) FROM (
+  SELECT o.count as count, p.name as product_name, p.description as product_description FROM Orders o CROSS JOIN Products p
+) joined
+GROUP BY 1 
+ORDER BY 2 DESC 
+LIMIT 5;
+   plan_type   |         plan          
+---------------+-----------------------
+ logical_plan  | CubeScan: request={  +
+               |   "measures": [      +
+               |     "Orders.count"   +
+               |   ],                 +
+               |   "dimensions": [    +
+               |     "Products.name"  +
+               |   ],                 +
+               |   "segments": [],    +
+               |   "order": [         +
+               |     [                +
+               |       "Orders.count",+
+               |       "desc"         +
+               |     ]                +
+               |   ],                 +
+               |   "limit": 5         +
+               | }
+ physical_plan | CubeScanExecutionPlan+
+               | 
+(2 rows)
 ```
 
-**`IS NULL`:**
+Please note even if `product_description` is in the inner selection, it isn't evaluated in the final query as it isn't used in any way.
 
-```sql
-WHERE completedAt IS NULL
-WHERE completedAt IS NOT NULL
-```
-
-**`LIKE`:**
-
-```sql
-WHERE name LIKE 'joe'
-WHERE name NOT LIKE 'bloggs'
-```
-
-### <--{"id" : "Limitations"}--> Joins
-
-SQL API currently does not support joins. We plan to support joins in future
-releases.
-
-As a workaround, it is possible to define proxy dimension or measure inside the
+As an alternative to achieve joins it is also possible to define proxy dimension or measure inside the
 Cube.
 
 ```js
@@ -546,6 +592,70 @@ cube=> SELECT count, user_city FROM Orders;
   3060 | Austin
   1804 | Palo Alto
 (8 rows)
+```
+
+## Limitations
+
+### <--{"id" : "Limitations"}--> Projection
+
+`SELECT` statements only support the following projections:
+
+**`*` for all dimensions:**
+
+```sql
+SELECT * FROM Orders;
+```
+
+**A valid expression for a dimension or measure:**
+
+```sql
+SELECT COUNT(*) FROM Orders;
+```
+
+**A valid expression as an alias:**
+
+```sql
+SELECT COUNT(*) AS order_count FROM Orders;
+```
+
+### <--{"id" : "Limitations"}--> Selection
+
+Cube SQL supports most conditional checks for the `WHERE` clause.
+
+**Comparison operators:**
+
+```sql
+WHERE price > 50
+WHERE price >= 50 AND <= 100
+```
+
+**Boolean logic:**
+
+```sql
+WHERE isPaid = true
+  AND isCompleted = false
+  OR isReviewed = false
+```
+
+**`IN` operator:**:
+
+```sql
+WHERE status IN ('completed', 'shipped')
+WHERE status NOT IN ('processing')
+```
+
+**`IS NULL`:**
+
+```sql
+WHERE completedAt IS NULL
+WHERE completedAt IS NOT NULL
+```
+
+**`LIKE`:**
+
+```sql
+WHERE name LIKE 'joe'
+WHERE name NOT LIKE 'bloggs'
 ```
 
 [ref-config-check-sql-auth]: /config#check-sql-auth
