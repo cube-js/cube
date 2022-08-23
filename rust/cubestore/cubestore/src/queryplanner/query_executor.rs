@@ -873,6 +873,10 @@ impl InlineTableProvider {
         t.worker_partition_ids = worker_partition_ids;
         t
     }
+
+    pub fn has_partitions(self: &Self, partition_ids: &Vec<(u64, RowFilter)>) -> bool {
+        partition_ids.iter().find(|(id, _)| *id == self.id).is_some()
+    }
 }
 
 impl Debug for InlineTableProvider {

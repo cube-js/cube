@@ -592,7 +592,9 @@ impl SerializedLogicalPlan {
                     SerializedTableSource::CubeTable(table) => {
                         !table.has_partitions(partition_ids_to_execute)
                     }
-                    _ => false,
+                    SerializedTableSource::InlineTable(table) => {
+                        !table.has_partitions(partition_ids_to_execute)
+                    }
                 };
                 if is_empty {
                     SerializedLogicalPlan::EmptyRelation {
