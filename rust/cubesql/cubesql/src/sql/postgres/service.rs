@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use log::{error, trace};
+use std::sync::Arc;
 use tokio::{
     net::TcpListener,
-    sync::{watch, RwLock},
+    sync::{oneshot, watch, RwLock},
 };
 
 use crate::{
@@ -57,22 +56,46 @@ impl ProcessingLoop for PostgresServer {
                 }
             };
 
-            let session = self.session_manager.create_session(
-                DatabaseProtocol::PostgreSQL,
-                socket.peer_addr().unwrap().to_string(),
-            );
+            let session = self
+                .session_manager
+                .create_session(
+                    DatabaseProtocol::PostgreSQL,
+                    socket.peer_addr().unwrap().to_string(),
+                )
+                .await;
+            let logger = Arc::new(SessionLogger::new(session.state.clone()));
 
             trace!("[pg] New connection {}", session.state.connection_id);
 
-            let logger = Arc::new(SessionLogger::new(session.state.clone()));
+            let (mut tx, rx) = oneshot::channel::<()>();
+
+            let connection_id = session.state.connection_id;
+            let session_manager = self.session_manager.clone();
+            tokio::spawn(async move {
+                tx.closed().await;
+
+                trace!("[postgres] Removing connection {}", connection_id);
+
+                session_manager.drop_session(connection_id).await;
+            });
 
             tokio::spawn(async move {
-                if let Err(e) = AsyncPostgresShim::run_on(socket, session, logger.clone()).await {
+                let handler = AsyncPostgresShim::run_on(socket, session.clone(), logger.clone());
+                if let Err(e) = handler.await {
                     logger.error(
                         format!("Error during processing PostgreSQL connection: {}", e).as_str(),
                         None,
                     );
-                }
+
+                    if let Some(bt) = e.backtrace() {
+                        trace!("{}", bt);
+                    } else {
+                        trace!("Backtrace: not found");
+                    }
+                };
+
+                // Handler can finish with panic, it's why we are using additional channel to drop session by moving it here
+                std::mem::drop(rx);
             });
         }
     }

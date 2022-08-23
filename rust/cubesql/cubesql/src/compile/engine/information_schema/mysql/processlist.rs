@@ -134,7 +134,7 @@ impl TableProvider for InfoSchemaProcesslistProvider {
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let mut builder = InformationSchemaProcesslistBuilder::new();
 
-        for process_list in self.sessions.process_list() {
+        for process_list in self.sessions.process_list().await {
             builder.add_row(process_list);
         }
 

@@ -1,23 +1,22 @@
+use crate::{CubeError, RWLockAsync};
 use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicU32, Ordering},
-        Arc, RwLock as RwLockSync,
+        Arc,
     },
 };
 
-use crate::{sql::session::SessionStatActivity, CubeError};
-
 use super::{
     server_manager::ServerManager,
-    session::{DatabaseProtocol, Session, SessionProcessList, SessionState},
+    session::{DatabaseProtocol, Session, SessionProcessList, SessionStatActivity, SessionState},
 };
 
 #[derive(Debug)]
 pub struct SessionManager {
     // Sessions
     last_id: AtomicU32,
-    sessions: RwLockSync<HashMap<u32, Arc<Session>>>,
+    sessions: RWLockAsync<HashMap<u32, Arc<Session>>>,
     // Backref
     pub server: Arc<ServerManager>,
 }
@@ -28,12 +27,12 @@ impl SessionManager {
     pub fn new(server: Arc<ServerManager>) -> Self {
         Self {
             last_id: AtomicU32::new(1),
-            sessions: RwLockSync::new(HashMap::new()),
+            sessions: RWLockAsync::new(HashMap::new()),
             server,
         }
     }
 
-    pub fn create_session(
+    pub async fn create_session(
         self: &Arc<Self>,
         protocol: DatabaseProtocol,
         host: String,
@@ -48,20 +47,15 @@ impl SessionManager {
 
         let session_ref = Arc::new(sess);
 
-        let mut guard = self
-            .sessions
-            .write()
-            .expect("failed to unlock sessions for inserting session");
+        let mut guard = self.sessions.write().await;
+
         guard.insert(connection_id, session_ref.clone());
 
         session_ref
     }
 
-    pub fn stat_activity(self: &Arc<Self>) -> Vec<SessionStatActivity> {
-        let guard = self
-            .sessions
-            .read()
-            .expect("failed to unlock sessions for stat_activity");
+    pub async fn stat_activity(self: &Arc<Self>) -> Vec<SessionStatActivity> {
+        let guard = self.sessions.read().await;
 
         guard
             .values()
@@ -69,11 +63,8 @@ impl SessionManager {
             .collect::<Vec<SessionStatActivity>>()
     }
 
-    pub fn process_list(self: &Arc<Self>) -> Vec<SessionProcessList> {
-        let guard = self
-            .sessions
-            .read()
-            .expect("failed to unlock sessions for process_list");
+    pub async fn process_list(self: &Arc<Self>) -> Vec<SessionProcessList> {
+        let guard = self.sessions.read().await;
 
         guard
             .values()
@@ -81,20 +72,15 @@ impl SessionManager {
             .collect::<Vec<SessionProcessList>>()
     }
 
-    pub fn get_session(&self, connection_id: u32) -> Option<Arc<Session>> {
-        let guard = self
-            .sessions
-            .read()
-            .expect("failed to unlock sessions for get_session session");
+    pub async fn get_session(&self, connection_id: u32) -> Option<Arc<Session>> {
+        let guard = self.sessions.read().await;
 
         guard.get(&connection_id).map(|s| s.clone())
     }
 
-    pub fn drop_session(&self, connection_id: u32) {
-        let mut guard = self
-            .sessions
-            .write()
-            .expect("failed to unlock sessions for drop_session session");
+    pub async fn drop_session(&self, connection_id: u32) {
+        let mut guard = self.sessions.write().await;
+
         guard.remove(&connection_id);
     }
 }
