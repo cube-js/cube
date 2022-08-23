@@ -203,7 +203,7 @@ impl TableProvider for PgCatalogStatActivityProvider {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        let sessions = self.sessions.stat_activity();
+        let sessions = self.sessions.stat_activity().await;
         let mut builder = PgStatActivityBuilder::new(sessions.len());
 
         for session in sessions {

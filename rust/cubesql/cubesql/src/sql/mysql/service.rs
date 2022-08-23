@@ -40,6 +40,7 @@ use crate::{
 use msql_srv::ColumnType as MySQLColumnType;
 use pg_srv::BindValue;
 use sqlparser::ast;
+use tokio::sync::oneshot;
 
 #[derive(Debug)]
 struct PreparedStatements {
@@ -63,19 +64,6 @@ struct MySqlConnection {
     // Shared
     session: Arc<Session>,
     logger: Arc<dyn ContextLogger>,
-}
-
-impl Drop for MySqlConnection {
-    fn drop(&mut self) {
-        trace!(
-            "[mysql] Droping connection {}",
-            self.session.state.connection_id
-        );
-
-        self.session
-            .session_manager
-            .drop_session(self.session.state.connection_id)
-    }
 }
 
 impl MySqlConnection {
@@ -527,34 +515,52 @@ impl ProcessingLoop for MySqlServer {
                 }
             };
 
-            let session = self.session_manager.create_session(
-                DatabaseProtocol::MySQL,
-                socket.peer_addr().unwrap().to_string(),
-            );
+            let session = self
+                .session_manager
+                .create_session(
+                    DatabaseProtocol::MySQL,
+                    socket.peer_addr().unwrap().to_string(),
+                )
+                .await;
 
             let logger = Arc::new(SessionLogger::new(session.state.clone()));
 
+            let (mut tx, rx) = oneshot::channel::<()>();
+
+            let connection_id = session.state.connection_id;
+            let session_manager = self.session_manager.clone();
             tokio::spawn(async move {
-                if let Err(e) = AsyncMysqlIntermediary::run_on(
+                tx.closed().await;
+
+                trace!("[mysql] Removing connection {}", connection_id);
+
+                session_manager.drop_session(connection_id).await;
+            });
+
+            tokio::spawn(async move {
+                let handler = AsyncMysqlIntermediary::run_on(
                     MySqlConnection {
                         session,
                         statements: Arc::new(RwLock::new(PreparedStatements::new())),
                         logger: logger.clone(),
                     },
                     socket,
-                )
-                .await
-                {
+                );
+                if let Err(e) = handler.await {
                     logger.error(
                         format!("Error during processing MySQL connection: {}", e).as_str(),
                         None,
                     );
+
                     if let Some(bt) = e.backtrace() {
                         trace!("{}", bt.to_string());
                     } else {
                         trace!("Backtrace: not found");
                     }
                 }
+
+                // Handler can finish with panic, it's why we are using additional channel to drop session by moving it here
+                std::mem::drop(rx);
             });
         }
     }

@@ -2872,7 +2872,7 @@ mod tests {
         Arc::new(MetaContext::new(get_test_meta()))
     }
 
-    fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
+    async fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
         let server = Arc::new(ServerManager::new(
             get_test_auth(),
             get_test_transport(),
@@ -2880,7 +2880,9 @@ mod tests {
         ));
 
         let session_manager = Arc::new(SessionManager::new(server.clone()));
-        let session = session_manager.create_session(protocol, "127.0.0.1".to_string());
+        let session = session_manager
+            .create_session(protocol, "127.0.0.1".to_string())
+            .await;
 
         // Populate like shims
         session.state.set_database(Some("db".to_string()));
@@ -2946,7 +2948,8 @@ mod tests {
 
     async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
         let query =
-            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db)).await;
+            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db).await)
+                .await;
 
         query.unwrap()
     }
@@ -3171,7 +3174,7 @@ mod tests {
             convert_sql_to_cube_query(
                 &"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' OR customer_gender = 'male'".to_string(),
                 get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::PostgreSQL)
+                get_test_session(DatabaseProtocol::PostgreSQL).await
             ).await;
 
         // TODO: We need to propagate error to result, to assert message
@@ -4314,7 +4317,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let create_query = convert_sql_to_cube_query(
             &"SELECT MEASURE(customer_gender) FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
             get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
         ).await;
 
         assert_eq!(
@@ -4687,7 +4690,7 @@ ORDER BY \"COUNT(count)\" DESC"
             let query = convert_sql_to_cube_query(
                 &input_query,
                 get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::MySQL),
+                get_test_session(DatabaseProtocol::MySQL).await,
             )
             .await;
 
@@ -5387,7 +5390,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     sql
                 ),
                 get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::MySQL),
+                get_test_session(DatabaseProtocol::MySQL).await,
             )
             .await;
 
@@ -5882,7 +5885,7 @@ ORDER BY \"COUNT(count)\" DESC"
         db: DatabaseProtocol,
     ) -> Result<(String, StatusFlags), CubeError> {
         let meta = get_test_tenant_ctx();
-        let session = get_test_session(db);
+        let session = get_test_session(db).await;
 
         let mut output: Vec<String> = Vec::new();
         let mut output_flags = StatusFlags::empty();
@@ -9425,7 +9428,7 @@ ORDER BY \"COUNT(count)\" DESC"
             ) ON COMMIT PRESERVE ROWS
             ".to_string(),
             get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
         ).await;
         match create_query {
             Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
@@ -9441,7 +9444,7 @@ ORDER BY \"COUNT(count)\" DESC"
             "
             .to_string(),
             get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
         )
         .await;
         match select_into_query {
@@ -11035,12 +11038,12 @@ ORDER BY \"COUNT(count)\" DESC"
 
         let logical_plan = convert_select_to_query_plan(
             format!(
-                "SELECT \"source\".\"order_date\" AS \"order_date\", \"source\".\"max\" AS \"max\" 
+                "SELECT \"source\".\"order_date\" AS \"order_date\", \"source\".\"max\" AS \"max\"
                 FROM (SELECT date_trunc('month', \"KibanaSampleDataEcommerce\".\"order_date\") AS \"order_date\", max(\"KibanaSampleDataEcommerce\".\"maxPrice\") AS \"max\" FROM \"KibanaSampleDataEcommerce\"
                 GROUP BY date_trunc('month', \"KibanaSampleDataEcommerce\".\"order_date\")
                 ORDER BY date_trunc('month', \"KibanaSampleDataEcommerce\".\"order_date\") ASC) \"source\"
                 WHERE (CAST(date_trunc('month', \"source\".\"order_date\") AS timestamp) + (INTERVAL '60 minute')) BETWEEN date_trunc('minute', ({} + (INTERVAL '-30 minute')))
-                AND date_trunc('minute', {})", 
+                AND date_trunc('minute', {})",
                 now, now
             ),
             DatabaseProtocol::PostgreSQL,
@@ -11589,7 +11592,7 @@ ORDER BY \"COUNT(count)\" DESC"
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
-            "SELECT max(CAST(\"KibanaSampleDataEcommerce\".\"order_date\" AS date)) AS \"max\" FROM \"KibanaSampleDataEcommerce\"".to_string(), 
+            "SELECT max(CAST(\"KibanaSampleDataEcommerce\".\"order_date\" AS date)) AS \"max\" FROM \"KibanaSampleDataEcommerce\"".to_string(),
             DatabaseProtocol::PostgreSQL
         ).await.as_logical_plan();
 

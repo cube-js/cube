@@ -185,7 +185,7 @@ impl AsyncPostgresShim {
         socket: TcpStream,
         session: Arc<Session>,
         logger: Arc<dyn ContextLogger>,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), ConnectionError> {
         let mut shim = Self {
             socket,
             cursors: HashMap::new(),
@@ -207,18 +207,7 @@ impl AsyncPostgresShim {
                     }
                 }
 
-                shim.logger.error(
-                    format!("Error during processing PostgreSQL connection: {}", e).as_str(),
-                    None,
-                );
-
-                if let Some(bt) = e.backtrace() {
-                    trace!("{}", bt);
-                } else {
-                    trace!("Backtrace: not found");
-                }
-
-                Ok(())
+                Err(e)
             }
             _ => {
                 shim.socket.shutdown().await?;
@@ -446,6 +435,7 @@ impl AsyncPostgresShim {
             .session
             .session_manager
             .get_session(cancel_message.process_id)
+            .await
         {
             if s.state.secret == cancel_message.secret {
                 s.state.cancel_query();
@@ -1375,18 +1365,5 @@ impl AsyncPostgresShim {
             .state
             .auth_context()
             .ok_or(CubeError::internal("must be auth".to_string()))
-    }
-}
-
-impl Drop for AsyncPostgresShim {
-    fn drop(&mut self) {
-        trace!(
-            "[pg] Droping connection {}",
-            self.session.state.connection_id
-        );
-
-        self.session
-            .session_manager
-            .drop_session(self.session.state.connection_id)
     }
 }
