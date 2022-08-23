@@ -101,7 +101,7 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
       - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore/worker_1:/cube/data
+      - .cubestore:/cube/data
     depends_on:
       - cubestore_router
 
@@ -115,7 +115,7 @@ services:
       - CUBESTORE_REMOTE_DIR=/cube/data
       - CUBESTORE_META_ADDR=cubestore_router:9999
     volumes:
-      - .cubestore/worker_2:/cube/data
+      - .cubestore:/cube/data
     depends_on:
       - cubestore_router
 
