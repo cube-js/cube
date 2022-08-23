@@ -1222,14 +1222,6 @@ impl TableProvider for InlineTableProvider {
         _filters: &[Expr],
         _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let filter = self
-            .worker_partition_ids
-            .binary_search_by_key(&self.id, |(id, _)| *id);
-        if filter.is_err() {
-            return Ok(Arc::new(EmptyExec::new(false, self.schema())));
-        }
-
-        let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;
         let schema = self.schema();
         let projected_schema = if let Some(p) = projection {
             Arc::new(Schema::new(
@@ -1238,6 +1230,15 @@ impl TableProvider for InlineTableProvider {
         } else {
             schema
         };
+
+        let filter = self
+            .worker_partition_ids
+            .binary_search_by_key(&self.id, |(id, _)| *id);
+        if filter.is_err() {
+            return Ok(Arc::new(EmptyExec::new(false, projected_schema)));
+        }
+
+        let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;
         let projection = (*projection).clone();
         Ok(Arc::new(MemoryExec::try_new(
             &vec![batches],
