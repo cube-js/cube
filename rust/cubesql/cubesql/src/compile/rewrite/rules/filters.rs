@@ -5,11 +5,12 @@ use crate::{
         rewrite::{
             analysis::{ConstantFolding, LogicalPlanAnalysis},
             between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
-            column_expr, cube_scan, cube_scan_filters, cube_scan_members, dimension_expr,
-            expr_column_name, filter, filter_cast_unwrap_replacer, filter_member, filter_op,
-            filter_op_filters, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
-            is_not_null_expr, is_null_expr, limit, literal_expr, literal_string, measure_expr,
-            member_name_by_alias, not_expr, projection, rewrite,
+            column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail,
+            cube_scan_members, dimension_expr, expr_column_name, filter,
+            filter_cast_unwrap_replacer, filter_member, filter_op, filter_op_filters,
+            filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
+            is_null_expr, limit, literal_expr, literal_string, measure_expr, member_name_by_alias,
+            not_expr, projection, rewrite,
             rewriter::RewriteRules,
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_rewrite,
@@ -82,6 +83,7 @@ impl RewriteRules for FilterRules {
                 ),
                 self.push_down_filter("?alias_to_cube", "?expr", "?filter_alias_to_cube"),
             ),
+            // Transform Filter: Boolean(False)
             transforming_rewrite(
                 "push-down-limit-filter",
                 filter(
@@ -183,6 +185,13 @@ impl RewriteRules for FilterRules {
                         "?alias",
                     ),
                 ),
+            ),
+            // Transform Filter: Boolean(True) same as TRUE = TRUE, which is useless
+            transforming_rewrite(
+                "filter-truncate-true",
+                filter_replacer(literal_expr("?literal"), "?alias_to_cube", "?members"),
+                cube_scan_filters_empty_tail(),
+                self.truncate_filter_literal_true("?literal"),
             ),
             transforming_rewrite(
                 "filter-replacer",
@@ -989,6 +998,22 @@ impl FilterRules {
                         new_limit_n_var,
                         egraph.add(LogicalPlanLanguage::LimitN(LimitN(0))),
                     );
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn truncate_filter_literal_true(
+        &self,
+        literal_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let literal_var = var!(literal_var);
+
+        move |egraph, subst| {
+            for literal_value in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                if let ScalarValue::Boolean(Some(true)) = literal_value {
                     return true;
                 }
             }
