@@ -6058,6 +6058,99 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_thought_spot_cte() -> Result<(), CubeError> {
+        init_logger();
+
+        // CTE called qt_1 is used as ta_2, under the hood DF will use * projection
+        let query_plan = convert_select_to_query_plan(
+            "WITH \"qt_1\" AS (
+                  SELECT
+                    \"ta_1\".\"customer_gender\" \"ca_2\",
+                    CASE
+                      WHEN sum(\"ta_1\".\"count\") IS NOT NULL THEN sum(\"ta_1\".\"count\")
+                      ELSE 0
+                    END \"ca_3\"
+                  FROM \"db\".\"public\".\"KibanaSampleDataEcommerce\" \"ta_1\"
+                  GROUP BY \"ca_2\"
+                )
+                SELECT
+                  \"qt_1\".\"ca_2\" \"ca_4\",
+                  \"qt_1\".\"ca_3\" \"ca_5\"
+                FROM \"qt_1\"
+                WHERE TRUE = TRUE
+                LIMIT 1000;"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                // TODO: limit: Some(1000),
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    // same as test_thought_spot_cte, but with realiasing
+    #[tokio::test]
+    async fn test_thought_spot_cte_with_realiasing() -> Result<(), CubeError> {
+        init_logger();
+
+        // CTE called qt_1 is used as ta_2, under the hood DF will use * projection
+        let query_plan = convert_select_to_query_plan(
+            "WITH \"qt_1\" AS (
+                  SELECT
+                    \"ta_1\".\"customer_gender\" \"ca_2\",
+                    CASE
+                      WHEN sum(\"ta_1\".\"count\") IS NOT NULL THEN sum(\"ta_1\".\"count\")
+                      ELSE 0
+                    END \"ca_3\"
+                  FROM \"db\".\"public\".\"KibanaSampleDataEcommerce\" \"ta_1\"
+                  GROUP BY \"ca_2\"
+                )
+                SELECT
+                  \"ta_2\".\"ca_2\" \"ca_4\",
+                  \"ta_2\".\"ca_3\" \"ca_5\"
+                FROM \"qt_1\" \"ta_2\"
+                WHERE TRUE = TRUE
+                LIMIT 1000;"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                // TODO: limit: Some(1000),
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_thought_spot_introspection() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "thought_spot_tables",
