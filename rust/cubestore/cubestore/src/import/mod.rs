@@ -51,16 +51,24 @@ impl ImportFormat {
         location: String,
         columns: Vec<Column>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
+        let reader: Pin<Box<dyn AsyncBufRead + Send>> = if location.contains(".gz") {
+            Box::pin(BufReader::new(GzipDecoder::new(BufReader::new(file))))
+        } else {
+            Box::pin(BufReader::new(file))
+        };
+        self.row_stream_from_reader(reader, columns)
+    }
+
+    pub fn row_stream_from_reader<'a>(
+        &self,
+        reader: Pin<Box<dyn AsyncBufRead + Send + 'a>>,
+        columns: Vec<Column>,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send + 'a>>, CubeError>
+    {
         match self {
             ImportFormat::CSV | ImportFormat::CSVNoHeader => {
                 let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
-                    if location.contains(".gz") {
-                        let reader = BufReader::new(GzipDecoder::new(BufReader::new(file)));
-                        Box::pin(CsvLineStream::new(reader))
-                    } else {
-                        let reader = BufReader::new(file);
-                        Box::pin(CsvLineStream::new(reader))
-                    };
+                    Box::pin(CsvLineStream::new(reader));
 
                 let mut header_mapping = match self {
                     ImportFormat::CSV => None,
@@ -160,28 +168,18 @@ impl ImportFormat {
                 value,
                 u8::try_from(t.target_scale()).unwrap(),
             )?),
-            ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
+            ColumnType::Bytes => TableValue::Bytes(parse_binary_data(value)?),
             ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
                 let hll = HllSketch::read_snowflake(value)?;
                 TableValue::Bytes(hll.write())
             }
             ColumnType::HyperLogLog(HllFlavour::Postgres) => {
-                let mut data = Vec::new();
-                if value.contains(' ') {
-                    parse_space_separated_binstring(&mut data, value)?;
-                } else {
-                    base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
-                };
+                let data = parse_binary_data(value)?;
                 let hll = HllSketch::read_hll_storage_spec(&data)?;
                 TableValue::Bytes(hll.write())
             }
             ColumnType::HyperLogLog(f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch)) => {
-                let mut data = Vec::new();
-                if value.contains(' ') {
-                    parse_space_separated_binstring(&mut data, value)?;
-                } else {
-                    base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
-                };
+                let data = parse_binary_data(value)?;
                 is_valid_plain_binary_hll(&data, *f)?;
                 TableValue::Bytes(data)
             }
@@ -242,6 +240,17 @@ pub(crate) fn parse_space_separated_binstring<'a>(
         })
         .try_collect()?;
     Ok(buffer.as_slice())
+}
+
+fn parse_binary_data(value: &str) -> Result<Vec<u8>, CubeError> {
+    let mut data = Vec::new();
+
+    if value.contains(' ') {
+        parse_space_separated_binstring(&mut data, value)?;
+    } else {
+        base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
+    };
+    Ok(data)
 }
 
 struct CsvLineParser<'a> {
@@ -760,6 +769,11 @@ mod tests {
     extern crate test;
 
     use crate::import::parse_decimal;
+    use crate::metastore::{Column, ColumnType, ImportFormat};
+    use crate::table::{Row, TableValue};
+    use indoc::indoc;
+    use tokio::io::BufReader;
+    use tokio_stream::StreamExt;
 
     #[test]
     fn parse_decimal_test() {
@@ -778,6 +792,43 @@ mod tests {
         assert_eq!(
             parse_decimal("-200.040000", 5).unwrap().to_string(5),
             "-200.04",
+        );
+    }
+
+    #[tokio::test]
+    async fn read_nulls() {
+        let data = indoc! {"
+            one,1
+            ,
+            three,3
+        "};
+        let csv_reader = Box::pin(BufReader::new(data.as_bytes()));
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::Int, 1),
+        ];
+        let mut row_stream = ImportFormat::CSVNoHeader
+            .row_stream_from_reader(csv_reader, columns)
+            .unwrap();
+        let mut rows = vec![];
+        while let Some(row) = row_stream.next().await {
+            if let Some(row) = row.unwrap() {
+                rows.push(row)
+            }
+        }
+        assert_eq!(
+            rows,
+            vec![
+                Row::new(vec![
+                    TableValue::String("one".to_string()),
+                    TableValue::Int(1)
+                ]),
+                Row::new(vec![TableValue::Null, TableValue::Null]),
+                Row::new(vec![
+                    TableValue::String("three".to_string()),
+                    TableValue::Int(3)
+                ]),
+            ]
         );
     }
 }

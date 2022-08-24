@@ -10,7 +10,7 @@
     "antd": "^3.11.2",
     "bizcharts": "^3.4.1",
     "component-cookie": "^1.1.4",
-    "moment": "^2.22.2",
+    "moment": "^2.29.4",
     "prismjs": "^1.23.0",
     "react": "^16.6.3",
     "react-dom": "^16.6.3",

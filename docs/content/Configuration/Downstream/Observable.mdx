@@ -35,7 +35,7 @@ your connection credentials:
 ### <--{"id" : "Use SQL API in Cube"}--> Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Apache Superset
+These credentials will be required to connect to Cube from Observable
 later.
 
 ```dotenv
@@ -66,7 +66,7 @@ Make sure to add a database to your notebook, and select **Database query** when
   <img
     src="https://ucarecdn.com/83b5f0ec-4134-413a-aaa0-2794d9bc34ed/"
     style="border: none"
-    width="80%"
+    width="100%"
   />
 </div>
 
@@ -77,7 +77,7 @@ syntax on the [reference page][ref-sql-api].
   <img
     src="https://ucarecdn.com/5a4705c2-d675-4a50-b193-847b95177fb5/"
     style="border: none"
-    width="80%"
+    width="100%"
   />
 </div>
 
@@ -87,7 +87,7 @@ You can also create a visualization of the executed SQL query.
   <img
     src="https://ucarecdn.com/a61ec062-b6c7-4c33-be10-bf1cd5826a77/"
     style="border: none"
-    width="80%"
+    width="100%"
   />
 </div>
 
@@ -121,17 +121,29 @@ Observable connects to Cube through the REST API.
 
 ### <--{"id" : "Connecting Cube REST API from Observable"}--> Querying data with REST API
 
-First, add the generic **JavaScript** cell:
+First, add two generic **JavaScript** cells:
 
 <div style="text-align: center">
   <img
     src="https://ucarecdn.com/2384bda2-a56c-4376-9b07-efbdff09455a/"
     style="border: none"
-    width="80%"
+    width="100%"
   />
 </div>
 
-Next, copy Cube's REST API URL and the Authorization token.
+Next, copy Cube's REST API URL and the Authorization token and paste them into their respective cells.
+
+```js
+cubeRestApi = 'https://thirsty-raccoon.aws-eu-central-1.cubecloudapp.dev/cubejs-api/v1/load'
+```
+
+Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget to add the `/load` endpoint to the end of the data source API.
+
+```js
+cubeRestApiJwtToken = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTgzMzM3OTZ9.gUOoDgo_RJka_ZANdwSw3v8GkM4ZzH9LjxrxKxkGAk0'
+```
+
+Also make sure to add the token next to the Bearer part of the Authorization header.
 
 Get your Cube query in the JSON [query format](https://cube.dev/docs/query-format) ready. You can copy it from Cube's Playground or compose manually:
 
@@ -143,21 +155,47 @@ Get your Cube query in the JSON [query format](https://cube.dev/docs/query-forma
   />
 </div>
 
-Paste the JSON query in the cell as an object literal and give it a name, I chose `jsonBody` for simplicity. Make sure to add a `query` parameter for your JSON query.
+Paste the JSON query in another JavaScript cell as an object literal and give it a name, I chose `jsonBody` for simplicity. Make sure to add a `query` parameter for your JSON query.
 
-Next, create another JavaScript cell with a POST request.
+```js
+jsonQuery = ({
+  "query": {
+    "measures": [
+      "Orders.count"
+    ],
+    "timeDimensions": [
+      {
+        "dimension": "Orders.createdAt",
+        "granularity": "month"
+      }
+    ],
+    "order": {
+      "Orders.createdAt": "asc"
+    }
+  }
+});
+```
 
-Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget to add the `/load` endpoint to the end of the data source API.
+Next, create another JavaScript cell with a POST request. Paste this POST request in the cell. Don't forget to put the `jsonBody` object inside the `JSON.stringify` call.
 
-Also make sure to add the token next to the Bearer part of the Authorization header. Lastly, don't forget to put the `jsonBody` object inside the `JSON.stringify` call.
+```js
+orders_over_time = fetch(cubeRestApi, {
+  method: 'POST',
+  headers: {
+    'Authorization': cubeRestApiJwtToken,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(jsonQuery),
+}).then(response => response.json()).then(json => json.data)
+```
 
 Next, click the play button on the top right of the cell.
 
 <div style="text-align: center">
   <img
-    src="https://ucarecdn.com/feb03ce4-a6ff-4bff-a8bf-28b3d37b9a2e/"
+    src="https://ucarecdn.com/60eb940c-74b0-416f-bfc4-e6efee55f455/"
     style="border: none"
-    width="80%"
+    width="100%"
   />
 </div>
 
@@ -165,9 +203,9 @@ You can also create a visualization of the executed REST API request.
 
 <div style="text-align: center">
   <img
-    src="https://ucarecdn.com/9648ca8f-6d63-4acf-8fc6-3c5d54ebbd16/"
+    src="https://ucarecdn.com/2f414e15-38f0-4688-a7e7-5eb1be3027aa/"
     style="border: none"
-    width="80%"
+    width="100%"
   />
 </div>
 

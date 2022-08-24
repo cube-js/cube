@@ -1,5 +1,6 @@
 ---
-title: Developer Playground
+title: Developer Playground in Cube Cloud
+menuTitle: Developer Playground
 permalink: /cloud/dev-tools/dev-playground
 category: Developer Tools
 menuOrder: 2

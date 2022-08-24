@@ -24,7 +24,7 @@
     "graphql-tools": "^5.0.0",
     "highcharts": "^8.1.2",
     "highcharts-react-official": "^3.0.0",
-    "moment": "^2.27.0",
+    "moment": "^2.29.4",
     "prop-types": "^15.7.2",
     "react": "^16.13.1",
     "react-beautiful-dnd": "^13.0.0",

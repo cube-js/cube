@@ -264,7 +264,8 @@ const queryPreAggregationPreviewSchema = Joi.object().keys({
     last_updated_at: Joi.number(),
     naming_version: Joi.number(),
     structure_version: Joi.string(),
-    table_name: Joi.string()
+    table_name: Joi.string(),
+    build_range_end: Joi.string(),
   })
 });
 

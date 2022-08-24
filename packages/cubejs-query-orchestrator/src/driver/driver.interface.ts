@@ -10,6 +10,14 @@ export type TableStructure = TableColumn[];
 export type SchemaStructure = Record<string, TableStructure>;
 export type DatabaseStructure = Record<string, SchemaStructure>;
 
+export type Rows = Record<string, unknown>[];
+export interface InlineTable {
+  name: string
+  columns: TableStructure
+  csvRows: string // in csv format
+}
+export type InlineTables = InlineTable[];
+
 // It's more easy to use this interface with optional method release as a base interface instead of type assertion
 export interface DownloadTableBase {
   /**
@@ -19,7 +27,7 @@ export interface DownloadTableBase {
 }
 
 export interface DownloadTableMemoryData extends DownloadTableBase {
-  rows: Record<string, unknown>[];
+  rows: Rows;
   /**
    * Some drivers know types of response
    */
@@ -87,17 +95,26 @@ export type IndexesSQL = {
   sql: [string, unknown[]];
 }[];
 
+export type CreateTableIndex = {
+  indexName: string,
+  type: string,
+  columns: string[]
+};
+
 export type UnloadOptions = {
   maxFileSize: number,
 };
 
-export type QueryOptions = {};
+export type QueryOptions = {
+  inlineTables?: InlineTables,
+  [key: string]: any
+};
 export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData);
 
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
   uploadTableWithIndexes(
-    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], queryTracingObj: any
+    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], queryTracingObj: any, aggregationsColumns: string[], createTableIndexes: CreateTableIndex[]
   ): Promise<void>;
   loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
   //

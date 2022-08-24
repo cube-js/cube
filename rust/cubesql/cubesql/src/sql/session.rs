@@ -1,14 +1,22 @@
 use datafusion::scalar::ScalarValue;
 use log::trace;
 use rand::Rng;
-use std::sync::{Arc, RwLock as RwLockSync};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock as RwLockSync},
+};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    sql::database_variables::{
-        mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
+    sql::{
+        database_variables::{
+            mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
+            DatabaseVariablesToUpdate,
+        },
+        extended::PreparedStatement,
     },
     transport::LoadRequestMeta,
+    RWLockAsync,
 };
 
 use super::{
@@ -87,8 +95,10 @@ pub struct SessionState {
     auth_context: RwLockSync<Option<AuthContextRef>>,
 
     transaction: RwLockSync<TransactionState>,
-
     query: RwLockSync<QueryState>,
+
+    // Extended Query
+    pub statements: RWLockAsync<HashMap<String, Option<PreparedStatement>>>,
 }
 
 impl SessionState {
@@ -110,6 +120,7 @@ impl SessionState {
             auth_context: RwLockSync::new(auth_context),
             transaction: RwLockSync::new(TransactionState::None),
             query: RwLockSync::new(QueryState::None),
+            statements: RWLockAsync::new(HashMap::new()),
         }
     }
 
@@ -222,6 +233,17 @@ impl SessionState {
         }
     }
 
+    /// Clear object used for extend query protocol in Postgres
+    /// This method is used in discard all
+    pub async fn clear_extended(&self) {
+        self.clear_prepared_statements().await;
+    }
+
+    pub async fn clear_prepared_statements(&self) {
+        let mut statements_guard = self.statements.write().await;
+        *statements_guard = HashMap::new();
+    }
+
     pub fn user(&self) -> Option<String> {
         let guard = self
             .properties
@@ -270,6 +292,7 @@ impl SessionState {
         *guard = auth_context;
     }
 
+    // TODO: Read without copy by holding acquired lock
     pub fn all_variables(&self) -> DatabaseVariables {
         let guard = self
             .variables
@@ -303,26 +326,16 @@ impl SessionState {
         }
     }
 
-    pub fn set_variables(&self, variables: DatabaseVariables) {
+    pub fn set_variables(&self, variables: DatabaseVariablesToUpdate) {
         let mut to_override = false;
-
         let mut current_variables = self.all_variables();
-        for (new_var_key, new_var_value) in variables.iter() {
-            let mut key_to_update: Option<String> = Some(new_var_key.to_string());
-            for (current_var_key, current_var_value) in current_variables.iter() {
-                if current_var_key.to_lowercase() == new_var_key.to_lowercase() {
-                    key_to_update = if current_var_value.readonly {
-                        None
-                    } else {
-                        Some(current_var_key.clone())
-                    };
 
-                    break;
+        for new_var in variables.into_iter() {
+            if let Some(current_var_value) = current_variables.get(&new_var.name) {
+                if !current_var_value.readonly {
+                    to_override = true;
+                    current_variables.insert(new_var.name.clone(), new_var);
                 }
-            }
-            if key_to_update.is_some() {
-                to_override = true;
-                current_variables.insert(key_to_update.unwrap(), new_var_value.clone());
             }
         }
 

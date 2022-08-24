@@ -56,7 +56,11 @@ impl VariablesProvider {
             identifier.concat()[2..].to_string()
         };
 
-        if let Some(var) = self.server.all_variables(DatabaseProtocol::MySQL).get(&key) {
+        if let Some(var) = self
+            .server
+            .read_variables(DatabaseProtocol::MySQL)
+            .get(&key)
+        {
             if var.var_type == VarType::System {
                 return Ok(var.value.clone());
             }

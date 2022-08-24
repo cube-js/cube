@@ -48,7 +48,7 @@ use tokio::task::JoinHandle;
 
 pub const ROW_GROUP_SIZE: usize = 16384; // TODO config
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Hash, Eq, PartialEq, Debug)]
 pub struct DataFrame {
     columns: Vec<Column>,
     data: Vec<Row>,

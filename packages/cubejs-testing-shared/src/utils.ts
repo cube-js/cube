@@ -51,6 +51,10 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '' }
             sql: 'id',
             primaryKey: true
           },
+          filter: {
+              type: 'number',
+              sql: 'filter'
+          },
           createdAt: {
             type: 'time',
             sql: 'created_at'

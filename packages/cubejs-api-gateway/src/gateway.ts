@@ -1159,7 +1159,7 @@ class ApiGateway {
   public handleError({
     e, context, query, res, requestStarted
   }: any) {
-    const { requestId } = context;
+    const { requestId } = context ?? {};
     
     if (e instanceof CubejsHandlerError) {
       this.log({

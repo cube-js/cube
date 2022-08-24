@@ -29,6 +29,7 @@ spec:
       {{- toYaml .Values.commonAnnotations | nindent 8 }}
       {{- end }}
     spec:
+      serviceAccountName: {{ template "cubestore.workers.serviceAccountName" . }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -68,7 +69,7 @@ spec:
               value: {{ printf "%s-router:%d" (include "cubestore.fullname" .) (.Values.router.metaPort | int) }}
             - name: CUBESTORE_DATA_DIR
               value: /cube/.cubestore/data
-            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
             {{- end }}
@@ -76,10 +77,10 @@ spec:
           resources:
             {{- toYaml .Values.workers.resources | nindent 12 }}
           {{- end }}
-          volumeMounts: 
+          volumeMounts:
             - name: datadir
               mountPath: /cube/.cubestore/data
-            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+            {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
             - name: remotedir
               mountPath: /cube/data
             {{- end }}
@@ -92,7 +93,7 @@ spec:
         - name: datadir
           emptyDir: {}
       {{- end }}
-      {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) }}
+      {{- if and (not .Values.cloudStorage.gcp.bucket) (not .Values.cloudStorage.aws.bucket) (not .Values.cloudStorage.minio.bucket) }}
         - name: remotedir
           persistentVolumeClaim:
             claimName: {{ printf "%s-remote-storage" (include "cubestore.fullname" .) }}
@@ -113,7 +114,7 @@ spec:
       topologySpreadConstraints:
         {{- toYaml .Values.workers.spreadConstraints | nindent 8 }}
       {{- end }}
-  
+
   {{- if .Values.workers.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:

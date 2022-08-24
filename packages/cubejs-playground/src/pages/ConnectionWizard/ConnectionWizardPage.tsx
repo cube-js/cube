@@ -335,7 +335,7 @@ export function ConnectionWizardPage({ history }) {
                 </Space>
               </Col>
 
-              {['MySQL', 'PostgreSQL', 'Druid', 'ClickHouse'].includes(
+              {['MySQL', 'PostgreSQL', 'Druid', 'ClickHouse', 'Crate'].includes(
                 db?.title || ''
               ) && playgroundContext?.isDocker ? (
                 <Col span={12}>

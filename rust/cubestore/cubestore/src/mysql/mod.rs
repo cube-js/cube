@@ -60,7 +60,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             .exec_query_with_context(
                 SqlQueryContext {
                     user: self.user.clone(),
-                    inline_tables: Arc::new(InlineTables::new()),
+                    inline_tables: InlineTables::new(),
                     trace_obj: None,
                 },
                 query,

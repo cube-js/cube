@@ -1,14 +1,15 @@
-use std::{any::type_name, sync::Arc, thread};
+use std::{any::type_name, collections::HashMap, sync::Arc, thread};
 
 use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, GenericStringArray, Int64Array, Int64Builder, IntervalDayTimeBuilder,
-            ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
-            StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
-            TimestampNanosecondArray, TimestampSecondArray, UInt32Builder,
+            Float64Array, GenericStringArray, Int32Builder, Int64Array, Int64Builder,
+            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
+            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
+            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
+            UInt32Builder,
         },
         compute::{cast, concat},
         datatypes::{
@@ -33,6 +34,7 @@ use datafusion::{
 };
 use itertools::izip;
 use pg_srv::{PgType, PgTypeId};
+use regex::Regex;
 
 use crate::{
     compile::engine::df::{
@@ -2033,7 +2035,7 @@ fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
             None
         };
 
-        let mut builder = Int64Builder::new(input_arr.len());
+        let mut builder = Int32Builder::new(input_arr.len());
 
         for (idx, element) in input_arr.iter().enumerate() {
             let element_dim = if let Some(d) = dims {
@@ -2060,7 +2062,7 @@ fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
                         if arr.len() == 0 {
                             builder.append_null()?
                         } else if upper {
-                            builder.append_value(arr.len() as i64)?
+                            builder.append_value(arr.len() as i32)?
                         } else {
                             // PostgreSQL allows to define array with n-based arrays,
                             // e.g. '[-7:-5]={1,2,3}'::int[], but it's not possible in the DF
@@ -2080,17 +2082,7 @@ fn create_array_lower_upper_fun(upper: bool) -> ScalarFunctionImplementation {
 pub fn create_array_lower_udf() -> ScalarUDF {
     let fun = create_array_lower_upper_fun(false);
 
-    let return_type: ReturnTypeFunction = Arc::new(move |args| {
-        assert!(args.len() >= 1);
-
-        match &args[0] {
-            DataType::List(f) => Ok(Arc::new(f.data_type().clone())),
-            other => Err(DataFusionError::Execution(format!(
-                "anyarray argument must be a List of numeric values, actual: {}",
-                other
-            ))),
-        }
-    });
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
 
     ScalarUDF::new(
         "array_lower",
@@ -2154,17 +2146,7 @@ pub fn create_pg_is_other_temp_schema() -> ScalarUDF {
 pub fn create_array_upper_udf() -> ScalarUDF {
     let fun = create_array_lower_upper_fun(true);
 
-    let return_type: ReturnTypeFunction = Arc::new(move |args| {
-        assert!(args.len() >= 1);
-
-        match &args[0] {
-            DataType::List(f) => Ok(Arc::new(f.data_type().clone())),
-            other => Err(DataFusionError::Execution(format!(
-                "anyarray argument must be a List of numeric values, actual: {}",
-                other
-            ))),
-        }
-    });
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
 
     ScalarUDF::new(
         "array_upper",
@@ -2499,6 +2481,112 @@ pub fn create_json_build_object_udf() -> ScalarUDF {
                 DataType::Boolean,
                 DataType::Int64,
                 DataType::UInt32,
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+/// https://docs.aws.amazon.com/redshift/latest/dg/REGEXP_SUBSTR.html
+pub fn create_regexp_substr_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let source_arr = downcast_string_arg!(args[0], "source_string", i32);
+        let pattern_arr = downcast_string_arg!(args[1], "pattern", i32);
+        let position_arr = if args.len() > 2 {
+            Some(downcast_primitive_arg!(args[2], "position", Int64Type))
+        } else {
+            None
+        };
+
+        if args.len() > 3 {
+            return Err(DataFusionError::NotImplemented(
+                "regexp_substr does not support occurrence and parameters (flags)".to_string(),
+            ));
+        }
+
+        let mut patterns: HashMap<String, Regex> = HashMap::new();
+        let mut builder = StringBuilder::new(source_arr.len());
+
+        for ((idx, source), pattern) in source_arr.iter().enumerate().zip(pattern_arr.iter()) {
+            match (source, pattern) {
+                (None, _) => builder.append_null()?,
+                (_, None) => builder.append_null()?,
+                (Some(s), Some(p)) => {
+                    let input = if let Some(position) = position_arr {
+                        if position.is_null(idx) {
+                            builder.append_null()?;
+
+                            continue;
+                        } else {
+                            let pos = position.value(idx);
+                            if pos <= 1 {
+                                s
+                            } else if (pos as usize) > s.len() {
+                                builder.append_value(&"")?;
+
+                                continue;
+                            } else {
+                                &s[((pos as usize) - 1)..]
+                            }
+                        }
+                    } else {
+                        s
+                    };
+
+                    let re_pattern = if let Some(re) = patterns.get(p) {
+                        re.clone()
+                    } else {
+                        let re = Regex::new(p).map_err(|e| {
+                            DataFusionError::Execution(format!(
+                                "Regular expression did not compile: {:?}",
+                                e
+                            ))
+                        })?;
+                        patterns.insert(p.to_string(), re.clone());
+
+                        re
+                    };
+
+                    match re_pattern.captures(input) {
+                        Some(caps) => {
+                            if let Some(m) = caps.get(0) {
+                                builder.append_value(m.as_str())?;
+                            } else {
+                                builder.append_value("")?
+                            }
+                        }
+                        None => builder.append_value("")?,
+                    }
+                }
+            };
+        }
+
+        Ok(Arc::new(builder.finish()))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "regexp_substr",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Int64]),
+                TypeSignature::Exact(vec![
+                    DataType::Utf8,
+                    DataType::Utf8,
+                    DataType::Int64,
+                    DataType::Int64,
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Utf8,
+                    DataType::Utf8,
+                    DataType::Int64,
+                    DataType::Int64,
+                    DataType::Utf8,
+                ]),
             ],
             Volatility::Immutable,
         ),
