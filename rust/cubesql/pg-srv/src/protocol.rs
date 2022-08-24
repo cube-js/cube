@@ -497,7 +497,7 @@ impl Serialize for EmptyQueryResponse {
 
 #[derive(Debug, Clone)]
 pub struct ParameterDescription {
-    parameters: Vec<PgTypeId>,
+    pub parameters: Vec<PgTypeId>,
 }
 
 impl ParameterDescription {

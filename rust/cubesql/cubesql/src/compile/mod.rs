@@ -7593,6 +7593,20 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_pgcatalog_pgprepared_statements_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgprepared_statements_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_prepared_statements".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_pgcatalog_pgtype_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "pgcatalog_pgtype_postgres",

@@ -662,10 +662,30 @@ impl PostgresIntegrationTestSuite {
         self.test_simple_query("PREPARE simple_query AS SELECT 1".to_string(), |_| {})
             .await?;
 
+        self.test_simple_query(
+            "select * from pg_catalog.pg_prepared_statements WHERE name = 'simple_query'"
+                .to_string(),
+            |rows| {
+                assert_eq!(rows.len(), 1 + 1, "prepared statement must be defined");
+            },
+        )
+        .await?;
+
         self.test_simple_query("DEALLOCATE simple_query".to_string(), |_| {})
             .await?;
 
-        // TODO: Check select * from pg_catalog.pg_prepared_statements
+        self.test_simple_query(
+            "select * from pg_catalog.pg_prepared_statements WHERE name = 'simple_query'"
+                .to_string(),
+            |rows| {
+                assert_eq!(
+                    rows.len(),
+                    1,
+                    "prepared statement called simple_query must be undefined (was deallocated)"
+                );
+            },
+        )
+        .await?;
 
         Ok(())
     }
@@ -674,10 +694,59 @@ impl PostgresIntegrationTestSuite {
         self.test_simple_query("PREPARE simple_query AS SELECT 1".to_string(), |_| {})
             .await?;
 
+        self.test_simple_query(
+            "select * from pg_catalog.pg_prepared_statements WHERE name = 'simple_query'"
+                .to_string(),
+            |rows| {
+                assert_eq!(rows.len(), 1 + 1, "prepared statement must be defined");
+            },
+        )
+        .await?;
+
         self.test_simple_query("DEALLOCATE ALL".to_string(), |_| {})
             .await?;
 
-        // TODO: Check select * from pg_catalog.pg_prepared_statements
+        self.test_simple_query(
+            "select * from pg_catalog.pg_prepared_statements".to_string(),
+            |rows| {
+                assert_eq!(
+                    rows.len(),
+                    1,
+                    "all prepared statement must be cleared after deallocate all"
+                );
+            },
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn test_simple_query_discard_all(&self) -> RunResult<()> {
+        self.test_simple_query("PREPARE simple_query AS SELECT 1".to_string(), |_| {})
+            .await?;
+        self.test_simple_query(
+            r#"DECLARE cursor_1 CURSOR WITH HOLD for SELECT generate_series(1, 100); DECLARE cursor_2 CURSOR WITH HOLD for SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+            .await?;
+
+        self.test_simple_query("DISCARD ALL".to_string(), |_| {})
+            .await?;
+
+        self.test_simple_query(
+            "select * from pg_catalog.pg_prepared_statements".to_string(),
+            |rows| {
+                assert_eq!(
+                    rows.len(),
+                    1,
+                    "all prepared statement must be cleared after DISCARD ALL"
+                );
+            },
+        )
+        .await?;
+
+        // TODO: Check portals/cursors
 
         Ok(())
     }
@@ -730,6 +799,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_simple_query_deallocate_specific().await?;
         self.test_simple_query_deallocate_all().await?;
         self.test_df_panic_handle().await?;
+        self.test_simple_query_discard_all().await?;
 
         // PostgreSQL doesn't support unsigned integers in the protocol, it's a constraint only
         self.test_snapshot_execute_query(
