@@ -10,7 +10,6 @@ const StyledHeader = styled(Layout.Header)`
 
 const StyledMenu = styled(Menu)`
   background: transparent;
-  line-height: 41px;
   border: none;
 `
 
