@@ -19,6 +19,7 @@
 .button {
   background: none;
   border: none;
+  cursor: pointer;
   font-size: inherit;
   margin: 0;
 }
