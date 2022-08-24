@@ -1,4 +1,4 @@
-use crate::cluster::{pick_worker_by_ids, pick_worker_by_partitions, Cluster};
+use crate::cluster::{pick_worker_by_ids, pick_worker_by_partitions, Cluster, has_inline_partition};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
@@ -1054,7 +1054,21 @@ impl ClusterSendExec {
         for ps in &logical {
             let node = match ps[0].get_row().multi_partition_id() {
                 Some(multi_id) => pick_worker_by_ids(c, [multi_id]),
-                None => pick_worker_by_partitions(c, ps.as_slice()),
+                None => {
+                    let ps = ps.as_slice();
+                    if has_inline_partition(ps) {
+                        let workers = c.select_workers();
+                        if let Some(worker_router) = workers.iter().find(|w| *w == c.server_name()) {
+                            // worker_router is picked at at random, therefore special casing does
+                            // not change the worker :: partitions distribution
+                            worker_router
+                        } else {
+                            pick_worker_by_partitions(c, ps)
+                        }
+                    } else {
+                        pick_worker_by_partitions(c, ps)
+                    }
+                },
             };
             m.entry(node.to_string())
                 .or_default()

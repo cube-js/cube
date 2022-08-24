@@ -485,6 +485,7 @@ impl SerializedLogicalPlan {
             _ => None,
         }
     }
+
     fn remove_unused_tables(
         &self,
         partition_ids_to_execute: &Vec<(u64, RowFilter)>,

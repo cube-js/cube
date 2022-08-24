@@ -64,6 +64,7 @@ use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
+use crate::http::INLINE_PARTITION_ID_BASE;
 
 #[automock]
 #[async_trait]
@@ -1675,6 +1676,17 @@ pub fn pick_worker_by_ids<'a>(
         p.hash(&mut hasher);
     }
     workers[(hasher.finish() % workers.len() as u64) as usize].as_str()
+}
+
+pub fn has_inline_partition<'a>(
+    partitions: impl IntoIterator<Item = &'a IdRow<Partition>>,
+) -> bool {
+    for partition in partitions {
+        if partition.get_id() >= INLINE_PARTITION_ID_BASE {
+            return true;
+        }
+    }
+    false
 }
 
 /// Same as [pick_worker_by_ids], but uses ranges of partitions. This is a hack
