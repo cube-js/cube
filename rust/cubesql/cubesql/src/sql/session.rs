@@ -98,7 +98,7 @@ pub struct SessionState {
     query: RwLockSync<QueryState>,
 
     // Extended Query
-    pub statements: RWLockAsync<HashMap<String, Option<PreparedStatement>>>,
+    pub statements: RWLockAsync<HashMap<String, PreparedStatement>>,
 }
 
 impl SessionState {

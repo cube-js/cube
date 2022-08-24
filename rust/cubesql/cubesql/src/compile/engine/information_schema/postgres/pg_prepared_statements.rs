@@ -41,36 +41,28 @@ impl PgPreparedStatementsBuilder {
         }
     }
 
-    fn add_prepared_statement(&mut self, name: &str, statement: &Option<PreparedStatement>) {
+    fn add_prepared_statement(&mut self, name: &str, statement: &PreparedStatement) {
         self.name.append_value(name).unwrap();
+        self.prepare_time
+            .append_value(statement.get_created().timestamp_nanos())
+            .unwrap();
 
-        let now = chrono::offset::Utc::now();
-
-        // TODO: We need to drop this option for PreparedStatement (we use it for empty query) and store all information
-        if let Some(st) = statement {
-            self.statement.append_value(st.query.to_string()).unwrap();
-            self.prepare_time
-                .append_value(now.timestamp_nanos())
-                .unwrap();
-
-            for param in &st.parameters.parameters {
+        if let Some(parameters) = statement.get_parameters() {
+            for param in parameters {
                 self.parameter_types
                     .values()
                     .append_value(param.clone() as i32)
                     .unwrap();
             }
-
-            self.parameter_types.append(true).unwrap();
-        } else {
-            self.statement.append_value("").unwrap();
-            self.prepare_time
-                .append_value(now.timestamp_nanos())
-                .unwrap();
-            self.parameter_types.append(true).unwrap();
         }
 
-        // TODO: from_sql
-        self.from_sql.append_value(false).unwrap();
+        self.parameter_types.append(true).unwrap();
+        self.statement
+            .append_value(statement.get_query_as_string())
+            .unwrap();
+        self.from_sql
+            .append_value(statement.get_from_sql())
+            .unwrap();
         // TODO: Stats
         self.generic_plans.append_value(0).unwrap();
         self.custom_plans.append_value(0).unwrap();

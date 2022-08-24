@@ -7,8 +7,9 @@ use crate::{
     },
     CubeError,
 };
+use chrono::{DateTime, Utc};
 use datafusion::arrow::record_batch::RecordBatch;
-use pg_srv::{protocol, BindValue, ProtocolError};
+use pg_srv::{protocol, BindValue, PgTypeId, ProtocolError};
 use sqlparser::ast;
 use std::fmt;
 
@@ -28,21 +29,70 @@ pub struct Cursor {
 }
 
 #[derive(Debug)]
-pub struct PreparedStatement {
-    pub query: ast::Statement,
-    pub parameters: protocol::ParameterDescription,
-    // Fields which will be returned to the client, It can be None if server doesnt return any field
-    // for example BEGIN
-    pub description: Option<protocol::RowDescription>,
+pub enum PreparedStatement {
+    // Postgres allows to define prepared statement on empty query: "",
+    // then it requires special handling in the protocol
+    Empty {
+        /// Prepared statement can be declared from SQL or protocol (Parser)
+        from_sql: bool,
+        created: DateTime<Utc>,
+    },
+    Query {
+        /// Prepared statement can be declared from SQL or protocol (Parser)
+        from_sql: bool,
+        created: DateTime<Utc>,
+        query: ast::Statement,
+        parameters: protocol::ParameterDescription,
+        /// Fields which will be returned to the client, It can be None if server doesnt return any field
+        /// for example BEGIN
+        description: Option<protocol::RowDescription>,
+    },
 }
 
 impl PreparedStatement {
-    pub fn bind(&self, values: Vec<BindValue>) -> Result<ast::Statement, ConnectionError> {
-        let binder = PostgresStatementParamsBinder::new(values);
-        let mut statement = self.query.clone();
-        binder.bind(&mut statement)?;
+    pub fn get_created(&self) -> &DateTime<Utc> {
+        match self {
+            PreparedStatement::Empty { created, .. } => created,
+            PreparedStatement::Query { created, .. } => created,
+        }
+    }
 
-        Ok(statement)
+    /// Format parser ast::Statement as String
+    pub fn get_query_as_string(&self) -> String {
+        match self {
+            PreparedStatement::Empty { .. } => "".to_string(),
+            PreparedStatement::Query { query, .. } => query.to_string(),
+        }
+    }
+
+    pub fn get_from_sql(&self) -> bool {
+        match self {
+            PreparedStatement::Empty { from_sql, .. } => from_sql.clone(),
+            PreparedStatement::Query { from_sql, .. } => from_sql.clone(),
+        }
+    }
+
+    pub fn get_parameters(&self) -> Option<&Vec<PgTypeId>> {
+        match self {
+            PreparedStatement::Empty { .. } => None,
+            PreparedStatement::Query { parameters, .. } => Some(&parameters.parameters),
+        }
+    }
+
+    pub fn bind(&self, values: Vec<BindValue>) -> Result<ast::Statement, ConnectionError> {
+        match self {
+            PreparedStatement::Empty { .. } => Err(CubeError::internal(
+                "It's not possible bind empty prepared statement (it's a bug)".to_string(),
+            )
+            .into()),
+            PreparedStatement::Query { query, .. } => {
+                let binder = PostgresStatementParamsBinder::new(values);
+                let mut statement = query.clone();
+                binder.bind(&mut statement)?;
+
+                Ok(statement)
+            }
+        }
     }
 }
 

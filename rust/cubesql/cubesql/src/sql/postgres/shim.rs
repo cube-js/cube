@@ -628,27 +628,26 @@ impl AsyncPostgresShim {
                 return Ok(());
             }
             Some(statement) => match statement {
-                // We use None for Statement on empty query
-                None => {
+                PreparedStatement::Empty { .. } => {
                     self.write(protocol::ParameterDescription::new(vec![]))
                         .await?;
                     self.write(protocol::NoData::new()).await
                 }
-                Some(named) => {
-                    match named.description.clone() {
-                        // If Query doesnt return data, no fields in response.
-                        None => {
-                            #[allow(mutable_borrow_reservation_conflict)]
-                            self.write(named.parameters.clone()).await?;
-                            self.write(protocol::NoData::new()).await
-                        }
-                        Some(packet) => {
-                            #[allow(mutable_borrow_reservation_conflict)]
-                            self.write(named.parameters.clone()).await?;
-                            self.write(packet).await
-                        }
+                PreparedStatement::Query {
+                    description,
+                    parameters,
+                    ..
+                } => match description {
+                    // If Query doesnt return data, no fields in response.
+                    None => {
+                        self.write(parameters.clone()).await?;
+                        self.write(protocol::NoData::new()).await
                     }
-                }
+                    Some(packet) => {
+                        self.write(parameters.clone()).await?;
+                        self.write(packet.clone()).await
+                    }
+                },
             },
         }
     }
@@ -753,27 +752,34 @@ impl AsyncPostgresShim {
             )
         })?;
 
-        let portal = if let Some(statement) = source_statement {
-            let prepared_statement = statement.bind(body.to_bind_values(&statement.parameters)?)?;
-            drop(statements_guard);
+        let portal = match source_statement {
+            PreparedStatement::Empty { .. } => {
+                drop(statements_guard);
 
-            let meta = self
-                .session
-                .server
-                .transport
-                .meta(self.auth_context()?)
-                .await?;
+                None
+            }
+            PreparedStatement::Query { parameters, .. } => {
+                let prepared_statement =
+                    source_statement.bind(body.to_bind_values(&parameters)?)?;
+                drop(statements_guard);
 
-            let plan =
-                convert_statement_to_cube_query(&prepared_statement, meta, self.session.clone())
+                let meta = self
+                    .session
+                    .server
+                    .transport
+                    .meta(self.auth_context()?)
                     .await?;
 
-            let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
-            Some(Portal::new(plan, format, PortalFrom::Extended))
-        } else {
-            drop(statements_guard);
+                let plan = convert_statement_to_cube_query(
+                    &prepared_statement,
+                    meta,
+                    self.session.clone(),
+                )
+                .await?;
 
-            None
+                let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
+                Some(Portal::new(plan, format, PortalFrom::Extended))
+            }
         };
 
         self.portals.insert(body.portal, portal);
@@ -785,10 +791,16 @@ impl AsyncPostgresShim {
     pub async fn parse(&mut self, parse: protocol::Parse) -> Result<(), ConnectionError> {
         if parse.query.trim() == "" {
             let mut statements_guard = self.session.state.statements.write().await;
-            statements_guard.insert(parse.name, None);
+            statements_guard.insert(
+                parse.name,
+                PreparedStatement::Empty {
+                    from_sql: false,
+                    created: chrono::offset::Utc::now(),
+                },
+            );
         } else {
             let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL)?;
-            self.prepare_statement(parse.name, query).await?;
+            self.prepare_statement(parse.name, query, false).await?;
         }
 
         self.write(protocol::ParseComplete::new()).await?;
@@ -800,6 +812,7 @@ impl AsyncPostgresShim {
         &mut self,
         name: String,
         query: Statement,
+        from_sql: bool,
     ) -> Result<(), ConnectionError> {
         let prepared_statements_count = self.session.state.statements.read().await.len();
         if prepared_statements_count
@@ -851,7 +864,9 @@ impl AsyncPostgresShim {
             None
         };
 
-        let pstmt = PreparedStatement {
+        let pstmt = PreparedStatement::Query {
+            from_sql,
+            created: chrono::offset::Utc::now(),
             query,
             parameters: protocol::ParameterDescription::new(parameters),
             description,
@@ -861,7 +876,7 @@ impl AsyncPostgresShim {
             .statements
             .write()
             .await
-            .insert(name, Some(pstmt));
+            .insert(name, pstmt);
 
         Ok(())
     }
@@ -1291,7 +1306,7 @@ impl AsyncPostgresShim {
                     _ => *statement,
                 };
 
-                self.prepare_statement(name.value, statement).await?;
+                self.prepare_statement(name.value, statement, true).await?;
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Prepare);
 
