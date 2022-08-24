@@ -34,7 +34,6 @@ use tokio_util::sync::CancellationToken;
 pub struct AsyncPostgresShim {
     socket: TcpStream,
     // Extended query
-    statements: HashMap<String, Option<PreparedStatement>>,
     cursors: HashMap<String, Cursor>,
     portals: HashMap<String, Option<Portal>>,
     // Shared
@@ -190,7 +189,6 @@ impl AsyncPostgresShim {
             socket,
             cursors: HashMap::new(),
             portals: HashMap::new(),
-            statements: HashMap::new(),
             session,
             logger,
         };
@@ -616,7 +614,9 @@ impl AsyncPostgresShim {
     }
 
     pub async fn describe_statement(&mut self, name: String) -> Result<(), ConnectionError> {
-        match self.statements.get(&name) {
+        let session = self.session.clone();
+        let statements_guard = session.state.statements.read().await;
+        match statements_guard.get(&name) {
             None => {
                 self.write(protocol::ErrorResponse::new(
                     protocol::ErrorSeverity::Error,
@@ -663,7 +663,12 @@ impl AsyncPostgresShim {
     pub async fn close(&mut self, body: protocol::Close) -> Result<(), ConnectionError> {
         match body.typ {
             protocol::CloseType::Statement => {
-                self.statements.remove(&body.name);
+                self.session
+                    .state
+                    .statements
+                    .write()
+                    .await
+                    .remove(&body.name);
             }
             protocol::CloseType::Portal => {
                 self.portals.remove(&body.name);
@@ -727,13 +732,6 @@ impl AsyncPostgresShim {
     }
 
     pub async fn bind(&mut self, body: protocol::Bind) -> Result<(), ConnectionError> {
-        let source_statement = self.statements.get(&body.statement).ok_or_else(|| {
-            ErrorResponse::error(
-                ErrorCode::InvalidSqlStatement,
-                format!(r#"Unknown statement: {}"#, body.statement),
-            )
-        })?;
-
         if self.portals.len() >= self.session.server.configuration.connection_max_portals {
             return Err(ConnectionError::Protocol(
                 protocol::ErrorResponse::error(
@@ -747,8 +745,17 @@ impl AsyncPostgresShim {
             ));
         }
 
+        let statements_guard = self.session.state.statements.read().await;
+        let source_statement = statements_guard.get(&body.statement).ok_or_else(|| {
+            ErrorResponse::error(
+                ErrorCode::InvalidSqlStatement,
+                format!(r#"Unknown statement: {}"#, body.statement),
+            )
+        })?;
+
         let portal = if let Some(statement) = source_statement {
             let prepared_statement = statement.bind(body.to_bind_values(&statement.parameters)?)?;
+            drop(statements_guard);
 
             let meta = self
                 .session
@@ -764,6 +771,8 @@ impl AsyncPostgresShim {
             let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
             Some(Portal::new(plan, format, PortalFrom::Extended))
         } else {
+            drop(statements_guard);
+
             None
         };
 
@@ -775,7 +784,8 @@ impl AsyncPostgresShim {
 
     pub async fn parse(&mut self, parse: protocol::Parse) -> Result<(), ConnectionError> {
         if parse.query.trim() == "" {
-            self.statements.insert(parse.name, None);
+            let mut statements_guard = self.session.state.statements.write().await;
+            statements_guard.insert(parse.name, None);
         } else {
             let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL)?;
             self.prepare_statement(parse.name, query).await?;
@@ -791,7 +801,8 @@ impl AsyncPostgresShim {
         name: String,
         query: Statement,
     ) -> Result<(), ConnectionError> {
-        if self.statements.len()
+        let prepared_statements_count = self.session.state.statements.read().await.len();
+        if prepared_statements_count
             >= self
                 .session
                 .server
@@ -803,7 +814,7 @@ impl AsyncPostgresShim {
                     protocol::ErrorCode::ConfigurationLimitExceeded,
                     format!(
                         "Unable to allocate a new prepared statement: max allocation reached, actual: {}, max: {}",
-                        self.statements.len(),
+                        prepared_statements_count,
                         self.session.server.configuration.connection_max_prepared_statements),
                 )
                     .into(),
@@ -845,7 +856,12 @@ impl AsyncPostgresShim {
             parameters: protocol::ParameterDescription::new(parameters),
             description,
         };
-        self.statements.insert(name, Some(pstmt));
+        self.session
+            .state
+            .statements
+            .write()
+            .await
+            .insert(name, Some(pstmt));
 
         Ok(())
     }
@@ -1101,7 +1117,14 @@ impl AsyncPostgresShim {
                     ));
                 };
 
-                if self.statements.contains_key(&name.value) {
+                if self
+                    .session
+                    .state
+                    .statements
+                    .read()
+                    .await
+                    .contains_key(&name.value)
+                {
                     return Err(ConnectionError::Protocol(
                         protocol::ErrorResponse::error(
                             protocol::ErrorCode::DuplicateCursor,
@@ -1152,7 +1175,7 @@ impl AsyncPostgresShim {
                 .await?;
             }
             Statement::Discard { object_type } => {
-                self.statements = HashMap::new();
+                self.session.state.clear_extended().await;
                 self.portals = HashMap::new();
                 self.cursors = HashMap::new();
 
@@ -1170,14 +1193,15 @@ impl AsyncPostgresShim {
             }
             Statement::Deallocate { name, .. } => {
                 let plan = if name.value.eq_ignore_ascii_case(&"all") {
-                    self.statements = HashMap::new();
+                    self.session.state.clear_prepared_statements().await;
 
                     Ok(QueryPlan::MetaOk(
                         StatusFlags::empty(),
                         CommandCompletion::DeallocateAll,
                     ))
                 } else {
-                    if self.statements.remove(&name.value).is_some() {
+                    let mut statements_guard = self.session.state.statements.write().await;
+                    if statements_guard.remove(&name.value).is_some() {
                         Ok(QueryPlan::MetaOk(
                             StatusFlags::empty(),
                             CommandCompletion::Deallocate,
