@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Alert, Button, Spin } from "antd";
 import { useQuery } from "@apollo/react-hooks";
-import { useLocation, withRouter, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import ExploreQueryBuilder from "../components/QueryBuilder/ExploreQueryBuilder";
 import { GET_DASHBOARD_ITEM } from "../graphql/queries";
 import TitleModal from "../components/TitleModal.js";
