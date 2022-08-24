@@ -118,6 +118,28 @@ export class PreAggregations {
     return this.hasCumulativeMeasuresValue;
   }
 
+  // Return array of `aggregations` columns descriptions in form `<func>(<column>)`
+  // Aggregations used in CubeStore create table for describe measures in CubeStore side
+  aggregationsColumns(cube, preAggregation) {
+    if (preAggregation.type === 'rollup') {
+      return this.query
+        .preAggregationQueryForSqlEvaluation(cube, preAggregation)
+        .measures
+        .filter(m => m.isAdditive())
+        .map(m => {
+          const fname = {
+            sum: 'sum',
+            count: 'sum',
+            countDistinctApprox: 'merge',
+            min: 'min',
+            max: 'max'
+          }[m.measureDefinition().type];
+          return `${fname}(${m.aliasName()})`;
+        });
+    }
+    return [];
+  }
+ 
   preAggregationDescriptionFor(cube, foundPreAggregation) {
     const { preAggregationName, preAggregation } = foundPreAggregation;
 
@@ -143,6 +165,8 @@ export class PreAggregations {
       originalSql: () => preAggregation.uniqueKeyColumns || null
     }[preAggregation.type] || uniqueKeyColumnsDefault)();
 
+    const aggregationsColumns = this.aggregationsColumns(cube, preAggregation);
+    
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
@@ -156,6 +180,7 @@ export class PreAggregations {
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
       uniqueKeyColumns,
+      aggregationsColumns,
       dataSource: queryForSqlEvaluation.dataSource,
       granularity: preAggregation.granularity,
       partitionGranularity: preAggregation.partitionGranularity,
@@ -167,22 +192,36 @@ export class PreAggregations {
           matchedTimeDimension && matchedTimeDimension.boundaryDateRangeFormatted() ||
           filters && filters[0] && filters[0].formattedDateRange() // TODO intersect all date ranges
         ),
-      indexesSql: Object.keys(preAggregation.indexes || {}).map(
-        index => {
-          // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
-          const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
-          return {
-            indexName,
-            sql: this.query.indexSql(
-              cube,
-              preAggregation,
-              preAggregation.indexes[index],
+      indexesSql: Object.keys(preAggregation.indexes || {})
+        .filter(index => preAggregation.indexes[index].type === 'regular')
+        .map(
+          index => {
+            // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
+            const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
+            return {
               indexName,
-              tableName
-            )
-          };
-        }
-      ),
+              sql: this.query.indexSql(
+                cube,
+                preAggregation,
+                preAggregation.indexes[index],
+                indexName,
+                tableName
+              )
+            };
+          }
+        ),
+      createTableIndexes: Object.keys(preAggregation.indexes || {})
+        .map(
+          index => {
+            // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
+            const indexName = this.preAggregationTableName(cube, `${foundPreAggregation.sqlAlias || preAggregationName}_${index}`, preAggregation, true);
+            return {
+              indexName,
+              type: preAggregation.indexes[index].type,
+              columns: this.query.evaluateIndexColumns(cube, preAggregation.indexes[index])
+            };
+          }
+        ),
       readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation),
       unionWithSourceData: preAggregation.unionWithSourceData,
     };

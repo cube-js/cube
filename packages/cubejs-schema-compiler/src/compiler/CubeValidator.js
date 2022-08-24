@@ -161,7 +161,8 @@ const BasePreAggregationWithoutPartitionGranularity = {
       sql: Joi.func().required()
     }),
     Joi.object().keys({
-      columns: Joi.func().required()
+      columns: Joi.func().required(),
+      type: Joi.any().valid('regular', 'aggregate'),
     })
   )),
   // refreshRange was deprecated
@@ -211,7 +212,7 @@ const OriginalSqlSchema = condition(
   ),
   inherit(BasePreAggregationWithoutPartitionGranularity, {
     type: Joi.any().valid('originalSql').required(),
-    uniqueKeyColumns: Joi.array().items(Joi.string()),
+    uniqueKeyColumns: Joi.array().items(Joi.string())
   }),
 );
 

@@ -1017,7 +1017,14 @@ export class PreAggregationLoader {
     this.logger('Uploading external pre-aggregation', queryOptions);
     await saveCancelFn(
       externalDriver.uploadTableWithIndexes(
-        table, tableData.types, tableData, this.prepareIndexesSql(newVersionEntry, queryOptions), this.preAggregation.uniqueKeyColumns, queryOptions
+        table,
+        tableData.types,
+        tableData,
+        this.prepareIndexesSql(newVersionEntry, queryOptions),
+        this.preAggregation.uniqueKeyColumns,
+        queryOptions,
+        this.preAggregation.aggregationsColumns,
+        this.prepareCreateTableIndexes(newVersionEntry, queryOptions),
       )
     ).catch((error: any) => {
       this.logger('Uploading external pre-aggregation error', { ...queryOptions, error: error?.stack || error?.message });
@@ -1056,6 +1063,19 @@ export class PreAggregationLoader {
         ])
       );
       return { sql: [resultingSql, params] };
+    });
+  }
+
+  protected prepareCreateTableIndexes(newVersionEntry, queryOptions) {
+    if (!this.preAggregation.createTableIndexes || !this.preAggregation.createTableIndexes.length) {
+      return [];
+    }
+    return this.preAggregation.createTableIndexes.map(({ indexName, type, columns }) => {
+      const indexVersionEntry = {
+        ...newVersionEntry,
+        table_name: indexName
+      };
+      return { indexName: this.targetTableName(indexVersionEntry), type, columns };
     });
   }
 
