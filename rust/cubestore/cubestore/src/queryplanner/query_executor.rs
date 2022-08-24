@@ -1,4 +1,6 @@
-use crate::cluster::{pick_worker_by_ids, pick_worker_by_partitions, Cluster, has_inline_partition};
+use crate::cluster::{
+    has_inline_partition, pick_worker_by_ids, pick_worker_by_partitions, Cluster,
+};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
@@ -875,7 +877,10 @@ impl InlineTableProvider {
     }
 
     pub fn has_partitions(self: &Self, partition_ids: &Vec<(u64, RowFilter)>) -> bool {
-        partition_ids.iter().find(|(id, _)| *id == self.id).is_some()
+        partition_ids
+            .iter()
+            .find(|(id, _)| *id == self.id)
+            .is_some()
     }
 }
 
@@ -1058,7 +1063,8 @@ impl ClusterSendExec {
                     let ps = ps.as_slice();
                     if has_inline_partition(ps) {
                         let workers = c.select_workers();
-                        if let Some(worker_router) = workers.iter().find(|w| *w == c.server_name()) {
+                        if let Some(worker_router) = workers.iter().find(|w| *w == c.server_name())
+                        {
                             // worker_router is picked at at random, therefore special casing does
                             // not change the worker :: partitions distribution
                             worker_router
@@ -1068,7 +1074,7 @@ impl ClusterSendExec {
                     } else {
                         pick_worker_by_partitions(c, ps)
                     }
-                },
+                }
             };
             m.entry(node.to_string())
                 .or_default()

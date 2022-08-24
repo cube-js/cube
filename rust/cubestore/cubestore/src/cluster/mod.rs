@@ -14,6 +14,7 @@ use crate::config::injection::{DIService, Injector};
 use crate::config::{is_router, WorkerServices};
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
+use crate::http::INLINE_PARTITION_ID_BASE;
 use crate::import::ImportService;
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
@@ -64,7 +65,6 @@ use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
-use crate::http::INLINE_PARTITION_ID_BASE;
 
 #[automock]
 #[async_trait]
