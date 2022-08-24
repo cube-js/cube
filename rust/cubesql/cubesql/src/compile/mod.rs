@@ -1801,6 +1801,9 @@ impl QueryPlanner {
                 ))
             }
             (ast::Statement::Discard { object_type }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Cursors + Portals
+                self.state.clear_prepared_statements().await;
+
                 Ok(QueryPlan::MetaOk(
                     StatusFlags::empty(),
                     CommandCompletion::Discard(object_type.to_string()),
