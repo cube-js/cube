@@ -135,6 +135,11 @@ pub fn parse_sql_to_statements(
         "and ix.indisprimary = false",
     );
 
+    let query = query.replace(
+        "on t.oid = a.attrelid and a.attnum = ANY(ix.indkey)",
+        "on t.oid = a.attrelid",
+    );
+
     // TODO: Quick workaround for Tableau Desktop (ODBC), waiting for DF rebase...
     // Right now, our fork of DF doesn't support ON conditions with this filter
     let query = query.replace(
