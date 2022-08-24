@@ -1,5 +1,5 @@
 use crate::cluster::{
-    has_inline_partition, pick_worker_by_ids, pick_worker_by_partitions, Cluster,
+    has_inline_table_partition, pick_worker_by_ids, pick_worker_by_partitions, Cluster,
 };
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -1056,12 +1056,15 @@ impl ClusterSendExec {
         logical: Vec<Vec<IdRow<Partition>>>,
     ) -> Vec<(String, Vec<(u64, RowRange)>)> {
         let mut m: HashMap<_, Vec<(u64, RowRange)>> = HashMap::new();
+        let mut rerouted_inline_table_partition = false;
         for ps in &logical {
             let node = match ps[0].get_row().multi_partition_id() {
                 Some(multi_id) => pick_worker_by_ids(c, [multi_id]),
                 None => {
                     let ps = ps.as_slice();
-                    if has_inline_partition(ps) {
+                    if !rerouted_inline_table_partition && has_inline_table_partition(ps) {
+                        // Only reroute at most one set of partitions.
+                        rerouted_inline_table_partition = true;
                         let workers = c.select_workers();
                         if let Some(worker_router) = workers.iter().find(|w| *w == c.server_name())
                         {

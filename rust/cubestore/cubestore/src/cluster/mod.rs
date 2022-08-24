@@ -1678,7 +1678,7 @@ pub fn pick_worker_by_ids<'a>(
     workers[(hasher.finish() % workers.len() as u64) as usize].as_str()
 }
 
-pub fn has_inline_partition<'a>(
+pub fn has_inline_table_partition<'a>(
     partitions: impl IntoIterator<Item = &'a IdRow<Partition>>,
 ) -> bool {
     for partition in partitions {
