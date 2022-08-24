@@ -11,7 +11,9 @@ const countryCodeMap = {
   'HE': 'IL',
   'EL': 'GR',
   'DA': 'DK',
-  'HI': 'IN'
+  'HI': 'IN',
+  'AR': 'EG',
+  'SV': 'SE',
 }
 
 export function getEmoji(region) {
