@@ -8,4 +8,4 @@ if (!fs.existsSync(path.join(__dirname, '..', 'dist', 'src', 'post-install.js'))
   return;
 }
 
-require('./post-install.js');
+require('../dist/src/post-install');
