@@ -121,8 +121,6 @@ reference][ref-config-env].
 
 `CUBESTORE_WORKERS` and `CUBESTORE_META_ADDR` variables should be set with stable addresses, which should not change.
 You can use stable DNS names and put load balancers in front of your worker and router instances to fulfill stable name requirements in environments where stable IP addresses can't be guaranteed.
-Please note that instances behind load balancer can't be replicated, and replication will lead to undefined behavior of cluster, including connection errors and data loss.
-If Cube Store replication is a requirement, please consider using Cube Cloud.
 
 <InfoBox>
 
@@ -183,6 +181,14 @@ services:
     volumes:
       - .:/cube/conf
 ```
+
+## Replication and High Availability
+
+The open-source version of Cube Store doesn't support replicating any of its nodes.
+The router node and every worker node should always have only one instance copy if served behind the load balancer or service address.
+Replication will lead to undefined behavior of the cluster, including connection errors and data loss.
+If any cluster node is down, it'll lead to a complete cluster outage.
+If Cube Store replication and high availability are required, please consider using Cube Cloud.
 
 ## Storage
 
