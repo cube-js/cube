@@ -197,10 +197,28 @@ traceObj(optionalEncoding?:any):string|Uint8Array|null {
 };
 
 /**
+ * @param number index
+ * @param HttpTable= obj
+ * @returns HttpTable
+ */
+inlineTables(index: number, obj?:HttpTable):HttpTable|null {
+  var offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? (obj || new HttpTable()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+};
+
+/**
+ * @returns number
+ */
+inlineTablesLength():number {
+  var offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+};
+
+/**
  * @param flatbuffers.Builder builder
  */
 static startHttpQuery(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(3);
 };
 
 /**
@@ -221,6 +239,35 @@ static addTraceObj(builder:flatbuffers.Builder, traceObjOffset:flatbuffers.Offse
 
 /**
  * @param flatbuffers.Builder builder
+ * @param flatbuffers.Offset inlineTablesOffset
+ */
+static addInlineTables(builder:flatbuffers.Builder, inlineTablesOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(2, inlineTablesOffset, 0);
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @param Array.<flatbuffers.Offset> data
+ * @returns flatbuffers.Offset
+ */
+static createInlineTablesVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (var i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]);
+  }
+  return builder.endVector();
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @param number numElems
+ */
+static startInlineTablesVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+};
+
+/**
+ * @param flatbuffers.Builder builder
  * @returns flatbuffers.Offset
  */
 static endHttpQuery(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -228,11 +275,210 @@ static endHttpQuery(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 };
 
-static createHttpQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset, traceObjOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createHttpQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset, traceObjOffset:flatbuffers.Offset, inlineTablesOffset:flatbuffers.Offset):flatbuffers.Offset {
   HttpQuery.startHttpQuery(builder);
   HttpQuery.addQuery(builder, queryOffset);
   HttpQuery.addTraceObj(builder, traceObjOffset);
+  HttpQuery.addInlineTables(builder, inlineTablesOffset);
   return HttpQuery.endHttpQuery(builder);
+}
+}
+/**
+ * @constructor
+ */
+export class HttpTable {
+  bb: flatbuffers.ByteBuffer|null = null;
+
+  bb_pos:number = 0;
+/**
+ * @param number i
+ * @param flatbuffers.ByteBuffer bb
+ * @returns HttpTable
+ */
+__init(i:number, bb:flatbuffers.ByteBuffer):HttpTable {
+  this.bb_pos = i;
+  this.bb = bb;
+  return this;
+};
+
+/**
+ * @param flatbuffers.ByteBuffer bb
+ * @param HttpTable= obj
+ * @returns HttpTable
+ */
+static getRootAsHttpTable(bb:flatbuffers.ByteBuffer, obj?:HttpTable):HttpTable {
+  return (obj || new HttpTable()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+};
+
+/**
+ * @param flatbuffers.ByteBuffer bb
+ * @param HttpTable= obj
+ * @returns HttpTable
+ */
+static getSizePrefixedRootAsHttpTable(bb:flatbuffers.ByteBuffer, obj?:HttpTable):HttpTable {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new HttpTable()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+};
+
+/**
+ * @param flatbuffers.Encoding= optionalEncoding
+ * @returns string|Uint8Array|null
+ */
+name():string|null
+name(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+name(optionalEncoding?:any):string|Uint8Array|null {
+  var offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+};
+
+/**
+ * @param number index
+ * @param flatbuffers.Encoding= optionalEncoding
+ * @returns string|Uint8Array
+ */
+columns(index: number):string
+columns(index: number,optionalEncoding:flatbuffers.Encoding):string|Uint8Array
+columns(index: number,optionalEncoding?:any):string|Uint8Array|null {
+  var offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.__string(this.bb!.__vector(this.bb_pos + offset) + index * 4, optionalEncoding) : null;
+};
+
+/**
+ * @returns number
+ */
+columnsLength():number {
+  var offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+};
+
+/**
+ * @param number index
+ * @param flatbuffers.Encoding= optionalEncoding
+ * @returns string|Uint8Array
+ */
+types(index: number):string
+types(index: number,optionalEncoding:flatbuffers.Encoding):string|Uint8Array
+types(index: number,optionalEncoding?:any):string|Uint8Array|null {
+  var offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.__string(this.bb!.__vector(this.bb_pos + offset) + index * 4, optionalEncoding) : null;
+};
+
+/**
+ * @returns number
+ */
+typesLength():number {
+  var offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+};
+
+/**
+ * @param flatbuffers.Encoding= optionalEncoding
+ * @returns string|Uint8Array|null
+ */
+csvRows():string|null
+csvRows(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+csvRows(optionalEncoding?:any):string|Uint8Array|null {
+  var offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ */
+static startHttpTable(builder:flatbuffers.Builder) {
+  builder.startObject(4);
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @param flatbuffers.Offset nameOffset
+ */
+static addName(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(0, nameOffset, 0);
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @param flatbuffers.Offset columnsOffset
+ */
+static addColumns(builder:flatbuffers.Builder, columnsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(1, columnsOffset, 0);
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @param Array.<flatbuffers.Offset> data
+ * @returns flatbuffers.Offset
+ */
+static createColumnsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (var i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]);
+  }
+  return builder.endVector();
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @param number numElems
+ */
+static startColumnsVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @param flatbuffers.Offset typesOffset
+ */
+static addTypes(builder:flatbuffers.Builder, typesOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(2, typesOffset, 0);
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @param Array.<flatbuffers.Offset> data
+ * @returns flatbuffers.Offset
+ */
+static createTypesVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (var i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]);
+  }
+  return builder.endVector();
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @param number numElems
+ */
+static startTypesVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @param flatbuffers.Offset csvRowsOffset
+ */
+static addCsvRows(builder:flatbuffers.Builder, csvRowsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(3, csvRowsOffset, 0);
+};
+
+/**
+ * @param flatbuffers.Builder builder
+ * @returns flatbuffers.Offset
+ */
+static endHttpTable(builder:flatbuffers.Builder):flatbuffers.Offset {
+  var offset = builder.endObject();
+  return offset;
+};
+
+static createHttpTable(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset, columnsOffset:flatbuffers.Offset, typesOffset:flatbuffers.Offset, csvRowsOffset:flatbuffers.Offset):flatbuffers.Offset {
+  HttpTable.startHttpTable(builder);
+  HttpTable.addName(builder, nameOffset);
+  HttpTable.addColumns(builder, columnsOffset);
+  HttpTable.addTypes(builder, typesOffset);
+  HttpTable.addCsvRows(builder, csvRowsOffset);
+  return HttpTable.endHttpTable(builder);
 }
 }
 /**

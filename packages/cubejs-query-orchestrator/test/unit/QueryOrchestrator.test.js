@@ -134,6 +134,7 @@ describe('QueryOrchestrator', () => {
   let barMockDriver = null;
   let externalMockDriver = null;
   let queryOrchestrator = null;
+  let queryOrchestratorExternalRefresh = null;
   let testCount = 1;
 
   beforeEach(() => {
@@ -143,34 +144,47 @@ describe('QueryOrchestrator', () => {
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
     const externalMockDriverLocal = new ExternalMockDriver();
 
-    queryOrchestrator = new QueryOrchestrator(
-      `ORCHESTRATOR_TEST_${testCount++}`, (dataSource) => {
-        if (dataSource === 'foo') {
-          return fooMockDriverLocal;
-        } else if (dataSource === 'bar') {
-          return barMockDriverLocal;
-        } else if (dataSource === 'csv') {
-          return csvMockDriverLocal;
-        } else {
-          return mockDriverLocal;
-        }
-      },
-      (msg, params) => console.log(new Date().toJSON(), msg, params), {
-        queryCacheOptions: {
-          queueOptions: () => ({
-            concurrency: 2,
-          }),
-        },
-        preAggregationsOptions: {
-          queueOptions: () => ({
-            executionTimeout: 2,
-            concurrency: 2,
-          }),
-          usedTablePersistTime: 1
-        },
-        externalDriverFactory: () => externalMockDriverLocal,
+    const redisPrefix = `ORCHESTRATOR_TEST_${testCount++}`;
+    const driverFactory = (dataSource) => {
+      if (dataSource === 'foo') {
+        return fooMockDriverLocal;
+      } else if (dataSource === 'bar') {
+        return barMockDriverLocal;
+      } else if (dataSource === 'csv') {
+        return csvMockDriverLocal;
+      } else {
+        return mockDriverLocal;
       }
-    );
+    };
+    const logger =
+      (msg, params) => console.log(new Date().toJSON(), msg, params);
+    const options = {
+      externalDriverFactory: () => externalMockDriverLocal,
+      queryCacheOptions: {
+        queueOptions: () => ({
+          concurrency: 2,
+        }),
+      },
+      preAggregationsOptions: {
+        maxPartitions: 32,
+        queueOptions: () => ({
+          executionTimeout: 2,
+          concurrency: 2,
+        }),
+        usedTablePersistTime: 1
+      },
+    };
+
+    queryOrchestrator =
+      new QueryOrchestrator(redisPrefix, driverFactory, logger, options);
+    queryOrchestratorExternalRefresh =
+      new QueryOrchestrator(redisPrefix, driverFactory, logger, {
+        ...options,
+        preAggregationsOptions: {
+          ...options.preAggregationsOptions,
+          externalRefresh: true,
+        },
+      });
     mockDriver = mockDriverLocal;
     fooMockDriver = fooMockDriverLocal;
     barMockDriver = barMockDriverLocal;
@@ -179,6 +193,7 @@ describe('QueryOrchestrator', () => {
 
   afterEach(async () => {
     await queryOrchestrator.cleanup();
+    await queryOrchestratorExternalRefresh.cleanup();
   });
 
   test('basic', async () => {
@@ -911,6 +926,46 @@ describe('QueryOrchestrator', () => {
     expect(mockDriver.executedQueries.filter(q => q.match(/NOW/)).length).toEqual(nowQueries);
   });
 
+  test('range partitions exceed maximum number', async () => {
+    const query = {
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        indexesSql: [{
+          sql: ['CREATE INDEX orders_d_main ON stb_pre_aggregations.orders_d ("orders__created_at")', []],
+          indexName: 'orders_d_main'
+        }],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT MAX(timestamp) FROM orders', []],
+        ],
+        partitionGranularity: 'hour',
+        timezone: 'UTC'
+      }],
+      requestId: 'range partitions',
+    };
+    await expect(async () => {
+      await queryOrchestrator.fetchQuery(query);
+    }).rejects.toThrow(
+      'The maximum number of partitions (32) was reached for the pre-aggregation'
+    );
+  });
+
   test('empty partitions', async () => {
     const query = {
       query: 'SELECT * FROM stb_pre_aggregations.orders_d',
@@ -947,6 +1002,49 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
     console.log(JSON.stringify(mockDriver.executedQueries));
     expect(mockDriver.tables.length).toEqual(1);
+  });
+
+  test('empty partitions with externalRefresh', async () => {
+    const query = {
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_empty',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_empty AS SELECT * FROM public.orders WHERE created_at >= ? AND created_at <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        indexesSql: [{
+          sql: ['CREATE INDEX orders_d_main ON stb_pre_aggregations.orders_d ("orders__created_at")', []],
+          indexName: 'orders_d_main'
+        }],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(created_at) FROM orders', []],
+          ['SELECT MAX(created_at) FROM orders', []],
+        ],
+        partitionGranularity: 'day',
+        timezone: 'UTC'
+      }],
+      requestId: 'empty partitions',
+    };
+    await expect(async () => {
+      await queryOrchestratorExternalRefresh.fetchQuery(query);
+    }).rejects.toThrow(
+      'Your configuration restricts query requests to only be served from ' +
+      'pre-aggregations, and required pre-aggregation partitions were not ' +
+      'built yet. Please make sure your refresh worker is configured ' +
+      'correctly and running.'
+    );
   });
 
   test('empty intersection', async () => {

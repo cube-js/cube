@@ -135,6 +135,11 @@ pub fn parse_sql_to_statements(
         "and ix.indisprimary = false",
     );
 
+    let query = query.replace(
+        "on t.oid = a.attrelid and a.attnum = ANY(ix.indkey)",
+        "on t.oid = a.attrelid",
+    );
+
     // TODO: Quick workaround for Tableau Desktop (ODBC), waiting for DF rebase...
     // Right now, our fork of DF doesn't support ON conditions with this filter
     let query = query.replace(
@@ -144,6 +149,32 @@ pub fn parse_sql_to_statements(
 
     let query = query.replace("a.attnum = ANY(cons.conkey)", "1 = 1");
     let query = query.replace("pg_get_constraintdef(cons.oid) as src", "NULL as src");
+
+    // ThoughtSpot (Redshift)
+    // Subquery must have alias, It's a default Postgres behaviour, but Redshift is based on top of old Postgres version...
+    let query = query.replace(
+        // Subquery must have alias
+        "AS REF_GENERATION  FROM svv_tables) WHERE true  AND current_database() = ",
+        "AS REF_GENERATION  FROM svv_tables) as svv_tables WHERE current_database() =",
+    );
+    let query = query.replace("AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')", "");
+    let query = query.replace(
+        // REGEXP_REPLACE
+        // Subquery must have alias
+        // Incorrect alias for subquery
+        "FROM (select lbv_cols.schemaname, lbv_cols.tablename, lbv_cols.columnname,REGEXP_REPLACE(REGEXP_REPLACE(lbv_cols.columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, lbv_cols.columnnum from pg_get_late_binding_view_cols() lbv_cols( schemaname name, tablename name, columnname name, columntype text, columnnum int)) lbv_columns   WHERE",
+        "FROM (select schemaname, tablename, columnname,columntype as columntype_rep,columntype, columnnum from get_late_binding_view_cols_unpacked) as lbv_columns   WHERE",
+    );
+    let query = query.replace(
+        // Subquery must have alias
+        "ORDER BY TABLE_SCHEM,c.relname,attnum )  UNION ALL SELECT current_database()::VARCHAR(128) AS TABLE_CAT",
+        "ORDER BY TABLE_SCHEM,c.relname,attnum ) as t  UNION ALL SELECT current_database()::VARCHAR(128) AS TABLE_CAT",
+    );
+    let query = query.replace(
+        // Reusage of new column in another column
+        "END AS IS_AUTOINCREMENT, IS_AUTOINCREMENT AS IS_GENERATEDCOLUMN",
+        "END AS IS_AUTOINCREMENT, false AS IS_GENERATEDCOLUMN",
+    );
 
     // Sigma Computing WITH query workaround
     let query = match SIGMA_WORKAROUND.captures(&query) {
@@ -174,6 +205,13 @@ pub fn parse_sql_to_statements(
         }
         None => query,
     };
+
+    // Metabase
+    // TODO: To Support InSubquery Node.
+    let query = query.replace(
+        "WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e)",
+        "WHERE t.oid = 0",
+    );
 
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),

@@ -127,7 +127,7 @@ impl InfoSchemaTableProvider {
         builder.add_table("db", "information_schema", "pg_tables", "VIEW");
 
         for cube in cubes {
-            builder.add_table("db", "public", cube.name.clone(), "BASE TABLE");
+            builder.add_table("db", "public", &cube.name, "BASE TABLE");
         }
 
         Self {

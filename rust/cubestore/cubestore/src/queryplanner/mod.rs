@@ -73,7 +73,7 @@ pub trait QueryPlanner: DIService + Send + Sync {
     async fn logical_plan(
         &self,
         statement: Statement,
-        inline_tables: Arc<InlineTables>,
+        inline_tables: &InlineTables,
     ) -> Result<QueryPlan, CubeError>;
     async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError>;
 }
@@ -97,14 +97,14 @@ impl QueryPlanner for QueryPlannerImpl {
     async fn logical_plan(
         &self,
         statement: Statement,
-        inline_tables: Arc<InlineTables>,
+        inline_tables: &InlineTables,
     ) -> Result<QueryPlan, CubeError> {
         let ctx = self.execution_context().await?;
 
         let schema_provider = MetaStoreSchemaProvider::new(
             self.meta_store.get_tables_with_path(false).await?,
             self.meta_store.clone(),
-            inline_tables.clone(),
+            inline_tables,
         );
 
         let query_planner = SqlToRel::new(&schema_provider);
@@ -174,7 +174,7 @@ struct MetaStoreSchemaProvider {
     _data: Arc<Vec<TablePath>>,
     by_name: HashSet<TableKey>,
     meta_store: Arc<dyn MetaStore>,
-    inline_tables: Arc<InlineTables>,
+    inline_tables: InlineTables,
 }
 
 /// Points into [MetaStoreSchemaProvider::data], never null.
@@ -208,14 +208,14 @@ impl MetaStoreSchemaProvider {
     pub fn new(
         tables: Arc<Vec<TablePath>>,
         meta_store: Arc<dyn MetaStore>,
-        inline_tables: Arc<InlineTables>,
+        inline_tables: &InlineTables,
     ) -> Self {
         let by_name = tables.iter().map(|t| TableKey(t)).collect();
         Self {
             _data: tables,
             by_name,
             meta_store,
-            inline_tables,
+            inline_tables: (*inline_tables).clone(),
         }
     }
 }
@@ -226,7 +226,11 @@ impl ContextProvider for MetaStoreSchemaProvider {
             TableReference::Partial { schema, table } => (schema, table),
             TableReference::Bare { table } => {
                 return Some(Arc::new(InlineTableProvider::new(
-                    self.inline_tables.get(table)?.clone(),
+                    self.inline_tables
+                        .iter()
+                        .find(|inline_table| inline_table.name == table)?
+                        .data
+                        .clone(),
                 )));
             }
             TableReference::Full { .. } => return None,

@@ -14,7 +14,7 @@ use datafusion::{
     },
     logical_plan::{
         plan::{Analyze, Explain, Extension, Projection, ToStringifiedPlan},
-        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, ToDFSchema,
+        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
     },
     prelude::*,
     scalar::ScalarValue,
@@ -61,9 +61,10 @@ use self::{
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
             create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
             create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
-            create_quarter_udf, create_second_udf, create_session_user_udf, create_str_to_date_udf,
-            create_time_format_udf, create_timediff_udf, create_to_char_udf, create_ucase_udf,
-            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
+            create_quarter_udf, create_regexp_substr_udf, create_second_udf,
+            create_session_user_udf, create_str_to_date_udf, create_time_format_udf,
+            create_timediff_udf, create_to_char_udf, create_ucase_udf, create_unnest_udtf,
+            create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -1800,6 +1801,9 @@ impl QueryPlanner {
                 ))
             }
             (ast::Statement::Discard { object_type }, DatabaseProtocol::PostgreSQL) => {
+                // TODO: Cursors + Portals
+                self.state.clear_prepared_statements().await;
+
                 Ok(QueryPlan::MetaOk(
                     StatusFlags::empty(),
                     CommandCompletion::Discard(object_type.to_string()),
@@ -2469,6 +2473,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_cube_regclass_cast_udf());
         ctx.register_udf(create_pg_get_serial_sequence_udf());
         ctx.register_udf(create_json_build_object_udf());
+        ctx.register_udf(create_regexp_substr_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -2546,6 +2551,15 @@ WHERE `TABLE_SCHEMA` = '{}'",
 
         let rewrite_plan = result?;
 
+        // DF optimizes logical plan (second time) on physical plan creation
+        // It's not safety to use all optimizers from DF for OLAP queries, because it will lead to errors
+        // From another side, 99% optimizers cannot optimize anything
+        if is_olap_query(&rewrite_plan)? {
+            let mut guard = ctx.state.write();
+            // TODO: We should find what optimizers will be safety to use for OLAP queries
+            guard.optimizers = vec![];
+        };
+
         log::debug!("Rewrite: {:#?}", rewrite_plan);
 
         Ok(QueryPlan::DataFusionSelect(
@@ -2554,6 +2568,31 @@ WHERE `TABLE_SCHEMA` = '{}'",
             ctx,
         ))
     }
+}
+
+fn is_olap_query(parent: &LogicalPlan) -> Result<bool, CompilationError> {
+    pub struct FindCubeScanNodeVisitor(bool);
+
+    impl PlanVisitor for FindCubeScanNodeVisitor {
+        type Error = CompilationError;
+
+        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+            if let LogicalPlan::Extension(ext) = plan {
+                if let Some(_) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
+                    self.0 = true;
+
+                    return Ok(false);
+                }
+            }
+
+            Ok(true)
+        }
+    }
+
+    let mut visitor = FindCubeScanNodeVisitor(false);
+    parent.accept(&mut visitor)?;
+
+    Ok(visitor.0)
 }
 
 pub async fn convert_statement_to_cube_query(
@@ -2836,7 +2875,7 @@ mod tests {
         Arc::new(MetaContext::new(get_test_meta()))
     }
 
-    fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
+    async fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
         let server = Arc::new(ServerManager::new(
             get_test_auth(),
             get_test_transport(),
@@ -2844,7 +2883,9 @@ mod tests {
         ));
 
         let session_manager = Arc::new(SessionManager::new(server.clone()));
-        let session = session_manager.create_session(protocol, "127.0.0.1".to_string());
+        let session = session_manager
+            .create_session(protocol, "127.0.0.1".to_string())
+            .await;
 
         // Populate like shims
         session.state.set_database(Some("db".to_string()));
@@ -2910,7 +2951,8 @@ mod tests {
 
     async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
         let query =
-            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db)).await;
+            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db).await)
+                .await;
 
         query.unwrap()
     }
@@ -2935,6 +2977,7 @@ mod tests {
         parent.accept(&mut visitor).unwrap();
         visitor.0.expect("No CubeScanNode was found in plan")
     }
+
     trait LogicalPlanTestUtils {
         fn find_projection_schema(&self) -> DFSchemaRef;
 
@@ -2969,6 +3012,28 @@ mod tests {
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                 ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_select_null_if_measure_diff() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT MEASURE(count), NULLIF(MEASURE(count), 0) as t, MEASURE(count) / NULLIF(MEASURE(count), 0) FROM KibanaSampleDataEcommerce;".to_string(),
+        DatabaseProtocol::PostgreSQL).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 time_dimensions: None,
@@ -3112,7 +3177,7 @@ mod tests {
             convert_sql_to_cube_query(
                 &"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' OR customer_gender = 'male'".to_string(),
                 get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::PostgreSQL)
+                get_test_session(DatabaseProtocol::PostgreSQL).await
             ).await;
 
         // TODO: We need to propagate error to result, to assert message
@@ -4255,7 +4320,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let create_query = convert_sql_to_cube_query(
             &"SELECT MEASURE(customer_gender) FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
             get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
         ).await;
 
         assert_eq!(
@@ -4409,6 +4474,38 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(50000),
                 offset: None,
                 filters: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn powerbi_inner_decimal_cast() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "select \"_\".\"customer_gender\",\r\n    \"_\".\"a0\"\r\nfrom \r\n(\r\n    select \"rows\".\"customer_gender\" as \"customer_gender\",\r\n        sum(cast(\"rows\".\"count\" as decimal)) as \"a0\"\r\n    from \"public\".\"KibanaSampleDataEcommerce\" \"rows\"\r\n    group by \"customer_gender\"\r\n) \"_\"\r\nwhere not \"_\".\"a0\" is null\r\nlimit 1000001"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(50000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                }]),
             }
         );
     }
@@ -4596,7 +4693,7 @@ ORDER BY \"COUNT(count)\" DESC"
             let query = convert_sql_to_cube_query(
                 &input_query,
                 get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::MySQL),
+                get_test_session(DatabaseProtocol::MySQL).await,
             )
             .await;
 
@@ -5296,7 +5393,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     sql
                 ),
                 get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::MySQL),
+                get_test_session(DatabaseProtocol::MySQL).await,
             )
             .await;
 
@@ -5791,7 +5888,7 @@ ORDER BY \"COUNT(count)\" DESC"
         db: DatabaseProtocol,
     ) -> Result<(String, StatusFlags), CubeError> {
         let meta = get_test_tenant_ctx();
-        let session = get_test_session(db);
+        let session = get_test_session(db).await;
 
         let mut output: Vec<String> = Vec::new();
         let mut output_flags = StatusFlags::empty();
@@ -5946,6 +6043,226 @@ ORDER BY \"COUNT(count)\" DESC"
             FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B
             WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME
             ORDER BY A.COLUMN_NAME".to_string(), DatabaseProtocol::MySQL).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_redshift_svv_tables() -> Result<(), CubeError> {
+        // This query is used by metabase for introspection
+        insta::assert_snapshot!(
+            "redshift_svv_tables",
+            execute_query(
+                "SELECT * FROM svv_tables ORDER BY table_name DESC".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_cte() -> Result<(), CubeError> {
+        init_logger();
+
+        // CTE called qt_1 is used as ta_2, under the hood DF will use * projection
+        let query_plan = convert_select_to_query_plan(
+            "WITH \"qt_1\" AS (
+                  SELECT
+                    \"ta_1\".\"customer_gender\" \"ca_2\",
+                    CASE
+                      WHEN sum(\"ta_1\".\"count\") IS NOT NULL THEN sum(\"ta_1\".\"count\")
+                      ELSE 0
+                    END \"ca_3\"
+                  FROM \"db\".\"public\".\"KibanaSampleDataEcommerce\" \"ta_1\"
+                  GROUP BY \"ca_2\"
+                )
+                SELECT
+                  \"qt_1\".\"ca_2\" \"ca_4\",
+                  \"qt_1\".\"ca_3\" \"ca_5\"
+                FROM \"qt_1\"
+                WHERE TRUE = TRUE
+                LIMIT 1000;"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                // TODO: limit: Some(1000),
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    // same as test_thought_spot_cte, but with realiasing
+    #[tokio::test]
+    async fn test_thought_spot_cte_with_realiasing() -> Result<(), CubeError> {
+        init_logger();
+
+        // CTE called qt_1 is used as ta_2, under the hood DF will use * projection
+        let query_plan = convert_select_to_query_plan(
+            "WITH \"qt_1\" AS (
+                  SELECT
+                    \"ta_1\".\"customer_gender\" \"ca_2\",
+                    CASE
+                      WHEN sum(\"ta_1\".\"count\") IS NOT NULL THEN sum(\"ta_1\".\"count\")
+                      ELSE 0
+                    END \"ca_3\"
+                  FROM \"db\".\"public\".\"KibanaSampleDataEcommerce\" \"ta_1\"
+                  GROUP BY \"ca_2\"
+                )
+                SELECT
+                  \"ta_2\".\"ca_2\" \"ca_4\",
+                  \"ta_2\".\"ca_3\" \"ca_5\"
+                FROM \"qt_1\" \"ta_2\"
+                WHERE TRUE = TRUE
+                LIMIT 1000;"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                // TODO: limit: Some(1000),
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_introspection() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "thought_spot_tables",
+            execute_query(
+                "SELECT * FROM (SELECT CAST(current_database() AS VARCHAR(124)) AS TABLE_CAT, table_schema AS TABLE_SCHEM, table_name AS TABLE_NAME, CAST( CASE table_type WHEN 'BASE TABLE' THEN CASE WHEN table_schema = 'pg_catalog' OR table_schema = 'information_schema' THEN 'SYSTEM TABLE' WHEN table_schema = 'pg_toast' THEN 'SYSTEM TOAST TABLE' WHEN table_schema ~ '^pg_' AND table_schema != 'pg_toast' THEN 'TEMPORARY TABLE' ELSE 'TABLE' END WHEN 'VIEW' THEN CASE WHEN table_schema = 'pg_catalog' OR table_schema = 'information_schema' THEN 'SYSTEM VIEW' WHEN table_schema = 'pg_toast' THEN NULL WHEN table_schema ~ '^pg_' AND table_schema != 'pg_toast' THEN 'TEMPORARY VIEW' ELSE 'VIEW' END WHEN 'EXTERNAL TABLE' THEN 'EXTERNAL TABLE' END AS VARCHAR(124)) AS TABLE_TYPE, REMARKS, '' as TYPE_CAT, '' as TYPE_SCHEM, '' as TYPE_NAME,  '' AS SELF_REFERENCING_COL_NAME, '' AS REF_GENERATION  FROM svv_tables) WHERE true  AND current_database() = 'db' AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')  ORDER BY TABLE_TYPE,TABLE_SCHEM,TABLE_NAME".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "thought_spot_svv_external_schemas",
+            execute_query(
+                "select 1 from svv_external_schemas where schemaname like 'public'".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "thought_spot_table_columns",
+            execute_query(
+                "SELECT * FROM ( SELECT current_database() AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname as TABLE_NAME , a.attname as COLUMN_NAME, CAST(case typname when 'text' THEN 12 when 'bit' THEN -7 when 'bool' THEN -7 when 'boolean' THEN -7 when 'varchar' THEN 12 when 'character varying' THEN 12 when 'char' THEN 1 when '\"char\"' THEN 1 when 'character' THEN 1 when 'nchar' THEN 12 when 'bpchar' THEN 1 when 'nvarchar' THEN 12 when 'date' THEN 91 when 'timestamp' THEN 93 when 'timestamp without time zone' THEN 93 when 'smallint' THEN 5 when 'int2' THEN 5 when 'integer' THEN 4 when 'int' THEN 4 when 'int4' THEN 4 when 'bigint' THEN -5 when 'int8' THEN -5 when 'decimal' THEN 3 when 'real' THEN 7 when 'float4' THEN 7 when 'double precision' THEN 8 when 'float8' THEN 8 when 'float' THEN 6 when 'numeric' THEN 2 when '_float4' THEN 2003 when 'timestamptz' THEN 2014 when 'timestamp with time zone' THEN 2014 when '_aclitem' THEN 2003 when '_text' THEN 2003 when 'bytea' THEN -2 when 'oid' THEN -5 when 'name' THEN 12 when '_int4' THEN 2003 when '_int2' THEN 2003 when 'ARRAY' THEN 2003 when 'geometry' THEN -4 when 'super' THEN -16 else 1111 END as SMALLINT) AS DATA_TYPE, t.typname as TYPE_NAME, case typname when 'int4' THEN 10 when 'bit' THEN 1 when 'bool' THEN 1 when 'varchar' THEN atttypmod -4 when 'character varying' THEN atttypmod -4 when 'char' THEN atttypmod -4 when 'character' THEN atttypmod -4 when 'nchar' THEN atttypmod -4 when 'bpchar' THEN atttypmod -4 when 'nvarchar' THEN atttypmod -4 when 'date' THEN 13 when 'timestamp' THEN 29 when 'smallint' THEN 5 when 'int2' THEN 5 when 'integer' THEN 10 when 'int' THEN 10 when 'int4' THEN 10 when 'bigint' THEN 19 when 'int8' THEN 19 when 'decimal' then (atttypmod - 4) >> 16 when 'real' THEN 8 when 'float4' THEN 8 when 'double precision' THEN 17 when 'float8' THEN 17 when 'float' THEN 17 when 'numeric' THEN (atttypmod - 4) >> 16 when '_float4' THEN 8 when 'timestamptz' THEN 35 when 'oid' THEN 10 when '_int4' THEN 10 when '_int2' THEN 5 when 'geometry' THEN NULL when 'super' THEN NULL else 2147483647 end as COLUMN_SIZE , null as BUFFER_LENGTH , case typname when 'float4' then 8 when 'float8' then 17 when 'numeric' then (atttypmod - 4) & 65535 when 'timestamp' then 6 when 'geometry' then NULL when 'super' then NULL else 0 end as DECIMAL_DIGITS, 10 AS NUM_PREC_RADIX , case a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) when 'false' then 1 when NULL then 2 else 0 end AS NULLABLE , dsc.description as REMARKS , pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS COLUMN_DEF, CAST(case typname when 'text' THEN 12 when 'bit' THEN -7 when 'bool' THEN -7 when 'boolean' THEN -7 when 'varchar' THEN 12 when 'character varying' THEN 12 when '\"char\"' THEN 1 when 'char' THEN 1 when 'character' THEN 1 when 'nchar' THEN 1 when 'bpchar' THEN 1 when 'nvarchar' THEN 12 when 'date' THEN 91 when 'timestamp' THEN 93 when 'timestamp without time zone' THEN 93 when 'smallint' THEN 5 when 'int2' THEN 5 when 'integer' THEN 4 when 'int' THEN 4 when 'int4' THEN 4 when 'bigint' THEN -5 when 'int8' THEN -5 when 'decimal' THEN 3 when 'real' THEN 7 when 'float4' THEN 7 when 'double precision' THEN 8 when 'float8' THEN 8 when 'float' THEN 6 when 'numeric' THEN 2 when '_float4' THEN 2003 when 'timestamptz' THEN 2014 when 'timestamp with time zone' THEN 2014 when '_aclitem' THEN 2003 when '_text' THEN 2003 when 'bytea' THEN -2 when 'oid' THEN -5 when 'name' THEN 12 when '_int4' THEN 2003 when '_int2' THEN 2003 when 'ARRAY' THEN 2003 when 'geometry' THEN -4 when 'super' THEN -16 else 1111 END as SMALLINT) AS SQL_DATA_TYPE, CAST(NULL AS SMALLINT) as SQL_DATETIME_SUB , case typname when 'int4' THEN 10 when 'bit' THEN 1 when 'bool' THEN 1 when 'varchar' THEN atttypmod -4 when 'character varying' THEN atttypmod -4 when 'char' THEN atttypmod -4 when 'character' THEN atttypmod -4 when 'nchar' THEN atttypmod -4 when 'bpchar' THEN atttypmod -4 when 'nvarchar' THEN atttypmod -4 when 'date' THEN 13 when 'timestamp' THEN 29 when 'smallint' THEN 5 when 'int2' THEN 5 when 'integer' THEN 10 when 'int' THEN 10 when 'int4' THEN 10 when 'bigint' THEN 19 when 'int8' THEN 19 when 'decimal' then ((atttypmod - 4) >> 16) & 65535 when 'real' THEN 8 when 'float4' THEN 8 when 'double precision' THEN 17 when 'float8' THEN 17 when 'float' THEN 17 when 'numeric' THEN ((atttypmod - 4) >> 16) & 65535 when '_float4' THEN 8 when 'timestamptz' THEN 35 when 'oid' THEN 10 when '_int4' THEN 10 when '_int2' THEN 5 when 'geometry' THEN NULL when 'super' THEN NULL else 2147483647 end as CHAR_OCTET_LENGTH , a.attnum AS ORDINAL_POSITION, case a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) when 'false' then 'YES' when NULL then '' else 'NO' end AS IS_NULLABLE, null as SCOPE_CATALOG , null as SCOPE_SCHEMA , null as SCOPE_TABLE, t.typbasetype AS SOURCE_DATA_TYPE , CASE WHEN left(pg_catalog.pg_get_expr(def.adbin, def.adrelid), 16) = 'default_identity' THEN 'YES' ELSE 'NO' END AS IS_AUTOINCREMENT, IS_AUTOINCREMENT AS IS_GENERATEDCOLUMN FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid) JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid) JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid) LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum) LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid) LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class') LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog') WHERE a.attnum > 0 AND NOT a.attisdropped     AND current_database() = 'db' AND n.nspname LIKE 'public' AND c.relname LIKE 'KibanaSampleDataEcommerce' ORDER BY TABLE_SCHEM,c.relname,attnum )  UNION ALL SELECT current_database()::VARCHAR(128) AS TABLE_CAT, schemaname::varchar(128) AS table_schem, tablename::varchar(128) AS table_name, columnname::varchar(128) AS column_name, CAST(CASE columntype_rep WHEN 'text' THEN 12 WHEN 'bit' THEN -7 WHEN 'bool' THEN -7 WHEN 'boolean' THEN -7 WHEN 'varchar' THEN 12 WHEN 'character varying' THEN 12 WHEN 'char' THEN 1 WHEN 'character' THEN 1 WHEN 'nchar' THEN 1 WHEN 'bpchar' THEN 1 WHEN 'nvarchar' THEN 12 WHEN '\"char\"' THEN 1 WHEN 'date' THEN 91 WHEN 'timestamp' THEN 93 WHEN 'timestamp without time zone' THEN 93 WHEN 'timestamp with time zone' THEN 2014 WHEN 'smallint' THEN 5 WHEN 'int2' THEN 5 WHEN 'integer' THEN 4 WHEN 'int' THEN 4 WHEN 'int4' THEN 4 WHEN 'bigint' THEN -5 WHEN 'int8' THEN -5 WHEN 'decimal' THEN 3 WHEN 'real' THEN 7 WHEN 'float4' THEN 7 WHEN 'double precision' THEN 8 WHEN 'float8' THEN 8 WHEN 'float' THEN 6 WHEN 'numeric' THEN 2 WHEN 'timestamptz' THEN 2014 WHEN 'bytea' THEN -2 WHEN 'oid' THEN -5 WHEN 'name' THEN 12 WHEN 'ARRAY' THEN 2003 WHEN 'geometry' THEN -4 WHEN 'super' THEN -16 ELSE 1111 END AS SMALLINT) AS DATA_TYPE, COALESCE(NULL,CASE columntype WHEN 'boolean' THEN 'bool' WHEN 'character varying' THEN 'varchar' WHEN '\"char\"' THEN 'char' WHEN 'smallint' THEN 'int2' WHEN 'integer' THEN 'int4'WHEN 'bigint' THEN 'int8' WHEN 'real' THEN 'float4' WHEN 'double precision' THEN 'float8' WHEN 'timestamp without time zone' THEN 'timestamp' WHEN 'timestamp with time zone' THEN 'timestamptz' ELSE columntype END) AS TYPE_NAME,  CASE columntype_rep WHEN 'int4' THEN 10  WHEN 'bit' THEN 1    WHEN 'bool' THEN 1WHEN 'boolean' THEN 1WHEN 'varchar' THEN regexp_substr (columntype,'[0-9]+',7)::INTEGER WHEN 'character varying' THEN regexp_substr (columntype,'[0-9]+',7)::INTEGER WHEN 'char' THEN regexp_substr (columntype,'[0-9]+',4)::INTEGER WHEN 'character' THEN regexp_substr (columntype,'[0-9]+',4)::INTEGER WHEN 'nchar' THEN regexp_substr (columntype,'[0-9]+',7)::INTEGER WHEN 'bpchar' THEN regexp_substr (columntype,'[0-9]+',7)::INTEGER WHEN 'nvarchar' THEN regexp_substr (columntype,'[0-9]+',7)::INTEGER WHEN 'date' THEN 13 WHEN 'timestamp' THEN 29 WHEN 'timestamp without time zone' THEN 29 WHEN 'smallint' THEN 5 WHEN 'int2' THEN 5 WHEN 'integer' THEN 10 WHEN 'int' THEN 10 WHEN 'int4' THEN 10 WHEN 'bigint' THEN 19 WHEN 'int8' THEN 19 WHEN 'decimal' THEN regexp_substr (columntype,'[0-9]+',7)::INTEGER WHEN 'real' THEN 8 WHEN 'float4' THEN 8 WHEN 'double precision' THEN 17 WHEN 'float8' THEN 17 WHEN 'float' THEN 17WHEN 'numeric' THEN regexp_substr (columntype,'[0-9]+',7)::INTEGER WHEN '_float4' THEN 8 WHEN 'timestamptz' THEN 35 WHEN 'timestamp with time zone' THEN 35 WHEN 'oid' THEN 10 WHEN '_int4' THEN 10 WHEN '_int2' THEN 5 WHEN 'geometry' THEN NULL WHEN 'super' THEN NULL ELSE 2147483647 END AS COLUMN_SIZE, NULL AS BUFFER_LENGTH, CASE columntype WHEN 'real' THEN 8 WHEN 'float4' THEN 8 WHEN 'double precision' THEN 17 WHEN 'float8' THEN 17 WHEN 'timestamp' THEN 6 WHEN 'timestamp without time zone' THEN 6 WHEN 'geometry' THEN NULL WHEN 'super' THEN NULL ELSE 0 END AS DECIMAL_DIGITS, 10 AS NUM_PREC_RADIX, NULL AS NULLABLE,  NULL AS REMARKS,   NULL AS COLUMN_DEF, CAST(CASE columntype_rep WHEN 'text' THEN 12 WHEN 'bit' THEN -7 WHEN 'bool' THEN -7 WHEN 'boolean' THEN -7 WHEN 'varchar' THEN 12 WHEN 'character varying' THEN 12 WHEN 'char' THEN 1 WHEN 'character' THEN 1 WHEN 'nchar' THEN 12 WHEN 'bpchar' THEN 1 WHEN 'nvarchar' THEN 12 WHEN '\"char\"' THEN 1 WHEN 'date' THEN 91 WHEN 'timestamp' THEN 93 WHEN 'timestamp without time zone' THEN 93 WHEN 'timestamp with time zone' THEN 2014 WHEN 'smallint' THEN 5 WHEN 'int2' THEN 5 WHEN 'integer' THEN 4 WHEN 'int' THEN 4 WHEN 'int4' THEN 4 WHEN 'bigint' THEN -5 WHEN 'int8' THEN -5 WHEN 'decimal' THEN 3 WHEN 'real' THEN 7 WHEN 'float4' THEN 7 WHEN 'double precision' THEN 8 WHEN 'float8' THEN 8 WHEN 'float' THEN 6 WHEN 'numeric' THEN 2 WHEN 'timestamptz' THEN 2014 WHEN 'bytea' THEN -2 WHEN 'oid' THEN -5 WHEN 'name' THEN 12 WHEN 'ARRAY' THEN 2003 WHEN 'geometry' THEN -4 WHEN 'super' THEN -4 ELSE 1111 END AS SMALLINT) AS SQL_DATA_TYPE, CAST(NULL AS SMALLINT) AS SQL_DATETIME_SUB, CASE WHEN LEFT (columntype,7) = 'varchar' THEN regexp_substr (columntype,'[0-9]+',7)::INTEGER WHEN LEFT (columntype,4) = 'char' THEN regexp_substr (columntype,'[0-9]+',4)::INTEGER WHEN columntype = 'string' THEN 16383  ELSE NULL END AS CHAR_OCTET_LENGTH, columnnum AS ORDINAL_POSITION, NULL AS IS_NULLABLE,  NULL AS SCOPE_CATALOG,  NULL AS SCOPE_SCHEMA, NULL AS SCOPE_TABLE, NULL AS SOURCE_DATA_TYPE, 'NO' AS IS_AUTOINCREMENT, 'NO' as IS_GENERATEDCOLUMN FROM (select lbv_cols.schemaname, lbv_cols.tablename, lbv_cols.columnname,REGEXP_REPLACE(REGEXP_REPLACE(lbv_cols.columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, lbv_cols.columnnum from pg_get_late_binding_view_cols() lbv_cols( schemaname name, tablename name, columnname name, columntype text, columnnum int)) lbv_columns   WHERE true  AND current_database() = 'db' AND schemaname LIKE 'public' AND tablename LIKE 'KibanaSampleDataEcommerce';".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "thought_spot_attributes",
+            execute_query(
+                "SELECT
+                    current_database() AS PKTABLE_CAT,
+                    pkn.nspname AS PKTABLE_SCHEM,
+                    pkc.relname AS PKTABLE_NAME,
+                    pka.attname AS PKCOLUMN_NAME,
+                    current_database() AS FKTABLE_CAT,
+                    fkn.nspname AS FKTABLE_SCHEM,
+                    fkc.relname AS FKTABLE_NAME,
+                    fka.attname AS FKCOLUMN_NAME,
+                    pos.n AS KEY_SEQ,
+                    CASE
+                        con.confupdtype
+                        WHEN 'c' THEN 0
+                        WHEN 'n' THEN 2
+                        WHEN 'd' THEN 4
+                        WHEN 'r' THEN 1
+                        WHEN 'p' THEN 1
+                        WHEN 'a' THEN 3
+                        ELSE NULL
+                    END AS UPDATE_RULE,
+                    CASE
+                        con.confdeltype
+                        WHEN 'c' THEN 0
+                        WHEN 'n' THEN 2
+                        WHEN 'd' THEN 4
+                        WHEN 'r' THEN 1
+                        WHEN 'p' THEN 1
+                        WHEN 'a' THEN 3
+                        ELSE NULL
+                    END AS DELETE_RULE,
+                    con.conname AS FK_NAME,
+                    pkic.relname AS PK_NAME,
+                    CASE
+                        WHEN con.condeferrable
+                        AND con.condeferred THEN 5
+                        WHEN con.condeferrable THEN 6
+                        ELSE 7
+                    END AS DEFERRABILITY
+                FROM
+                    pg_catalog.pg_namespace pkn,
+                    pg_catalog.pg_class pkc,
+                    pg_catalog.pg_attribute pka,
+                    pg_catalog.pg_namespace fkn,
+                    pg_catalog.pg_class fkc,
+                    pg_catalog.pg_attribute fka,
+                    pg_catalog.pg_constraint con,
+                    pg_catalog.generate_series(1, 32) pos(n),
+                    pg_catalog.pg_class pkic,
+                    pg_catalog.pg_depend dep
+                WHERE
+                    pkn.oid = pkc.relnamespace
+                    AND pkc.oid = pka.attrelid
+                    AND pka.attnum = con.confkey [pos.n]
+                    AND con.confrelid = pkc.oid
+                    AND fkn.oid = fkc.relnamespace
+                    AND fkc.oid = fka.attrelid
+                    AND fka.attnum = con.conkey [pos.n]
+                    AND con.conrelid = fkc.oid
+                    AND con.contype = 'f'
+                    AND pkic.relkind = 'i'
+                    AND con.oid = dep.objid
+                    AND pkic.oid = dep.refobjid
+                    AND dep.classid = 'pg_constraint' :: regclass :: oid
+                    AND dep.refclassid = 'pg_class' :: regclass :: oid
+                    AND fkn.nspname = 'public'
+                    AND fkc.relname = 'KibanaSampleDataEcommerce'
+                ORDER BY
+                    pkn.nspname,
+                    pkc.relname,
+                    con.conname,
+                    pos.n"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
         );
 
         Ok(())
@@ -7276,6 +7593,20 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_pgcatalog_pgprepared_statements_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgprepared_statements_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_prepared_statements".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_pgcatalog_pgtype_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "pgcatalog_pgtype_postgres",
@@ -8104,6 +8435,15 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "array_lower_string",
+            execute_query(
+                "SELECT array_lower(ARRAY['a', 'b']) v1".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -8139,6 +8479,15 @@ ORDER BY \"COUNT(count)\" DESC"
                 ) t
                 "
                 .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "array_upper_string",
+            execute_query(
+                "SELECT array_upper(ARRAY['a', 'b']) v1".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -8337,6 +8686,37 @@ ORDER BY \"COUNT(count)\" DESC"
                 FROM pg_catalog.pg_type t
                 LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
                 WHERE t.typtype = 'd'
+                ;"#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "superset_indkey_varchar_query",
+            execute_query(
+                r#"SELECT 
+                    i.relname as relname, 
+                    ix.indisunique, 
+                    ix.indexprs, 
+                    a.attname, 
+                    a.attnum, 
+                    c.conrelid, 
+                    ix.indkey::varchar, 
+                    ix.indoption::varchar, 
+                    i.reloptions, 
+                    am.amname, 
+                    pg_get_expr(ix.indpred, ix.indrelid), 
+                    ix.indnkeyatts as indnkeyatts 
+                FROM pg_class t 
+                    join pg_index ix on t.oid = ix.indrelid 
+                    join pg_class i on i.oid = ix.indexrelid 
+                    left outer join pg_attribute a on t.oid = a.attrelid and a.attnum = ANY(ix.indkey) 
+                    left outer join pg_constraint c on (ix.indrelid = c.conrelid and ix.indexrelid = c.conindid and c.contype in ('p', 'u', 'x')) 
+                    left outer join pg_am am on i.relam = am.oid 
+                WHERE t.relkind IN ('r', 'v', 'f', 'm', 'p') and t.oid = 18010 and ix.indisprimary = 'f' 
+                ORDER BY t.relname, i.relname
                 ;"#
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
@@ -9096,7 +9476,7 @@ ORDER BY \"COUNT(count)\" DESC"
             ) ON COMMIT PRESERVE ROWS
             ".to_string(),
             get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
         ).await;
         match create_query {
             Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
@@ -9112,7 +9492,7 @@ ORDER BY \"COUNT(count)\" DESC"
             "
             .to_string(),
             get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
         )
         .await;
         match select_into_query {
@@ -9132,6 +9512,55 @@ ORDER BY \"COUNT(count)\" DESC"
                 "SELECT r.v, r.v IS TRUE as is_true, r.v IS FALSE as is_false
                  FROM (SELECT true as v UNION ALL SELECT false as v) as r;"
                     .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    // This tests asserts that our DF fork contains support for Coalesce
+    #[tokio::test]
+    async fn df_coalesce() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_coalesce",
+            execute_query(
+                "SELECT COALESCE(null, 1) as t1, COALESCE(null, 1, null, 2) as t2".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    // This tests asserts that our DF fork works correct with types
+    #[tokio::test]
+    async fn df_switch_case_coerc() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_case_fixes",
+            execute_query(
+                "SELECT
+                    CASE 'test' WHEN 'int4' THEN NULL ELSE 100 END as null_in_then,
+                    CASE true WHEN 'false' THEN 'yes' ELSE 'no' END as bool_utf8_cast,
+                    CASE true WHEN 'false' THEN 'yes' WHEN 'true' THEN true ELSE 'no' END as then_diff_types
+                ".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    // This tests asserts that our DF fork contains support for >> && <<
+    #[tokio::test]
+    async fn df_is_bitwise_shit() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_bitwise_shit",
+            execute_query(
+                "SELECT 2 << 10 as t1, 2048 >> 10 as t2;".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -9232,6 +9661,48 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_regexp_substr_udf() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "regexp_substr",
+            execute_query(
+                "SELECT
+                    regexp_substr('test@test.com', '@[^.]*') as match_dot,
+                    regexp_substr('12345', '[0-9]+') as match_number,
+                    regexp_substr('12345', '[0-9]+', 2) as match_number_pos_2,
+                    regexp_substr(null, '@[^.]*') as source_null,
+                    regexp_substr('test@test.com', null) as pattern_null,
+                    regexp_substr('test@test.com', '@[^.]*', 1) as position_default,
+                    regexp_substr('test@test.com', '@[^.]*', 5) as position_no_skip,
+                    regexp_substr('test@test.com', '@[^.]*', 6) as position_skip,
+                    regexp_substr('test@test.com', '@[^.]*', 0) as position_zero,
+                    regexp_substr('test@test.com', '@[^.]*', -1) as position_negative,
+                    regexp_substr('test@test.com', '@[^.]*', 100) as position_more_then_input
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "regexp_substr_column",
+            execute_query(
+                "SELECT r.a as input, regexp_substr(r.a, '@[^.]*') as result FROM (
+                    SELECT 'test@test.com' as a
+                    UNION ALL
+                    SELECT 'test'
+                ) as r
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_metabase_to_char_query() -> Result<(), CubeError> {
         execute_query(
             "select to_char(current_timestamp, 'YYYY-MM-DD HH24:MI:SS.MS TZ')".to_string(),
@@ -9259,6 +9730,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_metabase_substring() -> Result<(), CubeError> {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             "SELECT
                     \"source\".\"substring1\" AS \"substring2\",
@@ -9744,6 +10217,26 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_metabase_type_in_subquery_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_type_in_subquery_query",
+            execute_query(
+                "
+                SELECT nspname, typname 
+                FROM pg_type t 
+                JOIN pg_namespace n ON n.oid = t.typnamespace 
+                WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e);
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_sigma_computing_ilike_query() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "sigma_computing_ilike_query",
@@ -10139,7 +10632,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 WHERE
                     true AND
                     n.nspname = 'public' AND
-                    ct.relname = 'Orders' AND
+                    ct.relname = 'KibanaSampleDataEcommerce' AND
                     i.indisprimary
                 ORDER BY
                     table_name,
@@ -10590,6 +11083,42 @@ ORDER BY \"COUNT(count)\" DESC"
                 }
             );
         }
+
+        let logical_plan = convert_select_to_query_plan(
+            format!(
+                "SELECT \"source\".\"order_date\" AS \"order_date\", \"source\".\"max\" AS \"max\"
+                FROM (SELECT date_trunc('month', \"KibanaSampleDataEcommerce\".\"order_date\") AS \"order_date\", max(\"KibanaSampleDataEcommerce\".\"maxPrice\") AS \"max\" FROM \"KibanaSampleDataEcommerce\"
+                GROUP BY date_trunc('month', \"KibanaSampleDataEcommerce\".\"order_date\")
+                ORDER BY date_trunc('month', \"KibanaSampleDataEcommerce\".\"order_date\") ASC) \"source\"
+                WHERE (CAST(date_trunc('month', \"source\".\"order_date\") AS timestamp) + (INTERVAL '60 minute')) BETWEEN date_trunc('minute', ({} + (INTERVAL '-30 minute')))
+                AND date_trunc('minute', {})",
+                now, now
+            ),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        );
     }
 
     #[tokio::test]
@@ -10835,6 +11364,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn datastudio_date_aggregations() {
+        init_logger();
+
         let supported_granularities = vec![
             // date
             [
@@ -10871,11 +11402,10 @@ ORDER BY \"COUNT(count)\" DESC"
             // iso week / iso year / day of year
             ["DATE_TRUNC('SECOND', \"order_date\")", "second"],
             // month, day
-            // TODO: support TO_CHAR aggregation
-            // [
-            //     "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
-            //     "second",
-            // ],
+            [
+                "CAST(TO_CHAR(DATE_TRUNC('SECOND', \"order_date\"), 'MMDD') AS BIGINT)",
+                "second",
+            ],
             // date, hour, minute
             [
                 "DATE_TRUNC('MINUTE', DATE_TRUNC('SECOND', \"order_date\"))",
@@ -10930,7 +11460,139 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_datastudio_min_max_date() {
+        init_logger();
+
+        for fun in vec!["Max", "Min"].iter() {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "
+                SELECT 
+                    CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\", 
+                    {}(Date_trunc('SECOND', \"order_date\")) AS \"qt_d3yqo2towc\"
+                FROM  KibanaSampleDataEcommerce
+                GROUP BY \"qt_m3uskv6gwc\"
+                ",
+                    fun
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("second".to_string()),
+                        date_range: None,
+                    },]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                }
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn test_datastudio_between_dates_filter() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT 
+                CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\",
+                COUNT(1) AS \"__record_count\"
+            FROM KibanaSampleDataEcommerce
+            WHERE Date_trunc('SECOND', \"order_date\") 
+                BETWEEN 
+                    CAST('2022-07-11 18:00:00.000000' AS TIMESTAMP) 
+                AND CAST('2022-07-11 19:00:00.000000' AS TIMESTAMP)
+            GROUP BY \"qt_m3uskv6gwc\";
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("second".to_string()),
+                    date_range: Some(json!(vec![
+                        "2022-07-11 18:00:00.000000".to_string(),
+                        "2022-07-11 19:00:00.000000".to_string()
+                    ])),
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_datastudio_string_start_with_filter() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "
+            SELECT 
+                CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\",
+                COUNT(1) AS \"__record_count\",
+                \"customer_gender\"
+            FROM  KibanaSampleDataEcommerce
+            WHERE (\"customer_gender\" ~ 'test')
+            GROUP BY \"qt_m3uskv6gwc\", \"customer_gender\";
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("second".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("startsWith".to_string()),
+                    values: Some(vec!["test".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_extract_date_trunc_week() {
+        init_logger();
+
         let supported_granularities = vec![
             (
                 "EXTRACT(WEEK FROM DATE_TRUNC('MONTH', \"order_date\"))::integer",
@@ -10971,5 +11633,100 @@ ORDER BY \"COUNT(count)\" DESC"
                 }
             )
         }
+    }
+
+    #[tokio::test]
+    async fn test_metabase_unwrap_date_cast() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT max(CAST(\"KibanaSampleDataEcommerce\".\"order_date\" AS date)) AS \"max\" FROM \"KibanaSampleDataEcommerce\"".to_string(),
+            DatabaseProtocol::PostgreSQL
+        ).await.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("month".to_owned()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_select_asterisk_cross_join() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT * FROM \"KibanaSampleDataEcommerce\" CROSS JOIN Logs".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                    "Logs.agentCount".to_string(),
+                    "Logs.agentCountApprox".to_string(),
+                ]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_user_with_join() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT aliased.count as c, aliased.user_1 as u1, aliased.user_2 as u2 FROM (SELECT \"KibanaSampleDataEcommerce\".count as count, \"KibanaSampleDataEcommerce\".__user as user_1, Logs.__user as user_2 FROM \"KibanaSampleDataEcommerce\" CROSS JOIN Logs WHERE __user = 'foo') aliased".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await
+            .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        assert_eq!(cube_scan.options.change_user, Some("foo".to_string()))
     }
 }

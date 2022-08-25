@@ -2,6 +2,7 @@ import logoPostgres from '../img/db/postgres.svg';
 import logoMysql from '../img/db/mysql.svg';
 import logoAthena from '../img/db/athena.svg';
 import logoClickhouse from '../img/db/clickhouse.svg';
+import logoCrate from '../img/db/crate.svg';
 import logoFirebolt from '../img/db/firebolt.svg';
 import logoHive from '../img/db/hive.svg';
 import logoRedshift from '../img/db/redshift.svg';
@@ -38,6 +39,7 @@ const envVarsDbMap = [
       { title: 'Oracle', driver: 'oracle', logo: logoOracle },
       { title: 'QuestDB', driver: 'questdb', logo: logoQuestdb },
       { title: 'Materialize', driver: 'materialize', logo: logoMaterialize },
+      { title: 'Crate', driver: 'crate', logo: logoCrate },
     ],
     settings: [...BASE_SERVER, DB_NAME, ...BASE_CRED],
   },
@@ -100,7 +102,8 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
     settings: [
       ...BASE_CRED,
       DB_NAME,
-      { env: 'CUBEJS_FIREBOLT_ENGINE_ENDPOINT', title: 'Engine Endpoint' },
+      { env: 'CUBEJS_FIREBOLT_ACCOUNT', title: 'Account' },
+      { env: 'CUBEJS_FIREBOLT_ENGINE_NAME', title: 'Engine name' },
     ]
   },
   {

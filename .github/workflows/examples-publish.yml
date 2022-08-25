@@ -619,31 +619,6 @@ jobs:
           EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  slack-vibe:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: pheel/path-watcher-action@v1
-        id: modified
-        with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/slack-vibe/*,examples/slack-vibe/**'
-
-      - if: steps.modified.outputs.modified
-        uses: actions/setup-node@v1
-        with:
-          node-version: 14.x
-
-      - if: steps.modified.outputs.modified
-        run: .github/actions/deploy-example.sh
-        env:
-          EXAMPLE_SLUG: slack-vibe
-          EXAMPLE_CUBE_SKIP: 1
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          EXAMPLE_FRONTEND_SUBDIRECTORY: 'frontend'
-
   multitenancy-workshop:
     runs-on: ubuntu-20.04
     timeout-minutes: 30

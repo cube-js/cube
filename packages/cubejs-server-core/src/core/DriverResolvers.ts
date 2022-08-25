@@ -42,6 +42,23 @@ export const lookupDriverClass = (dbType): Constructor<BaseDriver> & {
 };
 
 /**
+ * Determines whether specified value is a BaseDriver instance or not.
+ */
+export const isDriver = (val: any): boolean => {
+  let isDriverInstance = val instanceof BaseDriver;
+  if (!isDriverInstance && val && val.constructor) {
+    let end = false;
+    let obj = val.constructor;
+    while (!isDriverInstance && !end) {
+      obj = Object.getPrototypeOf(obj);
+      end = !obj;
+      isDriverInstance = obj && obj.name ? obj.name === 'BaseDriver' : false;
+    }
+  }
+  return isDriverInstance;
+};
+
+/**
  * Create new driver instance by specified database type.
  */
 export const createDriver = (

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/react",
-  "version": "0.30.40",
+  "version": "0.30.46",
   "author": "Cube Dev, Inc.",
   "license": "MIT",
   "engines": {},
@@ -24,7 +24,7 @@
   ],
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "^0.30.29",
+    "@cubejs-client/core": "^0.30.46",
     "anser": "^2.0.1",
     "core-js": "^3.6.5",
     "html-entities": "^2.3.2",

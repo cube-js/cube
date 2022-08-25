@@ -85,12 +85,6 @@ const config = {
       },
     },
     {
-      resolve: 'gatsby-redirect-from',
-      options: {
-        query: 'allMdx',
-      },
-    },
-    {
       resolve: 'gatsby-plugin-react-svg',
       options: {
         rule: {
@@ -98,7 +92,7 @@ const config = {
         },
       },
     },
-    'gatsby-plugin-meta-redirect',
+    'gatsby-plugin-netlify'
     // 'gatsby-plugin-percy',
   ],
 };

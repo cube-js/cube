@@ -1,5 +1,5 @@
 /**
- * Environment variables that cannot be hardcoded in code, and instead must be specified via the cli.
+ * Environment variables that cannot be hardcoded, and instead must be specified via the cli.
  * Usually cloud db config & auth variables.
  */
 export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
@@ -15,11 +15,12 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
     'CUBEJS_DB_EXPORT_BUCKET',
     'CUBEJS_DB_BQ_CREDENTIALS',
   ],
+  crate: [],
   firebolt: [
     'CUBEJS_DB_USER',
     'CUBEJS_DB_PASS',
     'CUBEJS_DB_NAME',
-    'CUBEJS_FIREBOLT_ENGINE_ENDPOINT'
+    'CUBEJS_FIREBOLT_ENGINE_NAME'
   ],
   materialize: [],
   multidb: [],

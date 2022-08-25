@@ -3,6 +3,110 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.57](https://github.com/cube-js/cube.js/compare/v0.30.56...v0.30.57) (2022-08-25)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.56](https://github.com/cube-js/cube.js/compare/v0.30.55...v0.30.56) (2022-08-23)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.55](https://github.com/cube-js/cube.js/compare/v0.30.54...v0.30.55) (2022-08-20)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.54](https://github.com/cube-js/cube.js/compare/v0.30.53...v0.30.54) (2022-08-19)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.53](https://github.com/cube-js/cube.js/compare/v0.30.52...v0.30.53) (2022-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.52](https://github.com/cube-js/cube.js/compare/v0.30.51...v0.30.52) (2022-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.51](https://github.com/cube-js/cube.js/compare/v0.30.50...v0.30.51) (2022-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.50](https://github.com/cube-js/cube.js/compare/v0.30.49...v0.30.50) (2022-08-16)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.49](https://github.com/cube-js/cube.js/compare/v0.30.48...v0.30.49) (2022-08-16)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.48](https://github.com/cube-js/cube.js/compare/v0.30.47...v0.30.48) (2022-08-14)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.47](https://github.com/cube-js/cube.js/compare/v0.30.46...v0.30.47) (2022-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.46](https://github.com/cube-js/cube.js/compare/v0.30.45...v0.30.46) (2022-08-10)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
+## [0.30.45](https://github.com/cube-js/cube.js/compare/v0.30.44...v0.30.45) (2022-08-05)
+
+**Note:** Version bump only for package @cubejs-backend/serverless-google
+
+
+
+
+
 ## [0.30.44](https://github.com/cube-js/cube.js/compare/v0.30.43...v0.30.44) (2022-08-01)
 
 **Note:** Version bump only for package @cubejs-backend/serverless-google

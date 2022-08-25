@@ -3,7 +3,7 @@ import React from "react";
 import cubejs from "@cubejs-client/core";
 import { CubeProvider } from "@cubejs-client/react";
 
-import "antd/dist/antd.css";
+import "antd/dist/antd.min.css";
 import { Tabs, Layout, Card, Tooltip } from "antd";
 import { Scrollbars } from 'react-custom-scrollbars';
 

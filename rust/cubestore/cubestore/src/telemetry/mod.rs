@@ -20,47 +20,63 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 lazy_static! {
-    pub static ref SENDER: Arc<EventSender<HttpTelemetryTransport>> =
-        Arc::new(EventSender::new(HttpTelemetryTransport));
+    pub static ref SENDER: Arc<EventSender> = Arc::new(EventSender::new(Arc::new(
+        HttpTelemetryTransport::try_new("https://track.cube.dev/track".to_string()).unwrap()
+    )));
 }
 
 lazy_static! {
-    pub static ref AGENT_SENDER: tokio::sync::RwLock<Option<Arc<EventSender<WsTelemetryTransport>>>> =
+    pub static ref AGENT_SENDER: tokio::sync::RwLock<Option<Arc<EventSender>>> =
         tokio::sync::RwLock::new(None);
 }
 
-pub struct EventSender<T: TelemetryTransport> {
+pub struct EventSender {
     events: Mutex<Vec<Map<String, Value>>>,
     notify: Arc<Notify>,
     stopped: RwLock<bool>,
-    transport: T,
+    transport: Arc<dyn TelemetryTransport>,
 }
 
 #[async_trait]
-pub trait TelemetryTransport {
+pub trait TelemetryTransport: Sync + Send {
     async fn send_events(&self, to_send: Vec<Map<String, Value>>) -> Result<(), CubeError>;
 }
 
-pub struct HttpTelemetryTransport;
+#[derive(Debug)]
+pub struct HttpTelemetryTransport {
+    endpoint_url: String,
+    client: reqwest::Client,
+}
+
+impl HttpTelemetryTransport {
+    pub fn try_new(endpoint_url: String) -> Result<Self, CubeError> {
+        let client = reqwest::ClientBuilder::new()
+            .use_rustls_tls()
+            .user_agent("cubestore")
+            .tcp_keepalive(Some(Duration::from_secs(30)))
+            .build()?;
+        Ok(Self {
+            endpoint_url,
+            client,
+        })
+    }
+}
 
 #[async_trait]
 impl TelemetryTransport for HttpTelemetryTransport {
     async fn send_events(&self, mut to_send: Vec<Map<String, Value>>) -> Result<(), CubeError> {
         let max_retries = 10usize;
         for retry in 0..max_retries {
-            let client = reqwest::ClientBuilder::new()
-                .use_rustls_tls()
-                .user_agent("cubestore")
-                .build()
-                .unwrap();
-
             let sent_at = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
             for event in to_send.iter_mut() {
                 event.insert("sentAt".to_string(), Value::String(sent_at.to_string()));
             }
 
-            let res = client
-                .post("https://track.cube.dev/track")
+            log::trace!("sending via http to {} :{:?}", self.endpoint_url, to_send);
+
+            let res = self
+                .client
+                .post(&self.endpoint_url)
                 .json(&to_send)
                 .send()
                 .await?;
@@ -152,6 +168,7 @@ impl TelemetryTransport for WsTelemetryTransport {
                 "callbackId".to_string(),
                 Value::String(callback_id.to_string()),
             );
+            log::trace!("sending via ws to {} :{:?}", self.endpoint_url, message);
             let json = deflate_bytes_zlib(serde_json::to_vec(&message)?.as_slice());
 
             self.insert_callback(callback_id.to_string()).await;
@@ -240,9 +257,9 @@ impl TelemetryTransport for WsTelemetryTransport {
     }
 }
 
-impl<T: TelemetryTransport> EventSender<T> {
-    pub fn new(transport: T) -> EventSender<T> {
-        EventSender {
+impl EventSender {
+    pub fn new(transport: Arc<dyn TelemetryTransport>) -> Self {
+        Self {
             events: Mutex::new(Vec::new()),
             notify: Arc::new(Notify::new()),
             stopped: RwLock::new(false),
@@ -371,14 +388,40 @@ pub async fn stop_track_event_loop() {
 
 pub async fn init_agent_sender() {
     let agent_url = env::var("CUBESTORE_AGENT_ENDPOINT_URL").ok();
+    log::trace!("agent endpoint url: {:?}", agent_url);
     let mut agent_sender = AGENT_SENDER.write().await;
-    *agent_sender = agent_url.map(|endpoint_url| {
-        Arc::new(EventSender::new(WsTelemetryTransport {
-            endpoint_url,
-            socket: RwLock::new(None),
-            waiting_callbacks: RwLock::new(HashSet::new()),
-        }))
-    });
+    *agent_sender = if let Some(endpoint_url) = agent_url {
+        if let Ok(agent_url_object) = reqwest::Url::parse(endpoint_url.as_str()) {
+            match agent_url_object.scheme() {
+                "https" | "http" => {
+                    log::trace!("using http transport for agent enpoint");
+                    Some(Arc::new(EventSender::new(Arc::new(
+                        HttpTelemetryTransport::try_new(endpoint_url).unwrap(),
+                    ))))
+                }
+                "wss" => {
+                    log::trace!("using wss transport for agent enpoint");
+                    Some(Arc::new(EventSender::new(Arc::new(WsTelemetryTransport {
+                        endpoint_url,
+                        socket: RwLock::new(None),
+                        waiting_callbacks: RwLock::new(HashSet::new()),
+                    }))))
+                }
+                _ => {
+                    log::error!(
+                        "Telemetry endpoint {} with unsupported protocol",
+                        endpoint_url
+                    );
+                    None
+                }
+            }
+        } else {
+            log::error!("Can't parse telemetry endpoint {}", endpoint_url);
+            None
+        }
+    } else {
+        None
+    };
 }
 
 pub async fn start_agent_event_loop() {
@@ -386,7 +429,6 @@ pub async fn start_agent_event_loop() {
         sender.clone().send_loop().await;
     }
 }
-
 pub async fn stop_agent_event_loop() {
     if let Some(sender) = AGENT_SENDER.read().await.as_ref() {
         sender.clone().stop_loop().await;

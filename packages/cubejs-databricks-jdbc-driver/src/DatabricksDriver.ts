@@ -64,18 +64,13 @@ const DatabricksToGenericType: Record<string, string> = {
   'decimal(10,0)': 'bigint',
 };
 
-const jdbcDriverResolver: Promise<string> | null = null;
-
 async function resolveJDBCDriver(): Promise<string> {
-  if (jdbcDriverResolver) {
-    return jdbcDriverResolver;
-  }
   return fileExistsOr(
     path.join(process.cwd(), 'SparkJDBC42.jar'),
     async () => fileExistsOr(
-      path.join(__dirname, '..', '..', 'download', 'SparkJDBC42.jar'),
+      path.join(__dirname, '..', 'download', 'SparkJDBC42.jar'),
       async () => {
-        const pathOrNull = await downloadJDBCDriver(false);
+        const pathOrNull = await downloadJDBCDriver();
         if (pathOrNull) {
           return pathOrNull;
         }
@@ -118,7 +113,7 @@ export class DatabricksDriver extends JDBCDriver {
         PWD: getEnv('databrickToken') || '',
         // CUBEJS_DB_DATABRICKS_AGENT is a predefined way to override the user
         // agent for the Cloud application.
-        UserAgentEntry: getEnv('databrickAgent') || `Cube+OS/${version} (Databricks)`,
+        UserAgentEntry: getEnv('databrickAgent') || `CubeDev+Cube/${version} (Databricks)`,
       },
       dbType: 'databricks',
       database: getEnv('dbName', { required: false }),

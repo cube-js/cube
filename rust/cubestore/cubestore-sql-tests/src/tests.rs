@@ -5,7 +5,7 @@ use async_compression::tokio::write::GzipEncoder;
 use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
-use cubestore::sql::{timestamp_from_string, SqlQueryContext};
+use cubestore::sql::{timestamp_from_string, InlineTable, SqlQueryContext};
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
@@ -112,6 +112,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_location_and_hyperloglog_postgress",
             create_table_with_location_and_hyperloglog_postgress,
         ),
+        t(
+            "create_table_with_location_and_hyperloglog_space_separated",
+            create_table_with_location_and_hyperloglog_space_separated,
+        ),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
@@ -147,6 +151,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t(
             "rolling_window_query_timestamps",
             rolling_window_query_timestamps,
+        ),
+        t(
+            "rolling_window_query_timestamps_exceeded",
+            rolling_window_query_timestamps_exceeded,
         ),
         t(
             "rolling_window_extra_aggregate",
@@ -2210,6 +2218,66 @@ async fn create_table_with_location_and_hyperloglog_postgress(service: Box<dyn S
     );
 }
 
+async fn create_table_with_location_and_hyperloglog_space_separated(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog-ssep.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!("0,02 0c 01 00 05 05 7b cf,{}\n", base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])).as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,02 0c 01 00 15 15 7b ff,{}\n",
+                base64::encode(vec![
+                               0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations_ssep (id int, hll varbinary, hll_base varbinary) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_ssep GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+    let res = service
+        .exec_query("SELECT hll, hll_base FROM hll.locations_ssep")
+        .await
+        .unwrap();
+    for r in to_rows(&res).iter() {
+        assert_eq!(r[0], r[1]);
+    }
+    println!("res {:?}", res);
+}
 async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
@@ -2983,10 +3051,11 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
     );
 
     let p = service
-        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 and a > 5 and a < 10 GROUP BY 1")
+        .plan_query(
+            "SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 and a > 5 and a < 10 GROUP BY 1",
+        )
         .await
         .unwrap();
-
 
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
@@ -3004,7 +3073,6 @@ async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
         \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [a, b, c, amount]\
         \n              Empty"
     );
-
 }
 
 async fn planning_joins(service: Box<dyn SqlClient>) {
@@ -3379,7 +3447,7 @@ async fn topk_having(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("y", 80), ("c", 48), ("d", 44)]));
-    
+
     service
         .exec_query("CREATE TABLE s.Data21(url text, hits int, hits_2 int)")
         .await
@@ -3411,7 +3479,6 @@ async fn topk_having(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&[("b", 55), ("d", 43)]));
-
 }
 
 async fn topk_decimals(service: Box<dyn SqlClient>) {
@@ -3492,7 +3559,7 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
         \n              MergeSort\
         \n                Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
         \n                  Empty"
-        );
+    );
 
     let p = service
         .plan_query(
@@ -3527,7 +3594,6 @@ async fn planning_topk_having(service: Box<dyn SqlClient>) {
         );
 }
 async fn planning_topk_hll(service: Box<dyn SqlClient>) {
-
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
         .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
@@ -3567,7 +3633,7 @@ async fn planning_topk_hll(service: Box<dyn SqlClient>) {
          \n              MergeSort\
          \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
          \n                  Empty"
-        );
+    );
 
     let p = service
         .plan_query(
@@ -3647,10 +3713,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("d", 10383), ("b", 9722), ("c", 171)])
-    ); 
+    assert_eq!(to_rows(&r), rows(&[("d", 10383), ("b", 9722), ("c", 171)]));
 
     let r = service
         .exec_query(
@@ -3665,10 +3728,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("b", 9722), ("c", 171), ("h", 164)])
-    ); 
+    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("c", 171), ("h", 164)]));
     let r = service
         .exec_query(
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
@@ -3682,11 +3742,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("h", 164)])
-    ); 
-
+    assert_eq!(to_rows(&r), rows(&[("h", 164)]));
 }
 
 async fn topk_hll_with_nulls(service: Box<dyn SqlClient>) {
@@ -3734,11 +3790,7 @@ async fn topk_hll_with_nulls(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&r),
-        rows(&[("a", 0), ("e", 1), ("c", 164)])
-    ); 
-
+    assert_eq!(to_rows(&r), rows(&[("a", 0), ("e", 1), ("c", 164)]));
 }
 
 async fn offset(service: Box<dyn SqlClient>) {
@@ -4366,6 +4418,57 @@ async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn rolling_window_query_timestamps_exceeded(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day int, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         (4, 'john', 10), \
+                         (4, 'sara', 7), \
+                         (5, 'sara', 3), \
+                         (5, 'john', 9), \
+                         (6, 'john', 11), \
+                         (7, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.data GROUP BY 1, 2) base \
+             ROLLING_WINDOW DIMENSION day PARTITION BY name \
+               FROM -5 \
+               TO 5 \
+               EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            to_rows(&r),
+            rows(&[
+             (-5, None, None),
+             (-4, None, None),
+             (-3, None, None),
+             (-2, None, None),
+             (-1, None, None),
+             (0, None, None),
+             (1, None, None),
+             (2, None, None),
+             (3, None, None),
+             (4, Some("john"), Some(10)),
+             (4, Some("sara"), Some(7)),
+             (5, Some("john"), Some(19)),
+             (5, Some("sara"), Some(10))
+        ])
+        );
+}
 async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -5550,16 +5653,16 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]),
     ];
     let data = Arc::new(DataFrame::new(columns, rows.clone()));
-    let inline_tables = vec![("Persons".to_string(), data)];
+    let inline_tables = vec![InlineTable::new("Persons".to_string(), data)];
 
-    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
         .exec_query_with_context(context, "SELECT * FROM Persons")
         .await
         .unwrap();
     assert_eq!(result.get_rows(), &rows);
 
-    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
         .exec_query_with_context(context, "SELECT LastName, Timestamp FROM Persons")
         .await
@@ -5586,7 +5689,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]
     );
 
-    let context = SqlQueryContext::default().with_inline_tables(inline_tables.clone());
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
         .exec_query_with_context(
             context,
@@ -5659,7 +5762,9 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
     );
 
     let r = service
-        .exec_query("SELECT table_schema, table_name, build_range_end FROM information_schema.tables")
+        .exec_query(
+            "SELECT table_schema, table_name, build_range_end FROM information_schema.tables",
+        )
         .await
         .unwrap();
 

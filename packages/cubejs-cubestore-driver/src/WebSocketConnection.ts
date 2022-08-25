@@ -1,6 +1,14 @@
 import WebSocket from 'ws';
 import { flatbuffers } from 'flatbuffers';
-import { HttpCommand, HttpError, HttpMessage, HttpQuery, HttpResultSet } from '../codegen/HttpMessage';
+import { InlineTable } from '@cubejs-backend/query-orchestrator';
+import {
+  HttpCommand,
+  HttpError,
+  HttpMessage,
+  HttpQuery,
+  HttpResultSet,
+  HttpTable
+} from '../codegen/HttpMessage';
 
 export class WebSocketConnection {
   protected messageCounter: number;
@@ -145,17 +153,48 @@ export class WebSocketConnection {
     });
   }
 
-  public async query(query: string, queryTracingObj?: any): Promise<any[]> {
+  public async query(query: string, inlineTables: InlineTable[], queryTracingObj?: any): Promise<any[]> {
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
     let traceObjOffset: number | null = null;
     if (queryTracingObj) {
       traceObjOffset = builder.createString(JSON.stringify(queryTracingObj));
     }
+    let inlineTablesOffset: number | null = null;
+    if (inlineTables && inlineTables.length > 0) {
+      const inlineTableOffsets: number[] = [];
+      for (const table of inlineTables) {
+        const nameOffset = builder.createString(table.name);
+        const columnOffsets: number[] = [];
+        for (const column of table.columns) {
+          const columnOffset = builder.createString(column.name);
+          columnOffsets.push(columnOffset);
+        }
+        const columnsOffset = HttpTable.createColumnsVector(builder, columnOffsets);
+        const typeOffsets: number[] = [];
+        for (const column of table.columns) {
+          const typeOffset = builder.createString(column.type);
+          typeOffsets.push(typeOffset);
+        }
+        const typesOffset = HttpTable.createColumnsVector(builder, typeOffsets);
+        const csvRowsOffset = builder.createString(table.csvRows);
+        HttpTable.startHttpTable(builder);
+        HttpTable.addName(builder, nameOffset);
+        HttpTable.addColumns(builder, columnsOffset);
+        HttpTable.addTypes(builder, typesOffset);
+        HttpTable.addCsvRows(builder, csvRowsOffset);
+        const inlineTableOffset = HttpTable.endHttpTable(builder);
+        inlineTableOffsets.push(inlineTableOffset);
+      }
+      inlineTablesOffset = HttpQuery.createInlineTablesVector(builder, inlineTableOffsets);
+    }
     HttpQuery.startHttpQuery(builder);
     HttpQuery.addQuery(builder, queryOffset);
     if (traceObjOffset) {
       HttpQuery.addTraceObj(builder, traceObjOffset);
+    }
+    if (inlineTablesOffset) {
+      HttpQuery.addInlineTables(builder, inlineTablesOffset);
     }
     const httpQueryOffset = HttpQuery.endHttpQuery(builder);
     const messageId = this.messageCounter++;
