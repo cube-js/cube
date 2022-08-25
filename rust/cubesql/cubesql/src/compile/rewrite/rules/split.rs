@@ -1,3 +1,4 @@
+use super::utils;
 use crate::{
     compile::{
         engine::provider::CubeContext,
@@ -340,7 +341,7 @@ impl RewriteRules for SplitRules {
                 column_expr("?column"),
             ),
             // Date trunc
-            rewrite(
+            transforming_rewrite(
                 "split-push-down-date-trunc-inner-replacer",
                 inner_aggregate_split_replacer(
                     fun_expr(
@@ -351,8 +352,13 @@ impl RewriteRules for SplitRules {
                 ),
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
+                    vec![
+                        literal_expr("?rewritten_granularity"),
+                        column_expr("?column"),
+                    ],
                 ),
+                // To validate & de-aliasing granularity
+                self.split_date_trunc("?granularity", "?rewritten_granularity"),
             ),
             transforming_chain_rewrite(
                 "split-push-down-date-trunc-outer-aggr-replacer",
@@ -1245,6 +1251,35 @@ impl SplitRules {
                 return true;
             }
             false
+        }
+    }
+
+    fn split_date_trunc(
+        &self,
+        granularity_var: &'static str,
+        out_granularity_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let granularity_var = var!(granularity_var);
+        let out_granularity_var = var!(out_granularity_var);
+
+        move |egraph, subst| {
+            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
+                let output_granularity = match utils::parse_granularity(granularity, false) {
+                    Some(g) => g,
+                    None => continue,
+                };
+
+                subst.insert(
+                    out_granularity_var,
+                    egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                        ScalarValue::Utf8(Some(output_granularity)),
+                    ))),
+                );
+
+                return true;
+            }
+
+            return false;
         }
     }
 

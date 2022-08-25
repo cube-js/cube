@@ -4733,6 +4733,10 @@ ORDER BY \"COUNT(count)\" DESC"
                 "quarter".to_string(),
             ],
             [
+                "DATE_TRUNC('qtr', order_date)".to_string(),
+                "quarter".to_string(),
+            ],
+            [
                 "DATE_TRUNC('year', order_date)".to_string(),
                 "year".to_string(),
             ],
@@ -6100,6 +6104,44 @@ ORDER BY \"COUNT(count)\" DESC"
                 time_dimensions: None,
                 order: None,
                 // TODO: limit: Some(1000),
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_qrt_granularity() -> Result<(), CubeError> {
+        init_logger();
+
+        // CTE called qt_1 is used as ta_2, under the hood DF will use * projection
+        let query_plan = convert_select_to_query_plan(
+            "SELECT
+            \"ta_1\".\"count\" \"ca_1\",
+            DATE_TRUNC('qtr', \"ta_1\".\"order_date\") \"ca_2\"
+            FROM \"db\".\"public\".\"KibanaSampleDataEcommerce\" \"ta_1\"
+            GROUP BY ca_1, ca_2"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("quarter".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
                 limit: None,
                 offset: None,
                 filters: None,
