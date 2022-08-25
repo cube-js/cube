@@ -52,6 +52,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("in_list", in_list),
         t("in_list_with_union", in_list_with_union),
         t("numeric_cast", numeric_cast),
+        t("cast_timestamp_to_utf8", cast_timestamp_to_utf8),
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
         t("timestamp_select", timestamp_select),
@@ -901,6 +902,29 @@ async fn numeric_cast(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
+}
+
+async fn cast_timestamp_to_utf8(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.timestamps (id text, created timestamp)")
+        .await
+        .unwrap();
+
+    service.exec_query(
+        "INSERT INTO foo.timestamps (id, created) VALUES ('a', '2022-01-01T00:00:00Z'), ('b', '2021-01-01T00:00:00Z')"
+    ).await.unwrap();
+
+    let r = service
+        .exec_query("SELECT id, CAST(created AS VARCHAR) from foo.timestamps ORDER BY id ASC")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("a", "2022-01-01 00:00:00"), ("b", "2021-01-01 00:00:00"),])
+    );
 }
 
 async fn numbers_to_bool(service: Box<dyn SqlClient>) {
@@ -2228,15 +2252,17 @@ async fn create_table_with_location_and_hyperloglog_space_separated(service: Box
         file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
 
         file.write_all(
-            format!("0,02 0c 01 00 05 05 7b cf,{}\n", base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])).as_bytes(),
+            format!(
+                "0,02 0c 01 00 05 05 7b cf,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])
+            )
+            .as_bytes(),
         )
         .unwrap();
         file.write_all(
             format!(
                 "1,02 0c 01 00 15 15 7b ff,{}\n",
-                base64::encode(vec![
-                               0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff
-                ])
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff])
             )
             .as_bytes(),
         )
@@ -4450,24 +4476,24 @@ async fn rolling_window_query_timestamps_exceeded(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-        assert_eq!(
-            to_rows(&r),
-            rows(&[
-             (-5, None, None),
-             (-4, None, None),
-             (-3, None, None),
-             (-2, None, None),
-             (-1, None, None),
-             (0, None, None),
-             (1, None, None),
-             (2, None, None),
-             (3, None, None),
-             (4, Some("john"), Some(10)),
-             (4, Some("sara"), Some(7)),
-             (5, Some("john"), Some(19)),
-             (5, Some("sara"), Some(10))
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (-5, None, None),
+            (-4, None, None),
+            (-3, None, None),
+            (-2, None, None),
+            (-1, None, None),
+            (0, None, None),
+            (1, None, None),
+            (2, None, None),
+            (3, None, None),
+            (4, Some("john"), Some(10)),
+            (4, Some("sara"), Some(7)),
+            (5, Some("john"), Some(19)),
+            (5, Some("sara"), Some(10))
         ])
-        );
+    );
 }
 async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
