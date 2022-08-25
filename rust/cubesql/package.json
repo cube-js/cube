@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cubesql",
-  "version": "0.30.57",
+  "version": "0.30.58",
   "description": "SQL API for Cube as proxy over MySQL protocol.",
   "engines": {
     "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
