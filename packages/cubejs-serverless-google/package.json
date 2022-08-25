@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/serverless-google",
   "description": "Cube.js Serverless Google support",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.56",
+  "version": "0.30.57",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -13,7 +13,7 @@
   },
   "main": "index.js",
   "dependencies": {
-    "@cubejs-backend/serverless": "^0.30.56",
+    "@cubejs-backend/serverless": "^0.30.57",
     "@google-cloud/pubsub": "^2.5.0"
   },
   "devDependencies": {
