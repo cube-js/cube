@@ -125,7 +125,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#15715de458e3de2f76b8d0030a57f2b2862b2768"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#6bfc9fb4f038f09f72d41e0aa51929e8e40c4e6f"
 dependencies = [
  "bitflags",
  "chrono",
@@ -148,7 +148,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#15715de458e3de2f76b8d0030a57f2b2862b2768"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#6bfc9fb4f038f09f72d41e0aa51929e8e40c4e6f"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -3119,7 +3119,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#15715de458e3de2f76b8d0030a57f2b2862b2768"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#6bfc9fb4f038f09f72d41e0aa51929e8e40c4e6f"
 dependencies = [
  "arrow",
  "base64 0.13.0",
