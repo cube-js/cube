@@ -468,7 +468,7 @@ impl AsyncPostgresShim {
             return Ok(StartupState::Denied);
         }
 
-        let mut parameters = startup_message.parameters;
+        let parameters = startup_message.parameters;
         if !parameters.contains_key("user") {
             let error_response = protocol::ErrorResponse::new(
                 protocol::ErrorSeverity::Fatal,
@@ -477,10 +477,6 @@ impl AsyncPostgresShim {
             );
             buffer::write_message(&mut self.socket, error_response).await?;
             return Ok(StartupState::Denied);
-        }
-
-        if !parameters.contains_key("database") {
-            parameters.insert("database".to_string(), "db".to_string());
         }
 
         self.write(protocol::Authentication::new(
@@ -527,6 +523,11 @@ impl AsyncPostgresShim {
             return Ok(false);
         }
 
+        let database = parameters
+            .get("database")
+            .map(|v| v.clone())
+            .unwrap_or("db".to_string());
+        self.session.state.set_database(Some(database));
         self.session.state.set_user(Some(user));
         self.session.state.set_auth_context(auth_context);
 
