@@ -54,7 +54,7 @@
     "gatsby-link": "^3",
     "gatsby-plugin-antd": "^2.0.2",
     "gatsby-plugin-catch-links": "^3",
-    "gatsby-plugin-google-analytics": "^3",
+    "gatsby-plugin-google-tagmanager": "^4.21.0",
     "gatsby-plugin-layout": "^1.0.14",
     "gatsby-plugin-manifest": "^3.6.0",
     "gatsby-plugin-mdx": "^2.11.0",

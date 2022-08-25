@@ -32,9 +32,9 @@ const config = {
       },
     },
     {
-      resolve: `gatsby-plugin-google-analytics`,
+      resolve: `gatsby-plugin-google-tagmanager`,
       options: {
-        trackingId: 'UA-70480064-3',
+        id: 'GTM-52W7VM2'
       },
     },
     {
