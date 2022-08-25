@@ -98,6 +98,10 @@ export class CubeStoreQuery extends BaseQuery {
     return `cardinality(${sql})`;
   }
 
+  public castToString(sql) {
+    return `CAST(${sql} as VARCHAR)`;
+  }
+
   public countDistinctApprox(sql) {
     // TODO: We should throw an error, but this gets called even when only `hllMerge` result is used.
     return `approx_distinct_is_unsupported_in_cubestore(${sql}))`;

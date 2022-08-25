@@ -94,7 +94,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       sql = `${sql} WITH (${withEntries.join(', ')})`;
     }
     if (options.uniqueKey) {
-      sql = `${sql} UNIQUE KEY ${options.uniqueKey}`;
+      sql = `${sql} UNIQUE KEY (${options.uniqueKey})`;
     }
     if (options.aggregations) {
       sql = `${sql} ${options.aggregations}`;
