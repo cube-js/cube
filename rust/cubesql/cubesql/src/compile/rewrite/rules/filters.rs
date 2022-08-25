@@ -1,3 +1,4 @@
+use super::utils;
 use crate::{
     compile::{
         engine::provider::CubeContext,
@@ -39,8 +40,6 @@ use datafusion::{
 };
 use egg::{EGraph, Rewrite, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
-
-use super::members::MemberRules;
 
 pub struct FilterRules {
     cube_context: Arc<CubeContext>,
@@ -1767,7 +1766,7 @@ impl FilterRules {
         let granularity_var = var!(granularity_var);
         move |egraph, subst| {
             for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
-                match MemberRules::parse_granularity(granularity, false) {
+                match utils::parse_granularity(granularity, false) {
                     Some(granularity)
                         if granularity.to_lowercase() == target_granularity.to_lowercase() =>
                     {

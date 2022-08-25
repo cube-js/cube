@@ -14,7 +14,7 @@ use crate::{
             original_expr_name, projection, projection_expr, projection_expr_empty_tail,
             referenced_columns, rewrite,
             rewriter::RewriteRules,
-            rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules},
+            rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules, utils},
             segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
             transforming_rewrite, udaf_expr, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AliasExprAlias, CastExprDataType, ChangeUserCube,
@@ -865,7 +865,8 @@ impl MemberRules {
                     )));
 
             for granularity in var_iter!(egraph[subst[outer_granularity_var]], LiteralExprValue) {
-                let outer_granularity = match Self::parse_granularity(granularity, inner_replacer) {
+                let outer_granularity = match utils::parse_granularity(granularity, inner_replacer)
+                {
                     Some(granularity) => granularity,
                     None => continue,
                 };
@@ -873,7 +874,7 @@ impl MemberRules {
                     outer_granularity.clone()
                 } else {
                     var_iter!(egraph[subst[inner_granularity_var]], LiteralExprValue)
-                        .find_map(|g| Self::parse_granularity(g, inner_replacer))
+                        .find_map(|g| utils::parse_granularity(g, inner_replacer))
                         .unwrap_or(outer_granularity.clone())
                 };
 
@@ -1442,6 +1443,7 @@ impl MemberRules {
         let original_expr_var = var!(original_expr_var);
         let alias_var = var!(alias_var);
         let meta_context = self.cube_context.meta.clone();
+
         move |egraph, subst| {
             for column in var_iter!(egraph[subst[dimension_var]], ColumnExprColumn).cloned() {
                 for alias_to_cube in var_iter!(egraph[subst[cube_var]], MemberReplacerAliasToCube) {
@@ -1455,52 +1457,44 @@ impl MemberRules {
                             for granularity in
                                 var_iter!(egraph[subst[granularity_var]], LiteralExprValue)
                             {
-                                if let Some(alias) =
+                                let alias = if let Some(alias) =
                                     original_expr_name(egraph, subst[original_expr_var])
                                 {
-                                    match granularity {
-                                        ScalarValue::Utf8(Some(granularity_value)) => {
-                                            let granularity_value =
-                                                granularity_value.to_lowercase();
-                                            subst.insert(
-                                                time_dimension_name_var,
-                                                egraph.add(LogicalPlanLanguage::TimeDimensionName(
-                                                    TimeDimensionName(
-                                                        time_dimension.name.to_string(),
-                                                    ),
-                                                )),
-                                            );
-                                            subst.insert(
-                                                date_range_var,
-                                                egraph.add(
-                                                    LogicalPlanLanguage::TimeDimensionDateRange(
-                                                        TimeDimensionDateRange(None), // TODO
-                                                    ),
-                                                ),
-                                            );
-                                            subst.insert(
-                                                time_dimension_granularity_var,
-                                                egraph.add(
-                                                    LogicalPlanLanguage::TimeDimensionGranularity(
-                                                        TimeDimensionGranularity(Some(
-                                                            granularity_value,
-                                                        )),
-                                                    ),
-                                                ),
-                                            );
+                                    alias
+                                } else {
+                                    continue;
+                                };
 
-                                            let alias_expr = Self::add_alias_column(
-                                                egraph,
-                                                alias,
-                                                Some(cube_alias),
-                                            );
-                                            subst.insert(alias_var, alias_expr);
+                                let granularity_value =
+                                    match utils::parse_granularity(granularity, false) {
+                                        Some(g) => g,
+                                        None => continue,
+                                    };
 
-                                            return true;
-                                        }
-                                        _ => {}
-                                    }
-                                }
+                                subst.insert(
+                                    time_dimension_name_var,
+                                    egraph.add(LogicalPlanLanguage::TimeDimensionName(
+                                        TimeDimensionName(time_dimension.name.to_string()),
+                                    )),
+                                );
+                                subst.insert(
+                                    date_range_var,
+                                    egraph.add(LogicalPlanLanguage::TimeDimensionDateRange(
+                                        TimeDimensionDateRange(None), // TODO
+                                    )),
+                                );
+                                subst.insert(
+                                    time_dimension_granularity_var,
+                                    egraph.add(LogicalPlanLanguage::TimeDimensionGranularity(
+                                        TimeDimensionGranularity(Some(granularity_value)),
+                                    )),
+                                );
+
+                                let alias_expr =
+                                    Self::add_alias_column(egraph, alias, Some(cube_alias));
+                                subst.insert(alias_var, alias_expr);
+
+                                return true;
                             }
                         }
                     }
@@ -1930,22 +1924,6 @@ impl MemberRules {
 
     pub fn default_count_measure_name() -> String {
         "count".to_string()
-    }
-
-    pub fn parse_granularity(granularity: &ScalarValue, to_normalize: bool) -> Option<String> {
-        match granularity {
-            ScalarValue::Utf8(Some(granularity)) => {
-                if to_normalize {
-                    match granularity.to_lowercase().as_str() {
-                        "dow" | "doy" => Some("day".to_string()),
-                        _ => Some(granularity.clone()),
-                    }
-                } else {
-                    Some(granularity.clone())
-                }
-            }
-            _ => None,
-        }
     }
 
     fn push_down_cross_join_to_empty_scan(

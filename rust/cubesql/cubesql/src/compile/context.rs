@@ -287,8 +287,9 @@ impl QueryContext {
             [ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(ast::Expr::Value(ast::Value::SingleQuotedString(granularity)))), ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(ast::Expr::Identifier(column)))] => {
                 let possible_dimension_name = column.value.to_string();
 
-                match granularity.as_str() {
-                    "second" | "minute" | "hour" | "day" | "week" | "month" | "quarter" | "year" => (),
+                let granularity_value = match granularity.as_str() {
+                    "second" | "minute" | "hour" | "day" | "week" | "month" | "quarter" | "year" => granularity.clone(),
+                    "qtr" => "quarter".to_string(),
                     _ => {
                         return Err(CompilationError::user(format!(
                             "Unsupported granularity {:?}",
@@ -299,7 +300,7 @@ impl QueryContext {
 
                 if let Some(r) = self.find_dimension_for_identifier(&possible_dimension_name) {
                     if r.is_time() {
-                        Ok(Selection::TimeDimension(r, granularity.clone()))
+                        Ok(Selection::TimeDimension(r, granularity_value))
                     } else {
                         Err(CompilationError::user(format!(
                             "Unable to use non time dimension \"{}\" as a column in date_trunc, please specify time dimension",
