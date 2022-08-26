@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.59](https://github.com/cube-js/cube.js/compare/v0.30.58...v0.30.59) (2022-08-26)
+
+
+### Bug Fixes
+
+* **cubesql:** Persist dbname from connection for pg-wire ([#5165](https://github.com/cube-js/cube.js/issues/5165)) ([6bdf5df](https://github.com/cube-js/cube.js/commit/6bdf5df270d00840b1c49e0733c1a5cf8bbc18e3))
+* **cubestore-driver:** Correct syntax for string cast ([#5160](https://github.com/cube-js/cube.js/issues/5160)) ([961a2f2](https://github.com/cube-js/cube.js/commit/961a2f2e838fd8d07b7b15b0d89905a2e596c872))
+
+
+### Features
+
+* **cubestore:** Support Cast from timestamp to string ([#5163](https://github.com/cube-js/cube.js/issues/5163)) ([651a584](https://github.com/cube-js/cube.js/commit/651a5846fd76b2b4792e6f2b83607581ba564cf8))
+
+
+
+
+
 ## [0.30.58](https://github.com/cube-js/cube.js/compare/v0.30.57...v0.30.58) (2022-08-25)
 
 

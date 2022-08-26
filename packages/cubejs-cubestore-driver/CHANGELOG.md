@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.59](https://github.com/cube-js/cube.js/compare/v0.30.58...v0.30.59) (2022-08-26)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Correct syntax for string cast ([#5160](https://github.com/cube-js/cube.js/issues/5160)) ([961a2f2](https://github.com/cube-js/cube.js/commit/961a2f2e838fd8d07b7b15b0d89905a2e596c872))
+
+
+
+
+
 ## [0.30.58](https://github.com/cube-js/cube.js/compare/v0.30.57...v0.30.58) (2022-08-25)
 
 
