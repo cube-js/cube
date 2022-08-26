@@ -8,6 +8,7 @@ type AddPreAggregationToSchemaResult = {
 
 type CloudProviderContext = {
   isCloud: boolean;
+  isAddRollupButtonVisible: boolean;
   addPreAggregationToSchema?: (
     preAggregationDefinition: PreAggregationDefinition
   ) => Promise<AddPreAggregationToSchemaResult>;
@@ -20,14 +21,16 @@ const CloudContext = createContext({} as CloudProviderContext);
 
 type CloudProviderProps = {
   children: ReactNode;
+  isAddRollupButtonVisible?: boolean;
 };
 
-export function CloudProvider({ children }: CloudProviderProps) {
+export function CloudProvider({ children, isAddRollupButtonVisible = true }: CloudProviderProps) {
   const [context, set] = useState<Partial<CloudProviderContext>>({});
 
   return (
     <CloudContext.Provider
       value={{
+        isAddRollupButtonVisible,
         ...context,
         setContext(partialContext) {
           set({
