@@ -134,7 +134,7 @@ function QueryTabsRenderer({
             {securityContextToken ? 'Edit' : 'Add'} Security Context
           </Button>
 
-          {isAddRollupButtonVisible ? (
+          {isAddRollupButtonVisible == null || isAddRollupButtonVisible ? (
             <Button
               data-testid="rd-btn"
               icon={<ThunderboltOutlined />}
