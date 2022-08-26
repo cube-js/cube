@@ -240,6 +240,7 @@ declare module '@cubejs-client/react' {
 
     meta: Meta | undefined;
     metaError?: Error | null;
+    richMetaError?: Error | null;
     metaErrorStack?: string | null;
     isFetchingMeta: boolean;
     /**

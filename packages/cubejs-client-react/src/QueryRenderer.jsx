@@ -3,7 +3,6 @@ import { equals, toPairs, fromPairs } from 'ramda';
 import { isQueryPresent } from '@cubejs-client/core';
 
 import CubeContext from './CubeContext';
-import { generateAnsiHTML } from './utils';
 
 export default class QueryRenderer extends React.Component {
   // @deprected use `isQueryPresent` from `@cubejs-client/core`
@@ -136,7 +135,7 @@ export default class QueryRenderer extends React.Component {
     const { render } = this.props;
 
     const loadState = {
-      error: error ? new Error(generateAnsiHTML(error.message || error.toString())) : null,
+      error: error ? new Error(error.response?.plainError || error.message || error.toString()) : null,
       resultSet: queries ? (resultSet || {}) : resultSet,
       loadingState: { isLoading },
       sqlQuery
