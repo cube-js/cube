@@ -870,6 +870,7 @@ impl MemberRules {
                     Some(granularity) => granularity,
                     None => continue,
                 };
+
                 let inner_granularity = if outer_granularity_var == inner_granularity_var {
                     outer_granularity.clone()
                 } else {
@@ -919,9 +920,11 @@ impl MemberRules {
                             ))),
                         );
                     }
+
                     return true;
                 }
             }
+
             false
         }
     }
