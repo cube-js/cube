@@ -1,6 +1,7 @@
 import { Space, Typography, Button } from 'antd';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import styled from 'styled-components';
+import { generateAnsiHTML } from '../shared/helpers';
 
 import { Alert } from './Alert';
 
@@ -20,6 +21,10 @@ type FatalErrorProps = {
 
 export function FatalError({ error, stack }: FatalErrorProps) {
   const [visible, setVisible] = useState(false);
+  
+  const ansiHtmlError = useMemo(() => {
+    return generateAnsiHTML(error.toString()).replace(/(Error:\s)/g, '');
+  }, [error])
 
   return (
     <Space direction="vertical">
@@ -45,7 +50,7 @@ export function FatalError({ error, stack }: FatalErrorProps) {
           <Space direction="vertical">
             <Code
               dangerouslySetInnerHTML={{
-                __html: error.toString().replace(/(Error:\s)/g, ''),
+                __html: ansiHtmlError,
               }}
             />
 
