@@ -1161,6 +1161,8 @@ class ApiGateway {
   }: any) {
     const { requestId } = context ?? {};
     
+    const plainError = e.plainMessages;
+    
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
@@ -1168,7 +1170,7 @@ class ApiGateway {
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.message, stack: e.stack, requestId }, { status: e.status });
+      res({ error: e.message, stack: e.stack, requestId, plainError }, { status: e.status });
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
@@ -1196,6 +1198,7 @@ class ApiGateway {
         {
           type: e.type,
           error: e.message,
+          plainError,
           stack: e.stack,
           requestId
         },
@@ -1208,7 +1211,7 @@ class ApiGateway {
         error: e.stack || e.toString(),
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.toString(), stack: e.stack, requestId }, { status: 500 });
+      res({ error: e.toString(), stack: e.stack, requestId, plainError, }, { status: 500 });
     }
   }
 
