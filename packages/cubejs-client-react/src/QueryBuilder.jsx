@@ -154,7 +154,7 @@ export default class QueryBuilder extends React.Component {
       this.setState({ isFetchingMeta: true });
       meta = await this.cubejsApi().meta();
     } catch (error) {
-      metaError = error;
+      metaError = error.response?.plainError || error;
       metaErrorStack = error.response?.stack?.replace(error.message || '', '') || '';
     }
 

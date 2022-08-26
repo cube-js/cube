@@ -1,4 +1,4 @@
-import { Component, useEffect, FunctionComponent, lazy, Suspense } from 'react';
+import { Component, FunctionComponent, lazy, Suspense } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
@@ -12,14 +12,11 @@ import { Dropdown, Menu, Modal } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
 import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
-import { QueryRenderer } from '@cubejs-client/react';
 import { ChartType, Meta, Query, ResultSet } from '@cubejs-client/core';
-import { format } from 'sql-formatter';
 
 import { SectionRow } from './components';
 import { Button, Card, CubeLoader, FatalError } from './atoms';
 import PrismCode from './PrismCode';
-import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
 import { codeSandboxDefinition, copyToClipboard } from './utils';
 import DashboardSource from './DashboardSource';
@@ -29,6 +26,10 @@ const GraphiQLSandbox = lazy(
   () => import('./components/GraphQL/GraphiQLSandbox')
 );
 
+const SqlQueryTab = lazy(() => import('./components/SqlQueryTab'));
+
+const CachePane = lazy(() => import('./components/CachePane'));
+
 const frameworkToTemplate = {
   react: 'create-react-app',
   angular: 'angular-cli',
@@ -37,7 +38,7 @@ const frameworkToTemplate = {
 
 const StyledCard: any = styled(Card)`
   min-height: 420px;
-  
+
   .ant-card-head {
     position: sticky;
     top: 0;
@@ -184,7 +185,7 @@ class ChartContainer extends Component<
         }
       );
       let codeExample = '';
-      
+
       if (props.framework === 'react') {
         codeExample = codesandboxFiles['index.js'];
       } else if (props.framework === 'angular') {
@@ -503,47 +504,46 @@ class ChartContainer extends Component<
         return <PrismCode code={queryText} />;
       } else if (showCode === 'sql') {
         return (
-          <QueryRenderer
-            loadSql="only"
-            query={query}
-            render={({ sqlQuery, loadingState, error }) => {
-              if (error) {
-                return <FatalError error={error} />;
-              }
-
-              // in the case of a compareDateRange query the SQL will be the same
-              const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
-              const value = query && format(query.sql());
-
-              return (
-                <>
-                  <PrismCode code={value} />
-                  <SqlEmitter
-                    loading={loadingState.isLoading}
-                    sql={value}
-                    onChange={({ sql, loading }) => {
-                      this.setState({
-                        sql: {
-                          loading,
-                          value: sql,
-                        },
-                      });
-                    }}
-                  />
-                </>
-              );
-            }}
-          />
+          <Suspense
+            fallback={
+              <div style={{ height: 363 }}>
+                <CubeLoader />
+              </div>
+            }
+          >
+            <SqlQueryTab
+              query={query}
+              onChange={(sql) => {
+                this.setState({ sql });
+              }}
+            />
+          </Suspense>
         );
       } else if (showCode === 'cache') {
-        return <CachePane query={query} />;
+        return (
+          <Suspense
+            fallback={
+              <div style={{ height: 363 }}>
+                <CubeLoader />
+              </div>
+            }
+          >
+            <CachePane query={query} />
+          </Suspense>
+        );
       } else if (showCode === 'graphiql' && meta) {
         if (!this.props.isGraphQLSupported) {
-          return <div>GraphQL API is supported since version 0.29.0</div>
+          return <div>GraphQL API is supported since version 0.29.0</div>;
         }
-        
+
         return (
-          <Suspense fallback={<div style={{ height: 363 }}><CubeLoader /></div>}>
+          <Suspense
+            fallback={
+              <div style={{ height: 363 }}>
+                <CubeLoader />
+              </div>
+            }
+          >
             <GraphiQLSandbox
               apiUrl={this.props.apiUrl}
               query={query}
@@ -634,25 +634,6 @@ class ChartContainer extends Component<
       </StyledCard>
     );
   }
-}
-
-type SqlEmitterOnChangeProps = {
-  sql?: string;
-  loading: boolean;
-};
-
-type SqlEmitterProps = {
-  loading: boolean;
-  sql?: string;
-  onChange: (props: SqlEmitterOnChangeProps) => void;
-};
-
-function SqlEmitter({ sql, loading, onChange }: SqlEmitterProps) {
-  useEffect(() => {
-    onChange({ sql, loading });
-  }, [sql, loading]);
-
-  return null;
 }
 
 export default withRouter(ChartContainer);
