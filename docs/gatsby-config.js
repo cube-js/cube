@@ -34,7 +34,8 @@ const config = {
     {
       resolve: `gatsby-plugin-google-tagmanager`,
       options: {
-        id: 'GTM-52W7VM2'
+        id: 'GTM-52W7VM2',
+        routeChangeEventName: 'pageview'
       },
     },
     {
