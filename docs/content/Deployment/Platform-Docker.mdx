@@ -89,7 +89,7 @@ services:
       - CUBESTORE_META_PORT=9999
       - CUBESTORE_SERVER_NAME=cubestore_router:9999
     volumes:
-      - .cubestore/router:/cube/data
+      - .cubestore:/cube/data
 
   cubestore_worker_1:
     restart: always
