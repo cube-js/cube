@@ -203,6 +203,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("aggregate_index_hll", aggregate_index_hll),
         t("aggregate_index_errors", aggregate_index_errors),
         t("inline_tables", inline_tables),
+        t("inline_tables_2x", inline_tables_2x),
         t("build_range_end", build_range_end),
     ];
 
@@ -5601,8 +5602,8 @@ async fn aggregate_index_errors(service: Box<dyn SqlClient>) {
 }
 
 async fn inline_tables(service: Box<dyn SqlClient>) {
-    let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
-    let _ = service
+    service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    service
         .exec_query(
             "CREATE TABLE Foo.Persons (
                 ID int,
@@ -5679,7 +5680,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]),
     ];
     let data = Arc::new(DataFrame::new(columns, rows.clone()));
-    let inline_tables = vec![InlineTable::new("Persons".to_string(), data)];
+    let inline_tables = vec![InlineTable::new(1000, "Persons".to_string(), data)];
 
     let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
@@ -5749,6 +5750,122 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
                 TableValue::Null,
                 TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
             ]),
+        ]
+    );
+}
+
+async fn inline_tables_2x(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    service
+        .exec_query("CREATE TABLE Foo.Persons (ID int, First varchar(255), Last varchar(255))")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE Foo.Persons2 (ID int, First varchar(255), Last varchar(255))")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons
+            (ID, Last, First)
+            VALUES
+            (11, 'last 11', 'first 11'),
+            (12, 'last 12', 'first 12'),
+            (13, 'last 13', 'first 13')",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons2
+            (ID, Last, First)
+            VALUES
+            (31, 'last 31', 'first 31'),
+            (32, 'last 32', 'first 32'),
+            (33, 'last 33', 'first 33')",
+        )
+        .await
+        .unwrap();
+
+    let columns = vec![
+        Column::new("ID".to_string(), ColumnType::Int, 0),
+        Column::new("Last".to_string(), ColumnType::String, 1),
+        Column::new("First".to_string(), ColumnType::String, 2),
+    ];
+    let rows = vec![
+        Row::new(vec![
+            TableValue::Int(41),
+            TableValue::String("last 41".to_string()),
+            TableValue::String("first 41".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(42),
+            TableValue::String("last 42".to_string()),
+            TableValue::String("first 42".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(43),
+            TableValue::String("last 43".to_string()),
+            TableValue::String("first 43".to_string()),
+        ]),
+    ];
+    let rows2 = vec![
+        Row::new(vec![
+            TableValue::Int(21),
+            TableValue::String("last 21".to_string()),
+            TableValue::String("first 21".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(22),
+            TableValue::String("last 22".to_string()),
+            TableValue::String("first 22".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(23),
+            TableValue::String("last 23".to_string()),
+            TableValue::String("first 23".to_string()),
+        ]),
+    ];
+    let data = Arc::new(DataFrame::new(columns.clone(), rows.clone()));
+    let data2 = Arc::new(DataFrame::new(columns.clone(), rows2.clone()));
+    let inline_tables = vec![
+        InlineTable::new(1000, "Persons".to_string(), data),
+        InlineTable::new(1001, "Persons2".to_string(), data2),
+    ];
+
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
+    let result = service
+        .exec_query_with_context(
+            context,
+            r#"
+            SELECT Last
+            FROM (
+                SELECT ID, Last FROM Foo.Persons
+                UNION ALL SELECT ID, Last FROM Foo.Persons2
+                UNION ALL SELECT ID, Last FROM Persons
+                UNION ALL SELECT ID, Last FROM Persons2
+            )
+            ORDER BY Last
+        "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows().to_vec(),
+        vec![
+            Row::new(vec![TableValue::String("last 11".to_string())]),
+            Row::new(vec![TableValue::String("last 12".to_string())]),
+            Row::new(vec![TableValue::String("last 13".to_string())]),
+            Row::new(vec![TableValue::String("last 21".to_string())]),
+            Row::new(vec![TableValue::String("last 22".to_string())]),
+            Row::new(vec![TableValue::String("last 23".to_string())]),
+            Row::new(vec![TableValue::String("last 31".to_string())]),
+            Row::new(vec![TableValue::String("last 32".to_string())]),
+            Row::new(vec![TableValue::String("last 33".to_string())]),
+            Row::new(vec![TableValue::String("last 41".to_string())]),
+            Row::new(vec![TableValue::String("last 42".to_string())]),
+            Row::new(vec![TableValue::String("last 43".to_string())]),
         ]
     );
 }

@@ -225,12 +225,14 @@ impl ContextProvider for MetaStoreSchemaProvider {
         let (schema, table) = match name {
             TableReference::Partial { schema, table } => (schema, table),
             TableReference::Bare { table } => {
+                let table = self
+                    .inline_tables
+                    .iter()
+                    .find(|inline_table| inline_table.name == table)?;
                 return Some(Arc::new(InlineTableProvider::new(
-                    self.inline_tables
-                        .iter()
-                        .find(|inline_table| inline_table.name == table)?
-                        .data
-                        .clone(),
+                    table.id,
+                    table.data.clone(),
+                    Vec::new(),
                 )));
             }
             TableReference::Full { .. } => return None,
@@ -573,9 +575,9 @@ fn compute_workers(
         workers: Vec<String>,
     }
     impl<'a> PlanVisitor for Visitor<'a> {
-        type Error = ();
+        type Error = CubeError;
 
-        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, ()> {
+        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, CubeError> {
             match plan {
                 LogicalPlan::Extension { node } => {
                     let snapshots;
@@ -590,7 +592,7 @@ fn compute_workers(
                         self.config,
                         snapshots.as_slice(),
                         self.tree,
-                    );
+                    )?;
                     self.workers = workers.into_iter().map(|w| w.0).collect();
                     Ok(false)
                 }
@@ -609,6 +611,6 @@ fn compute_workers(
         Ok(true) => Err(CubeError::internal(
             "no cluster send node found in plan".to_string(),
         )),
-        Err(_) => panic!("unexpected return value"),
+        Err(e) => Err(e),
     }
 }

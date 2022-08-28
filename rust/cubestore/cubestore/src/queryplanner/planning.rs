@@ -44,8 +44,10 @@ use crate::metastore::{
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
 use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
-use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable};
-use crate::queryplanner::serialized_plan::{IndexSnapshot, PartitionSnapshot, SerializedPlan};
+use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, InlineTableProvider};
+use crate::queryplanner::serialized_plan::{
+    IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
+};
 use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
@@ -471,44 +473,49 @@ impl ChooseIndex<'_> {
     fn choose_table_index(&mut self, mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> {
         match &mut p {
             LogicalPlan::TableScan { source, .. } => {
-                match source.as_any().downcast_ref::<CubeTableLogical>() {
-                    Some(table) => {
-                        assert!(
-                            self.next_index < self.chosen_indices.len(),
-                            "inconsistent state"
-                        );
+                if let Some(table) = source.as_any().downcast_ref::<CubeTableLogical>() {
+                    assert!(
+                        self.next_index < self.chosen_indices.len(),
+                        "inconsistent state"
+                    );
 
-                        assert_eq!(
-                            table.table.table.get_id(),
-                            self.chosen_indices[self.next_index]
-                                .table_path
-                                .table
-                                .get_id()
-                        );
+                    assert_eq!(
+                        table.table.table.get_id(),
+                        self.chosen_indices[self.next_index]
+                            .table_path
+                            .table
+                            .get_id()
+                    );
 
-                        let snapshot = self.chosen_indices[self.next_index].clone();
-                        self.next_index += 1;
+                    let snapshot = self.chosen_indices[self.next_index].clone();
+                    self.next_index += 1;
 
-                        let table_schema = source.schema();
-                        *source = Arc::new(CubeTable::try_new(
-                            snapshot.clone(),
-                            // Filled by workers
-                            HashMap::new(),
-                            Vec::new(),
-                            NoopParquetMetadataCache::new(),
-                        )?);
+                    let table_schema = source.schema();
+                    *source = Arc::new(CubeTable::try_new(
+                        snapshot.clone(),
+                        // Filled by workers
+                        HashMap::new(),
+                        Vec::new(),
+                        NoopParquetMetadataCache::new(),
+                    )?);
 
-                        let index_schema = source.schema();
-                        assert_eq!(table_schema, index_schema);
+                    let index_schema = source.schema();
+                    assert_eq!(table_schema, index_schema);
 
-                        return Ok(
-                            ClusterSendNode::new(Arc::new(p), vec![vec![Some(snapshot)]])
-                                .into_plan(),
-                        );
-                    }
-                    None => {
-                        return Ok(ClusterSendNode::new(Arc::new(p), vec![vec![None]]).into_plan());
-                    }
+                    return Ok(ClusterSendNode::new(
+                        Arc::new(p),
+                        vec![vec![Snapshot::Index(snapshot)]],
+                    )
+                    .into_plan());
+                } else if let Some(table) = source.as_any().downcast_ref::<InlineTableProvider>() {
+                    let id = table.get_id();
+                    return Ok(ClusterSendNode::new(
+                        Arc::new(p),
+                        vec![vec![Snapshot::Inline(InlineSnapshot { id })]],
+                    )
+                    .into_plan());
+                } else {
+                    panic!("Unexpected table source")
                 }
             }
             _ => return Ok(p),
@@ -906,17 +913,22 @@ fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
     arrow::datatypes::Schema::new(schema_fields)
 }
 
-// None snapshot denotes an inline table and its associated fake partition.
-pub type Snapshots = Vec<Vec<Option<IndexSnapshot>>>;
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum Snapshot {
+    Index(IndexSnapshot),
+    Inline(InlineSnapshot),
+}
+
+pub type Snapshots = Vec<Snapshot>;
 
 #[derive(Debug, Clone)]
 pub struct ClusterSendNode {
     pub input: Arc<LogicalPlan>,
-    pub snapshots: Snapshots,
+    pub snapshots: Vec<Snapshots>,
 }
 
 impl ClusterSendNode {
-    pub fn new(input: Arc<LogicalPlan>, snapshots: Snapshots) -> Self {
+    pub fn new(input: Arc<LogicalPlan>, snapshots: Vec<Snapshots>) -> Self {
         ClusterSendNode { input, snapshots }
     }
 
@@ -1090,7 +1102,7 @@ impl CubeExtensionPlanner {
     pub fn plan_cluster_send(
         &self,
         input: Arc<dyn ExecutionPlan>,
-        snapshots: &Snapshots,
+        snapshots: &Vec<Snapshots>,
         schema: SchemaRef,
         use_streaming: bool,
         max_batch_rows: usize,
@@ -1107,7 +1119,7 @@ impl CubeExtensionPlanner {
                 snapshots,
                 input,
                 use_streaming,
-            )))
+            )?))
         } else {
             Ok(Arc::new(WorkerExec {
                 input,
@@ -1585,7 +1597,8 @@ pub mod tests {
             c.config_obj().as_ref(),
             &cs,
             &meta.multi_part_subtree,
-        );
+        )
+        .unwrap();
 
         let part = |id: u64, start: Option<i64>, end: Option<i64>| {
             let start = start.map(|i| Row::new(vec![TableValue::Int(i)]));
@@ -1597,29 +1610,35 @@ pub mod tests {
             vec![
                 (
                     "worker1".to_string(),
-                    vec![
-                        part(2, None, None),
-                        part(7, None, None),
-                        part(0, Some(100), None),
-                        part(5, Some(100), None),
-                        part(3, None, None),
-                        part(8, None, None),
-                        part(1, None, Some(25)),
-                        part(6, None, Some(25)),
-                        part(0, None, Some(25)),
-                        part(5, None, Some(25)),
-                    ]
+                    (
+                        vec![
+                            part(2, None, None),
+                            part(7, None, None),
+                            part(0, Some(100), None),
+                            part(5, Some(100), None),
+                            part(3, None, None),
+                            part(8, None, None),
+                            part(1, None, Some(25)),
+                            part(6, None, Some(25)),
+                            part(0, None, Some(25)),
+                            part(5, None, Some(25)),
+                        ],
+                        vec![]
+                    )
                 ),
                 (
                     "worker2".to_string(),
-                    vec![
-                        part(4, None, None),
-                        part(9, None, None),
-                        part(1, Some(25), Some(100)),
-                        part(6, Some(25), Some(100)),
-                        part(0, Some(25), Some(100)),
-                        part(5, Some(25), Some(100)),
-                    ]
+                    (
+                        vec![
+                            part(4, None, None),
+                            part(9, None, None),
+                            part(1, Some(25), Some(100)),
+                            part(6, Some(25), Some(100)),
+                            part(0, Some(25), Some(100)),
+                            part(5, Some(25), Some(100)),
+                        ],
+                        vec![]
+                    )
                 )
             ]
         );
