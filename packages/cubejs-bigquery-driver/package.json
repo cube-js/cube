@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/bigquery-driver",
   "description": "Cube.js BigQuery database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.57",
+  "version": "0.30.60",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -36,7 +36,7 @@
     "ramda": "^0.27.2"
   },
   "devDependencies": {
-    "@cubejs-backend/testing-shared": "^0.30.57",
+    "@cubejs-backend/testing-shared": "^0.30.60",
     "@types/dedent": "^0.7.0",
     "@types/ramda": "^0.27.40",
     "typescript": "~4.1.5"

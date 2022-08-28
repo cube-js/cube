@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.60](https://github.com/cube-js/cube.js/compare/v0.30.59...v0.30.60) (2022-08-28)
+
+
+### Bug Fixes
+
+* **cubestore:** Read an inline table only on the assigned worker ([#5147](https://github.com/cube-js/cube.js/issues/5147)) ([15c2aa0](https://github.com/cube-js/cube.js/commit/15c2aa0c6ff7460450b432a0cc6ff0bd04126faf))
+
+
+
+
+
 ## [0.30.59](https://github.com/cube-js/cube.js/compare/v0.30.58...v0.30.59) (2022-08-26)
 
 
