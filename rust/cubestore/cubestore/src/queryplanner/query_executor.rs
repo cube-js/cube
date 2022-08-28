@@ -898,7 +898,7 @@ pub type PartitionWithFilters = (u64, RowRange);
 pub type InlineTableId = u64;
 
 /// Compound structure to assign inline tables to specific partitions so they can get to the same worker.
-/// It's helpful to do so in order to avoid allocation of additional worker allocations for inline table micro reads.
+/// It's helpful to do so in order to avoid allocation of additional workers for inline table micro reads.
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum InlineCompoundPartition {
     Partition(IdRow<Partition>),
