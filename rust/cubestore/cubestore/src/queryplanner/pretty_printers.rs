@@ -375,12 +375,16 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 "ClusterSend, partitions: [{}]",
                 cs.partitions
                     .iter()
-                    .map(|(_, ps)| {
+                    .map(|(_, (ps, inline))| {
                         let ps = ps
                             .iter()
                             .map(|(id, range)| format!("{}{}", id, pp_row_range(range)))
                             .join(", ");
-                        format!("[{}]", ps)
+                        if !inline.is_empty() {
+                            format!("[{}, inline: {}]", ps, inline.iter().join(", "))
+                        } else {
+                            format!("[{}]", ps)
+                        }
                     })
                     .join(", ")
             );

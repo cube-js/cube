@@ -14,7 +14,6 @@ use crate::config::injection::{DIService, Injector};
 use crate::config::{is_router, WorkerServices};
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
-use crate::http::INLINE_PARTITION_ID_BASE;
 use crate::import::ImportService;
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
@@ -1676,17 +1675,6 @@ pub fn pick_worker_by_ids<'a>(
         p.hash(&mut hasher);
     }
     workers[(hasher.finish() % workers.len() as u64) as usize].as_str()
-}
-
-pub fn has_inline_table_partition<'a>(
-    partitions: impl IntoIterator<Item = &'a IdRow<Partition>>,
-) -> bool {
-    for partition in partitions {
-        if partition.get_id() >= INLINE_PARTITION_ID_BASE {
-            return true;
-        }
-    }
-    false
 }
 
 /// Same as [pick_worker_by_ids], but uses ranges of partitions. This is a hack

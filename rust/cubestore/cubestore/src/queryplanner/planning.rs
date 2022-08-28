@@ -1119,7 +1119,7 @@ impl CubeExtensionPlanner {
                 snapshots,
                 input,
                 use_streaming,
-            )))
+            )?))
         } else {
             Ok(Arc::new(WorkerExec {
                 input,
@@ -1597,7 +1597,8 @@ pub mod tests {
             c.config_obj().as_ref(),
             &cs,
             &meta.multi_part_subtree,
-        );
+        )
+        .unwrap();
 
         let part = |id: u64, start: Option<i64>, end: Option<i64>| {
             let start = start.map(|i| Row::new(vec![TableValue::Int(i)]));
@@ -1609,29 +1610,35 @@ pub mod tests {
             vec![
                 (
                     "worker1".to_string(),
-                    vec![
-                        part(2, None, None),
-                        part(7, None, None),
-                        part(0, Some(100), None),
-                        part(5, Some(100), None),
-                        part(3, None, None),
-                        part(8, None, None),
-                        part(1, None, Some(25)),
-                        part(6, None, Some(25)),
-                        part(0, None, Some(25)),
-                        part(5, None, Some(25)),
-                    ]
+                    (
+                        vec![
+                            part(2, None, None),
+                            part(7, None, None),
+                            part(0, Some(100), None),
+                            part(5, Some(100), None),
+                            part(3, None, None),
+                            part(8, None, None),
+                            part(1, None, Some(25)),
+                            part(6, None, Some(25)),
+                            part(0, None, Some(25)),
+                            part(5, None, Some(25)),
+                        ],
+                        vec![]
+                    )
                 ),
                 (
                     "worker2".to_string(),
-                    vec![
-                        part(4, None, None),
-                        part(9, None, None),
-                        part(1, Some(25), Some(100)),
-                        part(6, Some(25), Some(100)),
-                        part(0, Some(25), Some(100)),
-                        part(5, Some(25), Some(100)),
-                    ]
+                    (
+                        vec![
+                            part(4, None, None),
+                            part(9, None, None),
+                            part(1, Some(25), Some(100)),
+                            part(6, Some(25), Some(100)),
+                            part(0, Some(25), Some(100)),
+                            part(5, Some(25), Some(100)),
+                        ],
+                        vec![]
+                    )
                 )
             ]
         );

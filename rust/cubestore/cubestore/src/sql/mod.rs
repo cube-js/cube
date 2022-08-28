@@ -1160,6 +1160,7 @@ impl SqlService for SqlServiceImpl {
                                         .map(|p| (p.partition.get_id(), RowFilter::default()))
                                 })
                                 .collect(),
+                            context.inline_tables.into_iter().map(|i| i.id).collect(),
                         );
                         let mut mocked_names = HashMap::new();
                         for (_, f, _) in worker_plan.files_to_download() {
