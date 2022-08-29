@@ -2449,7 +2449,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_date_sub_udf());
         ctx.register_udf(create_date_add_udf());
         ctx.register_udf(create_str_to_date_udf());
-        ctx.register_udf(create_current_timestamp_udf());
+        ctx.register_udf(create_current_timestamp_udf("current_timestamp"));
+        ctx.register_udf(create_current_timestamp_udf("localtimestamp"));
         ctx.register_udf(create_current_schema_udf());
         ctx.register_udf(create_current_schemas_udf());
         ctx.register_udf(create_format_type_udf());
@@ -10682,6 +10683,21 @@ ORDER BY \"COUNT(count)\" DESC"
                     key_seq
                 "
                 .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_localtimestamp() -> Result<(), CubeError> {
+        // TODO: the value will be different with the introduction of TZ support
+        insta::assert_snapshot!(
+            "localtimestamp",
+            execute_query(
+                "SELECT localtimestamp = current_timestamp".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
