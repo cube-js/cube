@@ -1226,7 +1226,7 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
     )
 }
 
-pub fn create_current_timestamp_udf() -> ScalarUDF {
+pub fn create_current_timestamp_udf(name: &str) -> ScalarUDF {
     let fun: Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync> =
         Arc::new(move |_| panic!("Should be rewritten with UtcTimestamp function"));
 
@@ -1234,7 +1234,7 @@ pub fn create_current_timestamp_udf() -> ScalarUDF {
         Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
 
     ScalarUDF::new(
-        "current_timestamp",
+        name,
         &Signature::exact(vec![], Volatility::Immutable),
         &return_type,
         &fun,
