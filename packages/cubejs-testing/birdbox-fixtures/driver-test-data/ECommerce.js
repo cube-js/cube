@@ -15,6 +15,7 @@ cube(`ECommerce`, {
         CUBE.avgDiscount,
         CUBE.totalSales,
         CUBE.totalProfit,
+        CUBE.uniqueCityCount,
       ],
       refreshKey: {
         every: `1 hour`,

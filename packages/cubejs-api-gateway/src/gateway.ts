@@ -31,6 +31,7 @@ import {
   ExtendContextFn,
   ResponseResultFn,
   QueryRequest,
+  PreAggsSelector,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -244,6 +245,12 @@ class ApiGateway {
       });
     }));
 
+    app.post(
+      `${this.basePath}/v1/pre-aggregations-build`,
+      userMiddlewares,
+      this.postPreAggregationsBuildJob.bind(this),
+    );
+
     app.get(`${this.basePath}/v1/dry-run`, userMiddlewares, (async (req, res) => {
       await this.dryRun({
         query: req.query.query,
@@ -450,6 +457,65 @@ class ApiGateway {
         res,
         requestStarted,
       });
+    }
+  }
+
+  /**
+   * Add pre-aggregations build job. Returns added jobs ids.
+   * TODO (buntarb): selector object validator.
+   */
+  private async postPreAggregationsBuildJob(req: Request, res: Response) {
+    const requestStarted = new Date();
+    const { context } = req;
+    const selector = <PreAggsSelector>req.body;
+    const response = this.resToResultFn(res);
+    try {
+      const compiler = this.getCompilerApi(context);
+      const orchestrator = this.getAdapterApi(context);
+      const timezones = selector.timezones && selector.timezones.length
+        ? selector.timezones
+        : undefined;
+      const preaggs = await compiler.preAggregations({
+        dataSources: selector.dataSources,
+        cubes: selector.cubes,
+        preAggregationIds: selector.preAggregationIds,
+      });
+      const partitions = (
+        await this
+          .refreshScheduler()
+          .preAggregationPartitions(
+            context,
+            normalizeQueryPreAggregations({
+              timezones,
+              preAggregations: preaggs.map(p => ({ id: p.id })),
+            }),
+          )
+      ).filter(p => !p?.errors?.length);
+      const versions = partitions && await orchestrator
+        .getPreAggregationVersionEntries(
+          context,
+          partitions,
+          compiler.preAggregationsSchema,
+        );
+      // await this.refreshScheduler()
+      //   .buildPreAggregations(
+      //     context,
+      //     {
+      //       metadata: undefined,
+      //       timezones,
+      //       preAggregations: preaggs.map(p => ({
+      //         id: p.id,
+      //         cacheOnly: undefined, // boolean
+      //         partitions: undefined, // string[]
+      //       })),
+      //       forceBuildPreAggregations: undefined,
+      //       throwErrors: false,
+      //     }
+      //   );
+      // const preAggsStates = await orchestrator.getPreAggregationQueueStates();
+      response({ partitions, versions }, { status: 200 });
+    } catch (e) {
+      this.handleError({ e, context, res: response, requestStarted });
     }
   }
 

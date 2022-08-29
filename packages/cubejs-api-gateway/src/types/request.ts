@@ -119,6 +119,14 @@ type QueryRequest = BaseRequest & {
   resType?: ResultType
 };
 
+type PreAggsSelector = {
+  tenants?: {securityContext: any}[],
+  timezones?: string[],
+  dataSources?: string[],
+  cubes?: string[],
+  preAggregationIds?: string[],
+};
+
 export {
   RequestContext,
   RequestExtension,
@@ -130,4 +138,5 @@ export {
   ResponseResultFn,
   BaseRequest,
   QueryRequest,
+  PreAggsSelector,
 };

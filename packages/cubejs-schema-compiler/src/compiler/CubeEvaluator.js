@@ -207,12 +207,24 @@ export class CubeEvaluator extends CubeSymbols {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
+  /**
+   * Returns pre-aggregations filtered by the spcified selector.
+   * @param {{
+   *  scheduled: boolean,
+   *  dataSource: Array<string>,
+   *  cubes: Array<string>,
+   *  preAggregationIds: Array<string>
+   * }} filter pre-aggregations selector
+   * @returns {*}
+   */
   preAggregations(filter) {
-    const { scheduled, cubes, preAggregationIds } = filter || {};
+    const { scheduled, dataSources, cubes, preAggregationIds } = filter || {};
     const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
 
     return Object.keys(this.evaluatedCubes)
+      // TODO (buntarb): optimize it to one cycle
       .filter(cube => !cubes || cubes.includes(cube))
+      .filter(cube => !dataSources || dataSources.includes(this.evaluatedCubes[cube].dataSource))
       .map(cube => {
         const preAggregations = this.preAggregationsForCube(cube);
         return Object.keys(preAggregations)
