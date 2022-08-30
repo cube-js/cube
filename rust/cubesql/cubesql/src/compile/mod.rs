@@ -11771,4 +11771,84 @@ ORDER BY \"COUNT(count)\" DESC"
 
         assert_eq!(cube_scan.options.change_user, Some("foo".to_string()))
     }
+
+    #[tokio::test]
+    async fn test_sort_relations() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_sort_relations_0",
+            execute_query(
+                "select pg_class.oid as oid from pg_class order by pg_class.oid asc".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_1",
+            execute_query(
+                "select * from (select pg_class.oid AS oid from pg_class order by pg_class.oid) source".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_2",
+            execute_query(
+                "select * from (select oid from pg_class order by pg_class.oid) t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_3",
+            execute_query(
+                "select t.oid as oid from (select oid as oid from pg_class) t order by t.oid"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_4",
+            execute_query(
+                "select oid as oid from (select count(oid) as oid from pg_class order by count(pg_class.oid)) t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_5",
+            execute_query(
+                "select oid as oid from (select count(oid) as oid from pg_class order by count(oid)) t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_6",
+            execute_query(
+                "select pg_class.oid as oid from pg_class group by pg_class.oid order by pg_class.oid asc".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_7",
+            execute_query(
+                "select * from (select oid from pg_class group by pg_class.oid order by pg_class.oid) t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }

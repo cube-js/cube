@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select oid as oid from (select count(oid) as oid from pg_class order by count(oid)) t\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----+
+| oid |
++-----+
+| 2   |
++-----+
