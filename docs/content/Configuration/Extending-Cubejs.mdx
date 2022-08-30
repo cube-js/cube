@@ -1,18 +1,40 @@
 ---
-title: Extending Cube.js
+title: Extending Cube
 permalink: /configuration/extending-cubejs
 category: Configuration
 menuOrder: 5
 ---
 
-For some advanced use-cases like instrumentation, or custom authentication,
-Cube.js can be extended by installing third-party Node.js packages and using
-them in the [`cube.js` configuration file][ref-config].
+For some advanced use-cases like instrumentation, or custom authentication, Cube
+can be extended by installing third-party Node.js packages and using them in the
+[`cube.js` configuration file][ref-config].
 
-## Example: sending Cube.js logs to Loggly
+## Examples
+
+### Sending Express metrics to Prometheus
+
+```typescript
+const prometheusMiddleware = require('express-prometheus-middleware');
+
+module.exports = {
+  initApp: (app) => {
+    app.use(
+      prometheusMiddleware({
+        metricsPath: '/metrics',
+        collectDefaultMetrics: true,
+        requestDurationBuckets: [0.1, 0.5, 1, 1.5],
+        requestLengthBuckets: [512, 1024, 5120, 10240, 51200, 102400],
+        responseLengthBuckets: [512, 1024, 5120, 10240, 51200, 102400],
+      })
+    );
+  },
+};
+```
+
+### Sending Cube logs to Loggly
 
 The example below shows how to use the Node.js Loggly client to collect and send
-logs from Cube.js.
+logs from Cube.
 
 First, you'd need to install the third-party library with [NPM][link-npm]. In
 our example, we're going to use [winston-loggly-bulk][link-loggly-client] to
@@ -22,9 +44,9 @@ collect and send logs to Loggly. You can install it with the following command:
 $ npm install --save winston-loggly-bulk
 ```
 
-<InfoBox heading={`Running Cube.js in Docker`}>
+<InfoBox heading={`Running Cube in Docker`}>
 
-When installing custom Node.js packages for Cube.js running in Docker container,
+When installing custom Node.js packages for Cube running in Docker container,
 make sure you mount the project _including_ the `node_modules` subfolder:
 
 ```bash
@@ -64,14 +86,14 @@ module.exports = {
 ## Using CubejsServer and CubejsServerCore
 
 You can directly use `@cubejs-backend/server-core` or `@cubejs-backend/server`
-Node.js packages to run Cube.js.
+Node.js packages to run Cube.
 
 <WarningBox>
 
-We do not recommend embedding Cube.js into existing Express application to share
-the runtime. Cube.js should be scaled very differently vs. other parts of
-Express, and embedding Cube.js **is not** the right approach in the long term,
-especially for larger deployments.
+We do not recommend embedding Cube into existing Express application to share
+the runtime. Cube should be scaled very differently vs. other parts of Express,
+and embedding Cube **is not** the right approach in the long term, especially
+for larger deployments.
 
 </WarningBox>
 
@@ -83,11 +105,11 @@ const CubejsServer = require('@cubejs-backend/server');
 const server = new CubejsServer();
 
 server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
+  console.log(`🚀 Cube server (${version}) is listening on ${port}`);
 });
 ```
 
-Then start Cube.js as a regular Node.js application:
+Then start Cube as a regular Node.js application:
 
 ```bash
 node index.js
