@@ -232,6 +232,48 @@ SELECT * FROM information_schema.tables;
 These pre-aggregations are stored as Parquet files under the `.cubestore/`
 folder in the project root during development.
 
+### <--{"id" : "Inspecting Pre-Aggregations"}--> EXPLAIN queries
+
+Cube Store's MySQL protocol also supports `EXPLAIN` and `EXPLAIN ANALYZE`
+queries both of which are useful for determining how much processing a query
+will require.
+
+`EXPLAIN` queries show the logical plan for a query:
+
+```sql
+ EXPLAIN SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
+ GROUP BY orders__gender, orders__platform;
++-------------------------------------------------------------------------------------------------------------------------------------+
+| logical plan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
++--------------------------------------------------------------------------------------------------------------------------------------+
+| Projection, [dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__platform, dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)]
+  Aggregate
+    ClusterSend, indices: [[96]]
+      Scan dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r, source: CubeTable(index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126]), fields: [orders__gender, orders__platform, orders__count] |
++-------------------------------------------------------------------------------------------------------------------------------------+
+```
+
+`EXPLAIN ANALYZE` queries show the physical plan for the router and all workers
+used for query processing:
+
+```sql
+ EXPLAIN ANALYZE SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
+ GROUP BY orders__gender, orders__platform
+
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+| node type | node name       | physical plan                                                                                                                                                                                                                                                                                                                                                   |
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+| router    |                 | Projection, [orders__platform, orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)@2:SUM(orders__count)]
+  FinalInplaceAggregate
+    ClusterSend, partitions: [[123, 126]]                                                                                                                                         |
+| worker    | 127.0.0.1:10001 | PartialInplaceAggregate
+  Merge
+    Scan, index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126], fields: [orders__gender, orders__platform, orders__count]
+      Projection, [orders__gender, orders__platform, orders__count]
+        ParquetScan, files: /.cubestore/data/126-0qtyakym.parquet |
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+```
+
 ## Pre-Aggregations Storage
 
 The default pre-aggregations storage in Cube is its own purpose-built storage
