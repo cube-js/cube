@@ -137,15 +137,28 @@ impl RemoteFs for S3RemoteFs {
         temp_upload_path: &str,
         remote_path: &str,
     ) -> Result<u64, CubeError> {
-        let time = SystemTime::now();
-        debug!("Uploading {}", remote_path);
-        let path = self.s3_path(remote_path);
-        let bucket = self.bucket.read().unwrap().clone();
-        let temp_upload_path_copy = temp_upload_path.to_string();
-        let status_code = cube_ext::spawn_blocking(move || {
-            bucket.put_object_stream_blocking(temp_upload_path_copy, path)
-        })
-        .await??;
+        {
+            let time = SystemTime::now();
+            debug!("Uploading {}", remote_path);
+            let path = self.s3_path(remote_path);
+            let bucket = self.bucket.read().unwrap().clone();
+            let temp_upload_path_copy = temp_upload_path.to_string();
+            let status_code = cube_ext::spawn_blocking(move || {
+                bucket.put_object_stream_blocking(temp_upload_path_copy, path)
+            })
+            .await??;
+
+            info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
+            if status_code != 200 {
+                return Err(CubeError::user(format!(
+                    "S3 upload returned non OK status: {}",
+                    status_code
+                )));
+            }
+        }
+        let size = fs::metadata(temp_upload_path).await?.len();
+        self.check_upload_file(remote_path, size).await?;
+
         let local_path = self.dir.as_path().join(remote_path);
         if Path::new(temp_upload_path) != local_path {
             fs::create_dir_all(local_path.parent().unwrap())
@@ -158,13 +171,6 @@ impl RemoteFs for S3RemoteFs {
                     ))
                 })?;
             fs::rename(&temp_upload_path, local_path.clone()).await?;
-        }
-        info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
-        if status_code != 200 {
-            return Err(CubeError::user(format!(
-                "S3 upload returned non OK status: {}",
-                status_code
-            )));
         }
         Ok(fs::metadata(local_path).await?.len())
     }
