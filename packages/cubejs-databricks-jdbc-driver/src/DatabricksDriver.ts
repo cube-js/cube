@@ -142,6 +142,30 @@ export class DatabricksDriver extends JDBCDriver {
     return !!this.config.readOnly;
   }
 
+  public showDeprecationWarnings() {
+    this.tokenInConnectionString();
+  }
+
+  public async testConnection(): Promise<void> {
+    this.showDeprecationWarnings();
+    super.testConnection();
+  }
+
+  public tokenInConnectionString() {
+    if (this.config.url) {
+      const result = this.config.url
+        .split(';')
+        .find(node => /^PWD/i.test(node))
+        ?.split('=')[1];
+
+      if (result) {
+        this.logger('PWD Parameter Deprecation in connection string', {
+          warning: 'PWD Parameter is deprecated and will be ignored in the future releases, please migrate to a separate ENV variable CUBEJS_DB_DATABRICKS_TOKEN'
+        });
+      }
+    }
+  }
+
   /**
    * @override
    */
