@@ -110,6 +110,7 @@ export class DevServer {
         authInfo: null,
         securityContext: null,
         requestId: getRequestIdFromRequest(req),
+        logger: this.cubejsServer.logger,
       });
 
       const tablesSchema = await driver.tablesSchema();
@@ -148,6 +149,7 @@ export class DevServer {
         authInfo: null,
         securityContext: null,
         requestId: getRequestIdFromRequest(req),
+        logger: this.cubejsServer.logger,
       });
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 
@@ -434,7 +436,13 @@ export class DevServer {
           process.env[envName] = <string>value;
         }
 
-        driver = CubejsServerCore.createDriver(variables.CUBEJS_DB_TYPE);
+        driver = CubejsServerCore.createDriver(variables.CUBEJS_DB_TYPE, {
+          logger: this.cubejsServer.logger,
+          dataSource: req.body.dataSource || 'default',
+          authInfo: null,
+          securityContext: null,
+          requestId: getRequestIdFromRequest(req),
+        });
 
         // Restore original process.env
         process.env = originalProcessEnv;

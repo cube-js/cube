@@ -90,7 +90,14 @@ describe('OptsHandler class', () => {
     core = new CubejsServerCoreExposed({
       ...conf,
       dbType: 'postgres',
-      driverFactory: () => CubejsServerCore.createDriver('postgres'),
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      driverFactory: () => CubejsServerCore.createDriver('postgres', {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        logger: () => {},
+        dataSource: null,
+        authInfo: null,
+        securityContext: null,
+        requestId: '' }),
     });
 
     expect(core.options.dbType).toBeDefined();
@@ -103,14 +110,26 @@ describe('OptsHandler class', () => {
     expect(
       JSON.stringify(await core.options.driverFactory({} as DriverContext)),
     ).toEqual(
-      JSON.stringify(CubejsServerCore.createDriver('postgres')),
+      JSON.stringify(CubejsServerCore.createDriver('postgres', {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        logger: () => {},
+        dataSource: null,
+        authInfo: null,
+        securityContext: null,
+        requestId: '' })),
     );
 
     // Case 3
     core = new CubejsServerCoreExposed({
       ...conf,
       dbType: () => 'postgres',
-      driverFactory: () => CubejsServerCore.createDriver('postgres'),
+      driverFactory: () => CubejsServerCore.createDriver('postgres', {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        logger: () => {},
+        dataSource: null,
+        authInfo: null,
+        securityContext: null,
+        requestId: '' }),
     });
 
     expect(core.options.dbType).toBeDefined();
@@ -123,14 +142,26 @@ describe('OptsHandler class', () => {
     expect(
       JSON.stringify(await core.options.driverFactory({} as DriverContext)),
     ).toEqual(
-      JSON.stringify(CubejsServerCore.createDriver('postgres')),
+      JSON.stringify(CubejsServerCore.createDriver('postgres', {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        logger: () => {},
+        dataSource: null,
+        authInfo: null,
+        securityContext: null,
+        requestId: '' })),
     );
 
     // Case 4
     core = new CubejsServerCoreExposed({
       ...conf,
       dbType: () => 'postgres',
-      driverFactory: async () => CubejsServerCore.createDriver('postgres'),
+      driverFactory: async () => CubejsServerCore.createDriver('postgres', {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        logger: () => {},
+        dataSource: null,
+        authInfo: null,
+        securityContext: null,
+        requestId: '' }),
     });
 
     expect(core.options.dbType).toBeDefined();
@@ -143,7 +174,13 @@ describe('OptsHandler class', () => {
     expect(
       JSON.stringify(await core.options.driverFactory({} as DriverContext)),
     ).toEqual(
-      JSON.stringify(CubejsServerCore.createDriver('postgres')),
+      JSON.stringify(CubejsServerCore.createDriver('postgres', {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        logger: () => {},
+        dataSource: null,
+        authInfo: null,
+        securityContext: null,
+        requestId: '' })),
     );
   });
 

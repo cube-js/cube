@@ -63,8 +63,9 @@ export const isDriver = (val: any): boolean => {
  */
 export const createDriver = (
   type: DatabaseType,
-  options?: DriverOptions,
-): BaseDriver => new (lookupDriverClass(type))(options);
+  ctx: DriverContext,
+  options: DriverOptions = {},
+): BaseDriver => new (lookupDriverClass(type))(options, ctx);
 
 /**
  * Calculate and returns driver's max pool number.

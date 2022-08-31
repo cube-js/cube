@@ -186,8 +186,8 @@ export class CubejsServer {
     }
   }
 
-  public static createDriver(dbType: DatabaseType, opt: DriverOptions) {
-    return CubeCore.createDriver(dbType, opt);
+  public static createDriver(dbType: DatabaseType, driverCtx: DriverContext, opt: DriverOptions) {
+    return CubeCore.createDriver(dbType, driverCtx, opt);
   }
 
   public static driverDependencies(dbType: DatabaseType) {

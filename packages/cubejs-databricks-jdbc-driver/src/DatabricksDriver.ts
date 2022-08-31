@@ -1,3 +1,4 @@
+import { DriverContext } from '@cubejs-backend/server-core';
 /* eslint-disable no-restricted-syntax */
 import fs from 'fs';
 import path from 'path';
@@ -102,6 +103,7 @@ export class DatabricksDriver extends JDBCDriver {
 
   public constructor(
     conf: Partial<DatabricksDriverConfiguration>,
+    ctx: DriverContext,
   ) {
     const config: DatabricksDriverConfiguration = {
       ...conf,
@@ -135,20 +137,35 @@ export class DatabricksDriver extends JDBCDriver {
       azureKey: conf?.azureKey || getEnv('dbExportBucketAzureKey'),
     };
     super(config);
+
+    console.log('configconfigconfigconfig', config);
+    console.log('bunchof ctxes', ctx);
     this.config = config;
-    this.deprecationWarnings();
+    this.showDeprecationWarnings();
   }
 
   public readOnly() {
     return !!this.config.readOnly;
   }
 
-  private deprecationWarnings() {
+  private showDeprecationWarnings() {
     this.tokenInConnectionString();
   }
 
   private tokenInConnectionString() {
-    if (this.config.url) {}
+    // @ts-ignore
+    console.log(this.logger);
+      
+      if (this.config.url) {
+      const result = this.config.url
+        .split(';')
+        .find(node => /^PWD/i.test(node))
+        ?.split('=')[1];
+
+      if (result) {
+        console.warn('WARNING: PWD parameter is deprecated and will be ignored in the future releases. Please, use a separate ENV variable CUBEJS_DB_DATABRICKS_TOKEN');
+      }
+    }
   }
 
   /**

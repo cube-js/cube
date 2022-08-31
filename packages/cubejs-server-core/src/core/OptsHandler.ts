@@ -308,6 +308,7 @@ export class OptsHandler {
         } else {
           const defConcurrency = await this.getDriverConcurrency({
             ...context,
+            logger: this.core.logger,
             dataSource,
           });
           if (defConcurrency) {

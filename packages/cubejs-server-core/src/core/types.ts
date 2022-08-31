@@ -86,7 +86,10 @@ export interface RequestContext {
   requestId: string;
 }
 
+export type LoggerFn = (msg: string, params: Record<string, any>) => void;
+
 export interface DriverContext extends RequestContext {
+  logger: LoggerFn;
   dataSource: string;
 }
 
@@ -152,7 +155,7 @@ export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-export type LoggerFn = (msg: string, params: Record<string, any>) => void;
+
 
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;

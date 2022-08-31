@@ -488,6 +488,7 @@ export class CubejsServerCore {
   }
 
   public getOrchestratorApi(context: RequestContext): OrchestratorApi {
+    console.log('getOrchestratorApi', context);
     const orchestratorId = this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
@@ -530,6 +531,7 @@ export class CubejsServerCore {
             driver = await this.resolveDriver(
               {
                 ...context,
+                logger: this.logger,
                 dataSource,
               },
               orchestratorOptions,
@@ -746,7 +748,7 @@ export class CubejsServerCore {
         : {
           maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
         };
-      return CubejsServerCore.createDriver(type, opts);
+      return CubejsServerCore.createDriver(type, context, opts);
     }
   }
 
