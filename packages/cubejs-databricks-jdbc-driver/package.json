@@ -35,6 +35,7 @@
     "@cubejs-backend/query-orchestrator": "^0.30.57",
     "@cubejs-backend/schema-compiler": "^0.30.60",
     "@cubejs-backend/shared": "^0.30.57",
+    "@cubejs-backend/server-core": "^0.30.60",
     "inquirer": "^8.0.0",
     "node-fetch": "^2.6.1",
     "ramda": "^0.27.1",
