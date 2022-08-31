@@ -1040,10 +1040,8 @@ describe('QueryOrchestrator', () => {
     await expect(async () => {
       await queryOrchestratorExternalRefresh.fetchQuery(query);
     }).rejects.toThrow(
-      'Your configuration restricts query requests to only be served from ' +
-      'pre-aggregations, and required pre-aggregation partitions were not ' +
-      'built yet. Please make sure your refresh worker is configured ' +
-      'correctly and running.'
+      'No pre-aggregation partitions were built yet for the pre-aggregation serving this query. ' +
+      'Please make sure your refresh worker is configured correctly and running.'
     );
   });
 
