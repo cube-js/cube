@@ -155,8 +155,6 @@ export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
-
-
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;
   externalDbType?: DatabaseType | ExternalDbTypeFn;

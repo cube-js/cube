@@ -488,7 +488,6 @@ export class CubejsServerCore {
   }
 
   public getOrchestratorApi(context: RequestContext): OrchestratorApi {
-    console.log('getOrchestratorApi', context);
     const orchestratorId = this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
@@ -720,11 +719,11 @@ export class CubejsServerCore {
    * Returns driver instance by a given context
    */
   public async getDriver(
-    context: DriverContext,
+    context: Exclude<DriverContext, 'logger'>,
     options?: OrchestratorInitedOptions,
   ): Promise<BaseDriver> {
     if (!this.driver) {
-      const driver = await this.resolveDriver(context, options);
+      const driver = await this.resolveDriver({ ...context, logger: this.logger }, options);
       await driver.testConnection(); // TODO mutex
       this.driver = driver;
     }
