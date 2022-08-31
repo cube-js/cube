@@ -114,6 +114,22 @@ impl RewriteRules for FilterRules {
                 ),
                 self.push_down_limit_filter("?literal", "?new_limit", "?new_limit_n"),
             ),
+            // Transform Filter: Boolean(true)
+            // It's safety case to push down filter under projection, next filter-truncate-true will truncate it
+            // TODO: Find a better solution how to drop filter node at all once
+            transforming_rewrite(
+                "push-down-filter-projection",
+                filter(
+                    literal_expr("?literal"),
+                    projection("?expr", "?input", "?alias"),
+                ),
+                projection(
+                    "?expr",
+                    filter(literal_expr("?literal"), "?input"),
+                    "?alias",
+                ),
+                self.truncate_filter_literal_true("?literal"),
+            ),
             rewrite(
                 "swap-limit-filter",
                 filter(

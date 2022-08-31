@@ -6264,8 +6264,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 time_dimensions: None,
                 order: None,
-                // TODO: limit: Some(1000),
-                limit: None,
+                limit: Some(1000),
                 offset: None,
                 filters: None,
             }
@@ -6349,8 +6348,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 time_dimensions: None,
                 order: None,
-                // TODO: limit: Some(1000),
-                limit: None,
+                limit: Some(1000),
                 offset: None,
                 filters: None,
             }
