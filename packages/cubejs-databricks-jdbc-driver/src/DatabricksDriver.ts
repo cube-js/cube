@@ -136,10 +136,19 @@ export class DatabricksDriver extends JDBCDriver {
     };
     super(config);
     this.config = config;
+    this.deprecationWarnings();
   }
 
   public readOnly() {
     return !!this.config.readOnly;
+  }
+
+  private deprecationWarnings() {
+    this.tokenInConnectionString();
+  }
+
+  private tokenInConnectionString() {
+    if (this.config.url) {}
   }
 
   /**
