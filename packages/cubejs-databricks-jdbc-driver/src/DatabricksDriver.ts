@@ -143,7 +143,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public showDeprecationWarnings() {
-    this.tokenInConnectionString();
+    this.showUrlTokenDeprecation();
   }
 
   public async testConnection(): Promise<void> {
@@ -151,7 +151,7 @@ export class DatabricksDriver extends JDBCDriver {
     super.testConnection();
   }
 
-  public tokenInConnectionString() {
+  public showUrlTokenDeprecation() {
     if (this.config.url) {
       const result = this.config.url
         .split(';')
