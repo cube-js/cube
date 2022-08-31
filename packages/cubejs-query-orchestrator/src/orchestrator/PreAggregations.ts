@@ -1325,9 +1325,8 @@ export class PreAggregationPartitionRangeLoader {
       const loadResults = resolveResults.filter(res => res !== null);
       if (this.options.externalRefresh && loadResults.length === 0) {
         throw new Error(
-          'Your configuration restricts query requests to only be served from ' +
-          'pre-aggregations, and required pre-aggregation partitions were not ' +
-          'built yet. Please make sure your refresh worker is configured ' +
+          'No pre-aggregation partitions were built yet for the pre-aggregation serving this query. ' +
+          'Please make sure your refresh worker is configured ' +
           'correctly and running.'
         );
       }
