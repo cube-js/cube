@@ -110,7 +110,6 @@ export class DevServer {
         authInfo: null,
         securityContext: null,
         requestId: getRequestIdFromRequest(req),
-        logger: this.cubejsServer.logger,
       });
 
       const tablesSchema = await driver.tablesSchema();

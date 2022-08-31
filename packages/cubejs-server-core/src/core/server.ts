@@ -719,7 +719,7 @@ export class CubejsServerCore {
    * Returns driver instance by a given context
    */
   public async getDriver(
-    context: Exclude<DriverContext, 'logger'>,
+    context: Omit<DriverContext, 'logger'>,
     options?: OrchestratorInitedOptions,
   ): Promise<BaseDriver> {
     if (!this.driver) {

@@ -153,7 +153,7 @@ export class CubejsServer {
   }
 
   // @internal
-  public async getDriver(ctx: DriverContext): Promise<BaseDriver> {
+  public async getDriver(ctx: Omit<DriverContext, 'logger'>): Promise<BaseDriver> {
     return this.core.getDriver(ctx);
   }
 
