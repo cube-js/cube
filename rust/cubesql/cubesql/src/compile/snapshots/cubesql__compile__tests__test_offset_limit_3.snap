@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select oid from pg_class order by oid limit 0 offset 1\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----+
+| oid |
++-----+
++-----+

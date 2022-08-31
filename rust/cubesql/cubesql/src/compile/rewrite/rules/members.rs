@@ -18,12 +18,13 @@ use crate::{
             segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
             transforming_rewrite, udaf_expr, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AliasExprAlias, CastExprDataType, ChangeUserCube,
-            ColumnExprColumn, CubeScanAliasToCube, CubeScanAliases, CubeScanLimit, DimensionName,
-            LimitN, LiteralExprValue, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
-            MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
-            MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias,
-            SegmentName, TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, WithColumnRelation,
+            ColumnExprColumn, CubeScanAliasToCube, CubeScanAliases, CubeScanLimit, CubeScanOffset,
+            DimensionName, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberValue,
+            LogicalPlanLanguage, MeasureName, MemberErrorAliasToCube, MemberErrorError,
+            MemberErrorPriority, MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube,
+            ProjectionAlias, SegmentName, TableScanSourceTableName, TableScanTableName,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            WithColumnRelation,
         },
     },
     transport::{V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
@@ -58,7 +59,7 @@ impl RewriteRules for MemberRules {
                     "?table_name",
                     "?projection",
                     "?filters",
-                    "?limit",
+                    "?fetch",
                 ),
                 cube_scan(
                     "?alias_to_cube",
@@ -440,13 +441,14 @@ impl RewriteRules for MemberRules {
             transforming_rewrite(
                 "limit-push-down",
                 limit(
-                    "?limit",
+                    "?skip",
+                    "?fetch",
                     cube_scan(
                         "?alias_to_cube",
                         "?members",
                         "?filters",
                         "?orders",
-                        "?cube_limit",
+                        "?cube_fetch",
                         "?offset",
                         "?aliases",
                         "?split",
@@ -457,12 +459,12 @@ impl RewriteRules for MemberRules {
                     "?members",
                     "?filters",
                     "?orders",
-                    "?new_limit",
-                    "?offset",
+                    "?new_fetch",
+                    "?new_skip",
                     "?aliases",
                     "?split",
                 ),
-                self.push_down_limit("?limit", "?new_limit"),
+                self.push_down_limit("?skip", "?fetch", "?new_skip", "?new_fetch"),
             ),
             // Empty tail merges
             rewrite(
@@ -1224,24 +1226,48 @@ impl MemberRules {
 
     fn push_down_limit(
         &self,
-        limit_var: &'static str,
-        new_limit_var: &'static str,
+        skip_var: &'static str,
+        fetch_var: &'static str,
+        new_skip_var: &'static str,
+        new_fetch_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let limit_var = var!(limit_var);
-        let new_limit_var = var!(new_limit_var);
+        let skip_var = var!(skip_var);
+        let fetch_var = var!(fetch_var);
+        let new_skip_var = var!(new_skip_var);
+        let new_fetch_var = var!(new_fetch_var);
         move |egraph, subst| {
-            for limit in var_iter!(egraph[subst[limit_var]], LimitN) {
-                let limit = *limit;
-                if limit > 0 {
-                    subst.insert(
-                        new_limit_var,
-                        egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(
-                            limit,
-                        )))),
-                    );
-                    return true;
+            let mut skip_value = None;
+            for skip in var_iter!(egraph[subst[skip_var]], LimitSkip) {
+                if skip.unwrap_or_default() > 0 {
+                    skip_value = *skip;
+                    break;
                 }
             }
+            let mut fetch_value = None;
+            for fetch in var_iter!(egraph[subst[fetch_var]], LimitFetch) {
+                if fetch.unwrap_or_default() > 0 {
+                    fetch_value = *fetch;
+                    break;
+                }
+            }
+
+            if skip_value.is_some() || fetch_value.is_some() {
+                subst.insert(
+                    new_skip_var,
+                    egraph.add(LogicalPlanLanguage::CubeScanOffset(CubeScanOffset(
+                        skip_value,
+                    ))),
+                );
+                subst.insert(
+                    new_fetch_var,
+                    egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(
+                        fetch_value,
+                    ))),
+                );
+
+                return true;
+            }
+
             false
         }
     }
