@@ -122,7 +122,7 @@ impl MetaStoreFs for RocksMetaStoreFs {
 }
 
 impl RocksMetaStoreFs {
-    async fn upload_snapsots_files(
+    pub async fn upload_snapsots_files(
         &self,
         remote_path: &str,
         checkpoint_path: &PathBuf,
@@ -153,7 +153,7 @@ impl RocksMetaStoreFs {
 
         Ok(upload_results)
     }
-    async fn delete_old_snapshots(&self) -> Result<Vec<String>, CubeError> {
+    pub async fn delete_old_snapshots(&self) -> Result<Vec<String>, CubeError> {
         let existing_metastore_files = self.remote_fs.list("metastore-").await?;
         let to_delete = existing_metastore_files
             .into_iter()
@@ -189,7 +189,7 @@ impl RocksMetaStoreFs {
         }
         Ok(to_delete)
     }
-    async fn commit_upload(&self, remote_path: &str) -> Result<(), CubeError> {
+    pub async fn commit_upload(&self, remote_path: &str) -> Result<(), CubeError> {
         let uploads_dir = self.remote_fs.uploads_dir().await?;
         let (file, file_path) = cube_ext::spawn_blocking(move || {
             tempfile::Builder::new()
@@ -207,11 +207,11 @@ impl RocksMetaStoreFs {
             .await?;
         Ok(())
     }
-    async fn is_remote_metadata_exists(&self) -> Result<bool, CubeError> {
+    pub async fn is_remote_metadata_exists(&self) -> Result<bool, CubeError> {
         let res = self.remote_fs.list("metastore-current").await?.len() > 0;
         Ok(res)
     }
-    async fn load_current_snapshot_id(&self) -> Result<Option<u128>, CubeError> {
+    pub async fn load_current_snapshot_id(&self) -> Result<Option<u128>, CubeError> {
         let re = Regex::new(r"^metastore-(\d+)").unwrap();
         info!("Downloading remote metastore");
         let current_metastore_file = self.remote_fs.local_file("metastore-current").await?;
@@ -238,7 +238,7 @@ impl RocksMetaStoreFs {
         };
         Ok(last_metastore_snapshot)
     }
-    async fn load_metastore_logs(
+    pub async fn load_metastore_logs(
         &self,
         snapshot: u128,
         meta_store: &Arc<RocksMetaStore>,
@@ -263,12 +263,12 @@ impl RocksMetaStoreFs {
         }
         Ok(())
     }
-    async fn files_to_load(&self, snapshot: u128) -> Result<Vec<String>, CubeError> {
+    pub async fn files_to_load(&self, snapshot: u128) -> Result<Vec<String>, CubeError> {
         self.remote_fs
             .list(&format!("metastore-{}", snapshot))
             .await
     }
-    async fn make_local_metastore_dir(&self) -> Result<String, CubeError> {
+    pub async fn make_local_metastore_dir(&self) -> Result<String, CubeError> {
         let meta_store_path = self.remote_fs.local_file("metastore").await?;
         fs::create_dir_all(meta_store_path.to_string()).await?;
         Ok(meta_store_path)
