@@ -137,7 +137,6 @@ export class DatabricksDriver extends JDBCDriver {
       azureKey: conf?.azureKey || getEnv('dbExportBucketAzureKey'),
     };
     super(config);
-
     this.config = config;
   }
 
