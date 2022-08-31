@@ -148,7 +148,7 @@ export class DatabricksDriver extends JDBCDriver {
 
   public async testConnection(): Promise<void> {
     this.showDeprecationWarnings();
-    super.testConnection();
+    await super.testConnection();
   }
 
   public showUrlTokenDeprecation() {
