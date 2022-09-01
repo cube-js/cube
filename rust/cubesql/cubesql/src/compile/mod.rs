@@ -6166,6 +6166,69 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_limit_push_down() -> Result<(), CubeError> {
+        // 1 level push down
+        let query_plan = convert_select_to_query_plan(
+            "SELECT l1.*, 1 as projection_should_exist_l1 FROM (\
+                    SELECT
+                      \"customer_gender\"
+                    FROM \"KibanaSampleDataEcommerce\"
+                    WHERE TRUE = TRUE
+                ) as l1 LIMIT 1000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        // 2 levels push down
+        let query_plan = convert_select_to_query_plan(
+            "SELECT l2.*, 1 as projection_should_exist_l2 FROM (\
+                SELECT l1.*, 1 as projection_should_exist FROM (\
+                    SELECT
+                    \"customer_gender\"
+                    FROM \"KibanaSampleDataEcommerce\"
+                    WHERE TRUE = TRUE
+                ) as l1
+             ) as l2 LIMIT 1000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_thought_spot_cte() -> Result<(), CubeError> {
         init_logger();
 
@@ -6201,8 +6264,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 time_dimensions: None,
                 order: None,
-                // TODO: limit: Some(1000),
-                limit: None,
+                limit: Some(1000),
                 offset: None,
                 filters: None,
             }
@@ -6286,8 +6348,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 time_dimensions: None,
                 order: None,
-                // TODO: limit: Some(1000),
-                limit: None,
+                limit: Some(1000),
                 offset: None,
                 filters: None,
             }
@@ -10783,6 +10844,53 @@ ORDER BY \"COUNT(count)\" DESC"
                 DatabaseProtocol::PostgreSQL
             )
             .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_to_timestamp_format() -> Result<(), CubeError> {
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                date_trunc('day', "order_date") AS "uuid.order_date_tg",
+                COUNT(*) AS "count"
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE
+                "order_date" >= date_trunc('second', TO_TIMESTAMP('2019-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')) AND
+                "order_date" < date_trunc('second', TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss'))
+            GROUP BY date_trunc('day', "order_date")
+            ORDER BY date_trunc('day', "order_date") DESC NULLS LAST
+            LIMIT 2500
+            ;"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-01-01T00:00:00.000Z".to_string(),
+                        "2019-12-31T23:59:59.999Z".to_string()
+                    ])),
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "desc".to_string()
+                ]]),
+                limit: Some(2500),
+                offset: None,
+                filters: None,
+            }
         );
 
         Ok(())
