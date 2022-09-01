@@ -115,7 +115,7 @@ impl RewriteRules for FilterRules {
                 self.push_down_limit_filter("?literal", "?new_limit", "?new_limit_n"),
             ),
             // Transform Filter: Boolean(true)
-            // It's safety case to push down filter under projection, next filter-truncate-true will truncate it
+            // It's safe to push down filter under projection, next filter-truncate-true will truncate it
             // TODO: Find a better solution how to drop filter node at all once
             transforming_rewrite(
                 "push-down-filter-projection",
@@ -128,7 +128,7 @@ impl RewriteRules for FilterRules {
                     filter(literal_expr("?literal"), "?input"),
                     "?alias",
                 ),
-                self.truncate_filter_literal_true("?literal"),
+                self.match_filter_literal_true("?literal"),
             ),
             rewrite(
                 "swap-limit-filter",
@@ -213,7 +213,7 @@ impl RewriteRules for FilterRules {
                 "filter-truncate-true",
                 filter_replacer(literal_expr("?literal"), "?alias_to_cube", "?members"),
                 cube_scan_filters_empty_tail(),
-                self.truncate_filter_literal_true("?literal"),
+                self.match_filter_literal_true("?literal"),
             ),
             transforming_rewrite(
                 "filter-replacer",
@@ -1027,7 +1027,7 @@ impl FilterRules {
         }
     }
 
-    fn truncate_filter_literal_true(
+    fn match_filter_literal_true(
         &self,
         literal_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
