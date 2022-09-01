@@ -2360,7 +2360,7 @@ impl RocksMetaStore {
         Ok(())
     }
 
-    async fn upload_check_point(&self) -> Result<(), CubeError> {
+    pub async fn upload_check_point(&self) -> Result<(), CubeError> {
         let mut check_point_time = self.last_checkpoint_time.write().await;
 
         let (remote_path, checkpoint_path) = {

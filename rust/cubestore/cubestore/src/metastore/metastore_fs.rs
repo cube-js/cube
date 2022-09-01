@@ -122,6 +122,10 @@ impl MetaStoreFs for RocksMetaStoreFs {
 }
 
 impl RocksMetaStoreFs {
+    pub fn remote_fs(&self) -> Arc<dyn RemoteFs> {
+        self.remote_fs.clone()
+    }
+
     pub async fn upload_snapsots_files(
         &self,
         remote_path: &str,
