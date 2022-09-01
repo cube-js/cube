@@ -142,13 +142,8 @@ export class DatabricksDriver extends JDBCDriver {
     return !!this.config.readOnly;
   }
 
-  public showDeprecationWarnings() {
+  public onCreate() {
     this.showUrlTokenDeprecation();
-  }
-
-  public async testConnection(): Promise<void> {
-    this.showDeprecationWarnings();
-    await super.testConnection();
   }
 
   public showUrlTokenDeprecation() {
@@ -160,7 +155,7 @@ export class DatabricksDriver extends JDBCDriver {
 
       if (result) {
         this.logger('PWD Parameter Deprecation in connection string', {
-          warning: 'PWD Parameter is deprecated and will be ignored in the future releases, please migrate to a separate ENV variable CUBEJS_DB_DATABRICKS_TOKEN'
+          warning: 'PWD parameter is deprecated and will be ignored in future releases. Please migrate to the CUBEJS_DB_DATABRICKS_TOKEN environment variable.'
         });
       }
     }
