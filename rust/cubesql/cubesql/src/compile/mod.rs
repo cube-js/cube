@@ -6166,6 +6166,69 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_limit_push_down() -> Result<(), CubeError> {
+        // 1 level push down
+        let query_plan = convert_select_to_query_plan(
+            "SELECT l1.*, 1 as projection_should_exist_l1 FROM (\
+                    SELECT
+                      \"customer_gender\"
+                    FROM \"KibanaSampleDataEcommerce\"
+                    WHERE TRUE = TRUE
+                ) as l1 LIMIT 1000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        // 2 levels push down
+        let query_plan = convert_select_to_query_plan(
+            "SELECT l2.*, 1 as projection_should_exist_l2 FROM (\
+                SELECT l1.*, 1 as projection_should_exist FROM (\
+                    SELECT
+                    \"customer_gender\"
+                    FROM \"KibanaSampleDataEcommerce\"
+                    WHERE TRUE = TRUE
+                ) as l1
+             ) as l2 LIMIT 1000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_thought_spot_cte() -> Result<(), CubeError> {
         init_logger();
 
@@ -6201,8 +6264,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 time_dimensions: None,
                 order: None,
-                // TODO: limit: Some(1000),
-                limit: None,
+                limit: Some(1000),
                 offset: None,
                 filters: None,
             }
@@ -6286,8 +6348,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 time_dimensions: None,
                 order: None,
-                // TODO: limit: Some(1000),
-                limit: None,
+                limit: Some(1000),
                 offset: None,
                 filters: None,
             }
