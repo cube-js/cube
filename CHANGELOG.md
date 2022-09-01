@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.61](https://github.com/cube-js/cube.js/compare/v0.30.60...v0.30.61) (2022-09-01)
+
+
+### Bug Fixes
+
+* Correct error message when no pre-aggregation partitions were built and API instance accessing those ([82f2378](https://github.com/cube-js/cube.js/commit/82f2378703d561a93b86b0707d76fe7093a8edf9))
+
+
+### Features
+
+* **cubesql:** Eliminate literal filter (true or true = true) ([#5142](https://github.com/cube-js/cube.js/issues/5142)) ([7a6f8f9](https://github.com/cube-js/cube.js/commit/7a6f8f9ae91cd314f5c2699dadbd2c5b79c1e73e))
+* **cubesql:** Improve support (formats) for TO_TIMESTAMP function ([#5218](https://github.com/cube-js/cube.js/issues/5218)) ([044c3e1](https://github.com/cube-js/cube.js/commit/044c3e1585479b59c391d31c9783ee46908bbcc3))
+* **cubesql:** Push down limit through projection ([#5206](https://github.com/cube-js/cube.js/issues/5206)) ([3c6ff7d](https://github.com/cube-js/cube.js/commit/3c6ff7d6eddc925567234a5ec94606eb09970b33))
+* **cubesql:** Support `LOCALTIMESTAMP` ([0089a65](https://github.com/cube-js/cube.js/commit/0089a65ae86019df159c0d9dbe5323ebc38c7172))
+
+
+
+
+
 ## [0.30.60](https://github.com/cube-js/cube.js/compare/v0.30.59...v0.30.60) (2022-08-28)
 
 
