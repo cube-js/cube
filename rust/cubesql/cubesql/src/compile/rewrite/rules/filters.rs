@@ -175,8 +175,8 @@ impl RewriteRules for FilterRules {
             ),
             rewrite(
                 "limit-push-down-projection",
-                limit("?limit", projection("?expr", "?input", "?alias")),
-                projection("?expr", limit("?limit", "?input"), "?alias"),
+                limit("?skip", "?fetch", projection("?expr", "?input", "?alias")),
+                projection("?expr", limit("?skip", "?fetch", "?input"), "?alias"),
             ),
             // Limit to top node
             rewrite(

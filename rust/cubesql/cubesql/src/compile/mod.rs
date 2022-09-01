@@ -12120,7 +12120,7 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "test_offset_limit_1",
             execute_query(
-                "select oid from pg_class order by oid limit 1 offset 1".to_string(),
+                "select n from generate_series(1, 1000) pos(n) limit 10 offset 10".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -12129,7 +12129,7 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "test_offset_limit_2",
             execute_query(
-                "select oid from pg_class order by oid limit 1 offset 0".to_string(),
+                "select n from generate_series(1, 1000) pos(n) limit 10 offset 0".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -12138,7 +12138,25 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "test_offset_limit_3",
             execute_query(
-                "select oid from pg_class order by oid limit 0 offset 1".to_string(),
+                "select n from generate_series(1, 1000) pos(n) limit 0 offset 10".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_offset_limit_4",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 100 offset 100".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_offset_limit_5",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 100 offset 990".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

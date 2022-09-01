@@ -1,9 +1,18 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"select oid from pg_class order by oid limit 1 offset 0\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(\"select n from generate_series(1, 1000) pos(n) limit 10 offset 0\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
-+-------+
-| oid   |
-+-------+
-| 18000 |
-+-------+
++----+
+| n  |
++----+
+| 1  |
+| 2  |
+| 3  |
+| 4  |
+| 5  |
+| 6  |
+| 7  |
+| 8  |
+| 9  |
+| 10 |
++----+
