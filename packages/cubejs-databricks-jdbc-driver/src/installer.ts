@@ -1,6 +1,5 @@
 import path from 'path';
-import inquirer from 'inquirer';
-import { displayCLIWarning, downloadAndExtractFile, getEnv } from '@cubejs-backend/shared';
+import { downloadAndExtractFile, getEnv } from '@cubejs-backend/shared';
 
 function acceptedByEnv() {
   const acceptStatus = getEnv('databrickAcceptPolicy');
@@ -16,33 +15,8 @@ function acceptedByEnv() {
   return acceptStatus;
 }
 
-async function cliAcceptVerify() {
-  console.log('Databricks driver is using JDBC driver from Data Bricks');
-  console.log('By downloading the driver, you agree to the Terms & Conditions');
-  console.log('https://databricks.com/jdbc-odbc-driver-license');
-  console.log('More info: https://databricks.com/spark/jdbc-drivers-download');
-
-  if (process.stdout.isTTY) {
-    const { licenseAccepted } = await inquirer.prompt([{
-      type: 'confirm',
-      name: 'licenseAccepted',
-      message: 'You read & agree to the Terms & Conditions',
-    }]);
-
-    return licenseAccepted;
-  }
-
-  displayCLIWarning('Your stdout is not interactive, you can accept it via CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true');
-
-  return false;
-}
-
-export async function downloadJDBCDriver(isCli: boolean = false): Promise<string | null> {
-  let driverAccepted = acceptedByEnv();
-
-  if (driverAccepted === undefined && isCli) {
-    driverAccepted = await cliAcceptVerify();
-  }
+export async function downloadJDBCDriver(): Promise<string | null> {
+  const driverAccepted = acceptedByEnv();
 
   if (driverAccepted) {
     console.log('Downloading SimbaSparkJDBC42-2.6.17.1021');

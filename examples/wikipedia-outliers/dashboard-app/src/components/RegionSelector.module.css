@@ -1,0 +1,25 @@
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 2em;
+  justify-content: center;
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  padding: 0 0.2em;
+}
+
+.item__not_selected {
+  opacity: 0.4;
+} 
+
+.button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
+  margin: 0;
+}

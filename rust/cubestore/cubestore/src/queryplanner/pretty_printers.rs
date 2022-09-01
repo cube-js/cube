@@ -2,6 +2,7 @@
 
 use bigdecimal::ToPrimitive;
 
+use datafusion::cube_ext::alias::LogicalAlias;
 use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::{LogicalPlan, PlanVisitor};
 use datafusion::physical_plan::filter::FilterExec;
@@ -20,7 +21,7 @@ use itertools::{repeat_n, Itertools};
 
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
-use crate::queryplanner::planning::{ClusterSendNode, WorkerExec};
+use crate::queryplanner::planning::{ClusterSendNode, Snapshot, WorkerExec};
 use crate::queryplanner::query_executor::{
     ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider,
 };
@@ -31,6 +32,7 @@ use crate::queryplanner::CubeTableLogical;
 use datafusion::cube_ext::join::CrossJoinExec;
 use datafusion::cube_ext::joinagg::CrossJoinAggExec;
 use datafusion::cube_ext::rolling::RollingWindowAggExec;
+use datafusion::cube_ext::rolling::RollingWindowAggregate;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::memory::MemoryExec;
@@ -176,11 +178,12 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                 .iter()
                                 .map(|is| is
                                     .iter()
-                                    .map(|i| i.clone().map_or(-1, |i| i
-                                        .index
-                                        .get_id()
-                                        .to_i64()
-                                        .map_or(-2, |i| i)))
+                                    .map(|s| match s {
+                                        Snapshot::Index(i) => i.index.get_id(),
+                                        Snapshot::Inline(i) => i.id,
+                                    }
+                                    .to_i64()
+                                    .map_or(-1, |i| i))
                                     .collect_vec())
                                 .collect_vec()
                         )
@@ -203,8 +206,12 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                         }
                     } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
                         self.output += &format!("PanicWorker")
+                    } else if let Some(_) = node.as_any().downcast_ref::<RollingWindowAggregate>() {
+                        self.output += &format!("RollingWindowAggreagate");
+                    } else if let Some(alias) = node.as_any().downcast_ref::<LogicalAlias>() {
+                        self.output += &format!("LogicalAlias, alias: {}", alias.alias);
                     } else {
-                        panic!("unknown extension node");
+                        log::error!("unknown extension node")
                     }
                 }
                 LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
@@ -368,12 +375,16 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 "ClusterSend, partitions: [{}]",
                 cs.partitions
                     .iter()
-                    .map(|(_, ps)| {
+                    .map(|(_, (ps, inline))| {
                         let ps = ps
                             .iter()
                             .map(|(id, range)| format!("{}{}", id, pp_row_range(range)))
                             .join(", ");
-                        format!("[{}]", ps)
+                        if !inline.is_empty() {
+                            format!("[{}, inline: {}]", ps, inline.iter().join(", "))
+                        } else {
+                            format!("[{}]", ps)
+                        }
                     })
                     .join(", ")
             );

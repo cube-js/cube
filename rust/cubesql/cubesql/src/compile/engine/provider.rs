@@ -49,7 +49,12 @@ use super::information_schema::postgres::{
     PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
     PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
     PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatioUserTablesProvider,
-    PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgCatalogTableProvider, PgCatalogTypeProvider, PgPreparedStatementsProvider,
+};
+
+use super::information_schema::redshift::{
+    RedshiftLateBindingViewUnpackedTableProvider, RedshiftSvvExternalSchemasTableProvider,
+    RedshiftSvvTablesTableProvider,
 };
 
 #[derive(Clone)]
@@ -312,6 +317,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_enum".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogMatviewsProvider>() {
             "pg_catalog.pg_matviews".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgPreparedStatementsProvider>() {
+            "pg_catalog.pg_prepared_statements".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogDatabaseProvider>() {
             "pg_catalog.pg_database".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogRolesProvider>() {
@@ -322,6 +329,12 @@ impl DatabaseProtocol {
             "pg_catalog.pg_statio_user_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogSequenceProvider>() {
             "pg_catalog.pg_sequence".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
+            "public.svv_tables".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftSvvExternalSchemasTableProvider>() {
+            "public.svv_external_schemas".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftLateBindingViewUnpackedTableProvider>() {
+            "public.get_late_binding_view_cols_unpacked".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
             "information_schema.constraint_column_usage".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaViewsProvider>() {
@@ -385,7 +398,24 @@ impl DatabaseProtocol {
                 {
                     return Some(Arc::new(CubeTableProvider::new(cube.clone())));
                     // TODO .clone()
-                }
+                };
+
+                // TODO: Move to pg_catalog, support SEARCH PATH.
+                // Redshift
+                match table.as_str() {
+                    "svv_tables" => {
+                        return Some(Arc::new(RedshiftSvvTablesTableProvider::new(
+                            &context.meta.cubes,
+                        )))
+                    }
+                    "svv_external_schemas" => {
+                        return Some(Arc::new(RedshiftSvvExternalSchemasTableProvider::new()))
+                    }
+                    "get_late_binding_view_cols_unpacked" => {
+                        return Some(Arc::new(RedshiftLateBindingViewUnpackedTableProvider::new()))
+                    }
+                    _ => {}
+                };
             }
             "information_schema" => match table.as_str() {
                 "columns" => {
@@ -469,6 +499,11 @@ impl DatabaseProtocol {
                 "pg_am" => return Some(Arc::new(PgCatalogAmProvider::new())),
                 "pg_enum" => return Some(Arc::new(PgCatalogEnumProvider::new())),
                 "pg_matviews" => return Some(Arc::new(PgCatalogMatviewsProvider::new())),
+                "pg_prepared_statements" => {
+                    return Some(Arc::new(PgPreparedStatementsProvider::new(
+                        context.session_state.clone(),
+                    )))
+                }
                 "pg_database" => {
                     return Some(Arc::new(PgCatalogDatabaseProvider::new(
                         &context.session_state.database().unwrap_or("db".to_string()),

@@ -151,6 +151,18 @@ export class CubeSymbols {
           ['rollup', 'rollupJoin'].includes(preAggregation.type) &&
           getEnv('externalDefault');
       }
+
+      if (preAggregation.indexes) {
+        this.transformPreAggregationIndexes(preAggregation.indexes);
+      }
+    }
+  }
+
+  transformPreAggregationIndexes(indexes) {
+    for (const index of Object.values(indexes)) {
+      if (!index.type) {
+        index.type = 'regular';
+      }
     }
   }
 

@@ -1,0 +1,30 @@
+###########
+## Uncomment this workflow job to enable deployment automation
+###########
+# # Demo Deployment automation
+
+# name: My Cube.js App
+# on:
+#   push:
+#     paths:
+#       - '**'
+#     branches:
+#       - 'master'
+# jobs:
+#   deploy:
+#     name: Deploy My Cube.js App
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 30
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v2
+#       - name: Use Node.js 14.x
+#         uses: actions/setup-node@v1
+#         with:
+#           node-version: 14.x
+#       - run: npm install
+#       - name: Deploy to Cube Cloud
+#         run: npx cubejs-cli deploy --token $CUBE_CLOUD_DEPLOY_AUTH
+#         env:
+#           CUBE_CLOUD_DEPLOY_AUTH: fb153ad68fe20100280c405cd76a5c7c
+#           # CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }} # Add env var to GitHub actions secrets!!

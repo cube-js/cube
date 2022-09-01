@@ -129,12 +129,13 @@ source database.
 
 `originalSql` pre-aggregations **must only** be used when [storing
 pre-aggregations in the source database][ref-caching-using-preaggs-internal].
-While you can set `external: true` for `originalSql` pre-aggregation, this is not recommended or generally supported.
+While you can set `external: true` for `originalSql` pre-aggregation, this is
+not recommended or generally supported.
 
 </WarningBox>
 
-They often do not provide much in the way of performance
-directly, but there are two specific applications:
+They often do not provide much in the way of performance directly, but there are
+two specific applications:
 
 1. They can be used in tandem with the
    [`useOriginalSqlPreAggregations`][self-origsql-preaggs] option in other
@@ -474,14 +475,17 @@ The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
 **must** also be included in the pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
 
-Number of partitions to be built per cube is calculated as [buildRange][self-buildrange] divided by `partitionGranularity`.
-Number of partitions to be built per cube is multiplied by count of time zones and tenants in case different tenants have different pre-aggregation SQL.
+Number of partitions to be built per cube is calculated as
+[buildRange][self-buildrange] divided by `partitionGranularity`. Number of
+partitions to be built per cube is multiplied by the count of time zones and
+tenants in case different tenants have different pre-aggregation SQL.
 
 <WarningBox>
 
 Choose the count of partitions wisely as those consume memory and CPU resources.
-As a rule of thumb, you do not want to go over 5,000-10,000 partitions in total to keep partitioning overhead low.
-Too many partitions will most likely cause out of memory.
+As a rule of thumb, you do not want to go over 5,000-10,000 partitions in total
+to keep the partitioning overhead low. Too many partitions will most likely
+cause out of memory.
 
 </WarningBox>
 
@@ -842,7 +846,7 @@ cube(`Orders`, {
 ### <--{"id" : "Parameters"}--> indexes
 
 In case of pre-aggregation tables having significant cardinality, you might want
-to create indexes for them in databases which support it. This is can be done as
+to create indexes for them in databases which support it. This can be done as
 follows:
 
 ```javascript
@@ -867,13 +871,16 @@ cube(`Orders`, {
 });
 ```
 
-To maximize performance, you can introduce an index per query, so the set of dimensions used in the query is the same as in the index.
-There's no need to define measure columns in the index.
-Index column order is the sort order of all data within an index.
-Under the hood Cube Store will create table dataset copy and will sort it according to index specification.
-Cube Store works best when you define all your `equals` filter dimensions first and all dimensions from `GROUP BY` last.
-For range filter columns like `contains`, `>`, `<`, `>=`, `<=` with high selectivity, typically less than 5% of records keep those columns before `GROUP BY` dimensions.
-Otherwise, for low selectivity range filters, consider putting these columns after `GROUP BY` dimensions.
+To maximize performance, you can introduce an index per query, so the set of
+dimensions used in the query is the same as in the index. There's no need to
+define measure columns in the index. The index column order is the sort order of
+all data within the index. Under the hood, Cube Store will create table dataset
+copy and will sort it according to index specification. Cube Store works best
+when you define all your `equals` filter dimensions first and all dimensions
+from `GROUP BY` last. For range filter columns like `contains`, `>`, `<`, `>=`,
+`<=` with high selectivity, typically less than 5% of records keep those columns
+before `GROUP BY` dimensions. Otherwise, for low selectivity range filters,
+consider putting these columns after `GROUP BY` dimensions.
 
 For `originalSql` pre-aggregations, the original column names as strings can be
 used:
@@ -897,6 +904,45 @@ cube(`Orders`, {
 });
 ```
 
+Cube also supports aggregating indexes that contain **only** any specified
+columns and pre-aggregated measures in the pre-aggregation definition.
+[Queries][ref-api-ref-query-ref] that can target aggregating indexes must have
+the following characteristics:
+
+1. They cannot make use of any `filters`
+2. **All** dimensions in the query must be defined in the aggregating index
+
+Queries that do not have the above can still make use of regular indexes so
+performance can still be optimized.
+
+Aggregating indexes can be defined by adding a `type: 'aggregate'` to the index
+definition:
+
+```javascript
+cube(`Orders`, {
+  ...,
+
+  preAggregations: {
+    categoryAndDate: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.status],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+      indexes: {
+        categoryIndex: {
+          columns: [CUBE.status, Products.name],
+        },
+        aggregatedIndex: {
+          columns: [CUBE.status],
+          type: `aggregate`,
+        },
+      },
+    },
+  },
+});
+```
+
+[ref-api-ref-query-ref]: https://cube.dev/docs/query-format#query-properties
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]:
   /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries

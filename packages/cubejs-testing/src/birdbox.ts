@@ -64,15 +64,22 @@ export interface LocalOptions extends ContainerOptions {
 /**
  * Birdbox environments for cube.js passed for testcase.
  */
-export interface Env {
+export type Env = {
   CUBEJS_DEV_MODE: string,
   CUBEJS_WEB_SOCKETS: string,
   CUBEJS_EXTERNAL_DEFAULT: string,
   CUBEJS_SCHEDULED_REFRESH_DEFAULT: string,
   CUBEJS_REFRESH_WORKER: string,
   CUBEJS_ROLLUP_ONLY: string,
+  // SQL API
+  CUBEJS_SQL_PORT?: string,
+  CUBEJS_SQL_USER?: string,
+  CUBEJS_PG_SQL_PORT?: string,
+  CUBEJS_SQL_PASSWORD?: string,
+  CUBEJS_SQL_SUPER_USER?: string,
+} & {
   [key: string]: string,
-}
+};
 
 /**
  * List of permanent test data files.
@@ -152,6 +159,7 @@ export interface BirdBox {
   configuration: {
     playgroundUrl: string;
     apiUrl: string;
+    systemUrl: string;
     wsUrl: string;
     env?: Record<string, string>;
   };
@@ -174,6 +182,7 @@ export async function startBirdBoxFromContainer(
       configuration: {
         playgroundUrl: `http://${host}:${port}`,
         apiUrl: `http://${host}:${port}/cubejs-api/v1`,
+        systemUrl: `http://${host}:${port}/cubejs-system/v1`,
         wsUrl: `ws://${host}:${port}`,
       },
     };
@@ -212,7 +221,7 @@ export async function startBirdBoxFromContainer(
       `[Birdbox] Using ${composeFile} compose file\n`
     );
   }
-  
+
   const env = await dc
     .withStartupTimeout(30 * 1000)
     .withEnv(
@@ -236,7 +245,7 @@ export async function startBirdBoxFromContainer(
         `[Birdbox] Creating a proxy server 4000->${port} for local testing\n`
       );
     }
-    
+
     // As local Playground proxies requests to the 4000 port
     proxyServer = HttpProxy.createProxyServer({
       target: `http://localhost:${port}`
@@ -297,6 +306,7 @@ export async function startBirdBoxFromContainer(
     configuration: {
       playgroundUrl: `http://${host}:${playgroundPort}`,
       apiUrl: `http://${host}:${port}/cubejs-api/v1`,
+      systemUrl: `http://${host}:${port}/cubejs-system/v1`,
       wsUrl: `ws://${host}:${port}`,
       env: {
         ...(
@@ -321,10 +331,11 @@ export async function startBirdBoxFromCli(
   if (!options.schemaDir) {
     options.schemaDir = 'postgresql/schema';
   }
+
   if (!options.cubejsConfig) {
     options.cubejsConfig = 'postgresql/single/cube.js';
   }
-  
+
   if (options.loadScript) {
     db = await PostgresDBRunner.startContainer({
       volumes: [
@@ -381,6 +392,10 @@ export async function startBirdBoxFromCli(
 
   if (fs.existsSync(path.join(testDir, '.cubestore'))) {
     fs.removeSync(path.join(testDir, '.cubestore'));
+  }
+
+  if (fs.existsSync(path.join(testDir, 'schema'))) {
+    fs.removeSync(path.join(testDir, 'schema'));
   }
 
   // Ignored if not explicitly required by a schema file.
@@ -480,6 +495,7 @@ export async function startBirdBoxFromCli(
     configuration: {
       playgroundUrl: 'http://127.0.0.1:4000',
       apiUrl: 'http://127.0.0.1:4000/cubejs-api/v1',
+      systemUrl: 'http://127.0.0.1:4000/cubejs-system/v1',
       wsUrl: 'ws://127.0.0.1:4000',
     },
   };
@@ -542,11 +558,7 @@ export async function getBirdbox(
     REQUIRED_ENV_VARS[type].forEach((key: string) => {
       if (process.env[key] === undefined) {
         process.stderr.write(
-          `Error: ${
-            key
-          } is required environment variable for ${
-            type
-          }\n`
+          `Error: ${key} is required environment variable for ${type}\n`
         );
         process.exit(1);
       } else {

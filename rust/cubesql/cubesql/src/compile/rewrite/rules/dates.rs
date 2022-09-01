@@ -242,6 +242,11 @@ impl RewriteRules for DateRules {
                 fun_expr("UtcTimestamp", Vec::<String>::new()),
             ),
             rewrite(
+                "localtimestamp-to-now",
+                udf_expr("localtimestamp", Vec::<String>::new()),
+                fun_expr("UtcTimestamp", Vec::<String>::new()),
+            ),
+            rewrite(
                 "tableau-week",
                 binary_expr(
                     fun_expr(

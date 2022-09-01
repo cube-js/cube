@@ -79,6 +79,5 @@ Have a look at some demo applications you can build with Cube.js:
 | Application                                          | Story                                                                                                                          |
 | :--------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
 | [Hacktoberfest 2020](https://hacktoberfest.cube.dev) | [Hacktoberfest 2020 in insights and statistics](https://dev.to/igorlukanin/hacktoberfest-2020-in-insights-and-statistics-3m57) |
-| [Slack Vibe](https://slack-vibe-demo.cube.dev)       | [Slack Vibe, the Open Source Analytics for Slack](https://dev.to/cubejs/slack-vibe-the-open-source-analytics-for-slack-2khl)   |
 
 Cube integrates with all kinds of [data sources](https://cube.dev/docs/config/databases) and data [visualization tools](https://cube.dev/docs/config/downstream). You can [find](https://cube.dev/for) more easy-step guides to get started with Cube.

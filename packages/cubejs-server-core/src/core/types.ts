@@ -28,9 +28,19 @@ export interface QueryCacheOptions {
   externalQueueOptions?: QueueOptions;
 }
 
+/**
+ * This interface describes properties users could use to configure
+ * pre-aggregations in the cube.js file.
+ */
 export interface PreAggregationsOptions {
   queueOptions?: QueueOptions | ((dataSource: string) => QueueOptions);
   externalRefresh?: boolean;
+
+  /**
+   * The maximum number of partitions that pre-aggregation can have. Uses
+   * CUBEJS_MAX_PARTITIONS_PER_CUBE environment variable as the default value.
+   */
+  maxPartitions?: number;
 }
 
 export interface OrchestratorOptions {
@@ -91,6 +101,7 @@ export type DatabaseType =
   | 'athena'
   | 'bigquery'
   | 'clickhouse'
+  | 'crate'
   | 'druid'
   | 'jdbc'
   | 'firebolt'

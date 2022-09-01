@@ -109,12 +109,24 @@ pub struct QueryPlans {
     pub worker: Arc<dyn ExecutionPlan>,
 }
 
-pub type InlineTables = HashMap<String, Arc<DataFrame>>;
+#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug)]
+pub struct InlineTable {
+    pub id: u64,
+    pub name: String,
+    pub data: Arc<DataFrame>,
+}
+pub type InlineTables = Vec<InlineTable>;
+
+impl InlineTable {
+    pub fn new(id: u64, name: String, data: Arc<DataFrame>) -> Self {
+        Self { id, name, data }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
-    pub inline_tables: Arc<InlineTables>,
+    pub inline_tables: InlineTables,
     pub trace_obj: Option<String>,
 }
 
@@ -125,9 +137,9 @@ impl SqlQueryContext {
         res
     }
 
-    pub fn with_inline_tables(&self, inline_tables: Vec<(String, Arc<DataFrame>)>) -> Self {
+    pub fn with_inline_tables(&self, inline_tables: &InlineTables) -> Self {
         let mut res = self.clone();
-        res.inline_tables = Arc::new(HashMap::from_iter(inline_tables.iter().cloned()));
+        res.inline_tables = inline_tables.clone();
         res
     }
 
@@ -521,7 +533,7 @@ impl SqlServiceImpl {
             .query_planner
             .logical_plan(
                 DFStatement::Statement(Statement::Query(q)),
-                Arc::new(InlineTables::new()),
+                &InlineTables::new(),
             )
             .await?;
 
@@ -591,10 +603,7 @@ impl SqlServiceImpl {
 
         let query_plan = self
             .query_planner
-            .logical_plan(
-                DFStatement::Statement(statement),
-                Arc::new(InlineTables::new()),
-            )
+            .logical_plan(DFStatement::Statement(statement), &InlineTables::new())
             .await?;
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
@@ -1043,7 +1052,7 @@ impl SqlService for SqlServiceImpl {
                     .query_planner
                     .logical_plan(
                         DFStatement::Statement(Statement::Query(q)),
-                        context.inline_tables.clone(),
+                        &context.inline_tables,
                     )
                     .await?;
                 // TODO distribute and combine
@@ -1059,28 +1068,37 @@ impl SqlService for SqlServiceImpl {
                         timeout(
                             self.query_timeout,
                             self.cache
-                                .get(query, serialized, async move |plan| {
-                                    let records;
-                                    if workers.len() == 0 {
-                                        records =
-                                            executor.execute_router_plan(plan, cluster).await?.1;
-                                    } else {
-                                        // Pick one of the workers to run as main for the request.
-                                        let i = thread_rng().sample(Uniform::new(0, workers.len()));
-                                        let rs = cluster.route_select(&workers[i], plan).await?.1;
-                                        records = rs
-                                            .into_iter()
-                                            .map(|r| r.read())
-                                            .collect::<Result<Vec<_>, _>>()?;
-                                    }
-                                    Ok(cube_ext::spawn_blocking(
-                                        move || -> Result<DataFrame, CubeError> {
-                                            let df = batch_to_dataframe(&records)?;
-                                            Ok(df)
-                                        },
-                                    )
-                                    .await??)
-                                })
+                                .get(
+                                    query,
+                                    &context.inline_tables,
+                                    serialized,
+                                    async move |plan| {
+                                        let records;
+                                        if workers.len() == 0 {
+                                            records = executor
+                                                .execute_router_plan(plan, cluster)
+                                                .await?
+                                                .1;
+                                        } else {
+                                            // Pick one of the workers to run as main for the request.
+                                            let i =
+                                                thread_rng().sample(Uniform::new(0, workers.len()));
+                                            let rs =
+                                                cluster.route_select(&workers[i], plan).await?.1;
+                                            records = rs
+                                                .into_iter()
+                                                .map(|r| r.read())
+                                                .collect::<Result<Vec<_>, _>>()?;
+                                        }
+                                        Ok(cube_ext::spawn_blocking(
+                                            move || -> Result<DataFrame, CubeError> {
+                                                let df = batch_to_dataframe(&records)?;
+                                                Ok(df)
+                                            },
+                                        )
+                                        .await??)
+                                    },
+                                )
                                 .with_current_subscriber(),
                         )
                         .await??
@@ -1126,7 +1144,7 @@ impl SqlService for SqlServiceImpl {
                     .query_planner
                     .logical_plan(
                         DFStatement::Statement(Statement::Query(q)),
-                        context.inline_tables.clone(),
+                        &context.inline_tables,
                     )
                     .await?;
                 match logical_plan {
@@ -1142,6 +1160,7 @@ impl SqlService for SqlServiceImpl {
                                         .map(|p| (p.partition.get_id(), RowFilter::default()))
                                 })
                                 .collect(),
+                            context.inline_tables.into_iter().map(|i| i.id).collect(),
                         );
                         let mut mocked_names = HashMap::new();
                         for (_, f, _) in worker_plan.files_to_download() {

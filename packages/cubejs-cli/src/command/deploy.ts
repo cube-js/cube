@@ -119,8 +119,12 @@ export function configureDeployCommand(program: CommanderStatic) {
     .description('Deploy project to Cube Cloud')
     .option('--upload-env', 'Upload .env file to CubeCloud')
     .option('--token <token>', 'Add auth token to CubeCloud')
+    .option('--directory [path]', 'Specify path to conf directory', './')
     .action(
-      (options) => deploy({ directory: process.cwd(), ...options })
+      (options) => deploy({
+        ...options,
+        directory: path.join(process.cwd(), options.directory)
+      })
         .catch(e => displayError(e.stack || e))
     )
     .on('--help', () => {

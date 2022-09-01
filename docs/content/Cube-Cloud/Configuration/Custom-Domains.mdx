@@ -1,0 +1,31 @@
+---
+title: Custom Domains
+permalink: /cloud/configuration/custom-domains
+category: Configuration
+menuOrder: 5
+---
+
+To set up a custom domain, go to your deployment's settings page. Under the
+**Custom Domain** section, type in your custom domain and click **Add**:
+
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/b896d232-1414-41f3-a753-eacec2355928/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+After doing this, copy the provided domain and add the following `CNAME` records
+to your DNS provider:
+
+| Name          | Value                                       |
+| ------------- | ------------------------------------------- |
+| `YOUR_DOMAIN` | The copied value from Cube Cloud's settings |
+
+Using the example subdomain from the screenshot, a `CNAME` record for `acme.dev`
+would look like:
+
+| Name       | Value                                                 |
+| ---------- | ----------------------------------------------------- |
+| `insights` | `colossal-crowville.gcp-us-central1.cubecloudapp.dev` |

@@ -119,7 +119,7 @@ definition][ref-schema-ref-preaggs]. In the example below, the
 separate tables for each month's worth of data. Once built, it will continue to
 refresh on a daily basis the last 3 months of data.
 
-```javascript
+```typescript
 cube(`Orders`, {
   sql: `select * from orders`,
 
@@ -141,6 +141,66 @@ cube(`Orders`, {
   },
 });
 ```
+
+## Using Indexes
+
+For larger pre-aggregations, performance can be significantly improved by adding
+an [index][ref-schema-ref-preaggs-index]. This is done by defining the `indexes`
+property for a pre-aggregation:
+
+```typescript
+cube(`Orders`, {
+  ...,
+
+  preAggregations: {
+    status: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.status, Products.name, ProductCategories.name],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+      indexes: {
+        statusIndex: {
+          columns: [CUBE.status, Products.name],
+        },
+        aggregatedIndex: {
+          columns: [CUBE.status],
+          type: `aggregate`,
+        },
+      },
+    },
+  },
+});
+```
+
+For example, if the pre-aggregated data looks like:
+
+| created_at | status     | products\_\_name | product_categories\_\_name | count |
+| ---------- | ---------- | ---------------- | -------------------------- | ----- |
+| 2022-08-01 | completed  | Plastic Chair    | Furniture                  | 4     |
+| 2022-08-01 | processing | Plastic Chair    | Furniture                  | 11    |
+| 2022-08-01 | shipped    | Plastic Chair    | Furniture                  | 2     |
+| 2022-08-01 | completed  | Keyboard         | Electronics                | 1     |
+| 2022-08-01 | processing | Keyboard         | Electronics                | 3     |
+| 2022-08-01 | shipped    | Keyboard         | Electronics                | 7     |
+
+Then the data within `statusIndex` would look like:
+
+| status     | products\_\_name | created_at | product_categories\_\_name | count |
+| ---------- | ---------------- | ---------- | -------------------------- | ----- |
+| completed  | Plastic Chair    | 2022-08-01 | Furniture                  | 4     |
+| processing | Plastic Chair    | 2022-08-01 | Furniture                  | 11    |
+| shipped    | Plastic Chair    | 2022-08-01 | Furniture                  | 2     |
+| completed  | Keyboard         | 2022-08-01 | Electronics                | 1     |
+| processing | Keyboard         | 2022-08-01 | Electronics                | 3     |
+| shipped    | Keyboard         | 2022-08-01 | Electronics                | 7     |
+
+And the data within `aggregatedIndex` would look like:
+
+| status     | count |
+| ---------- | ----- |
+| completed  | 5     |
+| processing | 14    |
+| shipped    | 9     |
 
 ## Inspecting Pre-Aggregations
 
@@ -391,6 +451,7 @@ currently manage this. For most use-cases, 1 day is sufficient.
 [ref-connect-db-snowflake]: /config/databases/snowflake
 [ref-schema-timedimension]: /types-and-formats#types-time
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
+[ref-schema-ref-preaggs-index]: /schema/reference/pre-aggregations#indexes
 [ref-schema-ref-preaggs-refresh-key]:
   /schema/reference/pre-aggregations#refresh-key
 [ref-schema-ref-preaggs-refresh-key-every]:

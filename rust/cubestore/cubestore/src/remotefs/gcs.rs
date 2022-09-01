@@ -136,6 +136,10 @@ impl RemoteFs for GCSRemoteFs {
             "application/octet-stream",
         )
         .await?;
+
+        let size = fs::metadata(temp_upload_path).await?.len();
+        self.check_upload_file(remote_path, size).await?;
+
         let local_path = self.dir.as_path().join(remote_path);
         if Path::new(temp_upload_path) != local_path {
             fs::create_dir_all(local_path.parent().unwrap())
