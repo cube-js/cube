@@ -540,6 +540,8 @@ export class CubejsServerCore {
                 driver.setLogger(this.logger);
               }
 
+              driver.onCreate?.();
+
               await driver.testConnection();
 
               return driver;
@@ -575,6 +577,8 @@ export class CubejsServerCore {
                 if (driver.setLogger) {
                   driver.setLogger(this.logger);
                 }
+
+                driver.onCreate?.();
 
                 await driver.testConnection();
 

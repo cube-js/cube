@@ -180,6 +180,13 @@ export class BaseDriver {
   }
 
   /**
+   * @public
+   */
+  onCreate() {
+    // override, if it's needed
+  }
+
+  /**
    * @abstract
    * @param {string} query
    * @param {Array<unknown>} values
