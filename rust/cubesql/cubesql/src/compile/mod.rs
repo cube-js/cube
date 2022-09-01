@@ -2749,7 +2749,7 @@ mod tests {
     use cubeclient::models::{
         V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadResponse,
     };
-    use datafusion::dataframe::DataFrame as DFDataFrame;
+    use datafusion::{dataframe::DataFrame as DFDataFrame, logical_plan::plan::Filter};
     use pretty_assertions::assert_eq;
     use regex::Regex;
 
@@ -2983,6 +2983,27 @@ mod tests {
         fn find_projection_schema(&self) -> DFSchemaRef;
 
         fn find_cube_scan(&self) -> CubeScanNode;
+
+        fn find_filter(&self) -> Option<Filter>;
+    }
+
+    fn find_filter_deep_search(parent: Arc<LogicalPlan>) -> Option<Filter> {
+        pub struct FindFilterNodeVisitor(Option<Filter>);
+
+        impl PlanVisitor for FindFilterNodeVisitor {
+            type Error = CubeError;
+
+            fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+                if let LogicalPlan::Filter(filter) = plan {
+                    self.0 = Some(filter.clone());
+                }
+                Ok(true)
+            }
+        }
+
+        let mut visitor = FindFilterNodeVisitor(None);
+        parent.accept(&mut visitor).unwrap();
+        visitor.0
     }
 
     impl LogicalPlanTestUtils for LogicalPlan {
@@ -2995,6 +3016,10 @@ mod tests {
 
         fn find_cube_scan(&self) -> CubeScanNode {
             find_cube_scan_deep_search(Arc::new(self.clone()))
+        }
+
+        fn find_filter(&self) -> Option<Filter> {
+            find_filter_deep_search(Arc::new(self.clone()))
         }
     }
 
@@ -6063,6 +6088,78 @@ ORDER BY \"COUNT(count)\" DESC"
                 DatabaseProtocol::PostgreSQL
             )
             .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_literal_filter_simplify() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+                SELECT
+                  \"customer_gender\"
+                FROM \"KibanaSampleDataEcommerce\"
+                WHERE TRUE = TRUE
+                LIMIT 1000;"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: None,
+            }
+        );
+        assert_eq!(
+            logical_plan.find_filter().is_none(),
+            true,
+            "Filter must be eliminated"
+        );
+
+        let query_plan = convert_select_to_query_plan(
+            "
+                SELECT
+                  \"customer_gender\"
+                FROM \"KibanaSampleDataEcommerce\"
+                WHERE TRUE = TRUE AND customer_gender = 'male'
+                LIMIT 1000;"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["male".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
         );
 
         Ok(())
