@@ -6,13 +6,13 @@ use crate::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
             binary_expr, cast_expr, column_expr, cube_scan, fun_expr,
-            inner_aggregate_split_replacer, literal_expr, literal_string, original_expr_name,
-            outer_aggregate_split_replacer, outer_projection_split_replacer, projection,
-            projection_expr, projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
-            rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
-            udf_expr, AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, ColumnExprColumn,
-            CubeScanAliasToCube, InnerAggregateSplitReplacerAliasToCube, LiteralExprValue,
-            LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
+            inner_aggregate_split_replacer, literal_expr, literal_number, literal_string,
+            original_expr_name, outer_aggregate_split_replacer, outer_projection_split_replacer,
+            projection, projection_expr, projection_expr_empty_tail, rewrite,
+            rewriter::RewriteRules, rules::members::MemberRules, transforming_chain_rewrite,
+            transforming_rewrite, udf_expr, AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp,
+            ColumnExprColumn, CubeScanAliasToCube, InnerAggregateSplitReplacerAliasToCube,
+            LiteralExprValue, LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
             OuterProjectionSplitReplacerAliasToCube, ProjectionAlias,
         },
     },
@@ -632,23 +632,19 @@ impl RewriteRules for SplitRules {
                                 udf_expr(
                                     "datediff",
                                     vec![
-                                        // TODO: Validate day
-                                        "?granularity".to_string(),
+                                        literal_string("day"),
                                         cast_expr(literal_string("1970-01-01"), "?data_type"),
                                         column_expr("?column"),
                                     ],
                                 ),
                                 "+",
-                                // TODO: Validate  literal number 3
-                                "?literal_plus",
+                                literal_number(3),
                             ),
                             "%",
-                            // TODO: Validate  literal number 7
-                            literal_expr("?literal_divide"),
+                            literal_number(7),
                         ),
                         "+",
-                        // TODO: Validate  literal number 1
-                        literal_expr("?literal_align"),
+                        literal_number(1),
                     ),
                 )],
                 alias_expr(
@@ -676,23 +672,19 @@ impl RewriteRules for SplitRules {
                                 udf_expr(
                                     "datediff",
                                     vec![
-                                        // TODO: Validate day
-                                        "?granularity".to_string(),
+                                        literal_string("day"),
                                         cast_expr(literal_string("1970-01-01"), "?data_type"),
                                         column_expr("?column"),
                                     ],
                                 ),
                                 "+",
-                                // TODO: Validate  literal number 3
-                                "?literal_plus",
+                                literal_number(3),
                             ),
                             "%",
-                            // TODO: Validate  literal number 7
-                            literal_expr("?literal_divide"),
+                            literal_number(7),
                         ),
                         "+",
-                        // TODO: Validate  literal number 1
-                        literal_expr("?literal_align"),
+                        literal_number(1),
                     ),
                 )],
                 alias_expr(

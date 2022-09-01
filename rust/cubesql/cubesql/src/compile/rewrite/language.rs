@@ -504,10 +504,19 @@ macro_rules! variant_field_struct {
                 type Err = CubeError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
                     let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    if s.starts_with(&prefix) {
-                        return Ok([<$variant $var_field:camel>](ScalarValue::Utf8(Some(s.replace(&prefix, "")))));
+                    let typed_str = s.strip_prefix(&prefix).ok_or(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))?;
+
+                    if let Some(value) = typed_str.strip_prefix("s:") {
+                        Ok([<$variant $var_field:camel>](ScalarValue::Utf8(Some(value.to_string()))))
+                    } else if let Some(value) = typed_str.strip_prefix("b:") {
+                        let n: bool = value.parse().map_err(|err| CubeError::internal(format!("Can't parse boolean scalar value from '{}' with error: {}", typed_str, err)))?;
+                        Ok([<$variant $var_field:camel>](ScalarValue::Boolean(Some(n))))
+                    } else if let Some(value) = typed_str.strip_prefix("i:") {
+                        let n: i64 = value.parse().map_err(|err| CubeError::internal(format!("Can't parse i64 scalar value from '{}' with error: {}", typed_str, err)))?;
+                        Ok([<$variant $var_field:camel>](ScalarValue::Int64(Some(n))))
+                    } else {
+                        Err(CubeError::internal(format!("Can't convert {}. Should contains type type, actual: {}", s, typed_str)))
                     }
-                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
                 }
             }
 
