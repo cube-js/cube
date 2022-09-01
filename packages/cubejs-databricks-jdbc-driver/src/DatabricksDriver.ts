@@ -142,7 +142,8 @@ export class DatabricksDriver extends JDBCDriver {
     return !!this.config.readOnly;
   }
 
-  public onCreate() {
+  public setLogger(logger: any) {
+    super.setLogger(logger);
     this.showUrlTokenDeprecation();
   }
 
