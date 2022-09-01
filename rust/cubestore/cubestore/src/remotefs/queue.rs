@@ -519,7 +519,12 @@ mod test {
     fn make_test_csv() -> std::path::PathBuf {
         let dir = env::temp_dir();
 
-        let path = dir.clone().join("foo.csv");
+        let path = tempfile::Builder::new()
+            .prefix("foo.csv")
+            .tempfile_in(dir)
+            .unwrap()
+            .path()
+            .to_path_buf();
 
         let mut file = File::create(path.clone()).unwrap();
 
@@ -558,7 +563,7 @@ mod test {
     }
     #[tokio::test]
     async fn queue_upload_wrong_size() {
-        let config = Config::test("upload_retries_all_fail");
+        let config = Config::test("upload_upload_wrong_size");
         config.configure_injector().await;
         let failed_fs = Arc::new(MockFs {
             base_fs: config.injector().get_service("original_remote_fs").await,
@@ -578,7 +583,7 @@ mod test {
     }
     #[tokio::test]
     async fn queue_upload_missing_file() {
-        let config = Config::test("upload_retries_all_fail");
+        let config = Config::test("upload_missing_file");
         config.configure_injector().await;
         let failed_fs = Arc::new(MockFs {
             base_fs: config.injector().get_service("original_remote_fs").await,
