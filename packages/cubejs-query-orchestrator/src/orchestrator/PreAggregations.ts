@@ -906,7 +906,7 @@ export class PreAggregationLoader {
     this.logExecutingSql(queryOptions);
     this.logger('Downloading external pre-aggregation via query', queryOptions);
     const externalDriver = await this.externalDriverFactory();
-    const capabilities = externalDriver.capabilities && externalDriver.capabilities();
+    const capabilities = externalDriver.capabilities();
 
     const tableData = await saveCancelFn(client.downloadQueryResults(
       sql,

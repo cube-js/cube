@@ -6,7 +6,7 @@ import * as moment from 'moment';
 import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
-  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions, StreamTableDataWithTypes, QueryOptions,
+  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions, StreamTableDataWithTypes, QueryOptions, DownloadTableData, DownloadQueryResultsResult,
 } from '@cubejs-backend/query-orchestrator';
 import { QueryStream } from './QueryStream';
 
@@ -54,6 +54,10 @@ export type PostgresDriverConfiguration = Partial<PoolConfig> & {
 } & {
   maxPoolSize?: number
 };
+
+function isStreamImport(options: unknown, ) {
+
+}
 
 export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
   extends BaseDriver implements DriverInterface {
@@ -266,7 +270,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     return result.rows;
   }
 
-  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions) {
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
     if (options.streamImport) {
       return this.stream(query, values, options);
     }
