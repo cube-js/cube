@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.62](https://github.com/cube-js/cube.js/compare/v0.30.61...v0.30.62) (2022-09-02)
+
+
+### Features
+
+* **cubesql:** Superset - serverside paging ([#5204](https://github.com/cube-js/cube.js/issues/5204)) ([dfd695d](https://github.com/cube-js/cube.js/commit/dfd695d2f09ea00b4a0b8ef816a597b5c3986ce6))
+* **cubesql:** Support dow granularity (ThoughtSpot) ([#5172](https://github.com/cube-js/cube.js/issues/5172)) ([0919e40](https://github.com/cube-js/cube.js/commit/0919e40c9283db45b3856fcf81993d985cbfc7ac))
+* **cubesql:** Support doy granularity (ThoughtSpot) ([#5232](https://github.com/cube-js/cube.js/issues/5232)) ([be26775](https://github.com/cube-js/cube.js/commit/be2677535ae1b7bd231530c3bb9266016f9b4c8b))
+
+
+
+
+
 ## [0.30.61](https://github.com/cube-js/cube.js/compare/v0.30.60...v0.30.61) (2022-09-01)
 
 
