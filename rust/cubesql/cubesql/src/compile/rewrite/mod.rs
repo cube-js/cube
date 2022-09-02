@@ -668,7 +668,15 @@ fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> Str
 }
 
 fn literal_string(literal_str: impl Display) -> String {
-    format!("(LiteralExpr LiteralExprValue:{})", literal_str)
+    format!("(LiteralExpr LiteralExprValue:s:{})", literal_str)
+}
+
+fn literal_number(literal_number: i64) -> String {
+    format!("(LiteralExpr LiteralExprValue:i:{})", literal_number)
+}
+
+fn literal_bool(literal_bool: bool) -> String {
+    format!("(LiteralExpr LiteralExprValue:b:{})", literal_bool)
 }
 
 fn projection(expr: impl Display, input: impl Display, alias: impl Display) -> String {
