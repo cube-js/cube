@@ -141,12 +141,12 @@ services:
 
 ## API Instance
 
-API instance is processing incoming API requests and quering either Cube Store
-for pre-aggregated data or connected database(s) for raw data. It is possible to
-horizontally scale API instances and use load balancer to balance incoming
+API instances process incoming API requests and query either Cube Store
+for pre-aggregated data or connected data sources for raw data. It is possible to
+horizontally scale API instances and use a load balancer to balance incoming
 requests between multiple API instances.
 
-The [Cube.js Docker image][dh-cubejs] is used for API Instance.
+The [Cube Docker image][dh-cubejs] is used for API Instance.
 
 API instance needs to be configured via environment variables, cube.js file and
 has access to the data schema files.
