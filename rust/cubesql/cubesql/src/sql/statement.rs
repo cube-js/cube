@@ -870,7 +870,8 @@ impl<'ast> Visitor<'ast, ConnectionError> for DateDiffReplacer {
                     };
 
                     match granularity_in_identifier.as_str() {
-                        "second" | "minute" | "hour" | "day" | "qtr" | "week" | "month" | "year" => {
+                        "second" | "minute" | "hour" | "day" | "qtr" | "week" | "month"
+                        | "year" => {
                             *arg =
                                 Expr::Value(Value::SingleQuotedString(granularity_in_identifier));
                         }
@@ -1072,6 +1073,27 @@ mod tests {
         run_cast_replacer(
             "SELECT CAST(1 + 1 as Regclass);",
             "SELECT __cube_regclass_cast(1 + 1)",
+        )?;
+
+        Ok(())
+    }
+
+    fn run_datediff_replacer(input: &str, output: &str) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let replacer = DateDiffReplacer::new();
+        let res = replacer.replace(&stmts[0]);
+
+        assert_eq!(res.to_string(), output);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_datediff_replacer() -> Result<(), CubeError> {
+        run_datediff_replacer(
+            r#"SELECT DATEDIFF(day, DATE '1970-01-01', "ta_1"."createdAt")"#,
+            r#"SELECT DATEDIFF('day', DATE '1970-01-01', "ta_1"."createdAt")"#,
         )?;
 
         Ok(())
