@@ -55,10 +55,6 @@ export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   maxPoolSize?: number
 };
 
-function isStreamImport(options: unknown, ) {
-
-}
-
 export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
   extends BaseDriver implements DriverInterface {
   /**
