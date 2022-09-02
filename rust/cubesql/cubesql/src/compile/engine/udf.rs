@@ -676,6 +676,7 @@ pub fn create_timediff_udf() -> ScalarUDF {
     )
 }
 
+// https://docs.aws.amazon.com/redshift/latest/dg/r_DATEDIFF_function.html
 pub fn create_datediff_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 3);
@@ -689,6 +690,26 @@ pub fn create_datediff_udf() -> ScalarUDF {
 
     ScalarUDF::new(
         "datediff",
+        &Signature::any(3, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+// https://docs.aws.amazon.com/redshift/latest/dg/r_DATEADD_function.html
+pub fn create_dateadd_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "dateadd is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "dateadd",
         &Signature::any(3, Volatility::Immutable),
         &return_type,
         &fun,
