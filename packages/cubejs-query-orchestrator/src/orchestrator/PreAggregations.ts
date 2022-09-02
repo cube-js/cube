@@ -871,6 +871,8 @@ export class PreAggregationLoader {
         queryOptions
       );
 
+      await client.dropTable(targetTableName);
+
       try {
         await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn, queryOptions);
       } finally {
