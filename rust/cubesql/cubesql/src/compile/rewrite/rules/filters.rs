@@ -16,10 +16,10 @@ use crate::{
             time_dimension_date_range_replacer, time_dimension_expr, transforming_rewrite,
             BetweenExprNegated, BinaryExprOp, ChangeUserMemberValue, ColumnExprColumn,
             CubeScanAliasToCube, CubeScanLimit, FilterMemberMember, FilterMemberOp,
-            FilterMemberValues, FilterReplacerAliasToCube, InListExprNegated, LimitN,
-            LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember, TimeDimensionDateRange,
-            TimeDimensionDateRangeReplacerDateRange, TimeDimensionDateRangeReplacerMember,
-            TimeDimensionGranularity, TimeDimensionName,
+            FilterMemberValues, FilterReplacerAliasToCube, InListExprNegated, LimitFetch,
+            LimitSkip, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
+            TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
+            TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
         },
     },
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
@@ -100,7 +100,8 @@ impl RewriteRules for FilterRules {
                     ),
                 ),
                 limit(
-                    "?new_limit_n",
+                    "?new_limit_skip",
+                    "?new_limit_fetch",
                     cube_scan(
                         "?source_table_name",
                         "?members",
@@ -112,7 +113,12 @@ impl RewriteRules for FilterRules {
                         "?split",
                     ),
                 ),
-                self.push_down_limit_filter("?literal", "?new_limit", "?new_limit_n"),
+                self.push_down_limit_filter(
+                    "?literal",
+                    "?new_limit",
+                    "?new_limit_skip",
+                    "?new_limit_fetch",
+                ),
             ),
             // Transform Filter: Boolean(true)
             // It's safe to push down filter under projection, next filter-truncate-true will truncate it
@@ -127,7 +133,8 @@ impl RewriteRules for FilterRules {
                 filter(
                     "?filter",
                     limit(
-                        "LimitN:0",
+                        "?limit_skip",
+                        "LimitFetch:0",
                         cube_scan(
                             "?source_table_name",
                             "?members",
@@ -141,7 +148,8 @@ impl RewriteRules for FilterRules {
                     ),
                 ),
                 limit(
-                    "LimitN:0",
+                    "?limit_skip",
+                    "LimitFetch:0",
                     filter(
                         "?filter",
                         cube_scan(
@@ -159,8 +167,8 @@ impl RewriteRules for FilterRules {
             ),
             rewrite(
                 "limit-push-down-projection",
-                limit("?limit", projection("?expr", "?input", "?alias")),
-                projection("?expr", limit("?limit", "?input"), "?alias"),
+                limit("?skip", "?fetch", projection("?expr", "?input", "?alias")),
+                projection("?expr", limit("?skip", "?fetch", "?input"), "?alias"),
             ),
             // Limit to top node
             rewrite(
@@ -168,7 +176,8 @@ impl RewriteRules for FilterRules {
                 projection(
                     "?filter",
                     limit(
-                        "LimitN:0",
+                        "?limit_skip",
+                        "LimitFetch:0",
                         cube_scan(
                             "?source_table_name",
                             "?members",
@@ -183,7 +192,8 @@ impl RewriteRules for FilterRules {
                     "?alias",
                 ),
                 limit(
-                    "LimitN:0",
+                    "?limit_skip",
+                    "LimitFetch:0",
                     projection(
                         "?filter",
                         cube_scan(
@@ -995,11 +1005,13 @@ impl FilterRules {
         &self,
         literal_var: &'static str,
         new_limit_var: &'static str,
-        new_limit_n_var: &'static str,
+        new_limit_skip_var: &'static str,
+        new_limit_fetch_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let literal_var = var!(literal_var);
         let new_limit_var = var!(new_limit_var);
-        let new_limit_n_var = var!(new_limit_n_var);
+        let new_limit_skip_var = var!(new_limit_skip_var);
+        let new_limit_fetch_var = var!(new_limit_fetch_var);
         move |egraph, subst| {
             for literal_value in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
                 if let ScalarValue::Boolean(Some(false)) = literal_value {
@@ -1008,8 +1020,12 @@ impl FilterRules {
                         egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(1)))),
                     );
                     subst.insert(
-                        new_limit_n_var,
-                        egraph.add(LogicalPlanLanguage::LimitN(LimitN(0))),
+                        new_limit_skip_var,
+                        egraph.add(LogicalPlanLanguage::LimitSkip(LimitSkip(Some(0)))),
+                    );
+                    subst.insert(
+                        new_limit_fetch_var,
+                        egraph.add(LogicalPlanLanguage::LimitFetch(LimitFetch(Some(0)))),
                     );
                     return true;
                 }

@@ -87,14 +87,15 @@ crate::plan_to_language! {
             projection: Option<Vec<usize>>,
             projected_schema: DFSchemaRef,
             filters: Vec<Expr>,
-            limit: Option<usize>,
+            fetch: Option<usize>,
         },
         EmptyRelation {
             produce_one_row: bool,
             schema: DFSchemaRef,
         },
         Limit {
-            n: usize,
+            skip: Option<usize>,
+            fetch: Option<usize>,
             input: Arc<LogicalPlan>,
         },
         TableUDFs {
@@ -547,8 +548,8 @@ fn udaf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
     )
 }
 
-fn limit(n: impl Display, input: impl Display) -> String {
-    format!("(Limit {} {})", n, input)
+fn limit(skip: impl Display, fetch: impl Display, input: impl Display) -> String {
+    format!("(Limit {} {} {})", skip, fetch, input)
 }
 
 fn aggregate(input: impl Display, group: impl Display, aggr: impl Display) -> String {
@@ -854,11 +855,11 @@ fn table_scan(
     table_name: impl Display,
     projection: impl Display,
     filters: impl Display,
-    limit: impl Display,
+    fetch: impl Display,
 ) -> String {
     format!(
         "(TableScan {} {} {} {} {})",
-        source_table_name, table_name, projection, filters, limit
+        source_table_name, table_name, projection, filters, fetch
     )
 }
 

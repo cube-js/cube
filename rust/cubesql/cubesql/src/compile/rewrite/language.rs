@@ -316,7 +316,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::Sqrt => "Sqrt",
                 BuiltinScalarFunction::Tan => "Tan",
                 BuiltinScalarFunction::Trunc => "Trunc",
-                BuiltinScalarFunction::Array => "Array",
+                BuiltinScalarFunction::MakeArray => "MakeArray",
                 BuiltinScalarFunction::Ascii => "Ascii",
                 BuiltinScalarFunction::BitLength => "BitLength",
                 BuiltinScalarFunction::Btrim => "Btrim",

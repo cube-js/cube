@@ -2564,7 +2564,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         if is_olap_query(&rewrite_plan)? {
             let mut guard = ctx.state.write();
             // TODO: We should find what optimizers will be safety to use for OLAP queries
-            guard.optimizers = vec![];
+            guard.optimizer.rules = vec![];
         };
 
         log::debug!("Rewrite: {:#?}", rewrite_plan);
@@ -12162,5 +12162,103 @@ ORDER BY \"COUNT(count)\" DESC"
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_offset_limit() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_offset_limit_1",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 10 offset 10".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_offset_limit_2",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 10 offset 0".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_offset_limit_3",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 0 offset 10".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_offset_limit_4",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 100 offset 100".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_offset_limit_5",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 100 offset 990".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_superset_pagination() {
+        init_logger();
+
+        // At first, Superset gets the total count (no more than 50k)
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) AS rowcount FROM (SELECT order_date as order_date FROM public.\"KibanaSampleDataEcommerce\" GROUP BY order_date LIMIT 50000) AS rowcount_qry".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await.as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(50000),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT order_date AS order_date FROM public.\"KibanaSampleDataEcommerce\" GROUP BY order_date LIMIT 200 OFFSET 200".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await.as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(200),
+                offset: Some(200),
+                filters: None,
+            }
+        );
     }
 }
