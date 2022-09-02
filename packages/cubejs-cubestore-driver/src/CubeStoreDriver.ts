@@ -8,7 +8,7 @@ import {
   BaseDriver,
   DownloadTableCSVData,
   DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
-  StreamTableData,
+  StreamTableData, ExternalDriverCompatibilities,
   StreamingSourceTableData, QueryOptions,
 } from '@cubejs-backend/query-orchestrator';
 import { getEnv } from '@cubejs-backend/shared';
@@ -161,7 +161,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[], queryTracingObj?: any, aggregationsColumns?: string[], createTableIndexes?: CreateTableIndex[]) {
+  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns: string[] | null, queryTracingObj?: any, aggregationsColumns?: string[], createTableIndexes?: CreateTableIndex[]) {
     const indexes = createTableIndexes && createTableIndexes.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
 
     let hasAggregatingIndexes = false;
@@ -338,7 +338,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns?: string[], queryTracingObj?: any) {
+  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns: string[] | null, queryTracingObj?: any) {
     if (!uniqueKeyColumns) {
       throw new Error('Older version of orchestrator is being used with newer version of Cube Store driver. Please upgrade cube.js.');
     }
@@ -364,7 +364,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return CubeStoreQuery;
   }
 
-  public capabilities() {
+  public capabilities(): ExternalDriverCompatibilities {
     return {
       csvImport: true,
       streamImport: true,
