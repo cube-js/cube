@@ -6,7 +6,8 @@ import * as moment from 'moment';
 import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
-  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions, StreamTableDataWithTypes, QueryOptions, DownloadTableData, DownloadQueryResultsResult,
+  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
+  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult,
 } from '@cubejs-backend/query-orchestrator';
 import { QueryStream } from './QueryStream';
 
