@@ -463,6 +463,7 @@ impl RewriteRules for SplitRules {
                     false,
                 ),
             ),
+            // DatePart ("?expr", DateTrunc)
             transforming_chain_rewrite(
                 "split-push-down-date-part-with-date-trunc-inner-replacer",
                 inner_aggregate_split_replacer(
@@ -617,6 +618,94 @@ impl RewriteRules for SplitRules {
                     "?alias_column",
                     Some("?alias"),
                     false,
+                ),
+            ),
+            // (DATEDIFF(day, DATE '1970-01-01', "ta_1"."createdAt") + 3) % 7) + 1)
+            transforming_chain_rewrite(
+                "split-push-down-dow-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            binary_expr(
+                                udf_expr(
+                                    "datediff",
+                                    vec![
+                                        // TODO: Validate day
+                                        "?granularity".to_string(),
+                                        cast_expr(literal_string("1970-01-01"), "?data_type"),
+                                        column_expr("?column"),
+                                    ],
+                                ),
+                                "+",
+                                // TODO: Validate  literal number 3
+                                "?literal_plus",
+                            ),
+                            "%",
+                            // TODO: Validate  literal number 7
+                            literal_expr("?literal_divide"),
+                        ),
+                        "+",
+                        // TODO: Validate  literal number 1
+                        literal_expr("?literal_align"),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("day"), column_expr("?column")],
+                    ),
+                    "?outer_alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?outer_alias",
+                    "?outer_column",
+                ),
+            ),
+            // (DATEDIFF(day, DATE '1970-01-01', "ta_1"."createdAt") + 3) % 7) + 1)
+            transforming_chain_rewrite(
+                "split-push-down-dow-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            binary_expr(
+                                udf_expr(
+                                    "datediff",
+                                    vec![
+                                        // TODO: Validate day
+                                        "?granularity".to_string(),
+                                        cast_expr(literal_string("1970-01-01"), "?data_type"),
+                                        column_expr("?column"),
+                                    ],
+                                ),
+                                "+",
+                                // TODO: Validate  literal number 3
+                                "?literal_plus",
+                            ),
+                            "%",
+                            // TODO: Validate  literal number 7
+                            literal_expr("?literal_divide"),
+                        ),
+                        "+",
+                        // TODO: Validate  literal number 1
+                        literal_expr("?literal_align"),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DatePart",
+                        vec![literal_string("dow"), column_expr("?outer_column")],
+                    ),
+                    "?outer_alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?outer_alias",
+                    "?outer_column",
                 ),
             ),
             transforming_chain_rewrite(
@@ -988,6 +1077,52 @@ impl SplitRules {
     pub fn new(cube_context: Arc<CubeContext>) -> Self {
         Self {
             cube_context: cube_context,
+        }
+    }
+
+    pub fn transform_original_expr_to_alias_and_column(
+        &self,
+        original_expr_var: &'static str,
+        out_alias_expr_var: &'static str,
+        out_column_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let original_expr_var = var!(original_expr_var);
+        let out_alias_expr_var = var!(out_alias_expr_var);
+        let out_column_expr_var = var!(out_column_expr_var);
+
+        move |egraph, subst| {
+            let original_expr_id = subst[original_expr_var];
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )));
+
+            if let Ok(expr) = res {
+                // TODO unwrap
+                let name = expr.name(&DFSchema::empty()).unwrap();
+                let column = Column::from_name(name.to_string());
+
+                subst.insert(
+                    out_alias_expr_var,
+                    egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(name))),
+                );
+
+                subst.insert(
+                    out_column_expr_var,
+                    egraph.add(LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(
+                        column,
+                    ))),
+                );
+
+                return true;
+            }
+
+            false
         }
     }
 

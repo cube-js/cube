@@ -676,6 +676,25 @@ pub fn create_timediff_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_datediff_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "datediff is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "datediff",
+        &Signature::any(3, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_time_format_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2);

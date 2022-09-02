@@ -48,9 +48,9 @@ use self::{
             create_array_lower_udf, create_array_upper_udf, create_connection_id_udf,
             create_convert_tz_udf, create_cube_regclass_cast_udf, create_current_schema_udf,
             create_current_schemas_udf, create_current_timestamp_udf, create_current_user_udf,
-            create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
-            create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_format_type_udf,
-            create_generate_series_udtf, create_generate_subscripts_udtf,
+            create_date_add_udf, create_date_sub_udf, create_date_udf, create_datediff_udf,
+            create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf, create_db_udf,
+            create_format_type_udf, create_generate_series_udtf, create_generate_subscripts_udtf,
             create_has_schema_privilege_udf, create_hour_udf, create_if_udf, create_instr_udf,
             create_isnull_udf, create_json_build_object_udf, create_least_udf, create_locate_udf,
             create_makedate_udf, create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
@@ -76,7 +76,7 @@ use crate::{
         database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
         dataframe,
         session::DatabaseProtocol,
-        statement::{CastReplacer, ToTimestampReplacer, UdfWildcardArgReplacer},
+        statement::{CastReplacer, DateDiffReplacer, ToTimestampReplacer, UdfWildcardArgReplacer},
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -2485,6 +2485,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udtf(create_generate_subscripts_udtf());
         ctx.register_udtf(create_pg_expandarray_udtf());
 
+        // redshift
+        ctx.register_udf(create_datediff_udf());
+
         ctx
     }
 
@@ -2604,6 +2607,7 @@ pub async fn convert_statement_to_cube_query(
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(&stmt);
     let stmt = UdfWildcardArgReplacer::new().replace(&stmt);
+    let stmt = DateDiffReplacer::new().replace(&stmt);
 
     let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
     planner.plan(&stmt).await
@@ -6299,6 +6303,42 @@ ORDER BY \"COUNT(count)\" DESC"
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
                     granularity: Some("quarter".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_dow_granularity() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT
+              (((DATEDIFF(day, DATE '1970-01-01', \"ta_1\".\"order_date\") + 3) % 7) + 1) \"ca_1\"
+            FROM \"db\".\"public\".\"KibanaSampleDataEcommerce\" \"ta_1\"
+            GROUP BY \"ca_1\""
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("day".to_string()),
                     date_range: None,
                 }]),
                 order: None,

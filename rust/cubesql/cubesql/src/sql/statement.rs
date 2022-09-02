@@ -6,7 +6,7 @@ use pg_srv::{
     protocol::{ErrorCode, ErrorResponse},
     BindValue, PgType,
 };
-use sqlparser::ast::{self, Expr, Ident, Value};
+use sqlparser::ast::{self, Expr, Function, FunctionArgExpr, Ident, Value};
 use std::{collections::HashMap, error::Error};
 
 use super::types::{ColumnFlags, ColumnType};
@@ -838,6 +838,55 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
     }
 }
 
+#[derive(Debug)]
+pub struct DateDiffReplacer {}
+
+impl DateDiffReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result).unwrap();
+
+        result
+    }
+}
+
+impl<'ast> Visitor<'ast, ConnectionError> for DateDiffReplacer {
+    fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
+        if !(fun.name.to_string().eq_ignore_ascii_case("datediff") && fun.args.len() == 3) {
+            return Ok(());
+        }
+
+        match &mut fun.args[0] {
+            ast::FunctionArg::Unnamed(arg) => match arg {
+                FunctionArgExpr::Expr(arg) => {
+                    let granularity_in_identifier = match arg {
+                        Expr::Identifier(ident) => ident.value.to_lowercase(),
+                        _ => return Ok(()),
+                    };
+
+                    match granularity_in_identifier.as_str() {
+                        "second" | "minute" | "hour" | "day" | "qtr" | "week" | "month"
+                        | "year" => {
+                            *arg =
+                                Expr::Value(Value::SingleQuotedString(granularity_in_identifier));
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+
+        Ok(())
+    }
+}
+
 /// Postgres to_timestamp clashes with Datafusion to_timestamp so we replace it with str_to_date
 #[derive(Debug)]
 pub struct ToTimestampReplacer {}
@@ -1024,6 +1073,27 @@ mod tests {
         run_cast_replacer(
             "SELECT CAST(1 + 1 as Regclass);",
             "SELECT __cube_regclass_cast(1 + 1)",
+        )?;
+
+        Ok(())
+    }
+
+    fn run_datediff_replacer(input: &str, output: &str) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let replacer = DateDiffReplacer::new();
+        let res = replacer.replace(&stmts[0]);
+
+        assert_eq!(res.to_string(), output);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_datediff_replacer() -> Result<(), CubeError> {
+        run_datediff_replacer(
+            r#"SELECT DATEDIFF(day, DATE '1970-01-01', "ta_1"."createdAt")"#,
+            r#"SELECT DATEDIFF('day', DATE '1970-01-01', "ta_1"."createdAt")"#,
         )?;
 
         Ok(())
