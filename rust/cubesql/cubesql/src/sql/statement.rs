@@ -839,9 +839,9 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
 }
 
 #[derive(Debug)]
-pub struct DateDiffReplacer {}
+pub struct RedshiftDatePartReplacer {}
 
-impl DateDiffReplacer {
+impl RedshiftDatePartReplacer {
     pub fn new() -> Self {
         Self {}
     }
@@ -855,9 +855,10 @@ impl DateDiffReplacer {
     }
 }
 
-impl<'ast> Visitor<'ast, ConnectionError> for DateDiffReplacer {
+impl<'ast> Visitor<'ast, ConnectionError> for RedshiftDatePartReplacer {
     fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
-        if !(fun.name.to_string().eq_ignore_ascii_case("datediff") && fun.args.len() == 3) {
+        let fn_name = fun.name.to_string().to_lowercase();
+        if !((fn_name == "datediff" || fn_name == "dateadd") && fun.args.len() == 3) {
             return Ok(());
         }
 
@@ -881,7 +882,9 @@ impl<'ast> Visitor<'ast, ConnectionError> for DateDiffReplacer {
                 _ => {}
             },
             _ => {}
-        }
+        };
+
+        self.visit_function_args(&mut fun.args)?;
 
         Ok(())
     }
@@ -1078,10 +1081,10 @@ mod tests {
         Ok(())
     }
 
-    fn run_datediff_replacer(input: &str, output: &str) -> Result<(), CubeError> {
+    fn run_redshift_date_part_replacer(input: &str, output: &str) -> Result<(), CubeError> {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
-        let replacer = DateDiffReplacer::new();
+        let replacer = RedshiftDatePartReplacer::new();
         let res = replacer.replace(&stmts[0]);
 
         assert_eq!(res.to_string(), output);
@@ -1090,10 +1093,20 @@ mod tests {
     }
 
     #[test]
-    fn test_datediff_replacer() -> Result<(), CubeError> {
-        run_datediff_replacer(
+    fn test_redshift_date_part_replacer() -> Result<(), CubeError> {
+        run_redshift_date_part_replacer(
             r#"SELECT DATEDIFF(day, DATE '1970-01-01', "ta_1"."createdAt")"#,
             r#"SELECT DATEDIFF('day', DATE '1970-01-01', "ta_1"."createdAt")"#,
+        )?;
+
+        run_redshift_date_part_replacer(
+            r#"SELECT DATEADD(week, '2009-01-01', '2009-12-31')"#,
+            r#"SELECT DATEADD('week', '2009-01-01', '2009-12-31')"#,
+        )?;
+
+        run_redshift_date_part_replacer(
+            r#"SELECT DATEDIFF(day, DATEADD(week, '2009-01-01', '2009-12-31'), "ta_1"."createdAt")"#,
+            r#"SELECT DATEDIFF('day', DATEADD('week', '2009-01-01', '2009-12-31'), "ta_1"."createdAt")"#,
         )?;
 
         Ok(())
