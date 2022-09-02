@@ -137,7 +137,7 @@ export interface DriverInterface {
   ): Promise<void>;
   loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
   //
-  query<R = unknown>(query: string, params: unknown[], options: QueryOptions): Promise<R[]>;
+  query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
   // eslint-disable-next-line camelcase
