@@ -864,14 +864,23 @@ export class PreAggregationLoader {
     ));
 
     try {
-      const tableData = await this.downloadTempExternalPreAggregation(
-        client,
-        newVersionEntry,
-        saveCancelFn,
-        queryOptions
-      );
+      let tableData: DownloadTableData;
+      try {
+        tableData = await this.downloadTempExternalPreAggregation(
+          client,
+          newVersionEntry,
+          saveCancelFn,
+          queryOptions
+        );
+      } finally {
+        const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
 
-      await client.dropTable(targetTableName);
+        const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
+
+        if (mappedActualTables.includes(targetTableName)) {
+          await client.dropTable(targetTableName);
+        }
+      }
 
       try {
         await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn, queryOptions);
