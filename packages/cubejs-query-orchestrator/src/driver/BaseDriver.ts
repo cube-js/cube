@@ -244,7 +244,7 @@ export class BaseDriver implements DriverInterface {
     );
   }
 
-  public loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options) {
+  public loadPreAggregationIntoTable(_preAggregationTableName: string, loadSql: string, params, options) {
     return this.query(loadSql, params, options);
   }
 
@@ -281,7 +281,7 @@ export class BaseDriver implements DriverInterface {
             `INSERT INTO ${table}
           (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
           VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
-            columns.map(c => this.toColumnValue(tableData.rows[i][c.name], c.type))
+            columns.map(c => this.toColumnValue(tableData.rows[i][c.name] as string, c.type))
           );
         }
         for (let i = 0; i < indexesSql.length; i++) {
@@ -295,7 +295,7 @@ export class BaseDriver implements DriverInterface {
     }
   }
 
-  protected toColumnValue(value, _genericType) {
+  protected toColumnValue(value: string, _genericType: string): string | boolean {
     return value;
   }
 
@@ -315,7 +315,7 @@ export class BaseDriver implements DriverInterface {
     return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
-  public createTable(quotedTableName, columns) {
+  public createTable(quotedTableName: string, columns: TableColumn[]) {
     const createTableSql = this.createTableSql(quotedTableName, columns);
     return this.query(createTableSql, []).catch(e => {
       e.message = `Error during create table: ${createTableSql}: ${e.message}`;
@@ -323,9 +323,9 @@ export class BaseDriver implements DriverInterface {
     });
   }
 
-  protected createTableSql(quotedTableName, columns) {
-    columns = columns.map(c => `${this.quoteIdentifier(c.name)} ${this.fromGenericType(c.type)}`);
-    return `CREATE TABLE ${quotedTableName} (${columns.join(', ')})`;
+  protected createTableSql(quotedTableName: string, columns: TableColumn[]) {
+    const columnNames = columns.map(c => `${this.quoteIdentifier(c.name)} ${this.fromGenericType(c.type)}`);
+    return `CREATE TABLE ${quotedTableName} (${columnNames.join(', ')})`;
   }
 
   protected toGenericType(columnType: string): string {

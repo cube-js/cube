@@ -109,7 +109,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return sql;
   }
 
-  public createTableWithOptions(tableName, columns, options: CreateTableOptions, queryTracingObj: any) {
+  public createTableWithOptions(tableName: string, columns: Column[], options: CreateTableOptions, queryTracingObj: any) {
     const sql = this.createTableSqlWithOptions(tableName, columns, options);
     const params: string[] = [];
 
@@ -250,7 +250,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       const { baseUrl } = this;
       let fileCounter = 0;
 
-      const createTableSql = this.createTableSql(table, columns);
+      this.createTableSql(table, columns);
       // eslint-disable-next-line no-unused-vars
       const createTableSqlWithoutLocation = this.createTableSqlWithOptions(table, columns, options);
 
