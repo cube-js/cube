@@ -1040,8 +1040,7 @@ describe('QueryOrchestrator', () => {
     await expect(async () => {
       await queryOrchestratorExternalRefresh.fetchQuery(query);
     }).rejects.toThrow(
-      'No pre-aggregation partitions were built yet for the pre-aggregation serving this query. ' +
-      'Please make sure your refresh worker is configured correctly and running.'
+      /refresh worker/
     );
   });
 
