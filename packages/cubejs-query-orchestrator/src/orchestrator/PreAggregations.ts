@@ -1326,8 +1326,7 @@ export class PreAggregationPartitionRangeLoader {
       if (this.options.externalRefresh && loadResults.length === 0) {
         throw new Error(
           'No pre-aggregation partitions were built yet for the pre-aggregation serving this query. ' +
-          'Please make sure your refresh worker is configured ' +
-          'correctly and running.'
+          'Please ensure your refresh worker is configured correctly, running, and has already built this pre-aggregation.'
         );
       }
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
