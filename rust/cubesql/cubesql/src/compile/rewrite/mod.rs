@@ -641,6 +641,10 @@ fn cast_expr(expr: impl Display, data_type: impl Display) -> String {
     format!("(CastExpr {} {})", expr, data_type)
 }
 
+fn cast_expr_explicit(expr: impl Display, data_type: DataType) -> String {
+    format!("(CastExpr {} (CastExprDataType:{}))", expr, data_type)
+}
+
 fn alias_expr(column: impl Display, alias: impl Display) -> String {
     format!("(AliasExpr {} {})", column, alias)
 }
