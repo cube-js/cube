@@ -74,7 +74,6 @@
     "@types/react-router-dom": "^5.1.7",
     "@types/styled-components": "5.1.9",
     "@types/uuid": "^8.3.1",
-    "@vitejs/plugin-legacy": "^2.1.0",
     "@vitejs/plugin-react": "^2.1.0",
     "antd": "4.16.13",
     "eslint-config-airbnb": "^18.1.0",
