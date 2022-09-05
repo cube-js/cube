@@ -748,8 +748,9 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(internalPreAggregation);
     await queryOrchestrator.fetchQuery(externalPreAggregation);
     await queryOrchestrator.fetchQuery(internalPreAggregation);
+    await queryOrchestrator.fetchQuery(externalPreAggregation);
     console.log(mockDriver.tables);
-    expect(mockDriver.tables.length).toBe(2);
+    expect(mockDriver.tables.length).toBe(1);
   });
 
   test('pre-aggregation version entries', async () => {

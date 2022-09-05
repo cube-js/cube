@@ -879,6 +879,11 @@ export class PreAggregationLoader {
         }
       }
     } finally {
+      const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
+      const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
+      if (mappedActualTables.includes(targetTableName)) {
+        await client.dropTable(targetTableName);
+      }
       // We must clean orphaned in any cases: success or exception
       await this.loadCache.fetchTables(this.preAggregation);
       await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
