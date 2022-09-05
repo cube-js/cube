@@ -112,11 +112,13 @@ impl<
 }
 
 struct ProcessHandleGuard {
-    handle: Child
+    handle: Child,
 }
 
 impl ProcessHandleGuard {
-    pub fn new(handle: Child) -> Self { Self { handle } }
+    pub fn new(handle: Child) -> Self {
+        Self { handle }
+    }
     pub fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
         self.handle.try_wait()
     }
@@ -132,10 +134,11 @@ impl ProcessHandleGuard {
 
 impl Drop for ProcessHandleGuard {
     fn drop(&mut self) {
-        self.kill();
+        if self.is_alive() {
+            self.kill();
+        }
     }
 }
-
 
 pub struct WorkerProcess<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -204,22 +207,32 @@ impl<
                                 error!(
                                     "Worker process is killed, reshedule message in another process"
                                     );
-                                self.queue.push(Message{message, sender, span, dispatcher});
+                                self.queue.push(Message {
+                                    message,
+                                    sender,
+                                    span,
+                                    dispatcher,
+                                });
                                 break;
-                            },
-                            Ok(None) => {},
+                            }
+                            Ok(None) => {}
                             Err(_) => {
                                 error!(
                                     "Can't read worker process status, reshedule message in another process"
                                     );
-                                self.queue.push(Message{message, sender, span, dispatcher});
+                                self.queue.push(Message {
+                                    message,
+                                    sender,
+                                    span,
+                                    dispatcher,
+                                });
                                 break;
                             }
                         }
 
                         let process_message_res_timeout = tokio::time::timeout(
                             self.timeout,
-                            self.process_message(message, args_tx, res_rx, &mut handle_guard),
+                            self.process_message(message, args_tx, res_rx),
                         )
                         .instrument(span)
                         .with_subscriber(dispatcher)
@@ -256,12 +269,6 @@ impl<
                     error!("Can't start process: {}", e);
                 }
             }
-        }
-    }
-
-    fn kill(handle: &mut Child) {
-        if let Err(e) = handle.kill() {
-            error!("Error during kill: {:?}", e);
         }
     }
 
