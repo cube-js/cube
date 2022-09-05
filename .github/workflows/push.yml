@@ -206,6 +206,8 @@ jobs:
         run: yarn build
       - name: Build other packages
         run: yarn lerna run --concurrency 1 build
+        env:
+          NODE_OPTIONS: --max_old_space_size=4096
 
   integration-redis:
     needs: [unit, lint, latest-tag-sha]
