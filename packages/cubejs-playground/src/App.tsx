@@ -19,6 +19,8 @@ import { AppContextConsumer, PlaygroundContext } from './components/AppContext';
 import { useAppContext } from './hooks';
 import { LivePreviewContextProvider } from './components/LivePreviewContext/LivePreviewContextProvider';
 
+console.log('>>>', 'hello')
+
 const selectedTab = (pathname) => {
   if (pathname === '/template-gallery') {
     return ['/dashboard'];
