@@ -1,12 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import legacy from '@vitejs/plugin-legacy';
 
 export default defineConfig(({ mode }) => ({
   build: {
     outDir: 'build',
-    sourcemap: true,
-    minify: 'terser',
     target: 'es2018',
   },
   server: {
@@ -16,10 +13,7 @@ export default defineConfig(({ mode }) => ({
       '^/cubejs-api/*': 'http://localhost:4000',
     },
   },
-  plugins: [
-    react(),
-    legacy(),
-  ],
+  plugins: [react()],
   css: {
     preprocessorOptions: {
       less: {
