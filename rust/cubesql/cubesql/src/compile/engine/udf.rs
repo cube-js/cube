@@ -1323,7 +1323,12 @@ pub fn create_to_char_udf() -> ScalarUDF {
                     parse_timestamp_arr!(arr, TimestampSecondArray, seconds),
                     str.clone().unwrap_or_default(),
                 ),
-                _ => (None, "".to_string()),
+                dt => {
+                    return Err(DataFusionError::Execution(format!(
+                        "unsupported date type for to_char, actual: {}",
+                        dt
+                    )))
+                }
             };
 
             if durations.is_none() {

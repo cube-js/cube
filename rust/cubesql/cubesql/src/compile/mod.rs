@@ -4820,6 +4820,46 @@ ORDER BY \"COUNT(count)\" DESC"
         Ok(())
     }
 
+    #[tokio::test]
+    async fn test_thought_spot_yearly_granularity() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT
+              CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."order_date") * 100) + 1) * 100) + 1) AS varchar) AS date) "ca_1",
+              CASE
+                WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
+                ELSE 0
+              END "ca_2"
+            FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
+            GROUP BY "ca_1";"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("year".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
     // same as test_thought_spot_cte, but with realiasing
     #[tokio::test]
     async fn test_thought_spot_cte_with_realiasing() -> Result<(), CubeError> {
@@ -8237,6 +8277,21 @@ ORDER BY \"COUNT(count)\" DESC"
             execute_query(
                 "SELECT r.v, r.v IS TRUE as is_true, r.v IS FALSE as is_false
                  FROM (SELECT true as v UNION ALL SELECT false as v) as r;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn df_cast_date32_additional_formats() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_cast_date32_additional_formats",
+            execute_query(
+                "SELECT CAST('20220101' as DATE) as no_dim, CAST('2022/02/02' as DATE) as slash_dim,  CAST('2022|03|03' as DATE) as pipe_dim;"
                     .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
