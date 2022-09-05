@@ -864,23 +864,12 @@ export class PreAggregationLoader {
     ));
 
     try {
-      let tableData: DownloadTableData;
-      try {
-        tableData = await this.downloadTempExternalPreAggregation(
-          client,
-          newVersionEntry,
-          saveCancelFn,
-          queryOptions
-        );
-      } finally {
-        const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
-
-        const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
-
-        if (mappedActualTables.includes(targetTableName)) {
-          await client.dropTable(targetTableName);
-        }
-      }
+      const tableData = await this.downloadTempExternalPreAggregation(
+        client,
+        newVersionEntry,
+        saveCancelFn,
+        queryOptions
+      );
 
       try {
         await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn, queryOptions);
@@ -890,6 +879,11 @@ export class PreAggregationLoader {
         }
       }
     } finally {
+      const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
+      const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
+      if (mappedActualTables.includes(targetTableName)) {
+        await client.dropTable(targetTableName);
+      }
       // We must clean orphaned in any cases: success or exception
       await this.loadCache.fetchTables(this.preAggregation);
       await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
