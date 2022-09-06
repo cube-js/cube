@@ -359,7 +359,7 @@ impl RemoteFs for QueueRemoteFs {
                             let local_path = self.local_file(remote_path).await?;
                             let metadata = tokio::fs::metadata(&local_path).await.map_err(|e| {
                                 CubeError::internal(format!(
-                                    "Error while reading local file {}: {}",
+                                    "Error while listing local file for consistency check {}: {}",
                                     local_path, e
                                 ))
                             })?;
