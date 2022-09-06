@@ -794,7 +794,7 @@ class BaseQuery {
               () => this.aggregateSubQuery(keyCubeName, measures),
             )
           )
-        )(regularMeasures.concat(multipliedMeasures));
+        )(regularMeasures.concat(multipliedMeasures)); // point 1
       }
     }
     return this.joinFullKeyQueryAggregate(
@@ -835,10 +835,21 @@ class BaseQuery {
       renderedReferenceContext,
     );
 
+    // point 3
     // TODO all having filters should be pushed down
     // subQuery dimensions can introduce projection remapping
-    if (toJoin.length === 1 && this.measureFilters.length === 0 && this.measures.filter(m => m.expression).length === 0) {
-      return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
+    if (
+      toJoin.length === 1 &&
+      this.measureFilters.length === 0 &&
+      this.measures.filter(m => m.expression).length === 0
+    ) {
+      return `${
+        toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)
+      } ${
+        this.orderBy()
+      }${
+        this.groupByDimensionLimit()
+      }`;
     }
 
     return `SELECT ${this.topLimit()}${columnsToSelect} FROM (${toJoin[0]}) as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
@@ -1269,7 +1280,7 @@ class BaseQuery {
     ) : measureSelectFn();
     const columnsForSelect = this
       .dimensionColumns(this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS))
-      .concat(selectedMeasures)
+      .concat(selectedMeasures) // point2
       .filter(s => !!s)
       .join(', ');
 
