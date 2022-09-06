@@ -30,7 +30,7 @@ const LineChart = ({ data /* see data tab */ }) => (
     }}
     axisLeft={{
       orient: 'left',
-      // tickSize: 5,
+      tickSize: 5,
       tickPadding: 5,
       tickRotation: 0,
       legend: 'Sum of the transaction amount',
