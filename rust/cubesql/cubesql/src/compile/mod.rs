@@ -12310,4 +12310,20 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_select_column_with_same_name_as_table() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_select_column_with_same_name_as_table",
+            execute_query(
+                "select table.column as column from (select 1 column, 2 table union all select 3 column, 4 table) table;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
