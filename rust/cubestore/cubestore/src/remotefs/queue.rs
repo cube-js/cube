@@ -357,28 +357,23 @@ impl RemoteFs for QueueRemoteFs {
                     match result {
                         Ok(f) => {
                             let local_path = self.local_file(remote_path).await?;
-                            let metadata = tokio::fs::metadata(&local_path).await;
-                            match metadata {
-                                Ok(metadata) => {
-                                    if let Err(e) = QueueRemoteFs::check_file_size(
-                                        remote_path,
-                                        expected_file_size,
-                                        &local_path,
-                                        metadata,
-                                    )
-                                    .await
-                                    {
-                                        return Err(e);
-                                    }
-                                    return Ok(f);
-                                }
-                                Err(e) => {
-                                    return Err(CubeError::internal(format!(
-                                        "Error while reading local file {}: {}",
-                                        local_path, e
-                                    )))
-                                }
+                            let metadata = tokio::fs::metadata(&local_path).await.map_err(|e| {
+                                CubeError::internal(format!(
+                                    "Error while reading local file {}: {}",
+                                    local_path, e
+                                ))
+                            })?;
+                            if let Err(e) = QueueRemoteFs::check_file_size(
+                                remote_path,
+                                expected_file_size,
+                                &local_path,
+                                metadata,
+                            )
+                            .await
+                            {
+                                return Err(e);
                             }
+                            return Ok(f);
                         }
                         Err(err) => {
                             //Check if file doesn't exists in remoteFs
