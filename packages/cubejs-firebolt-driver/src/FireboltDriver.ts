@@ -52,7 +52,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
         username: <string>process.env.CUBEJS_DB_USER,
         password: <string>process.env.CUBEJS_DB_PASS,
         database: <string>process.env.CUBEJS_DB_NAME,
-        // The propery `account` is deprecated according to Firebolt SDK docs 
+        // The propery `account` is deprecated according to Firebolt SDK docs
         // and will be removed in the future.
         // account: <string>process.env.CUBEJS_FIREBOLT_ACCOUNT,
         engineName: <string>process.env.CUBEJS_FIREBOLT_ENGINE_NAME,
