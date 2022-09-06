@@ -244,7 +244,7 @@ export function ConnectionWizardPage({ history }) {
               ) : (
                 <Typography.Paragraph>
                   Enter database credentials to connect to your database. <br />
-                  Cube.js will store your credentials into the <code>
+                  Cube will store your credentials into the <code>
                     .env
                   </code>{' '}
                   file for future use.
@@ -256,7 +256,7 @@ export function ConnectionWizardPage({ history }) {
                 message={
                   <>
                     For advanced configuration, use the <b>cube.js</b> or{' '}
-                    <b>.env</b> configuration files in your cube.js project.
+                    <b>.env</b> configuration files in your Cube project.
                     Note these files are on the mount volume if you are running
                     Docker.
                     <br />

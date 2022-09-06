@@ -79,7 +79,7 @@ const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({
     >
       Vanilla JavaScript &nbsp;docs
     </a>
-    &nbsp;to see on how to use it with Cube.js.
+    &nbsp;to see on how to use it with Cube.
   </h2>
 );
 
