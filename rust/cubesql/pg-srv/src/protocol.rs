@@ -49,9 +49,12 @@ impl StartupMessage {
     }
 }
 
+/// (F) Cancel request which clients sends as single message in separate connection. ref [`InitialMessage`].
 #[derive(Debug, PartialEq)]
 pub struct CancelRequest {
+    /// The process ID of the target backend. Postgres spawns a new process for each connection
     pub process_id: u32,
+    /// The secret key for the target backend. Random number
     pub secret: u32,
 }
 
@@ -64,18 +67,22 @@ impl CancelRequest {
     }
 }
 
+/// The value (major version) is chosen to contain 1234 in the most significant 16 bits, this code must not be the same as any protocol version number.
+pub const VERSION_MAJOR_SPECIAL: i16 = 1234;
+/// The value (minor version) which is used to identify CancelRequest
+pub const VERSION_MINOR_CANCEL: i16 = 5678;
+/// The value (minor version) which is used to identify SslRequest
+pub const VERSION_MINOR_SSL: i16 = 5679;
+/// The value (minor version) which is used to identify GSSENCRequest
+pub const VERSION_MINOR_GSSENC: i16 = 5680;
+
+/// Initial message which client sends at the beginning of a handshake process.
 pub enum InitialMessage {
     Startup(StartupMessage),
     CancelRequest(CancelRequest),
     SslRequest,
     Gssenc,
 }
-
-// The value is chosen to contain 1234 in the most significant 16 bits, this code must not be the same as any protocol version number.
-pub const VERSION_MAJOR_SPECIAL: i16 = 1234;
-pub const VERSION_MINOR_CANCEL: i16 = 5678;
-pub const VERSION_MINOR_SSL: i16 = 5679;
-pub const VERSION_MINOR_GSSENC: i16 = 5680;
 
 impl InitialMessage {
     pub async fn from(buffer: &mut Cursor<Vec<u8>>) -> Result<InitialMessage, ProtocolError> {
