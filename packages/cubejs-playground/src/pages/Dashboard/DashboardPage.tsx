@@ -13,9 +13,9 @@ const Frame = ({ children }) => (
 const Hint = () => (
   <p style={{ width: 450, margin: '20px auto' }}>
     Dashboard App is a convenient way to setup and deploy frontend app to work
-    with Cube.js backend. You can learn more about in the{' '}
+    with Cube backend. You can learn more about in the{' '}
     <a href="https://cube.dev/docs/dashboard-app" target="_blankl">
-      Cube.js docs
+      Cube docs
     </a>
     .
   </p>
@@ -162,7 +162,7 @@ class DashboardPage extends Component<any, any> {
               </a>
               . Learn more how to customize and deploy it at&nbsp;
               <a href="https://cube.dev/docs/dashboard-app">
-                Cube.js&nbsp;docs
+                Cube&nbsp;docs
               </a>
               .&nbsp;
               <a
