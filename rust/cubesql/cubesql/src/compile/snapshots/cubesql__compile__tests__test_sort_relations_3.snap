@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select t.oid as oid from (select oid as oid from pg_class) t order by t.oid\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------+
+| oid   |
++-------+
+| 18000 |
+| 18014 |
++-------+

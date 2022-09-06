@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT localtimestamp = current_timestamp\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------+
+| Boolean(true) |
++---------------+
+| true          |
++---------------+

@@ -24,6 +24,7 @@ const menuOrderCloud = [
   'Deploys',
   'Inspecting Queries',
   'Release Notes',
+  'Cloud Runtime'
 ];
 
 const menuOrder = [

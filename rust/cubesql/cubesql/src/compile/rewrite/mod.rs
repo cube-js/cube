@@ -87,14 +87,15 @@ crate::plan_to_language! {
             projection: Option<Vec<usize>>,
             projected_schema: DFSchemaRef,
             filters: Vec<Expr>,
-            limit: Option<usize>,
+            fetch: Option<usize>,
         },
         EmptyRelation {
             produce_one_row: bool,
             schema: DFSchemaRef,
         },
         Limit {
-            n: usize,
+            skip: Option<usize>,
+            fetch: Option<usize>,
             input: Arc<LogicalPlan>,
         },
         TableUDFs {
@@ -547,8 +548,8 @@ fn udaf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
     )
 }
 
-fn limit(n: impl Display, input: impl Display) -> String {
-    format!("(Limit {} {})", n, input)
+fn limit(skip: impl Display, fetch: impl Display, input: impl Display) -> String {
+    format!("(Limit {} {} {})", skip, fetch, input)
 }
 
 fn aggregate(input: impl Display, group: impl Display, aggr: impl Display) -> String {
@@ -668,7 +669,15 @@ fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> Str
 }
 
 fn literal_string(literal_str: impl Display) -> String {
-    format!("(LiteralExpr LiteralExprValue:{})", literal_str)
+    format!("(LiteralExpr LiteralExprValue:s:{})", literal_str)
+}
+
+fn literal_number(literal_number: i64) -> String {
+    format!("(LiteralExpr LiteralExprValue:i:{})", literal_number)
+}
+
+fn literal_bool(literal_bool: bool) -> String {
+    format!("(LiteralExpr LiteralExprValue:b:{})", literal_bool)
 }
 
 fn projection(expr: impl Display, input: impl Display, alias: impl Display) -> String {
@@ -846,11 +855,11 @@ fn table_scan(
     table_name: impl Display,
     projection: impl Display,
     filters: impl Display,
-    limit: impl Display,
+    fetch: impl Display,
 ) -> String {
     format!(
         "(TableScan {} {} {} {} {})",
-        source_table_name, table_name, projection, filters, limit
+        source_table_name, table_name, projection, filters, fetch
     )
 }
 

@@ -48,14 +48,14 @@ use self::{
             create_array_lower_udf, create_array_upper_udf, create_connection_id_udf,
             create_convert_tz_udf, create_cube_regclass_cast_udf, create_current_schema_udf,
             create_current_schemas_udf, create_current_timestamp_udf, create_current_user_udf,
-            create_date_add_udf, create_date_sub_udf, create_date_udf, create_dayofmonth_udf,
-            create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_format_type_udf,
-            create_generate_series_udtf, create_generate_subscripts_udtf,
-            create_has_schema_privilege_udf, create_hour_udf, create_if_udf, create_instr_udf,
-            create_isnull_udf, create_json_build_object_udf, create_least_udf, create_locate_udf,
-            create_makedate_udf, create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
-            create_pg_datetime_precision_udf, create_pg_expandarray_udtf,
-            create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
+            create_date_add_udf, create_date_sub_udf, create_date_udf, create_dateadd_udf,
+            create_datediff_udf, create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf,
+            create_db_udf, create_format_type_udf, create_generate_series_udtf,
+            create_generate_subscripts_udtf, create_has_schema_privilege_udf, create_hour_udf,
+            create_if_udf, create_instr_udf, create_isnull_udf, create_json_build_object_udf,
+            create_least_udf, create_locate_udf, create_makedate_udf, create_measure_udaf,
+            create_minute_udf, create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
+            create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
             create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
             create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
@@ -76,7 +76,9 @@ use crate::{
         database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
         dataframe,
         session::DatabaseProtocol,
-        statement::{CastReplacer, ToTimestampReplacer, UdfWildcardArgReplacer},
+        statement::{
+            CastReplacer, RedshiftDatePartReplacer, ToTimestampReplacer, UdfWildcardArgReplacer,
+        },
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -2449,7 +2451,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_date_sub_udf());
         ctx.register_udf(create_date_add_udf());
         ctx.register_udf(create_str_to_date_udf());
-        ctx.register_udf(create_current_timestamp_udf());
+        ctx.register_udf(create_current_timestamp_udf("current_timestamp"));
+        ctx.register_udf(create_current_timestamp_udf("localtimestamp"));
         ctx.register_udf(create_current_schema_udf());
         ctx.register_udf(create_current_schemas_udf());
         ctx.register_udf(create_format_type_udf());
@@ -2483,6 +2486,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udtf(create_unnest_udtf());
         ctx.register_udtf(create_generate_subscripts_udtf());
         ctx.register_udtf(create_pg_expandarray_udtf());
+
+        // redshift
+        ctx.register_udf(create_datediff_udf());
+        ctx.register_udf(create_dateadd_udf());
 
         ctx
     }
@@ -2557,7 +2564,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         if is_olap_query(&rewrite_plan)? {
             let mut guard = ctx.state.write();
             // TODO: We should find what optimizers will be safety to use for OLAP queries
-            guard.optimizers = vec![];
+            guard.optimizer.rules = vec![];
         };
 
         log::debug!("Rewrite: {:#?}", rewrite_plan);
@@ -2603,6 +2610,7 @@ pub async fn convert_statement_to_cube_query(
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(&stmt);
     let stmt = UdfWildcardArgReplacer::new().replace(&stmt);
+    let stmt = RedshiftDatePartReplacer::new().replace(&stmt);
 
     let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
     planner.plan(&stmt).await
@@ -2748,7 +2756,7 @@ mod tests {
     use cubeclient::models::{
         V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadResponse,
     };
-    use datafusion::dataframe::DataFrame as DFDataFrame;
+    use datafusion::{dataframe::DataFrame as DFDataFrame, logical_plan::plan::Filter};
     use pretty_assertions::assert_eq;
     use regex::Regex;
 
@@ -2982,6 +2990,27 @@ mod tests {
         fn find_projection_schema(&self) -> DFSchemaRef;
 
         fn find_cube_scan(&self) -> CubeScanNode;
+
+        fn find_filter(&self) -> Option<Filter>;
+    }
+
+    fn find_filter_deep_search(parent: Arc<LogicalPlan>) -> Option<Filter> {
+        pub struct FindFilterNodeVisitor(Option<Filter>);
+
+        impl PlanVisitor for FindFilterNodeVisitor {
+            type Error = CubeError;
+
+            fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
+                if let LogicalPlan::Filter(filter) = plan {
+                    self.0 = Some(filter.clone());
+                }
+                Ok(true)
+            }
+        }
+
+        let mut visitor = FindFilterNodeVisitor(None);
+        parent.accept(&mut visitor).unwrap();
+        visitor.0
     }
 
     impl LogicalPlanTestUtils for LogicalPlan {
@@ -2994,6 +3023,10 @@ mod tests {
 
         fn find_cube_scan(&self) -> CubeScanNode {
             find_cube_scan_deep_search(Arc::new(self.clone()))
+        }
+
+        fn find_filter(&self) -> Option<Filter> {
+            find_filter_deep_search(Arc::new(self.clone()))
         }
     }
 
@@ -4733,6 +4766,10 @@ ORDER BY \"COUNT(count)\" DESC"
                 "quarter".to_string(),
             ],
             [
+                "DATE_TRUNC('qtr', order_date)".to_string(),
+                "quarter".to_string(),
+            ],
+            [
                 "DATE_TRUNC('year', order_date)".to_string(),
                 "year".to_string(),
             ],
@@ -6064,6 +6101,141 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_literal_filter_simplify() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+                SELECT
+                  \"customer_gender\"
+                FROM \"KibanaSampleDataEcommerce\"
+                WHERE TRUE = TRUE
+                LIMIT 1000;"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: None,
+            }
+        );
+        assert_eq!(
+            logical_plan.find_filter().is_none(),
+            true,
+            "Filter must be eliminated"
+        );
+
+        let query_plan = convert_select_to_query_plan(
+            "
+                SELECT
+                  \"customer_gender\"
+                FROM \"KibanaSampleDataEcommerce\"
+                WHERE TRUE = TRUE AND customer_gender = 'male'
+                LIMIT 1000;"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["male".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_limit_push_down() -> Result<(), CubeError> {
+        // 1 level push down
+        let query_plan = convert_select_to_query_plan(
+            "SELECT l1.*, 1 as projection_should_exist_l1 FROM (\
+                    SELECT
+                      \"customer_gender\"
+                    FROM \"KibanaSampleDataEcommerce\"
+                    WHERE TRUE = TRUE
+                ) as l1 LIMIT 1000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        // 2 levels push down
+        let query_plan = convert_select_to_query_plan(
+            "SELECT l2.*, 1 as projection_should_exist_l2 FROM (\
+                SELECT l1.*, 1 as projection_should_exist FROM (\
+                    SELECT
+                    \"customer_gender\"
+                    FROM \"KibanaSampleDataEcommerce\"
+                    WHERE TRUE = TRUE
+                ) as l1
+             ) as l2 LIMIT 1000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_thought_spot_cte() -> Result<(), CubeError> {
         init_logger();
 
@@ -6099,7 +6271,128 @@ ORDER BY \"COUNT(count)\" DESC"
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 time_dimensions: None,
                 order: None,
-                // TODO: limit: Some(1000),
+                limit: Some(1000),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_qrt_granularity() -> Result<(), CubeError> {
+        init_logger();
+
+        // CTE called qt_1 is used as ta_2, under the hood DF will use * projection
+        let query_plan = convert_select_to_query_plan(
+            "SELECT
+            \"ta_1\".\"count\" \"ca_1\",
+            DATE_TRUNC('qtr', \"ta_1\".\"order_date\") \"ca_2\"
+            FROM \"db\".\"public\".\"KibanaSampleDataEcommerce\" \"ta_1\"
+            GROUP BY ca_1, ca_2"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("quarter".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_dow_granularity() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT
+              (((DATEDIFF(day, DATE '1970-01-01', \"ta_1\".\"order_date\") + 3) % 7) + 1) \"ca_1\"
+            FROM \"db\".\"public\".\"KibanaSampleDataEcommerce\" \"ta_1\"
+            GROUP BY \"ca_1\""
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("day".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_doy_granularity() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT
+              (DATEDIFF(day,
+                DATEADD(
+                    month,
+                    CAST(((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) * -1) AS int),
+                    CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."order_date") * 100) + EXTRACT(MONTH FROM "ta_1"."order_date")) * 100) + 1) AS varchar) AS date)),
+                    "ta_1"."order_date"
+                ) + 1
+              ) "ca_1",
+              CASE
+                WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
+                ELSE 0
+              END "ca_2"
+            FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
+            GROUP BY "ca_1"
+            LIMIT 5000"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("day".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
                 limit: None,
                 offset: None,
                 filters: None,
@@ -6146,8 +6439,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 time_dimensions: None,
                 order: None,
-                // TODO: limit: Some(1000),
-                limit: None,
+                limit: Some(1000),
                 offset: None,
                 filters: None,
             }
@@ -8528,6 +8820,22 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "has_schema_privilege_default_user",
+            execute_query(
+                "SELECT
+                    nspname,
+                    has_schema_privilege(nspname, 'CREATE') create,
+                    has_schema_privilege(nspname, 'USAGE') usage
+                FROM pg_namespace
+                ORDER BY nspname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -9527,6 +9835,21 @@ ORDER BY \"COUNT(count)\" DESC"
             "df_fork_coalesce",
             execute_query(
                 "SELECT COALESCE(null, 1) as t1, COALESCE(null, 1, null, 2) as t2".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    // This tests asserts that our DF fork contains support for nullif(scalar,scalar)
+    #[tokio::test]
+    async fn df_nullif() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_nullif",
+            execute_query(
+                "SELECT nullif('test1', 'test1') as str_null, nullif('test1', 'test2') as str_first, nullif(3.0, 3.0) as float_null, nullif(3.0, 1.0) as float_first".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -10649,6 +10972,68 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_quicksight_to_timestamp_format() -> Result<(), CubeError> {
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                date_trunc('day', "order_date") AS "uuid.order_date_tg",
+                COUNT(*) AS "count"
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE
+                "order_date" >= date_trunc('second', TO_TIMESTAMP('2019-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')) AND
+                "order_date" < date_trunc('second', TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss'))
+            GROUP BY date_trunc('day', "order_date")
+            ORDER BY date_trunc('day', "order_date") DESC NULLS LAST
+            LIMIT 2500
+            ;"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-01-01T00:00:00.000Z".to_string(),
+                        "2019-12-31T23:59:59.999Z".to_string()
+                    ])),
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "desc".to_string()
+                ]]),
+                limit: Some(2500),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_localtimestamp() -> Result<(), CubeError> {
+        // TODO: the value will be different with the introduction of TZ support
+        insta::assert_snapshot!(
+            "localtimestamp",
+            execute_query(
+                "SELECT localtimestamp = current_timestamp".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "cast_decimal_default_precision",
@@ -11728,5 +12113,201 @@ ORDER BY \"COUNT(count)\" DESC"
         );
 
         assert_eq!(cube_scan.options.change_user, Some("foo".to_string()))
+    }
+
+    #[tokio::test]
+    async fn test_sort_relations() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_sort_relations_0",
+            execute_query(
+                "select pg_class.oid as oid from pg_class order by pg_class.oid asc".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_1",
+            execute_query(
+                "select * from (select pg_class.oid AS oid from pg_class order by pg_class.oid) source".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_2",
+            execute_query(
+                "select * from (select oid from pg_class order by pg_class.oid) t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_3",
+            execute_query(
+                "select t.oid as oid from (select oid as oid from pg_class) t order by t.oid"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_4",
+            execute_query(
+                "select oid as oid from (select count(oid) as oid from pg_class order by count(pg_class.oid)) t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_5",
+            execute_query(
+                "select oid as oid from (select count(oid) as oid from pg_class order by count(oid)) t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_6",
+            execute_query(
+                "select pg_class.oid as oid from pg_class group by pg_class.oid order by pg_class.oid asc".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_sort_relations_7",
+            execute_query(
+                "select * from (select oid from pg_class group by pg_class.oid order by pg_class.oid) t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_offset_limit() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_offset_limit_1",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 10 offset 10".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_offset_limit_2",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 10 offset 0".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_offset_limit_3",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 0 offset 10".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_offset_limit_4",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 100 offset 100".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_offset_limit_5",
+            execute_query(
+                "select n from generate_series(1, 1000) pos(n) limit 100 offset 990".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_superset_pagination() {
+        init_logger();
+
+        // At first, Superset gets the total count (no more than 50k)
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) AS rowcount FROM (SELECT order_date as order_date FROM public.\"KibanaSampleDataEcommerce\" GROUP BY order_date LIMIT 50000) AS rowcount_qry".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await.as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(50000),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT order_date AS order_date FROM public.\"KibanaSampleDataEcommerce\" GROUP BY order_date LIMIT 200 OFFSET 200".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await.as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(200),
+                offset: Some(200),
+                filters: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_holistics_schema_privilege_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "holistics_schema_privilege_query",
+            execute_query(
+                "
+                SELECT n.nspname AS schema_name
+                FROM pg_namespace n
+                WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname <> 'information_schema' AND has_schema_privilege(n.nspname, 'USAGE'::text);
+                ".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }

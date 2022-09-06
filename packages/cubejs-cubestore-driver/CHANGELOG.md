@@ -3,6 +3,53 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.63](https://github.com/cube-js/cube.js/compare/v0.30.62...v0.30.63) (2022-09-05)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.30.61](https://github.com/cube-js/cube.js/compare/v0.30.60...v0.30.61) (2022-09-01)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.30.60](https://github.com/cube-js/cube.js/compare/v0.30.59...v0.30.60) (2022-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.30.59](https://github.com/cube-js/cube.js/compare/v0.30.58...v0.30.59) (2022-08-26)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Correct syntax for string cast ([#5160](https://github.com/cube-js/cube.js/issues/5160)) ([961a2f2](https://github.com/cube-js/cube.js/commit/961a2f2e838fd8d07b7b15b0d89905a2e596c872))
+
+
+
+
+
+## [0.30.58](https://github.com/cube-js/cube.js/compare/v0.30.57...v0.30.58) (2022-08-25)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cubestore-driver:** Aggregate function MERGE not allowed for column type bytes ([#5164](https://github.com/cube-js/cube.js/issues/5164)) ([6cf5ad2](https://github.com/cube-js/cube.js/commit/6cf5ad2abbb61edb21d27074026fb4c8a1c63f4a))
+* **@cubejs-backend/cubestore-driver:** ParseError "Expected (, found: ..." ([6ed62ae](https://github.com/cube-js/cube.js/commit/6ed62aebcfeda10726cdce4e359de95e136c6b89))
+
+
+
+
+
 ## [0.30.57](https://github.com/cube-js/cube.js/compare/v0.30.56...v0.30.57) (2022-08-25)
 
 

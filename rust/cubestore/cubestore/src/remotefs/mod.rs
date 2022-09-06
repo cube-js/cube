@@ -59,6 +59,37 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
             .unwrap()
             .to_owned())
     }
+    /// Check existance and size of uploaded file. Raise error if file doesn't exists or has wrong
+    /// size
+    async fn check_upload_file(
+        &self,
+        remote_path: &str,
+        expected_size: u64,
+    ) -> Result<(), CubeError> {
+        match self.list_with_metadata(&remote_path).await {
+            Ok(list) => {
+                let list_res = list.iter().next().ok_or(CubeError::internal(
+                        format!("File {} can't be listed after upload. Either there's Cube Store cluster misconfiguration, or storage can't provide the required consistency.", remote_path),
+                        ));
+                match list_res {
+                    Ok(file) => {
+                        if file.file_size != expected_size {
+                            Err(CubeError::internal(format!(
+                                        "File sizes for {} doesn't match after upload. Expected to be {} but {} uploaded",
+                                        remote_path,
+                                        expected_size,
+                                        file.file_size
+                                        )))
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
 
     /// In addition to uploading this file to the remote filesystem, this function moves the file
     /// from `temp_upload_path` to `self.local_path(remote_path)` on the local file system.
@@ -134,7 +165,9 @@ impl RemoteFs for LocalDirRemoteFs {
         temp_upload_path: &str,
         remote_path: &str,
     ) -> Result<u64, CubeError> {
+        let mut has_remote = false;
         if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
+            has_remote = true;
             debug!("Uploading {}", remote_path);
             let dest = remote_dir.as_path().join(remote_path);
             fs::create_dir_all(dest.parent().unwrap())
@@ -157,7 +190,13 @@ impl RemoteFs for LocalDirRemoteFs {
                     ))
                 })?;
         }
+        if has_remote {
+            let size = fs::metadata(&temp_upload_path).await?.len();
+            self.check_upload_file(&remote_path, size).await?;
+        }
+
         let local_path = self.dir.as_path().join(remote_path);
+
         if Path::new(temp_upload_path) != local_path {
             fs::create_dir_all(local_path.parent().unwrap())
                 .await

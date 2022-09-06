@@ -6,7 +6,7 @@ use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::optimizations::CubeQueryPlanner;
-use crate::queryplanner::planning::get_worker_plan;
+use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::store::DataFrame;
@@ -836,16 +836,42 @@ impl ExecutionPlan for CubeTableExec {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct InlineTableProvider {
+    id: u64,
     data: Arc<DataFrame>,
+    // Filled in by workers
+    inline_table_ids: Vec<InlineTableId>,
 }
 
 impl InlineTableProvider {
-    pub fn new(data: Arc<DataFrame>) -> InlineTableProvider {
-        InlineTableProvider { data }
+    pub fn new(
+        id: u64,
+        data: Arc<DataFrame>,
+        inline_table_ids: Vec<InlineTableId>,
+    ) -> InlineTableProvider {
+        InlineTableProvider {
+            id,
+            data,
+            inline_table_ids,
+        }
+    }
+
+    pub fn get_id(self: &Self) -> u64 {
+        self.id
     }
 
     pub fn get_data(self: &Self) -> Arc<DataFrame> {
         self.data.clone()
+    }
+
+    #[must_use]
+    pub fn to_worker_table(&self, inline_table_ids: Vec<InlineTableId>) -> InlineTableProvider {
+        let mut t = self.clone();
+        t.inline_table_ids = inline_table_ids;
+        t
+    }
+
+    pub fn has_inline_table_id(self: &Self, inline_table_ids: &Vec<InlineTableId>) -> bool {
+        inline_table_ids.iter().any(|id| id == &self.id)
     }
 }
 
@@ -855,13 +881,11 @@ impl Debug for InlineTableProvider {
     }
 }
 
-pub const INLINE_PARTITION_ID: u64 = 0xffffffff;
-
 pub struct ClusterSendExec {
     schema: SchemaRef,
     pub partitions: Vec<(
         /*node*/ String,
-        /*partition_id*/ Vec<(u64, RowRange)>,
+        (Vec<PartitionWithFilters>, Vec<InlineTableId>),
     )>,
     /// Never executed, only stored to allow consistent optimization on router and worker.
     pub input_for_optimizations: Arc<dyn ExecutionPlan>,
@@ -870,50 +894,64 @@ pub struct ClusterSendExec {
     pub use_streaming: bool,
 }
 
+pub type PartitionWithFilters = (u64, RowRange);
+pub type InlineTableId = u64;
+
+/// Compound structure to assign inline tables to specific partitions so they can get to the same worker.
+/// It's helpful to do so in order to avoid allocation of additional workers for inline table micro reads.
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub enum InlineCompoundPartition {
+    Partition(IdRow<Partition>),
+    PartitionWithInlineTables(IdRow<Partition>, Vec<InlineTableId>),
+    InlineTables(Vec<InlineTableId>),
+}
+
 impl ClusterSendExec {
     pub fn new(
         schema: SchemaRef,
         cluster: Arc<dyn Cluster>,
         serialized_plan: Arc<SerializedPlan>,
-        union_snapshots: &[Vec<Option<IndexSnapshot>>],
+        union_snapshots: &[Snapshots],
         input_for_optimizations: Arc<dyn ExecutionPlan>,
         use_streaming: bool,
-    ) -> Self {
+    ) -> Result<Self, CubeError> {
         let partitions = Self::distribute_to_workers(
             cluster.config().as_ref(),
             union_snapshots,
             &serialized_plan.planning_meta().multi_part_subtree,
-        );
-        Self {
+        )?;
+        Ok(Self {
             schema,
             partitions,
             cluster,
             serialized_plan,
             input_for_optimizations,
             use_streaming,
-        }
+        })
     }
 
     pub(crate) fn distribute_to_workers(
         config: &dyn ConfigObj,
-        snapshots: &[Vec<Option<IndexSnapshot>>],
+        snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
-    ) -> Vec<(String, Vec<(u64, RowRange)>)> {
-        let partitions = Self::logical_partitions(snapshots, tree);
-        Self::assign_nodes(config, partitions)
+    ) -> Result<Vec<(String, (Vec<PartitionWithFilters>, Vec<InlineTableId>))>, CubeError> {
+        let partitions = Self::logical_partitions(snapshots, tree)?;
+        Ok(Self::assign_nodes(config, partitions))
     }
 
     fn logical_partitions(
-        snapshots: &[Vec<Option<IndexSnapshot>>],
+        snapshots: &[Snapshots],
         tree: &HashMap<u64, MultiPartition>,
-    ) -> Vec<Vec<IdRow<Partition>>> {
+    ) -> Result<Vec<Vec<InlineCompoundPartition>>, CubeError> {
         let mut to_multiply = Vec::new();
         let mut multi_partitions = HashMap::<u64, Vec<_>>::new();
+        let mut has_inline_tables = false;
         for union in snapshots.iter() {
             let mut ordinary_partitions = Vec::new();
+            let mut inline_table_ids = Vec::new();
             for index in union {
                 match index {
-                    Some(index) => {
+                    Snapshot::Index(index) => {
                         for p in &index.partitions {
                             match p.partition.get_row().multi_partition_id() {
                                 Some(id) => multi_partitions
@@ -924,14 +962,36 @@ impl ClusterSendExec {
                             }
                         }
                     }
-                    None => ordinary_partitions.push(IdRow::new(
-                        INLINE_PARTITION_ID,
-                        Partition::new(INLINE_PARTITION_ID, None, None, None),
-                    )),
+                    Snapshot::Inline(inline) => {
+                        has_inline_tables = true;
+                        inline_table_ids.push(inline.id);
+                    }
                 }
             }
-            if !ordinary_partitions.is_empty() {
-                to_multiply.push(ordinary_partitions);
+            let partitions_merged_with_inline_tables =
+                if !ordinary_partitions.is_empty() && !inline_table_ids.is_empty() {
+                    let last_partition = ordinary_partitions.pop().unwrap();
+                    let mut result = ordinary_partitions
+                        .into_iter()
+                        .map(|p| InlineCompoundPartition::Partition(p))
+                        .collect::<Vec<_>>();
+                    result.push(InlineCompoundPartition::PartitionWithInlineTables(
+                        last_partition,
+                        inline_table_ids,
+                    ));
+                    result
+                } else if inline_table_ids.is_empty() {
+                    ordinary_partitions
+                        .into_iter()
+                        .map(|p| InlineCompoundPartition::Partition(p))
+                        .collect()
+                } else if ordinary_partitions.is_empty() {
+                    vec![InlineCompoundPartition::InlineTables(inline_table_ids)]
+                } else {
+                    Vec::new()
+                };
+            if !partitions_merged_with_inline_tables.is_empty() {
+                to_multiply.push(partitions_merged_with_inline_tables);
             }
         }
         assert!(to_multiply.is_empty() || multi_partitions.is_empty(),
@@ -939,14 +999,26 @@ impl ClusterSendExec {
                 to_multiply, multi_partitions, snapshots);
         // Multi partitions define how we distribute joins. They may not be present, though.
         if !multi_partitions.is_empty() {
-            return Self::distribute_multi_partitions(multi_partitions, tree);
+            if has_inline_tables {
+                return Err(CubeError::user(
+                    "Partitioned index queries aren't supported with inline tables".to_string(),
+                ));
+            }
+            return Ok(Self::distribute_multi_partitions(multi_partitions, tree)
+                .into_iter()
+                .map(|i| {
+                    i.into_iter()
+                        .map(|p| InlineCompoundPartition::Partition(p))
+                        .collect()
+                })
+                .collect());
         }
         // Ordinary partitions need to be duplicated on multiple machines.
         let partitions = to_multiply
             .into_iter()
             .multi_cartesian_product()
             .collect::<Vec<Vec<_>>>();
-        partitions
+        Ok(partitions)
     }
 
     fn distribute_multi_partitions(
@@ -1020,17 +1092,44 @@ impl ClusterSendExec {
 
     fn assign_nodes(
         c: &dyn ConfigObj,
-        logical: Vec<Vec<IdRow<Partition>>>,
-    ) -> Vec<(String, Vec<(u64, RowRange)>)> {
-        let mut m: HashMap<_, Vec<(u64, RowRange)>> = HashMap::new();
+        logical: Vec<Vec<InlineCompoundPartition>>,
+    ) -> Vec<(String, (Vec<(u64, RowRange)>, Vec<InlineTableId>))> {
+        let mut m: HashMap<_, (Vec<(u64, RowRange)>, Vec<InlineTableId>)> = HashMap::new();
         for ps in &logical {
-            let node = match ps[0].get_row().multi_partition_id() {
+            let inline_table_ids = ps
+                .iter()
+                .filter_map(|p| match p {
+                    InlineCompoundPartition::PartitionWithInlineTables(_, inline_tables) => {
+                        Some(inline_tables.clone())
+                    }
+                    InlineCompoundPartition::InlineTables(inline_tables) => {
+                        Some(inline_tables.clone())
+                    }
+                    _ => None,
+                })
+                .flatten()
+                .collect::<Vec<_>>();
+            let partitions = ps
+                .iter()
+                .filter_map(|p| match p {
+                    InlineCompoundPartition::PartitionWithInlineTables(p, _) => Some(p.clone()),
+                    InlineCompoundPartition::Partition(p) => Some(p.clone()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            let node = match partitions
+                .iter()
+                .next()
+                .and_then(|p| p.get_row().multi_partition_id())
+            {
                 Some(multi_id) => pick_worker_by_ids(c, [multi_id]),
-                None => pick_worker_by_partitions(c, ps.as_slice()),
+                None => pick_worker_by_partitions(c, partitions.iter()),
             };
-            m.entry(node.to_string())
-                .or_default()
-                .extend(Self::issue_filters(ps))
+            let node_entry = &mut m.entry(node.to_string()).or_default();
+            node_entry
+                .0
+                .extend(Self::issue_filters(partitions.as_slice()));
+            node_entry.1.extend(inline_table_ids);
         }
 
         let mut r = m.into_iter().collect_vec();
@@ -1064,7 +1163,11 @@ impl ClusterSendExec {
         res
     }
 
-    fn serialized_plan_for_partitions(&self, partitions: &Vec<(u64, RowRange)>) -> SerializedPlan {
+    fn serialized_plan_for_partitions(
+        &self,
+        partitions: &(Vec<(u64, RowRange)>, Vec<InlineTableId>),
+    ) -> SerializedPlan {
+        let (partitions, inline_table_ids) = partitions;
         let mut ps = HashMap::<_, RowFilter>::new();
         for (id, range) in partitions {
             ps.entry(*id).or_default().append_or(range.clone())
@@ -1072,7 +1175,8 @@ impl ClusterSendExec {
         let mut ps = ps.into_iter().collect_vec();
         ps.sort_unstable_by_key(|(id, _)| *id);
 
-        self.serialized_plan.with_partition_id_to_execute(ps)
+        self.serialized_plan
+            .with_partition_id_to_execute(ps, inline_table_ids.clone())
     }
 }
 
@@ -1198,8 +1302,7 @@ impl TableProvider for InlineTableProvider {
         _filters: &[Expr],
         _limit: Option<usize>, // TODO: propagate limit
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;
-        let schema = self.data.get_schema();
+        let schema = self.schema();
         let projected_schema = if let Some(p) = projection {
             Arc::new(Schema::new(
                 p.iter().map(|i| schema.field(*i).clone()).collect(),
@@ -1207,6 +1310,12 @@ impl TableProvider for InlineTableProvider {
         } else {
             schema
         };
+
+        if !self.inline_table_ids.iter().any(|id| id == &self.id) {
+            return Ok(Arc::new(EmptyExec::new(false, projected_schema)));
+        }
+
+        let batches = dataframe_to_batches(self.data.as_ref(), batch_size)?;
         let projection = (*projection).clone();
         Ok(Arc::new(MemoryExec::try_new(
             &vec![batches],

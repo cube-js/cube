@@ -3,6 +3,95 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.63](https://github.com/cube-js/cube.js/compare/v0.30.62...v0.30.63) (2022-09-05)
+
+
+### Bug Fixes
+
+* **databricks-driver:** add deprecation of token in jdbc connection string ([#5208](https://github.com/cube-js/cube.js/issues/5208)) ([e59d72c](https://github.com/cube-js/cube.js/commit/e59d72cce23fdcb8a2eb6fa076ca13ace4d75a27))
+* **query-orchestrator:** delete temp tables ([#5231](https://github.com/cube-js/cube.js/issues/5231)) ([a39944a](https://github.com/cube-js/cube.js/commit/a39944a44a9e66013087cd98d18aa9a430cc789f))
+
+
+
+
+
+## [0.30.62](https://github.com/cube-js/cube.js/compare/v0.30.61...v0.30.62) (2022-09-02)
+
+
+### Features
+
+* **cubesql:** Superset - serverside paging ([#5204](https://github.com/cube-js/cube.js/issues/5204)) ([dfd695d](https://github.com/cube-js/cube.js/commit/dfd695d2f09ea00b4a0b8ef816a597b5c3986ce6))
+* **cubesql:** Support dow granularity (ThoughtSpot) ([#5172](https://github.com/cube-js/cube.js/issues/5172)) ([0919e40](https://github.com/cube-js/cube.js/commit/0919e40c9283db45b3856fcf81993d985cbfc7ac))
+* **cubesql:** Support doy granularity (ThoughtSpot) ([#5232](https://github.com/cube-js/cube.js/issues/5232)) ([be26775](https://github.com/cube-js/cube.js/commit/be2677535ae1b7bd231530c3bb9266016f9b4c8b))
+
+
+
+
+
+## [0.30.61](https://github.com/cube-js/cube.js/compare/v0.30.60...v0.30.61) (2022-09-01)
+
+
+### Bug Fixes
+
+* Correct error message when no pre-aggregation partitions were built and API instance accessing those ([82f2378](https://github.com/cube-js/cube.js/commit/82f2378703d561a93b86b0707d76fe7093a8edf9))
+
+
+### Features
+
+* **cubesql:** Eliminate literal filter (true or true = true) ([#5142](https://github.com/cube-js/cube.js/issues/5142)) ([7a6f8f9](https://github.com/cube-js/cube.js/commit/7a6f8f9ae91cd314f5c2699dadbd2c5b79c1e73e))
+* **cubesql:** Improve support (formats) for TO_TIMESTAMP function ([#5218](https://github.com/cube-js/cube.js/issues/5218)) ([044c3e1](https://github.com/cube-js/cube.js/commit/044c3e1585479b59c391d31c9783ee46908bbcc3))
+* **cubesql:** Push down limit through projection ([#5206](https://github.com/cube-js/cube.js/issues/5206)) ([3c6ff7d](https://github.com/cube-js/cube.js/commit/3c6ff7d6eddc925567234a5ec94606eb09970b33))
+* **cubesql:** Support `LOCALTIMESTAMP` ([0089a65](https://github.com/cube-js/cube.js/commit/0089a65ae86019df159c0d9dbe5323ebc38c7172))
+
+
+
+
+
+## [0.30.60](https://github.com/cube-js/cube.js/compare/v0.30.59...v0.30.60) (2022-08-28)
+
+
+### Bug Fixes
+
+* **cubestore:** Read an inline table only on the assigned worker ([#5147](https://github.com/cube-js/cube.js/issues/5147)) ([15c2aa0](https://github.com/cube-js/cube.js/commit/15c2aa0c6ff7460450b432a0cc6ff0bd04126faf))
+
+
+
+
+
+## [0.30.59](https://github.com/cube-js/cube.js/compare/v0.30.58...v0.30.59) (2022-08-26)
+
+
+### Bug Fixes
+
+* **cubesql:** Persist dbname from connection for pg-wire ([#5165](https://github.com/cube-js/cube.js/issues/5165)) ([6bdf5df](https://github.com/cube-js/cube.js/commit/6bdf5df270d00840b1c49e0733c1a5cf8bbc18e3))
+* **cubestore-driver:** Correct syntax for string cast ([#5160](https://github.com/cube-js/cube.js/issues/5160)) ([961a2f2](https://github.com/cube-js/cube.js/commit/961a2f2e838fd8d07b7b15b0d89905a2e596c872))
+
+
+### Features
+
+* **cubestore:** Support Cast from timestamp to string ([#5163](https://github.com/cube-js/cube.js/issues/5163)) ([651a584](https://github.com/cube-js/cube.js/commit/651a5846fd76b2b4792e6f2b83607581ba564cf8))
+
+
+
+
+
+## [0.30.58](https://github.com/cube-js/cube.js/compare/v0.30.57...v0.30.58) (2022-08-25)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/cubestore-driver:** Aggregate function MERGE not allowed for column type bytes ([#5164](https://github.com/cube-js/cube.js/issues/5164)) ([6cf5ad2](https://github.com/cube-js/cube.js/commit/6cf5ad2abbb61edb21d27074026fb4c8a1c63f4a))
+* **@cubejs-backend/cubestore-driver:** ParseError "Expected (, found: ..." ([6ed62ae](https://github.com/cube-js/cube.js/commit/6ed62aebcfeda10726cdce4e359de95e136c6b89))
+
+
+### Features
+
+* **cubesql:**  Support qtr granularity in DateTrunc for analytics queries ([#5159](https://github.com/cube-js/cube.js/issues/5159)) ([ce13846](https://github.com/cube-js/cube.js/commit/ce1384631f73a6405fd3c82502f0cbb24154259e))
+
+
+
+
+
 ## [0.30.57](https://github.com/cube-js/cube.js/compare/v0.30.56...v0.30.57) (2022-08-25)
 
 

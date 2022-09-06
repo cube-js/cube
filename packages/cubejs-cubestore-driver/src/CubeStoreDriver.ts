@@ -94,7 +94,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       sql = `${sql} WITH (${withEntries.join(', ')})`;
     }
     if (options.uniqueKey) {
-      sql = `${sql} UNIQUE KEY ${options.uniqueKey}`;
+      sql = `${sql} UNIQUE KEY (${options.uniqueKey})`;
     }
     if (options.aggregations) {
       sql = `${sql} ${options.aggregations}`;
@@ -163,7 +163,13 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
   public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[], queryTracingObj?: any, aggregationsColumns?: string[], createTableIndexes?: CreateTableIndex[]) {
     const indexes = createTableIndexes && createTableIndexes.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
-    const aggregations = aggregationsColumns && aggregationsColumns.length ? ` AGGREGATIONS (${aggregationsColumns.join(', ')})` : '';
+
+    let hasAggregatingIndexes = false;
+    if (createTableIndexes && createTableIndexes.length) {
+      hasAggregatingIndexes = createTableIndexes.some((index) => index.type === 'aggregate');
+    }
+
+    const aggregations = hasAggregatingIndexes && aggregationsColumns && aggregationsColumns.length ? ` AGGREGATIONS (${aggregationsColumns.join(', ')})` : '';
 
     if (tableData.rowStream) {
       await this.importStream(columns, tableData, table, indexes, aggregations, queryTracingObj);

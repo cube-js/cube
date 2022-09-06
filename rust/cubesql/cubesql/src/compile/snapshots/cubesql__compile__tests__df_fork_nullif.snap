@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 9849
+expression: "execute_query(\"SELECT nullif('test1', 'test1') as str_null, nullif('test1', 'test2') as str_first, nullif(3.0, 3.0) as float_null, nullif(3.0, 1.0) as float_first\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------+-----------+------------+-------------+
+| str_null | str_first | float_null | float_first |
++----------+-----------+------------+-------------+
+| NULL     | test1     | NULL       | 3           |
++----------+-----------+------------+-------------+
