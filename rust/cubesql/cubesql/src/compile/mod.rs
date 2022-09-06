@@ -9843,6 +9843,21 @@ ORDER BY \"COUNT(count)\" DESC"
         Ok(())
     }
 
+    // This tests asserts that our DF fork contains support for nullif(scalar,scalar)
+    #[tokio::test]
+    async fn df_nullif() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_nullif",
+            execute_query(
+                "SELECT nullif('test1', 'test1') as str_null, nullif('test1', 'test2') as str_first, nullif(3.0, 3.0) as float_null, nullif(3.0, 1.0) as float_first".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
     // This tests asserts that our DF fork works correct with types
     #[tokio::test]
     async fn df_switch_case_coerc() -> Result<(), CubeError> {
