@@ -8820,6 +8820,22 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "has_schema_privilege_default_user",
+            execute_query(
+                "SELECT
+                    nspname,
+                    has_schema_privilege(nspname, 'CREATE') create,
+                    has_schema_privilege(nspname, 'USAGE') usage
+                FROM pg_namespace
+                ORDER BY nspname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -12260,5 +12276,23 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }
         );
+    }
+
+    #[tokio::test]
+    async fn test_holistics_schema_privilege_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "holistics_schema_privilege_query",
+            execute_query(
+                "
+                SELECT n.nspname AS schema_name
+                FROM pg_namespace n
+                WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname <> 'information_schema' AND has_schema_privilege(n.nspname, 'USAGE'::text);
+                ".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }
