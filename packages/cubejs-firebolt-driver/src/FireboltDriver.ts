@@ -191,6 +191,10 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
         types,
       };
     } catch (error) {
+      if (error.status === 401 && retry) {
+        this.connection = null;
+        return this.streamResponse(query, parameters, false);
+      }
       if (error.status === 404 && retry) {
         await this.ensureEngineRunning();
         return this.streamResponse(query, parameters, false);
@@ -225,6 +229,10 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       const response = await statement.fetchResult();
       return response;
     } catch (error) {
+      if (error.status === 401 && retry) {
+        this.connection = null;
+        return this.queryResponse(query, parameters, false);
+      }
       if (error.status === 404 && retry) {
         await this.ensureEngineRunning();
         return this.queryResponse(query, parameters, false);
