@@ -11,6 +11,30 @@ on:
 
 jobs:
 
+  hasura-remote-schema:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/hasura-remote-schema-with-cube/*,examples/hasura-remote-schema-with-cube/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: hasura-remote-schema-with-cube
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
   angular-dashboard:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
