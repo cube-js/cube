@@ -437,6 +437,7 @@ cube(`Tickets`, {
 
 `FILTER_PARAMS` allows you to use filter values during SQL generation. You can
 add it for any valid SQL expression as in the case of dimensions.
+This is useful if you want to hint your database optimizer to use a specific index or filter out partitions or shards in your cloud data warehouse so you won't be billed for scanning those.
 
 It has the following structure:
 
