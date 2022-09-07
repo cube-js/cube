@@ -12,6 +12,7 @@
     "@cubejs-backend/athena-driver": "^0.30.63",
     "@cubejs-backend/bigquery-driver": "^0.30.63",
     "@cubejs-backend/clickhouse-driver": "^0.30.63",
+    "@cubejs-backend/crate-driver": "^0.30.63",
     "@cubejs-backend/databricks-jdbc-driver": "^0.30.63",
     "@cubejs-backend/dbt-schema-extension": "^0.30.64",
     "@cubejs-backend/dremio-driver": "^0.30.63",
