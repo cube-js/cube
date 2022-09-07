@@ -245,12 +245,6 @@ class ApiGateway {
       });
     }));
 
-    app.post(
-      `${this.basePath}/v1/pre-aggregations-build`,
-      userMiddlewares,
-      this.postPreAggregationsBuildJob.bind(this),
-    );
-
     app.get(`${this.basePath}/v1/dry-run`, userMiddlewares, (async (req, res) => {
       await this.dryRun({
         query: req.query.query,
@@ -337,6 +331,12 @@ class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
+
+      app.post(
+        '/cubejs-system/v1/pre-aggregations/jobs',
+        userMiddlewares,
+        this.preAggregationsJobs.bind(this),
+      );
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -590,63 +590,100 @@ class ApiGateway {
   }
 
   /**
-   * Add pre-aggregations build job. Returns added jobs ids.
+   * Entry point for the `/cubejs-system/v1/pre-aggregations/jobs` endpoint.
+   * Post object example:
+   * ```
+   * {
+   *   "contexts": [
+   *     {"securityContext": {"tenant": "t1"}},
+   *     {"securityContext": {"tenant": "t2"}}
+   *   ],
+   *   "timezones": ["UTC"],
+   *   "datasources": ["default"],
+   *   "cubes": ["Events"],
+   *   "preAggregations": ["Events.TemporaryData"]
+   * }
+   * ```
    * TODO (buntarb): selector object validator.
    */
-  private async postPreAggregationsBuildJob(req: Request, res: Response) {
-    const requestStarted = new Date();
-    const { context } = req;
-    const selector = <PreAggsSelector>req.body;
+  private async preAggregationsJobs(req: Request, res: Response) {
     const response = this.resToResultFn(res);
+    const requestStarted = new Date();
+    const context = <RequestContext>req.context;
+    const selector = <PreAggsSelector>req.body;
+    let jobs: {
+      id: string;
+      table: string;
+      target: string;
+      structure: string;
+      content: string;
+      updated: string;
+    }[] = [];
     try {
-      const compiler = this.getCompilerApi(context);
-      const orchestrator = this.getAdapterApi(context);
-      const timezones = selector.timezones && selector.timezones.length
-        ? selector.timezones
-        : undefined;
-      const preaggs = await compiler.preAggregations({
-        dataSources: selector.dataSources,
-        cubes: selector.cubes,
-        preAggregationIds: selector.preAggregationIds,
-      });
-      // const partitions = (
-      //   await this
-      //     .refreshScheduler()
-      //     .preAggregationPartitions(
-      //       context,
-      //       normalizeQueryPreAggregations({
-      //         timezones,
-      //         preAggregations: preaggs.map(p => ({ id: p.id })),
-      //       }),
-      //     )
-      // ).filter(p => !p?.errors?.length);
-      // const versions = partitions && await orchestrator
-      //   .getPreAggregationVersionEntries(
-      //     context,
-      //     partitions,
-      //     compiler.preAggregationsSchema,
-      //   );
-      const buildPromise = await this
-        .refreshScheduler()
-        .buildPreAggregations(
-          context,
-          {
-            metadata: undefined,
-            timezones,
-            preAggregations: preaggs.map(p => ({
-              id: p.id,
-              cacheOnly: undefined, // boolean
-              partitions: undefined, // string[]
-            })),
-            forceBuildPreAggregations: undefined,
-            throwErrors: false,
-          }
+      if (!selector.contexts?.length) {
+        jobs = await this.postPreAggregationsBuildJobs(context, selector);
+      } else {
+        const promise = Promise.all(
+          selector.contexts.map(async (config) => {
+            const ctx = <RequestContext>{
+              ...context,
+              ...config,
+            };
+            const job = await this.postPreAggregationsBuildJobs(ctx, selector);
+            return job;
+          })
         );
-      // const preAggsStates = await orchestrator.getPreAggregationQueueStates();
-      response({}, { status: 200 });
+        const resolve = await promise;
+        resolve.forEach((j) => {
+          jobs = jobs.concat(j);
+        });
+      }
+      response(jobs, { status: 200 });
     } catch (e) {
       this.handleError({ e, context, res: response, requestStarted });
     }
+  }
+
+  /**
+   * Add pre-aggregations build job. Returns added jobs ids.
+   */
+  private async postPreAggregationsBuildJobs(
+    context: RequestContext,
+    selector: PreAggsSelector
+  ): Promise<{
+    id: string;
+    table: string;
+    target: string;
+    structure: string;
+    content: string;
+    updated: string;
+  }[]> {
+    const compiler = this.getCompilerApi(context);
+    const timezones = selector.timezones && selector.timezones.length
+      ? selector.timezones
+      : undefined;
+    const preaggs = await compiler.preAggregations({
+      dataSources: selector.dataSources,
+      cubes: selector.cubes,
+      preAggregationIds: selector.preAggregationIds,
+    });
+    const jobs: any[] = await this
+      .refreshScheduler()
+      .postPreAggregationsBuildJobs(
+        context,
+        {
+          metadata: undefined,
+          timezones,
+          preAggregations: preaggs.map(p => ({
+            id: p.id,
+            cacheOnly: undefined, // boolean
+            partitions: undefined, // string[]
+          })),
+          forceBuildPreAggregations: undefined,
+          throwErrors: false,
+        }
+      );
+    return jobs;
   }
 
   public async getPreAggregationsInQueue(

@@ -52,6 +52,11 @@ export class OrchestratorApi {
     await this.orchestrator.forceReconcile(datasource);
   }
 
+  /**
+   * Push query to the queue, fetch and return result if query takes
+   * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
+   * error otherwise.
+   */
   public async executeQuery(query) {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
@@ -67,6 +72,11 @@ export class OrchestratorApi {
         this.orchestrator.loadRefreshKeys(query) :
         this.orchestrator.fetchQuery(query);
 
+      if (query.isJob) {
+        const job = await fetchQueryPromise;
+        return job;
+      }
+      
       fetchQueryPromise = pt.timeout(fetchQueryPromise, this.continueWaitTimeout * 1000);
 
       const data = await fetchQueryPromise;

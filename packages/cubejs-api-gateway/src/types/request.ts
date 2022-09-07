@@ -119,8 +119,11 @@ type QueryRequest = BaseRequest & {
   resType?: ResultType
 };
 
+/**
+ * The `/cubejs-system/v1/pre-aggregations/jobs` endpoint object type.
+ */
 type PreAggsSelector = {
-  tenants?: {securityContext: any}[],
+  contexts?: {securityContext: any}[],
   timezones?: string[],
   dataSources?: string[],
   cubes?: string[],

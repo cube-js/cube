@@ -126,6 +126,11 @@ export class QueryOrchestrator {
     await this.queryCache.forceReconcile(datasource);
   }
 
+  /**
+   * Push query to the queue, fetch and return result if query takes
+   * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
+   * error otherwise.
+   */
   public async fetchQuery(queryBody: any): Promise<any> {
     const { preAggregationsTablesToTempTables, values } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
 
@@ -151,10 +156,17 @@ export class QueryOrchestrator {
     let lastRefreshTimestamp = getLastUpdatedAtTimestamp(preAggregationsTablesToTempTables.map(pa => new Date(pa[1].lastUpdatedAt)));
 
     if (!queryBody.query) {
-      return {
-        usedPreAggregations,
-        lastRefreshTime: lastRefreshTimestamp && new Date(lastRefreshTimestamp),
-      };
+      if (queryBody.isJob) {
+        return preAggregationsTablesToTempTables.map((pa) => ({
+          tableName: pa[0],
+          ...pa[1],
+        }));
+      } else {
+        return {
+          usedPreAggregations,
+          lastRefreshTime: lastRefreshTimestamp && new Date(lastRefreshTimestamp),
+        };
+      }
     }
 
     const result = await this.queryCache.cachedQueryResult(
