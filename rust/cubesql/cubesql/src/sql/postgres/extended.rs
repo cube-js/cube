@@ -298,7 +298,7 @@ impl Portal {
         writer: &mut BatchWriter,
         frame: DataFrame,
     ) -> Result<(), ProtocolError> {
-        for (idx, row) in frame.to_rows().into_iter().enumerate() {
+        for row in frame.to_rows().into_iter() {
             for value in row.to_values() {
                 match value {
                     TableValue::Null => writer.write_value::<Option<bool>>(None)?,
@@ -495,6 +495,7 @@ impl Portal {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::{
         compile::engine::information_schema::postgres::InfoSchemaTestingDatasetProvider,
         sql::{
@@ -507,7 +508,13 @@ mod tests {
     use pg_srv::protocol::{CommandComplete, Format, PortalCompletion, PortalSuspended};
 
     use crate::sql::{extended::PortalFrom, shim::ConnectionError};
-    use datafusion::prelude::SessionContext;
+    use datafusion::{
+        arrow::{
+            array::{ArrayRef, StringArray},
+            datatypes::{DataType, Field, Schema},
+        },
+        prelude::SessionContext,
+    };
     use std::sync::Arc;
 
     fn generate_testing_data_frame(cnt: usize) -> DataFrame {
@@ -525,6 +532,53 @@ mod tests {
             )],
             rows,
         )
+    }
+
+    #[test]
+    fn test_split_record_batch() -> Result<(), ConnectionError> {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "KibanaSampleDataEcommerce.count",
+            DataType::Utf8,
+            false,
+        )]));
+        let column1 = Arc::new(StringArray::from(vec![
+            Some("1"),
+            Some("2"),
+            Some("3"),
+            Some("4"),
+            Some("5"),
+            Some("6"),
+        ])) as ArrayRef;
+
+        // 0
+        {
+            let (left, right) = split_record_batch(
+                RecordBatch::try_new(schema.clone(), vec![column1.clone()])?,
+                0,
+            );
+            assert_eq!(left.num_rows(), 0);
+            assert_eq!(right.unwrap().num_rows(), 6);
+        }
+
+        // 3
+        {
+            let (left, right) = split_record_batch(
+                RecordBatch::try_new(schema.clone(), vec![column1.clone()])?,
+                3,
+            );
+            assert_eq!(left.num_rows(), 3);
+            assert_eq!(right.unwrap().num_rows(), 3);
+        }
+
+        // 6
+        {
+            let (left, right) =
+                split_record_batch(RecordBatch::try_new(schema.clone(), vec![column1])?, 6);
+            assert_eq!(left.num_rows(), 6);
+            assert_eq!(right, None);
+        }
+
+        Ok(())
     }
 
     #[tokio::test]
