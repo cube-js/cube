@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/cubestore-driver",
   "description": "Cube Store driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.63",
+  "version": "0.30.65",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -29,7 +29,7 @@
     "integration:cubestore": "jest"
   },
   "dependencies": {
-    "@cubejs-backend/cubestore": "^0.30.61",
+    "@cubejs-backend/cubestore": "^0.30.65",
     "@cubejs-backend/query-orchestrator": "^0.30.63",
     "@cubejs-backend/schema-compiler": "^0.30.63",
     "@cubejs-backend/shared": "^0.30.57",

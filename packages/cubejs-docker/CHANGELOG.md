@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.65](https://github.com/cube-js/cube.js/compare/v0.30.64...v0.30.65) (2022-09-07)
+
+
+### Features
+
+* **docker:** Install CrateDB driver ([#5252](https://github.com/cube-js/cube.js/issues/5252)) ([40fdfd6](https://github.com/cube-js/cube.js/commit/40fdfd6e7c25450f6c78f7b55e9ffa2d000b1b04))
+
+
+
+
+
 ## [0.30.64](https://github.com/cube-js/cube.js/compare/v0.30.63...v0.30.64) (2022-09-07)
 
 **Note:** Version bump only for package @cubejs-backend/docker

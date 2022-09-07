@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.65](https://github.com/cube-js/cube.js/compare/v0.30.64...v0.30.65) (2022-09-07)
+
+
+### Bug Fixes
+
+* **cubestore:** Fix 'no such file or directory' after cubestore restart ([#5247](https://github.com/cube-js/cube.js/issues/5247)) ([efaf897](https://github.com/cube-js/cube.js/commit/efaf8972c2751cbb5c5852b91a5c22b171f6064b))
+
+
+### Features
+
+* **cubesql:** Holistics - support in subquery introspection query ([#5248](https://github.com/cube-js/cube.js/issues/5248)) ([977a251](https://github.com/cube-js/cube.js/commit/977a251fa869344dedebc1315635f2ff9e7de07b))
+* **cubesql:** Holistics - support left join introspection query ([#5249](https://github.com/cube-js/cube.js/issues/5249)) ([455d31f](https://github.com/cube-js/cube.js/commit/455d31f531c783c5f621303a1fa4bce01e1fac61))
+* **docker:** Install CrateDB driver ([#5252](https://github.com/cube-js/cube.js/issues/5252)) ([40fdfd6](https://github.com/cube-js/cube.js/commit/40fdfd6e7c25450f6c78f7b55e9ffa2d000b1b04))
+
+
+
+
+
 ## [0.30.64](https://github.com/cube-js/cube.js/compare/v0.30.63...v0.30.64) (2022-09-07)
 
 
