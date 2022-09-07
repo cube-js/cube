@@ -207,7 +207,7 @@ pub fn parse_sql_to_statements(
     };
 
     // Metabase
-    // TODO: To Support InSubquery Node.
+    // TODO: To Support InSubquery Node (waiting for rebase DF)
     let query = query.replace(
         "WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e)",
         "WHERE t.oid = 0",
@@ -227,6 +227,13 @@ pub fn parse_sql_to_statements(
     let query = query.replace(
         "ON c.confrelid=fa.attrelid AND fa.attnum=c.confkey[o.ord]",
         "ON c.confrelid=fa.attrelid",
+    );
+
+    // Holistics.io
+    // TODO: To Support InSubquery Node (waiting for rebase DF)
+    let query = query.replace(
+        "AND c.relname IN (SELECT table_name\nFROM information_schema.tables\nWHERE (table_type = 'BASE TABLE' OR table_type = 'VIEW')\n  AND table_schema NOT IN ('pg_catalog', 'information_schema')\n  AND has_schema_privilege(table_schema, 'USAGE'::text)\n)\n",
+        "",
     );
 
     let parse_result = match protocol {
