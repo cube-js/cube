@@ -507,12 +507,15 @@ macro_rules! variant_field_struct {
                     let typed_str = s.strip_prefix(&prefix).ok_or(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))?;
 
                     match typed_str {
+                        "Float32" => Ok([<$variant $var_field:camel>](DataType::Float32)),
+                        "Float64" => Ok([<$variant $var_field:camel>](DataType::Float64)),
                         "Int32" => Ok([<$variant $var_field:camel>](DataType::Int32)),
                         "Int64" => Ok([<$variant $var_field:camel>](DataType::Int64)),
                         "Boolean" => Ok([<$variant $var_field:camel>](DataType::Boolean)),
                         "Utf8" => Ok([<$variant $var_field:camel>](DataType::Utf8)),
                         "Date32" => Ok([<$variant $var_field:camel>](DataType::Date32)),
-                        _ => Err(CubeError::internal(format!("Can't convert {}. Should contains type type, actual: {}", s, typed_str))),
+                        "Date64" => Ok([<$variant $var_field:camel>](DataType::Date64)),
+                        _ => Err(CubeError::internal(format!("Can't convert {}. Should contain a valid type, actual: {}", s, typed_str))),
                     }
                 }
             }
