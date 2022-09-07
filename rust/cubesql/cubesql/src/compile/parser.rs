@@ -213,6 +213,22 @@ pub fn parse_sql_to_statements(
         "WHERE t.oid = 0",
     );
 
+    // Holistics.io
+    // TODO: Waiting for rebase DF
+    // Right now, our fork of DF doesn't support ON conditions with this filter
+    let query = query.replace(
+        "ON c.conrelid=ta.attrelid AND ta.attnum=c.conkey[o.ord]",
+        "ON c.conrelid=ta.attrelid",
+    );
+
+    // Holistics.io
+    // TODO: Waiting for rebase DF
+    // Right now, our fork of DF doesn't support ON conditions with this filter
+    let query = query.replace(
+        "ON c.confrelid=fa.attrelid AND fa.attnum=c.confkey[o.ord]",
+        "ON c.confrelid=fa.attrelid",
+    );
+
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
