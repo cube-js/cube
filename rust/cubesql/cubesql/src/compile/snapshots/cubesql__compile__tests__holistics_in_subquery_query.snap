@@ -1,0 +1,22 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS \\\"table_name\\\",\\n          a.attname AS \\\"column_name\\\",\\n          format_type(a.atttypid, a.atttypmod) AS \\\"data_type\\\"\\n        FROM pg_namespace n,\\n             pg_class c,\\n             pg_attribute a\\n        WHERE n.oid = c.relnamespace\\n          AND c.oid = a.attrelid\\n          AND a.attnum > 0\\n          AND NOT a.attisdropped\\n          AND c.relname IN (SELECT table_name\\nFROM information_schema.tables\\nWHERE (table_type = 'BASE TABLE' OR table_type = 'VIEW')\\n  AND table_schema NOT IN ('pg_catalog', 'information_schema')\\n  AND has_schema_privilege(table_schema, 'USAGE'::text)\\n)\\n\n                /* Added to avoid random output order and validate snapshot */\n                order by table_name;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------------------------------+--------------------+-----------------------------+
+| table_name                       | column_name        | data_type                   |
++----------------------------------+--------------------+-----------------------------+
+| public.KibanaSampleDataEcommerce | count              | bigint                      |
+| public.KibanaSampleDataEcommerce | maxPrice           | numeric                     |
+| public.KibanaSampleDataEcommerce | minPrice           | numeric                     |
+| public.KibanaSampleDataEcommerce | avgPrice           | numeric                     |
+| public.KibanaSampleDataEcommerce | order_date         | timestamp without time zone |
+| public.KibanaSampleDataEcommerce | customer_gender    | text                        |
+| public.KibanaSampleDataEcommerce | taxful_total_price | numeric                     |
+| public.KibanaSampleDataEcommerce | has_subscription   | boolean                     |
+| public.KibanaSampleDataEcommerce | is_male            | boolean                     |
+| public.KibanaSampleDataEcommerce | is_female          | boolean                     |
+| public.KibanaSampleDataEcommerce | __user             | text                        |
+| public.Logs                      | agentCount         | bigint                      |
+| public.Logs                      | agentCountApprox   | bigint                      |
+| public.Logs                      | __user             | text                        |
++----------------------------------+--------------------+-----------------------------+
