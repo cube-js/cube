@@ -354,19 +354,38 @@ impl RemoteFs for QueueRemoteFs {
             let res = receiver.recv().await?;
             if let RemoteFsOpResult::Download(file, result) = res {
                 if &file == remote_path {
-                    let local_path = self.local_file(remote_path).await?;
-                    let metadata = tokio::fs::metadata(&local_path).await?;
-                    if let Err(e) = QueueRemoteFs::check_file_size(
-                        remote_path,
-                        expected_file_size,
-                        &local_path,
-                        metadata,
-                    )
-                    .await
-                    {
-                        return Err(e);
+                    match result {
+                        Ok(f) => {
+                            let local_path = self.local_file(remote_path).await?;
+                            let metadata = tokio::fs::metadata(&local_path).await.map_err(|e| {
+                                CubeError::internal(format!(
+                                    "Error while listing local file for consistency check {}: {}",
+                                    local_path, e
+                                ))
+                            })?;
+                            if let Err(e) = QueueRemoteFs::check_file_size(
+                                remote_path,
+                                expected_file_size,
+                                &local_path,
+                                metadata,
+                            )
+                            .await
+                            {
+                                return Err(e);
+                            }
+                            return Ok(f);
+                        }
+                        Err(err) => {
+                            //Check if file doesn't exists in remoteFs
+                            if self.remote_fs.list(&file).await?.is_empty() {
+                                return Err(CubeError::corrupt_data(format!(
+                                    "File {} doesn't exist in remote file system",
+                                    file
+                                )));
+                            }
+                            return Err(err);
+                        }
                     }
-                    return result;
                 }
             }
         }
@@ -430,6 +449,7 @@ impl QueueRemoteFs {
 
 #[cfg(test)]
 mod test {
+
     use super::*;
     use crate::config::Config;
     use crate::remotefs::LocalDirRemoteFs;
@@ -444,6 +464,7 @@ mod test {
     struct MockFs {
         base_fs: Arc<LocalDirRemoteFs>,
         error: MockFSError,
+        download_error: bool,
     }
     impl Debug for MockFs {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -472,10 +493,17 @@ mod test {
 
         async fn download_file(
             &self,
-            _remote_path: &str,
-            _expected_file_size: Option<u64>,
+            remote_path: &str,
+            expected_file_size: Option<u64>,
         ) -> Result<String, CubeError> {
-            Ok("".to_string())
+            let res = self
+                .base_fs
+                .download_file(remote_path, expected_file_size)
+                .await;
+            if self.download_error {
+                return Err(CubeError::internal("test download error".to_string()));
+            }
+            res
         }
 
         async fn delete_file(&self, _remote_path: &str) -> Result<(), CubeError> {
@@ -508,18 +536,23 @@ mod test {
         }
 
         async fn local_path(&self) -> String {
-            "".to_string()
+            self.base_fs.local_path().await
         }
 
-        async fn local_file(&self, _remote_path: &str) -> Result<String, CubeError> {
-            Ok("".to_string())
+        async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
+            self.base_fs.local_file(remote_path).await
         }
     }
 
     fn make_test_csv() -> std::path::PathBuf {
         let dir = env::temp_dir();
 
-        let path = dir.clone().join("foo.csv");
+        let path = tempfile::Builder::new()
+            .prefix("foo.csv")
+            .tempfile_in(dir)
+            .unwrap()
+            .path()
+            .to_path_buf();
 
         let mut file = File::create(path.clone()).unwrap();
 
@@ -543,6 +576,7 @@ mod test {
         let failed_fs = Arc::new(MockFs {
             base_fs: config.injector().get_service("original_remote_fs").await,
             error: MockFSError::None,
+            download_error: false,
         });
         let queue_fs = QueueRemoteFs::new(config.config_obj(), failed_fs.clone());
 
@@ -555,14 +589,17 @@ mod test {
         queue_fs.stop_processing_loops().unwrap();
         r.await.unwrap().unwrap();
         assert!(res.is_ok());
+        let _ = std::fs::remove_dir_all(config.local_dir());
+        let _ = std::fs::remove_dir_all(config.remote_dir());
     }
     #[tokio::test]
     async fn queue_upload_wrong_size() {
-        let config = Config::test("upload_retries_all_fail");
+        let config = Config::test("upload_upload_wrong_size");
         config.configure_injector().await;
         let failed_fs = Arc::new(MockFs {
             base_fs: config.injector().get_service("original_remote_fs").await,
             error: MockFSError::WrongSize,
+            download_error: false,
         });
         let queue_fs = QueueRemoteFs::new(config.config_obj(), failed_fs.clone());
 
@@ -575,14 +612,17 @@ mod test {
         queue_fs.stop_processing_loops().unwrap();
         r.await.unwrap().unwrap();
         assert!(res.is_err());
+        let _ = std::fs::remove_dir_all(config.local_dir());
+        let _ = std::fs::remove_dir_all(config.remote_dir());
     }
     #[tokio::test]
     async fn queue_upload_missing_file() {
-        let config = Config::test("upload_retries_all_fail");
+        let config = Config::test("upload_missing_file");
         config.configure_injector().await;
         let failed_fs = Arc::new(MockFs {
             base_fs: config.injector().get_service("original_remote_fs").await,
             error: MockFSError::MissingFile,
+            download_error: false,
         });
         let queue_fs = QueueRemoteFs::new(config.config_obj(), failed_fs.clone());
 
@@ -595,5 +635,91 @@ mod test {
         queue_fs.stop_processing_loops().unwrap();
         r.await.unwrap().unwrap();
         assert!(res.is_err());
+        let _ = std::fs::remove_dir_all(config.local_dir());
+        let _ = std::fs::remove_dir_all(config.remote_dir());
+    }
+    #[tokio::test]
+    async fn queue_download_missing_file() {
+        let config = Config::test("download_missing_file");
+        config.configure_injector().await;
+
+        let queue_fs = QueueRemoteFs::new(
+            config.config_obj(),
+            config.injector().get_service("original_remote_fs").await,
+        );
+        let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
+        let res = queue_fs.download_file("temp-upload/foo.csv", None).await;
+        match res {
+            Ok(_) => assert!(false),
+            Err(e) => assert!(e.is_corrupt_data()),
+        };
+        queue_fs.stop_processing_loops().unwrap();
+        r.await.unwrap().unwrap();
+        let _ = std::fs::remove_dir_all(config.local_dir());
+        let _ = std::fs::remove_dir_all(config.remote_dir());
+    }
+    #[tokio::test]
+    async fn queue_download_wrong_file_size() {
+        let config = Config::test("download_wrong_file_size");
+        config.configure_injector().await;
+
+        let path = make_test_csv();
+        let queue_fs = QueueRemoteFs::new(
+            config.config_obj(),
+            config.injector().get_service("original_remote_fs").await,
+        );
+        let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
+        queue_fs
+            .upload_file(path.to_str().unwrap(), "temp-upload/foo.csv")
+            .await
+            .unwrap();
+
+        std::fs::remove_file(queue_fs.local_file("temp-upload/foo.csv").await.unwrap()).unwrap();
+
+        let res = queue_fs.download_file("temp-upload/foo.csv", Some(1)).await;
+
+        match res {
+            Ok(_) => assert!(false),
+            Err(e) => assert!(e.is_corrupt_data()),
+        };
+        queue_fs.stop_processing_loops().unwrap();
+        r.await.unwrap().unwrap();
+        let _ = std::fs::remove_dir_all(config.local_dir());
+        let _ = std::fs::remove_dir_all(config.remote_dir());
+    }
+    #[tokio::test]
+    async fn queue_download_remotefs_error() {
+        let config = Config::test("download_remotefs_error");
+        config.configure_injector().await;
+
+        let failed_fs = Arc::new(MockFs {
+            base_fs: config.injector().get_service("original_remote_fs").await,
+            error: MockFSError::None,
+            download_error: true,
+        });
+        let path = make_test_csv();
+        let queue_fs = QueueRemoteFs::new(config.config_obj(), failed_fs.clone());
+
+        let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
+
+        queue_fs
+            .upload_file(path.to_str().unwrap(), "temp-upload/foo.csv")
+            .await
+            .unwrap();
+        std::fs::remove_file(queue_fs.local_file("temp-upload/foo.csv").await.unwrap()).unwrap();
+
+        let res = queue_fs.download_file("temp-upload/foo.csv", None).await;
+
+        match res {
+            Ok(_) => assert!(false),
+            Err(e) => {
+                assert!(!e.is_corrupt_data());
+                assert_eq!(e.message, "test download error")
+            }
+        };
+        queue_fs.stop_processing_loops().unwrap();
+        r.await.unwrap().unwrap();
+        let _ = std::fs::remove_dir_all(config.local_dir());
+        let _ = std::fs::remove_dir_all(config.remote_dir());
     }
 }
