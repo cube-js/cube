@@ -10785,6 +10785,48 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_holistics_left_join_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "holistics_left_join_query",
+            execute_query(
+                "
+                SELECT 
+                    TRIM(c.conname) AS constraint_name, 
+                    CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' WHEN 'u' THEN 'UNIQUE' WHEN 'f' THEN 'FOREIGN KEY' END AS constraint_type, 
+                    TRIM(cn.nspname) AS constraint_schema, 
+                    TRIM(tn.nspname) AS schema_name, 
+                    TRIM(tc.relname) AS table_name, 
+                    TRIM(ta.attname) AS column_name, 
+                    TRIM(fn.nspname) AS referenced_schema_name, 
+                    TRIM(fc.relname) AS referenced_table_name, 
+                    TRIM(fa.attname) AS referenced_column_name, 
+                    o.ord AS ordinal_position
+                FROM pg_constraint c
+                    LEFT JOIN generate_series(1,1600) as o(ord) ON c.conkey[o.ord] IS NOT  NULL
+                    LEFT JOIN pg_attribute ta ON c.conrelid=ta.attrelid AND ta.attnum=c.conkey[o.ord]
+                    LEFT JOIN pg_attribute fa ON c.confrelid=fa.attrelid AND fa.attnum=c.confkey[o.ord]
+                    LEFT JOIN pg_class tc ON ta.attrelid=tc.oid
+                    LEFT JOIN pg_class fc ON fa.attrelid=fc.oid
+                    LEFT JOIN pg_namespace cn ON c.connamespace=cn.oid
+                    LEFT JOIN pg_namespace tn ON tc.relnamespace=tn.oid
+                    LEFT JOIN pg_namespace fn ON fc.relnamespace=fn.oid
+                WHERE 
+                    CASE c.contype WHEN 'p' 
+                    THEN 'PRIMARY KEY' WHEN 'u' 
+                    THEN 'UNIQUE' WHEN 'f' 
+                    THEN 'FOREIGN KEY' 
+                    END 
+                IN ('UNIQUE', 'PRIMARY KEY', 'FOREIGN KEY') AND tc.relkind = 'r'
+                ".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_select_column_with_same_name_as_table() -> Result<(), CubeError> {
         init_logger();
 
