@@ -1,0 +1,46 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`postgres driver tests using postgres for the pre-aggregations querying Customers: dimentions + limit: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+]
+`;

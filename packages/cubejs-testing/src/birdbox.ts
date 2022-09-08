@@ -15,6 +15,8 @@ import {
   getLocalHostnameByOs,
   PostgresDBRunner,
 } from '@cubejs-backend/testing-shared';
+// eslint-disable-next-line import/no-extraneous-dependencies
+import globby from 'globby';
 import { REQUIRED_ENV_VARS } from './REQUIRED_ENV_VARS';
 
 /**
@@ -47,7 +49,7 @@ interface Args {
  */
 export interface ContainerOptions {
   type: string;
-  env?: Record<string, string>;
+  env?: Record<string, string | undefined>;
   log?: Log;
   loadScript?: string;
 }
@@ -61,25 +63,31 @@ export interface LocalOptions extends ContainerOptions {
   useCubejsServerBinary?: boolean
 }
 
-/**
- * Birdbox environments for cube.js passed for testcase.
- */
-export type Env = {
+type RequiredEnv = {
   CUBEJS_DEV_MODE: string,
   CUBEJS_WEB_SOCKETS: string,
   CUBEJS_EXTERNAL_DEFAULT: string,
   CUBEJS_SCHEDULED_REFRESH_DEFAULT: string,
   CUBEJS_REFRESH_WORKER: string,
   CUBEJS_ROLLUP_ONLY: string,
+};
+
+type OptionalEnv = {
   // SQL API
   CUBEJS_SQL_PORT?: string,
   CUBEJS_SQL_USER?: string,
   CUBEJS_PG_SQL_PORT?: string,
   CUBEJS_SQL_PASSWORD?: string,
   CUBEJS_SQL_SUPER_USER?: string,
-} & {
-  [key: string]: string,
 };
+
+/**
+ * Birdbox environments for cube.js passed for testcase.
+ */
+export type Env = RequiredEnv & OptionalEnv & Record<string, string | undefined>;
+
+// Record<cubeName, {}>
+type SchemaExtends = Record<string, {heritageCubeName: string, heritageCubeNameFilePath: string}>;
 
 /**
  * List of permanent test data files.
@@ -123,9 +131,54 @@ const TARGET = path.join(
  * Remove test data files from target directory.
  */
 function clearTestData() {
-  FILES.concat(SCHEMAS).forEach((name) => {
+  const extendsFiles = globby.sync(`${path.join(SOURCE, 'extends')}/**/*.js`, { objectMode: true }).map(glob => glob.name);
+
+  FILES.concat(SCHEMAS).concat(extendsFiles).forEach((name) => {
     if (fs.existsSync(path.join(TARGET, name))) {
       fs.removeSync(path.join(TARGET, name));
+    }
+  });
+}
+
+function getParentNewContent(sourceContent: string, heritageCubeName: string, index: number) {
+  return `import { ${heritageCubeName} } from './${heritageCubeName}';\n${sourceContent.slice(0, index)}  extends: ${heritageCubeName},\n${sourceContent.slice(index)}`;
+}
+
+function writeParentContent(sourceContent: string, parentCubeNname: string, heritageCubeName: string, targetFilePath: string) {
+  const re = new RegExp(`cube\\(\`${parentCubeNname}\`, {\n`, 'g');
+
+  re.test(sourceContent);
+  const newContent = getParentNewContent(sourceContent, heritageCubeName, re.lastIndex);
+
+  fs.writeFileSync(
+    targetFilePath,
+    newContent
+  );
+}
+function writeHeritageContent(type: string, heritageCubeName: string, heritageCubeNameFilePath: string) {
+  const originalHeritageCubeContent = fs.readFileSync(
+    path.join(SOURCE, 'extends', `${heritageCubeNameFilePath}.js`), 'utf8'
+  );
+  const updatedHeritageCubeContent = originalHeritageCubeContent.replace('_type_', type);
+  fs.writeFileSync(
+    path.join(TARGET, `${heritageCubeName}.js`),
+    updatedHeritageCubeContent
+  );
+}
+
+function runSchemaExtends(type: string, schemaExtends: SchemaExtends) {
+  const filesArray = fs.readdirSync(TARGET);
+  filesArray.forEach(filename => {
+    const { name } = path.parse(filename);
+
+    if (schemaExtends[name]) {
+      const filepath = path.resolve(TARGET, filename);
+      const sourceContent = fs.readFileSync(filepath, 'utf8');
+
+      const { heritageCubeName, heritageCubeNameFilePath } = schemaExtends[name];
+      
+      writeParentContent(sourceContent, name, heritageCubeName, filepath);
+      writeHeritageContent(type, heritageCubeName, heritageCubeNameFilePath);
     }
   });
 }
@@ -133,7 +186,7 @@ function clearTestData() {
 /**
  * Prepare and copy test data files.
  */
-function prepareTestData(type: string) {
+function prepareTestData(type: string, schemaExtends?: SchemaExtends) {
   clearTestData();
   FILES.forEach((name) => {
     fs.copySync(
@@ -142,13 +195,20 @@ function prepareTestData(type: string) {
     );
   });
   SCHEMAS.forEach((name) => {
+    const originalContent = fs.readFileSync(
+      path.join(SOURCE, name), 'utf8'
+    );
+
+    const updatedContent = originalContent.replace('_type_', type);
     fs.writeFileSync(
       path.join(TARGET, name),
-      fs.readFileSync(
-        path.join(SOURCE, name), 'utf8'
-      ).replace('_type_', type)
+      updatedContent
     );
   });
+
+  if (schemaExtends) {
+    runSchemaExtends(type, schemaExtends);
+  }
 }
 
 /**
@@ -213,7 +273,10 @@ export async function startBirdBoxFromContainer(
 
   if (options.env) {
     for (const k of Object.keys(options.env)) {
-      dc = dc.withEnv(k, options.env[k]);
+      const val = options.env[k];
+      if (val) {
+        dc = dc.withEnv(k, val);
+      }
     }
   }
   if (options.log === Log.PIPE) {
@@ -506,6 +569,8 @@ export interface BirdboxOptions {
   schemaDir?: string,
   // Config file. LOCAL mode.
   cubejsConfig?: string,
+  // Allow you extend schema files. LOCAL mode.
+  schemaExtends?: SchemaExtends
 }
 
 /**
@@ -569,7 +634,7 @@ export async function getBirdbox(
   }
 
   // prepare test data
-  prepareTestData(type);
+  prepareTestData(type, options?.schemaExtends);
 
   // birdbox instantiation
   let birdbox;

@@ -41,6 +41,7 @@
     "driver:firebolt": "jest --verbose -i dist/test/driver-firebolt.test.js",
     "driver:firebolt:snap": "jest --verbose --updateSnapshot dist/test/driver-firebolt.test.js",
     "driver:postgres": "jest --verbose -i dist/test/driver-postgres.test.js",
+    "driver:postgres:new": "jest --verbose -i dist/test/driver-postgres-new.test.js",
     "driver:postgres:snap": "jest --verbose --updateSnapshot -i dist/test/driver-postgres.test.js",
     "driver:questdb": "jest --verbose -i dist/test/driver-questdb.test.js",
     "driver:questdb:snap": "jest --verbose --updateSnapshot -i dist/test/driver-questdb.test.js",
@@ -105,6 +106,7 @@
     "jest": "^26.6.3",
     "jwt-decode": "^3.1.2",
     "pg": "^8.7.3",
+    "globby": "^11.0.4",
     "typescript": "~4.1.5"
   },
   "jest": {
