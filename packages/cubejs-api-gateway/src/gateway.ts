@@ -1573,9 +1573,10 @@ class ApiGateway {
         // todo: test other data sources
         orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
-      } catch (e) {
+      } catch (e: any) {
         this.log({
           type: 'Internal Server Error on readiness probe',
+          driverType: e.driverType,
           error: (e as Error).stack || (e as Error).toString(),
         });
 
@@ -1587,6 +1588,7 @@ class ApiGateway {
       } catch (e) {
         this.log({
           type: 'Internal Server Error on readiness probe',
+          driverType: 'cache',
           error: (e as Error).stack || (e as Error).toString(),
         });
 
@@ -1602,9 +1604,10 @@ class ApiGateway {
 
     try {
       await this.dataSourceStorage.testConnections();
-    } catch (e) {
+    } catch (e: any) {
       this.log({
         type: 'Internal Server Error on liveness probe',
+        driverType: e.driverType,
         error: (e as Error).stack || (e as Error).toString(),
       });
 
@@ -1617,6 +1620,7 @@ class ApiGateway {
     } catch (e) {
       this.log({
         type: 'Internal Server Error on liveness probe',
+        driverType: 'cache',
         error: (e as Error).stack || (e as Error).toString(),
       });
 
