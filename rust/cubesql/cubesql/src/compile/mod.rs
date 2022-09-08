@@ -7077,7 +7077,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     format_type(t.oid, 4) ft4,
                     format_type(t.oid, 0) ft0,
                     format_type(t.oid, -1) ftneg,
-                    format_type(t.oid, NULL::bigint) ftnull
+                    format_type(t.oid, NULL::bigint) ftnull,
+                    format_type(cast(t.oid as text), '5') ftstr
                 FROM pg_catalog.pg_type t
                 ORDER BY t.oid ASC
                 ;
