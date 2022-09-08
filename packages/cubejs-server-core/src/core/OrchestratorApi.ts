@@ -169,14 +169,14 @@ export class OrchestratorApi {
     console.log('testConnection', this.options);
     if (this.options.rollupOnlyMode) {
       return Promise.all([
-        this.testDriverConnection(this.options.externalDriverFactory, 'external-driver'),
+        this.testDriverConnection(this.options.externalDriverFactory, 'external'),
       ]);
     } else {
       return Promise.all([
         ...Object.keys(this.seenDataSources).map(
-          ds => this.testDriverConnection(this.driverFactory, 'driver', ds),
+          ds => this.testDriverConnection(this.driverFactory, 'internal', ds),
         ),
-        this.testDriverConnection(this.options.externalDriverFactory, 'external-driver'),
+        this.testDriverConnection(this.options.externalDriverFactory, 'external'),
       ]);
     }
   }
@@ -187,7 +187,7 @@ export class OrchestratorApi {
    */
   public async testDriverConnection(
     driverFn?: DriverFactoryByDataSource,
-    driverType?: 'external-driver' | 'driver',
+    driverType?: 'external' | 'internal',
     dataSource: string = 'default',
   ) {
     if (driverFn) {
