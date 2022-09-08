@@ -20,6 +20,7 @@ import globby from 'globby';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { parse as parseYaml } from 'yaml';
 import { uniq } from 'ramda';
+import internal from 'stream';
 import { REQUIRED_ENV_VARS } from './REQUIRED_ENV_VARS';
 
 /**
@@ -215,6 +216,7 @@ function prepareTestData(type: DriverType, schemas?: Schemas) {
  */
 export interface BirdBox {
   stop: () => Promise<void>;
+  stdout: internal.Readable | null;
   configuration: {
     playgroundUrl: string;
     apiUrl: string;
@@ -238,6 +240,7 @@ export async function startBirdBoxFromContainer(
       stop: async () => {
         process.stdout.write('[Birdbox] Closed\n');
       },
+      stdout: null,
       configuration: {
         playgroundUrl: `http://${host}:${port}`,
         apiUrl: `http://${host}:${port}/cubejs-api/v1`,
@@ -321,6 +324,7 @@ export async function startBirdBoxFromContainer(
     .up();
 
   const host = '127.0.0.1';
+  const cubeStdout = await env.getContainer('birdbox-cube').logs();
   const port = env.getContainer('birdbox-cube').getMappedPort(4000);
   const playgroundPort = process.env.TEST_PLAYGROUND_PORT ?? port;
   let proxyServer: HttpProxy | null = null;
@@ -378,6 +382,7 @@ export async function startBirdBoxFromContainer(
   }
 
   return {
+    stdout: cubeStdout,
     stop: async () => {
       clearTestData(options.type);
       if (options.log === Log.PIPE) {
@@ -562,6 +567,8 @@ export async function startBirdBoxFromCli(
   }
 
   return {
+    // @ts-expect-error
+    stdout: cli.stdout,
     stop: async () => {
       clearTestData(options.type);
       if (options.log === Log.PIPE) {
