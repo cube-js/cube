@@ -101,7 +101,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public constructor(
-    conf: Partial<DatabricksDriverConfiguration>,
+    conf: Partial<DatabricksDriverConfiguration> = {},
   ) {
     const config: DatabricksDriverConfiguration = {
       ...conf,

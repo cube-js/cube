@@ -15,7 +15,7 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
     return 2;
   }
 
-  constructor(config) {
+  constructor(config = {}) {
     super();
     this.config = {
       secretArn: process.env.CUBEJS_DATABASE_SECRET_ARN || config.secretArn,
