@@ -34,6 +34,7 @@ jobs:
           EXAMPLE_SLUG: hasura-remote-schema-with-cube
           EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_CUBE_SKIP: 1
 
   angular-dashboard:
     runs-on: ubuntu-20.04
