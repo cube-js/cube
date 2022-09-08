@@ -20,22 +20,11 @@ const LineChart = ({ data /* see data tab */ }) => (
     axisTop={null}
     axisRight={null}
     axisBottom={null}
-    // axisBottom={{
-    //   orient: 'bottom',
-    //   tickSize: 5,
-    //   tickPadding: 5,
-    //   tickRotation: 0,
-    //   legend: 'Step in time',
-    //   legendOffset: 36,
-    //   legendPosition: 'middle'
-    // }}
     axisLeft={{
       orient: 'left',
       tickSize: 5,
       tickPadding: 5,
       tickRotation: 0,
-      legend: 'Sum of the transaction amount',
-      legendOffset: -70,
       legendPosition: 'middle'
     }}
     pointSize={2}
