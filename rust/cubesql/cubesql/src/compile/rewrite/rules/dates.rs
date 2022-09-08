@@ -280,7 +280,7 @@ impl RewriteRules for DateRules {
                 ),
             ),
             transforming_rewrite(
-                "binary-expr-interval-right",
+                "binary-expr-interval-add-right",
                 binary_expr("?left", "+", literal_expr("?interval")),
                 udf_expr(
                     "date_add",
@@ -289,7 +289,7 @@ impl RewriteRules for DateRules {
                 self.transform_interval_binary_expr("?interval"),
             ),
             transforming_rewrite(
-                "binary-expr-interval-left",
+                "binary-expr-interval-add-left",
                 binary_expr(literal_expr("?interval"), "+", "?right"),
                 udf_expr(
                     "date_add",
@@ -298,11 +298,38 @@ impl RewriteRules for DateRules {
                 self.transform_interval_binary_expr("?interval"),
             ),
             transforming_rewrite(
-                "interval-binary-expr-minus",
+                "binary-expr-interval-sub",
                 binary_expr("?left", "-", literal_expr("?interval")),
                 udf_expr(
                     "date_sub",
                     vec!["?left".to_string(), literal_expr("?interval")],
+                ),
+                self.transform_interval_binary_expr("?interval"),
+            ),
+            transforming_rewrite(
+                "binary-expr-interval-mul-right",
+                binary_expr("?left", "*", literal_expr("?interval")),
+                udf_expr(
+                    "interval_mul",
+                    vec![literal_expr("?interval"), "?left".to_string()],
+                ),
+                self.transform_interval_binary_expr("?interval"),
+            ),
+            transforming_rewrite(
+                "binary-expr-interval-mul-left",
+                binary_expr(literal_expr("?interval"), "*", "?right"),
+                udf_expr(
+                    "interval_mul",
+                    vec![literal_expr("?interval"), "?right".to_string()],
+                ),
+                self.transform_interval_binary_expr("?interval"),
+            ),
+            transforming_rewrite(
+                "binary-expr-interval-neg",
+                negative_expr(literal_expr("?interval")),
+                udf_expr(
+                    "interval_mul",
+                    vec![literal_expr("?interval"), literal_number(-1)],
                 ),
                 self.transform_interval_binary_expr("?interval"),
             ),

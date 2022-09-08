@@ -43,10 +43,11 @@ use self::{
             create_datediff_udf, create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf,
             create_db_udf, create_format_type_udf, create_generate_series_udtf,
             create_generate_subscripts_udtf, create_has_schema_privilege_udf, create_hour_udf,
-            create_if_udf, create_instr_udf, create_isnull_udf, create_json_build_object_udf,
-            create_least_udf, create_locate_udf, create_makedate_udf, create_measure_udaf,
-            create_minute_udf, create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
-            create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
+            create_if_udf, create_instr_udf, create_interval_mul_udf, create_isnull_udf,
+            create_json_build_object_udf, create_least_udf, create_locate_udf, create_makedate_udf,
+            create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
+            create_pg_datetime_precision_udf, create_pg_expandarray_udtf,
+            create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
             create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
             create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
@@ -1126,6 +1127,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_get_serial_sequence_udf());
         ctx.register_udf(create_json_build_object_udf());
         ctx.register_udf(create_regexp_substr_udf());
+        ctx.register_udf(create_interval_mul_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -7297,6 +7299,42 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_interval_mul() -> Result<(), CubeError> {
+        let base_timestamp = "TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')";
+        let units = vec!["year", "month", "week", "day", "hour", "minute", "second"];
+        let multiplicands = vec![1, 5, -10];
+
+        let selects = units
+            .iter()
+            .enumerate()
+            .map(|(i, unit)| {
+                let columns = multiplicands
+                    .iter()
+                    .map(|multiplicand| {
+                        format!(
+                            "{} + {} * interval '1 {}' AS \"i*{}\"",
+                            base_timestamp, multiplicand, unit, multiplicand
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                format!(
+                    "SELECT {} AS id, '{}' AS unit, {}",
+                    i,
+                    unit,
+                    columns.join(", ")
+                )
+            })
+            .collect::<Vec<_>>();
+        let query = format!("{} ORDER BY id ASC", selects.join(" UNION ALL "));
+        insta::assert_snapshot!(
+            "interval_mul",
+            execute_query(query, DatabaseProtocol::PostgreSQL).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn superset_meta_queries() -> Result<(), CubeError> {
         init_logger();
 
@@ -10842,5 +10880,51 @@ ORDER BY \"COUNT(count)\" DESC"
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_interval_mul_query() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT date_trunc('day', "order_date") AS "uuid.order_date_tg", COUNT(*) AS "count"
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE
+                "order_date" >= date_trunc('year', LOCALTIMESTAMP + -5 * interval '1 YEAR') AND
+                "order_date" < date_trunc('year', LOCALTIMESTAMP)
+            GROUP BY date_trunc('day', "order_date")
+            ORDER BY date_trunc('day', "order_date") DESC NULLS LAST
+            LIMIT 2500;
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2017-01-01T00:00:00.000Z".to_string(),
+                        "2021-12-31T23:59:59.999Z".to_string()
+                    ]))
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "desc".to_string()
+                ]]),
+                limit: Some(2500),
+                offset: None,
+                filters: None,
+            }
+        )
     }
 }
