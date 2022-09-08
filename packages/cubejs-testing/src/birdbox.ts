@@ -17,6 +17,9 @@ import {
 } from '@cubejs-backend/testing-shared';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import globby from 'globby';
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { parse as parseYaml } from 'yaml';
+import { uniq } from 'ramda';
 import { REQUIRED_ENV_VARS } from './REQUIRED_ENV_VARS';
 
 /**
@@ -46,6 +49,8 @@ interface Args {
 
 export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift';
 
+export type Schemas = string[];
+
 /**
  * Birdbox options for container mode.
  */
@@ -54,6 +59,7 @@ export interface ContainerOptions {
   env?: Record<string, string | undefined>;
   log?: Log;
   loadScript?: string;
+  schemas?: Schemas,
 }
 
 /**
@@ -101,10 +107,6 @@ const driverNameToFolderNameMapper: Record<DriverType, string> = {
  * Birdbox environments for cube.js passed for testcase.
  */
 export type Env = RequiredEnv & OptionalEnv & Record<string, string | undefined>;
-
-// Record<cubeName, {}>
-type SchemaExtends = Record<string, {heritageCubeName: string, heritageCubeNameFilePath: string}>;
-
 /**
  * List of permanent test data files.
  */
@@ -143,7 +145,11 @@ const getTargetFolder = (type: DriverType) => path.join(
   'schema',
 );
 
-const extendsFiles = globby.sync(`${path.join(SOURCE, 'extends')}/**/*.js`, { objectMode: true }).map(glob => glob.name);
+const extendsFiles = globby.sync(
+  `${SOURCE}/**/*.js`,
+  { objectMode: true, ignore: SCHEMAS.concat(FILES).map(f => path.join(SOURCE, f)) }
+)
+  .map(glob => glob.name);
 
 /**
  * Remove test data files from target directory.
@@ -157,78 +163,50 @@ function clearTestData(type: DriverType) {
   });
 }
 
-function getParentNewContent(sourceContent: string, heritageCubeName: string, index: number) {
-  return `import { ${heritageCubeName} } from './${heritageCubeName}';\n${sourceContent.slice(0, index)}  extends: ${heritageCubeName},\n${sourceContent.slice(index)}`;
-}
-
-function writeParentContent(sourceContent: string, parentCubeNname: string, heritageCubeName: string, targetFilePath: string) {
-  const re = new RegExp(`cube\\(\`${parentCubeNname}\`, {\n`, 'g');
-
-  re.test(sourceContent);
-  const newContent = getParentNewContent(sourceContent, heritageCubeName, re.lastIndex);
-
-  fs.writeFileSync(
-    targetFilePath,
-    newContent
-  );
-}
-function writeHeritageContent(type: DriverType, heritageCubeName: string, heritageCubeNameFilePath: string) {
-  const originalHeritageCubeContent = fs.readFileSync(
-    path.join(SOURCE, 'extends', `${heritageCubeNameFilePath}.js`), 'utf8'
-  );
-
+function runSchemasGeneration(type: DriverType, schemas: Schemas) {
   const targetFolder = getTargetFolder(type);
-  const updatedHeritageCubeContent = originalHeritageCubeContent.replace('_type_', type);
-  fs.writeFileSync(
-    path.join(targetFolder, `${heritageCubeName}.js`),
-    updatedHeritageCubeContent
-  );
-}
 
-function runSchemaExtends(type: DriverType, schemaExtends: SchemaExtends) {
-  const targetFolder = getTargetFolder(type);
-  const filesArray = fs.readdirSync(targetFolder);
-  filesArray.forEach(filename => {
-    const { name } = path.parse(filename);
+  schemas.forEach((s) => {
+    const originalContent = fs.readFileSync(
+      path.join(SOURCE, s), 'utf8'
+    );
 
-    if (schemaExtends[name]) {
-      const filepath = path.resolve(targetFolder, filename);
-      const sourceContent = fs.readFileSync(filepath, 'utf8');
-
-      const { heritageCubeName, heritageCubeNameFilePath } = schemaExtends[name];
-      
-      writeParentContent(sourceContent, name, heritageCubeName, filepath);
-      writeHeritageContent(type, heritageCubeName, heritageCubeNameFilePath);
-    }
+    const { base } = path.parse(s);
+    const updatedContent = originalContent.replace('_type_', type);
+    fs.writeFileSync(
+      path.join(targetFolder, base),
+      updatedContent
+    );
   });
 }
 
 /**
  * Prepare and copy test data files.
  */
-function prepareTestData(type: DriverType, schemaExtends?: SchemaExtends) {
+function prepareTestData(type: DriverType, schemas?: Schemas) {
   const targetFolder = getTargetFolder(type);
   clearTestData(type);
-  FILES.forEach((name) => {
-    fs.copySync(
-      path.join(SOURCE, name),
-      path.join(targetFolder, name),
-    );
-  });
-  SCHEMAS.forEach((name) => {
-    const originalContent = fs.readFileSync(
-      path.join(SOURCE, name), 'utf8'
-    );
-
-    const updatedContent = originalContent.replace('_type_', type);
-    fs.writeFileSync(
-      path.join(targetFolder, name),
-      updatedContent
-    );
-  });
-
-  if (schemaExtends) {
-    runSchemaExtends(type, schemaExtends);
+  
+  if (schemas) {
+    runSchemasGeneration(type, schemas);
+  } else {
+    FILES.forEach((name) => {
+      fs.copySync(
+        path.join(SOURCE, name),
+        path.join(targetFolder, name),
+      );
+    });
+    SCHEMAS.forEach((name) => {
+      const originalContent = fs.readFileSync(
+        path.join(SOURCE, name), 'utf8'
+      );
+  
+      const updatedContent = originalContent.replace('_type_', type);
+      fs.writeFileSync(
+        path.join(targetFolder, name),
+        updatedContent
+      );
+    });
   }
 }
 
@@ -285,12 +263,36 @@ export async function startBirdBoxFromContainer(
   if (process.env.BIRDBOX_CUBESTORE_VERSION === undefined) {
     process.env.BIRDBOX_CUBESTORE_VERSION = 'latest';
   }
+  
+  const composeFileName = `${options.type}.yml`;
+  const composeFilePath = path.resolve(path.dirname(__filename), '../../birdbox-fixtures/');
+  let dc: DockerComposeEnvironment;
+  if (options.schemas) {
+    const dockerComposeFileContent = fs.readFileSync(path.join(composeFilePath, composeFileName), 'utf8');
+    const yamlContent = parseYaml(dockerComposeFileContent);
 
-  const composeFile = `${options.type}.yml`;
-  let dc = new DockerComposeEnvironment(
-    path.resolve(path.dirname(__filename), '../../birdbox-fixtures/'),
-    composeFile
-  );
+    if (!yamlContent?.services?.cube?.volumes) {
+      throw new Error('there is no services.cube.volumes in your docker compose');
+    }
+
+    options.schemas.forEach(s => {
+      yamlContent.services.cube.volumes.push(`./${options.type}/schema/${s}:/cube/conf/schema/${s}`);
+    });
+    yamlContent.services.cube.volumes = uniq(yamlContent.services.cube.volumes);
+
+    const newComposeFileName = `${options.type}.json`;
+    fs.writeFileSync(path.join(composeFilePath, newComposeFileName), JSON.stringify(yamlContent));
+    
+    dc = new DockerComposeEnvironment(
+      composeFilePath,
+      newComposeFileName
+    );
+  } else {
+    dc = new DockerComposeEnvironment(
+      composeFilePath,
+      composeFileName
+    );
+  }
 
   if (options.env) {
     for (const k of Object.keys(options.env)) {
@@ -302,7 +304,7 @@ export async function startBirdBoxFromContainer(
   }
   if (options.log === Log.PIPE) {
     process.stdout.write(
-      `[Birdbox] Using ${composeFile} compose file\n`
+      `[Birdbox] Using ${composeFileName} compose file\n`
     );
   }
 
@@ -590,8 +592,7 @@ export interface BirdboxOptions {
   schemaDir?: string,
   // Config file. LOCAL mode.
   cubejsConfig?: string,
-  // Allow you extend schema files. LOCAL mode.
-  schemaExtends?: SchemaExtends
+  schemas?: Schemas,
 }
 
 /**
@@ -655,7 +656,7 @@ export async function getBirdbox(
   }
 
   // prepare test data
-  prepareTestData(type, options?.schemaExtends);
+  prepareTestData(type, options?.schemas);
 
   // birdbox instantiation
   let birdbox;
@@ -678,6 +679,7 @@ export async function getBirdbox(
           type: type === 'postgres' ? 'postgresql' : type,
           log,
           env,
+          schemas: options?.schemas,
         });
         break;
       }

@@ -25,3 +25,4 @@ birdbox-fixtures/questdb/schema/ECommerce.js
 birdbox-fixtures/questdb/schema/ECommerce.sql.js
 birdbox-fixtures/questdb/schema/Products.js
 birdbox-fixtures/questdb/schema/Products.sql.js
+birdbox-fixtures/postgresql.json

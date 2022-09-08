@@ -3,19 +3,20 @@ import cubejs, { DeeplyReadonly, Query, CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import WebSocketTransport from '@cubejs-client/ws-transport';
-import { BirdBox, BirdboxOptions, Env, getBirdbox } from '../src';
+import { uniq } from 'ramda';
+import { BirdBox, Env, getBirdbox } from '../src';
 import { DriverTest } from './driverTests/driverTest';
 
 type DriverType = 'postgres';
 
 type TestSuite = {
-  options?: BirdboxOptions,
   config?: Partial<Env>,
   type: DriverType
   tests: DriverTest<DeeplyReadonly<Query | Query[]>>[]
 };
 
-export function executeTestSuite({ type, tests, config = {}, options }: TestSuite) {
+export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
+  const testSchemas = uniq(tests.flatMap(t => t.schemas));
   describe(`${type} driver tests`, () => {
     describe(`using ${type} for the pre-aggregations`, () => {
       jest.setTimeout(60 * 5 * 1000);
@@ -35,7 +36,7 @@ export function executeTestSuite({ type, tests, config = {}, options }: TestSuit
             CUBEJS_ROLLUP_ONLY: 'false',
             ...config,
           },
-          options
+          { schemas: testSchemas }
         );
         transport = new WebSocketTransport({
           apiUrl: box.configuration.apiUrl,
@@ -52,7 +53,7 @@ export function executeTestSuite({ type, tests, config = {}, options }: TestSuit
 
       for (const t of tests) {
         // eslint-disable-next-line no-loop-func
-        test(t.name, async () => {
+        const cbFn = async () => {
           const response = await client.load(t.query);
 
           expect(response.rawData()).toMatchSnapshot('query');
@@ -62,7 +63,12 @@ export function executeTestSuite({ type, tests, config = {}, options }: TestSuit
               expectFn(response);
             }
           }
-        });
+        };
+        if (t.skip) {
+          test.skip(t.name, cbFn);
+        } else {
+          test(t.name, cbFn);
+        }
       }
     });
   });

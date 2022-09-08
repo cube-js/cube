@@ -2,6 +2,17 @@
 import { expect } from '@jest/globals';
 import { driverTest } from './driverTest';
 
+const commonSchemas = [
+  'postgresql/CommonCustomers.js',
+  'CAST.js',
+  'Customers.sql.js',
+  'ECommerce.sql.js',
+  'Products.sql.js',
+  'Customers.js',
+  'ECommerce.js',
+  'Products.js',
+];
+
 export const queryingCustomersDimensions = driverTest({
   name: 'querying Customers: dimensions',
   query: {
@@ -10,6 +21,7 @@ export const queryingCustomersDimensions = driverTest({
       'Customers.customerName'
     ],
   },
+  schemas: commonSchemas,
 });
 
 export const queryingCustomersDimensionsAndOrder = driverTest({
@@ -23,6 +35,7 @@ export const queryingCustomersDimensionsAndOrder = driverTest({
       'Customers.customerId': 'asc',
     }
   },
+  schemas: commonSchemas,
 });
 
 export const queryingCustomerDimensionsAndLimitTest = driverTest({
@@ -34,7 +47,8 @@ export const queryingCustomerDimensionsAndLimitTest = driverTest({
     ],
     limit: 10
   },
-  expectArray: [(response) => expect(response.rawData().length).toEqual(10)]
+  expectArray: [(response) => expect(response.rawData().length).toEqual(10)],
+  schemas: commonSchemas,
 });
 
 export const queryingCustomersDimensionsAndTotal = driverTest({
@@ -48,7 +62,8 @@ export const queryingCustomersDimensionsAndTotal = driverTest({
   },
   expectArray: [(response) => expect(
     response.serialize().loadResponse.results[0].total
-  ).toEqual(41)]
+  ).toEqual(41)],
+  schemas: commonSchemas,
 });
 
 export const queryingCustomersDimensionsOrderLimitTotal = driverTest({
@@ -69,7 +84,8 @@ export const queryingCustomersDimensionsOrderLimitTotal = driverTest({
     (response) => expect(
       response.serialize().loadResponse.results[0].total
     ).toEqual(41)
-  ]
+  ],
+  schemas: commonSchemas,
 });
 
 export const queryingCustomersDimensionsOrderTotalOffset = driverTest({
@@ -90,7 +106,8 @@ export const queryingCustomersDimensionsOrderTotalOffset = driverTest({
     (response) => expect(
       response.serialize().loadResponse.results[0].total
     ).toEqual(41)
-  ]
+  ],
+  schemas: commonSchemas,
 
 });
 
@@ -110,7 +127,8 @@ export const queryingCustomersDimensionsOrderLimitTotalOffset = driverTest({
   },
   expectArray: [(r) => expect(r.rawData().length).toEqual(10), (r) => expect(
     r.serialize().loadResponse.results[0].total
-  ).toEqual(41)]
+  ).toEqual(41)],
+  schemas: commonSchemas,
 });
 
 export const filteringCustomersCubeFirst = driverTest(
@@ -128,7 +146,8 @@ export const filteringCustomersCubeFirst = driverTest(
           values: ['tom'],
         },
       ],
-    }
+    },
+    schemas: commonSchemas,
 
   }
 );
@@ -148,8 +167,8 @@ export const filteringCustomersCubeSecond = driverTest(
           values: ['us', 'om'],
         },
       ],
-    }
-    
+    },
+    schemas: commonSchemas,
   }
 );
 
@@ -168,8 +187,10 @@ export const filteringCustomersCubeThird = driverTest(
           values: ['non'],
         },
       ],
-    }
+    },
+    schemas: commonSchemas,
   }
+  
 );
 
 export const filteringCustomersEndsWithFilterFirst = driverTest({
@@ -186,7 +207,8 @@ export const filteringCustomersEndsWithFilterFirst = driverTest({
         values: ['0'],
       },
     ],
-  }
+  },
+  schemas: commonSchemas,
 });
 
 export const filteringCustomersEndsWithFilterSecond = driverTest({
@@ -203,7 +225,8 @@ export const filteringCustomersEndsWithFilterSecond = driverTest({
         values: ['0', '5'],
       },
     ],
-  }
+  },
+  schemas: commonSchemas,
 });
 
 export const filteringCustomersEndsWithFilterThird = driverTest({
@@ -220,7 +243,8 @@ export const filteringCustomersEndsWithFilterThird = driverTest({
         values: ['9'],
       },
     ],
-  }
+  },
+  schemas: commonSchemas,
 });
 
 export const filteringCustomersStartsWithAndDimensionsFirst = driverTest({
@@ -237,7 +261,8 @@ export const filteringCustomersStartsWithAndDimensionsFirst = driverTest({
         values: ['A'],
       },
     ],
-  }
+  },
+  schemas: commonSchemas,
 });
 
 export const filteringCustomersStartsWithAndDimensionsSecond = driverTest({
@@ -254,7 +279,8 @@ export const filteringCustomersStartsWithAndDimensionsSecond = driverTest({
         values: ['A', 'B'],
       },
     ],
-  }
+  },
+  schemas: commonSchemas,
 });
 
 export const filteringCustomersStartsWithAndDimensionsThird = driverTest({
@@ -271,7 +297,8 @@ export const filteringCustomersStartsWithAndDimensionsThird = driverTest({
         values: ['Z'],
       },
     ],
-  }
+  },
+  schemas: commonSchemas,
 });
 
 export const filteringCustomersEndsWithFilterAndDimensionsFirst = driverTest({
@@ -289,6 +316,7 @@ export const filteringCustomersEndsWithFilterAndDimensionsFirst = driverTest({
       },
     ],
   },
+  schemas: commonSchemas,
 });
 
 export const filteringCustomersEndsWithFilterAndDimensionsSecond = driverTest({
@@ -306,6 +334,7 @@ export const filteringCustomersEndsWithFilterAndDimensionsSecond = driverTest({
       },
     ],
   },
+  schemas: commonSchemas,
 });
 
 export const filteringCustomersEndsWithFilterAndDimensionsThird = driverTest({
@@ -323,6 +352,7 @@ export const filteringCustomersEndsWithFilterAndDimensionsThird = driverTest({
       },
     ],
   },
+  schemas: commonSchemas,
 });
 
 export const queryingProductDimensions = driverTest({
@@ -335,140 +365,140 @@ export const queryingProductDimensions = driverTest({
     ]
   },
   skip: true,
+  schemas: commonSchemas,
 });
 
-// test(
-//   'querying Products: dimentions + order',
-//   async () => {
-//     const response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       }
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
-//   }
-// );
-// test(
-//   'querying Products: dimentions + order + limit',
-//   async () => {
-//     const response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       limit: 10
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
-//     expect(response.rawData().length).toEqual(10);
-//   }
-// );
-// test(
-//   'querying Products: dimentions + order + total',
-//   async () => {
-//     const response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       total: true
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
-//     expect(
-//       response.serialize().loadResponse.results[0].total
-//     ).toEqual(28);
-//   }
-// );
-// test(
-//   'querying Products: dimentions + order + limit + total',
-//   async () => {
-//     const response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       limit: 10,
-//       total: true
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
-//     expect(response.rawData().length).toEqual(10);
-//     expect(
-//       response.serialize().loadResponse.results[0].total
-//     ).toEqual(28);
-//   },
-// );
+export const queryingProductsDimensionsAndOrder = driverTest({
+  name: 'querying Products: dimentions + order',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    }
+  },
+  schemas: commonSchemas,
+});
 
-// // filtering Products cube
-// test(
-//   'filtering Products: contains + dimentions + order',
-//   async () => {
-//     let response;
-    
-//     response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       filters: [
-//         {
-//           member: 'Products.subCategory',
-//           operator: 'contains',
-//           values: ['able'],
-//         },
-//       ],
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
+export const queryingProductsDimensionsAndOrderAndLimit = driverTest({
+  name: 'querying Products: dimentions + order + limit',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    limit: 10
+  },
+  expectArray: [r => expect(r.rawData().length).toEqual(10)],
+  schemas: commonSchemas,
+});
 
-//     response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       filters: [
-//         {
-//           member: 'Products.subCategory',
-//           operator: 'contains',
-//           values: ['able', 'urn'],
-//         },
-//       ],
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
+export const queryingProductsDimensionsOrderAndTotal = driverTest({
+  name: 'querying Products: dimentions + order + total',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    total: true
+  },
+  expectArray: [
+    (r) => expect(
+      r.serialize().loadResponse.results[0].total
+    ).toEqual(28)
+  ],
+  schemas: commonSchemas,
+});
+
+export const queryingProductsDimensionsOrderAndLimitAndTotal = driverTest({
+  name: 'querying Products: dimentions + order + limit + total',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    limit: 10,
+    total: true
+  },
+  expectArray: [
+    r => expect(r.rawData().length).toEqual(10),
+    r => expect(
+      r.serialize().loadResponse.results[0].total
+    ).toEqual(28)
+  ],
+  schemas: commonSchemas,
+});
+
+export const filteringProductsContainsAndDimensionsAndOrderFirst = driverTest({
+  name: 'filtering Products: contains + dimentions + order, first',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    filters: [
+      {
+        member: 'Products.subCategory',
+        operator: 'contains',
+        values: ['able'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
+
+export const filteringProductsContainsAndDimensionsAndOrderSecond = driverTest({
+  name: 'filtering Products: contains + dimentions + order, second',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    filters: [
+      {
+        member: 'Products.subCategory',
+        operator: 'contains',
+        values: ['able', 'urn'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
 
 //     response = await client.load({
 //       dimensions: [
