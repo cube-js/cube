@@ -1,8 +1,8 @@
-import { customerDimensionsAndLimitTest } from './driverTests/tests';
+import { mainTestSet } from './driverTests/testSets';
 import { executeTestSuite } from './new-driver-test-suite';
 
 executeTestSuite({ type: 'postgres',
-  tests: [customerDimensionsAndLimitTest],
+  tests: mainTestSet,
   options: {
     schemaExtends: { Customers: { heritageCubeNameFilePath: 'postgresql/CommonCustomers', heritageCubeName: 'CommonCustomers' } }
   }
