@@ -333,8 +333,13 @@ trait Visitor<'ast, E: Error> {
         if let Some(with) = query.with.as_mut() {
             self.visit_with(with)?;
         }
+
         if let Some(limit) = query.limit.as_mut() {
             self.visit_expr_with_placeholder_type(limit, PlaceholderType::Number)?;
+        }
+
+        if let Some(offset) = query.offset.as_mut() {
+            self.visit_offset(offset)?;
         }
 
         Ok(())
@@ -344,6 +349,12 @@ trait Visitor<'ast, E: Error> {
         for cte in &mut with.cte_tables {
             self.visit_query(&mut cte.query)?;
         }
+
+        Ok(())
+    }
+
+    fn visit_offset(&mut self, offset: &mut ast::Offset) -> Result<(), E> {
+        self.visit_expr_with_placeholder_type(&mut offset.value, PlaceholderType::Number)?;
 
         Ok(())
     }
@@ -1255,6 +1266,10 @@ mod tests {
             "SELECT 1 LIMIT $1",
             vec![FoundParameter::new(ColumnType::Int64)],
         )?;
+        assert_pg_params_finder(
+            "SELECT 1 OFFSET $1",
+            vec![FoundParameter::new(ColumnType::Int64)],
+        )?;
 
         assert_pg_params_finder(
             "SELECT $1, $2, $1, $2",
@@ -1319,6 +1334,7 @@ mod tests {
     fn test_placeholder_replacer() -> Result<(), CubeError> {
         assert_placeholder_replacer("SELECT ?", "SELECT 'replaced_placeholder'")?;
         assert_placeholder_replacer("SELECT 1 LIMIT ?", "SELECT 1 LIMIT 1")?;
+        // assert_placeholder_replacer("SELECT 1 OFFSET ?", "SELECT 1 OFFSET 1")?;
 
         Ok(())
     }
