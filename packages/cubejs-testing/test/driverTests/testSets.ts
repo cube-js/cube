@@ -1,3 +1,4 @@
+import { DriverTest } from './driverTest';
 import {
   queryingCustomersDimensions,
   queryingCustomersDimensionsAndOrder,
@@ -42,6 +43,9 @@ const customersTestSet = [
   filteringCustomersEndsWithFilterAndDimensionsThird,
 ];
 
+const productsTestSet: any[] = [];
+
 export const mainTestSet = [
-  ...customersTestSet
+  ...customersTestSet,
+  ...productsTestSet
 ];

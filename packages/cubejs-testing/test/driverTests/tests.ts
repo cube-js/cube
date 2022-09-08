@@ -288,7 +288,7 @@ export const filteringCustomersEndsWithFilterAndDimensionsFirst = driverTest({
         values: ['0'],
       },
     ],
-  }, 
+  },
 });
 
 export const filteringCustomersEndsWithFilterAndDimensionsSecond = driverTest({
@@ -305,9 +305,8 @@ export const filteringCustomersEndsWithFilterAndDimensionsSecond = driverTest({
         values: ['0', '5'],
       },
     ],
-  }, 
+  },
 });
-
 
 export const filteringCustomersEndsWithFilterAndDimensionsThird = driverTest({
   name: 'filtering Customers: endsWith filter + dimensions, third',
@@ -323,9 +322,8 @@ export const filteringCustomersEndsWithFilterAndDimensionsThird = driverTest({
         values: ['9'],
       },
     ],
-  }, 
+  },
 });
-
 
 // // querying Products cube
 // test.skip(
