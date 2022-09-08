@@ -127,12 +127,12 @@ const TARGET = path.join(
   'schema',
 );
 
+const extendsFiles = globby.sync(`${path.join(SOURCE, 'extends')}/**/*.js`, { objectMode: true }).map(glob => glob.name);
+
 /**
  * Remove test data files from target directory.
  */
 function clearTestData() {
-  const extendsFiles = globby.sync(`${path.join(SOURCE, 'extends')}/**/*.js`, { objectMode: true }).map(glob => glob.name);
-
   FILES.concat(SCHEMAS).concat(extendsFiles).forEach((name) => {
     if (fs.existsSync(path.join(TARGET, name))) {
       fs.removeSync(path.join(TARGET, name));
