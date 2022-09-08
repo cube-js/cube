@@ -3217,82 +3217,26 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_select_error() {
-        let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
-            .ok()
-            .map(|v| v.parse::<bool>().unwrap())
-            .unwrap_or(false);
-        let variants = if rewrite_engine {
-            vec![
-                (
-                    "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
-                ),
-                (
-                    "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information.".to_string()),
-                ),
-            ]
-        } else {
-            vec![
-                // Count agg fn
-                (
-                    "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided".to_string()),
-                ),
-                (
-                    "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead".to_string()),
-                ),
-                // (
-                //     "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use number '2' as argument to aggregation function".to_string()),
-                // ),
-                // (
-                //     "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'COUNT()'".to_string()),
-                // ),
-                // Another aggregation functions
-                // (
-                //     "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(*) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use '*' as argument to aggregation function 'MAX()' (only COUNT() supported)".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Dimension 'order_date' was used with the aggregate function 'MAX()'. Please use a measure instead".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(minPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'minPrice' is 'MIN()' but 'MAX()' was provided".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'MAX()'".to_string()),
-                // ),
-                // Check restrictions for segments usage
-                // (
-                //     "SELECT is_male FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' as column in SELECT statement".to_string()),
-                // ),
-                // (
-                //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' in GROUP BY".to_string()),
-                // ),
-                // (
-                //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' in ORDER BY".to_string()),
-                // ),
-            ]
-        };
+        let variants = vec![
+            (
+                "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
+            ),
+            (
+                "SELECT COUNT(someNumber) FROM NumberCube".to_string(),
+                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'someNumber' is 'MEASURE()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
+            ),
+            (
+                "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information.".to_string()),
+            ),
+        ];
 
         for (input_query, expected_error) in variants.iter() {
             let query = convert_sql_to_cube_query(
                 &input_query,
                 get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::MySQL).await,
+                get_test_session(DatabaseProtocol::PostgreSQL).await,
             )
             .await;
 

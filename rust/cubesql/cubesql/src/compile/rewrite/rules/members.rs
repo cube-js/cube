@@ -1845,12 +1845,20 @@ impl MemberRules {
         alias_to_cube: Vec<((String, String), String)>,
     ) {
         if call_agg_type.is_some() && !measure.is_same_agg_type(call_agg_type.as_ref().unwrap()) {
+            let mut agg_type = measure
+                .agg_type
+                .as_ref()
+                .unwrap_or(&"unknown".to_string())
+                .to_uppercase();
+            if agg_type == "NUMBER" {
+                agg_type = "MEASURE".to_string();
+            }
             subst.insert(
                 measure_out_var,
                 add_member_error(egraph, format!(
                     "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
                     measure.get_real_name(),
-                    measure.agg_type.as_ref().unwrap_or(&"unknown".to_string()).to_uppercase(),
+                    agg_type,
                     call_agg_type.unwrap().to_uppercase(),
                 ), 1, expr, alias_to_cube),
             );
