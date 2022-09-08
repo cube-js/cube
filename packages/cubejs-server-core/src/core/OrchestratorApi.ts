@@ -4,6 +4,7 @@ import {
   QueryOrchestrator,
   ContinueWaitError,
   DriverFactoryByDataSource,
+  DriverType,
   QueryOrchestratorOptions,
 } from '@cubejs-backend/query-orchestrator';
 
@@ -169,14 +170,14 @@ export class OrchestratorApi {
     console.log('testConnection', this.options);
     if (this.options.rollupOnlyMode) {
       return Promise.all([
-        this.testDriverConnection(this.options.externalDriverFactory, 'external'),
+        this.testDriverConnection(this.options.externalDriverFactory, DriverType.external),
       ]);
     } else {
       return Promise.all([
         ...Object.keys(this.seenDataSources).map(
-          ds => this.testDriverConnection(this.driverFactory, 'internal', ds),
+          ds => this.testDriverConnection(this.driverFactory, DriverType.internal, ds),
         ),
-        this.testDriverConnection(this.options.externalDriverFactory, 'external'),
+        this.testDriverConnection(this.options.externalDriverFactory, DriverType.external),
       ]);
     }
   }
@@ -187,7 +188,7 @@ export class OrchestratorApi {
    */
   public async testDriverConnection(
     driverFn?: DriverFactoryByDataSource,
-    driverType?: 'external' | 'internal',
+    driverType?: DriverType,
     dataSource: string = 'default',
   ) {
     if (driverFn) {

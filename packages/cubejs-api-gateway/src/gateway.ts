@@ -1563,36 +1563,39 @@ class ApiGateway {
     };
   };
 
+  private handleProbeError(e: any, type: string): 'DOWN' {
+    this.log({
+      type,
+      driverType: e.driverType,
+      error: (e as Error).stack || (e as Error).toString(),
+    });
+
+    return 'DOWN';
+  }
+
   protected readiness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
 
     if (this.standalone) {
       const orchestratorApi = await this.adapterApi({});
 
+      const handleError = (e: any) => {
+        health = this.handleProbeError(e, 'Internal Server Error on readiness probe');
+      };
+
       try {
         // todo: test other data sources
         orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
       } catch (e: any) {
-        this.log({
-          type: 'Internal Server Error on readiness probe',
-          driverType: e.driverType,
-          error: (e as Error).stack || (e as Error).toString(),
-        });
-
-        return this.healthResponse(res, 'DOWN');
+        handleError(e);
+        return this.healthResponse(res, health);
       }
 
       try {
         await orchestratorApi.testOrchestratorConnections();
-      } catch (e) {
-        this.log({
-          type: 'Internal Server Error on readiness probe',
-          driverType: 'cache',
-          error: (e as Error).stack || (e as Error).toString(),
-        });
-
-        health = 'DOWN';
+      } catch (e: any) {
+        handleError(e);
       }
     }
 
@@ -1602,29 +1605,22 @@ class ApiGateway {
   protected liveness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
 
+    const handleError = (e: any) => {
+      health = this.handleProbeError(e, 'Internal Server Error on liveness probe');
+    };
+
     try {
       await this.dataSourceStorage.testConnections();
     } catch (e: any) {
-      this.log({
-        type: 'Internal Server Error on liveness probe',
-        driverType: e.driverType,
-        error: (e as Error).stack || (e as Error).toString(),
-      });
-
-      return this.healthResponse(res, 'DOWN');
+      handleError(e);
+      return this.healthResponse(res, health);
     }
 
     try {
       // @todo Optimize this moment?
       await this.dataSourceStorage.testOrchestratorConnections();
-    } catch (e) {
-      this.log({
-        type: 'Internal Server Error on liveness probe',
-        driverType: 'cache',
-        error: (e as Error).stack || (e as Error).toString(),
-      });
-
-      health = 'DOWN';
+    } catch (e: any) {
+      handleError(e);
     }
 
     return this.healthResponse(res, health);
