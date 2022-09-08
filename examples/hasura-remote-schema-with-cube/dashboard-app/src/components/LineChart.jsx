@@ -7,7 +7,7 @@ const LineChart = ({ data /* see data tab */ }) => (
     borderColor={{ from: 'color' }}
     margin={{ top: 50, right: 50, bottom: 100, left: 150 }}
     enableGridX={false}
-    enableGridY={true}
+    enableGridY={false}
     xScale={{ type: 'point' }}
     yScale={{
       type: 'linear',
@@ -19,22 +19,12 @@ const LineChart = ({ data /* see data tab */ }) => (
     yFormat=" >-$.2f"
     axisTop={null}
     axisRight={null}
-    axisBottom={{
-      orient: 'bottom',
-      tickSize: 5,
-      tickPadding: 5,
-      tickRotation: 0,
-      legend: 'Step in time',
-      legendOffset: 36,
-      legendPosition: 'middle'
-    }}
+    axisBottom={null}
     axisLeft={{
       orient: 'left',
       tickSize: 5,
       tickPadding: 5,
       tickRotation: 0,
-      legend: 'Sum of the transaction amount',
-      legendOffset: -100,
       legendPosition: 'middle'
     }}
     pointSize={2}
@@ -49,7 +39,7 @@ const LineChart = ({ data /* see data tab */ }) => (
         direction: 'row',
         justify: false,
         translateX: 0,
-        translateY: 80,
+        translateY: 40,
         itemsSpacing: 30,
         itemDirection: 'left-to-right',
         itemWidth: 80,

@@ -16,6 +16,39 @@ import _ from 'lodash';
 import LineChart from './components/LineChart';
 import LoadingIndicator from './components/LoadingIndicator'
 
+function range(start, end) {
+  const arr = [...Array(end - start + 1).keys()].map(x => x + start)
+  return arr;
+}
+
+function tablePivotCube(data) {
+  return _.reduce(_.mapValues(
+    _.groupBy(data.cube.map(({ fraud: { amountSum, step, type } }) => ({ y: amountSum, x: step, type })), 'type'),
+    list => list.map(fraud => _.omit(fraud, 'type'))
+  ), (accumulator, iterator, key) => {
+    accumulator.push({
+      id: key,
+      data: iterator
+    });
+
+    return accumulator;
+  }, [])
+}
+
+function tablePivotHasura(data) {
+  return _.reduce(_.mapValues(
+    _.groupBy(data.map(({ fraud__amount_sum, fraud__step, fraud__type }) => ({ y: fraud__amount_sum, x: fraud__step, type: fraud__type })), 'type'),
+    list => list.map(fraud => _.omit(fraud, 'type'))
+  ), (accumulator, iterator, key) => {
+    accumulator.push({
+      id: key,
+      data: iterator
+    });
+
+    return accumulator;
+  }, [])
+}
+
 const httpLink = createHttpLink({
   uri: `${process.env.HASURA_GRAPHQL_API_URL}`,
 });
@@ -23,7 +56,7 @@ const authLink = setContext((_, { headers }) => {
   return {
     headers: {
       ...headers,
-      'x-hasura-admin-secret': `${process.env.X_HASURA_ADMIN_SECRET}`,
+      'x-hasura-role': `${process.env.X_HASURA_ROLE}`,
     }
   }
 });
@@ -55,28 +88,32 @@ const availableStepRanges = [
   { id: 12, start: 600, end: 650 },
   { id: 13, start: 650, end: 700 },
   { id: 14, start: 700, end: 750 },
-  { id: 15, start: 750, end: 800 },
 ];
 
 const defaultStepSelection = 1;
-const defaultIsFraudSelection = 0;
+const defaultIsFraudSelection = 1;
 
 function App() {
-  const [ fraudChartData, setFraudChartData ] = useState([])
+  const [ fraudChartDataCube, setFraudChartDataCube ] = useState([])
+  const [ fraudChartDataHasura, setFraudChartDataHasura ] = useState([])
 
   const [ stepSelection, setStepSelection ] = useState(defaultStepSelection);
   const selectedStep = availableStepRanges.find(x => x.id === stepSelection);
+  const selectedStepRange = range(selectedStep.start, selectedStep.end);
 
   const [ isFraudSelection, setIsFraudSelection ] = useState(defaultIsFraudSelection);
 
-  const GET_FRAUD_AMOUNT_SUM_DYNAMIC = gql`
+  const GET_FRAUD_AMOUNT_SUM_CUBE_REMOTE_SCHEMA = gql`
     query CubeQuery  { 
-      cube(where: {fraud: {AND: [
-        {step: {gte: ${selectedStep.start} }},
-        {step: {lte: ${selectedStep.end} }},
-        {isFraud: {equals: "${isFraudSelection}" }}
-      ]}}) {
-        fraud(orderBy: {step: asc}) {
+      cube(
+        where: {fraud: {AND: [
+          {step: {gte: ${selectedStep.start} }},
+          {step: {lte: ${selectedStep.end} }},
+          {isFraud: {equals: "${isFraudSelection}" }}
+        ]}},
+        orderBy: {fraud: {step: asc}}
+      ) {
+        fraud {
           amountSum
           step
           type
@@ -84,38 +121,91 @@ function App() {
       }
     }
   `;
-
-  const { loading, error, data: fraudData } = useQuery(GET_FRAUD_AMOUNT_SUM_DYNAMIC);
+  const { loading: loadingFraudDataCube, error: errorFraudDataCube, data: fraudDataCube } = useQuery(GET_FRAUD_AMOUNT_SUM_CUBE_REMOTE_SCHEMA);
   useEffect(() => {
-    if (fraudData) {
-      setFraudChartData(
-        _.reduce(_.mapValues(
-          _.groupBy(fraudData.cube.map(({ fraud: { amountSum, step, type } }) => ({ y: amountSum, x: step, type })), 'type'),
-          list => list.map(fraud => _.omit(fraud, 'type'))
-        ), (accumulator, iterator, key) => {
-          accumulator.push({
-            id: key,
-            data: iterator
-          });
-
-          return accumulator;
-        }, [])
+    if (fraudDataCube) {
+      setFraudChartDataCube(
+        tablePivotCube(fraudDataCube)
       )
     }
-  }, [ fraudData ])
+  }, [ fraudDataCube ])
+  function DisplayFraudAmountSumCube() {
+    if (loadingFraudDataCube) return <LoadingIndicator />;
 
-  function DisplayFraudAmountSum() {
-    if (loading) return <LoadingIndicator />;
-
-    if (error) {
-      console.error(error);
+    if (errorFraudDataCube) {
+      console.error(errorFraudDataCube);
       return <p>Error :( </p>;
     }
 
-    console.log(fraudChartData);
     return (
       <LineChart
-        data={fraudChartData}
+        data={fraudChartDataCube}
+      />
+    );
+  }
+
+  const GET_FRAUD_AMOUNT_SUM_HASURA_FRAUDS = gql`
+    query HasuraQuery{
+      fraud_amount_sum_frauds(
+        where: {
+          fraud__step: {_in: [${selectedStepRange}]}
+        }
+        order_by: { fraud__step: asc }
+      ) {
+        fraud__amount_sum
+        fraud__step
+        fraud__type
+      }
+    }
+  `;
+  const GET_FRAUD_AMOUNT_SUM_HASURA_NON_FRAUDS = gql`
+    query HasuraQuery{
+      fraud_amount_sum_non_frauds(
+        where: {
+          fraud__step: {_in: [${selectedStepRange}]}
+        }
+        order_by: { fraud__step: asc }
+      ) {
+        fraud__amount_sum
+        fraud__step
+        fraud__type
+      }
+    }
+  `;
+  let GET_FRAUD_AMOUNT_SUM_HASURA;
+  if (isFraudSelection) {
+    GET_FRAUD_AMOUNT_SUM_HASURA = GET_FRAUD_AMOUNT_SUM_HASURA_FRAUDS;
+  } else {
+    GET_FRAUD_AMOUNT_SUM_HASURA = GET_FRAUD_AMOUNT_SUM_HASURA_NON_FRAUDS;
+  }
+
+  const { loading: loadingFraudChartDataHasura, error: errorFraudChartDataHasura, data: fraudDataHasura } = useQuery(GET_FRAUD_AMOUNT_SUM_HASURA);
+  useEffect(() => {
+    if (fraudDataHasura) {
+      if (isFraudSelection) {
+        setFraudChartDataHasura(
+          tablePivotHasura(fraudDataHasura.fraud_amount_sum_frauds)
+        )
+      } else {  
+        setFraudChartDataHasura(
+          tablePivotHasura(fraudDataHasura.fraud_amount_sum_non_frauds)
+        )
+      }
+    }
+  }, [ fraudDataHasura ])
+
+  
+  function DisplayFraudAmountSumHasura() {
+    if (loadingFraudChartDataHasura) return <LoadingIndicator />;
+
+    if (errorFraudChartDataHasura) {
+      console.error(errorFraudChartDataHasura);
+      return <p>Error :( </p>;
+    }
+
+    return (
+      <LineChart
+        data={fraudChartDataHasura}
       />
     );
   }
@@ -161,8 +251,15 @@ function App() {
           </Form.Group>
         </Form>
       </Row>
-      <Row className='mb-12' style={{ height: '400px', margin: '0px' }}>
-        <DisplayFraudAmountSum />
+      <Row className='mb-12' style={{ height: '400px', margin: '50px 0' }}>
+        <Col md={{ span: 6 }} style={{ height: '400px', margin: '0px' }}>
+          <h3 style={{display: 'flex', justifyContent: 'center'}}>Cube</h3>
+          <DisplayFraudAmountSumCube />
+        </Col>
+        <Col md={{ span: 6 }} style={{ height: '400px', margin: '0px' }}>         
+          <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura</h3>
+          <DisplayFraudAmountSumHasura />
+        </Col>
       </Row>
     </Container>
   </>
