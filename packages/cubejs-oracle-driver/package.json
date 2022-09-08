@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/oracle-driver",
   "description": "Cube.js oracle database driver",
   "author": "Trikoz I.",
-  "version": "0.30.63",
+  "version": "0.30.66",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",

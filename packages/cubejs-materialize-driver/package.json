@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/materialize-driver",
   "description": "Cube.js Materialize database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.65",
+  "version": "0.30.66",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
