@@ -72,7 +72,9 @@ impl MetaStoreFs for RocksMetaStoreFs {
                         .await?;
                     }
 
-                    return self.create_and_check_store(path, config, snapshot).await;
+                    return self
+                        .create_and_check_store(path, config, Some(snapshot))
+                        .await;
                 }
             } else {
                 trace!("Can't find metastore-current in {:?}", self.remote_fs);
@@ -82,11 +84,7 @@ impl MetaStoreFs for RocksMetaStoreFs {
             info!("Using existing metastore in {}", path);
         }
 
-        let meta_store = RocksMetaStore::new(path, self.clone(), config);
-
-        RocksMetaStore::check_all_indexes(&meta_store).await?;
-
-        Ok(meta_store)
+        return self.create_and_check_store(path, config, None).await;
     }
 
     async fn upload_log(
@@ -268,10 +266,12 @@ impl RocksMetaStoreFs {
         self: &Arc<Self>,
         path: &str,
         config: Arc<dyn ConfigObj>,
-        snapshot: u128,
+        snapshot: Option<u128>,
     ) -> Result<Arc<RocksMetaStore>, CubeError> {
         let meta_store = RocksMetaStore::new(path, self.clone(), config);
-        self.load_metastore_logs(snapshot, &meta_store).await?;
+        if let Some(snapshot) = snapshot {
+            self.load_metastore_logs(snapshot, &meta_store).await?;
+        }
         RocksMetaStore::check_all_indexes(&meta_store).await?;
 
         Ok(meta_store)
