@@ -172,21 +172,351 @@ export const filteringCustomersCubeThird = driverTest(
   }
 );
 
+export const filteringCustomersEndsWithFilterFirst = driverTest({
+  name: 'filtering Customers: endsWith filter + dimensions, first',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'endsWith',
+        values: ['0'],
+      },
+    ],
+  }
+});
+
+export const filteringCustomersEndsWithFilterSecond = driverTest({
+  name: 'filtering Customers: endsWith filter + dimensions, second',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'endsWith',
+        values: ['0', '5'],
+      },
+    ],
+  }
+});
+
+export const filteringCustomersEndsWithFilterThird = driverTest({
+  name: 'filtering Customers: endsWith filter + dimensions, third',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'endsWith',
+        values: ['9'],
+      },
+    ],
+  }
+});
+
+export const filteringCustomersStartsWithAndDimensionsFirst = driverTest({
+  name: 'filtering Customers: startsWith + dimensions, first',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'startsWith',
+        values: ['A'],
+      },
+    ],
+  }
+});
+
+export const filteringCustomersStartsWithAndDimensionsSecond = driverTest({
+  name: 'filtering Customers: startsWith + dimensions, second',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'startsWith',
+        values: ['A', 'B'],
+      },
+    ],
+  }
+});
+
+export const filteringCustomersStartsWithAndDimensionsThird = driverTest({
+  name: 'filtering Customers: startsWith + dimensions, third',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'startsWith',
+        values: ['Z'],
+      },
+    ],
+  }
+});
+
+export const filteringCustomersEndsWithFilterAndDimensionsFirst = driverTest({
+  name: 'filtering Customers: endsWith filter + dimensions, first',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'endsWith',
+        values: ['0'],
+      },
+    ],
+  }, 
+});
+
+export const filteringCustomersEndsWithFilterAndDimensionsSecond = driverTest({
+  name: 'filtering Customers: endsWith filter + dimensions, second',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'endsWith',
+        values: ['0', '5'],
+      },
+    ],
+  }, 
+});
+
+
+export const filteringCustomersEndsWithFilterAndDimensionsThird = driverTest({
+  name: 'filtering Customers: endsWith filter + dimensions, third',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'endsWith',
+        values: ['9'],
+      },
+    ],
+  }, 
+});
+
+
+// // querying Products cube
+// test.skip(
+//   'querying Products: dimensions -- doesn\'t work wo ordering',
+//   async () => {
+//     const response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ]
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+//   }
+// );
 // test(
-//   'filtering Customers: startsWith + dimensions',
+//   'querying Products: dimentions + order',
+//   async () => {
+//     const response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       }
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+//   }
+// );
+// test(
+//   'querying Products: dimentions + order + limit',
+//   async () => {
+//     const response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
+//       limit: 10
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+//     expect(response.rawData().length).toEqual(10);
+//   }
+// );
+// test(
+//   'querying Products: dimentions + order + total',
+//   async () => {
+//     const response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
+//       total: true
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+//     expect(
+//       response.serialize().loadResponse.results[0].total
+//     ).toEqual(28);
+//   }
+// );
+// test(
+//   'querying Products: dimentions + order + limit + total',
+//   async () => {
+//     const response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
+//       limit: 10,
+//       total: true
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+//     expect(response.rawData().length).toEqual(10);
+//     expect(
+//       response.serialize().loadResponse.results[0].total
+//     ).toEqual(28);
+//   },
+// );
+
+// // filtering Products cube
+// test(
+//   'filtering Products: contains + dimentions + order',
+//   async () => {
+//     let response;
+    
+//     response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
+//       filters: [
+//         {
+//           member: 'Products.subCategory',
+//           operator: 'contains',
+//           values: ['able'],
+//         },
+//       ],
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+
+//     response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
+//       filters: [
+//         {
+//           member: 'Products.subCategory',
+//           operator: 'contains',
+//           values: ['able', 'urn'],
+//         },
+//       ],
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+
+//     response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
+//       filters: [
+//         {
+//           member: 'Products.subCategory',
+//           operator: 'contains',
+//           values: ['notexist'],
+//         },
+//       ],
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+//   }
+// );
+// test(
+//   'filtering Products: startsWith filter + dimentions + order',
 //   async () => {
 //     let response;
 
 //     response = await client.load({
 //       dimensions: [
-//         'Customers.customerId',
-//         'Customers.customerName'
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
 //       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
 //       filters: [
 //         {
-//           member: 'Customers.customerId',
+//           member: 'Products.productName',
 //           operator: 'startsWith',
-//           values: ['A'],
+//           values: ['O'],
 //         },
 //       ],
 //     });
@@ -194,14 +524,20 @@ export const filteringCustomersCubeThird = driverTest(
 
 //     response = await client.load({
 //       dimensions: [
-//         'Customers.customerId',
-//         'Customers.customerName'
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
 //       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
 //       filters: [
 //         {
-//           member: 'Customers.customerId',
+//           member: 'Products.productName',
 //           operator: 'startsWith',
-//           values: ['A', 'B'],
+//           values: ['O', 'K'],
 //         },
 //       ],
 //     });
@@ -209,14 +545,89 @@ export const filteringCustomersCubeThird = driverTest(
 
 //     response = await client.load({
 //       dimensions: [
-//         'Customers.customerId',
-//         'Customers.customerName'
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
 //       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
 //       filters: [
 //         {
-//           member: 'Customers.customerId',
+//           member: 'Products.productName',
 //           operator: 'startsWith',
-//           values: ['Z'],
+//           values: ['noneexist'],
+//         },
+//       ],
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+//   }
+// );
+// test(
+//   'filtering Products: endsWith filter + dimentions + order',
+//   async () => {
+//     let response;
+
+//     response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
+//       filters: [
+//         {
+//           member: 'Products.subCategory',
+//           operator: 'endsWith',
+//           values: ['es'],
+//         },
+//       ],
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+
+//     response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
+//       filters: [
+//         {
+//           member: 'Products.subCategory',
+//           operator: 'endsWith',
+//           values: ['es', 'gs'],
+//         },
+//       ],
+//     });
+//     expect(response.rawData()).toMatchSnapshot('query');
+
+//     response = await client.load({
+//       dimensions: [
+//         'Products.category',
+//         'Products.subCategory',
+//         'Products.productName'
+//       ],
+//       order: {
+//         'Products.category': 'asc',
+//         'Products.subCategory': 'asc',
+//         'Products.productName': 'asc'
+//       },
+//       filters: [
+//         {
+//           member: 'Products.subCategory',
+//           operator: 'endsWith',
+//           values: ['noneexist'],
 //         },
 //       ],
 //     });

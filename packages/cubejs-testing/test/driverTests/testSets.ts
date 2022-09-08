@@ -8,10 +8,19 @@ import {
   queryingCustomersDimensionsOrderLimitTotalOffset,
   filteringCustomersCubeFirst,
   filteringCustomersCubeSecond,
-  filteringCustomersCubeThird
+  filteringCustomersCubeThird,
+  filteringCustomersEndsWithFilterFirst,
+  filteringCustomersEndsWithFilterSecond,
+  filteringCustomersEndsWithFilterThird,
+  filteringCustomersStartsWithAndDimensionsFirst,
+  filteringCustomersStartsWithAndDimensionsSecond,
+  filteringCustomersStartsWithAndDimensionsThird,
+  filteringCustomersEndsWithFilterAndDimensionsFirst,
+  filteringCustomersEndsWithFilterAndDimensionsSecond,
+  filteringCustomersEndsWithFilterAndDimensionsThird,
 } from './tests';
 
-export const mainTestSet = [
+const customersTestSet = [
   queryingCustomersDimensions,
   queryingCustomersDimensionsAndOrder,
   queryingCustomerDimensionsAndLimitTest,
@@ -21,5 +30,18 @@ export const mainTestSet = [
   queryingCustomersDimensionsOrderLimitTotalOffset,
   filteringCustomersCubeFirst,
   filteringCustomersCubeSecond,
-  filteringCustomersCubeThird
+  filteringCustomersCubeThird,
+  filteringCustomersEndsWithFilterFirst,
+  filteringCustomersEndsWithFilterSecond,
+  filteringCustomersEndsWithFilterThird,
+  filteringCustomersStartsWithAndDimensionsFirst,
+  filteringCustomersStartsWithAndDimensionsSecond,
+  filteringCustomersStartsWithAndDimensionsThird,
+  filteringCustomersEndsWithFilterAndDimensionsFirst,
+  filteringCustomersEndsWithFilterAndDimensionsSecond,
+  filteringCustomersEndsWithFilterAndDimensionsThird,
+];
+
+export const mainTestSet = [
+  ...customersTestSet
 ];
