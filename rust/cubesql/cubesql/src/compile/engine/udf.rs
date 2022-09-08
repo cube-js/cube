@@ -676,6 +676,46 @@ pub fn create_timediff_udf() -> ScalarUDF {
     )
 }
 
+// https://docs.aws.amazon.com/redshift/latest/dg/r_DATEDIFF_function.html
+pub fn create_datediff_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "datediff is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "datediff",
+        &Signature::any(3, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+// https://docs.aws.amazon.com/redshift/latest/dg/r_DATEADD_function.html
+pub fn create_dateadd_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "dateadd is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "dateadd",
+        &Signature::any(3, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_time_format_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2);
@@ -1283,7 +1323,12 @@ pub fn create_to_char_udf() -> ScalarUDF {
                     parse_timestamp_arr!(arr, TimestampSecondArray, seconds),
                     str.clone().unwrap_or_default(),
                 ),
-                _ => (None, "".to_string()),
+                dt => {
+                    return Err(DataFusionError::Execution(format!(
+                        "unsupported date type for to_char, actual: {}",
+                        dt
+                    )))
+                }
             };
 
             if durations.is_none() {
@@ -2302,23 +2347,36 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
 
 pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 3);
+        let (users, schemas, privileges) = if args.len() == 3 {
+            (
+                Some(downcast_string_arg!(args[0], "user", i32)),
+                downcast_string_arg!(args[1], "schema", i32),
+                downcast_string_arg!(args[2], "privilege", i32),
+            )
+        } else {
+            (
+                None,
+                downcast_string_arg!(args[0], "schema", i32),
+                downcast_string_arg!(args[1], "privilege", i32),
+            )
+        };
 
-        let users = downcast_string_arg!(args[0], "user", i32);
-        let schemas = downcast_string_arg!(args[1], "schema", i32);
-        let privileges = downcast_string_arg!(args[2], "privilege", i32);
-
-        let result = izip!(users, schemas, privileges)
-            .map(|args| {
+        let result = izip!(schemas, privileges)
+            .enumerate()
+            .map(|(i, args)| {
                 Ok(match args {
-                    (Some(user), Some(schema), Some(privilege)) => {
-                        if let Some(session_user) = state.user() {
-                            if user != session_user {
-                                return Err(DataFusionError::Execution(format!(
-                                    "role \"{}\" does not exist",
-                                    user
-                                )));
+                    (Some(schema), Some(privilege)) => {
+                        match (users, state.user()) {
+                            (Some(users), Some(session_user)) => {
+                                let user = users.value(i);
+                                if user != session_user {
+                                    return Err(DataFusionError::Execution(format!(
+                                        "role \"{}\" does not exist",
+                                        user
+                                    )));
+                                }
                             }
+                            _ => (),
                         }
 
                         match schema {
@@ -2354,8 +2412,11 @@ pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
 
     ScalarUDF::new(
         "has_schema_privilege",
-        &Signature::exact(
-            vec![DataType::Utf8, DataType::Utf8, DataType::Utf8],
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Utf8]),
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+            ],
             Volatility::Immutable,
         ),
         &return_type,

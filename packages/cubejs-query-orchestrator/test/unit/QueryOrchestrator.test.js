@@ -748,8 +748,9 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(internalPreAggregation);
     await queryOrchestrator.fetchQuery(externalPreAggregation);
     await queryOrchestrator.fetchQuery(internalPreAggregation);
+    await queryOrchestrator.fetchQuery(externalPreAggregation);
     console.log(mockDriver.tables);
-    expect(mockDriver.tables.length).toBe(2);
+    expect(mockDriver.tables.length).toBe(1);
   });
 
   test('pre-aggregation version entries', async () => {
@@ -1040,8 +1041,7 @@ describe('QueryOrchestrator', () => {
     await expect(async () => {
       await queryOrchestratorExternalRefresh.fetchQuery(query);
     }).rejects.toThrow(
-      'No pre-aggregation partitions were built yet for the pre-aggregation serving this query. ' +
-      'Please make sure your refresh worker is configured correctly and running.'
+      /refresh worker/
     );
   });
 

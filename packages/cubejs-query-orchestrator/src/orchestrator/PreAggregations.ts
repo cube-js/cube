@@ -879,6 +879,11 @@ export class PreAggregationLoader {
         }
       }
     } finally {
+      const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
+      const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
+      if (mappedActualTables.includes(targetTableName)) {
+        await client.dropTable(targetTableName);
+      }
       // We must clean orphaned in any cases: success or exception
       await this.loadCache.fetchTables(this.preAggregation);
       await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
@@ -1326,8 +1331,7 @@ export class PreAggregationPartitionRangeLoader {
       if (this.options.externalRefresh && loadResults.length === 0) {
         throw new Error(
           'No pre-aggregation partitions were built yet for the pre-aggregation serving this query. ' +
-          'Please make sure your refresh worker is configured ' +
-          'correctly and running.'
+          'Please ensure your refresh worker is configured correctly, running, and has already built this pre-aggregation.'
         );
       }
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);

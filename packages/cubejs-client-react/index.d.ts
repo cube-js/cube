@@ -656,9 +656,11 @@ declare module '@cubejs-client/react' {
     sourceAxis: TSourceAxis;
     destinationAxis: TSourceAxis;
   };
+  
   type PivotConfigExtraUpdateFields = {
     limit?: number;
   };
+  
   type PivotConfigUpdater = {
     moveItem: (args: PivotConfigUpdaterArgs) => void;
     update: (pivotConfig: PivotConfig & PivotConfigExtraUpdateFields) => void;

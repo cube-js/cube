@@ -1,0 +1,26 @@
+{
+  "name": "wikipedia-outliers",
+  "version": "1.0.0",
+  "license": "MIT",
+  "scripts": {
+    "dev": "parcel src/index.html",
+    "build": "parcel build src/index.html"
+  },
+  "devDependencies": {
+    "parcel": "^2.6.2",
+    "process": "^0.11.10"
+  },
+  "dependencies": {
+    "@apollo/client": "^3.6.9",
+    "@nivo/colors": "^0.79.1",
+    "@nivo/core": "^0.79.0",
+    "@nivo/line": "^0.79.1",
+    "bootstrap": "^5.2.0",
+    "cube-example-wrapper": "^1.0.26",
+    "graphql": "^16.6.0",
+    "lodash": "^4.17.21",
+    "react": "^18.2.0",
+    "react-bootstrap": "^2.5.0",
+    "react-dom": "^18.2.0"
+  }
+}

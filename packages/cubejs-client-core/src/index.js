@@ -280,15 +280,6 @@ class CubejsApi {
     });
   }
 
-  /**
-   * Fetch data for the passed `query`. Operates with the
-   * `ApiGateway#load` method to fetch the data.
-   * @param {Query | Query[]} query
-   * @param {LoadMethodOptions | undefined} options
-   * @param {LoadMethodCallback<ResultSet> | undefined} callback
-   * @param {string} responseFormat
-   * @returns {undefined | Promise<ResultSet>}
-   */
   load(query, options, callback, responseFormat = ResultType.DEFAULT) {
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
@@ -308,16 +299,6 @@ class CubejsApi {
     );
   }
 
-  /**
-   * Allows you to fetch data and receive updates over time. Operates
-   * with the `ApiGateway#load` method to fetch the data.
-   * @link real-time-data-fetch
-   * @param {Query | Query[]} query
-   * @param {LoadMethodOptions | null} options
-   * @param {LoadMethodCallback<ResultSet> | undefined} callback
-   * @param {string} responseFormat
-   * @returns {void}
-   */
   subscribe(query, options, callback, responseFormat = ResultType.DEFAULT) {
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {

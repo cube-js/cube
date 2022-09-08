@@ -3,9 +3,9 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             agg_fun_expr, analysis::LogicalPlanAnalysis, binary_expr, cast_expr, column_expr,
-            fun_expr, literal_expr, literal_string, negative_expr, rewrite, rewriter::RewriteRules,
-            to_day_interval_expr, transforming_rewrite, udf_expr, CastExprDataType,
-            LiteralExprValue, LogicalPlanLanguage,
+            fun_expr, literal_expr, literal_number, literal_string, negative_expr, rewrite,
+            rewriter::RewriteRules, to_day_interval_expr, transforming_rewrite, udf_expr,
+            CastExprDataType, LiteralExprValue, LogicalPlanLanguage,
         },
     },
     var, var_iter,
@@ -21,7 +21,7 @@ pub struct DateRules {
 impl RewriteRules for DateRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
         vec![
-            // TODO ?interval ?one
+            // TODO ?interval
             rewrite(
                 "superset-quarter-to-date-trunc",
                 binary_expr(
@@ -30,7 +30,7 @@ impl RewriteRules for DateRules {
                             "makedate",
                             vec![
                                 udf_expr("year", vec![column_expr("?column")]),
-                                literal_expr("?one"),
+                                literal_number(1),
                             ],
                         ),
                         "+",
@@ -50,7 +50,7 @@ impl RewriteRules for DateRules {
                     vec![literal_string("quarter"), column_expr("?column")],
                 ),
             ),
-            // TODO ?one ?interval
+            // TODO ?interval
             rewrite(
                 "superset-week-to-date-trunc",
                 udf_expr(
@@ -69,7 +69,7 @@ impl RewriteRules for DateRules {
                                         )],
                                     ),
                                     "-",
-                                    literal_expr("?one"),
+                                    literal_number(1),
                                 ),
                                 literal_string("day"),
                             ),
@@ -81,7 +81,6 @@ impl RewriteRules for DateRules {
                     vec![literal_string("week"), column_expr("?column")],
                 ),
             ),
-            // TODO ?one ?interval
             rewrite(
                 "superset-month-to-date-trunc",
                 udf_expr(
@@ -94,7 +93,7 @@ impl RewriteRules for DateRules {
                                 binary_expr(
                                     udf_expr("dayofmonth", vec![column_expr("?column")]),
                                     "-",
-                                    literal_expr("?one"),
+                                    literal_number(1),
                                 ),
                                 literal_string("day"),
                             ),
@@ -106,7 +105,6 @@ impl RewriteRules for DateRules {
                     vec![literal_string("month"), column_expr("?column")],
                 ),
             ),
-            // TODO ?one ?interval
             rewrite(
                 "superset-year-to-date-trunc",
                 udf_expr(
@@ -119,7 +117,7 @@ impl RewriteRules for DateRules {
                                 binary_expr(
                                     udf_expr("dayofyear", vec![column_expr("?column")]),
                                     "-",
-                                    literal_expr("?one"),
+                                    literal_number(1),
                                 ),
                                 literal_string("day"),
                             ),
@@ -131,7 +129,6 @@ impl RewriteRules for DateRules {
                     vec![literal_string("year"), column_expr("?column")],
                 ),
             ),
-            // TODO ?one ?interval
             rewrite(
                 "superset-hour-to-date-trunc",
                 udf_expr(
@@ -149,7 +146,6 @@ impl RewriteRules for DateRules {
                     vec![literal_string("hour"), column_expr("?column")],
                 ),
             ),
-            // TODO ?sixty
             rewrite(
                 "superset-minute-to-date-trunc",
                 udf_expr(
@@ -161,7 +157,7 @@ impl RewriteRules for DateRules {
                                 binary_expr(
                                     udf_expr("hour", vec![column_expr("?column")]),
                                     "*",
-                                    "?sixty",
+                                    literal_number(60),
                                 ),
                                 "+",
                                 udf_expr("minute", vec![column_expr("?column")]),
@@ -175,7 +171,6 @@ impl RewriteRules for DateRules {
                     vec![literal_string("minute"), column_expr("?column")],
                 ),
             ),
-            // TODO ?sixty
             rewrite(
                 "superset-second-to-date-trunc",
                 udf_expr(
@@ -188,17 +183,17 @@ impl RewriteRules for DateRules {
                                     binary_expr(
                                         udf_expr("hour", vec![column_expr("?column")]),
                                         "*",
-                                        "?sixty",
+                                        literal_number(60),
                                     ),
                                     "*",
-                                    "?sixty",
+                                    literal_number(60),
                                 ),
                                 "+",
                                 binary_expr(
                                     binary_expr(
                                         udf_expr("minute", vec![column_expr("?column")]),
                                         "*",
-                                        "?sixty",
+                                        literal_number(60),
                                     ),
                                     "+",
                                     udf_expr("second", vec![column_expr("?column")]),

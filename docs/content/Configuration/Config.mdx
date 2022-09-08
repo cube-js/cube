@@ -80,6 +80,7 @@ interface CubejsConfiguration {
     | OrchestratorOptions
     | ((context: RequestContext) => OrchestratorOptions);
   allowJsDuplicatePropsInSchema: boolean;
+  initApp: (app: ExpressApplication) => void;
 }
 
 interface OrchestratorOptions {
@@ -712,6 +713,37 @@ module.exports = {
 };
 ```
 
+### <--{"id" : "Options Reference"}--> allowJsDuplicatePropsInSchema
+
+Boolean to enable or disable a check duplicate property names in all objects of
+a schema. The default value is `false`, and it is means the compiler would use
+the additional transpiler for check duplicates.
+
+### <--{"id" : "Options Reference"}--> initApp
+
+<WarningBox>
+
+This configuration option is likely to change in future versions of Cube
+
+</WarningBox>
+
+This function allows you to extend the Cube API server with custom Express
+middleware. This is especially useful for adding monitoring and observability
+solutions.
+
+```typescript
+const myCustomMiddleware = (req, res, next) => {
+  req.foo = 'bar';
+  next();
+};
+
+module.exports = {
+  initApp: (app) => {
+    app.use(myCustomMiddleware);
+  },
+};
+```
+
 ## QueueOptions
 
 Timeout and interval options' values are in seconds.
@@ -756,12 +788,6 @@ module.exports = {
   repositoryFactory: ({ securityContext }) => new ApiFileRepository(),
 };
 ```
-
-### <--{"id" : "SchemaFileRepository"}--> allowJsDuplicatePropsInSchema
-
-Boolean to enable or disable a check duplicate property names in all objects of
-a schema. The default value is `false`, and it is means the compiler would use
-the additional transpiler for check duplicates.
 
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported
