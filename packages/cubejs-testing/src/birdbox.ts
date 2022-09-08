@@ -44,11 +44,13 @@ interface Args {
   log: Log,
 }
 
+export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift';
+
 /**
  * Birdbox options for container mode.
  */
 export interface ContainerOptions {
-  type: string;
+  type: DriverType;
   env?: Record<string, string | undefined>;
   log?: Log;
   loadScript?: string;
@@ -79,6 +81,20 @@ type OptionalEnv = {
   CUBEJS_PG_SQL_PORT?: string,
   CUBEJS_SQL_PASSWORD?: string,
   CUBEJS_SQL_SUPER_USER?: string,
+};
+
+const driverNameToFolderNameMapper: Record<DriverType, string> = {
+  postgresql: 'postgresql',
+  postgres: 'postgresql',
+  multidb: 'postgresql',
+  materialize: 'postgresql',
+  crate: 'postgresql',
+  bigquery: 'postgresql',
+  athena: 'postgresql',
+  'postgresql-cubestore': 'postgresql',
+  firebolt: 'postgresql',
+  questdb: 'postgresql',
+  redshift: 'postgresql',
 };
 
 /**
@@ -120,10 +136,10 @@ const SOURCE = path.join(
 /**
  * Test data files target source.
  */
-const TARGET = path.join(
+const getTargetFolder = (type: DriverType) => path.join(
   process.cwd(),
   'birdbox-fixtures',
-  'postgresql',
+  driverNameToFolderNameMapper[type],
   'schema',
 );
 
@@ -132,10 +148,11 @@ const extendsFiles = globby.sync(`${path.join(SOURCE, 'extends')}/**/*.js`, { ob
 /**
  * Remove test data files from target directory.
  */
-function clearTestData() {
+function clearTestData(type: DriverType) {
+  const targetFolder = getTargetFolder(type);
   FILES.concat(SCHEMAS).concat(extendsFiles).forEach((name) => {
-    if (fs.existsSync(path.join(TARGET, name))) {
-      fs.removeSync(path.join(TARGET, name));
+    if (fs.existsSync(path.join(targetFolder, name))) {
+      fs.removeSync(path.join(targetFolder, name));
     }
   });
 }
@@ -155,24 +172,27 @@ function writeParentContent(sourceContent: string, parentCubeNname: string, heri
     newContent
   );
 }
-function writeHeritageContent(type: string, heritageCubeName: string, heritageCubeNameFilePath: string) {
+function writeHeritageContent(type: DriverType, heritageCubeName: string, heritageCubeNameFilePath: string) {
   const originalHeritageCubeContent = fs.readFileSync(
     path.join(SOURCE, 'extends', `${heritageCubeNameFilePath}.js`), 'utf8'
   );
+
+  const targetFolder = getTargetFolder(type);
   const updatedHeritageCubeContent = originalHeritageCubeContent.replace('_type_', type);
   fs.writeFileSync(
-    path.join(TARGET, `${heritageCubeName}.js`),
+    path.join(targetFolder, `${heritageCubeName}.js`),
     updatedHeritageCubeContent
   );
 }
 
-function runSchemaExtends(type: string, schemaExtends: SchemaExtends) {
-  const filesArray = fs.readdirSync(TARGET);
+function runSchemaExtends(type: DriverType, schemaExtends: SchemaExtends) {
+  const targetFolder = getTargetFolder(type);
+  const filesArray = fs.readdirSync(targetFolder);
   filesArray.forEach(filename => {
     const { name } = path.parse(filename);
 
     if (schemaExtends[name]) {
-      const filepath = path.resolve(TARGET, filename);
+      const filepath = path.resolve(targetFolder, filename);
       const sourceContent = fs.readFileSync(filepath, 'utf8');
 
       const { heritageCubeName, heritageCubeNameFilePath } = schemaExtends[name];
@@ -186,12 +206,13 @@ function runSchemaExtends(type: string, schemaExtends: SchemaExtends) {
 /**
  * Prepare and copy test data files.
  */
-function prepareTestData(type: string, schemaExtends?: SchemaExtends) {
-  clearTestData();
+function prepareTestData(type: DriverType, schemaExtends?: SchemaExtends) {
+  const targetFolder = getTargetFolder(type);
+  clearTestData(type);
   FILES.forEach((name) => {
     fs.copySync(
       path.join(SOURCE, name),
-      path.join(TARGET, name),
+      path.join(targetFolder, name),
     );
   });
   SCHEMAS.forEach((name) => {
@@ -201,7 +222,7 @@ function prepareTestData(type: string, schemaExtends?: SchemaExtends) {
 
     const updatedContent = originalContent.replace('_type_', type);
     fs.writeFileSync(
-      path.join(TARGET, name),
+      path.join(targetFolder, name),
       updatedContent
     );
   });
@@ -356,7 +377,7 @@ export async function startBirdBoxFromContainer(
 
   return {
     stop: async () => {
-      clearTestData();
+      clearTestData(options.type);
       if (options.log === Log.PIPE) {
         process.stdout.write('[Birdbox] Closing\n');
       }
@@ -540,7 +561,7 @@ export async function startBirdBoxFromCli(
 
   return {
     stop: async () => {
-      clearTestData();
+      clearTestData(options.type);
       if (options.log === Log.PIPE) {
         process.stdout.write('[Birdbox] Closing\n');
       }
@@ -577,7 +598,7 @@ export interface BirdboxOptions {
  * Returns birdbox.
  */
 export async function getBirdbox(
-  type: string,
+  type: DriverType,
   env: Env,
   options?: BirdboxOptions,
 ) {
@@ -668,7 +689,7 @@ export async function getBirdbox(
       }
     }
   } catch (e) {
-    clearTestData();
+    clearTestData(type);
     process.stderr.write(e.toString());
     process.exit(1);
   }

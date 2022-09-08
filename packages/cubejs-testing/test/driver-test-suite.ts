@@ -3,9 +3,9 @@ import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 import WebSocketTransport from '@cubejs-client/ws-transport';
-import { BirdBox, getBirdbox } from '../src';
+import { BirdBox, DriverType, getBirdbox } from '../src';
 
-export function executeTestSuiteFor(type: string) {
+export function executeTestSuiteFor(type: DriverType) {
   describe(`${type} driver tests`, () => {
     describe(`using ${type} for the pre-aggregations`, () => {
       jest.setTimeout(60 * 5 * 1000);
