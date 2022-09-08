@@ -166,6 +166,7 @@ export class OrchestratorApi {
    * mode, to the datasources.
    */
   public async testConnection() {
+    console.log('testConnection', this.options);
     if (this.options.rollupOnlyMode) {
       return Promise.all([
         this.testDriverConnection(this.options.externalDriverFactory, 'external-driver'),
@@ -190,11 +191,13 @@ export class OrchestratorApi {
     dataSource: string = 'default',
   ) {
     if (driverFn) {
-      const driver = await driverFn(dataSource);
-      await driver.testConnection().catch(e => {
+      try {
+        const driver = await driverFn(dataSource);
+        await driver.testConnection();
+      } catch (e: any) {
         e.driverType = driverType;
         throw e;
-      });
+      }
     }
   }
 
