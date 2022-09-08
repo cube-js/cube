@@ -41,7 +41,7 @@ class OracleDriver extends BaseDriver {
     return 2;
   }
 
-  constructor(config) {
+  constructor(config = {}) {
     super();
     this.db = oracledb;
     this.db.outFormat = this.db.OBJECT;

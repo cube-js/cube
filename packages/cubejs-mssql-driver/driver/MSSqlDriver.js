@@ -21,7 +21,7 @@ class MSSqlDriver extends BaseDriver {
     return 2;
   }
 
-  constructor(config) {
+  constructor(config = {}) {
     super();
     this.config = {
       server: process.env.CUBEJS_DB_HOST,

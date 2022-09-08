@@ -10,7 +10,7 @@ class ElasticSearchDriver extends BaseDriver {
     return 2;
   }
 
-  constructor(config) {
+  constructor(config = {}) {
     super();
 
     const auth = {
