@@ -19,6 +19,7 @@ import {
   filteringCustomersEndsWithFilterAndDimensionsFirst,
   filteringCustomersEndsWithFilterAndDimensionsSecond,
   filteringCustomersEndsWithFilterAndDimensionsThird,
+  queryingProductDimensions,
 } from './tests';
 
 const customersTestSet = [
@@ -43,7 +44,7 @@ const customersTestSet = [
   filteringCustomersEndsWithFilterAndDimensionsThird,
 ];
 
-const productsTestSet: any[] = [];
+const productsTestSet = [queryingProductDimensions];
 
 export const mainTestSet = [
   ...customersTestSet,

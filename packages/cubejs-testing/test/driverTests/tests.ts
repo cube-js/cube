@@ -325,20 +325,18 @@ export const filteringCustomersEndsWithFilterAndDimensionsThird = driverTest({
   },
 });
 
-// // querying Products cube
-// test.skip(
-//   'querying Products: dimensions -- doesn\'t work wo ordering',
-//   async () => {
-//     const response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ]
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
-//   }
-// );
+export const queryingProductDimensions = driverTest({
+  name: 'querying Products: dimensions -- doesn\'t work wo ordering',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ]
+  },
+  skip: true,
+});
+
 // test(
 //   'querying Products: dimentions + order',
 //   async () => {
