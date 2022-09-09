@@ -105,7 +105,9 @@
     "jest": "^26.6.3",
     "jwt-decode": "^3.1.2",
     "pg": "^8.7.3",
-    "typescript": "~4.1.5"
+    "globby": "^11.0.4",
+    "typescript": "~4.1.5",
+    "yaml": "^1.10.2"
   },
   "jest": {
     "coveragePathIgnorePatterns": [
