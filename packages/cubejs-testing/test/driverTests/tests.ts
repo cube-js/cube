@@ -3,7 +3,6 @@ import { expect } from '@jest/globals';
 import { driverTest, driverTestWithError } from './driverTest';
 
 const commonSchemas = [
-  'postgresql/CommonCustomers.js',
   'CAST.js',
   'Customers.sql.js',
   'ECommerce.sql.js',
