@@ -52,37 +52,21 @@ import {
   filteringECommerceEndsWithDimensionsSecond,
   filteringECommerceEndsWithDimensionsThird,
   queryingEcommerceTotalQuantifyAvgDiscountTotal,
-
 } from './tests';
+import { testSet } from './driverTest';
 
-const skippedTests = [
+const skippedTestSet = testSet([
   queryingEcommerceTotalQuantifyAvgDiscountTotal,
   queryingProductDimensions,
   queryingECommerceTotalQuantityAvgDiscountTotalSales,
   queryingECommerceTotalSalesTotalProfitByMonthAndOrder
-];
+]);
 
-export const mainTestSet = [
-  ...skippedTests,
-  queryingCustomersDimensions,
+const withOrderingTestSet = testSet([
   queryingCustomersDimensionsAndOrder,
-  queryingCustomerDimensionsAndLimitTest,
-  queryingCustomersDimensionsAndTotal,
   queryingCustomersDimensionsOrderLimitTotal,
   queryingCustomersDimensionsOrderTotalOffset,
   queryingCustomersDimensionsOrderLimitTotalOffset,
-  filteringCustomersCubeFirst,
-  filteringCustomersCubeSecond,
-  filteringCustomersCubeThird,
-  filteringCustomersEndsWithFilterFirst,
-  filteringCustomersEndsWithFilterSecond,
-  filteringCustomersEndsWithFilterThird,
-  filteringCustomersStartsWithAndDimensionsFirst,
-  filteringCustomersStartsWithAndDimensionsSecond,
-  filteringCustomersStartsWithAndDimensionsThird,
-  filteringCustomersEndsWithFilterAndDimensionsFirst,
-  filteringCustomersEndsWithFilterAndDimensionsSecond,
-  filteringCustomersEndsWithFilterAndDimensionsThird,
   queryingProductsDimensionsAndOrder,
   queryingProductsDimensionsAndOrderAndLimit,
   queryingProductsDimensionsOrderAndTotal,
@@ -96,14 +80,36 @@ export const mainTestSet = [
   filteringProductsEndsWithFilterDimensionsFirst,
   filteringProductsEndsWithFilterDimensionsSecond,
   filteringProductsEndsWithFilterDimensionsThird,
-  queryingECommerceDimensions,
   queryingECommerceDimensionsOrder,
-  queryingECommerceDimensionsLimit,
-  queryingECommerceDimensionsTotal,
   queryingECommerceDimensionsOrderLimitTotal,
   queryingECommerceDimensionsOrderTotalOffset,
   queryingECommerceDimensionsOrderLimitTotalOffset,
   queryingECommerceCountByCitiesOrder,
+  queryingECommerceTotalQuantityAvgDiscountTotalSales,
+  queryingECommerceTotalSalesTotalProfitByMonthAndOrder,
+  queryingEcommerceTotalQuantifyAvgDiscountTotal
+]);
+
+const withoutOrderingTestSet = testSet([
+  queryingCustomersDimensions,
+  queryingCustomerDimensionsAndLimitTest,
+  queryingCustomersDimensionsAndTotal,
+  filteringCustomersCubeFirst,
+  filteringCustomersCubeSecond,
+  filteringCustomersCubeThird,
+  filteringCustomersEndsWithFilterFirst,
+  filteringCustomersEndsWithFilterSecond,
+  filteringCustomersEndsWithFilterThird,
+  filteringCustomersStartsWithAndDimensionsFirst,
+  filteringCustomersStartsWithAndDimensionsSecond,
+  filteringCustomersStartsWithAndDimensionsThird,
+  filteringCustomersEndsWithFilterAndDimensionsFirst,
+  filteringCustomersEndsWithFilterAndDimensionsSecond,
+  filteringCustomersEndsWithFilterAndDimensionsThird,
+  queryingProductDimensions,
+  queryingECommerceDimensions,
+  queryingECommerceDimensionsLimit,
+  queryingECommerceDimensionsTotal,
   filteringECommerceContainsDimensionsFirst,
   filteringECommerceContainsDimensionsSecond,
   filteringECommerceContainsDimensionsThird,
@@ -112,5 +118,11 @@ export const mainTestSet = [
   filteringECommerceStartsWithDimensionsThird,
   filteringECommerceEndsWithDimensionsFirst,
   filteringECommerceEndsWithDimensionsSecond,
-  filteringECommerceEndsWithDimensionsThird,
-];
+  filteringECommerceEndsWithDimensionsThird
+]);
+
+export const mainTestSet = testSet([
+  ...skippedTestSet,
+  ...withOrderingTestSet,
+  ...withoutOrderingTestSet,
+]);

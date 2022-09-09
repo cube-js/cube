@@ -108,7 +108,6 @@ export const queryingCustomersDimensionsOrderTotalOffset = driverTest({
     ).toEqual(41)
   ],
   schemas: commonSchemas,
-
 });
 
 export const queryingCustomersDimensionsOrderLimitTotalOffset = driverTest({

@@ -1,5 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { DeeplyReadonly, Query, QueryRecordType, ResultSet } from '@cubejs-client/core';
+import { Query, QueryRecordType, ResultSet } from '@cubejs-client/core';
+import { uniqBy } from 'ramda';
 import { Schemas } from '../../src';
 
 export type TestType = 'basic' | 'withError';
@@ -50,4 +51,9 @@ export function driverTestWithError(
   { name, query, expectArray = [], skip, schemas }: DriverTestWithErrorArg
 ): DriverTestWithError {
   return { name, query, expectArray, schemas, skip, type: 'withError' };
+}
+
+export function testSet(tests: DriverTest[]) {
+  const uniqTests = uniqBy((t) => t.name, tests);
+  return uniqTests;
 }
