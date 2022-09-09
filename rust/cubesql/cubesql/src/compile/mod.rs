@@ -1772,23 +1772,30 @@ mod tests {
         )
             .await;
 
+        let expected_request = V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+            segments: Some(vec![]),
+            dimensions: Some(vec![]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+        };
+
         let cube_scan = query_plan.as_logical_plan().find_cube_scan();
-
         assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+        assert_eq!(cube_scan.request, expected_request);
 
-        assert_eq!(
-            cube_scan.request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None
-            }
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE ((LOWER("ta_1"."__user" IN ('gopher')) = TRUE) = TRUE)"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
         )
+            .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+        assert_eq!(cube_scan.request, expected_request);
     }
 
     #[tokio::test]

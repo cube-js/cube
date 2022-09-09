@@ -14,7 +14,7 @@ use crate::{
             rewriter::RewriteRules,
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_rewrite,
-            BetweenExprNegated, BinaryExprOp, ChangeUserMemberValue, ColumnExprColumn,
+            udf_expr, BetweenExprNegated, BinaryExprOp, ChangeUserMemberValue, ColumnExprColumn,
             CubeScanAliasToCube, CubeScanLimit, FilterMemberMember, FilterMemberOp,
             FilterMemberValues, FilterReplacerAliasToCube, InListExprNegated, LimitFetch,
             LimitSkip, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
@@ -41,7 +41,6 @@ use datafusion::{
 };
 use egg::{EGraph, Rewrite, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
-use crate::compile::rewrite::{udf_expr};
 
 pub struct FilterRules {
     cube_context: Arc<CubeContext>,
@@ -217,23 +216,15 @@ impl RewriteRules for FilterRules {
                 filter_replacer(literal_bool(true), "?alias_to_cube", "?members"),
                 cube_scan_filters_empty_tail(),
             ),
-            // Transform Filter: (?expr IN (?list..)) = TRUE
+            // We use this rule to transform: (?expr IN (?list..)) = TRUE and ((?expr IN (?list..)) = TRUE) = TRUE
             rewrite(
                 "filter-truncate-in-list-true",
                 filter_replacer(
-                    binary_expr(
-                        inlist_expr("?expr", "?list", "?negated"),
-                        "=",
-                        literal_bool(true)
-                    ),
+                    binary_expr("?expr", "=", literal_bool(true)),
                     "?alias_to_cube",
-                    "?members"
+                    "?members",
                 ),
-                filter_replacer(
-                    inlist_expr("?expr", "?list", "?negated"),
-                    "?alias_to_cube",
-                    "?members"
-                ),
+                filter_replacer("?expr", "?alias_to_cube", "?members"),
             ),
             transforming_rewrite(
                 "filter-replacer",
@@ -298,9 +289,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     udf_expr(
                         "lower",
-                        vec![
-                            inlist_expr(column_expr("?column"), "?list", "?negated")
-                        ]
+                        vec![inlist_expr(column_expr("?column"), "?list", "?negated")],
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -312,7 +301,7 @@ impl RewriteRules for FilterRules {
                 "filter-in-place-filter-to-true-filter",
                 filter_replacer(column_expr("?column"), "?alias_to_cube", "?members"),
                 filter_replacer(
-                    binary_expr(column_expr("?column"), "=", literal_string("true")),
+                    binary_expr(column_expr("?column"), "=", literal_bool(true)),
                     "?alias_to_cube",
                     "?members",
                 ),
@@ -325,7 +314,7 @@ impl RewriteRules for FilterRules {
                     "?members",
                 ),
                 filter_replacer(
-                    binary_expr(column_expr("?column"), "=", literal_string("false")),
+                    binary_expr(column_expr("?column"), "=", literal_bool(false)),
                     "?alias_to_cube",
                     "?members",
                 ),
