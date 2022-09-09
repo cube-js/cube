@@ -1,6 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { expect } from '@jest/globals';
-import { driverTest } from './driverTest';
+import { driverTest, driverTestWithError } from './driverTest';
 
 const commonSchemas = [
   'postgresql/CommonCustomers.js',
@@ -500,163 +500,711 @@ export const filteringProductsContainsAndDimensionsAndOrderSecond = driverTest({
   schemas: commonSchemas,
 });
 
-//     response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       filters: [
-//         {
-//           member: 'Products.subCategory',
-//           operator: 'contains',
-//           values: ['notexist'],
-//         },
-//       ],
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
-//   }
-// );
-// test(
-//   'filtering Products: startsWith filter + dimentions + order',
-//   async () => {
-//     let response;
+export const filteringProductsContainsAndDimensionsAndOrderThird = driverTest({
+  name: 'filtering Products: contains + dimentions + order, third',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    filters: [
+      {
+        member: 'Products.subCategory',
+        operator: 'contains',
+        values: ['notexist'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
 
-//     response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       filters: [
-//         {
-//           member: 'Products.productName',
-//           operator: 'startsWith',
-//           values: ['O'],
-//         },
-//       ],
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
+export const filteringProductsStartsWithFilterDimensionsOrderFirst = driverTest({
+  name: 'filtering Products: startsWith filter + dimentions + order, first',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    filters: [
+      {
+        member: 'Products.productName',
+        operator: 'startsWith',
+        values: ['O'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
 
-//     response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       filters: [
-//         {
-//           member: 'Products.productName',
-//           operator: 'startsWith',
-//           values: ['O', 'K'],
-//         },
-//       ],
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
+export const filteringProductsStartsWithFilterDimensionsSecond = driverTest({
+  name: 'filtering Products: startsWith filter + dimentions + order, second',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    filters: [
+      {
+        member: 'Products.productName',
+        operator: 'startsWith',
+        values: ['O', 'K'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
 
-//     response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       filters: [
-//         {
-//           member: 'Products.productName',
-//           operator: 'startsWith',
-//           values: ['noneexist'],
-//         },
-//       ],
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
-//   }
-// );
-// test(
-//   'filtering Products: endsWith filter + dimentions + order',
-//   async () => {
-//     let response;
+export const filteringProductsStartsWithFilterDimensionsThird = driverTest({
+  name: 'filtering Products: startsWith filter + dimentions + order, third',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    filters: [
+      {
+        member: 'Products.productName',
+        operator: 'startsWith',
+        values: ['noneexist'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
 
-//     response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       filters: [
-//         {
-//           member: 'Products.subCategory',
-//           operator: 'endsWith',
-//           values: ['es'],
-//         },
-//       ],
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
+export const filteringProductsEndsWithFilterDimensionsFirst = driverTest({
+  name: 'filtering Products: endsWith filter + dimentions + order, first',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    filters: [
+      {
+        member: 'Products.subCategory',
+        operator: 'endsWith',
+        values: ['es'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
 
-//     response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       filters: [
-//         {
-//           member: 'Products.subCategory',
-//           operator: 'endsWith',
-//           values: ['es', 'gs'],
-//         },
-//       ],
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
+export const filteringProductsEndsWithFilterDimensionsSecond = driverTest({
+  name: 'filtering Products: endsWith filter + dimentions + order, second',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    filters: [
+      {
+        member: 'Products.subCategory',
+        operator: 'endsWith',
+        values: ['es', 'gs'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
 
-//     response = await client.load({
-//       dimensions: [
-//         'Products.category',
-//         'Products.subCategory',
-//         'Products.productName'
-//       ],
-//       order: {
-//         'Products.category': 'asc',
-//         'Products.subCategory': 'asc',
-//         'Products.productName': 'asc'
-//       },
-//       filters: [
-//         {
-//           member: 'Products.subCategory',
-//           operator: 'endsWith',
-//           values: ['noneexist'],
-//         },
-//       ],
-//     });
-//     expect(response.rawData()).toMatchSnapshot('query');
-//   }
-// );
+export const filteringProductsEndsWithFilterDimensionsThird = driverTest({
+  name: 'filtering Products: endsWith filter + dimentions + order, third',
+  query: {
+    dimensions: [
+      'Products.category',
+      'Products.subCategory',
+      'Products.productName'
+    ],
+    order: {
+      'Products.category': 'asc',
+      'Products.subCategory': 'asc',
+      'Products.productName': 'asc'
+    },
+    filters: [
+      {
+        member: 'Products.subCategory',
+        operator: 'endsWith',
+        values: ['noneexist'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceDimensions = driverTest({
+  name: 'querying ECommerce: dimensions',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ]
+  },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceDimensionsOrder = driverTest({
+  name: 'querying ECommerce: dimentions + order',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    order: {
+      'ECommerce.rowId': 'asc'
+    }
+  },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceDimensionsLimit = driverTest({
+  name: 'querying ECommerce: dimentions + limit',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    limit: 10
+  },
+  expectArray: [r => expect(r.rawData().length).toEqual(10)],
+  schemas: commonSchemas
+});
+
+export const queryingECommerceDimensionsTotal = driverTest({
+  name: 'querying ECommerce: dimentions + total',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    total: true
+  },
+  expectArray: [(r) => expect(
+    r.serialize().loadResponse.results[0].total
+  ).toEqual(44)],
+  schemas: commonSchemas,
+});
+
+export const queryingECommerceDimensionsOrderLimitTotal = driverTest({
+  name: 'querying ECommerce: dimentions + order + limit + total',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    order: {
+      'ECommerce.rowId': 'asc'
+    },
+    limit: 10,
+    total: true
+  },
+  expectArray: [r => expect(r.rawData().length).toEqual(10), r => expect(
+    r.serialize().loadResponse.results[0].total
+  ).toEqual(44)],
+  schemas: commonSchemas
+});
+
+export const queryingECommerceDimensionsOrderTotalOffset = driverTest({
+  name: 'querying ECommerce: dimentions + order + total + offset',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    order: {
+      'ECommerce.rowId': 'asc'
+    },
+    total: true,
+    offset: 43
+  },
+  expectArray: [
+    r => expect(r.rawData().length).toEqual(1),
+    r => expect(
+      r.serialize().loadResponse.results[0].total
+    ).toEqual(44)
+  ],
+  schemas: commonSchemas
+});
+
+export const queryingECommerceDimensionsOrderLimitTotalOffset = driverTest({
+  name: 'querying ECommerce: dimentions + order + limit + total + offset',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    order: {
+      'ECommerce.rowId': 'asc'
+    },
+    limit: 10,
+    total: true,
+    offset: 10
+  },
+  expectArray: [
+    r => expect(r.rawData().length).toEqual(10),
+    r => expect(
+      r.serialize().loadResponse.results[0].total
+    ).toEqual(44)
+  ],
+  schemas: commonSchemas
+});
+
+export const queryingECommerceCountByCitiesOrder = driverTest({
+  name: 'querying ECommerce: count by cities + order',
+  query: {
+    dimensions: [
+      'ECommerce.city'
+    ],
+    measures: [
+      'ECommerce.count'
+    ],
+    order: {
+      'ECommerce.count': 'desc',
+      'ECommerce.city': 'asc',
+    },
+  },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceTotalQuantityAvgDiscountTotalSales = driverTest({
+  name: 'querying ECommerce: total quantity, avg discount, total sales, ' +
+    'total profit by product + order + total -- rounding in athena',
+  query: {
+    dimensions: [
+      'ECommerce.productName'
+    ],
+    measures: [
+      'ECommerce.totalQuantity',
+      'ECommerce.avgDiscount',
+      'ECommerce.totalSales',
+      'ECommerce.totalProfit'
+    ],
+    order: {
+      'ECommerce.totalProfit': 'desc',
+      'ECommerce.productName': 'asc'
+    },
+    total: true
+  },
+  skip: true,
+  schemas: commonSchemas
+});
+
+export const queryingECommerceTotalSalesTotalProfitByMonthAndOrder = driverTest({
+  name: 'querying ECommerce: total sales, total profit by month + order ' +
+  '(date) + total -- doesn\'t work with the BigQuery',
+  query: {
+    timeDimensions: [{
+      dimension: 'ECommerce.orderDate',
+      granularity: 'month'
+    }],
+    measures: [
+      'ECommerce.totalSales',
+      'ECommerce.totalProfit'
+    ],
+    order: {
+      'ECommerce.orderDate': 'asc'
+    },
+    total: true
+  },
+  schemas: commonSchemas,
+  skip: true,
+});
+
+export const filteringECommerceContainsDimensionsFirst = driverTest({
+  name: 'filtering ECommerce: contains dimensions, first',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    filters: [
+      {
+        member: 'ECommerce.subCategory',
+        operator: 'contains',
+        values: ['able'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
+
+export const filteringECommerceContainsDimensionsSecond = driverTest({
+  name: 'filtering ECommerce: contains dimensions, second',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    filters: [
+      {
+        member: 'ECommerce.subCategory',
+        operator: 'contains',
+        values: ['able', 'urn'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
+
+export const filteringECommerceContainsDimensionsThird = driverTest({
+  name: 'filtering ECommerce: contains dimensions, third',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    filters: [
+      {
+        member: 'ECommerce.subCategory',
+        operator: 'contains',
+        values: ['notexist'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
+
+export const filteringECommerceStartsWithDimensionsFirst = driverTest({
+  name: 'filtering ECommerce: startsWith + dimensions, first',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    filters: [
+      {
+        member: 'ECommerce.customerId',
+        operator: 'startsWith',
+        values: ['A'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
+
+export const filteringECommerceStartsWithDimensionsSecond = driverTest({
+  name: 'filtering ECommerce: startsWith + dimensions, second',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    filters: [
+      {
+        member: 'ECommerce.customerId',
+        operator: 'startsWith',
+        values: ['A', 'B'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
+
+export const filteringECommerceStartsWithDimensionsThird = driverTest({
+  name: 'filtering ECommerce: startsWith + dimensions, third',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    filters: [
+      {
+        member: 'ECommerce.customerId',
+        operator: 'startsWith',
+        values: ['Z'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
+
+export const filteringECommerceEndsWithDimensionsFirst = driverTest({
+  name: 'filtering ECommerce: endsWith + dimensions, first',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    filters: [
+      {
+        member: 'ECommerce.orderId',
+        operator: 'endsWith',
+        values: ['0'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
+
+export const filteringECommerceEndsWithDimensionsSecond = driverTest({
+  name: 'filtering ECommerce: endsWith + dimensions, second',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    filters: [
+      {
+        member: 'ECommerce.orderId',
+        operator: 'endsWith',
+        values: ['1', '2'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
+
+export const filteringECommerceEndsWithDimensionsThird = driverTest({
+  name: 'filtering ECommerce: endsWith + dimensions, third',
+  query: {
+    dimensions: [
+      'ECommerce.rowId',
+      'ECommerce.orderId',
+      'ECommerce.orderDate',
+      'ECommerce.customerId',
+      'ECommerce.customerName',
+      'ECommerce.city',
+      'ECommerce.category',
+      'ECommerce.subCategory',
+      'ECommerce.productName',
+      'ECommerce.sales',
+      'ECommerce.quantity',
+      'ECommerce.discount',
+      'ECommerce.profit'
+    ],
+    filters: [
+      {
+        member: 'ECommerce.orderId',
+        operator: 'endsWith',
+        values: ['Z'],
+      },
+    ],
+  },
+  schemas: commonSchemas
+});
+
+export const queryingEcommerceTotalQuantifyAvgDiscountTotal = driverTestWithError({
+  name: 'querying ECommerce: total quantity, avg discount, total ' +
+  'sales, total profit by product + order + total -- noisy ' +
+  'test',
+  query: {
+    dimensions: [
+      'ECommerce.productName'
+    ],
+    measures: [
+      'ECommerce.totalQuantity',
+      'ECommerce.avgDiscount',
+      'ECommerce.totalSales',
+      'ECommerce.totalProfit'
+    ],
+    order: {
+      'ECommerce.totalProfit': 'desc',
+      'ECommerce.productName': 'asc'
+    },
+    total: true
+  },
+  expectArray: [(e) => expect(e).toEqual('error')],
+  schemas: commonSchemas,
+  skip: true
+});

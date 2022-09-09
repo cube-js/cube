@@ -64,10 +64,19 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
             }
           }
         };
+        // eslint-disable-next-line no-loop-func
+        const cbFnError = async () => {
+          const promise = async () => {
+            await client.load(t.query);
+          };
+          await expect(promise).rejects.toThrow('error');
+        };
         if (t.skip) {
           test.skip(t.name, cbFn);
-        } else {
+        } else if (t.type === 'basic') {
           test(t.name, cbFn);
+        } else if (t.type === 'withError') {
+          test(t.name, cbFnError);
         }
       }
     });
