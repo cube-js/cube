@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 8001
 expression: "execute_query(\"select\n                    relname,\n                    nspname,\n                    relkind\n                from\n                    pg_catalog.pg_class c,\n                    pg_catalog.pg_namespace n\n                where\n                    relkind in ('r', 'v', 'm', 'f')\n                    and nspname not in (\n                        'pg_catalog',\n                        'information_schema',\n                        'pg_toast',\n                        'pg_temp_1'\n                    )\n                    and n.oid = relnamespace\n                order by\n                    nspname,\n                    relname\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------------------------+---------+---------+
@@ -8,4 +7,5 @@ expression: "execute_query(\"select\n                    relname,\n             
 +---------------------------+---------+---------+
 | KibanaSampleDataEcommerce | public  | r       |
 | Logs                      | public  | r       |
+| NumberCube                | public  | r       |
 +---------------------------+---------+---------+
