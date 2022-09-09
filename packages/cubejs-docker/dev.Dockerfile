@@ -90,7 +90,6 @@ RUN yarn policies set-version v1.22.5
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
 FROM base as prod_base_dependencies
-RUN npm install -g lerna patch-package
 RUN yarn install --prod
 
 FROM prod_base_dependencies as prod_dependencies
