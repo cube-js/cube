@@ -167,17 +167,16 @@ export class OrchestratorApi {
    * mode, to the datasources.
    */
   public async testConnection() {
-    console.log('testConnection', this.options);
     if (this.options.rollupOnlyMode) {
       return Promise.all([
-        this.testDriverConnection(this.options.externalDriverFactory, DriverType.external),
+        this.testDriverConnection(this.options.externalDriverFactory, DriverType.External),
       ]);
     } else {
       return Promise.all([
         ...Object.keys(this.seenDataSources).map(
-          ds => this.testDriverConnection(this.driverFactory, DriverType.internal, ds),
+          ds => this.testDriverConnection(this.driverFactory, DriverType.Internal, ds),
         ),
-        this.testDriverConnection(this.options.externalDriverFactory, DriverType.external),
+        this.testDriverConnection(this.options.externalDriverFactory, DriverType.External),
       ]);
     }
   }

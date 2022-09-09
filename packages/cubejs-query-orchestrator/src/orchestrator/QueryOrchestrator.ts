@@ -11,9 +11,9 @@ import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 export type CacheAndQueryDriverType = 'redis' | 'memory';
 
 export enum DriverType {
-  external = 'external',
-  internal = 'internal',
-  cache = 'cache',
+  External = 'external',
+  Internal = 'internal',
+  Cache = 'cache',
 }
 
 export interface QueryOrchestratorOptions {
@@ -234,7 +234,7 @@ export class QueryOrchestrator {
     try {
       await this.queryCache.testConnection();
     } catch (e: any) {
-      e.driverType = DriverType.cache;
+      e.driverType = DriverType.Cache;
       throw e;
     }
   }
