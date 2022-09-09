@@ -1,4 +1,3 @@
-import { DriverTest } from './driverTest';
 import {
   queryingCustomersDimensions,
   queryingCustomersDimensionsAndOrder,
@@ -56,7 +55,15 @@ import {
 
 } from './tests';
 
-const customersTestSet = [
+const skippedTests = [
+  queryingEcommerceTotalQuantifyAvgDiscountTotal,
+  queryingProductDimensions,
+  queryingECommerceTotalQuantityAvgDiscountTotalSales,
+  queryingECommerceTotalSalesTotalProfitByMonthAndOrder
+];
+
+export const mainTestSet = [
+  ...skippedTests,
   queryingCustomersDimensions,
   queryingCustomersDimensionsAndOrder,
   queryingCustomerDimensionsAndLimitTest,
@@ -76,7 +83,6 @@ const customersTestSet = [
   filteringCustomersEndsWithFilterAndDimensionsFirst,
   filteringCustomersEndsWithFilterAndDimensionsSecond,
   filteringCustomersEndsWithFilterAndDimensionsThird,
-  queryingProductDimensions,
   queryingProductsDimensionsAndOrder,
   queryingProductsDimensionsAndOrderAndLimit,
   queryingProductsDimensionsOrderAndTotal,
@@ -98,8 +104,6 @@ const customersTestSet = [
   queryingECommerceDimensionsOrderTotalOffset,
   queryingECommerceDimensionsOrderLimitTotalOffset,
   queryingECommerceCountByCitiesOrder,
-  queryingECommerceTotalQuantityAvgDiscountTotalSales,
-  queryingECommerceTotalSalesTotalProfitByMonthAndOrder,
   filteringECommerceContainsDimensionsFirst,
   filteringECommerceContainsDimensionsSecond,
   filteringECommerceContainsDimensionsThird,
@@ -109,12 +113,4 @@ const customersTestSet = [
   filteringECommerceEndsWithDimensionsFirst,
   filteringECommerceEndsWithDimensionsSecond,
   filteringECommerceEndsWithDimensionsThird,
-  queryingEcommerceTotalQuantifyAvgDiscountTotal,
-];
-
-const productsTestSet = [queryingProductDimensions];
-
-export const mainTestSet = [
-  ...customersTestSet,
-  ...productsTestSet
 ];
