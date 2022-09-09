@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.67](https://github.com/cube-js/cube.js/compare/v0.30.66...v0.30.67) (2022-09-09)
+
+
+### Bug Fixes
+
+* **cubesql:** Show `MEASURE()` instead of `NUMBER()` in measure aggregation type doesn't match error. ([#5268](https://github.com/cube-js/cube.js/issues/5268)) ([a76059e](https://github.com/cube-js/cube.js/commit/a76059eff93c0098ef812f9d09fe996489126cd5))
+
+
+### Features
+
+* **cubesql:** Holistics - GROUP BY dates support ([#5264](https://github.com/cube-js/cube.js/issues/5264)) ([7217950](https://github.com/cube-js/cube.js/commit/7217950c9f0954e23f37efd3609e5eff4d125620))
+
+
+
+
+
 ## [0.30.65](https://github.com/cube-js/cube.js/compare/v0.30.64...v0.30.65) (2022-09-07)
 
 

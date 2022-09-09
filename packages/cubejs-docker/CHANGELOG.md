@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.67](https://github.com/cube-js/cube.js/compare/v0.30.66...v0.30.67) (2022-09-09)
+
+
+### Bug Fixes
+
+* freeze node.js dependencies for images ([#5270](https://github.com/cube-js/cube.js/issues/5270)) ([7ea053e](https://github.com/cube-js/cube.js/commit/7ea053ef07fab6e35b1fa6ec9bd62778c871d221))
+
+
+
+
+
 ## [0.30.66](https://github.com/cube-js/cube.js/compare/v0.30.65...v0.30.66) (2022-09-08)
 
 **Note:** Version bump only for package @cubejs-backend/docker

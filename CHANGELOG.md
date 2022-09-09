@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.67](https://github.com/cube-js/cube.js/compare/v0.30.66...v0.30.67) (2022-09-09)
+
+
+### Bug Fixes
+
+* freeze node.js dependencies for images ([#5270](https://github.com/cube-js/cube.js/issues/5270)) ([7ea053e](https://github.com/cube-js/cube.js/commit/7ea053ef07fab6e35b1fa6ec9bd62778c871d221))
+* **cubesql:** Show `MEASURE()` instead of `NUMBER()` in measure aggregation type doesn't match error. ([#5268](https://github.com/cube-js/cube.js/issues/5268)) ([a76059e](https://github.com/cube-js/cube.js/commit/a76059eff93c0098ef812f9d09fe996489126cd5))
+* **schema-compiler:** messed order in sub-query aggregate ([#5257](https://github.com/cube-js/cube.js/issues/5257)) ([a6ad9f6](https://github.com/cube-js/cube.js/commit/a6ad9f63fd9db502d1e59aa4fe30dbe5c34c364d))
+
+
+### Features
+
+* **cubesql:** Holistics - GROUP BY dates support ([#5264](https://github.com/cube-js/cube.js/issues/5264)) ([7217950](https://github.com/cube-js/cube.js/commit/7217950c9f0954e23f37efd3609e5eff4d125620))
+* **testing:** driver test suite ([#5256](https://github.com/cube-js/cube.js/issues/5256)) ([2e94ec5](https://github.com/cube-js/cube.js/commit/2e94ec571de82e2214ac6d87e762b38c85109585))
+
+
+
+
+
 ## [0.30.66](https://github.com/cube-js/cube.js/compare/v0.30.65...v0.30.66) (2022-09-08)
 
 
