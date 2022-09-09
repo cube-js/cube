@@ -31,7 +31,7 @@
     "@cubejs-backend/shared": "^0.30.57",
     "@google-cloud/storage": "^5.8.5",
     "date-fns-timezone": "^0.1.4",
-    "snowflake-sdk": "^1.6.1"
+    "snowflake-sdk": "^1.6.13"
   },
   "license": "Apache-2.0",
   "publishConfig": {
@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.30.0",
-    "@types/snowflake-sdk": "^1.5.1",
+    "@types/snowflake-sdk": "^1.6.8",
     "typescript": "~4.1.5"
   }
 }
