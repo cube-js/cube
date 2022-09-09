@@ -10788,6 +10788,47 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_holistics_group_by_date() {
+        init_logger();
+
+        for granularity in vec!["year", "quarter", "month", "week", "day", "hour", "minute"].iter()
+        {
+            let logical_plan = convert_select_to_query_plan(
+                format!("
+                    SELECT 
+                        TO_CHAR((CAST((DATE_TRUNC('{}', (CAST(\"table\".\"order_date\" AS timestamptz)) AT TIME ZONE 'Etc/UTC')) AT TIME ZONE 'Etc/UTC' AS timestamptz)) AT TIME ZONE 'Etc/UTC', 'YYYY-MM-DD HH24:MI:SS') AS \"dm_pu_ca_754b1e\",
+                        MAX(\"table\".\"maxPrice\") AS \"a_pu_n_51f23b\"
+                    FROM \"KibanaSampleDataEcommerce\" \"table\"
+                    GROUP BY 1
+                    ORDER BY 2 DESC
+                    LIMIT 100000", 
+                    granularity),
+                DatabaseProtocol::PostgreSQL
+            ).await.as_logical_plan();
+
+            let cube_scan = logical_plan.find_cube_scan();
+
+            assert_eq!(
+                cube_scan.request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(granularity.to_string()),
+                        date_range: None
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                }
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn test_select_column_with_same_name_as_table() -> Result<(), CubeError> {
         init_logger();
 
