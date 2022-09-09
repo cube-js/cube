@@ -1739,6 +1739,68 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_change_user_via_in_filter() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user IN ('gopher')"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_in_filter_thoughtspot() {
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE (LOWER("ta_1"."__user" IN ('gopher')) = TRUE)"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let expected_request = V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+            segments: Some(vec![]),
+            dimensions: Some(vec![]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+        };
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+        assert_eq!(cube_scan.request, expected_request);
+
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE ((LOWER("ta_1"."__user" IN ('gopher')) = TRUE) = TRUE)"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+        assert_eq!(cube_scan.request, expected_request);
+    }
+
+    #[tokio::test]
     async fn test_change_user_via_filter_and() {
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' AND customer_gender = 'male'".to_string(),
