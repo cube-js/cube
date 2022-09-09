@@ -41,7 +41,7 @@ use datafusion::{
 };
 use egg::{EGraph, Rewrite, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
-use crate::compile::rewrite::{list_expr, udf_expr};
+use crate::compile::rewrite::{udf_expr};
 
 pub struct FilterRules {
     cube_context: Arc<CubeContext>,
