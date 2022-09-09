@@ -41,6 +41,7 @@ use datafusion::{
 };
 use egg::{EGraph, Rewrite, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
+use crate::compile::rewrite::{list_expr, udf_expr};
 
 pub struct FilterRules {
     cube_context: Arc<CubeContext>,
@@ -216,6 +217,24 @@ impl RewriteRules for FilterRules {
                 filter_replacer(literal_bool(true), "?alias_to_cube", "?members"),
                 cube_scan_filters_empty_tail(),
             ),
+            // Transform Filter: (?expr IN (?list..)) = TRUE
+            rewrite(
+                "filter-truncate-in-list-true",
+                filter_replacer(
+                    binary_expr(
+                        inlist_expr("?expr", "?list", "?negated"),
+                        "=",
+                        literal_bool(true)
+                    ),
+                    "?alias_to_cube",
+                    "?members"
+                ),
+                filter_replacer(
+                    inlist_expr("?expr", "?list", "?negated"),
+                    "?alias_to_cube",
+                    "?members"
+                ),
+            ),
             transforming_rewrite(
                 "filter-replacer",
                 filter_replacer(
@@ -262,10 +281,27 @@ impl RewriteRules for FilterRules {
                 change_user_member("?user"),
                 self.transform_change_user_eq("?column", "?literal", "?user"),
             ),
+            // ?change_user IN (?list..)
             transforming_rewrite(
                 "change-user-in-filter",
                 filter_replacer(
                     inlist_expr(column_expr("?column"), "?list", "?negated"),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                change_user_member("?user"),
+                self.transform_change_user_in("?column", "?list", "?negated", "?user"),
+            ),
+            // LOWER(?change_user) IN (?list..) - It's not safety to replace LOWER fn for all filters
+            transforming_rewrite(
+                "change-user-lower-in-filter",
+                filter_replacer(
+                    udf_expr(
+                        "lower",
+                        vec![
+                            inlist_expr(column_expr("?column"), "?list", "?negated")
+                        ]
+                    ),
                     "?alias_to_cube",
                     "?members",
                 ),
