@@ -2,50 +2,52 @@
 import { DeeplyReadonly, Query, QueryRecordType, ResultSet } from '@cubejs-client/core';
 import { Schemas } from '../../src';
 
-type TestType = 'basic' | 'withError';
+export type TestType = 'basic' | 'withError';
 
-type DriverTestArg<QueryType extends DeeplyReadonly<Query | Query[]> = DeeplyReadonly<Query | Query[]>> = {
+type DriverTestArg = {
   name: string;
-  query: QueryType;
-  expectArray?: ((response: ResultSet<QueryRecordType<QueryType>>) => any)[];
+  query: Query;
+  expectArray?: ((response: ResultSet<QueryRecordType<Query>>) => any)[];
   schemas: Schemas;
   skip?: boolean;
 };
 
-type DriverTestWithErrorArg<QueryType extends DeeplyReadonly<Query | Query[]> = DeeplyReadonly<Query | Query[]>> = {
+type DriverTestWithErrorArg = {
   name: string;
-  query: QueryType;
+  query: Query;
   expectArray?: ((e: Error) => any)[];
   schemas: Schemas;
   skip?: boolean;
 };
 
-export type DriverTest<QueryType extends DeeplyReadonly<Query | Query[]>> = {
+export type DriverTestBasic = {
   name: string,
-  query: QueryType,
-  expectArray?: ((response: ResultSet<QueryRecordType<QueryType>>) => any)[]
+  query: Query,
+  expectArray?: ((response: ResultSet<QueryRecordType<Query>>) => any)[]
   schemas: Schemas,
   skip?: boolean;
-  type: TestType;
+  type: 'basic';
 };
 
-export type DriverTestWithError<QueryType extends DeeplyReadonly<Query | Query[]>> = {
+export type DriverTestWithError = {
   name: string;
-  query: QueryType;
+  query: Query;
   expectArray?: ((e: Error) => any)[];
   schemas: Schemas;
   skip?: boolean;
-  type: TestType;
+  type: 'withError';
 };
 
-export function driverTest<QueryType extends DeeplyReadonly<Query | Query[]> = DeeplyReadonly<Query | Query[]>>(
-  { name, query, expectArray = [], skip, schemas }: DriverTestArg<QueryType>
-): DriverTest<QueryType> {
+export type DriverTest = DriverTestBasic | DriverTestWithError;
+
+export function driverTest(
+  { name, query, expectArray = [], skip, schemas }: DriverTestArg
+): DriverTestBasic {
   return { name, query, expectArray, schemas, skip, type: 'basic' };
 }
 
-export function driverTestWithError<QueryType extends DeeplyReadonly<Query | Query[]> = DeeplyReadonly<Query | Query[]>>(
-  { name, query, expectArray = [], skip, schemas }: DriverTestWithErrorArg<QueryType>
-): DriverTestWithError<QueryType> {
+export function driverTestWithError(
+  { name, query, expectArray = [], skip, schemas }: DriverTestWithErrorArg
+): DriverTestWithError {
   return { name, query, expectArray, schemas, skip, type: 'withError' };
 }
