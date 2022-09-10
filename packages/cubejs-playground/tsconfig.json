@@ -8,7 +8,7 @@
     ],
     "declaration": true,
     "rootDir": "src",
-    // "outDir": "./lib",
+    "outDir": "./lib",
     "declarationDir": "lib",
     "noEmitOnError": false,
     "sourceMap": true,
@@ -28,7 +28,7 @@
     "noImplicitAny": false,
     "incremental": true,
     "target": "ES2020",
-    // "noEmit": true,
+    "noEmit": true
   },
   "include": [
     "src/**/*"

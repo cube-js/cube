@@ -1,5 +1,3 @@
-import './index.less';
-
 export * from './components/QueryBuilder';
 export * from '../hooks';
 export { fetchPoll } from '../utils';
