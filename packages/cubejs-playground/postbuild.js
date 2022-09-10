@@ -3,6 +3,8 @@ const path = require('path');
 
 const distFolder = path.resolve(__dirname, 'lib');
 
+console.log('Postbuild...');
+
 ['cloud', 'rollup-designer'].forEach((name) => {
   fs.writeFileSync(
     path.join(distFolder, name, 'package.json'),
