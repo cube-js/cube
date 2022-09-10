@@ -15,7 +15,7 @@
     "dev": "kill-port 3080 && yarn start",
     "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
     "watch": "rollup -c -w",
-    "build": "rollup -c && node postbuild.js",
+    "build": "yarn build:playground && rollup -c && node postbuild.js",
     "build:playground": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
   },
   "browserslist": [
