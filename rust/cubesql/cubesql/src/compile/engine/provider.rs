@@ -49,7 +49,8 @@ use super::information_schema::postgres::{
     PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
     PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
     PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatioUserTablesProvider,
-    PgCatalogTableProvider, PgCatalogTypeProvider, PgPreparedStatementsProvider,
+    PgCatalogStatsProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
+    PgPreparedStatementsProvider,
 };
 
 use super::information_schema::redshift::{
@@ -329,6 +330,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_statio_user_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogSequenceProvider>() {
             "pg_catalog.pg_sequence".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogStatsProvider>() {
+            "pg_catalog.pg_stats".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
             "public.svv_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvExternalSchemasTableProvider>() {
@@ -525,6 +528,9 @@ impl DatabaseProtocol {
                     )))
                 }
                 "pg_sequence" => return Some(Arc::new(PgCatalogSequenceProvider::new())),
+                "pg_stats" => {
+                    return Some(Arc::new(PgCatalogStatsProvider::new(&context.meta.tables)))
+                }
                 _ => return None,
             },
             _ => return None,
