@@ -5,6 +5,18 @@ import { isQueryPresent } from '@cubejs-client/core';
 import CubeContext from './CubeContext';
 
 export default class QueryRenderer extends React.Component {
+  static contextType = CubeContext;
+  
+  static defaultProps = {
+    cubejsApi: null,
+    query: null,
+    render: null,
+    queries: null,
+    loadSql: null,
+    updateOnlyOnStateChange: false,
+    resetResultSetOnChange: true
+  };
+  
   // @deprected use `isQueryPresent` from `@cubejs-client/core`
   static isQueryPresent(query) {
     return isQueryPresent(query);
@@ -148,15 +160,3 @@ export default class QueryRenderer extends React.Component {
     return null;
   }
 }
-
-QueryRenderer.contextType = CubeContext;
-
-QueryRenderer.defaultProps = {
-  cubejsApi: null,
-  query: null,
-  render: null,
-  queries: null,
-  loadSql: null,
-  updateOnlyOnStateChange: false,
-  resetResultSetOnChange: true
-};
