@@ -8,7 +8,8 @@ import { fetchPoll, fetchWithTimeout } from '../../utils';
 import ConnectionTest from './components/ConnectionTest';
 import { DatabaseCard, SelectedDatabaseCard } from './components/DatabaseCard';
 import DatabaseForm from './components/DatabaseForm';
-import { Button, FatalError } from '../../atoms';
+import { Button } from '../../atoms';
+import { FatalError } from '../../components/Error/FatalError';
 import { LocalhostTipBox } from './components/LocalhostTipBox';
 import { event, playgroundAction } from '../../events';
 

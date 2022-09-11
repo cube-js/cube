@@ -7,6 +7,8 @@
       "esnext"
     ],
     "declaration": true,
+    "rootDir": "src",
+    "outDir": "./lib",
     "declarationDir": "lib",
     "noEmitOnError": false,
     "sourceMap": true,
@@ -25,8 +27,8 @@
     "isolatedModules": true,
     "noImplicitAny": false,
     "incremental": true,
-    "target": "es5",
-    "noEmit": true,
+    "target": "ES2020",
+    "noEmit": true
   },
   "include": [
     "src/**/*"

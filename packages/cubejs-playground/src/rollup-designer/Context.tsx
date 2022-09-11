@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react';
 
-import { useToggle } from '../../hooks';
+import { useToggle } from '../hooks';
 import { RollupDesignerModal } from './components/RollupDesignerModal';
 
 type RollupDesignerContextValue = {

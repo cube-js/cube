@@ -8,14 +8,15 @@
     "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-playground"
   },
-  "module": "lib/index.js",
+  "module": "lib/playground/index.js",
   "types": "lib/playground/index.d.ts",
   "scripts": {
     "unit": "react-scripts test",
     "dev": "kill-port 3080 && yarn start",
     "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
     "watch": "rollup -c -w",
-    "build": "yarn run build:playground && rollup -c",
+    "build": "yarn build:playground && yarn build:lib",
+    "build:lib": "tsc --noEmit false && node postbuild.js && cp -R src/img/ lib/img/",
     "build:playground": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
   },
   "browserslist": [
@@ -51,7 +52,6 @@
     "less": "^4.1.1",
     "mitt": "^2.1.0",
     "moment": "^2.25.3",
-    "prismjs": "^1.23.0",
     "react-beautiful-dnd": "^13.0.0",
     "react-hotkeys-hook": "^3.3.0",
     "react-is": "^16.8.4",
@@ -68,8 +68,6 @@
     "@babel/plugin-proposal-optional-chaining": "^7.11.0",
     "@cubejs-client/core": "^0.30.64",
     "@cubejs-client/react": "^0.30.64",
-    "@rollup/plugin-commonjs": "^20.0.0",
-    "@rollup/plugin-typescript": "^8.2.5",
     "@types/flexsearch": "^0.7.3",
     "@types/jest": "^26.0.20",
     "@types/node": "^14.14.35",
@@ -87,19 +85,16 @@
     "fs-extra": "^8.1.0",
     "graphql": "^15.8.0",
     "less-loader": "^8.1.1",
+    "prismjs": "^1.25.0",
     "react": "^17.0.1",
     "react-app-rewire-yarn-workspaces": "^1.0.3",
     "react-app-rewired": "^2.1.0",
     "react-dom": "^17.0.1",
     "react-scripts": "4.0.3",
     "recursive-readdir": "^2.2.2",
-    "rollup": "^2.53.3",
-    "rollup-plugin-local-resolve": "^1.0.7",
-    "rollup-plugin-postcss": "^4.0.0",
-    "rollup-plugin-svg": "^2.0.0",
     "styled-components": "5.2.0",
     "tslib": "^2.3.0",
-    "typescript": "^4.3.5"
+    "typescript": "4.8.2"
   },
   "peerDependencies": {
     "@ant-design/icons": ">=4.7.0",
@@ -107,6 +102,7 @@
     "@cubejs-client/react": ">=0.30.0",
     "antd": ">=4.16.13",
     "graphql": ">=15.8.0",
+    "prismjs": ">=1.25.0",
     "react": ">=17.0.1",
     "react-dom": ">=17.0.1",
     "styled-components": ">=5.2.0"
