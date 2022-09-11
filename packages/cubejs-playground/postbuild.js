@@ -1,11 +1,7 @@
-console.log('Postbuild...', __dirname);
-
 const fs = require('fs');
 const path = require('path');
 
 const distFolder = path.resolve(__dirname, 'lib');
-
-console.log(`Postbuild... ${distFolder}`);
 
 ['cloud', 'rollup-designer'].forEach((name) => {
   fs.writeFileSync(
