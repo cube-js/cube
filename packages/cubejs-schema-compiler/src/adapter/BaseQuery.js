@@ -1616,9 +1616,7 @@ class BaseQuery {
 
   dimensionSql(dimension) {
     const context = this.safeEvaluateSymbolContext();
-    if (context.rollupQuery) {
-      return this.escapeColumnName(dimension.unescapedAliasName(context.rollupGranularity));
-    } else if (context.wrapQuery) {
+    if (context.wrapQuery) {
       return this.escapeColumnName(dimension.unescapedAliasName(context.wrappedGranularity));
     }
     return this.evaluateSymbolSql(dimension.path()[0], dimension.path()[1], dimension.dimensionDefinition());
@@ -1650,10 +1648,13 @@ class BaseQuery {
   }
 
   pushMemberNameForCollectionIfNecessary(cubeName, name) {
-    this.pushCubeNameForCollectionIfNecessary(cubeName);
+    const pathFromArray = this.cubeEvaluator.pathFromArray([cubeName, name]);
+    if (this.cubeEvaluator.byPathAnyType(pathFromArray).ownedByCube) {
+      this.pushCubeNameForCollectionIfNecessary(cubeName);
+    }
     const context = this.safeEvaluateSymbolContext();
     if (context.memberNames && name) {
-      context.memberNames.push(this.cubeEvaluator.pathFromArray([cubeName, name]));
+      context.memberNames.push(pathFromArray);
     }
   }
 
@@ -1663,7 +1664,9 @@ class BaseQuery {
 
   evaluateSymbolSql(cubeName, name, symbol) {
     this.pushMemberNameForCollectionIfNecessary(cubeName, name);
-    if (this.cubeEvaluator.isMeasure([cubeName, name])) {
+    const memberPathArray = [cubeName, name];
+    const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
+    if (this.cubeEvaluator.isMeasure(memberPathArray)) {
       let parentMeasure;
       if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
         this.safeEvaluateSymbolContext().leafMeasures) {
@@ -1672,13 +1675,13 @@ class BaseQuery {
           if (parentMeasure &&
             (
               this.cubeEvaluator.cubeNameFromPath(parentMeasure) !== cubeName ||
-              this.newMeasure(this.cubeEvaluator.pathFromArray([cubeName, name])).isCumulative()
+              this.newMeasure(this.cubeEvaluator.pathFromArray(memberPathArray)).isCumulative()
             )
           ) {
             this.safeEvaluateSymbolContext().compositeCubeMeasures[parentMeasure] = true;
           }
         }
-        this.safeEvaluateSymbolContext().currentMeasure = this.cubeEvaluator.pathFromArray([cubeName, name]);
+        this.safeEvaluateSymbolContext().currentMeasure = this.cubeEvaluator.pathFromArray(memberPathArray);
         if (this.safeEvaluateSymbolContext().leafMeasures) {
           if (parentMeasure) {
             this.safeEvaluateSymbolContext().leafMeasures[parentMeasure] = false;
@@ -1713,13 +1716,15 @@ class BaseQuery {
         this.safeEvaluateSymbolContext().currentMeasure = parentMeasure;
       }
       return result;
-    } else if (this.cubeEvaluator.isDimension([cubeName, name])) {
+    } else if (this.cubeEvaluator.isDimension(memberPathArray)) {
+      if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
+        return this.evaluateSymbolContext.renderedReference[memberPath];
+      }
       if (symbol.subQuery) {
-        const dimensionPath = this.cubeEvaluator.pathFromArray([cubeName, name]);
         if (this.safeEvaluateSymbolContext().subQueryDimensions) {
-          this.safeEvaluateSymbolContext().subQueryDimensions.push(dimensionPath);
+          this.safeEvaluateSymbolContext().subQueryDimensions.push(memberPath);
         }
-        return this.escapeColumnName(this.aliasName(dimensionPath));
+        return this.escapeColumnName(this.aliasName(memberPath));
       }
       if (symbol.case) {
         return this.renderDimensionCase(symbol, cubeName);
@@ -1732,7 +1737,10 @@ class BaseQuery {
       } else {
         return this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
       }
-    } else if (this.cubeEvaluator.isSegment([cubeName, name])) {
+    } else if (this.cubeEvaluator.isSegment(memberPathArray)) {
+      if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
+        return this.evaluateSymbolContext.renderedReference[memberPath];
+      }
       return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql));
     }
     return this.evaluateSql(cubeName, symbol.sql);
@@ -1762,10 +1770,8 @@ class BaseQuery {
     options = options || {};
     const self = this;
     const { cubeEvaluator } = this;
-    this.pushCubeNameForCollectionIfNecessary(cubeName);
     return cubeEvaluator.resolveSymbolsCall(sql, (name) => {
       const nextCubeName = cubeEvaluator.symbols[name] && name || cubeName;
-      this.pushCubeNameForCollectionIfNecessary(nextCubeName);
       const resolvedSymbol =
         cubeEvaluator.resolveSymbol(
           cubeName,

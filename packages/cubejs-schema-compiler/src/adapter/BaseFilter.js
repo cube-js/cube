@@ -66,9 +66,13 @@ export class BaseFilter extends BaseDimension {
   }
 
   path() {
-    return this.measure ?
-      this.query.cubeEvaluator.parsePath('measures', this.measure) :
-      this.query.cubeEvaluator.parsePath('dimensions', this.dimension);
+    if (this.measure) {
+      return this.query.cubeEvaluator.parsePath('measures', this.measure);
+    } else if (this.query.cubeEvaluator.isInstanceOfType('segments', this.dimension)) {
+      return this.query.cubeEvaluator.parsePath('segments', this.dimension);
+    } else {
+      return this.query.cubeEvaluator.parsePath('dimensions', this.dimension);
+    }
   }
 
   cube() {

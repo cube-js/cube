@@ -228,7 +228,12 @@ export class CubeSymbols {
         }
         const { sqlResolveFn, cubeAliasFn, query } = self.resolveSymbolsCallContext || {};
         if (propertyName === 'toString') {
-          return () => cubeAliasFn && cubeAliasFn(cube.cubeName()) || cube.cubeName();
+          return () => {
+            if (query) {
+              query.pushCubeNameForCollectionIfNecessary(cube.cubeName());
+            }
+            return cubeAliasFn && cubeAliasFn(cube.cubeName()) || cube.cubeName();
+          };
         }
         if (propertyName === 'sql') {
           return () => query.cubeSql(cube.cubeName());

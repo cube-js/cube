@@ -87,6 +87,28 @@ export class CubeEvaluator extends CubeSymbols {
         }
       }
     }
+    this.transformMembers(cube.measures, cube);
+    this.transformMembers(cube.dimensions, cube);
+    this.transformMembers(cube.segments, cube);
+  }
+
+  transformMembers(members, cube) {
+    members = members || {};
+    for (const memberName of Object.keys(members)) {
+      const member = members[memberName];
+      let ownedByCube = true;
+      if (member.sql && !member.subQuery) {
+        const funcArgs = this.funcArguments(member.sql);
+        // TODO case when foreign cube is referenced isn't covered
+        // TODO case when other dimension is referenced through CUBE ref is not covered: it'll be rendered as an owned
+        if (funcArgs.length > 0 && funcArgs.every(
+          ref => !cube.measures[ref] && !cube.dimensions[ref] && !cube.segments[ref] && !this.isCurrentCube(ref) && ref !== cube.name
+        )) {
+          ownedByCube = false;
+        }
+      }
+      members[memberName].ownedByCube = ownedByCube;
+    }
   }
 
   cubesByFileName(fileName) {
@@ -212,6 +234,16 @@ export class CubeEvaluator extends CubeSymbols {
     return this.evaluatedCubes[cubeAndName[0]] &&
       this.evaluatedCubes[cubeAndName[0]][type] &&
       this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
+  }
+
+  byPathAnyType(path) {
+    const type = ['measures', 'dimensions', 'segments'].find(t => this.isInstanceOfType(t, path));
+
+    if (!type) {
+      throw new UserError(`Can't resolve member '${path.join('.')}'`);
+    }
+
+    return this.byPath(type, path);
   }
 
   byPath(type, path) {
