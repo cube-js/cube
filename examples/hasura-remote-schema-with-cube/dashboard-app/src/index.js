@@ -187,28 +187,30 @@ function App() {
     </div>
 
     <table style={{ width: '100%' }}>
-      <tr>
-        <td style={{ width: '50%' }}>
-          <div style={{ height: '375px', margin: '20px 0' }}>
-            <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + Cube {timestamps.CubeQuery ? `(${timestamps.CubeQuery / 1000}s)` : ``}</h3>
-            <DisplayFraudAmountSum
-              loading={loadingFraudDataCube}
-              error={errorFraudDataCube}
-              chartData={fraudChartDataCube}
-            />
-          </div>
-        </td>
-        <td style={{ width: '50%' }}>
-          <div style={{ height: '375px', margin: '20px 0' }}>
-            <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + PostgreSQL {timestamps.HasuraQuery ? `(${timestamps.HasuraQuery / 1000}s)` : ``}</h3>
-            <DisplayFraudAmountSum
-              loading={loadingFraudDataHasura}
-              error={errorFraudDataHasura}
-              chartData={fraudChartDataHasura}
-            />
-          </div>
-        </td>
-      </tr>
+      <tbody>
+        <tr>
+          <td style={{ width: '50%' }}>
+            <div style={{ height: '375px', margin: '20px 0' }}>
+              <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + Cube {timestamps.CubeQuery ? `(${timestamps.CubeQuery / 1000}s)` : ``}</h3>
+              <DisplayFraudAmountSum
+                loading={loadingFraudDataCube}
+                error={errorFraudDataCube}
+                chartData={fraudChartDataCube}
+              />
+            </div>
+          </td>
+          <td style={{ width: '50%' }}>
+            <div style={{ height: '375px', margin: '20px 0' }}>
+              <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + PostgreSQL {timestamps.HasuraQuery ? `(${timestamps.HasuraQuery / 1000}s)` : ``}</h3>
+              <DisplayFraudAmountSum
+                loading={loadingFraudDataHasura}
+                error={errorFraudDataHasura}
+                chartData={fraudChartDataHasura}
+              />
+            </div>
+          </td>
+        </tr>
+      </tbody>
     </table>
   </>
 }
