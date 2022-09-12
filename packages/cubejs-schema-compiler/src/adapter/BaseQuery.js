@@ -1615,10 +1615,6 @@ class BaseQuery {
   }
 
   dimensionSql(dimension) {
-    const context = this.safeEvaluateSymbolContext();
-    if (context.wrapQuery) {
-      return this.escapeColumnName(dimension.unescapedAliasName(context.wrappedGranularity));
-    }
     return this.evaluateSymbolSql(dimension.path()[0], dimension.path()[1], dimension.dimensionDefinition());
   }
 
