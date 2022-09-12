@@ -27,7 +27,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.16.0",
     "@aws-sdk/s3-request-presigner": "^3.16.0",
-    "@cubejs-backend/query-orchestrator": "^0.30.63",
+    "@cubejs-backend/base-driver": "^0.30.68",
     "@cubejs-backend/shared": "^0.30.57",
     "@google-cloud/storage": "^5.8.5",
     "date-fns-timezone": "^0.1.4",

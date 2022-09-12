@@ -5,9 +5,8 @@ import { Bucket, Storage } from '@google-cloud/storage';
 import {
   BaseDriver, DownloadTableCSVData,
   DriverInterface, QueryOptions, StreamTableData,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
-import { Table } from '@google-cloud/bigquery/build/src/table';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
 

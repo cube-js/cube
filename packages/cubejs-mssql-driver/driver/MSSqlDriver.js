@@ -1,5 +1,5 @@
 const sql = require('mssql');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 
 const GenericTypeToMSSql = {
   string: 'nvarchar(max)',

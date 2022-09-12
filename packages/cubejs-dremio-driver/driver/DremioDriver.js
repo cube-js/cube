@@ -1,6 +1,6 @@
 const axios = require('axios');
 const SqlString = require('sqlstring');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 const { getEnv, pausePromise } = require('@cubejs-backend/shared');
 
 const DremioQuery = require('./DremioQuery');

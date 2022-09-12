@@ -28,7 +28,7 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.30.63",
+    "@cubejs-backend/base-driver": "^0.30.68",
     "@cubejs-backend/schema-compiler": "^0.30.67",
     "@cubejs-backend/shared": "^0.30.57",
     "axios": "^0.21.1",

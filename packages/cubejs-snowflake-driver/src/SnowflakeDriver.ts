@@ -6,7 +6,7 @@ import {
   GenericDataBaseType,
   StreamTableData,
   UnloadOptions,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import * as crypto from 'crypto';
 import { formatToTimeZone } from 'date-fns-timezone';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';

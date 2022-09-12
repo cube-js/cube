@@ -17,7 +17,7 @@
     "lint": "eslint **/*.js"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.30.63",
+    "@cubejs-backend/base-driver": "^0.30.68",
     "sqlite3": "^5.0.11"
   },
   "license": "Apache-2.0",

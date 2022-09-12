@@ -31,7 +31,7 @@
     "@aws-sdk/client-athena": "^3.22.0",
     "@aws-sdk/client-s3": "^3.49.0",
     "@aws-sdk/s3-request-presigner": "^3.49.0",
-    "@cubejs-backend/query-orchestrator": "^0.30.63",
+    "@cubejs-backend/base-driver": "^0.30.68",
     "@cubejs-backend/shared": "^0.30.57",
     "sqlstring": "^2.3.1"
   },

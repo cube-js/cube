@@ -23,7 +23,7 @@
     "driver"
   ],
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.30.63",
+    "@cubejs-backend/base-driver": "^0.30.68",
     "@elastic/elasticsearch": "7.12.0",
     "sqlstring": "^2.3.1"
   },
