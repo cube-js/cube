@@ -1108,41 +1108,9 @@ export class PreAggregations {
     const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
 
     const renderedReference = {
-      ...R.pipe(
-        R.map(path => {
-          const measure = this.query.newMeasure(path);
-          return [
-            path,
-            this.query.aggregateOnGroupedColumn(
-              measure.measureDefinition(),
-              measure.aliasName(),
-              !this.query.safeEvaluateSymbolContext().overTimeSeriesAggregate,
-              path
-            ) || `sum(${measure.aliasName()})`
-          ];
-        }),
-        R.fromPairs
-      )(this.rollupMeasures(preAggregationForQuery)),
-      ...R.pipe(
-        R.map(path => {
-          const dimension = this.query.newDimension(path);
-          return [
-            path,
-            this.query.escapeColumnName(dimension.unescapedAliasName())
-          ];
-        }),
-        R.fromPairs
-      )(this.rollupDimensions(preAggregationForQuery)),
-      ...R.pipe(
-        R.map((td) => {
-          const timeDimension = this.query.newTimeDimension(td);
-          return [
-            td.dimension,
-            this.query.escapeColumnName(timeDimension.unescapedAliasName(rollupGranularity))
-          ];
-        }),
-        R.fromPairs
-      )(this.rollupTimeDimensions(preAggregationForQuery)),
+      ...(this.measuresRenderedReference(preAggregationForQuery)),
+      ...(this.dimensionsRenderedReference(preAggregationForQuery)),
+      ...(this.timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery)),
     };
 
     return this.query.evaluateSymbolSqlWithContext(
@@ -1161,6 +1129,50 @@ export class PreAggregations {
         rollupGranularity,
       }
     );
+  }
+
+  measuresRenderedReference(preAggregationForQuery) {
+    return R.pipe(
+      R.map(path => {
+        const measure = this.query.newMeasure(path);
+        return [
+          path,
+          this.query.aggregateOnGroupedColumn(
+            measure.measureDefinition(),
+            measure.aliasName(),
+            !this.query.safeEvaluateSymbolContext().overTimeSeriesAggregate,
+            path,
+          ) || `sum(${measure.aliasName()})`,
+        ];
+      }),
+      R.fromPairs,
+    )(this.rollupMeasures(preAggregationForQuery));
+  }
+
+  dimensionsRenderedReference(preAggregationForQuery) {
+    return R.pipe(
+      R.map(path => {
+        const dimension = this.query.newDimension(path);
+        return [
+          path,
+          this.query.escapeColumnName(dimension.unescapedAliasName()),
+        ];
+      }),
+      R.fromPairs,
+    )(this.rollupDimensions(preAggregationForQuery));
+  }
+
+  timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery) {
+    return R.pipe(
+      R.map((td) => {
+        const timeDimension = this.query.newTimeDimension(td);
+        return [
+          td.dimension,
+          this.query.escapeColumnName(timeDimension.unescapedAliasName(rollupGranularity)),
+        ];
+      }),
+      R.fromPairs,
+    )(this.rollupTimeDimensions(preAggregationForQuery));
   }
 
   rollupMembers(preAggregationForQuery, type) {
