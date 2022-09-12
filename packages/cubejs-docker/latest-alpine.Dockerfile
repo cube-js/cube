@@ -21,9 +21,8 @@ RUN apk update \
     && npm config set python /usr/bin/python2.7 \
     && rm -rf /var/cache/apk/*
 
-# There is a problem with release process.
-# We are doing version bump without updating lock files for the docker package.
-#RUN yarn install --frozen-lockfile
+# We are copying root yarn.lock file to the context folder during the Publish GH
+# action. So, a process will use the root lock file here.
 RUN yarn install && yarn cache clean
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more

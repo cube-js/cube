@@ -7,4 +7,5 @@ expression: "execute_query(\"select * from (select pg_class.oid AS oid from pg_c
 +-------+
 | 18000 |
 | 18014 |
+| 18020 |
 +-------+

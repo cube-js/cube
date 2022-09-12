@@ -9,7 +9,7 @@ class SqliteDriver extends BaseDriver {
     return 2;
   }
 
-  constructor(config) {
+  constructor(config = {}) {
     super();
     this.config = {
       database: process.env.CUBEJS_DB_NAME,

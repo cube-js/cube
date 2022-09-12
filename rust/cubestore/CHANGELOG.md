@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.65](https://github.com/cube-js/cube.js/compare/v0.30.64...v0.30.65) (2022-09-07)
+
+
+### Bug Fixes
+
+* **cubestore:** Fix 'no such file or directory' after cubestore restart ([#5247](https://github.com/cube-js/cube.js/issues/5247)) ([efaf897](https://github.com/cube-js/cube.js/commit/efaf8972c2751cbb5c5852b91a5c22b171f6064b))
+
+
+
+
+
 ## [0.30.61](https://github.com/cube-js/cube.js/compare/v0.30.60...v0.30.61) (2022-09-01)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

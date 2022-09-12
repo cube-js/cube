@@ -1,11 +1,5 @@
 use core::fmt;
-use std::{
-    backtrace::Backtrace, collections::HashMap, env, fmt::Formatter, future::Future, pin::Pin,
-    sync::Arc,
-};
-
-use chrono::{prelude::*, Duration};
-
+use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     arrow::datatypes::DataType,
     execution::context::{
@@ -22,16 +16,13 @@ use datafusion::{
     variable::VarType,
 };
 use itertools::Itertools;
-use log::{debug, trace, warn};
+use log::warn;
 use serde::Serialize;
-use serde_json::json;
-use sqlparser::ast::{self, escape_single_quote_string, DateTimeField, Ident, ObjectName};
-
-use cubeclient::models::{
-    V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+use sqlparser::ast::{self, escape_single_quote_string};
+use std::{
+    backtrace::Backtrace, collections::HashMap, env, fmt::Formatter, future::Future, pin::Pin,
+    sync::Arc,
 };
-
-pub use crate::transport::ctx::*;
 
 use self::{
     builder::*,
@@ -52,10 +43,11 @@ use self::{
             create_datediff_udf, create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf,
             create_db_udf, create_format_type_udf, create_generate_series_udtf,
             create_generate_subscripts_udtf, create_has_schema_privilege_udf, create_hour_udf,
-            create_if_udf, create_instr_udf, create_isnull_udf, create_json_build_object_udf,
-            create_least_udf, create_locate_udf, create_makedate_udf, create_measure_udaf,
-            create_minute_udf, create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
-            create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
+            create_if_udf, create_instr_udf, create_interval_mul_udf, create_isnull_udf,
+            create_json_build_object_udf, create_least_udf, create_locate_udf, create_makedate_udf,
+            create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
+            create_pg_datetime_precision_udf, create_pg_expandarray_udtf,
+            create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
             create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
             create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
@@ -82,1369 +74,24 @@ use crate::{
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
-    transport::{
-        df_data_type_by_column_type, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt,
-        V1CubeMetaSegmentExt,
-    },
+    transport::{df_data_type_by_column_type, V1CubeMetaExt},
     CubeError, CubeErrorCauseType,
 };
 
 pub mod builder;
 pub mod context;
 pub mod engine;
+pub mod error;
+mod legacy_compiler;
 pub mod parser;
 pub mod rewrite;
 pub mod service;
 
-#[derive(thiserror::Error, Debug)]
-pub enum CompilationError {
-    #[error("SQLCompilationError: Internal: {0}")]
-    Internal(String, Backtrace, Option<HashMap<String, String>>),
-    #[error("SQLCompilationError: User: {0}")]
-    User(String, Option<HashMap<String, String>>),
-    #[error("SQLCompilationError: Unsupported: {0}")]
-    Unsupported(String, Option<HashMap<String, String>>),
-}
-
-impl PartialEq for CompilationError {
-    fn eq(&self, other: &Self) -> bool {
-        match &self {
-            CompilationError::Internal(left, _, _) => match other {
-                CompilationError::Internal(right, _, _) => left == right,
-                _ => false,
-            },
-            CompilationError::User(left, _) => match other {
-                CompilationError::User(right, _) => left == right,
-                _ => false,
-            },
-            CompilationError::Unsupported(left, _) => match other {
-                CompilationError::Unsupported(right, _) => left == right,
-                _ => false,
-            },
-        }
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
-    }
-}
-
-impl CompilationError {
-    pub fn backtrace(&self) -> Option<&Backtrace> {
-        match self {
-            CompilationError::Internal(_, bt, _) => Some(bt),
-            CompilationError::User(_, _) => None,
-            CompilationError::Unsupported(_, _) => None,
-        }
-    }
-
-    pub fn to_backtrace(self) -> Option<Backtrace> {
-        match self {
-            CompilationError::Internal(_, bt, _) => Some(bt),
-            CompilationError::User(_, _) => None,
-            CompilationError::Unsupported(_, _) => None,
-        }
-    }
-}
-
-impl CompilationError {
-    pub fn internal(message: String) -> Self {
-        Self::Internal(message, Backtrace::capture(), None)
-    }
-
-    pub fn internal_with_bt(message: String, bt: Backtrace) -> Self {
-        Self::Internal(message, bt, None)
-    }
-
-    pub fn user(message: String) -> Self {
-        Self::User(message, None)
-    }
-
-    pub fn unsupported(message: String) -> Self {
-        Self::Unsupported(message, None)
-    }
-}
-
-impl CompilationError {
-    pub fn message(&self) -> String {
-        match self {
-            CompilationError::Internal(msg, _, _)
-            | CompilationError::User(msg, _)
-            | CompilationError::Unsupported(msg, _) => msg.clone(),
-        }
-    }
-
-    pub fn with_message(self, msg: String) -> Self {
-        match self {
-            CompilationError::Internal(_, bts, meta) => CompilationError::Internal(msg, bts, meta),
-            CompilationError::User(_, meta) => CompilationError::User(msg, meta),
-            CompilationError::Unsupported(_, meta) => CompilationError::Unsupported(msg, meta),
-        }
-    }
-}
-
-impl CompilationError {
-    pub fn with_meta(self, meta: Option<HashMap<String, String>>) -> Self {
-        match self {
-            CompilationError::Internal(msg, bts, _) => CompilationError::Internal(msg, bts, meta),
-            CompilationError::User(msg, _) => CompilationError::User(msg, meta),
-            CompilationError::Unsupported(msg, _) => CompilationError::Unsupported(msg, meta),
-        }
-    }
-}
-
-pub type CompilationResult<T> = std::result::Result<T, CompilationError>;
-
-impl From<regex::Error> for CompilationError {
-    fn from(v: regex::Error) -> Self {
-        CompilationError::internal(format!("{:?}", v))
-    }
-}
-
-impl From<serde_json::Error> for CompilationError {
-    fn from(v: serde_json::Error) -> Self {
-        CompilationError::internal(format!("{:?}", v))
-    }
-}
-
-fn compile_select_expr(
-    expr: &ast::Expr,
-    ctx: &mut QueryContext,
-    builder: &mut QueryBuilder,
-    mb_alias: Option<String>,
-) -> CompilationResult<()> {
-    let selection =
-        ctx.compile_selection_from_projection(expr)?
-            .ok_or(CompilationError::unsupported(format!(
-                "Unknown expression in SELECT statement: {}",
-                expr.to_string()
-            )))?;
-
-    match selection {
-        Selection::TimeDimension(dimension, granularity) => {
-            if let Some(alias) = mb_alias.clone() {
-                ctx.with_alias(
-                    alias,
-                    Selection::TimeDimension(dimension.clone(), granularity.clone()),
-                );
-            };
-
-            builder.with_time_dimension(
-                V1LoadRequestQueryTimeDimension {
-                    dimension: dimension.name.clone(),
-                    granularity: Some(granularity),
-                    date_range: None,
-                },
-                CompiledQueryFieldMeta {
-                    column_from: dimension.name.clone(),
-                    column_to: mb_alias.unwrap_or(dimension.get_real_name()),
-                    column_type: ColumnType::String,
-                },
-            );
-        }
-        Selection::Measure(measure) => {
-            if let Some(alias) = mb_alias.clone() {
-                ctx.with_alias(alias, Selection::Measure(measure.clone()));
-            };
-
-            builder.with_measure(
-                measure.name.clone(),
-                CompiledQueryFieldMeta {
-                    column_from: measure.name.clone(),
-                    column_to: mb_alias.unwrap_or(measure.get_real_name()),
-                    column_type: measure.get_sql_type(),
-                },
-            );
-        }
-        Selection::Dimension(dimension) => {
-            if let Some(alias) = mb_alias.clone() {
-                ctx.with_alias(alias, Selection::Dimension(dimension.clone()));
-            };
-
-            builder.with_dimension(
-                dimension.name.clone(),
-                CompiledQueryFieldMeta {
-                    column_from: dimension.name.clone(),
-                    column_to: mb_alias.unwrap_or(dimension.get_real_name()),
-                    column_type: match dimension._type.as_str() {
-                        "number" => ColumnType::Double,
-                        _ => ColumnType::String,
-                    },
-                },
-            );
-        }
-        Selection::Segment(s) => {
-            return Err(CompilationError::user(format!(
-                "Unable to use segment '{}' as column in SELECT statement",
-                s.get_real_name()
-            )))
-        }
-    }
-
-    Ok(())
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct IntervalLiteral {
-    negative: bool,
-    seconds: u32,
-    minutes: u32,
-    hours: u32,
-    days: u32,
-    months: u32,
-    years: u32,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-enum CompiledExpression {
-    Selection(Selection),
-    StringLiteral(String),
-    DateLiteral(DateTime<Utc>),
-    IntervalLiteral(IntervalLiteral),
-    NumberLiteral(String, bool),
-    BooleanLiteral(bool),
-}
-
-impl CompiledExpression {
-    pub fn to_date_literal(&self) -> Option<CompiledExpression> {
-        let date = self.to_date();
-        date.map(CompiledExpression::DateLiteral)
-    }
-
-    pub fn to_date(&self) -> Option<DateTime<Utc>> {
-        match self {
-            CompiledExpression::DateLiteral(date) => Some(*date),
-            CompiledExpression::StringLiteral(s) => {
-                if let Ok(datetime) = Utc.datetime_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f") {
-                    return Some(datetime);
-                };
-
-                if let Ok(datetime) = DateTime::parse_from_rfc3339(s.as_str()) {
-                    return Some(datetime.into());
-                };
-
-                if let Ok(ref date) = NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d") {
-                    return Some(
-                        Utc.ymd(date.year(), date.month(), date.day())
-                            .and_hms_nano(0, 0, 0, 0),
-                    );
-                }
-
-                None
-            }
-            _ => None,
-        }
-    }
-
-    pub fn to_value_as_str(&self) -> CompilationResult<String> {
-        match &self {
-            CompiledExpression::BooleanLiteral(v) => Ok(if *v {
-                "true".to_string()
-            } else {
-                "false".to_string()
-            }),
-            CompiledExpression::StringLiteral(v) => Ok(v.clone()),
-            CompiledExpression::DateLiteral(date) => {
-                Ok(date.to_rfc3339_opts(SecondsFormat::Millis, true))
-            }
-            CompiledExpression::NumberLiteral(n, is_negative) => {
-                Ok(format!("{}{}", if *is_negative { "-" } else { "" }, n))
-            }
-            _ => Err(CompilationError::internal(format!(
-                "Unable to convert CompiledExpression to String: {:?}",
-                self
-            ))),
-        }
-    }
-}
-
-fn compile_argument(argument: &ast::Expr) -> CompilationResult<CompiledExpression> {
-    match argument {
-        ast::Expr::Value(value) => match value {
-            ast::Value::SingleQuotedString(format) => {
-                Ok(CompiledExpression::StringLiteral(format.clone()))
-            }
-            _ => Err(CompilationError::unsupported(format!(
-                "Unable to compile argument: {:?}",
-                argument
-            ))),
-        },
-        _ => Err(CompilationError::unsupported(format!(
-            "Unable to compile argument: {:?}",
-            argument
-        ))),
-    }
-}
-
-fn function_arguments_unpack2<'a>(
-    f: &'a ast::Function,
-    fn_name: String,
-) -> CompilationResult<(&'a ast::Expr, &'a ast::Expr)> {
-    match f.args.as_slice() {
-        [ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(arg1)), ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(arg2))] => {
-            Ok((&arg1, &arg2))
-        }
-        _ => Err(CompilationError::user(format!(
-            "Unsupported signature for {} function: {:?}",
-            fn_name, f
-        ))),
-    }
-}
-
-fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpression> {
-    let (date_expr, format_expr) = function_arguments_unpack2(&f, "STR_TO_DATE".to_string())?;
-
-    let date = match compile_argument(date_expr)? {
-        CompiledExpression::StringLiteral(str) => str,
-        _ => {
-            return Err(CompilationError::user(format!(
-                "Wrong type of argument (date), must be StringLiteral: {:?}",
-                f
-            )))
-        }
-    };
-    let format = match compile_argument(format_expr)? {
-        CompiledExpression::StringLiteral(str) => str,
-        _ => {
-            return Err(CompilationError::user(format!(
-                "Wrong type of argument (format), must be StringLiteral: {:?}",
-                f
-            )))
-        }
-    };
-
-    if !format.eq("%Y-%m-%d %H:%i:%s.%f") {
-        return Err(CompilationError::user(format!(
-            "Wrong type of argument: {:?}",
-            f
-        )));
-    }
-
-    let parsed_date = Utc
-        .datetime_from_str(date.as_str(), "%Y-%m-%d %H:%M:%S.%f")
-        .map_err(|e| {
-            CompilationError::user(format!("Unable to parse {}, err: {}", date, e.to_string(),))
-        })?;
-
-    Ok(CompiledExpression::DateLiteral(parsed_date))
-}
-
-// DATE(expr)
-// Extracts the date part of the date or datetime expression expr.
-fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<CompiledExpression> {
-    let date_expr = match f.args.as_slice() {
-        [ast::FunctionArg::Unnamed(ast::FunctionArgExpr::Expr(date_expr))] => date_expr,
-        _ => {
-            return Err(CompilationError::user(format!(
-                "Unsupported signature for DATE function: {:?}",
-                f
-            )));
-        }
-    };
-
-    let compiled = compile_expression(&date_expr, &ctx)?;
-    match compiled {
-        date @ CompiledExpression::DateLiteral(_) => Ok(date),
-        CompiledExpression::StringLiteral(ref input) => {
-            let parsed_date = Utc
-                .datetime_from_str(input.as_str(), "%Y-%m-%d %H:%M:%S.%f")
-                .map_err(|e| {
-                    CompilationError::user(format!(
-                        "Unable to parse {}, err: {}",
-                        input,
-                        e.to_string(),
-                    ))
-                })?;
-
-            Ok(CompiledExpression::DateLiteral(parsed_date))
-        }
-        _ => {
-            return Err(CompilationError::user(format!(
-                "Wrong type of argument (date), must be DateLiteral, actual: {:?}",
-                f
-            )))
-        }
-    }
-}
-
-fn now_function(f: &ast::Function) -> CompilationResult<CompiledExpression> {
-    if f.args.len() > 1 {
-        return Err(CompilationError::user(format!(
-            "Unsupported signature for NOW function: {:?}",
-            f
-        )));
-    };
-
-    Ok(CompiledExpression::DateLiteral(Utc::now()))
-}
-
-fn date_add_function(
-    f: &ast::Function,
-    ctx: &QueryContext,
-) -> CompilationResult<CompiledExpression> {
-    let (left_expr, right_expr) = function_arguments_unpack2(&f, "DATE_ADD".to_string())?;
-
-    let date = match compile_expression(&left_expr, &ctx)? {
-        CompiledExpression::DateLiteral(str) => str,
-        _ => {
-            return Err(CompilationError::user(format!(
-                "Wrong type of argument (date), must be DateLiteral: {:?}",
-                f
-            )))
-        }
-    };
-
-    let interval = match compile_expression(&right_expr, &ctx)? {
-        CompiledExpression::IntervalLiteral(str) => str,
-        _ => {
-            return Err(CompilationError::user(format!(
-                "Wrong type of argument (interval), must be IntervalLiteral: {:?}",
-                f
-            )))
-        }
-    };
-
-    let duration = if interval.seconds > 0 {
-        Duration::seconds(interval.seconds as i64)
-    } else if interval.minutes > 0 {
-        Duration::minutes(interval.minutes as i64)
-    } else if interval.hours > 0 {
-        Duration::hours(interval.hours as i64)
-    } else if interval.days > 0 {
-        Duration::days(interval.days as i64)
-    } else if interval.months > 0 {
-        // @todo use real days
-        Duration::days((interval.months * 30) as i64)
-    } else if interval.years > 0 {
-        // @todo use real years
-        Duration::days((interval.years * 365) as i64)
-    } else {
-        return Err(CompilationError::unsupported(format!(
-            "Unsupported manipulation with interval",
-        )));
-    };
-
-    Ok(CompiledExpression::DateLiteral(if interval.negative {
-        date - duration
-    } else {
-        date + duration
-    }))
-}
-
-fn compile_expression(
-    expr: &ast::Expr,
-    ctx: &QueryContext,
-) -> CompilationResult<CompiledExpression> {
-    match expr {
-        ast::Expr::Identifier(ident) => {
-            if let Some(selection) = ctx.find_selection_for_identifier(&ident.value, true) {
-                Ok(CompiledExpression::Selection(selection))
-            } else {
-                Err(CompilationError::user(format!(
-                    "Unable to find selection for: {:?}",
-                    ident
-                )))
-            }
-        }
-        ast::Expr::CompoundIdentifier(i) => {
-            // @todo We need a context with main table rel
-            let identifier = if i.len() == 2 {
-                i[1].value.to_string()
-            } else {
-                return Err(CompilationError::unsupported(format!(
-                    "Unsupported compound identifier in argument: {}",
-                    expr.to_string()
-                )));
-            };
-
-            if let Some(selection) = ctx.find_selection_for_identifier(&identifier, true) {
-                Ok(CompiledExpression::Selection(selection))
-            } else {
-                Err(CompilationError::user(format!(
-                    "Unable to find selection for: {:?}",
-                    identifier
-                )))
-            }
-        }
-        ast::Expr::UnaryOp { expr, op } => match op {
-            ast::UnaryOperator::Minus => match *expr.clone() {
-                ast::Expr::Value(value) => match value {
-                    ast::Value::Number(v, _) => Ok(CompiledExpression::NumberLiteral(v, true)),
-                    _ => Err(CompilationError::user(format!(
-                        "Unsupported value: {:?}",
-                        value
-                    ))),
-                },
-                _ => Err(CompilationError::unsupported(format!(
-                    "Unable to compile Unary Op: {:?}",
-                    expr
-                ))),
-            },
-            _ => Err(CompilationError::unsupported(format!(
-                "Unable to compile Unary Op: {:?}",
-                expr
-            ))),
-        },
-        ast::Expr::Value(val) => match val {
-            ast::Value::SingleQuotedString(v) => Ok(CompiledExpression::StringLiteral(v.clone())),
-            ast::Value::Number(v, _) => Ok(CompiledExpression::NumberLiteral(v.clone(), false)),
-            ast::Value::Boolean(v) => Ok(CompiledExpression::BooleanLiteral(*v)),
-            ast::Value::Interval {
-                value,
-                leading_field,
-                ..
-            } => {
-                let (interval_value, interval_negative) = match compile_expression(&value, &ctx)? {
-                    CompiledExpression::NumberLiteral(n, is_negative) => {
-                        let n = n.to_string().parse::<u32>().map_err(|e| {
-                            CompilationError::unsupported(format!(
-                                "Unable to parse interval value: {}",
-                                e.to_string()
-                            ))
-                        })?;
-
-                        (n, is_negative)
-                    }
-                    _ => {
-                        return Err(CompilationError::user(format!(
-                            "Unsupported type of Interval value, must be NumberLiteral: {:?}",
-                            value
-                        )))
-                    }
-                };
-
-                let mut interval = IntervalLiteral {
-                    negative: false,
-                    seconds: 0,
-                    minutes: 0,
-                    hours: 0,
-                    days: 0,
-                    months: 0,
-                    years: 0,
-                };
-
-                interval.negative = interval_negative;
-
-                match leading_field.clone().unwrap_or(DateTimeField::Second) {
-                    DateTimeField::Second => {
-                        interval.seconds = interval_value;
-                    }
-                    DateTimeField::Minute => {
-                        interval.minutes = interval_value;
-                    }
-                    DateTimeField::Hour => {
-                        interval.hours = interval_value;
-                    }
-                    DateTimeField::Day => {
-                        interval.days = interval_value;
-                    }
-                    DateTimeField::Month => {
-                        interval.months = interval_value;
-                    }
-                    DateTimeField::Year => {
-                        interval.years = interval_value;
-                    }
-                    _ => {
-                        return Err(CompilationError::user(format!(
-                            "Unsupported type of Interval, actual: {:?}",
-                            leading_field
-                        )))
-                    }
-                };
-
-                Ok(CompiledExpression::IntervalLiteral(interval))
-            }
-            _ => Err(CompilationError::user(format!(
-                "Unsupported value: {:?}",
-                val
-            ))),
-        },
-        ast::Expr::Function(f) => match f.name.to_string().to_lowercase().as_str() {
-            "str_to_date" => str_to_date_function(&f),
-            "date" => date_function(&f, &ctx),
-            "date_add" => date_add_function(&f, &ctx),
-            "now" => now_function(&f),
-            _ => Err(CompilationError::user(format!(
-                "Unsupported function: {:?}",
-                f
-            ))),
-        },
-        _ => Err(CompilationError::unsupported(format!(
-            "Unable to compile expression: {:?}",
-            expr
-        ))),
-    }
-}
-
-fn compiled_binary_op_expr(
-    left: &Box<ast::Expr>,
-    op: &ast::BinaryOperator,
-    right: &Box<ast::Expr>,
-    ctx: &QueryContext,
-) -> CompilationResult<CompiledFilterTree> {
-    let left_ce = compile_expression(left, ctx)?;
-    let right_ce = compile_expression(right, ctx)?;
-
-    // Group selection to left, expr for filtering to right
-    let (selection_to_filter, filter_expr) = match (left_ce, right_ce) {
-        (CompiledExpression::Selection(selection), non_selection) => (selection, non_selection),
-        (non_selection, CompiledExpression::Selection(selection)) => (selection, non_selection),
-        // CubeSQL doesnt support BinaryExpression with literals in both sides
-        (l, r) => {
-            return Err(CompilationError::unsupported(format!(
-                "Unable to compile binary expression (unbound expr): ({:?}, {:?})",
-                l, r
-            )))
-        }
-    };
-
-    let member = match selection_to_filter.clone() {
-        Selection::TimeDimension(d, _) => d.name,
-        Selection::Dimension(d) => d.name,
-        Selection::Measure(m) => m.name,
-        Selection::Segment(m) => m.name,
-    };
-
-    let compiled_filter = match selection_to_filter {
-        // Compile to CompiledFilter::Filter
-        Selection::Measure(_measure) => {
-            let (value, operator) = match op {
-                ast::BinaryOperator::NotLike => (filter_expr, "notContains".to_string()),
-                ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
-                ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
-                ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
-                ast::BinaryOperator::GtEq => (filter_expr, "gte".to_string()),
-                ast::BinaryOperator::Gt => (filter_expr, "gt".to_string()),
-                ast::BinaryOperator::Lt => (filter_expr, "lt".to_string()),
-                ast::BinaryOperator::LtEq => (filter_expr, "lte".to_string()),
-                _ => {
-                    return Err(CompilationError::unsupported(format!(
-                        "Operator in binary expression for measure: {} {} {}",
-                        left, op, right
-                    )))
-                }
-            };
-
-            CompiledFilter::Filter {
-                member,
-                operator,
-                values: Some(vec![value.to_value_as_str()?]),
-            }
-        }
-        // Compile to CompiledFilter::Filter
-        Selection::Dimension(dim) => {
-            let filter_expr = if dim.is_time() {
-                let date = filter_expr.to_date();
-                if let Some(dt) = date {
-                    CompiledExpression::DateLiteral(dt)
-                } else {
-                    return Err(CompilationError::user(format!(
-                        "Unable to compare time dimension \"{}\" with not a date value: {}",
-                        dim.get_real_name(),
-                        filter_expr.to_value_as_str()?
-                    )));
-                }
-            } else {
-                filter_expr
-            };
-
-            let (value, operator) = match op {
-                ast::BinaryOperator::NotLike => (filter_expr, "notContains".to_string()),
-                ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
-                ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
-                ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
-                ast::BinaryOperator::GtEq => match filter_expr {
-                    CompiledExpression::DateLiteral(_) => (filter_expr, "afterDate".to_string()),
-                    _ => (filter_expr, "gte".to_string()),
-                },
-                ast::BinaryOperator::Gt => match filter_expr {
-                    CompiledExpression::DateLiteral(dt) => (
-                        CompiledExpression::DateLiteral(dt + Duration::milliseconds(1)),
-                        "afterDate".to_string(),
-                    ),
-                    _ => (filter_expr, "gt".to_string()),
-                },
-                ast::BinaryOperator::Lt => match filter_expr {
-                    CompiledExpression::DateLiteral(dt) => (
-                        CompiledExpression::DateLiteral(dt - Duration::milliseconds(1)),
-                        "beforeDate".to_string(),
-                    ),
-                    _ => (filter_expr, "lt".to_string()),
-                },
-                ast::BinaryOperator::LtEq => match filter_expr {
-                    CompiledExpression::DateLiteral(_) => (filter_expr, "beforeDate".to_string()),
-                    _ => (filter_expr, "lte".to_string()),
-                },
-                _ => {
-                    return Err(CompilationError::unsupported(format!(
-                        "Operator in binary expression for dimension: {} {} {}",
-                        left, op, right
-                    )))
-                }
-            };
-
-            CompiledFilter::Filter {
-                member,
-                operator,
-                values: Some(vec![value.to_value_as_str()?]),
-            }
-        }
-        // Compile to CompiledFilter::SegmentFilter (it will be pushed to segments via optimization)
-        Selection::Segment(_) => match op {
-            ast::BinaryOperator::Eq => match filter_expr {
-                CompiledExpression::BooleanLiteral(v) => {
-                    if v {
-                        CompiledFilter::SegmentFilter { member }
-                    } else {
-                        return Err(CompilationError::unsupported(
-                            "Unable to use false as value for filtering segment".to_string(),
-                        ));
-                    }
-                }
-                _ => {
-                    return Err(CompilationError::unsupported(format!(
-                        "Unable to use value {:?} as value for filtering segment",
-                        filter_expr
-                    )));
-                }
-            },
-            _ => {
-                return Err(CompilationError::user(format!(
-                    "Unable to use operator {} with segment: {} {} {}",
-                    op, left, op, right
-                )));
-            }
-        },
-        _ => {
-            return Err(CompilationError::unsupported(format!(
-                "Binary expression: {} {} {}",
-                left, op, right
-            )))
-        }
-    };
-
-    Ok(CompiledFilterTree::Filter(compiled_filter))
-}
-
-fn binary_op_create_node_and(
-    left: CompiledFilterTree,
-    right: CompiledFilterTree,
-) -> CompilationResult<CompiledFilterTree> {
-    match [&left, &right] {
-        [CompiledFilterTree::Filter(left_f), CompiledFilterTree::Filter(right_f)] => {
-            match [left_f, right_f] {
-                [CompiledFilter::Filter {
-                    member: l_member,
-                    operator: l_op,
-                    values: l_v,
-                }, CompiledFilter::Filter {
-                    member: r_member,
-                    operator: r_op,
-                    values: r_v,
-                }] => {
-                    if l_member.eq(r_member)
-                        && ((l_op.eq(&"beforeDate".to_string())
-                            && r_op.eq(&"afterDate".to_string()))
-                            || (l_op.eq(&"afterDate".to_string())
-                                && r_op.eq(&"beforeDate".to_string())))
-                    {
-                        return Ok(CompiledFilterTree::Filter(CompiledFilter::Filter {
-                            member: l_member.clone(),
-                            operator: "inDateRange".to_string(),
-                            values: Some(vec![
-                                l_v.as_ref().unwrap().first().unwrap().to_string(),
-                                r_v.as_ref().unwrap().first().unwrap().to_string(),
-                            ]),
-                        }));
-                    };
-                }
-                _ => {}
-            }
-        }
-        _ => {}
-    };
-
-    Ok(CompiledFilterTree::And(Box::new(left), Box::new(right)))
-}
-
-fn compiled_binary_op_logical(
-    left: &Box<ast::Expr>,
-    op: &ast::BinaryOperator,
-    right: &Box<ast::Expr>,
-    ctx: &QueryContext,
-) -> CompilationResult<CompiledFilterTree> {
-    let left = compile_where_expression(left, ctx)?;
-    let right = compile_where_expression(right, ctx)?;
-
-    match op {
-        ast::BinaryOperator::And => Ok(binary_op_create_node_and(left, right)?),
-        ast::BinaryOperator::Or => Ok(CompiledFilterTree::Or(Box::new(left), Box::new(right))),
-        _ => Err(CompilationError::unsupported(format!(
-            "Unable to compiled_binary_op_logical: BinaryOp({:?}, {:?}, {:?})",
-            left, op, right
-        ))),
-    }
-}
-
-fn compile_where_expression(
-    expr: &ast::Expr,
-    ctx: &QueryContext,
-) -> CompilationResult<CompiledFilterTree> {
-    match expr {
-        // Unwrap from brackets
-        ast::Expr::Nested(nested) => compile_where_expression(nested, ctx),
-        ast::Expr::BinaryOp { left, right, op } => match op {
-            ast::BinaryOperator::And | ast::BinaryOperator::Or => {
-                compiled_binary_op_logical(left, op, right, ctx)
-            }
-            _ => compiled_binary_op_expr(left, op, right, ctx),
-        },
-        ast::Expr::IsNull(expr) => {
-            let compiled_expr = compile_expression(expr, ctx)?;
-            let column_for_filter = match &compiled_expr {
-                CompiledExpression::Selection(selection) => match selection {
-                    Selection::TimeDimension(t, _) => Ok(t),
-                    Selection::Dimension(d) => Ok(d),
-                    Selection::Segment(_) | Selection::Measure(_) => {
-                        Err(CompilationError::user(format!(
-                            "Column for IsNull must be a Dimension or TimeDimension, actual: {:?}",
-                            compiled_expr
-                        )))
-                    }
-                },
-                _ => Err(CompilationError::user(format!(
-                    "Column for IsNull must be a Dimension or TimeDimension, actual: {:?}",
-                    compiled_expr
-                ))),
-            }?;
-
-            Ok(CompiledFilterTree::Filter(CompiledFilter::Filter {
-                member: column_for_filter.name.clone(),
-                operator: "notSet".to_string(),
-                values: None,
-            }))
-        }
-        ast::Expr::Between {
-            expr,
-            negated,
-            low,
-            high,
-        } => {
-            let compiled_expr = compile_expression(expr, ctx)?;
-            let column_for_filter = match &compiled_expr {
-                CompiledExpression::Selection(Selection::TimeDimension(t, _)) => Ok(t),
-                CompiledExpression::Selection(Selection::Dimension(d)) => {
-                    if d.is_time() {
-                        Ok(d)
-                    } else {
-                        Err(CompilationError::user(format!(
-                            "Column for Between must be a time dimension, actual: {:?}",
-                            compiled_expr
-                        )))
-                    }
-                }
-                _ => Err(CompilationError::user(format!(
-                    "Column for Between must be a time dimension, actual: {:?}",
-                    compiled_expr
-                ))),
-            }?;
-
-            let low_compiled = compile_expression(low, ctx)?;
-            let low_compiled_date =
-                low_compiled
-                    .to_date_literal()
-                    .ok_or(CompilationError::user(format!(
-                        "Unable to compare time dimension \"{}\" with not a date value: {}",
-                        column_for_filter.get_real_name(),
-                        low_compiled.to_value_as_str()?
-                    )))?;
-
-            let high_compiled = compile_expression(high, ctx)?;
-            let high_compiled_date =
-                high_compiled
-                    .to_date_literal()
-                    .ok_or(CompilationError::user(format!(
-                        "Unable to compare time dimension \"{}\" with not a date value: {}",
-                        column_for_filter.get_real_name(),
-                        high_compiled.to_value_as_str()?
-                    )))?;
-
-            Ok(CompiledFilterTree::Filter(CompiledFilter::Filter {
-                member: column_for_filter.name.clone(),
-                operator: if *negated {
-                    "notInDateRange".to_string()
-                } else {
-                    "inDateRange".to_string()
-                },
-                values: Some(vec![
-                    low_compiled_date.to_value_as_str()?,
-                    high_compiled_date.to_value_as_str()?,
-                ]),
-            }))
-        }
-        ast::Expr::IsNotNull(expr) => {
-            let compiled_expr = compile_expression(expr, ctx)?;
-            let column_for_filter = match &compiled_expr {
-                CompiledExpression::Selection(selection) => match selection {
-                    Selection::TimeDimension(t, _) => Ok(t),
-                    Selection::Dimension(d) => Ok(d),
-                    Selection::Segment(_) | Selection::Measure(_) => {
-                        Err(CompilationError::user(format!(
-                            "Column for IsNull must be a Dimension or TimeDimension, actual: {:?}",
-                            compiled_expr
-                        )))
-                    }
-                },
-                _ => Err(CompilationError::user(format!(
-                    "Column for IsNull must be a Dimension or TimeDimension, actual: {:?}",
-                    compiled_expr
-                ))),
-            }?;
-
-            Ok(CompiledFilterTree::Filter(CompiledFilter::Filter {
-                member: column_for_filter.name.clone(),
-                operator: "set".to_string(),
-                values: None,
-            }))
-        }
-        ast::Expr::InList {
-            expr,
-            list,
-            negated,
-        } => {
-            let compiled_expr = compile_expression(expr, ctx)?;
-            let column_for_filter = match &compiled_expr {
-                CompiledExpression::Selection(selection) => match selection {
-                    Selection::TimeDimension(t, _) => Ok(t),
-                    Selection::Dimension(d) => Ok(d),
-                    Selection::Segment(_) | Selection::Measure(_) => {
-                        Err(CompilationError::user(format!(
-                            "Column for InExpr must be a Dimension or TimeDimension, actual: {:?}",
-                            compiled_expr
-                        )))
-                    }
-                },
-                _ => Err(CompilationError::user(format!(
-                    "Column for InExpr must be a Dimension or TimeDimension, actual: {:?}",
-                    compiled_expr
-                ))),
-            }?;
-
-            fn compile_value(value: &ast::Expr, ctx: &QueryContext) -> CompilationResult<String> {
-                compile_expression(value, ctx)?.to_value_as_str()
-            }
-
-            let values = list
-                .iter()
-                .map(|value| compile_value(value, ctx))
-                .take_while(Result::is_ok)
-                .map(Result::unwrap)
-                .collect();
-
-            Ok(CompiledFilterTree::Filter(CompiledFilter::Filter {
-                member: column_for_filter.name.clone(),
-                operator: if *negated {
-                    "notEquals".to_string()
-                } else {
-                    "equals".to_string()
-                },
-                values: Some(values),
-            }))
-        }
-        _ => Err(CompilationError::unsupported(format!(
-            "Unable to compile expression: {:?}",
-            expr
-        ))),
-    }
-}
-
-fn optimize_where_inner_filter(
-    tree: Box<CompiledFilterTree>,
-    builder: &mut QueryBuilder,
-) -> Option<Box<CompiledFilterTree>> {
-    match *tree {
-        CompiledFilterTree::Filter(ref filter) => match filter {
-            CompiledFilter::Filter {
-                member,
-                operator,
-                values,
-            } => {
-                if operator.eq(&"inDateRange".to_string()) {
-                    let filter_pushdown = builder.push_date_range_for_time_dimension(
-                        member,
-                        json!(values.as_ref().unwrap()),
-                    );
-                    if filter_pushdown {
-                        None
-                    } else {
-                        debug!("Unable to push down {}", member);
-
-                        Some(tree)
-                    }
-                } else {
-                    Some(tree)
-                }
-            }
-            CompiledFilter::SegmentFilter { member } => {
-                builder.with_segment(member.clone());
-
-                None
-            }
-        },
-        _ => Some(tree),
-    }
-}
-
-fn optimize_where_filters(
-    parent: Option<CompiledFilterTree>,
-    current: CompiledFilterTree,
-    builder: &mut QueryBuilder,
-) -> Option<CompiledFilterTree> {
-    if parent.is_none() {
-        match current {
-            CompiledFilterTree::And(left, right) => {
-                let left_recompile = optimize_where_inner_filter(left, builder);
-                let right_recompile = optimize_where_inner_filter(right, builder);
-
-                match (left_recompile, right_recompile) {
-                    (Some(l), Some(r)) => {
-                        return Some(CompiledFilterTree::And(l, r));
-                    }
-                    (Some(l), None) => {
-                        return Some(*l);
-                    }
-                    (None, Some(r)) => {
-                        return Some(*r);
-                    }
-                    (None, None) => {
-                        return None;
-                    }
-                }
-            }
-            CompiledFilterTree::Filter(ref filter) => {
-                match filter {
-                    CompiledFilter::Filter {
-                        member,
-                        operator,
-                        values,
-                    } => {
-                        if operator.eq(&"inDateRange".to_string()) {
-                            let filter_pushdown = builder.push_date_range_for_time_dimension(
-                                member,
-                                json!(values.as_ref().unwrap()),
-                            );
-                            if filter_pushdown {
-                                return None;
-                            } else {
-                                debug!("Unable to push down {}", member)
-                            }
-                        }
-                    }
-                    CompiledFilter::SegmentFilter { member } => {
-                        builder.with_segment(member.clone());
-
-                        return None;
-                    }
-                };
-            }
-            _ => {}
-        };
-    };
-
-    Some(current)
-}
-
-fn convert_where_filters(
-    node: CompiledFilterTree,
-) -> CompilationResult<Vec<V1LoadRequestQueryFilterItem>> {
-    match node {
-        // It's a special case for the root of CompiledFilterTree to simplify and operator without using logical and
-        CompiledFilterTree::And(left, right) => {
-            let mut l = convert_where_filters_unnest_and(*left)?;
-            let mut r = convert_where_filters_unnest_and(*right)?;
-
-            l.append(&mut r);
-
-            Ok(l)
-        }
-        _ => Ok(vec![convert_where_filters_base(node)?]),
-    }
-}
-
-fn convert_where_filters_unnest_and(
-    node: CompiledFilterTree,
-) -> CompilationResult<Vec<V1LoadRequestQueryFilterItem>> {
-    match node {
-        CompiledFilterTree::And(left, right) => {
-            let mut l = convert_where_filters_unnest_and(*left)?;
-            let mut r = convert_where_filters_unnest_and(*right)?;
-
-            l.append(&mut r);
-
-            Ok(l)
-        }
-        _ => Ok(vec![convert_where_filters_base(node)?]),
-    }
-}
-
-fn convert_where_filters_unnest_or(
-    node: CompiledFilterTree,
-) -> CompilationResult<Vec<V1LoadRequestQueryFilterItem>> {
-    match node {
-        CompiledFilterTree::Or(left, right) => {
-            let mut l = convert_where_filters_unnest_or(*left)?;
-            let mut r = convert_where_filters_unnest_or(*right)?;
-
-            l.append(&mut r);
-
-            Ok(l)
-        }
-        _ => Ok(vec![convert_where_filters_base(node)?]),
-    }
-}
-
-fn convert_where_filters_base(
-    node: CompiledFilterTree,
-) -> CompilationResult<V1LoadRequestQueryFilterItem> {
-    match node {
-        CompiledFilterTree::Filter(filter) => match filter {
-            CompiledFilter::Filter {
-                member,
-                operator,
-                values,
-            } => Ok(V1LoadRequestQueryFilterItem {
-                member: Some(member),
-                operator: Some(operator),
-                values,
-                or: None,
-                and: None,
-            }),
-            CompiledFilter::SegmentFilter { member: _ } => Err(CompilationError::internal(
-                "Unable to compile segments, it should be pushed down to segments".to_string(),
-            )),
-        },
-        CompiledFilterTree::And(left, right) => {
-            let mut l = convert_where_filters_unnest_and(*left)?;
-            let mut r = convert_where_filters_unnest_and(*right)?;
-
-            l.append(&mut r);
-
-            Ok(V1LoadRequestQueryFilterItem {
-                member: None,
-                operator: None,
-                values: None,
-                or: None,
-                and: Some(l.iter().map(|filter| json!(filter)).collect::<_>()),
-            })
-        }
-        CompiledFilterTree::Or(left, right) => {
-            let mut l = convert_where_filters_unnest_or(*left)?;
-            let mut r = convert_where_filters_unnest_or(*right)?;
-
-            l.append(&mut r);
-
-            Ok(V1LoadRequestQueryFilterItem {
-                member: None,
-                operator: None,
-                values: None,
-                or: Some(l.iter().map(|filter| json!(filter)).collect::<_>()),
-                and: None,
-            })
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-enum CompiledFilter {
-    Filter {
-        member: String,
-        operator: String,
-        values: Option<Vec<String>>,
-    },
-    SegmentFilter {
-        member: String,
-    },
-}
-
-#[derive(Debug, Clone)]
-enum CompiledFilterTree {
-    Filter(CompiledFilter),
-    And(Box<CompiledFilterTree>, Box<CompiledFilterTree>),
-    Or(Box<CompiledFilterTree>, Box<CompiledFilterTree>),
-}
-
-fn compile_group(
-    grouping: &Vec<ast::Expr>,
-    ctx: &QueryContext,
-    _builder: &mut QueryBuilder,
-) -> CompilationResult<()> {
-    for group in grouping.iter() {
-        match &group {
-            ast::Expr::Identifier(i) => {
-                if let Some(selection) = ctx.find_selection_for_identifier(&i.to_string(), true) {
-                    match selection {
-                        Selection::Segment(s) => {
-                            return Err(CompilationError::user(format!(
-                                "Unable to use segment '{}' in GROUP BY",
-                                s.get_real_name()
-                            )));
-                        }
-                        _ => {}
-                    }
-                };
-            }
-            _ => {}
-        }
-    }
-
-    Ok(())
-}
-
-fn compile_where(
-    selection: &ast::Expr,
-    ctx: &QueryContext,
-    builder: &mut QueryBuilder,
-) -> CompilationResult<()> {
-    let filters = match &selection {
-        binary @ ast::Expr::BinaryOp { left, right, op } => match op {
-            ast::BinaryOperator::Like
-            | ast::BinaryOperator::NotLike
-            | ast::BinaryOperator::Lt
-            | ast::BinaryOperator::LtEq
-            | ast::BinaryOperator::Gt
-            | ast::BinaryOperator::GtEq
-            | ast::BinaryOperator::Eq
-            | ast::BinaryOperator::NotEq => compile_where_expression(binary, ctx)?,
-            ast::BinaryOperator::And => {
-                let left_compiled = compile_where_expression(left, ctx)?;
-                let right_compiled = compile_where_expression(right, ctx)?;
-
-                binary_op_create_node_and(left_compiled, right_compiled)?
-            }
-            ast::BinaryOperator::Or => {
-                let left_compiled = compile_where_expression(left, ctx)?;
-                let right_compiled = compile_where_expression(right, ctx)?;
-
-                CompiledFilterTree::Or(Box::new(left_compiled), Box::new(right_compiled))
-            }
-            _ => {
-                return Err(CompilationError::unsupported(format!(
-                    "Operator for binary expression in WHERE clause: {:?}",
-                    selection
-                )));
-            }
-        },
-        ast::Expr::Nested(nested) => compile_where_expression(nested, ctx)?,
-        inlist @ ast::Expr::InList { .. } => compile_where_expression(inlist, ctx)?,
-        isnull @ ast::Expr::IsNull { .. } => compile_where_expression(isnull, ctx)?,
-        isnotnull @ ast::Expr::IsNotNull { .. } => compile_where_expression(isnotnull, ctx)?,
-        between @ ast::Expr::Between { .. } => compile_where_expression(between, ctx)?,
-        _ => {
-            return Err(CompilationError::unsupported(format!(
-                "Expression in WHERE clause: {:?}",
-                selection
-            )));
-        }
-    };
-
-    trace!("Filters (before optimization): {:?}", filters);
-
-    let filters = optimize_where_filters(None, filters, builder);
-    trace!("Filters (after optimization): {:?}", filters);
-
-    if let Some(optimized_filter) = filters {
-        builder.with_filters(convert_where_filters(optimized_filter)?);
-    }
-
-    Ok(())
-}
-
-fn compile_order(
-    order_by: &Vec<ast::OrderByExpr>,
-    ctx: &QueryContext,
-    builder: &mut QueryBuilder,
-) -> CompilationResult<()> {
-    if order_by.is_empty() {
-        return Ok(());
-    };
-
-    for order_expr in order_by.iter() {
-        let order_selection = ctx
-            .compile_selection(&order_expr.expr.clone())?
-            .ok_or_else(|| {
-                CompilationError::unsupported(format!(
-                    "Unsupported expression in order: {:?}",
-                    order_expr.expr
-                ))
-            })?;
-
-        let direction_as_str = if let Some(direction) = order_expr.asc {
-            if direction {
-                "asc".to_string()
-            } else {
-                "desc".to_string()
-            }
-        } else {
-            "asc".to_string()
-        };
-
-        match order_selection {
-            Selection::Dimension(d) => builder.with_order(vec![d.name.clone(), direction_as_str]),
-            Selection::Measure(m) => builder.with_order(vec![m.name.clone(), direction_as_str]),
-            Selection::TimeDimension(t, _) => {
-                builder.with_order(vec![t.name.clone(), direction_as_str])
-            }
-            Selection::Segment(s) => {
-                return Err(CompilationError::user(format!(
-                    "Unable to use segment '{}' in ORDER BY",
-                    s.get_real_name()
-                )));
-            }
-        };
-    }
-
-    Ok(())
-}
-
-fn compile_select(expr: &ast::Select, ctx: &mut QueryContext) -> CompilationResult<QueryBuilder> {
-    let mut builder = QueryBuilder::new();
-
-    if !expr.projection.is_empty() {
-        for projection in expr.projection.iter() {
-            match projection {
-                ast::SelectItem::Wildcard => {
-                    for dimension in ctx.meta.dimensions.iter() {
-                        builder.with_dimension(
-                            dimension.name.clone(),
-                            CompiledQueryFieldMeta {
-                                column_from: dimension.name.clone(),
-                                column_to: dimension.get_real_name(),
-                                column_type: match dimension._type.as_str() {
-                                    "number" => ColumnType::Double,
-                                    _ => ColumnType::String,
-                                },
-                            },
-                        )
-                    }
-                }
-                ast::SelectItem::UnnamedExpr(expr) => {
-                    compile_select_expr(expr, ctx, &mut builder, None)?
-                }
-                ast::SelectItem::ExprWithAlias { expr, alias } => {
-                    compile_select_expr(expr, ctx, &mut builder, Some(alias.value.to_string()))?
-                }
-                _ => {
-                    return Err(CompilationError::unsupported(format!(
-                        "Unsupported expression in projection: {:?}",
-                        projection
-                    )));
-                }
-            }
-        }
-    }
-
-    Ok(builder)
-}
+#[cfg(test)]
+pub mod test;
+
+pub use crate::transport::ctx::*;
+pub use error::{CompilationError, CompilationResult};
 
 #[derive(Clone)]
 struct QueryPlanner {
@@ -1629,7 +276,7 @@ impl QueryPlanner {
 
         if let Some(cube) = self.meta.find_cube_with_name(&table_name) {
             let mut ctx = QueryContext::new(&cube);
-            let mut builder = compile_select(select, &mut ctx)?;
+            let mut builder = legacy_compiler::compile_select(select, &mut ctx)?;
 
             if let Some(limit_expr) = &q.limit {
                 let limit = limit_expr.to_string().parse::<i32>().map_err(|e| {
@@ -1653,11 +300,11 @@ impl QueryPlanner {
                 builder.with_offset(offset);
             }
 
-            compile_group(&select.group_by, &ctx, &mut builder)?;
-            compile_order(&q.order_by, &ctx, &mut builder)?;
+            legacy_compiler::compile_group(&select.group_by, &ctx, &mut builder)?;
+            legacy_compiler::compile_order(&q.order_by, &ctx, &mut builder)?;
 
             if let Some(selection) = &select.selection {
-                compile_where(selection, &ctx, &mut builder)?;
+                legacy_compiler::compile_where(selection, &ctx, &mut builder)?;
             }
 
             let query = builder.build();
@@ -1818,7 +465,10 @@ impl QueryPlanner {
         }
     }
 
-    async fn show_variable_to_plan(&self, variable: &Vec<Ident>) -> CompilationResult<QueryPlan> {
+    async fn show_variable_to_plan(
+        &self,
+        variable: &Vec<ast::Ident>,
+    ) -> CompilationResult<QueryPlan> {
         let name = variable.to_vec()[0].value.clone();
         if self.state.protocol == DatabaseProtocol::PostgreSQL {
             let full_variable = variable.iter().map(|v| v.value.to_lowercase()).join("_");
@@ -1940,7 +590,7 @@ impl QueryPlanner {
 
     fn show_create_to_plan(
         &self,
-        obj_name: &ObjectName,
+        obj_name: &ast::ObjectName,
         obj_type: &ast::ShowCreateObject,
     ) -> Result<QueryPlan, CompilationError> {
         match obj_type {
@@ -2078,13 +728,13 @@ impl QueryPlanner {
     ) -> Result<QueryPlan, CompilationError> {
         let db_name = match db_name {
             Some(db_name) => db_name.clone(),
-            None => Ident::new(self.state.database().unwrap_or("db".to_string())),
+            None => ast::Ident::new(self.state.database().unwrap_or("db".to_string())),
         };
 
         let column_name = format!("Tables_in_{}", db_name.value);
         let column_name = match db_name.quote_style {
-            Some(quote_style) => Ident::with_quote(quote_style, column_name),
-            None => Ident::new(column_name),
+            Some(quote_style) => ast::Ident::with_quote(quote_style, column_name),
+            None => ast::Ident::new(column_name),
         };
 
         let columns = match full {
@@ -2477,6 +1127,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_get_serial_sequence_udf());
         ctx.register_udf(create_json_build_object_udf());
         ctx.register_udf(create_regexp_substr_udf());
+        ctx.register_udf(create_interval_mul_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -2754,7 +1405,7 @@ pub async fn convert_sql_to_cube_query(
 mod tests {
     use async_trait::async_trait;
     use cubeclient::models::{
-        V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadResponse,
+        V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension, V1LoadResponse,
     };
     use datafusion::{dataframe::DataFrame as DFDataFrame, logical_plan::plan::Filter};
     use pretty_assertions::assert_eq;
@@ -2762,6 +1413,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        compile::test::get_test_meta,
         sql::{
             dataframe::batch_to_dataframe, types::StatusFlags, AuthContextRef,
             AuthenticateResponse, HttpAuthContext, ServerManager, SqlAuthService,
@@ -2770,6 +1422,7 @@ mod tests {
     };
     use datafusion::logical_plan::PlanVisitor;
     use log::Level;
+    use serde_json::json;
     use simple_logger::SimpleLogger;
 
     lazy_static! {
@@ -2792,91 +1445,6 @@ mod tests {
             log::set_max_level(log_level.to_level_filter());
             *initialized = true;
         }
-    }
-
-    fn get_test_meta() -> Vec<V1CubeMeta> {
-        vec![
-            V1CubeMeta {
-                name: "KibanaSampleDataEcommerce".to_string(),
-                title: None,
-                dimensions: vec![
-                    V1CubeMetaDimension {
-                        name: "KibanaSampleDataEcommerce.order_date".to_string(),
-                        _type: "time".to_string(),
-                    },
-                    V1CubeMetaDimension {
-                        name: "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                        _type: "string".to_string(),
-                    },
-                    V1CubeMetaDimension {
-                        name: "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                        _type: "number".to_string(),
-                    },
-                    V1CubeMetaDimension {
-                        name: "KibanaSampleDataEcommerce.has_subscription".to_string(),
-                        _type: "boolean".to_string(),
-                    },
-                ],
-                measures: vec![
-                    V1CubeMetaMeasure {
-                        name: "KibanaSampleDataEcommerce.count".to_string(),
-                        title: None,
-                        _type: "number".to_string(),
-                        agg_type: Some("count".to_string()),
-                    },
-                    V1CubeMetaMeasure {
-                        name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                        title: None,
-                        _type: "number".to_string(),
-                        agg_type: Some("max".to_string()),
-                    },
-                    V1CubeMetaMeasure {
-                        name: "KibanaSampleDataEcommerce.minPrice".to_string(),
-                        title: None,
-                        _type: "number".to_string(),
-                        agg_type: Some("min".to_string()),
-                    },
-                    V1CubeMetaMeasure {
-                        name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
-                        title: None,
-                        _type: "number".to_string(),
-                        agg_type: Some("avg".to_string()),
-                    },
-                ],
-                segments: vec![
-                    V1CubeMetaSegment {
-                        name: "KibanaSampleDataEcommerce.is_male".to_string(),
-                        title: "Ecommerce Male".to_string(),
-                        short_title: "Male".to_string(),
-                    },
-                    V1CubeMetaSegment {
-                        name: "KibanaSampleDataEcommerce.is_female".to_string(),
-                        title: "Ecommerce Female".to_string(),
-                        short_title: "Female".to_string(),
-                    },
-                ],
-            },
-            V1CubeMeta {
-                name: "Logs".to_string(),
-                title: None,
-                dimensions: vec![],
-                measures: vec![
-                    V1CubeMetaMeasure {
-                        name: "Logs.agentCount".to_string(),
-                        title: None,
-                        _type: "number".to_string(),
-                        agg_type: Some("countDistinct".to_string()),
-                    },
-                    V1CubeMetaMeasure {
-                        name: "Logs.agentCountApprox".to_string(),
-                        title: None,
-                        _type: "number".to_string(),
-                        agg_type: Some("countDistinctApprox".to_string()),
-                    },
-                ],
-                segments: vec![],
-            },
-        ]
     }
 
     fn get_test_tenant_ctx() -> Arc<MetaContext> {
@@ -3168,6 +1736,68 @@ mod tests {
                 filters: None
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_in_filter() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user IN ('gopher')"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_in_filter_thoughtspot() {
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE (LOWER("ta_1"."__user" IN ('gopher')) = TRUE)"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let expected_request = V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+            segments: Some(vec![]),
+            dimensions: Some(vec![]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+        };
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+        assert_eq!(cube_scan.request, expected_request);
+
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE ((LOWER("ta_1"."__user" IN ('gopher')) = TRUE) = TRUE)"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+        assert_eq!(cube_scan.request, expected_request);
     }
 
     #[tokio::test]
@@ -4651,82 +3281,26 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_select_error() {
-        let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
-            .ok()
-            .map(|v| v.parse::<bool>().unwrap())
-            .unwrap_or(false);
-        let variants = if rewrite_engine {
-            vec![
-                (
-                    "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
-                ),
-                (
-                    "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information.".to_string()),
-                ),
-            ]
-        } else {
-            vec![
-                // Count agg fn
-                (
-                    "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided".to_string()),
-                ),
-                (
-                    "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead".to_string()),
-                ),
-                // (
-                //     "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use number '2' as argument to aggregation function".to_string()),
-                // ),
-                // (
-                //     "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'COUNT()'".to_string()),
-                // ),
-                // Another aggregation functions
-                // (
-                //     "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(*) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use '*' as argument to aggregation function 'MAX()' (only COUNT() supported)".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Dimension 'order_date' was used with the aggregate function 'MAX()'. Please use a measure instead".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(minPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'minPrice' is 'MIN()' but 'MAX()' was provided".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'MAX()'".to_string()),
-                // ),
-                // Check restrictions for segments usage
-                // (
-                //     "SELECT is_male FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' as column in SELECT statement".to_string()),
-                // ),
-                // (
-                //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' in GROUP BY".to_string()),
-                // ),
-                // (
-                //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' in ORDER BY".to_string()),
-                // ),
-            ]
-        };
+        let variants = vec![
+            (
+                "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
+            ),
+            (
+                "SELECT COUNT(someNumber) FROM NumberCube".to_string(),
+                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'someNumber' is 'MEASURE()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
+            ),
+            (
+                "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information.".to_string()),
+            ),
+        ];
 
         for (input_query, expected_error) in variants.iter() {
             let query = convert_sql_to_cube_query(
                 &input_query,
                 get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::MySQL).await,
+                get_test_session(DatabaseProtocol::PostgreSQL).await,
             )
             .await;
 
@@ -5657,118 +4231,6 @@ ORDER BY \"COUNT(count)\" DESC"
         }
     }
 
-    fn parse_expr_from_projection(query: &String, db: DatabaseProtocol) -> ast::Expr {
-        let stmt = parse_sql_to_statement(&query, db).unwrap();
-        match stmt {
-            ast::Statement::Query(query) => match &query.body {
-                ast::SetExpr::Select(select) => {
-                    if select.projection.len() == 1 {
-                        match &select.projection[0] {
-                            ast::SelectItem::UnnamedExpr(expr) => {
-                                return expr.clone();
-                            }
-                            ast::SelectItem::ExprWithAlias { expr, .. } => {
-                                return expr.clone();
-                            }
-                            _ => panic!("err"),
-                        };
-                    } else {
-                        panic!("err");
-                    }
-                }
-                _ => panic!("err"),
-            },
-            _ => panic!("err"),
-        }
-    }
-
-    #[tokio::test]
-    async fn test_str_to_date() {
-        let compiled = compile_expression(
-            &parse_expr_from_projection(
-                &"SELECT STR_TO_DATE('2021-08-31 00:00:00.000000', '%Y-%m-%d %H:%i:%s.%f')"
-                    .to_string(),
-                DatabaseProtocol::MySQL,
-            ),
-            &QueryContext::new(&get_test_meta()[0]),
-        )
-        .unwrap();
-
-        match compiled {
-            CompiledExpression::DateLiteral(date) => {
-                assert_eq!(date.to_string(), "2021-08-31 00:00:00 UTC".to_string())
-            }
-            _ => panic!("Must be DateLiteral"),
-        };
-    }
-
-    #[tokio::test]
-    async fn test_now_expr() {
-        let compiled = compile_expression(
-            &parse_expr_from_projection(&"SELECT NOW()".to_string(), DatabaseProtocol::MySQL),
-            &QueryContext::new(&get_test_meta()[0]),
-        )
-        .unwrap();
-
-        match compiled {
-            CompiledExpression::DateLiteral(_) => {}
-            _ => panic!("Must be DateLiteral"),
-        };
-    }
-
-    #[tokio::test]
-    async fn test_date_date_add_interval_expr() {
-        let to_check = vec![
-            // positive
-            (
-                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 second)".to_string(),
-                "2021-01-01 00:00:01 UTC",
-            ),
-            (
-                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 minute)".to_string(),
-                "2021-01-01 00:01:00 UTC",
-            ),
-            (
-                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 hour)".to_string(),
-                "2021-01-01 01:00:00 UTC",
-            ),
-            (
-                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 day)".to_string(),
-                "2021-01-02 00:00:00 UTC",
-            ),
-            // @todo we need to support exact +1 month
-            (
-                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 month)".to_string(),
-                "2021-01-31 00:00:00 UTC",
-            ),
-            // @todo we need to support exact +1 year
-            (
-                "date_add(date('2021-01-01 00:00:00.000000'), INTERVAL 1 year)".to_string(),
-                "2022-01-01 00:00:00 UTC",
-            ),
-            // negative
-            (
-                "date_add(date('2021-08-31 00:00:00.000000'), INTERVAL -30 day)".to_string(),
-                "2021-08-01 00:00:00 UTC",
-            ),
-        ];
-
-        for (sql, expected_date) in to_check.iter() {
-            let compiled = compile_expression(
-                &parse_expr_from_projection(&format!("SELECT {}", sql), DatabaseProtocol::MySQL),
-                &QueryContext::new(&get_test_meta()[0]),
-            )
-            .unwrap();
-
-            match compiled {
-                CompiledExpression::DateLiteral(date) => {
-                    assert_eq!(date.to_string(), expected_date.to_string())
-                }
-                _ => panic!("Must be DateLiteral"),
-            };
-        }
-    }
-
     #[tokio::test]
     async fn test_date_add_sub_postgres() {
         async fn check_fun(name: &str, t: &str, i: &str, expected: &str) {
@@ -5871,42 +4333,6 @@ ORDER BY \"COUNT(count)\" DESC"
 
         check_adds_to("2021-01-29 00:00:00", "1 month", "2021-02-28T00:00:00.000").await;
         check_subs_to("2021-03-29 00:00:00", "1 month", "2021-02-28T00:00:00.000").await;
-    }
-
-    #[tokio::test]
-    async fn test_str_literal_to_date() {
-        let d = CompiledExpression::StringLiteral("2021-08-31".to_string())
-            .to_date_literal()
-            .unwrap();
-        assert_eq!(
-            d.to_value_as_str().unwrap(),
-            "2021-08-31T00:00:00.000Z".to_string()
-        );
-
-        let d = CompiledExpression::StringLiteral("2021-08-31 00:00:00.000000".to_string())
-            .to_date_literal()
-            .unwrap();
-        assert_eq!(
-            d.to_value_as_str().unwrap(),
-            "2021-08-31T00:00:00.000Z".to_string()
-        );
-
-        let d = CompiledExpression::StringLiteral("2021-08-31T00:00:00+00:00".to_string())
-            .to_date_literal()
-            .unwrap();
-        assert_eq!(
-            d.to_value_as_str().unwrap(),
-            "2021-08-31T00:00:00.000Z".to_string()
-        );
-
-        // JS date.toIsoString()
-        let d = CompiledExpression::StringLiteral("2021-08-31T00:00:00.000Z".to_string())
-            .to_date_literal()
-            .unwrap();
-        assert_eq!(
-            d.to_value_as_str().unwrap(),
-            "2021-08-31T00:00:00.000Z".to_string()
-        );
     }
 
     async fn execute_query(query: String, db: DatabaseProtocol) -> Result<String, CubeError> {
@@ -6390,6 +4816,46 @@ ORDER BY \"COUNT(count)\" DESC"
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
                     granularity: Some("day".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_yearly_granularity() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT
+              CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."order_date") * 100) + 1) * 100) + 1) AS varchar) AS date) "ca_1",
+              CASE
+                WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
+                ELSE 0
+              END "ca_2"
+            FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
+            GROUP BY "ca_1";"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("year".to_string()),
                     date_range: None,
                 }]),
                 order: None,
@@ -8820,6 +7286,22 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "has_schema_privilege_default_user",
+            execute_query(
+                "SELECT
+                    nspname,
+                    has_schema_privilege(nspname, 'CREATE') create,
+                    has_schema_privilege(nspname, 'USAGE') usage
+                FROM pg_namespace
+                ORDER BY nspname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -8873,6 +7355,42 @@ ORDER BY \"COUNT(count)\" DESC"
         insta::assert_snapshot!(
             "discard_postgres_temp",
             execute_query("DISCARD TEMP;".to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_interval_mul() -> Result<(), CubeError> {
+        let base_timestamp = "TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')";
+        let units = vec!["year", "month", "week", "day", "hour", "minute", "second"];
+        let multiplicands = vec![1, 5, -10];
+
+        let selects = units
+            .iter()
+            .enumerate()
+            .map(|(i, unit)| {
+                let columns = multiplicands
+                    .iter()
+                    .map(|multiplicand| {
+                        format!(
+                            "{} + {} * interval '1 {}' AS \"i*{}\"",
+                            base_timestamp, multiplicand, unit, multiplicand
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                format!(
+                    "SELECT {} AS id, '{}' AS unit, {}",
+                    i,
+                    unit,
+                    columns.join(", ")
+                )
+            })
+            .collect::<Vec<_>>();
+        let query = format!("{} ORDER BY id ASC", selects.join(" UNION ALL "));
+        insta::assert_snapshot!(
+            "interval_mul",
+            execute_query(query, DatabaseProtocol::PostgreSQL).await?
         );
 
         Ok(())
@@ -9812,6 +8330,21 @@ ORDER BY \"COUNT(count)\" DESC"
         Ok(())
     }
 
+    #[tokio::test]
+    async fn df_cast_date32_additional_formats() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_cast_date32_additional_formats",
+            execute_query(
+                "SELECT CAST('20220101' as DATE) as no_dim, CAST('2022/02/02' as DATE) as slash_dim,  CAST('2022|03|03' as DATE) as pipe_dim;"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
     // This tests asserts that our DF fork contains support for Coalesce
     #[tokio::test]
     async fn df_coalesce() -> Result<(), CubeError> {
@@ -9819,6 +8352,21 @@ ORDER BY \"COUNT(count)\" DESC"
             "df_fork_coalesce",
             execute_query(
                 "SELECT COALESCE(null, 1) as t1, COALESCE(null, 1, null, 2) as t2".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    // This tests asserts that our DF fork contains support for nullif(scalar,scalar)
+    #[tokio::test]
+    async fn df_nullif() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_fork_nullif",
+            execute_query(
+                "SELECT nullif('test1', 'test1') as str_null, nullif('test1', 'test2') as str_first, nullif(3.0, 3.0) as float_null, nullif(3.0, 1.0) as float_first".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
@@ -12260,5 +10808,185 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }
         );
+    }
+
+    #[tokio::test]
+    async fn test_holistics_schema_privilege_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "holistics_schema_privilege_query",
+            execute_query(
+                "
+                SELECT n.nspname AS schema_name
+                FROM pg_namespace n
+                WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname <> 'information_schema' AND has_schema_privilege(n.nspname, 'USAGE'::text);
+                ".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_holistics_left_join_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "holistics_left_join_query",
+            execute_query(
+                "
+                SELECT 
+                    TRIM(c.conname) AS constraint_name, 
+                    CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' WHEN 'u' THEN 'UNIQUE' WHEN 'f' THEN 'FOREIGN KEY' END AS constraint_type, 
+                    TRIM(cn.nspname) AS constraint_schema, 
+                    TRIM(tn.nspname) AS schema_name, 
+                    TRIM(tc.relname) AS table_name, 
+                    TRIM(ta.attname) AS column_name, 
+                    TRIM(fn.nspname) AS referenced_schema_name, 
+                    TRIM(fc.relname) AS referenced_table_name, 
+                    TRIM(fa.attname) AS referenced_column_name, 
+                    o.ord AS ordinal_position
+                FROM pg_constraint c
+                    LEFT JOIN generate_series(1,1600) as o(ord) ON c.conkey[o.ord] IS NOT  NULL
+                    LEFT JOIN pg_attribute ta ON c.conrelid=ta.attrelid AND ta.attnum=c.conkey[o.ord]
+                    LEFT JOIN pg_attribute fa ON c.confrelid=fa.attrelid AND fa.attnum=c.confkey[o.ord]
+                    LEFT JOIN pg_class tc ON ta.attrelid=tc.oid
+                    LEFT JOIN pg_class fc ON fa.attrelid=fc.oid
+                    LEFT JOIN pg_namespace cn ON c.connamespace=cn.oid
+                    LEFT JOIN pg_namespace tn ON tc.relnamespace=tn.oid
+                    LEFT JOIN pg_namespace fn ON fc.relnamespace=fn.oid
+                WHERE 
+                    CASE c.contype WHEN 'p' 
+                    THEN 'PRIMARY KEY' WHEN 'u' 
+                    THEN 'UNIQUE' WHEN 'f' 
+                    THEN 'FOREIGN KEY' 
+                    END 
+                IN ('UNIQUE', 'PRIMARY KEY', 'FOREIGN KEY') AND tc.relkind = 'r'
+                ".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_holistics_in_subquery_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "holistics_in_subquery_query",
+            execute_query(
+                "SELECT\n          n.nspname || '.' || c.relname AS \"table_name\",\n          a.attname AS \"column_name\",\n          format_type(a.atttypid, a.atttypmod) AS \"data_type\"\n        FROM pg_namespace n,\n             pg_class c,\n             pg_attribute a\n        WHERE n.oid = c.relnamespace\n          AND c.oid = a.attrelid\n          AND a.attnum > 0\n          AND NOT a.attisdropped\n          AND c.relname IN (SELECT table_name\nFROM information_schema.tables\nWHERE (table_type = 'BASE TABLE' OR table_type = 'VIEW')\n  AND table_schema NOT IN ('pg_catalog', 'information_schema')\n  AND has_schema_privilege(table_schema, 'USAGE'::text)\n)\n
+                /* Added to avoid random output order and validate snapshot */
+                order by table_name;"
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_holistics_group_by_date() {
+        init_logger();
+
+        for granularity in vec!["year", "quarter", "month", "week", "day", "hour", "minute"].iter()
+        {
+            let logical_plan = convert_select_to_query_plan(
+                format!("
+                    SELECT 
+                        TO_CHAR((CAST((DATE_TRUNC('{}', (CAST(\"table\".\"order_date\" AS timestamptz)) AT TIME ZONE 'Etc/UTC')) AT TIME ZONE 'Etc/UTC' AS timestamptz)) AT TIME ZONE 'Etc/UTC', 'YYYY-MM-DD HH24:MI:SS') AS \"dm_pu_ca_754b1e\",
+                        MAX(\"table\".\"maxPrice\") AS \"a_pu_n_51f23b\"
+                    FROM \"KibanaSampleDataEcommerce\" \"table\"
+                    GROUP BY 1
+                    ORDER BY 2 DESC
+                    LIMIT 100000", 
+                    granularity),
+                DatabaseProtocol::PostgreSQL
+            ).await.as_logical_plan();
+
+            let cube_scan = logical_plan.find_cube_scan();
+
+            assert_eq!(
+                cube_scan.request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(granularity.to_string()),
+                        date_range: None
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                }
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_select_column_with_same_name_as_table() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_select_column_with_same_name_as_table",
+            execute_query(
+                "select table.column as column from (select 1 column, 2 table union all select 3 column, 4 table) table;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_interval_mul_query() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT date_trunc('day', "order_date") AS "uuid.order_date_tg", COUNT(*) AS "count"
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE
+                "order_date" >= date_trunc('year', LOCALTIMESTAMP + -5 * interval '1 YEAR') AND
+                "order_date" < date_trunc('year', LOCALTIMESTAMP)
+            GROUP BY date_trunc('day', "order_date")
+            ORDER BY date_trunc('day', "order_date") DESC NULLS LAST
+            LIMIT 2500;
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2017-01-01T00:00:00.000Z".to_string(),
+                        "2021-12-31T23:59:59.999Z".to_string()
+                    ]))
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "desc".to_string()
+                ]]),
+                limit: Some(2500),
+                offset: None,
+                filters: None,
+            }
+        )
     }
 }

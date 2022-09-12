@@ -16,7 +16,8 @@ import { Col, Row, Space } from 'antd';
 import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
-import { Card, FatalError } from '../../../atoms';
+import { Card } from '../../../atoms';
+import { FatalError } from '../../../components/Error/FatalError';
 import ChartContainer from '../../../ChartContainer';
 import { SectionHeader, SectionRow } from '../../../components';
 import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';

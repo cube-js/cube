@@ -101,7 +101,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public constructor(
-    conf: Partial<DatabricksDriverConfiguration>,
+    conf: Partial<DatabricksDriverConfiguration> = {},
   ) {
     const config: DatabricksDriverConfiguration = {
       ...conf,
@@ -140,6 +140,26 @@ export class DatabricksDriver extends JDBCDriver {
 
   public readOnly() {
     return !!this.config.readOnly;
+  }
+
+  public setLogger(logger: any) {
+    super.setLogger(logger);
+    this.showUrlTokenDeprecation();
+  }
+
+  public showUrlTokenDeprecation() {
+    if (this.config.url) {
+      const result = this.config.url
+        .split(';')
+        .find(node => /^PWD/i.test(node))
+        ?.split('=')[1];
+
+      if (result) {
+        this.logger('PWD Parameter Deprecation in connection string', {
+          warning: 'PWD parameter is deprecated and will be ignored in future releases. Please migrate to the CUBEJS_DB_DATABRICKS_TOKEN environment variable.'
+        });
+      }
+    }
   }
 
   /**

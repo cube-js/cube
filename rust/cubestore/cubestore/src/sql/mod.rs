@@ -2487,6 +2487,7 @@ mod tests {
                 c.compaction_chunks_count_threshold = 0;
                 c.not_used_timeout = 0;
                 c.meta_store_log_upload_interval = 1;
+                c.meta_store_snapshot_interval = 1;
                 c.gc_loop_interval = 1;
                 c
             })

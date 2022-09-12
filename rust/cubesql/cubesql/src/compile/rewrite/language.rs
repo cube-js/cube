@@ -495,6 +495,39 @@ macro_rules! variant_field_struct {
         }
     };
 
+    ($variant:ident, $var_field:ident, DataType) => {
+        paste::item! {
+            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+            pub struct [<$variant $var_field:camel>](DataType);
+
+            impl FromStr for [<$variant $var_field:camel>] {
+                type Err = CubeError;
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
+                    let typed_str = s.strip_prefix(&prefix).ok_or(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))?;
+
+                    match typed_str {
+                        "Float32" => Ok([<$variant $var_field:camel>](DataType::Float32)),
+                        "Float64" => Ok([<$variant $var_field:camel>](DataType::Float64)),
+                        "Int32" => Ok([<$variant $var_field:camel>](DataType::Int32)),
+                        "Int64" => Ok([<$variant $var_field:camel>](DataType::Int64)),
+                        "Boolean" => Ok([<$variant $var_field:camel>](DataType::Boolean)),
+                        "Utf8" => Ok([<$variant $var_field:camel>](DataType::Utf8)),
+                        "Date32" => Ok([<$variant $var_field:camel>](DataType::Date32)),
+                        "Date64" => Ok([<$variant $var_field:camel>](DataType::Date64)),
+                        _ => Err(CubeError::internal(format!("Can't convert {}. Should contain a valid type, actual: {}", s, typed_str))),
+                    }
+                }
+            }
+
+            impl std::fmt::Display for [<$variant $var_field:camel>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}", self.0)
+                }
+            }
+        }
+    };
+
     ($variant:ident, $var_field:ident, ScalarValue) => {
         paste::item! {
             #[derive(Debug, PartialOrd, Clone)]

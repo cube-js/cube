@@ -19,9 +19,9 @@ import { isValidCron } from 'cron-validator';
 import { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 
-import { Flex } from '../../../grid';
-import { ucfirst } from '../../../shared/helpers';
-import { timeZones } from '../../../shared/time-zones';
+import { Flex } from '../../grid';
+import { ucfirst } from '../../shared/helpers';
+import { timeZones } from '../../shared/time-zones';
 import { flatten } from '../utils';
 
 const Wrapper = styled.div`

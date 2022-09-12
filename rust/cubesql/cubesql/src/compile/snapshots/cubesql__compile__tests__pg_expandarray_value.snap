@@ -1,11 +1,13 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 6484
 expression: "execute_query(\"SELECT (information_schema._pg_expandarray(t.a)).x FROM pg_catalog.pg_class c, (SELECT ARRAY[5, 10, 15] a) t;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +----------------------------------------------------+
 | information_schema._pg_expandarray(t.a)[Utf8("x")] |
 +----------------------------------------------------+
+| 5                                                  |
+| 10                                                 |
+| 15                                                 |
 | 5                                                  |
 | 10                                                 |
 | 15                                                 |

@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select table.column as column from (select 1 column, 2 table union all select 3 column, 4 table) table;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------+
+| column |
++--------+
+| 1      |
+| 3      |
++--------+

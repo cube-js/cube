@@ -18,7 +18,7 @@ export class MaterializeDriver extends PostgresDriver {
     return 2;
   }
 
-  public constructor(options: PostgresDriverConfiguration) {
+  public constructor(options: PostgresDriverConfiguration = {}) {
     super(options);
   }
 

@@ -1,3 +1,14 @@
-import { executeTestSuiteFor } from './driver-test-suite';
+import { mainTestSet } from './driverTests/testSets';
+import { executeTestSuite } from './driver-test-suite';
 
-executeTestSuiteFor('postgres');
+executeTestSuite({
+  type: 'postgres',
+  tests: mainTestSet,
+  
+});
+
+executeTestSuite({
+  type: 'postgres',
+  tests: mainTestSet,
+  config: { CUBEJS_EXTERNAL_DEFAULT: 'true' }
+});

@@ -5,7 +5,7 @@ use crate::{
         rewrite::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, column_expr, cube_scan, fun_expr,
+            binary_expr, cast_expr, cast_expr_explicit, column_expr, cube_scan, fun_expr,
             inner_aggregate_split_replacer, literal_expr, literal_number, literal_string,
             original_expr_name, outer_aggregate_split_replacer, outer_projection_split_replacer,
             projection, projection_expr, projection_expr_empty_tail, rewrite,
@@ -20,6 +20,7 @@ use crate::{
     var, var_iter, CubeError,
 };
 use datafusion::{
+    arrow::datatypes::DataType as ArrowDataType,
     logical_plan::{Column, DFSchema, Operator},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
@@ -633,7 +634,10 @@ impl RewriteRules for SplitRules {
                                     "datediff",
                                     vec![
                                         literal_string("day"),
-                                        cast_expr(literal_string("1970-01-01"), "?data_type"),
+                                        cast_expr_explicit(
+                                            literal_string("1970-01-01"),
+                                            ArrowDataType::Date32,
+                                        ),
                                         column_expr("?column"),
                                     ],
                                 ),
@@ -673,7 +677,10 @@ impl RewriteRules for SplitRules {
                                     "datediff",
                                     vec![
                                         literal_string("day"),
-                                        cast_expr(literal_string("1970-01-01"), "?data_type"),
+                                        cast_expr_explicit(
+                                            literal_string("1970-01-01"),
+                                            ArrowDataType::Date32,
+                                        ),
                                         column_expr("?column"),
                                     ],
                                 ),
@@ -715,7 +722,7 @@ impl RewriteRules for SplitRules {
                                     "dateadd",
                                     vec![
                                         literal_string("month"),
-                                        cast_expr(
+                                        cast_expr_explicit(
                                             binary_expr(
                                                 binary_expr(
                                                     fun_expr(
@@ -731,10 +738,10 @@ impl RewriteRules for SplitRules {
                                                 "*",
                                                 literal_number(-1),
                                             ),
-                                            "?int_date_type",
+                                            ArrowDataType::Int32,
                                         ),
-                                        cast_expr(
-                                            cast_expr(
+                                        cast_expr_explicit(
+                                            cast_expr_explicit(
                                                 binary_expr(
                                                     binary_expr(
                                                         binary_expr(
@@ -764,9 +771,9 @@ impl RewriteRules for SplitRules {
                                                     "+",
                                                     literal_number(1),
                                                 ),
-                                                "?varchar_data_type",
+                                                ArrowDataType::Utf8,
                                             ),
-                                            "?data_data_type",
+                                            ArrowDataType::Date32,
                                         ),
                                     ],
                                 ),
@@ -805,7 +812,7 @@ impl RewriteRules for SplitRules {
                                     "dateadd",
                                     vec![
                                         literal_string("month"),
-                                        cast_expr(
+                                        cast_expr_explicit(
                                             binary_expr(
                                                 binary_expr(
                                                     fun_expr(
@@ -821,10 +828,10 @@ impl RewriteRules for SplitRules {
                                                 "*",
                                                 literal_number(-1),
                                             ),
-                                            "?int_date_type",
+                                            ArrowDataType::Int32,
                                         ),
-                                        cast_expr(
-                                            cast_expr(
+                                        cast_expr_explicit(
+                                            cast_expr_explicit(
                                                 binary_expr(
                                                     binary_expr(
                                                         binary_expr(
@@ -854,9 +861,9 @@ impl RewriteRules for SplitRules {
                                                     "+",
                                                     literal_number(1),
                                                 ),
-                                                "?varchar_data_type",
+                                                ArrowDataType::Utf8,
                                             ),
-                                            "?data_data_type",
+                                            ArrowDataType::Date32,
                                         ),
                                     ],
                                 ),
@@ -880,6 +887,7 @@ impl RewriteRules for SplitRules {
                     "?outer_column",
                 ),
             ),
+            //
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-with-date-trunc-inner-aggr-replacer",
                 inner_aggregate_split_replacer(
