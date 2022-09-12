@@ -5,7 +5,7 @@ const LineChart = ({ data /* see data tab */ }) => (
     data={data}
     colors={{ scheme: 'nivo' }}
     borderColor={{ from: 'color' }}
-    margin={{ top: 50, right: 50, bottom: 100, left: 150 }}
+    margin={{ top: 20, right: 50, bottom: 100, left: 100 }}
     enableGridX={false}
     enableGridY={false}
     xScale={{ type: 'point' }}
