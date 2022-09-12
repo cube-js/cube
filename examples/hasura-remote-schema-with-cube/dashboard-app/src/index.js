@@ -1,7 +1,5 @@
 import React from 'react';
 import { useState, useEffect } from 'react'
-import { Col, Container, Form, Row } from 'react-bootstrap';
-import 'bootstrap/dist/css/bootstrap.min.css';
 import * as classes from './index.module.css'
 import * as ReactDOM from 'react-dom/client';
 import {
@@ -11,6 +9,8 @@ import {
   useQuery,
   gql,
   createHttpLink,
+  ApolloLink,
+  from,
 } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import {
@@ -21,6 +21,7 @@ import {
   defaultIsFraudSelection,
   defaultStepSelection,
   DisplayFraudAmountSum,
+  randomIntFromInterval,
 } from './utils/utils';
 
 const httpLink = createHttpLink({
@@ -34,8 +35,18 @@ const authLink = setContext((_, { headers }) => {
     }
   }
 });
+let timestampsGlobal = {};
+const roundTripLink = new ApolloLink((operation, forward) => {
+  operation.setContext({ start: new Date() });
+  timestampsGlobal = {};
+
+  return forward(operation).map((data) => {
+    timestampsGlobal[operation.operationName] = new Date() - operation.getContext().start;
+    return data;
+  });
+});
 const client = new ApolloClient({
-  link: authLink.concat(httpLink),
+  link: from([roundTripLink, authLink.concat(httpLink)]),
   cache: new InMemoryCache()
 });
 
@@ -48,14 +59,21 @@ ReactDOM
   )
 
 function App() {
+  const [ timestamps, setTimestamps ] = useState(0);
+  useEffect(() => {
+    setTimestamps(timestampsGlobal)
+  }, [ timestampsGlobal ]);
+
   const [ fraudChartDataCube, setFraudChartDataCube ] = useState([])
   const [ fraudChartDataHasura, setFraudChartDataHasura ] = useState([])
-
   const [ stepSelection, setStepSelection ] = useState(defaultStepSelection);
   const selectedStep = availableStepRanges.find(x => x.id === stepSelection);
   const selectedStepRange = range(selectedStep.start, selectedStep.end);
-
   const [ isFraudSelection, setIsFraudSelection ] = useState(defaultIsFraudSelection);
+  const shuffleAndRun = () => {
+    setStepSelection(randomIntFromInterval(1, 14));
+    setIsFraudSelection(randomIntFromInterval(0, 1));
+  }
 
   const GET_FRAUD_AMOUNT_SUM_CUBE_REMOTE_SCHEMA = gql`
     query CubeQuery  { 
@@ -75,14 +93,15 @@ function App() {
       }
     }
   `;
-  const { loading: loadingFraudDataCube, error: errorFraudDataCube, data: fraudDataCube } = useQuery(GET_FRAUD_AMOUNT_SUM_CUBE_REMOTE_SCHEMA);
+  const {
+    loading: loadingFraudDataCube,
+    error: errorFraudDataCube,
+    data: fraudDataCube,
+  } = useQuery(GET_FRAUD_AMOUNT_SUM_CUBE_REMOTE_SCHEMA);
   useEffect(() => {
-    if (fraudDataCube) {
-      setFraudChartDataCube(
-        tablePivotCube(fraudDataCube)
-      )
-    }
-  }, [ fraudDataCube ])
+    if (loadingFraudDataCube) { return; }
+    setFraudChartDataCube(tablePivotCube(fraudDataCube));
+  }, [ fraudDataCube ]);
 
   const GET_FRAUD_AMOUNT_SUM_HASURA_FRAUDS = gql`
     query HasuraQuery{
@@ -119,23 +138,22 @@ function App() {
     GET_FRAUD_AMOUNT_SUM_HASURA = GET_FRAUD_AMOUNT_SUM_HASURA_NON_FRAUDS;
   }
 
-  const { loading: loadingFraudDataHasura, error: errorFraudDataHasura, data: fraudDataHasura } = useQuery(GET_FRAUD_AMOUNT_SUM_HASURA);
+  const {
+    loading: loadingFraudDataHasura,
+    error: errorFraudDataHasura,
+    data: fraudDataHasura,
+  } = useQuery(GET_FRAUD_AMOUNT_SUM_HASURA);
   useEffect(() => {
-    if (fraudDataHasura) {
-      if (isFraudSelection) {
-        setFraudChartDataHasura(
-          tablePivotHasura(fraudDataHasura.fraud_amount_sum_frauds)
-        )
-      } else {  
-        setFraudChartDataHasura(
-          tablePivotHasura(fraudDataHasura.fraud_amount_sum_non_frauds)
-        )
-      }
+    if (loadingFraudDataHasura) { return; }
+    if (isFraudSelection) {
+      setFraudChartDataHasura(tablePivotHasura(fraudDataHasura.fraud_amount_sum_frauds));
+    } else {  
+      setFraudChartDataHasura(tablePivotHasura(fraudDataHasura.fraud_amount_sum_non_frauds));
     }
-  }, [ fraudDataHasura ])
+  }, [ fraudDataHasura ]);
 
   return <>
-    <div>
+    <div style={{display: 'flex', justifyContent: 'center'}}>
       <select
         className={classes.select}
         value={stepSelection}
@@ -148,9 +166,6 @@ function App() {
           </option>
         ))}
       </select>
-    </div>
-
-    <div>
       <select
         className={classes.select}
         value={isFraudSelection}
@@ -164,25 +179,36 @@ function App() {
           Fraudulent transactions
         </option>
       </select>
+      <div className={`${classes.buttonwrp}`}>
+        <button className={`Button Button--size-s Button--pink`} onClick={shuffleAndRun}>
+          Shuffle and Run!
+        </button>
+      </div>
     </div>
 
-      <Row className='mb-12' style={{ height: '400px', margin: '50px 0' }}>
-        <Col md={{ span: 6 }} style={{ height: '400px', margin: '0px' }}>
-          <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + Cube</h3>
-          <DisplayFraudAmountSum
-            loading={loadingFraudDataCube}
-            error={errorFraudDataCube}
-            chartData={fraudChartDataCube}
-          />
-        </Col>
-        <Col md={{ span: 6 }} style={{ height: '400px', margin: '0px' }}>         
-          <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + PostgreSQL</h3>
-          <DisplayFraudAmountSum
-            loading={loadingFraudDataHasura}
-            error={errorFraudDataHasura}
-            chartData={fraudChartDataHasura}
-          />
-        </Col>
-      </Row>
+    <table style={{ width: '100%' }}>
+      <tr>
+        <td style={{ width: '50%' }}>
+          <div style={{ height: '375px', margin: '20px 0' }}>
+            <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + Cube {timestamps.CubeQuery ? `(${timestamps.CubeQuery / 1000}s)` : ``}</h3>
+            <DisplayFraudAmountSum
+              loading={loadingFraudDataCube}
+              error={errorFraudDataCube}
+              chartData={fraudChartDataCube}
+            />
+          </div>
+        </td>
+        <td style={{ width: '50%' }}>
+          <div style={{ height: '375px', margin: '20px 0' }}>
+            <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + PostgreSQL {timestamps.HasuraQuery ? `(${timestamps.HasuraQuery / 1000}s)` : ``}</h3>
+            <DisplayFraudAmountSum
+              loading={loadingFraudDataHasura}
+              error={errorFraudDataHasura}
+              chartData={fraudChartDataHasura}
+            />
+          </div>
+        </td>
+      </tr>
+    </table>
   </>
 }

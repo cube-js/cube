@@ -29,6 +29,10 @@ export const availableStepRanges = [
 export const defaultStepSelection = 1;
 export const defaultIsFraudSelection = 1;
 
+export const randomIntFromInterval = (min, max) => { 
+  return Math.floor(Math.random() * (max - min + 1) + min)
+}
+
 export function range(start, end) {
   const arr = [...Array(end - start + 1).keys()].map(x => x + start)
   return arr;
