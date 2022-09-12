@@ -147,7 +147,10 @@ export class CubeStoreQuery extends BaseQuery {
         wrapQuery: true,
         wrappedGranularity: timeDimension?.granularity || rollupGranularity,
         rollupGranularity: granularityOverride,
-        topLevelMerge: false
+        topLevelMerge: false,
+        renderedReference: {
+          [timeDimension.dimension]: timeDimension.cumulativeSelectColumns()[0]
+        }
       }
     );
   }
@@ -155,7 +158,7 @@ export class CubeStoreQuery extends BaseQuery {
   public overTimeSeriesSelectRollup(cumulativeMeasures, otherMeasures, baseQuery, baseQueryAlias, timeDimension, preAggregationForQuery) {
     const cumulativeDimensions = this.dimensions.map(s => s.cumulativeSelectColumns()).filter(c => !!c).join(', ');
     const partitionByClause = this.dimensions.length ? `PARTITION BY ${cumulativeDimensions}` : '';
-    const groupByDimensionClause = otherMeasures.length && timeDimension ? ` GROUP BY DIMENSION ${timeDimension.cumulativeSelectColumns().join(', ')}` : '';
+    const groupByDimensionClause = otherMeasures.length && timeDimension ? ` GROUP BY DIMENSION ${timeDimension.dimensionSql()}` : '';
     const rollingWindowOrGroupByClause = timeDimension ?
       ` ROLLING_WINDOW DIMENSION ${timeDimension.aliasName()}${partitionByClause}${groupByDimensionClause} FROM ${this.timeGroupedColumn(timeDimension.granularity, timeDimension.localDateTimeFromOrBuildRangeParam())} TO ${this.timeGroupedColumn(timeDimension.granularity, timeDimension.localDateTimeToOrBuildRangeParam())} EVERY INTERVAL '1 ${timeDimension.granularity}'` :
       this.groupByClause();
