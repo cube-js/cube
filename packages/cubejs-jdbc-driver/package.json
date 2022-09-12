@@ -42,6 +42,7 @@
     "testEnvironment": "node"
   },
   "devDependencies": {
+    "@cubejs-backend/shared": "^0.30.57",
     "@cubejs-backend/linter": "^0.30.0",
     "@types/generic-pool": "^3.1.9",
     "@types/node": "^12",

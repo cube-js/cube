@@ -26,7 +26,6 @@ const { version } = require('../../package.json');
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
     readOnly?: boolean,
-    maxPoolSize?: number,
     // common bucket config
     bucketType?: string,
     exportBucket?: string,

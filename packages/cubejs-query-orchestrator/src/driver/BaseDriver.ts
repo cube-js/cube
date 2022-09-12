@@ -87,8 +87,8 @@ const DbTypeValueMatcher = {
   text: () => true
 };
 
-export class BaseDriver implements DriverInterface {
-  private logger: any;
+export abstract class BaseDriver implements DriverInterface {
+  protected logger: any;
 
   public constructor(_options = {}) {
     //
@@ -169,13 +169,9 @@ export class BaseDriver implements DriverInterface {
     return ssl;
   }
 
-  public async testConnection() {
-    throw new Error('Not implemented');
-  }
+  abstract testConnection(): Promise<void>;
 
-  public async query<R = unknown>(_query: string, _values: unknown[] = [], _options: QueryOptions = {}): Promise<R[]> {
-    throw new Error('Not implemented');
-  }
+  abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
 
   public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
     const rows = await this.query<Row>(query, values);
