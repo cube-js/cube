@@ -6,14 +6,11 @@ import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { Button, CubeLoader } from '../../atoms';
+import { useCloud } from '../../cloud';
 import { useAppContext, useCubejsApi, useSecurityContext } from '../../hooks';
-import { useCloud } from '../../playground';
+import { useRollupDesignerContext, RollupDesignerContext } from '../../rollup-designer';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
-import {
-  RollupDesignerContext,
-  useRollupDesignerContext,
-} from '../RollupDesigner';
 import {
   PlaygroundQueryBuilder,
   PlaygroundQueryBuilderProps,

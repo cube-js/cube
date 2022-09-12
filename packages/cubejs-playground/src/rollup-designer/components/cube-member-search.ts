@@ -1,8 +1,8 @@
 import { AvailableMembers } from '@cubejs-client/react';
 import FlexSearch from 'flexsearch';
 import { useEffect, useRef, useState } from 'react';
-import { useDeepEffect } from '../../../hooks';
-import { getNameMemberPairs } from '../../../shared/helpers';
+import { useDeepEffect } from '../../hooks';
+import { getNameMemberPairs } from '../../shared/members';
 
 export function useCubeMemberSearch(memberTypeCubeMap: AvailableMembers) {
   const index = useRef(new FlexSearch.Index({ tokenize: 'forward' })).current;

@@ -19,4 +19,6 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.Logs                      | agentCount         | bigint                      |
 | public.Logs                      | agentCountApprox   | bigint                      |
 | public.Logs                      | __user             | text                        |
+| public.NumberCube                | someNumber         | numeric                     |
+| public.NumberCube                | __user             | text                        |
 +----------------------------------+--------------------+-----------------------------+

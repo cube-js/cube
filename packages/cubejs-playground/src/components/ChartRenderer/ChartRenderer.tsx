@@ -7,7 +7,8 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import styled from 'styled-components';
 import { CubeContext } from '@cubejs-client/react';
 
-import { Button, CubeLoader, FatalError } from '../../atoms';
+import { FatalError } from '../../components/Error/FatalError';
+import { Button, CubeLoader } from '../../atoms';
 import { UIFramework } from '../../types';
 import { QueryStatus } from '../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 import {

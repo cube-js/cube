@@ -1,4 +1,4 @@
-use std::{any::type_name, collections::HashMap, sync::Arc, thread};
+use std::{any::type_name, collections::HashMap, convert::TryFrom, sync::Arc, thread};
 
 use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime};
 use datafusion::{
@@ -6,10 +6,10 @@ use datafusion::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
             Float64Array, GenericStringArray, Int32Builder, Int64Array, Int64Builder,
-            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
-            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
-            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
-            UInt32Builder,
+            IntervalDayTimeArray, IntervalDayTimeBuilder, IntervalYearMonthArray, ListArray,
+            ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
+            StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
+            TimestampNanosecondArray, TimestampSecondArray, UInt32Builder,
         },
         compute::{cast, concat},
         datatypes::{
@@ -1196,6 +1196,95 @@ fn last_day_of_month(y: i32, m: u32) -> u32 {
         return 31;
     }
     NaiveDate::from_ymd(y, m + 1, 1).pred().day()
+}
+
+pub fn create_interval_mul_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let multiplicands = downcast_primitive_arg!(args[1], "multiplicand", Int64Type);
+
+        match &args[0].data_type() {
+            DataType::Interval(IntervalUnit::YearMonth) => {
+                let intervals = downcast_primitive_arg!(args[0], "interval", IntervalYearMonthType);
+                let result = intervals
+                    .iter()
+                    .zip(multiplicands.iter())
+                    .map(|values| match values {
+                        (Some(interval), Some(multiplicand)) => {
+                            Some(interval * i32::try_from(multiplicand).ok()?)
+                        }
+                        _ => None,
+                    })
+                    .collect::<IntervalYearMonthArray>();
+                Ok(Arc::new(result))
+            }
+            DataType::Interval(IntervalUnit::DayTime) => {
+                let intervals = downcast_primitive_arg!(args[0], "interval", IntervalDayTimeType);
+                let result = intervals
+                    .iter()
+                    .zip(multiplicands.iter())
+                    .map(|values| match values {
+                        (Some(interval), Some(multiplicand)) => {
+                            let interval_value: u64 = interval as u64;
+                            let days: i32 = ((interval_value & 0xFFFFFFFF00000000) >> 32) as i32;
+                            let milliseconds: i32 = (interval_value & 0xFFFFFFFF) as i32;
+                            let multiplicand = i32::try_from(multiplicand).ok()?;
+                            let days_product = days * multiplicand;
+                            let milliseconds_product = milliseconds * multiplicand;
+                            let interval_product = (((days_product as u64) << 32)
+                                | (milliseconds_product as u64))
+                                as i64;
+                            Some(interval_product)
+                        }
+                        _ => None,
+                    })
+                    .collect::<IntervalDayTimeArray>();
+                Ok(Arc::new(result))
+            }
+            _ => Err(DataFusionError::Execution(
+                "unsupported interval type".to_string(),
+            )),
+        }
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |arg_types| {
+        if arg_types.len() != 2 {
+            return Err(DataFusionError::Execution(format!(
+                "\"interval_mul\" expects 2 arguments, {} given",
+                arg_types.len()
+            )));
+        }
+        match arg_types[0] {
+            DataType::Interval(_) => Ok(Arc::new(arg_types[0].clone())),
+            _ => Err(DataFusionError::Execution(
+                "first argument to \"interval_mul\" must be an interval".to_string(),
+            )),
+        }
+    });
+
+    ScalarUDF::new(
+        "interval_mul",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::YearMonth),
+                    DataType::Int64,
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::DayTime),
+                    DataType::Int64,
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                    DataType::Int64,
+                ]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
 }
 
 fn postgres_datetime_format_to_iso(format: String) -> String {

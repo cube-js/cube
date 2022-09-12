@@ -43,10 +43,11 @@ use self::{
             create_datediff_udf, create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf,
             create_db_udf, create_format_type_udf, create_generate_series_udtf,
             create_generate_subscripts_udtf, create_has_schema_privilege_udf, create_hour_udf,
-            create_if_udf, create_instr_udf, create_isnull_udf, create_json_build_object_udf,
-            create_least_udf, create_locate_udf, create_makedate_udf, create_measure_udaf,
-            create_minute_udf, create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
-            create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
+            create_if_udf, create_instr_udf, create_interval_mul_udf, create_isnull_udf,
+            create_json_build_object_udf, create_least_udf, create_locate_udf, create_makedate_udf,
+            create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
+            create_pg_datetime_precision_udf, create_pg_expandarray_udtf,
+            create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
             create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
             create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
@@ -1126,6 +1127,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_get_serial_sequence_udf());
         ctx.register_udf(create_json_build_object_udf());
         ctx.register_udf(create_regexp_substr_udf());
+        ctx.register_udf(create_interval_mul_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -1734,6 +1736,68 @@ mod tests {
                 filters: None
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_in_filter() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user IN ('gopher')"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_change_user_via_in_filter_thoughtspot() {
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE (LOWER("ta_1"."__user" IN ('gopher')) = TRUE)"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let expected_request = V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+            segments: Some(vec![]),
+            dimensions: Some(vec![]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+        };
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+        assert_eq!(cube_scan.request, expected_request);
+
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE ((LOWER("ta_1"."__user" IN ('gopher')) = TRUE) = TRUE)"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+        assert_eq!(cube_scan.options.change_user, Some("gopher".to_string()));
+        assert_eq!(cube_scan.request, expected_request);
     }
 
     #[tokio::test]
@@ -3217,82 +3281,26 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_select_error() {
-        let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
-            .ok()
-            .map(|v| v.parse::<bool>().unwrap())
-            .unwrap_or(false);
-        let variants = if rewrite_engine {
-            vec![
-                (
-                    "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
-                ),
-                (
-                    "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information.".to_string()),
-                ),
-            ]
-        } else {
-            vec![
-                // Count agg fn
-                (
-                    "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided".to_string()),
-                ),
-                (
-                    "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                    CompilationError::user("Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead".to_string()),
-                ),
-                // (
-                //     "SELECT COUNT(2) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use number '2' as argument to aggregation function".to_string()),
-                // ),
-                // (
-                //     "SELECT COUNT(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'COUNT()'".to_string()),
-                // ),
-                // Another aggregation functions
-                // (
-                //     "SELECT COUNT(DISTINCT *) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use '*' as argument to aggregation function 'COUNT()' (only COUNT() supported)".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(*) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use '*' as argument to aggregation function 'MAX()' (only COUNT() supported)".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Dimension 'order_date' was used with the aggregate function 'MAX()'. Please use a measure instead".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(minPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Measure aggregation type doesn't match. The aggregation type for 'minPrice' is 'MIN()' but 'MAX()' was provided".to_string()),
-                // ),
-                // (
-                //     "SELECT MAX(unknownIdentifier) FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to find measure with name 'unknownIdentifier' which is used as argument to aggregation function 'MAX()'".to_string()),
-                // ),
-                // Check restrictions for segments usage
-                // (
-                //     "SELECT is_male FROM KibanaSampleDataEcommerce".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' as column in SELECT statement".to_string()),
-                // ),
-                // (
-                //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce GROUP BY is_male".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' in GROUP BY".to_string()),
-                // ),
-                // (
-                //     "SELECT COUNT(*) FROM KibanaSampleDataEcommerce ORDER BY is_male DESC".to_string(),
-                //     CompilationError::user("Unable to use segment 'is_male' in ORDER BY".to_string()),
-                // ),
-            ]
-        };
+        let variants = vec![
+            (
+                "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
+            ),
+            (
+                "SELECT COUNT(someNumber) FROM NumberCube".to_string(),
+                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'someNumber' is 'MEASURE()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
+            ),
+            (
+                "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information.".to_string()),
+            ),
+        ];
 
         for (input_query, expected_error) in variants.iter() {
             let query = convert_sql_to_cube_query(
                 &input_query,
                 get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::MySQL).await,
+                get_test_session(DatabaseProtocol::PostgreSQL).await,
             )
             .await;
 
@@ -7353,6 +7361,42 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_interval_mul() -> Result<(), CubeError> {
+        let base_timestamp = "TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')";
+        let units = vec!["year", "month", "week", "day", "hour", "minute", "second"];
+        let multiplicands = vec![1, 5, -10];
+
+        let selects = units
+            .iter()
+            .enumerate()
+            .map(|(i, unit)| {
+                let columns = multiplicands
+                    .iter()
+                    .map(|multiplicand| {
+                        format!(
+                            "{} + {} * interval '1 {}' AS \"i*{}\"",
+                            base_timestamp, multiplicand, unit, multiplicand
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                format!(
+                    "SELECT {} AS id, '{}' AS unit, {}",
+                    i,
+                    unit,
+                    columns.join(", ")
+                )
+            })
+            .collect::<Vec<_>>();
+        let query = format!("{} ORDER BY id ASC", selects.join(" UNION ALL "));
+        insta::assert_snapshot!(
+            "interval_mul",
+            execute_query(query, DatabaseProtocol::PostgreSQL).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn superset_meta_queries() -> Result<(), CubeError> {
         init_logger();
 
@@ -10844,6 +10888,47 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_holistics_group_by_date() {
+        init_logger();
+
+        for granularity in vec!["year", "quarter", "month", "week", "day", "hour", "minute"].iter()
+        {
+            let logical_plan = convert_select_to_query_plan(
+                format!("
+                    SELECT 
+                        TO_CHAR((CAST((DATE_TRUNC('{}', (CAST(\"table\".\"order_date\" AS timestamptz)) AT TIME ZONE 'Etc/UTC')) AT TIME ZONE 'Etc/UTC' AS timestamptz)) AT TIME ZONE 'Etc/UTC', 'YYYY-MM-DD HH24:MI:SS') AS \"dm_pu_ca_754b1e\",
+                        MAX(\"table\".\"maxPrice\") AS \"a_pu_n_51f23b\"
+                    FROM \"KibanaSampleDataEcommerce\" \"table\"
+                    GROUP BY 1
+                    ORDER BY 2 DESC
+                    LIMIT 100000", 
+                    granularity),
+                DatabaseProtocol::PostgreSQL
+            ).await.as_logical_plan();
+
+            let cube_scan = logical_plan.find_cube_scan();
+
+            assert_eq!(
+                cube_scan.request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(granularity.to_string()),
+                        date_range: None
+                    }]),
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: None,
+                }
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn test_select_column_with_same_name_as_table() -> Result<(), CubeError> {
         init_logger();
 
@@ -10857,5 +10942,51 @@ ORDER BY \"COUNT(count)\" DESC"
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_interval_mul_query() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT date_trunc('day', "order_date") AS "uuid.order_date_tg", COUNT(*) AS "count"
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE
+                "order_date" >= date_trunc('year', LOCALTIMESTAMP + -5 * interval '1 YEAR') AND
+                "order_date" < date_trunc('year', LOCALTIMESTAMP)
+            GROUP BY date_trunc('day', "order_date")
+            ORDER BY date_trunc('day', "order_date") DESC NULLS LAST
+            LIMIT 2500;
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        "2017-01-01T00:00:00.000Z".to_string(),
+                        "2021-12-31T23:59:59.999Z".to_string()
+                    ]))
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "desc".to_string()
+                ]]),
+                limit: Some(2500),
+                offset: None,
+                filters: None,
+            }
+        )
     }
 }

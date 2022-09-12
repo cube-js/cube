@@ -82,5 +82,17 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
             ],
             segments: vec![],
         },
+        V1CubeMeta {
+            name: "NumberCube".to_string(),
+            title: None,
+            dimensions: vec![],
+            measures: vec![V1CubeMetaMeasure {
+                name: "NumberCube.someNumber".to_string(),
+                title: None,
+                _type: "number".to_string(),
+                agg_type: Some("number".to_string()),
+            }],
+            segments: vec![],
+        },
     ]
 }

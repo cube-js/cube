@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useState } from 'react';
 
-import { PreAggregationDefinition } from '../../components/RollupDesigner/utils';
+import { PreAggregationDefinition } from '../rollup-designer/utils';
 
 type AddPreAggregationToSchemaResult = {
   error?: string;

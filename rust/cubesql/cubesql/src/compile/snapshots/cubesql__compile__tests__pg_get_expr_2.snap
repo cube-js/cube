@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 7844
 expression: "execute_query(\"\n                SELECT\n                    attrelid,\n                    attname,\n                    pg_catalog.pg_get_expr(attname, attrelid, true) default\n                FROM pg_catalog.pg_attribute\n                ORDER BY\n                    attrelid ASC,\n                    attname ASC\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +----------+--------------------+---------+
@@ -20,4 +19,6 @@ expression: "execute_query(\"\n                SELECT\n                    attre
 | 18014    | __user             | NULL    |
 | 18014    | agentCount         | NULL    |
 | 18014    | agentCountApprox   | NULL    |
+| 18020    | __user             | NULL    |
+| 18020    | someNumber         | NULL    |
 +----------+--------------------+---------+

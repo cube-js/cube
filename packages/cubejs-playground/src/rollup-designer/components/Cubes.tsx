@@ -4,9 +4,9 @@ import { Input, Menu } from 'antd';
 import { useLayoutEffect } from 'react';
 import styled from 'styled-components';
 
-import { useDeepMemo } from '../../../hooks/deep-memo';
-import { getMembersByCube, MembersByCube } from '../../../shared/helpers';
-import { QueryMemberKey } from '../../../types';
+import { useDeepMemo } from '../../hooks/deep-memo';
+import { getMembersByCube, MembersByCube } from '../../shared/members';
+import { QueryMemberKey } from '../../types';
 import { useCubeMemberSearch } from './cube-member-search';
 
 const { SubMenu } = Menu;

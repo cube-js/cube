@@ -355,6 +355,7 @@ impl LogicalPlanAnalysis {
                         || &fun.name == "date_add"
                         || &fun.name == "date_sub"
                         || &fun.name == "date"
+                        || &fun.name == "interval_mul"
                     {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {

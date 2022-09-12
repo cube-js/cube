@@ -15,14 +15,13 @@ import {
 import deepEquals from 'fast-deep-equal';
 import { useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
-import { CodeSnippet, FatalError } from '../../atoms';
-import { Box, Flex } from '../../grid';
-import { useDeepEffect, useIsMounted, useToken } from '../../hooks';
-import { useDeepMemo } from '../../hooks/deep-memo';
-import { useCloud } from '../../playground/cloud';
-import { getNameMemberPairs, request } from '../../shared/helpers';
-import { QueryMemberKey } from '../../types';
-import { prettifyObject } from '../../utils';
+import { CodeSnippet } from '../atoms';
+import { Box, Flex } from '../grid';
+import { useDeepEffect, useIsMounted, useToken } from '../hooks';
+import { useDeepMemo } from '../hooks/deep-memo';
+import { useCloud } from '../cloud';
+import { QueryMemberKey } from '../types';
+import { prettifyObject } from '../utils';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
 import { RollupSettings, Settings } from './components/Settings';
@@ -36,6 +35,9 @@ import {
   PreAggregationReferences,
   updateQuery,
 } from './utils';
+import { request } from '../shared/request';
+import { getNameMemberPairs } from '../shared/members';
+import { FatalError } from '../components/Error/FatalError';
 
 const { Paragraph, Text } = Typography;
 const { TabPane } = Tabs;

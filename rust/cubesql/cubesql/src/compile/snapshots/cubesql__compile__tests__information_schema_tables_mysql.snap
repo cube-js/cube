@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"SELECT * FROM information_schema.tables\".to_string(),\n              DatabaseProtocol::MySQL).await?"
+expression: "execute_query(\"SELECT * FROM information_schema.tables\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+
 | TABLE_CATALOG | TABLE_SCHEMA       | TABLE_NAME                | TABLE_TYPE | ENGINE | VERSION | ROW_FORMAT | TABLES_ROWS | AVG_ROW_LENGTH | DATA_LENGTH | MAX_DATA_LENGTH | INDEX_LENGTH | DATA_FREE | AUTO_INCREMENT | CREATE_TIME | UPDATE_TIME | CHECK_TIME | TABLE_COLLATION | CHECKSUM | CREATE_OPTIONS | TABLE_COMMENT |
@@ -13,4 +13,5 @@ expression: "execute_query(\"SELECT * FROM information_schema.tables\".to_string
 | def           | performance_schema | global_variables          | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |
 | def           | db                 | KibanaSampleDataEcommerce | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |
 | def           | db                 | Logs                      | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |
+| def           | db                 | NumberCube                | BASE TABLE | InnoDB | 10      | Dynamic    | 0           | 0              | 16384       |                 |              |           |                |             |             |            |                 |          |                |               |
 +---------------+--------------------+---------------------------+------------+--------+---------+------------+-------------+----------------+-------------+-----------------+--------------+-----------+----------------+-------------+-------------+------------+-----------------+----------+----------------+---------------+
