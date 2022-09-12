@@ -769,8 +769,18 @@ export class PreAggregationLoader {
         this.preAggregation.readOnly ||
         client.config && client.config.readOnly ||
         client.readOnly && (typeof client.readOnly === 'boolean' ? client.readOnly : client.readOnly());
-      refreshStrategy = readOnly ?
-        this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
+
+      if (readOnly) {
+        refreshStrategy = this.refreshImplStreamExternalStrategy;
+      } else {
+        const capabilities = client?.capabilities?.();
+
+        if (capabilities.unloadWithoutTempTable) {
+          refreshStrategy = this.refreshImplWithoutTempTableExternalStrategy;
+        } else {
+          refreshStrategy = this.refreshImplTempTableExternalStrategy;
+        }
+      }
     }
     return cancelCombinator(
       saveCancelFn => refreshStrategy.bind(this)(
@@ -833,6 +843,91 @@ export class PreAggregationLoader {
       // We must clean orphaned in any cases: success or exception
       await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
       await this.loadCache.fetchTables(this.preAggregation);
+    }
+  }
+
+  protected async refreshImplWithoutTempTableExternalStrategy(
+    client: DriverInterface,
+    newVersionEntry: VersionEntry,
+    saveCancelFn: SaveCancelFn,
+    invalidationKeys
+  ) {
+    const [sql, params] =
+        Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
+
+        console.log('[sql, params]', sql, params);
+    await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
+    const targetTableName = this.targetTableName(newVersionEntry);
+
+    const queryOptions = this.queryOptions(invalidationKeys, sql, params, targetTableName, newVersionEntry);
+    this.logExecutingSql(queryOptions);
+
+    console.log('queryOptionsqueryOptionsqueryOptionsqueryOptions', queryOptions);
+
+    try {
+      const tableData = await this.downloadWithoutTempTableExternalPreAggregation(
+        client,
+        newVersionEntry,
+        saveCancelFn,
+        queryOptions,
+        sql,
+        params,
+      );
+
+      try {
+        await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn, queryOptions);
+      } finally {
+        if (tableData && tableData.release) {
+          await tableData.release();
+        }
+      }
+    } finally {
+      // We must clean orphaned in any cases: success or exception
+      await this.loadCache.fetchTables(this.preAggregation);
+      await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
+    }
+  }
+
+  protected async downloadWithoutTempTableExternalPreAggregation(
+    client: DriverInterface,
+    newVersionEntry,
+    saveCancelFn: SaveCancelFn,
+    queryOptions: any,
+    sql: string,
+    sqlParams: any
+  ) {
+    // @todo Deprecated, BaseDriver already implements it, before remove we need to add check for factoryDriver
+    if (!client.downloadTable) {
+      throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadTable()');
+    }
+
+    const table = this.targetTableName(newVersionEntry);
+    this.logger('Downloading external pre-aggregation', queryOptions);
+
+    try {
+      const externalDriver = await this.externalDriverFactory();
+      const capabilities = externalDriver.capabilities && externalDriver.capabilities();
+
+      let tableData: DownloadTableData;
+
+      console.log('unloadWithSql');
+
+      if (capabilities.csvImport && client.unloadWithSql && await client.isUnloadSupported(this.getUnloadOptions())) {
+        tableData = await saveCancelFn(client.unloadWithSql(table, sql, sqlParams, this.getUnloadOptions()));
+      }
+
+      if (!tableData.types) {
+        tableData.types = await saveCancelFn(client.tableColumnTypes(table));
+      }
+      this.logger('Downloading external pre-aggregation completed', queryOptions);
+
+      return tableData;
+    } catch (error: any) {
+      this.logger('Downloading external pre-aggregation error', {
+        ...queryOptions,
+        error: error?.stack || error?.message
+      });
+      throw error;
     }
   }
 
