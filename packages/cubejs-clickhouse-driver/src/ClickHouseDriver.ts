@@ -6,7 +6,7 @@ import {
   DriverInterface,
   StreamOptions,
   StreamTableDataWithTypes,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';

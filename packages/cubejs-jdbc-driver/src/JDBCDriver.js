@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
-import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver } from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { promisify } from 'util';
 import genericPool from 'generic-pool';

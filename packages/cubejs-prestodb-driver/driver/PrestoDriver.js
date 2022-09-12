@@ -2,7 +2,7 @@ const presto = require('presto-client');
 const {
   map, zipObj, prop, concat
 } = require('ramda');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 const SqlString = require('sqlstring');
 
 class PrestoDriver extends BaseDriver {

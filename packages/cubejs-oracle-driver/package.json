@@ -13,7 +13,7 @@
   },
   "main": "driver/OracleDriver.js",
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.30.63",
+    "@cubejs-backend/base-driver": "^0.30.68",
     "ramda": "^0.27.0"
   },
   "optionalDependencies": {

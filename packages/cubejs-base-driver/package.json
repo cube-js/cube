@@ -1,12 +1,12 @@
 {
-  "name": "@cubejs-backend/query-orchestrator",
-  "description": "Cube.js Query Orchestrator and Cache",
+  "name": "@cubejs-backend/base-driver",
+  "description": "Cube.js Base Driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.63",
+  "version": "0.30.68",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
-    "directory": "packages/cubejs-query-orchestrator"
+    "directory": "packages/cubejs-base-driver"
   },
   "engines": {
     "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
@@ -19,8 +19,6 @@
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
     "unit": "jest --runInBand --coverage --verbose dist/test/unit",
-    "integration": "npm run integration:redis dist/test/integration",
-    "integration:redis": "jest --runInBand --verbose dist/test/integration",
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },
@@ -32,25 +30,13 @@
   ],
   "dependencies": {
     "@cubejs-backend/shared": "^0.30.57",
-    "@cubejs-backend/base-driver": "^0.30.68",
-    "csv-write-stream": "^2.0.0",
-    "es5-ext": "0.10.53",
-    "generic-pool": "^3.7.1",
-    "ioredis": "^4.27.8",
-    "lru-cache": "^6.0.0",
-    "moment-range": "^4.0.2",
-    "moment-timezone": "^0.5.33",
-    "ramda": "^0.27.0",
-    "redis": "^3.0.2"
+    "ramda": "^0.27.0"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.30.0",
-    "@types/generic-pool": "^3.1.9",
-    "@types/ioredis": "^4.19.3",
     "@types/jest": "^26.0.15",
     "@types/node": "^12",
     "@types/ramda": "^0.27.32",
-    "@types/redis": "^2.8.28",
     "jest": "^26.6.3",
     "typescript": "~4.1.5"
   },

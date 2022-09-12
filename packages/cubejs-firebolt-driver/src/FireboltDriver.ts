@@ -3,7 +3,7 @@ import {
   DriverInterface,
   StreamTableData,
   DownloadTableCSVData,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import {
   Firebolt,
   ConnectionOptions,
