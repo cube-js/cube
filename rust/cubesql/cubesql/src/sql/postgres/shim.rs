@@ -339,15 +339,28 @@ impl AsyncPostgresShim {
             ),
         };
 
-        self.logger.error(message.as_str(), props);
-
         if let Some(bt) = err.backtrace() {
             trace!("{}", bt);
         } else {
             trace!("Backtrace: not found");
         }
 
-        self.write(err.to_error_response()).await?;
+        let err_response = match &props {
+            Some(props) => {
+                let query = props.get(&"query".to_string());
+                let mut err_response = err.to_error_response();
+                if let Some(query) = query {
+                    err_response.message = format!("{}\nQUERY: {}", message, query);
+                }
+
+                err_response
+            }
+            None => err.to_error_response(),
+        };
+
+        self.logger.error(message.as_str(), props);
+
+        self.write(err_response).await?;
 
         Ok(())
     }
