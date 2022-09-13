@@ -966,8 +966,7 @@ export class PreAggregationLoader {
 
     try {
       const externalDriver = await this.externalDriverFactory();
-      // TODO: Drop any, awaiting https://github.com/cube-js/cube.js/pull/5233
-      const capabilities: any = externalDriver.capabilities && externalDriver.capabilities();
+      const capabilities = externalDriver.capabilities && externalDriver.capabilities();
 
       let tableData: DownloadTableData;
 
@@ -1571,7 +1570,7 @@ export class PreAggregations {
 
   private cacheDriver: CacheDriverInterface;
 
-  public externalDriverFactory: any;
+  public externalDriverFactory: DriverFactory;
 
   public structureVersionPersistTime: any;
 
