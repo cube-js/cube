@@ -916,9 +916,6 @@ export class PreAggregationLoader {
         tableData = await saveCancelFn(client.unloadWithSql(table, sql, sqlParams, this.getUnloadOptions()));
       }
 
-      if (!tableData.types) {
-        tableData.types = await saveCancelFn(client.tableColumnTypes(table));
-      }
       this.logger('Downloading external pre-aggregation completed', queryOptions);
 
       return tableData;
