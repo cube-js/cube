@@ -81,6 +81,7 @@ interface CubejsConfiguration {
     | ((context: RequestContext) => OrchestratorOptions);
   allowJsDuplicatePropsInSchema: boolean;
   initApp: (app: ExpressApplication) => void;
+  processSubscriptionsInterval: number;
 }
 
 interface OrchestratorOptions {
@@ -743,6 +744,11 @@ module.exports = {
   },
 };
 ```
+
+### <--{"id" : "Options Reference"}--> processSubscriptionsInterval
+
+This property controls how often Websocket client subscriptions are refreshed.
+Defaults to `5000`.
 
 ## QueueOptions
 
