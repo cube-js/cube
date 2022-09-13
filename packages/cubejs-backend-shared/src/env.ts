@@ -205,8 +205,6 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
     .asBoolStrict(),
-  snowflakeAgent: () => get('CUBEJS_DB_SNOWFLAKE_AGENT')
-    .asString(),
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
     .default('2')

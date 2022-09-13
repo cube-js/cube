@@ -177,7 +177,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       exportBucket: this.getExportBucket(),
       resultPrefetch: 1,
       executionTimeout: getEnv('dbQueryTimeout'),
-      application: getEnv('snowflakeAgent') || 'CubeDev_Cube',
+      application: 'CubeDev_Cube',
       ...config
     };
   }
