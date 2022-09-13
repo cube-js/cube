@@ -1,4 +1,5 @@
 import { BaseDriver, TableQueryResult } from '@cubejs-backend/base-driver';
+import { getEnv } from '@cubejs-backend/shared';
 import { DruidClient, DruidClientBaseConfiguration } from './DruidClient';
 import { DruidQuery } from './DruidQuery';
 
