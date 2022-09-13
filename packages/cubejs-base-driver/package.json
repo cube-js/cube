@@ -58,5 +58,8 @@
   "resolutions": {
     "es5-ext": "0.10.53",
     "minimist": "^1.2.6"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
