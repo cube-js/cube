@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 7658
 expression: "execute_query(\"\n                SELECT t.oid, information_schema._pg_numeric_precision(t.oid, 3) p\n                FROM pg_catalog.pg_type t\n                ORDER BY t.oid ASC;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+-------+
@@ -64,4 +63,6 @@ expression: "execute_query(\"\n                SELECT t.oid, information_schema.
 | 18002 | NULL  |
 | 18015 | NULL  |
 | 18016 | NULL  |
+| 18021 | NULL  |
+| 18022 | NULL  |
 +-------+-------+

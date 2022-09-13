@@ -423,6 +423,10 @@ describe('OptsHandler class', () => {
       public async release() {
         //
       }
+
+      public query() {
+        return Promise.resolve([]);
+      }
     }
 
     class Driver2 extends OriginalBaseDriver {
@@ -432,6 +436,10 @@ describe('OptsHandler class', () => {
 
       public async release() {
         //
+      }
+
+      public query() {
+        return Promise.resolve([]);
       }
     }
 

@@ -4,13 +4,13 @@ import LRUCache from 'lru-cache';
 import { pipeline } from 'stream';
 import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 
+import { BaseDriver, InlineTables } from '@cubejs-backend/base-driver';
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { BaseDriver, InlineTables } from '../driver';
 import { PreAggregationDescription } from './PreAggregations';
 
 type QueryOptions = {

@@ -173,14 +173,15 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
       { name: 'cards__max', type: 'int' },
 
     ];
-    await connection.query(`CREATE SCHEMA ${preAggregation.preAggregationsSchema}`, {}, {});
+    await connection.query(`CREATE SCHEMA ${preAggregation.preAggregationsSchema}`, [], {});
     await connection.uploadTableWithIndexes(
       preAggregation.tableName,
       columns,
       { rows: [] }, preAggregation.indexesSql, preAggregation.uniqueKeyColumns, {}, preAggregation.aggregationsColumns, preAggregation.createTableIndexes
     );
 
-    const tables = await connection.query('select * from system.tables', {}, {});
+    // eslint-disable-next-line camelcase
+    const tables = await connection.query<{ aggregate_columns: string }>('select * from system.tables', [], {});
     expect(tables).toHaveLength(1);
     const table = tables[0];
     expect(table).toHaveProperty('aggregate_columns');
@@ -188,7 +189,8 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
     expect(table.aggregate_columns).toMatch('{ column: Column { name: "cards__max", column_type: Int, column_index: 5 }, function: MAX }');
     expect(table.aggregate_columns).toMatch('{ column: Column { name: "cards__sum", column_type: Int, column_index: 4 }, function: SUM }');
 
-    const indexes = await connection.query('select * from system.indexes', {}, {});
+    // eslint-disable-next-line camelcase
+    const indexes = await connection.query<{name: string; index_type: string}>('select * from system.indexes', [], {});
     expect(indexes).toHaveLength(4);
     const indexesMap: {[key: string]: any} = {
       cards_count_created_at_reg_default: { type: 'Regular', seen: false },

@@ -200,6 +200,7 @@ trait Visitor<'ast, E: Error> {
                 self.visit_identifier(field)?;
             }
             Expr::TypedString { .. } => (),
+            Expr::AtTimeZone { timestamp, .. } => self.visit_expr(timestamp)?,
         };
 
         Ok(())

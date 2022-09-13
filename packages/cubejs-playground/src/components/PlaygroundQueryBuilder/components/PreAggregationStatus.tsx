@@ -5,7 +5,7 @@ import { Alert, Button, Space, Typography } from 'antd';
 import styled from 'styled-components';
 
 import { useServerCoreVersionGte } from '../../../hooks';
-import { useRollupDesignerContext } from '../../RollupDesigner';
+import { useRollupDesignerContext } from '../../../rollup-designer';
 import { QueryStatus } from './PlaygroundQueryBuilder';
 
 const Badge = styled.div`

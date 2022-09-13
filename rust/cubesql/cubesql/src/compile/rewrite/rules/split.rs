@@ -341,6 +341,22 @@ impl RewriteRules for SplitRules {
                 outer_aggregate_split_replacer(column_expr("?column"), "?cube"),
                 column_expr("?column"),
             ),
+            // Literal rules
+            rewrite(
+                "split-push-down-literal-inner-replacer",
+                inner_aggregate_split_replacer(literal_expr("?expr"), "?cube"),
+                literal_expr("?expr"),
+            ),
+            rewrite(
+                "split-push-down-literal-outer-replacer",
+                outer_projection_split_replacer(literal_expr("?expr"), "?cube"),
+                literal_expr("?expr"),
+            ),
+            rewrite(
+                "split-push-down-literal-outer-aggr-replacer",
+                outer_aggregate_split_replacer(literal_expr("?expr"), "?cube"),
+                literal_expr("?expr"),
+            ),
             // Date trunc
             transforming_rewrite(
                 "split-push-down-date-trunc-inner-replacer",

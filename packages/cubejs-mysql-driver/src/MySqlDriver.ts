@@ -7,7 +7,7 @@ import {
   DriverInterface,
   StreamOptions,
   DownloadQueryResultsOptions, TableStructure, DownloadTableData, IndexesSQL, DownloadTableMemoryData,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
   string: 'varchar(255) CHARACTER SET utf8mb4',

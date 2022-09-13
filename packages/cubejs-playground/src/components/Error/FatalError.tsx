@@ -1,9 +1,9 @@
 import { Space, Typography, Button } from 'antd';
 import { useState, useMemo } from 'react';
 import styled from 'styled-components';
-import { generateAnsiHTML } from '../shared/helpers';
 
-import { Alert } from './Alert';
+import { Alert } from '../../atoms/Alert';
+import { generateAnsiHTML } from './utils';
 
 const { Text, Paragraph } = Typography;
 

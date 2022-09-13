@@ -2,15 +2,27 @@
 export type GenericDataBaseType = string;
 
 export interface TableColumn {
+  // eslint-disable-next-line camelcase
   name: string;
+  // eslint-disable-next-line camelcase
   type: GenericDataBaseType;
   attributes?: string[]
 }
+
+export interface TableColumnQueryResult {
+  // eslint-disable-next-line camelcase
+  column_name: string;
+  // eslint-disable-next-line camelcase
+  data_type: GenericDataBaseType;
+  attributes?: string[]
+}
+
 export type TableStructure = TableColumn[];
 export type SchemaStructure = Record<string, TableStructure>;
 export type DatabaseStructure = Record<string, SchemaStructure>;
 
-export type Rows = Record<string, unknown>[];
+export type Row = Record<string, unknown>;
+export type Rows = Row[];
 export interface InlineTable {
   name: string
   columns: TableStructure
@@ -75,6 +87,10 @@ export type StreamTableDataWithTypes = StreamTableData & {
   types: TableStructure;
 };
 
+export function isDownloadTableMemoryData(tableData: any): tableData is DownloadTableMemoryData {
+  return Boolean(tableData.rows);
+}
+
 export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData;
 
 export interface ExternalDriverCompatibilities {
@@ -109,7 +125,10 @@ export type QueryOptions = {
   inlineTables?: InlineTables,
   [key: string]: any
 };
-export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData);
+export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData | StreamTableDataWithTypes);
+
+// eslint-disable-next-line camelcase
+export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
 
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
@@ -122,7 +141,7 @@ export interface DriverInterface {
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
   // eslint-disable-next-line camelcase
-  getTablesQuery: (schemaName: string) => Promise<({ table_name?: string, TABLE_NAME?: string })[]>;
+  getTablesQuery: (schemaName: string) => Promise<TableQueryResult[]>;
   // Remove table from database
   dropTable: (tableName: string, options?: QueryOptions) => Promise<unknown>;
   // Download data from Query (for readOnly)
@@ -139,4 +158,6 @@ export interface DriverInterface {
   nowTimestamp(): number;
   // Shutdown the driver
   release(): Promise<void>
+
+  capabilities(): ExternalDriverCompatibilities;
 }

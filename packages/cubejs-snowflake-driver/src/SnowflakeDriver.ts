@@ -6,7 +6,7 @@ import {
   GenericDataBaseType,
   StreamTableData,
   UnloadOptions,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import * as crypto from 'crypto';
 import { formatToTimeZone } from 'date-fns-timezone';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -134,6 +134,7 @@ interface SnowflakeDriverOptions {
   resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
   executionTimeout?: number,
+  application: string
 }
 
 /**
@@ -176,6 +177,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       exportBucket: this.getExportBucket(),
       resultPrefetch: 1,
       executionTimeout: getEnv('dbQueryTimeout'),
+      application: 'CubeDev_Cube',
       ...config
     };
   }

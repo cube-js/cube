@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/cloud",
-  "version": "0.30.57",
+  "version": "0.30.69",
   "description": "Cube Cloud package",
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/shared": "^0.30.57",
+    "@cubejs-backend/shared": "^0.30.69",
     "chokidar": "^3.5.1",
     "env-var": "^6.3.0",
     "fs-extra": "^9.1.0",

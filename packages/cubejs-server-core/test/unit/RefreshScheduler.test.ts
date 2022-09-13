@@ -256,6 +256,9 @@ class MockDriver extends BaseDriver {
     super();
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  public async testConnection() {}
+
   public query(query) {
     this.executedQueries.push(query);
     let promise: any = Promise.resolve([query]);

@@ -12,7 +12,7 @@ import {
 } from '@azure/storage-blob';
 import {
   DownloadTableCSVData,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -26,7 +26,6 @@ const { version } = require('../../package.json');
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
     readOnly?: boolean,
-    maxPoolSize?: number,
     // common bucket config
     bucketType?: string,
     exportBucket?: string,
@@ -101,7 +100,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public constructor(
-    conf: Partial<DatabricksDriverConfiguration>,
+    conf: Partial<DatabricksDriverConfiguration> = {},
   ) {
     const config: DatabricksDriverConfiguration = {
       ...conf,
@@ -113,7 +112,7 @@ export class DatabricksDriver extends JDBCDriver {
         PWD: getEnv('databrickToken') || '',
         // CUBEJS_DB_DATABRICKS_AGENT is a predefined way to override the user
         // agent for the Cloud application.
-        UserAgentEntry: getEnv('databrickAgent') || `CubeDev+Cube/${version} (Databricks)`,
+        UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
       },
       dbType: 'databricks',
       database: getEnv('dbName', { required: false }),
@@ -205,13 +204,13 @@ export class DatabricksDriver extends JDBCDriver {
 
   protected async getTables(): Promise<ShowTableRow[]> {
     if (this.config.database) {
-      return <any> this.query(`SHOW TABLES IN ${this.quoteIdentifier(this.config.database)}`, []);
+      return <any> this.query<ShowTableRow>(`SHOW TABLES IN ${this.quoteIdentifier(this.config.database)}`, []);
     }
 
-    const databases: ShowDatabasesRow[] = await this.query('SHOW DATABASES', []);
+    const databases = await this.query<ShowDatabasesRow>('SHOW DATABASES', []);
 
-    const allTables: (ShowTableRow[])[] = await Promise.all(
-      databases.map(async ({ databaseName }) => this.query(
+    const allTables = await Promise.all(
+      databases.map(async ({ databaseName }) => this.query<ShowTableRow>(
         `SHOW TABLES IN ${this.quoteIdentifier(databaseName)}`,
         []
       ))

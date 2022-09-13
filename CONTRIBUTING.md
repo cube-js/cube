@@ -52,7 +52,7 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 #### Stable Docker Release
 
 1. After cloning Cube.js repository run `yarn install` in `packages/cubejs-docker` to install dependencies.
-2. Use `docker build -t cubejs/cube:latest -f latest.Dockerfile` in `packages/cubejs-docker` to build stable docker image.
+2. Copy `yarn.lock` file from the project root to the `packages/cubejs-docker` folder and use `docker build -t cubejs/cube:latest -f latest.Dockerfile` in `packages/cubejs-docker` to build stable docker image manually.
 
 #### Development
 

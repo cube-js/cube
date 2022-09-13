@@ -17,11 +17,4 @@ const QueryRendererWithTotals = ({ query, ...restProps }) => (
   />
 );
 
-QueryRendererWithTotals.defaultProps = {
-  query: null,
-  render: null,
-  queries: null,
-  loadSql: null
-};
-
 export default QueryRendererWithTotals;

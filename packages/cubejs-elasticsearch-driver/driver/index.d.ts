@@ -1,5 +1,5 @@
 import { ClientOptions } from "@elastic/elasticsearch";
-import { BaseDriver } from "@cubejs-backend/query-orchestrator";
+import { BaseDriver } from "@cubejs-backend/base-driver";
 
 declare module "@cubejs-backend/elasticsearch-driver" {
   export type ElasticSearchDriverOptions = Pick<ClientOptions, 'ssl' | 'auth' | 'cloud'> & {
