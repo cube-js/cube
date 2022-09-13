@@ -758,7 +758,7 @@ export class PreAggregationLoader {
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(newVersionEntry, invalidationKeys, client) {
+  public refresh(newVersionEntry, invalidationKeys, client: DriverInterface) {
     let refreshStrategy = this.refreshImplStoreInSourceStrategy;
     if (this.preAggregation.external) {
       const readOnly =
@@ -771,7 +771,7 @@ export class PreAggregationLoader {
       } else {
         const capabilities = client?.capabilities?.();
 
-        if (capabilities.unloadWithoutTempTable && client.unloadWithSql) {
+        if (capabilities?.unloadWithoutTempTable && client.unloadWithSql) {
           refreshStrategy = this.refreshImplWithoutTempTableExternalStrategy;
         } else {
           refreshStrategy = this.refreshImplTempTableExternalStrategy;
