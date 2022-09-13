@@ -14,7 +14,7 @@ use crate::{
             rewriter::RewriteRules,
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_rewrite,
-            udf_expr, BetweenExprNegated, BinaryExprOp, ChangeUserMemberValue, ColumnExprColumn,
+            BetweenExprNegated, BinaryExprOp, ChangeUserMemberValue, ColumnExprColumn,
             CubeScanAliasToCube, CubeScanLimit, FilterMemberMember, FilterMemberOp,
             FilterMemberValues, FilterReplacerAliasToCube, InListExprNegated, LimitFetch,
             LimitSkip, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
@@ -287,9 +287,10 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "change-user-lower-in-filter",
                 filter_replacer(
-                    udf_expr(
-                        "lower",
-                        vec![inlist_expr(column_expr("?column"), "?list", "?negated")],
+                    inlist_expr(
+                        fun_expr("Lower", vec![column_expr("?column")]),
+                        "?list",
+                        "?negated",
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1318,7 +1319,7 @@ impl FilterRules {
         negated_var: &'static str,
         change_user_member_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let column_var = column_var.parse().unwrap();
+        let column_var = var!(column_var);
         let list_var = var!(list_var);
         let negated_var = var!(negated_var);
         let change_user_member_var = change_user_member_var.parse().unwrap();
