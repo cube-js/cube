@@ -169,7 +169,7 @@ impl RocksMetaStoreFs {
                         .unwrap()
                         .as_millis()
                         - millis
-                        > 3 * 60 * 1000
+                        > 15 * 60 * 1000
                     {
                         return Some(existing);
                     }
