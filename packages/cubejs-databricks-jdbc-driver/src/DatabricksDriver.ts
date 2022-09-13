@@ -10,9 +10,7 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import {
-  DownloadTableCSVData, DriverCapabilities,
-} from '@cubejs-backend/query-orchestrator';
+import { DriverCapabilities, } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -194,11 +192,9 @@ export class DatabricksDriver extends JDBCDriver {
     return result;
   }
 
-  public async queryColumnTypes(sql: string, params: any) {
+  private async queryColumnTypes(sql: string, params: unknown[]) {
     const result = [];
     const response: any[] = await this.query(`DESCRIBE QUERY ${sql}`, params);
-
-    console.log('response queryColumnTypesqueryColumnTypes', response);
 
     for (const column of response) {
       // Databricks describe additional info by default after empty line.
@@ -266,11 +262,10 @@ export class DatabricksDriver extends JDBCDriver {
     return this.config.exportBucket !== undefined;
   }
 
-  public async unloadWithSql(tableName: string, sql: string, params: any) {
+  public async unloadWithSql(tableName: string, sql: string, params: unknown[]) {
     const types = await this.queryColumnTypes(sql, params);
     const pathname = `${this.config.exportBucket}/${tableName}.csv`;
 
-    console.log('try moi');
     const csvFile = await this.getCsvFiles(
       tableName,
       sql,
@@ -278,7 +273,6 @@ export class DatabricksDriver extends JDBCDriver {
       params,
     );
 
-    console.log('success moi');
     return {
       csvFile,
       types,
@@ -294,7 +288,7 @@ export class DatabricksDriver extends JDBCDriver {
     table: string,
     sql: string,
     pathname: string,
-    params: any,
+    params: unknown[],
   ): Promise<string[]> {
     let res;
     switch (this.config.bucketType) {
@@ -320,7 +314,7 @@ export class DatabricksDriver extends JDBCDriver {
     table: string,
     sql: string,
     pathname: string,
-    params: any,
+    params: unknown[],
   ): Promise<string[]> {
     await this.createExternalTable(table, sql, params);
     return this.getSignedAzureUrls(pathname);
@@ -448,10 +442,7 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
    */
-  private async createExternalTable(table: string, sql: string, params: any) {
-    console.log('sqslqslqlsqlqslsq', sql);
-    console.log('pareqwoNeipKQWPoEQW', params);
-    console.log('this.config.exportBucketMountDir || this.config.exportBucket', this.config.exportBucketMountDir || this.config.exportBucket);
+  private async createExternalTable(table: string, sql: string, params: unknown[]) {
     await this.query(
       `
       CREATE TABLE ${table}_csv_export

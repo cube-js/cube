@@ -771,7 +771,7 @@ export class PreAggregationLoader {
       } else {
         const capabilities = client?.capabilities?.();
 
-        if (capabilities.unloadWithoutTempTable) {
+        if (capabilities.unloadWithoutTempTable && client.unloadWithSql) {
           refreshStrategy = this.refreshImplWithoutTempTableExternalStrategy;
         } else {
           refreshStrategy = this.refreshImplTempTableExternalStrategy;
@@ -851,14 +851,11 @@ export class PreAggregationLoader {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
 
-        console.log('[sql, params]', sql, params);
     await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
     const targetTableName = this.targetTableName(newVersionEntry);
 
     const queryOptions = this.queryOptions(invalidationKeys, sql, params, targetTableName, newVersionEntry);
     this.logExecutingSql(queryOptions);
-
-    console.log('queryOptionsqueryOptionsqueryOptionsqueryOptions', queryOptions);
 
     try {
       const tableData = await this.downloadWithoutTempTableExternalPreAggregation(
@@ -890,13 +887,8 @@ export class PreAggregationLoader {
     saveCancelFn: SaveCancelFn,
     queryOptions: any,
     sql: string,
-    sqlParams: any
+    sqlParams: unknown[]
   ) {
-    // @todo Deprecated, BaseDriver already implements it, before remove we need to add check for factoryDriver
-    if (!client.downloadTable) {
-      throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadTable()');
-    }
-
     const table = this.targetTableName(newVersionEntry);
     this.logger('Downloading external pre-aggregation', queryOptions);
 
@@ -906,10 +898,10 @@ export class PreAggregationLoader {
 
       let tableData: DownloadTableData;
 
-      console.log('unloadWithSql');
-
       if (capabilities.csvImport && client.unloadWithSql && await client.isUnloadSupported(this.getUnloadOptions())) {
         tableData = await saveCancelFn(client.unloadWithSql(table, sql, sqlParams, this.getUnloadOptions()));
+      } else {
+        throw new Error('download without temp table error');
       }
 
       this.logger('Downloading external pre-aggregation completed', queryOptions);
