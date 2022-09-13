@@ -1,0 +1,18 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select n from generate_series(1, 1000) pos(n) limit 10 offset 10\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----+
+| n  |
++----+
+| 11 |
+| 12 |
+| 13 |
+| 14 |
+| 15 |
+| 16 |
+| 17 |
+| 18 |
+| 19 |
+| 20 |
++----+

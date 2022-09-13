@@ -60,7 +60,7 @@ export function LocalhostTipBox({ onHostnameCopy }: TLocalhostTipBoxProps) {
 
             <Space direction="vertical" size="middle">
               <Typography.Text>
-                Please note, for Linux, you need to run Cube.js Docker container
+                Please note, for Linux, you need to run Cube Docker container
                 in the{' '}
                 <Typography.Link
                   href="https://docs.docker.com/network/host/"

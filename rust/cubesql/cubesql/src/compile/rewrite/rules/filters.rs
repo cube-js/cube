@@ -16,10 +16,10 @@ use crate::{
             time_dimension_date_range_replacer, time_dimension_expr, transforming_rewrite,
             BetweenExprNegated, BinaryExprOp, ChangeUserMemberValue, ColumnExprColumn,
             CubeScanAliasToCube, CubeScanLimit, FilterMemberMember, FilterMemberOp,
-            FilterMemberValues, FilterReplacerAliasToCube, InListExprNegated, LimitN,
-            LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember, TimeDimensionDateRange,
-            TimeDimensionDateRangeReplacerDateRange, TimeDimensionDateRangeReplacerMember,
-            TimeDimensionGranularity, TimeDimensionName,
+            FilterMemberValues, FilterReplacerAliasToCube, InListExprNegated, LimitFetch,
+            LimitSkip, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
+            TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
+            TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
         },
     },
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
@@ -100,7 +100,8 @@ impl RewriteRules for FilterRules {
                     ),
                 ),
                 limit(
-                    "?new_limit_n",
+                    "?new_limit_skip",
+                    "?new_limit_fetch",
                     cube_scan(
                         "?source_table_name",
                         "?members",
@@ -112,7 +113,12 @@ impl RewriteRules for FilterRules {
                         "?split",
                     ),
                 ),
-                self.push_down_limit_filter("?literal", "?new_limit", "?new_limit_n"),
+                self.push_down_limit_filter(
+                    "?literal",
+                    "?new_limit",
+                    "?new_limit_skip",
+                    "?new_limit_fetch",
+                ),
             ),
             // Transform Filter: Boolean(true)
             // It's safe to push down filter under projection, next filter-truncate-true will truncate it
@@ -127,7 +133,8 @@ impl RewriteRules for FilterRules {
                 filter(
                     "?filter",
                     limit(
-                        "LimitN:0",
+                        "?limit_skip",
+                        "LimitFetch:0",
                         cube_scan(
                             "?source_table_name",
                             "?members",
@@ -141,7 +148,8 @@ impl RewriteRules for FilterRules {
                     ),
                 ),
                 limit(
-                    "LimitN:0",
+                    "?limit_skip",
+                    "LimitFetch:0",
                     filter(
                         "?filter",
                         cube_scan(
@@ -159,8 +167,8 @@ impl RewriteRules for FilterRules {
             ),
             rewrite(
                 "limit-push-down-projection",
-                limit("?limit", projection("?expr", "?input", "?alias")),
-                projection("?expr", limit("?limit", "?input"), "?alias"),
+                limit("?skip", "?fetch", projection("?expr", "?input", "?alias")),
+                projection("?expr", limit("?skip", "?fetch", "?input"), "?alias"),
             ),
             // Limit to top node
             rewrite(
@@ -168,7 +176,8 @@ impl RewriteRules for FilterRules {
                 projection(
                     "?filter",
                     limit(
-                        "LimitN:0",
+                        "?limit_skip",
+                        "LimitFetch:0",
                         cube_scan(
                             "?source_table_name",
                             "?members",
@@ -183,7 +192,8 @@ impl RewriteRules for FilterRules {
                     "?alias",
                 ),
                 limit(
-                    "LimitN:0",
+                    "?limit_skip",
+                    "LimitFetch:0",
                     projection(
                         "?filter",
                         cube_scan(
@@ -205,6 +215,16 @@ impl RewriteRules for FilterRules {
                 "filter-truncate-true",
                 filter_replacer(literal_bool(true), "?alias_to_cube", "?members"),
                 cube_scan_filters_empty_tail(),
+            ),
+            // We use this rule to transform: (?expr IN (?list..)) = TRUE and ((?expr IN (?list..)) = TRUE) = TRUE
+            rewrite(
+                "filter-truncate-in-list-true",
+                filter_replacer(
+                    binary_expr("?expr", "=", literal_bool(true)),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer("?expr", "?alias_to_cube", "?members"),
             ),
             transforming_rewrite(
                 "filter-replacer",
@@ -243,20 +263,46 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             transforming_rewrite(
-                "change-user-replacer",
+                "change-user-equal-filter",
                 filter_replacer(
-                    binary_expr(column_expr("?column"), "?op", literal_expr("?literal")),
+                    binary_expr(column_expr("?column"), "=", literal_expr("?literal")),
                     "?alias_to_cube",
                     "?members",
                 ),
                 change_user_member("?user"),
-                self.transform_change_user("?column", "?op", "?literal", "?user"),
+                self.transform_change_user_eq("?column", "?literal", "?user"),
+            ),
+            // ?change_user IN (?list..)
+            transforming_rewrite(
+                "change-user-in-filter",
+                filter_replacer(
+                    inlist_expr(column_expr("?column"), "?list", "?negated"),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                change_user_member("?user"),
+                self.transform_change_user_in("?column", "?list", "?negated", "?user"),
+            ),
+            // LOWER(?change_user) IN (?list..) - It's not safety to replace LOWER fn for all filters
+            transforming_rewrite(
+                "change-user-lower-in-filter",
+                filter_replacer(
+                    inlist_expr(
+                        fun_expr("Lower", vec![column_expr("?column")]),
+                        "?list",
+                        "?negated",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                change_user_member("?user"),
+                self.transform_change_user_in("?column", "?list", "?negated", "?user"),
             ),
             rewrite(
                 "filter-in-place-filter-to-true-filter",
                 filter_replacer(column_expr("?column"), "?alias_to_cube", "?members"),
                 filter_replacer(
-                    binary_expr(column_expr("?column"), "=", literal_string("true")),
+                    binary_expr(column_expr("?column"), "=", literal_bool(true)),
                     "?alias_to_cube",
                     "?members",
                 ),
@@ -269,7 +315,7 @@ impl RewriteRules for FilterRules {
                     "?members",
                 ),
                 filter_replacer(
-                    binary_expr(column_expr("?column"), "=", literal_string("false")),
+                    binary_expr(column_expr("?column"), "=", literal_bool(false)),
                     "?alias_to_cube",
                     "?members",
                 ),
@@ -995,11 +1041,13 @@ impl FilterRules {
         &self,
         literal_var: &'static str,
         new_limit_var: &'static str,
-        new_limit_n_var: &'static str,
+        new_limit_skip_var: &'static str,
+        new_limit_fetch_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let literal_var = var!(literal_var);
         let new_limit_var = var!(new_limit_var);
-        let new_limit_n_var = var!(new_limit_n_var);
+        let new_limit_skip_var = var!(new_limit_skip_var);
+        let new_limit_fetch_var = var!(new_limit_fetch_var);
         move |egraph, subst| {
             for literal_value in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
                 if let ScalarValue::Boolean(Some(false)) = literal_value {
@@ -1008,8 +1056,12 @@ impl FilterRules {
                         egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(1)))),
                     );
                     subst.insert(
-                        new_limit_n_var,
-                        egraph.add(LogicalPlanLanguage::LimitN(LimitN(0))),
+                        new_limit_skip_var,
+                        egraph.add(LogicalPlanLanguage::LimitSkip(LimitSkip(Some(0)))),
+                    );
+                    subst.insert(
+                        new_limit_fetch_var,
+                        egraph.add(LogicalPlanLanguage::LimitFetch(LimitFetch(Some(0)))),
                     );
                     return true;
                 }
@@ -1226,38 +1278,78 @@ impl FilterRules {
         }
     }
 
-    fn transform_change_user(
+    fn transform_change_user_eq(
         &self,
         column_var: &'static str,
-        op_var: &'static str,
         literal_var: &'static str,
         change_user_member_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let column_var = column_var.parse().unwrap();
-        let op_var = op_var.parse().unwrap();
         let literal_var = literal_var.parse().unwrap();
         let change_user_member_var = change_user_member_var.parse().unwrap();
 
         move |egraph, subst| {
-            for expr_op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
-                for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
-                    if expr_op == &Operator::Eq {
-                        if let ScalarValue::Utf8(Some(change_user)) = literal {
-                            let specified_user = change_user.clone();
+            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                if let ScalarValue::Utf8(Some(change_user)) = literal {
+                    let specified_user = change_user.clone();
 
-                            for column in
-                                var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned()
-                            {
-                                if column.name.eq_ignore_ascii_case("__user") {
-                                    subst.insert(
-                                        change_user_member_var,
-                                        egraph.add(LogicalPlanLanguage::ChangeUserMemberValue(
-                                            ChangeUserMemberValue(specified_user),
-                                        )),
-                                    );
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        if column.name.eq_ignore_ascii_case("__user") {
+                            subst.insert(
+                                change_user_member_var,
+                                egraph.add(LogicalPlanLanguage::ChangeUserMemberValue(
+                                    ChangeUserMemberValue(specified_user),
+                                )),
+                            );
 
-                                    return true;
-                                }
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_change_user_in(
+        &self,
+        column_var: &'static str,
+        list_var: &'static str,
+        negated_var: &'static str,
+        change_user_member_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = var!(column_var);
+        let list_var = var!(list_var);
+        let negated_var = var!(negated_var);
+        let change_user_member_var = change_user_member_var.parse().unwrap();
+
+        move |egraph, subst| {
+            for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
+                if *negated {
+                    return false;
+                }
+
+                if let Some(list) = &egraph[subst[list_var]].data.constant_in_list {
+                    if list.len() != 1 {
+                        return false;
+                    }
+
+                    if let Some(ScalarValue::Utf8(Some(change_user))) = list.first() {
+                        let specified_user = change_user.clone();
+
+                        for column in
+                            var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned()
+                        {
+                            if column.name.eq_ignore_ascii_case("__user") {
+                                subst.insert(
+                                    change_user_member_var,
+                                    egraph.add(LogicalPlanLanguage::ChangeUserMemberValue(
+                                        ChangeUserMemberValue(specified_user),
+                                    )),
+                                );
+
+                                return true;
                             }
                         }
                     }

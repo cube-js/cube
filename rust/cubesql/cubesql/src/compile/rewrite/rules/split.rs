@@ -5,7 +5,7 @@ use crate::{
         rewrite::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, column_expr, cube_scan, fun_expr,
+            binary_expr, cast_expr, cast_expr_explicit, column_expr, cube_scan, fun_expr,
             inner_aggregate_split_replacer, literal_expr, literal_number, literal_string,
             original_expr_name, outer_aggregate_split_replacer, outer_projection_split_replacer,
             projection, projection_expr, projection_expr_empty_tail, rewrite,
@@ -20,6 +20,7 @@ use crate::{
     var, var_iter, CubeError,
 };
 use datafusion::{
+    arrow::datatypes::DataType as ArrowDataType,
     logical_plan::{Column, DFSchema, Operator},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
@@ -340,6 +341,22 @@ impl RewriteRules for SplitRules {
                 outer_aggregate_split_replacer(column_expr("?column"), "?cube"),
                 column_expr("?column"),
             ),
+            // Literal rules
+            rewrite(
+                "split-push-down-literal-inner-replacer",
+                inner_aggregate_split_replacer(literal_expr("?expr"), "?cube"),
+                literal_expr("?expr"),
+            ),
+            rewrite(
+                "split-push-down-literal-outer-replacer",
+                outer_projection_split_replacer(literal_expr("?expr"), "?cube"),
+                literal_expr("?expr"),
+            ),
+            rewrite(
+                "split-push-down-literal-outer-aggr-replacer",
+                outer_aggregate_split_replacer(literal_expr("?expr"), "?cube"),
+                literal_expr("?expr"),
+            ),
             // Date trunc
             transforming_rewrite(
                 "split-push-down-date-trunc-inner-replacer",
@@ -633,7 +650,10 @@ impl RewriteRules for SplitRules {
                                     "datediff",
                                     vec![
                                         literal_string("day"),
-                                        cast_expr(literal_string("1970-01-01"), "?data_type"),
+                                        cast_expr_explicit(
+                                            literal_string("1970-01-01"),
+                                            ArrowDataType::Date32,
+                                        ),
                                         column_expr("?column"),
                                     ],
                                 ),
@@ -673,7 +693,10 @@ impl RewriteRules for SplitRules {
                                     "datediff",
                                     vec![
                                         literal_string("day"),
-                                        cast_expr(literal_string("1970-01-01"), "?data_type"),
+                                        cast_expr_explicit(
+                                            literal_string("1970-01-01"),
+                                            ArrowDataType::Date32,
+                                        ),
                                         column_expr("?column"),
                                     ],
                                 ),
@@ -700,6 +723,187 @@ impl RewriteRules for SplitRules {
                     "?outer_column",
                 ),
             ),
+            // (DATEDIFF(day, DATEADD(month, CAST(((EXTRACT(MONTH FROM "ta_1"."createdAt") - 1) * -1) AS int), CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."createdAt") * 100) + EXTRACT(MONTH FROM "ta_1"."createdAt")) * 100) + 1) AS varchar) AS date)), "ta_1"."createdAt")
+            transforming_chain_rewrite(
+                "split-push-down-doy-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        udf_expr(
+                            "datediff",
+                            vec![
+                                literal_string("day"),
+                                udf_expr(
+                                    "dateadd",
+                                    vec![
+                                        literal_string("month"),
+                                        cast_expr_explicit(
+                                            binary_expr(
+                                                binary_expr(
+                                                    fun_expr(
+                                                        "DatePart",
+                                                        vec![
+                                                            literal_string("MONTH"),
+                                                            column_expr("?column"),
+                                                        ],
+                                                    ),
+                                                    "-",
+                                                    literal_number(1),
+                                                ),
+                                                "*",
+                                                literal_number(-1),
+                                            ),
+                                            ArrowDataType::Int32,
+                                        ),
+                                        cast_expr_explicit(
+                                            cast_expr_explicit(
+                                                binary_expr(
+                                                    binary_expr(
+                                                        binary_expr(
+                                                            binary_expr(
+                                                                fun_expr(
+                                                                    "DatePart",
+                                                                    vec![
+                                                                        literal_string("YEAR"),
+                                                                        column_expr("?column"),
+                                                                    ],
+                                                                ),
+                                                                "*",
+                                                                literal_number(100),
+                                                            ),
+                                                            "+",
+                                                            fun_expr(
+                                                                "DatePart",
+                                                                vec![
+                                                                    literal_string("MONTH"),
+                                                                    column_expr("?column"),
+                                                                ],
+                                                            ),
+                                                        ),
+                                                        "*",
+                                                        literal_number(100),
+                                                    ),
+                                                    "+",
+                                                    literal_number(1),
+                                                ),
+                                                ArrowDataType::Utf8,
+                                            ),
+                                            ArrowDataType::Date32,
+                                        ),
+                                    ],
+                                ),
+                                column_expr("?column"),
+                            ],
+                        ),
+                        "+",
+                        literal_number(1),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("day"), column_expr("?column")],
+                    ),
+                    "?outer_alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?outer_alias",
+                    "?outer_column",
+                ),
+            ),
+            // (DATEDIFF(day, DATEADD(month, CAST(((EXTRACT(MONTH FROM "ta_1"."createdAt") - 1) * -1) AS int), CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."createdAt") * 100) + EXTRACT(MONTH FROM "ta_1"."createdAt")) * 100) + 1) AS varchar) AS date)), "ta_1"."createdAt")
+            transforming_chain_rewrite(
+                "split-push-down-doy-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        udf_expr(
+                            "datediff",
+                            vec![
+                                literal_string("day"),
+                                udf_expr(
+                                    "dateadd",
+                                    vec![
+                                        literal_string("month"),
+                                        cast_expr_explicit(
+                                            binary_expr(
+                                                binary_expr(
+                                                    fun_expr(
+                                                        "DatePart",
+                                                        vec![
+                                                            literal_string("MONTH"),
+                                                            column_expr("?column"),
+                                                        ],
+                                                    ),
+                                                    "-",
+                                                    literal_number(1),
+                                                ),
+                                                "*",
+                                                literal_number(-1),
+                                            ),
+                                            ArrowDataType::Int32,
+                                        ),
+                                        cast_expr_explicit(
+                                            cast_expr_explicit(
+                                                binary_expr(
+                                                    binary_expr(
+                                                        binary_expr(
+                                                            binary_expr(
+                                                                fun_expr(
+                                                                    "DatePart",
+                                                                    vec![
+                                                                        literal_string("YEAR"),
+                                                                        column_expr("?column"),
+                                                                    ],
+                                                                ),
+                                                                "*",
+                                                                literal_number(100),
+                                                            ),
+                                                            "+",
+                                                            fun_expr(
+                                                                "DatePart",
+                                                                vec![
+                                                                    literal_string("MONTH"),
+                                                                    column_expr("?column"),
+                                                                ],
+                                                            ),
+                                                        ),
+                                                        "*",
+                                                        literal_number(100),
+                                                    ),
+                                                    "+",
+                                                    literal_number(1),
+                                                ),
+                                                ArrowDataType::Utf8,
+                                            ),
+                                            ArrowDataType::Date32,
+                                        ),
+                                    ],
+                                ),
+                                column_expr("?column"),
+                            ],
+                        ),
+                        "+",
+                        literal_number(1),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DatePart",
+                        vec![literal_string("doy"), column_expr("?outer_column")],
+                    ),
+                    "?outer_alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?outer_alias",
+                    "?outer_column",
+                ),
+            ),
+            //
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-with-date-trunc-inner-aggr-replacer",
                 inner_aggregate_split_replacer(

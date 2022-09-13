@@ -7,7 +7,8 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import styled from 'styled-components';
 import { CubeContext } from '@cubejs-client/react';
 
-import { Button, CubeLoader, FatalError } from '../../atoms';
+import { FatalError } from '../../components/Error/FatalError';
+import { Button, CubeLoader } from '../../atoms';
 import { UIFramework } from '../../types';
 import { QueryStatus } from '../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 import {
@@ -221,7 +222,7 @@ export default function ChartRenderer({
   const slowQueryMsg = slowQuery
     ? 'This query takes more than 5 seconds to execute. Please consider using pre-aggregations to improve its performance. '
     : slowQueryFromCache
-    ? "This query takes more than 5 seconds to execute. It was served from the cache because Cube.js wasn't able to renew it in less than 5 seconds. Please consider using pre-aggregations to improve its performance. "
+    ? "This query takes more than 5 seconds to execute. It was served from the cache because Cube wasn't able to renew it in less than 5 seconds. Please consider using pre-aggregations to improve its performance. "
     : '';
 
   return (

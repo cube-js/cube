@@ -49,7 +49,7 @@ export default function ConnectionTest({
           description={(() => (
             <>
               <p style={{ paddingLeft: 20 }}>
-                Cube.js was unable to connect to the specified database.
+                Cube was unable to connect to the specified database.
               </p>
               <p style={{ paddingLeft: 20 }}>
                 The database returned the following error:

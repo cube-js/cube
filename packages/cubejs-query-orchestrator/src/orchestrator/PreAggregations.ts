@@ -14,22 +14,18 @@ import {
   utcToLocalTimeZone,
 } from '@cubejs-backend/shared';
 
-import { cancelCombinator, SaveCancelFn } from '../driver/utils';
+import { cancelCombinator, SaveCancelFn, DriverInterface, BaseDriver,
+  DownloadTableData,
+  InlineTable,
+  StreamOptions,
+  UnloadOptions } from '@cubejs-backend/base-driver';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
-import {
-  BaseDriver,
-  DownloadTableData,
-  InlineTable,
-  StreamOptions,
-  UnloadOptions
-} from '../driver';
 import { QueryQueue } from './QueryQueue';
-import { DriverInterface } from '../driver/driver.interface';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 
 /// Name of the inline table containing the lambda rows.
@@ -1423,8 +1419,7 @@ export class PreAggregationPartitionRangeLoader {
       if (this.options.externalRefresh && loadResults.length === 0) {
         throw new Error(
           'No pre-aggregation partitions were built yet for the pre-aggregation serving this query. ' +
-          'Please make sure your refresh worker is configured ' +
-          'correctly and running.'
+          'Please ensure your refresh worker is configured correctly, running, and has already built this pre-aggregation.'
         );
       }
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
@@ -1667,7 +1662,7 @@ export class PreAggregations {
 
   private cacheDriver: CacheDriverInterface;
 
-  public externalDriverFactory: any;
+  public externalDriverFactory: DriverFactory;
 
   public structureVersionPersistTime: any;
 

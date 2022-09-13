@@ -6,8 +6,9 @@ import * as moment from 'moment';
 import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
-  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions, StreamTableDataWithTypes, QueryOptions,
-} from '@cubejs-backend/query-orchestrator';
+  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
+  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult,
+} from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
@@ -266,7 +267,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     return result.rows;
   }
 
-  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions) {
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
     if (options.streamImport) {
       return this.stream(query, values, options);
     }
