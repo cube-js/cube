@@ -1805,7 +1805,7 @@ export class PreAggregations {
       preAggregationsSchema: schema,
     });
     tables = tables.filter(row => `${schema}.${row.table_name}` === table);
-    return table.length === 1;
+    return tables.length === 1;
   }
 
   public loadAllPreAggregationsIfNeeded(queryBody) {
