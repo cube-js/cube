@@ -73,7 +73,10 @@ impl MetaStoreFs for RocksMetaStoreFs {
                     }
 
                     return self
-                        .create_and_check_store(path, config, Some(snapshot))
+                        .check_meta_store(
+                            RocksMetaStore::new(path, self.clone(), config),
+                            Some(snapshot),
+                        )
                         .await;
                 }
             } else {
@@ -84,7 +87,9 @@ impl MetaStoreFs for RocksMetaStoreFs {
             info!("Using existing metastore in {}", path);
         }
 
-        return self.create_and_check_store(path, config, None).await;
+        return self
+            .check_meta_store(RocksMetaStore::new(path, self.clone(), config), None)
+            .await;
     }
 
     async fn upload_log(
@@ -262,13 +267,11 @@ impl RocksMetaStoreFs {
         }
         Ok(())
     }
-    pub async fn create_and_check_store(
+    pub async fn check_meta_store(
         self: &Arc<Self>,
-        path: &str,
-        config: Arc<dyn ConfigObj>,
+        meta_store: Arc<RocksMetaStore>,
         snapshot: Option<u128>,
     ) -> Result<Arc<RocksMetaStore>, CubeError> {
-        let meta_store = RocksMetaStore::new(path, self.clone(), config);
         if let Some(snapshot) = snapshot {
             self.load_metastore_logs(snapshot, &meta_store).await?;
         }
