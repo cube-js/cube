@@ -396,13 +396,13 @@ jobs:
           elif [[ $GITHUB_REF == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/}
           fi
-          TAGS="${DOCKER_IMAGE}:${VERSION}-debian-jdk"
+          TAGS="${DOCKER_IMAGE}:${VERSION}-jdk"
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-debian-jdk,${DOCKER_IMAGE}:${MAJOR}-debian-jdk,${DOCKER_IMAGE}:debian-jdk"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-jdk,${DOCKER_IMAGE}:${MAJOR}-jdk,${DOCKER_IMAGE}:jdk"
           elif [ "${{ github.event_name }}" = "push" ]; then
-            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-debian-jdk"
+            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-jdk"
           fi
           echo ::set-output name=version::${VERSION}
           echo ::set-output name=tags::${TAGS}
