@@ -13,6 +13,7 @@ import {
   Row,
   isNumberType
 } from 'firebolt-sdk';
+import { version } from 'firebolt-sdk/package.json';
 import { FireboltQuery } from './FireboltQuery';
 
 export type FireboltDriverConfiguration = {
@@ -58,6 +59,12 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
         engineName: <string>process.env.CUBEJS_FIREBOLT_ENGINE_NAME,
         // engineEndpoint was deprecated in favor of engineName + account
         engineEndpoint: <string>process.env.CUBEJS_FIREBOLT_ENGINE_ENDPOINT,
+        additionalParameters: {
+          userClients: [{
+            name: 'Cube',
+            version,
+          }]
+        },
         ...(config.connection || {}),
       },
     };
