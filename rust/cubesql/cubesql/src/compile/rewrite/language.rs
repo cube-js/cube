@@ -433,7 +433,10 @@ macro_rules! variant_field_struct {
             impl FromStr for [<$variant $var_field:camel>] {
                 type Err = CubeError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    match s {
+                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
+                    let name = s.strip_prefix(&prefix).ok_or(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))?;
+
+                    match name {
                         $($name => Ok([<$variant $var_field:camel>]($variant_type)),)*
                         x => Err(CubeError::internal(format!("{} can't be matched against {}", x, std::stringify!($var_field_type))))
                     }
