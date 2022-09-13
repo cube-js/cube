@@ -194,7 +194,8 @@ export class DatabricksDriver extends JDBCDriver {
 
   private async queryColumnTypes(sql: string, params: unknown[]) {
     const result = [];
-    const response: any[] = await this.query(`DESCRIBE QUERY ${sql}`, params);
+    // eslint-disable-next-line camelcase
+    const response = await this.query<{col_name: string; data_type: string}>(`DESCRIBE QUERY ${sql}`, params);
 
     for (const column of response) {
       // Databricks describe additional info by default after empty line.
