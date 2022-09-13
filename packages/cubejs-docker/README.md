@@ -51,43 +51,16 @@ building UI on top of that.
 
 ```bash
 docker pull cubejs/cube:latest
-docker run -p 3000:3000 -p 4000:4000 \
-  -e CUBEJS_DEV_MODE=true \
-  -e CUBEJS_DB_TYPE=databricks-jdbc \
-  -e CUBEJS_DB_NAME=default \
-  -e CUBEJS_DB_DATABRICKS_URL="jdbc:spark://dbc-5a7d63cf-e6dd.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/5928427581414565/0511-154725-hkkg2x4n;AuthMech=3;UID=token;PWD=dapi84bb26088d83d2b1de79bc2c0cbe90c7" \
-  -e CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true \
-  -e CUBEJS_API_SECRET=SECRET \
-  -v ${PWD}:/cube/conf \
-  cube-jdk-cloud:latest
-  
-  
-  docker run -p 3000:3000 -p 4000:4000 \
-  -e CUBEJS_DEV_MODE=true \
-  -e CUBEJS_DB_TYPE=databricks-jdbc \
-  -e CUBEJS_DB_NAME=default \
-  -e CUBEJS_DB_DATABRICKS_URL="jdbc:spark://dbc-5a7d63cf-e6dd.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/5928427581414565/0511-154725-hkkg2x4n;AuthMech=3;UID=token;PWD=dapi84bb26088d83d2b1de79bc2c0cbe90c7" \
-  -e CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true \
-  -e CUBEJS_API_SECRET=SECRET \
+docker run -d -p 3000:3000 -p 4000:4000 \
+  -e CUBEJS_DB_HOST=postgres://hostname \
+  -e CUBEJS_DB_NAME=<DB_NAME> \
+  -e CUBEJS_DB_USER=<USER> \
+  -e CUBEJS_DB_PASS=<PASS> \
+  -e CUBEJS_DB_TYPE=<DB_TYPE> \
+  -e CUBEJS_API_SECRET=<API_SECRET> \
   -v $(pwd):/cube/conf \
-  cube-jdk:latest
+  cubejs/cube:latest
 ```
-
-CUBEJS_DEV_MODE=true
-CUBEJS_EXTERNAL_DEFAULT=true
-CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
-CUBEJS_WEB_SOCKETS=true
-
-CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
-CUBEJS_DB_TYPE=databricks-jdbc
-CUBEJS_DB_NAME=default
-CUBEJS_DB_DATABRICKS_URL=jdbc:spark://dbc-5a7d63cf-e6dd.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/5928427581414565/0511-154725-hkkg2x4n;AuthMech=3;UID=token;PWD=dapi84bb26088d83d2b1de79bc2c0cbe90c7
-CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true
-
-CUBEJS_DB_EXPORT_BUCKET=s3://cube-test-e2e
-CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=AKIAXAMPONEMQ7IFDL6F
-CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=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
-CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=us-east-1
 
 The Cube.js Developer Playground will be available at `http://localhost:4000`.
 For more information about supported environment variables, please consult the
