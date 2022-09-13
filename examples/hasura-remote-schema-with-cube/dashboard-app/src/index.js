@@ -191,7 +191,7 @@ function App() {
         <tr>
           <td style={{ width: '50%' }}>
             <div style={{ height: '375px', margin: '20px 0' }}>
-              <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + Cube {timestamps.CubeQuery ? `(${timestamps.CubeQuery / 1000}s)` : ``}</h3>
+              <h3 style={{display: 'flex', justifyContent: 'center'}}>Cube {timestamps.CubeQuery ? `(${(timestamps.CubeQuery / 1000).toFixed(2)}s)` : ``}</h3>
               <DisplayFraudAmountSum
                 loading={loadingFraudDataCube}
                 error={errorFraudDataCube}
@@ -201,7 +201,7 @@ function App() {
           </td>
           <td style={{ width: '50%' }}>
             <div style={{ height: '375px', margin: '20px 0' }}>
-              <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + PostgreSQL {timestamps.HasuraQuery ? `(${timestamps.HasuraQuery / 1000}s)` : ``}</h3>
+              <h3 style={{display: 'flex', justifyContent: 'center'}}>PostgreSQL {timestamps.HasuraQuery ? `(${(timestamps.HasuraQuery / 1000).toFixed(2)}s)` : `(...)`}</h3>
               <DisplayFraudAmountSum
                 loading={loadingFraudDataHasura}
                 error={errorFraudDataHasura}
