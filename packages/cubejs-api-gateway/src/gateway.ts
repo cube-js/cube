@@ -1576,6 +1576,7 @@ class ApiGateway {
 
     if (this.standalone) {
       const orchestratorApi = await this.adapterApi({});
+
       try {
         // todo: test other data sources
         orchestratorApi.addDataSeenSource('default');
