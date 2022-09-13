@@ -112,7 +112,7 @@ export class DatabricksDriver extends JDBCDriver {
         PWD: getEnv('databrickToken') || '',
         // CUBEJS_DB_DATABRICKS_AGENT is a predefined way to override the user
         // agent for the Cloud application.
-        UserAgentEntry: getEnv('databrickAgent') || `CubeDev+Cube/${version} (Databricks)`,
+        UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
       },
       dbType: 'databricks',
       database: getEnv('dbName', { required: false }),
