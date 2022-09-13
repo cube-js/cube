@@ -1,3 +1,14 @@
-import { executeTestSuiteFor } from './driver-test-suite';
+import { mainTestSet } from './driverTests/testSets';
+import { executeTestSuite } from './driver-test-suite';
 
-executeTestSuiteFor('questdb');
+executeTestSuite({
+  type: 'questdb',
+  tests: mainTestSet,
+  
+});
+
+executeTestSuite({
+  type: 'questdb',
+  tests: mainTestSet,
+  config: { CUBEJS_EXTERNAL_DEFAULT: 'true' }
+});

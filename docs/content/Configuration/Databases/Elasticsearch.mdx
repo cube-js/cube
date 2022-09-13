@@ -4,7 +4,9 @@ permalink: /config/databases/elasticsearch
 ---
 
 <WarningBox>
-  The driver for Elasticsearch is <a href="../databases#driver-support">community-supported</a> and is not supported by Cube or the vendor. 
+  The driver for Elasticsearch is{' '}
+  <a href="../databases#driver-support">community-supported</a> and is not
+  supported by Cube or the vendor.
 </WarningBox>
 
 ## Prerequisites
@@ -51,6 +53,8 @@ CUBEJS_DB_ELASTIC_APIKEY_KEY=ui2lp2axTNmsyakw9tvNnw
 | `CUBEJS_DB_ELASTIC_OPENDISTRO`   | If `true`, then use the Open Distro for Elasticsearch                                                                                                                                    | `true`, `false`                        |    ❌    |
 | `CUBEJS_DB_ELASTIC_APIKEY_ID`    | [ID of the API key from elastic.co][elastic-docs-api-keys]                                                                                                                               | A valid Elastic.co API key ID          |    ❌    |
 | `CUBEJS_DB_ELASTIC_APIKEY_KEY`   | [Value of the API key from elastic.co][elastic-docs-api-keys]                                                                                                                            | A valid Elastic.co API key value       |    ❌    |
+| `CUBEJS_CONCURRENCY`             | The number of concurrent connections each queue has to the database. Default is `2`                                                                                                      | A valid number                         |    ❌    |
+| `CUBEJS_DB_MAX_POOL`             | The maximum number of concurrent database connections to pool. Default is `8`                                                                                                            | A valid number                         |    ❌    |
 
 ## SSL
 

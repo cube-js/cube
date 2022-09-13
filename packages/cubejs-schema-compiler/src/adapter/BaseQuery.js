@@ -11,7 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -555,6 +555,49 @@ class BaseQuery {
     );
   }
 
+  /**
+   * Returns a dictionary mapping each preagregation to its corresponding query fragment.
+   * @returns {Record<string, Array<string>>}
+   */
+  buildLambdaQuery() {
+    const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
+    const result = {};
+    if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
+      // TODO(cristipp) Use source query instead of preaggregation references.
+      const references = this.cubeEvaluator.evaluatePreAggregationReferences(preAggForQuery.cube, preAggForQuery.preAggregation);
+      const lambdaQuery = this.newSubQuery(
+        {
+          measures: references.measures,
+          dimensions: references.dimensions,
+          timeDimensions: references.timeDimensions,
+          filters: [
+            ...this.options.filters ?? [],
+            references.timeDimensions.length > 0
+              ? {
+                member: references.timeDimensions[0].dimension,
+                operator: 'afterDate',
+                values: [FROM_PARTITION_RANGE]
+              }
+              : [],
+          ],
+          segments: this.options.segments,
+          order: [],
+          limit: undefined,
+          offset: undefined,
+          rowLimit: MAX_SOURCE_ROW_LIMIT,
+          preAggregationQuery: true,
+        }
+      );
+      const sqlAndParams = lambdaQuery.buildSqlAndParams();
+      const cacheKeyQueries = this.evaluateSymbolSqlWithContext(
+        () => this.cacheKeyQueries(),
+        { preAggregationQuery: true }
+      );
+      result[this.preAggregations.preAggregationId(preAggForQuery)] = { sqlAndParams, cacheKeyQueries };
+    }
+    return result;
+  }
+
   externalQuery() {
     const ExternalQuery = this.externalQueryClass;
     return new ExternalQuery(this.compilers, {
@@ -742,6 +785,18 @@ class BaseQuery {
       const regularMeasuresCubes = cubeNames(regularMeasures);
       const multipliedMeasuresCubes = cubeNames(multipliedMeasures);
       if (R.equals(regularMeasuresCubes, multipliedMeasuresCubes)) {
+        const measuresList = regularMeasures.concat(multipliedMeasures);
+        // We need to use original measures sorting to avoid problems
+        // with the query order.
+        measuresList.sort((m1, m2) => {
+          let i1;
+          let i2;
+          this.measures.forEach((m, i) => {
+            if (m.measure === m1.measure) { i1 = i; }
+            if (m.measure === m2.measure) { i2 = i; }
+          });
+          return i1 - i2;
+        });
         toJoin = R.pipe(
           R.groupBy(m => m.cube().name),
           R.toPairs,
@@ -751,7 +806,7 @@ class BaseQuery {
               () => this.aggregateSubQuery(keyCubeName, measures),
             )
           )
-        )(regularMeasures.concat(multipliedMeasures));
+        )(measuresList);
       }
     }
     return this.joinFullKeyQueryAggregate(
@@ -794,7 +849,11 @@ class BaseQuery {
 
     // TODO all having filters should be pushed down
     // subQuery dimensions can introduce projection remapping
-    if (toJoin.length === 1 && this.measureFilters.length === 0 && this.measures.filter(m => m.expression).length === 0) {
+    if (
+      toJoin.length === 1 &&
+      this.measureFilters.length === 0 &&
+      this.measures.filter(m => m.expression).length === 0
+    ) {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
 
@@ -1516,7 +1575,14 @@ class BaseQuery {
   }
 
   groupByDimensionLimit() {
-    const limitClause = this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+    let limitClause = '';
+    if (this.rowLimit !== null) {
+      if (this.rowLimit === MAX_SOURCE_ROW_LIMIT) {
+        limitClause = ` LIMIT ${this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT)}`;
+      } else {
+        limitClause = ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+      }
+    }
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
     return `${limitClause}${offsetClause}`;
   }
@@ -2235,7 +2301,7 @@ class BaseQuery {
     );
   }
 
-  preAggregationReadOnly(cube, preAggregation) {
+  preAggregationReadOnly(_cube, _preAggregation) {
     return false;
   }
 

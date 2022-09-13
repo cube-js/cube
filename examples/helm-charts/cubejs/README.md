@@ -317,48 +317,56 @@ cubestore:
 
 ### Master parameters
 
-| Name                                        | Description                                          | Value  |
-| ------------------------------------------- | ---------------------------------------------------- | ------ |
-| `master.affinity`                           | Affinity for pod assignment                          | `{}`   |
-| `master.spreadConstraints`                  | Topology spread constraint for pod assignment        | `[]`   |
-| `master.resources`                          | Define resources requests and limits for single Pods | `{}`   |
-| `master.livenessProbe.enabled`              | Enable livenessProbe                                 | `true` |
-| `master.livenessProbe.initialDelaySeconds`  | Initial delay seconds for livenessProbe              | `10`   |
-| `master.livenessProbe.periodSeconds`        | Period seconds for livenessProbe                     | `30`   |
-| `master.livenessProbe.timeoutSeconds`       | Timeout seconds for livenessProbe                    | `3`    |
-| `master.livenessProbe.successThreshold`     | Failure threshold for livenessProbe                  | `1`    |
-| `master.livenessProbe.failureThreshold`     | Success threshold for livenessProbe                  | `3`    |
-| `master.readinessProbe.enabled`             | Enable readinessProbe                                | `true` |
-| `master.readinessProbe.initialDelaySeconds` | Initial delay seconds for readinessProbe             | `10`   |
-| `master.readinessProbe.periodSeconds`       | Period seconds for readinessProbe                    | `30`   |
-| `master.readinessProbe.timeoutSeconds`      | Timeout seconds for readinessProbe                   | `3`    |
-| `master.readinessProbe.successThreshold`    | Failure threshold for readinessProbe                 | `1`    |
-| `master.readinessProbe.failureThreshold`    | Success threshold for readinessProbe                 | `3`    |
-| `master.customLivenessProbe`                | Custom livenessProbe that overrides the default one  | `{}`   |
-| `master.customReadinessProbe`               | Custom readinessProbe that overrides the default one | `{}`   |
+| Name                                                 | Description                                                                                                         | Value   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------- |
+| `master.serviceAccount.create`                       | Specifies whether a ServiceAccount should be created                                                                | `false` |
+| `master.serviceAccount.name`                         | Name of the service account to use. If not set and create is true, a name is generated using the fullname template. | `""`    |
+| `master.serviceAccount.automountServiceAccountToken` | Automount service account token for the server service account                                                      | `true`  |
+| `master.serviceAccount.annotations`                  | Annotations for service account. Evaluated as a template. Only used if create is true.                              | `{}`    |
+| `master.affinity`                                    | Affinity for pod assignment                                                                                         | `{}`    |
+| `master.spreadConstraints`                           | Topology spread constraint for pod assignment                                                                       | `[]`    |
+| `master.resources`                                   | Define resources requests and limits for single Pods                                                                | `{}`    |
+| `master.livenessProbe.enabled`                       | Enable livenessProbe                                                                                                | `true`  |
+| `master.livenessProbe.initialDelaySeconds`           | Initial delay seconds for livenessProbe                                                                             | `10`    |
+| `master.livenessProbe.periodSeconds`                 | Period seconds for livenessProbe                                                                                    | `30`    |
+| `master.livenessProbe.timeoutSeconds`                | Timeout seconds for livenessProbe                                                                                   | `3`     |
+| `master.livenessProbe.successThreshold`              | Failure threshold for livenessProbe                                                                                 | `1`     |
+| `master.livenessProbe.failureThreshold`              | Success threshold for livenessProbe                                                                                 | `3`     |
+| `master.readinessProbe.enabled`                      | Enable readinessProbe                                                                                               | `true`  |
+| `master.readinessProbe.initialDelaySeconds`          | Initial delay seconds for readinessProbe                                                                            | `10`    |
+| `master.readinessProbe.periodSeconds`                | Period seconds for readinessProbe                                                                                   | `30`    |
+| `master.readinessProbe.timeoutSeconds`               | Timeout seconds for readinessProbe                                                                                  | `3`     |
+| `master.readinessProbe.successThreshold`             | Failure threshold for readinessProbe                                                                                | `1`     |
+| `master.readinessProbe.failureThreshold`             | Success threshold for readinessProbe                                                                                | `3`     |
+| `master.customLivenessProbe`                         | Custom livenessProbe that overrides the default one                                                                 | `{}`    |
+| `master.customReadinessProbe`                        | Custom readinessProbe that overrides the default one                                                                | `{}`    |
 
 ### Workers parameters
 
-| Name                                         | Description                                          | Value  |
-| -------------------------------------------- | ---------------------------------------------------- | ------ |
-| `workers.workersCount`                       | Number of workers to deploy                          | `1`    |
-| `workers.affinity`                           | Affinity for pod assignment                          | `{}`   |
-| `workers.spreadConstraints`                  | Topology spread constraint for pod assignment        | `[]`   |
-| `workers.resources`                          | Define resources requests and limits for single Pods | `{}`   |
-| `workers.livenessProbe.enabled`              | Enable livenessProbe                                 | `true` |
-| `workers.livenessProbe.initialDelaySeconds`  | Initial delay seconds for livenessProbe              | `10`   |
-| `workers.livenessProbe.periodSeconds`        | Period seconds for livenessProbe                     | `30`   |
-| `workers.livenessProbe.timeoutSeconds`       | Timeout seconds for livenessProbe                    | `3`    |
-| `workers.livenessProbe.successThreshold`     | Failure threshold for livenessProbe                  | `1`    |
-| `workers.livenessProbe.failureThreshold`     | Success threshold for livenessProbe                  | `3`    |
-| `workers.readinessProbe.enabled`             | Enable readinessProbe                                | `true` |
-| `workers.readinessProbe.initialDelaySeconds` | Initial delay seconds for readinessProbe             | `10`   |
-| `workers.readinessProbe.periodSeconds`       | Period seconds for readinessProbe                    | `30`   |
-| `workers.readinessProbe.timeoutSeconds`      | Timeout seconds for readinessProbe                   | `3`    |
-| `workers.readinessProbe.successThreshold`    | Failure threshold for readinessProbe                 | `1`    |
-| `workers.readinessProbe.failureThreshold`    | Success threshold for readinessProbe                 | `3`    |
-| `workers.customLivenessProbe`                | Custom livenessProbe that overrides the default one  | `{}`   |
-| `workers.customReadinessProbe`               | Custom readinessProbe that overrides the default one | `{}`   |
+| Name                                                  | Description                                                                                                         | Value   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------- |
+| `workers.serviceAccount.create`                       | Specifies whether a ServiceAccount should be created                                                                | `false` |
+| `workers.serviceAccount.name`                         | Name of the service account to use. If not set and create is true, a name is generated using the fullname template. | `""`    |
+| `workers.serviceAccount.automountServiceAccountToken` | Automount service account token for the server service account                                                      | `true`  |
+| `workers.serviceAccount.annotations`                  | Annotations for service account. Evaluated as a template. Only used if create is true.                              | `{}`    |
+| `workers.workersCount`                                | Number of workers to deploy                                                                                         | `1`     |
+| `workers.affinity`                                    | Affinity for pod assignment                                                                                         | `{}`    |
+| `workers.spreadConstraints`                           | Topology spread constraint for pod assignment                                                                       | `[]`    |
+| `workers.resources`                                   | Define resources requests and limits for single Pods                                                                | `{}`    |
+| `workers.livenessProbe.enabled`                       | Enable livenessProbe                                                                                                | `true`  |
+| `workers.livenessProbe.initialDelaySeconds`           | Initial delay seconds for livenessProbe                                                                             | `10`    |
+| `workers.livenessProbe.periodSeconds`                 | Period seconds for livenessProbe                                                                                    | `30`    |
+| `workers.livenessProbe.timeoutSeconds`                | Timeout seconds for livenessProbe                                                                                   | `3`     |
+| `workers.livenessProbe.successThreshold`              | Failure threshold for livenessProbe                                                                                 | `1`     |
+| `workers.livenessProbe.failureThreshold`              | Success threshold for livenessProbe                                                                                 | `3`     |
+| `workers.readinessProbe.enabled`                      | Enable readinessProbe                                                                                               | `true`  |
+| `workers.readinessProbe.initialDelaySeconds`          | Initial delay seconds for readinessProbe                                                                            | `10`    |
+| `workers.readinessProbe.periodSeconds`                | Period seconds for readinessProbe                                                                                   | `30`    |
+| `workers.readinessProbe.timeoutSeconds`               | Timeout seconds for readinessProbe                                                                                  | `3`     |
+| `workers.readinessProbe.successThreshold`             | Failure threshold for readinessProbe                                                                                | `1`     |
+| `workers.readinessProbe.failureThreshold`             | Success threshold for readinessProbe                                                                                | `3`     |
+| `workers.customLivenessProbe`                         | Custom livenessProbe that overrides the default one                                                                 | `{}`    |
+| `workers.customReadinessProbe`                        | Custom readinessProbe that overrides the default one                                                                | `{}`    |
 
 ## Ingress parameters
 

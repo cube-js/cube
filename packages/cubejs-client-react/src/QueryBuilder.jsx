@@ -15,7 +15,7 @@ import {
 
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
-import { generateAnsiHTML, removeEmpty } from './utils';
+import { removeEmpty } from './utils';
 
 const granularities = [
   { name: undefined, title: 'w/o grouping' },
@@ -31,6 +31,24 @@ const granularities = [
 
 export default class QueryBuilder extends React.Component {
   static contextType = CubeContext;
+  
+  static defaultProps = {
+    cubejsApi: null,
+    stateChangeHeuristics: null,
+    disableHeuristics: false,
+    render: null,
+    wrapWithQueryRenderer: true,
+    defaultChartType: 'line',
+    defaultQuery: {},
+    initialVizState: null,
+    onVizStateChanged: null,
+    
+    // deprecated
+    query: null,
+    setQuery: null,
+    vizState: null,
+    setVizState: null,
+  };
 
   // This is an anti-pattern, only kept for backward compatibility
   // https://reactjs.org/blog/2018/06/07/you-probably-dont-need-derived-state.html#anti-pattern-unconditionally-copying-props-to-state
@@ -148,20 +166,23 @@ export default class QueryBuilder extends React.Component {
 
     let meta;
     let metaError = null;
+    let richMetaError = null;
     let metaErrorStack = null;
 
     try {
       this.setState({ isFetchingMeta: true });
       meta = await this.cubejsApi().meta();
     } catch (error) {
-      metaError = error;
+      metaError = error.response?.plainError || error;
+      richMetaError = error;
       metaErrorStack = error.response?.stack?.replace(error.message || '', '') || '';
     }
 
     this.setState(
       {
         meta,
-        metaError: metaError ? new Error(generateAnsiHTML(metaError.message || metaError.toString())) : null,
+        metaError: metaError ? new Error(metaError.message || metaError.toString()) : null,
+        richMetaError,
         metaErrorStack,
         isFetchingMeta: false,
       },
@@ -248,6 +269,7 @@ export default class QueryBuilder extends React.Component {
     const {
       meta,
       metaError,
+      richMetaError,
       query,
       queryError,
       chartType,
@@ -339,6 +361,7 @@ export default class QueryBuilder extends React.Component {
     return {
       meta,
       metaError,
+      richMetaError,
       metaErrorStack,
       query,
       error: queryError, // Match same name as QueryRenderer prop
@@ -518,7 +541,8 @@ export default class QueryBuilder extends React.Component {
         }
       } catch (error) {
         this.setState({
-          queryError: new Error(generateAnsiHTML(error.message || error.toString())),
+          queryError: new Error(error.response?.plainError || error.message),
+          richQueryError: new Error(error.message || error.toString())
         });
       }
     }
@@ -575,21 +599,3 @@ export default class QueryBuilder extends React.Component {
     }
   }
 }
-
-QueryBuilder.defaultProps = {
-  cubejsApi: null,
-  stateChangeHeuristics: null,
-  disableHeuristics: false,
-  render: null,
-  wrapWithQueryRenderer: true,
-  defaultChartType: 'line',
-  defaultQuery: {},
-  initialVizState: null,
-  onVizStateChanged: null,
-
-  // deprecated
-  query: null,
-  setQuery: null,
-  vizState: null,
-  setVizState: null,
-};

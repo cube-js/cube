@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile-upstream:master-experimental
-FROM node:14.18.2-buster-slim
+FROM node:14.20.0-bullseye-slim
 
 ARG IMAGE_VERSION=unknown
 
@@ -29,8 +29,8 @@ USER cube
 WORKDIR /cube
 COPY --chown=cube:cube . .
 
-# There is a problem with release process.
-# We are doing version bump without updating lock files for the docker package.
+# We are copying root yarn.lock file to the context folder during the Publish GH
+# action. So, a process will use the root lock file here.
 RUN yarn policies set-version v1.22.5 \
     && yarn install && yarn cache clean
 

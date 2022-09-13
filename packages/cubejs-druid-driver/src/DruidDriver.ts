@@ -1,4 +1,4 @@
-import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 
 import { DruidClient, DruidClientBaseConfiguration } from './DruidClient';

@@ -27,13 +27,14 @@ CUBEJS_AWS_ATHENA_WORKGROUP=primary
 
 ## Environment Variables
 
-| Environment Variable            | Description                                                       | Possible Values                                  | Required |
-| ------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------ | :------: |
-| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections             | A valid AWS Access Key ID                        |    ✅    |
-| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections         | A valid AWS Secret Access Key                    |    ✅    |
-| `CUBEJS_AWS_REGION`             | The AWS region of the Cube.js deployment                          | [A valid AWS region][aws-docs-regions]           |    ✅    |
-| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube.js deployment | A valid S3 path                                  |    ❌    |
-| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started     | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
+| Environment Variable            | Description                                                                         | Possible Values                                  | Required |
+| ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------ | :------: |
+| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections                               | A valid AWS Access Key ID                        |    ✅    |
+| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections                           | A valid AWS Secret Access Key                    |    ✅    |
+| `CUBEJS_AWS_REGION`             | The AWS region of the Cube.js deployment                                            | [A valid AWS region][aws-docs-regions]           |    ✅    |
+| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube.js deployment                   | A valid S3 path                                  |    ❌    |
+| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                       | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
+| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5` | A valid number                                   |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
@@ -56,11 +57,11 @@ here][ref-caching-using-preaggs-build-strats].
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
-| Batching      |             ❌             |      ✅     |
-| Export Bucket |             ❌             |      ❌     |
+| Batching      |             ❌             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
 
-By default, AWS Athena uses a [batching][self-preaggs-batching] strategy to build
-pre-aggregations.
+By default, AWS Athena uses a [batching][self-preaggs-batching] strategy to
+build pre-aggregations.
 
 ### Batching
 

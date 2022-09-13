@@ -73,7 +73,7 @@ pub trait QueryPlanner: DIService + Send + Sync {
     async fn logical_plan(
         &self,
         statement: Statement,
-        inline_tables: Arc<InlineTables>,
+        inline_tables: &InlineTables,
     ) -> Result<QueryPlan, CubeError>;
     async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError>;
 }
@@ -97,14 +97,14 @@ impl QueryPlanner for QueryPlannerImpl {
     async fn logical_plan(
         &self,
         statement: Statement,
-        inline_tables: Arc<InlineTables>,
+        inline_tables: &InlineTables,
     ) -> Result<QueryPlan, CubeError> {
         let ctx = self.execution_context().await?;
 
         let schema_provider = MetaStoreSchemaProvider::new(
             self.meta_store.get_tables_with_path(false).await?,
             self.meta_store.clone(),
-            inline_tables.clone(),
+            inline_tables,
         );
 
         let query_planner = SqlToRel::new(&schema_provider);
@@ -174,7 +174,7 @@ struct MetaStoreSchemaProvider {
     _data: Arc<Vec<TablePath>>,
     by_name: HashSet<TableKey>,
     meta_store: Arc<dyn MetaStore>,
-    inline_tables: Arc<InlineTables>,
+    inline_tables: InlineTables,
 }
 
 /// Points into [MetaStoreSchemaProvider::data], never null.
@@ -208,14 +208,14 @@ impl MetaStoreSchemaProvider {
     pub fn new(
         tables: Arc<Vec<TablePath>>,
         meta_store: Arc<dyn MetaStore>,
-        inline_tables: Arc<InlineTables>,
+        inline_tables: &InlineTables,
     ) -> Self {
         let by_name = tables.iter().map(|t| TableKey(t)).collect();
         Self {
             _data: tables,
             by_name,
             meta_store,
-            inline_tables,
+            inline_tables: (*inline_tables).clone(),
         }
     }
 }
@@ -225,8 +225,14 @@ impl ContextProvider for MetaStoreSchemaProvider {
         let (schema, table) = match name {
             TableReference::Partial { schema, table } => (schema, table),
             TableReference::Bare { table } => {
+                let table = self
+                    .inline_tables
+                    .iter()
+                    .find(|inline_table| inline_table.name == table)?;
                 return Some(Arc::new(InlineTableProvider::new(
-                    self.inline_tables.get(table)?.clone(),
+                    table.id,
+                    table.data.clone(),
+                    Vec::new(),
                 )));
             }
             TableReference::Full { .. } => return None,
@@ -569,9 +575,9 @@ fn compute_workers(
         workers: Vec<String>,
     }
     impl<'a> PlanVisitor for Visitor<'a> {
-        type Error = ();
+        type Error = CubeError;
 
-        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, ()> {
+        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, CubeError> {
             match plan {
                 LogicalPlan::Extension { node } => {
                     let snapshots;
@@ -586,7 +592,7 @@ fn compute_workers(
                         self.config,
                         snapshots.as_slice(),
                         self.tree,
-                    );
+                    )?;
                     self.workers = workers.into_iter().map(|w| w.0).collect();
                     Ok(false)
                 }
@@ -605,6 +611,6 @@ fn compute_workers(
         Ok(true) => Err(CubeError::internal(
             "no cluster send node found in plan".to_string(),
         )),
-        Err(_) => panic!("unexpected return value"),
+        Err(e) => Err(e),
     }
 }

@@ -69,18 +69,18 @@ impl PostgresIntegrationTestSuite {
 
         sleep(Duration::from_millis(1 * 1000)).await;
 
-        let client = PostgresIntegrationTestSuite::create_client(port).await;
+        let client = PostgresIntegrationTestSuite::create_client(
+            format!("host=127.0.0.1 port={} user=test password=test", port)
+                .parse()
+                .unwrap(),
+        )
+        .await;
 
         AsyncTestConstructorResult::Sucess(Box::new(PostgresIntegrationTestSuite { client, port }))
     }
 
-    async fn create_client(port: Port) -> Client {
-        let (client, connection) = tokio_postgres::connect(
-            format!("host=127.0.0.1 port={} user=test password=test", port).as_str(),
-            NoTls,
-        )
-        .await
-        .unwrap();
+    async fn create_client(config: tokio_postgres::Config) -> Client {
+        let (client, connection) = config.connect(NoTls).await.unwrap();
 
         // The connection object performs the actual communication with the database,
         // so spawn it off to run on its own.
@@ -440,7 +440,12 @@ impl PostgresIntegrationTestSuite {
     }
 
     async fn test_portal_pagination(&self) -> RunResult<()> {
-        let mut client = PostgresIntegrationTestSuite::create_client(self.port).await;
+        let mut client = PostgresIntegrationTestSuite::create_client(
+            format!("host=127.0.0.1 port={} user=test password=test", self.port)
+                .parse()
+                .unwrap(),
+        )
+        .await;
 
         let stmt = client
             .prepare("SELECT generate_series(1, 100)")
@@ -662,10 +667,30 @@ impl PostgresIntegrationTestSuite {
         self.test_simple_query("PREPARE simple_query AS SELECT 1".to_string(), |_| {})
             .await?;
 
+        self.test_simple_query(
+            "select * from pg_catalog.pg_prepared_statements WHERE name = 'simple_query'"
+                .to_string(),
+            |rows| {
+                assert_eq!(rows.len(), 1 + 1, "prepared statement must be defined");
+            },
+        )
+        .await?;
+
         self.test_simple_query("DEALLOCATE simple_query".to_string(), |_| {})
             .await?;
 
-        // TODO: Check select * from pg_catalog.pg_prepared_statements
+        self.test_simple_query(
+            "select * from pg_catalog.pg_prepared_statements WHERE name = 'simple_query'"
+                .to_string(),
+            |rows| {
+                assert_eq!(
+                    rows.len(),
+                    1,
+                    "prepared statement called simple_query must be undefined (was deallocated)"
+                );
+            },
+        )
+        .await?;
 
         Ok(())
     }
@@ -674,10 +699,113 @@ impl PostgresIntegrationTestSuite {
         self.test_simple_query("PREPARE simple_query AS SELECT 1".to_string(), |_| {})
             .await?;
 
+        self.test_simple_query(
+            "select * from pg_catalog.pg_prepared_statements WHERE name = 'simple_query'"
+                .to_string(),
+            |rows| {
+                assert_eq!(rows.len(), 1 + 1, "prepared statement must be defined");
+            },
+        )
+        .await?;
+
         self.test_simple_query("DEALLOCATE ALL".to_string(), |_| {})
             .await?;
 
-        // TODO: Check select * from pg_catalog.pg_prepared_statements
+        self.test_simple_query(
+            "select * from pg_catalog.pg_prepared_statements".to_string(),
+            |rows| {
+                assert_eq!(
+                    rows.len(),
+                    1,
+                    "all prepared statement must be cleared after deallocate all"
+                );
+            },
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn test_simple_query_discard_all(&self) -> RunResult<()> {
+        self.test_simple_query("PREPARE simple_query AS SELECT 1".to_string(), |_| {})
+            .await?;
+        self.test_simple_query(
+            r#"DECLARE cursor_1 CURSOR WITH HOLD for SELECT generate_series(1, 100); DECLARE cursor_2 CURSOR WITH HOLD for SELECT generate_series(1, 100);"#
+                .to_string(),
+            |_| {},
+        )
+            .await?;
+
+        self.test_simple_query("DISCARD ALL".to_string(), |_| {})
+            .await?;
+
+        self.test_simple_query(
+            "select * from pg_catalog.pg_prepared_statements".to_string(),
+            |rows| {
+                assert_eq!(
+                    rows.len(),
+                    1,
+                    "all prepared statement must be cleared after DISCARD ALL"
+                );
+            },
+        )
+        .await?;
+
+        // TODO: Check portals/cursors
+
+        Ok(())
+    }
+
+    async fn test_database_change(&self) -> RunResult<()> {
+        self.test_simple_query("SELECT current_database()".to_string(), |messages| {
+            assert_eq!(messages.len(), 2);
+
+            if let SimpleQueryMessage::Row(row) = &messages[0] {
+                // default one
+                assert_eq!(row.get(0), Some("db"));
+            } else {
+                panic!("Must be Row command, 0")
+            }
+        })
+        .await?;
+
+        let new_client = Self::create_client(
+            format!(
+                "host=127.0.0.1 port={} dbname=meow user=test password=test",
+                self.port
+            )
+            .parse()
+            .unwrap(),
+        )
+        .await;
+
+        let messages = new_client
+            .simple_query(&"SELECT current_database()")
+            .await?;
+        if let SimpleQueryMessage::Row(row) = &messages[0] {
+            // default one
+            assert_eq!(row.get(0), Some("meow"));
+        } else {
+            panic!("Must be Row command, 0")
+        }
+
+        Ok(())
+    }
+
+    async fn test_df_panic_handle(&self) -> RunResult<()> {
+        // This test only stream call with panic on the Portal
+        let err = self
+            .test_simple_query(
+                "SELECT TIMESTAMP '9999-12-31 00:00:00';".to_string(),
+                |_| {},
+            )
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: Internal: Unexpected panic. Reason: attempt to multiply with overflow"
+        );
 
         Ok(())
     }
@@ -711,6 +839,9 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         .await?;
         self.test_simple_query_deallocate_specific().await?;
         self.test_simple_query_deallocate_all().await?;
+        self.test_df_panic_handle().await?;
+        self.test_simple_query_discard_all().await?;
+        self.test_database_change().await?;
 
         // PostgreSQL doesn't support unsigned integers in the protocol, it's a constraint only
         self.test_snapshot_execute_query(

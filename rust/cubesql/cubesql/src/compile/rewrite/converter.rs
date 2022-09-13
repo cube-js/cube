@@ -8,17 +8,17 @@ use crate::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
             BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
-            ColumnExprColumn, CubeScanAliases, CubeScanLimit, CubeScanTableName, DimensionName,
+            ColumnExprColumn, CubeScanAliases, CubeScanLimit, CubeScanOffset, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
-            JoinRightOn, LimitN, LiteralExprValue, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
-            OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun, ScalarUDFExprFun,
-            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
-            SortExprAsc, SortExprNullsFirst, TableScanLimit, TableScanProjection,
-            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
-            WindowFunctionExprFun, WindowFunctionExprWindowFrame,
+            JoinRightOn, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberValue,
+            LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc, OrderMember,
+            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun,
+            ScalarUDFExprFun, ScalarVariableExprDataType, ScalarVariableExprVariable,
+            SegmentMemberMember, SortExprAsc, SortExprNullsFirst, TableScanFetch,
+            TableScanProjection, TableScanSourceTableName, TableScanTableName, TableUDFExprFun,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
     sql::AuthContextRef,
@@ -407,13 +407,13 @@ impl LogicalPlanToLanguageConverter {
                 let table_name = add_data_node!(self, node.table_name, TableScanTableName);
                 let projection = add_data_node!(self, node.projection, TableScanProjection);
                 let filters = add_expr_list_node!(self, node.filters, TableScanFilters);
-                let limit = add_data_node!(self, node.limit, TableScanLimit);
+                let fetch = add_data_node!(self, node.fetch, TableScanFetch);
                 self.graph.add(LogicalPlanLanguage::TableScan([
                     source_table_name,
                     table_name,
                     projection,
                     filters,
-                    limit,
+                    fetch,
                 ]))
             }
             LogicalPlan::EmptyRelation(rel) => {
@@ -423,9 +423,11 @@ impl LogicalPlanToLanguageConverter {
                     .add(LogicalPlanLanguage::EmptyRelation([produce_one_row]))
             }
             LogicalPlan::Limit(limit) => {
-                let n = add_data_node!(self, limit.n, LimitN);
+                let skip = add_data_node!(self, limit.skip, LimitSkip);
+                let fetch = add_data_node!(self, limit.fetch, LimitFetch);
                 let input = self.add_logical_plan(limit.input.as_ref())?;
-                self.graph.add(LogicalPlanLanguage::Limit([n, input]))
+                self.graph
+                    .add(LogicalPlanLanguage::Limit([skip, fetch, input]))
             }
             LogicalPlan::CreateExternalTable { .. } => {
                 panic!("CreateExternalTable is not supported");
@@ -967,7 +969,7 @@ impl LanguageToLogicalPlanConverter {
                 let projection = match_data_node!(node_by_id, params[2], TableScanProjection);
                 let filters =
                     match_expr_list_node!(node_by_id, to_expr, params[3], TableScanFilters);
-                let limit = match_data_node!(node_by_id, params[4], TableScanLimit);
+                let fetch = match_data_node!(node_by_id, params[4], TableScanFetch);
                 let table_parts = source_table_name.split(".").collect::<Vec<_>>();
                 let table_reference = if table_parts.len() == 2 {
                     TableReference::Partial {
@@ -1012,7 +1014,7 @@ impl LanguageToLogicalPlanConverter {
                     projection,
                     projected_schema: Arc::new(projected_schema),
                     filters,
-                    limit,
+                    fetch,
                 })
             }
             LogicalPlanLanguage::EmptyRelation(params) => {
@@ -1026,9 +1028,10 @@ impl LanguageToLogicalPlanConverter {
                 })
             }
             LogicalPlanLanguage::Limit(params) => {
-                let n = match_data_node!(node_by_id, params[0], LimitN);
-                let input = Arc::new(self.to_logical_plan(params[1])?);
-                LogicalPlan::Limit(Limit { n, input })
+                let skip = match_data_node!(node_by_id, params[0], LimitSkip);
+                let fetch = match_data_node!(node_by_id, params[1], LimitFetch);
+                let input = Arc::new(self.to_logical_plan(params[2])?);
+                LogicalPlan::Limit(Limit { skip, fetch, input })
             }
             // LogicalPlan::CreateExternalTable { .. } => {
             //     panic!("CreateExternalTable is not supported");
@@ -1049,8 +1052,6 @@ impl LanguageToLogicalPlanConverter {
                             match_list_node!(node_by_id, cube_scan_params[1], CubeScanMembers);
                         let order =
                             match_list_node!(node_by_id, cube_scan_params[3], CubeScanOrder);
-                        let table_name =
-                            match_data_node!(node_by_id, cube_scan_params[7], CubeScanTableName);
                         // TODO filters
                         // TODO
                         let mut query = V1LoadRequestQuery::new();
@@ -1080,7 +1081,7 @@ impl LanguageToLogicalPlanConverter {
                                         )))?;
                                     fields.push((
                                         DFField::new(
-                                            Some(&table_name),
+                                            expr_relation(&expr),
                                             &expr_name(&expr)?,
                                             data_type,
                                             true,
@@ -1117,7 +1118,7 @@ impl LanguageToLogicalPlanConverter {
                                     if let Some(granularity) = &granularity {
                                         fields.push((
                                             DFField::new(
-                                                None,
+                                                expr_relation(&expr),
                                                 // TODO empty schema
                                                 &expr_name(&expr)?,
                                                 DataType::Timestamp(TimeUnit::Nanosecond, None),
@@ -1145,7 +1146,7 @@ impl LanguageToLogicalPlanConverter {
                                     query_dimensions.push(dimension.to_string());
                                     fields.push((
                                         DFField::new(
-                                            Some(&table_name),
+                                            expr_relation(&expr),
                                             // TODO empty schema
                                             &expr_name(&expr)?,
                                             data_type,
@@ -1158,7 +1159,7 @@ impl LanguageToLogicalPlanConverter {
                                     let expr = self.to_expr(params[1])?;
                                     fields.push((
                                         DFField::new(
-                                            Some(&table_name),
+                                            expr_relation(&expr),
                                             // TODO empty schema
                                             &expr_name(&expr)?,
                                             DataType::Boolean,
@@ -1168,10 +1169,10 @@ impl LanguageToLogicalPlanConverter {
                                     ));
                                 }
                                 LogicalPlanLanguage::ChangeUser(params) => {
-                                    let expr = self.to_expr(params[0])?;
+                                    let expr = self.to_expr(params[1])?;
                                     fields.push((
                                         DFField::new(
-                                            Some(&table_name),
+                                            expr_relation(&expr),
                                             // TODO empty schema
                                             &expr_name(&expr)?,
                                             DataType::Utf8,
@@ -1186,7 +1187,7 @@ impl LanguageToLogicalPlanConverter {
                                     let expr = self.to_expr(params[1])?;
                                     fields.push((
                                         DFField::new(
-                                            Some(&table_name),
+                                            expr_relation(&expr),
                                             &expr_name(&expr)?,
                                             value.get_datatype(),
                                             true,
@@ -1417,6 +1418,13 @@ impl LanguageToLogicalPlanConverter {
                             match_data_node!(node_by_id, cube_scan_params[4], CubeScanLimit)
                                 .map(|n| if n > 50000 { 50000 } else { n as i32 });
 
+                        let offset =
+                            match_data_node!(node_by_id, cube_scan_params[5], CubeScanOffset)
+                                .map(|offset| offset as i32);
+                        if offset.is_some() {
+                            query.offset = offset;
+                        }
+
                         let aliases =
                             match_data_node!(node_by_id, cube_scan_params[6], CubeScanAliases);
 
@@ -1492,5 +1500,12 @@ pub fn expr_name(expr: &Expr) -> Result<String, CubeError> {
     match expr {
         Expr::Column(c) => Ok(c.name.to_string()),
         _ => Ok(expr.name(&DFSchema::empty())?),
+    }
+}
+
+pub fn expr_relation(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::Column(c) => c.relation.as_ref().map(|s| s.as_str()),
+        _ => None,
     }
 }

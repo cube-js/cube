@@ -40,8 +40,18 @@ jobs:
             ${{ runner.os }}-workspace-main-14.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
+      - name: Copy yarn.lock file
+        run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
@@ -108,8 +118,18 @@ jobs:
         run: npm install -g yarn
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
+      - name: Copy yarn.lock file
+        run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build native
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
@@ -179,10 +199,18 @@ jobs:
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
+      - name: Copy yarn.lock file
+        run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install
+        uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
-        run: yarn install --frozen-lockfile
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build native
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Upload artifact

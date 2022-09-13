@@ -12,7 +12,7 @@ import {
 } from '@azure/storage-blob';
 import {
   DownloadTableCSVData,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -64,18 +64,13 @@ const DatabricksToGenericType: Record<string, string> = {
   'decimal(10,0)': 'bigint',
 };
 
-const jdbcDriverResolver: Promise<string> | null = null;
-
 async function resolveJDBCDriver(): Promise<string> {
-  if (jdbcDriverResolver) {
-    return jdbcDriverResolver;
-  }
   return fileExistsOr(
     path.join(process.cwd(), 'SparkJDBC42.jar'),
     async () => fileExistsOr(
-      path.join(__dirname, '..', '..', 'download', 'SparkJDBC42.jar'),
+      path.join(__dirname, '..', 'download', 'SparkJDBC42.jar'),
       async () => {
-        const pathOrNull = await downloadJDBCDriver(false);
+        const pathOrNull = await downloadJDBCDriver();
         if (pathOrNull) {
           return pathOrNull;
         }
@@ -106,7 +101,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public constructor(
-    conf: Partial<DatabricksDriverConfiguration>,
+    conf: Partial<DatabricksDriverConfiguration> = {},
   ) {
     const config: DatabricksDriverConfiguration = {
       ...conf,
@@ -118,7 +113,7 @@ export class DatabricksDriver extends JDBCDriver {
         PWD: getEnv('databrickToken') || '',
         // CUBEJS_DB_DATABRICKS_AGENT is a predefined way to override the user
         // agent for the Cloud application.
-        UserAgentEntry: getEnv('databrickAgent') || `Cube+OS/${version} (Databricks)`,
+        UserAgentEntry: getEnv('databrickAgent') || `CubeDev+Cube/${version} (Databricks)`,
       },
       dbType: 'databricks',
       database: getEnv('dbName', { required: false }),
@@ -145,6 +140,26 @@ export class DatabricksDriver extends JDBCDriver {
 
   public readOnly() {
     return !!this.config.readOnly;
+  }
+
+  public setLogger(logger: any) {
+    super.setLogger(logger);
+    this.showUrlTokenDeprecation();
+  }
+
+  public showUrlTokenDeprecation() {
+    if (this.config.url) {
+      const result = this.config.url
+        .split(';')
+        .find(node => /^PWD/i.test(node))
+        ?.split('=')[1];
+
+      if (result) {
+        this.logger('PWD Parameter Deprecation in connection string', {
+          warning: 'PWD parameter is deprecated and will be ignored in future releases. Please migrate to the CUBEJS_DB_DATABRICKS_TOKEN environment variable.'
+        });
+      }
+    }
   }
 
   /**

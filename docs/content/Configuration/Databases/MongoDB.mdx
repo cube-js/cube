@@ -4,7 +4,9 @@ permalink: /config/databases/mongodb
 ---
 
 <WarningBox>
-  The driver for MongoDB is <a href="../databases#driver-support">community-supported</a> and is not supported by Cube or the vendor. 
+  The driver for MongoDB is{' '}
+  <a href="../databases#driver-support">community-supported</a> and is not
+  supported by Cube or the vendor.
 </WarningBox>
 
 ## Prerequisites
@@ -44,22 +46,24 @@ file][mongobi-with-remote-db].
 
 ## Environment Variables
 
-| Environment Variable | Description                                                             | Possible Values           | Required |
-| -------------------- | ----------------------------------------------------------------------- | ------------------------- | :------: |
-| `CUBEJS_DB_HOST`     | The host URL for a database                                             | A valid database host URL |    ✅    |
-| `CUBEJS_DB_PORT`     | The port for the database connection                                    | A valid port number       |    ❌    |
-| `CUBEJS_DB_NAME`     | The name of the database to connect to                                  | A valid database name     |    ✅    |
-| `CUBEJS_DB_USER`     | The username used to connect to the database                            | A valid database username |    ✅    |
-| `CUBEJS_DB_PASS`     | The password used to connect to the database                            | A valid database password |    ✅    |
-| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js | `true`, `false`           |    ❌    |
+| Environment Variable | Description                                                                         | Possible Values           | Required |
+| -------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
+| `CUBEJS_DB_HOST`     | The host URL for a database                                                         | A valid database host URL |    ✅    |
+| `CUBEJS_DB_PORT`     | The port for the database connection                                                | A valid port number       |    ❌    |
+| `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name     |    ✅    |
+| `CUBEJS_DB_USER`     | The username used to connect to the database                                        | A valid database username |    ✅    |
+| `CUBEJS_DB_PASS`     | The password used to connect to the database                                        | A valid database password |    ✅    |
+| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js             | `true`, `false`           |    ❌    |
+| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the database. Default is `2` | A valid number            |    ❌    |
+| `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
 ### countDistinctApprox
 
 Measures of type
-[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can not be
-used in pre-aggregations when using MongoDB as a source database.
+[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can
+not be used in pre-aggregations when using MongoDB as a source database.
 
 ## Pre-Aggregation Build Strategies
 

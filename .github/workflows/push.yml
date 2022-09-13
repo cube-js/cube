@@ -83,7 +83,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
       - name: Build client
@@ -133,7 +141,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: NPM lint
         run: yarn lint:npm
       - name: Lerna lint
@@ -175,7 +191,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Check Yarn lock wasn't modified
         run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status; exit 1; else echo "Nothing to commit. Proceeding"; fi;
       - name: Build Core Client libraries
@@ -235,7 +259,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Redis Integration with Redis Driver
@@ -312,7 +344,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Integration tests for ${{ matrix.db }} matrix
@@ -336,7 +376,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -360,19 +400,40 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build client
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubestore
+          key: ubuntu-20.04
+      - name: Build cubestore
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --manifest-path rust/cubestore/Cargo.toml -j 4
       - name: Run Integration smoke tests
         timeout-minutes: 30
         run: |
+          mkdir -p rust/cubestore/downloaded/latest/bin
+          cp rust/cubestore/target/debug/cubestored rust/cubestore/downloaded/latest/bin/cubestored
           cd packages/cubejs-testing/
+          yarn run smoke:postgres
           yarn run smoke:crate
           yarn run smoke:materialize
           yarn run smoke:questdb
           yarn run smoke:multidb
+          yarn run smoke:lambda
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
@@ -472,7 +533,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build client
         run: yarn build
       - name: Lerna tsc

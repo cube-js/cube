@@ -7,4 +7,5 @@ expression: "execute_query(r#\"SELECT n.nspname as \"Schema\",\n                
 +--------+---------------------------+-------+-------+
 | public | KibanaSampleDataEcommerce | table | ovr   |
 | public | Logs                      | table | ovr   |
+| public | NumberCube                | table | ovr   |
 +--------+---------------------------+-------+-------+

@@ -1,6 +1,6 @@
 const { Client } = require('@elastic/elasticsearch');
 const SqlString = require('sqlstring');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 
 class ElasticSearchDriver extends BaseDriver {
   /**
@@ -10,7 +10,7 @@ class ElasticSearchDriver extends BaseDriver {
     return 2;
   }
 
-  constructor(config) {
+  constructor(config = {}) {
     super();
 
     const auth = {

@@ -204,7 +204,7 @@ const variables: Record<string, (...args: any) => any> = {
   databrickToken: () => get('CUBEJS_DB_DATABRICKS_TOKEN')
     .asString(),
   databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
-    .asString(),
+    .asBoolStrict(),
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
     .default('2')
@@ -373,6 +373,9 @@ const variables: Record<string, (...args: any) => any> = {
   batchingRowSplitCount: () => get('CUBEJS_BATCHING_ROW_SPLIT_COUNT')
     .default(256 * 1024)
     .asInt(),
+  maxSourceRowLimit: () => get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
+    .default(200000)
+    .asInt()
 };
 
 type Vars = typeof variables;

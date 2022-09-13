@@ -64,6 +64,23 @@ impl ColumnType {
             },
         }
     }
+
+    pub fn avg_size(&self) -> usize {
+        match self {
+            ColumnType::Boolean | ColumnType::Int8 => 1,
+            ColumnType::Int32
+            | ColumnType::Date(true)
+            | ColumnType::Interval(IntervalUnit::YearMonth) => 4,
+            ColumnType::Double
+            | ColumnType::Int64
+            | ColumnType::Date(false)
+            | ColumnType::Interval(IntervalUnit::DayTime)
+            | ColumnType::Timestamp => 8,
+            ColumnType::Interval(IntervalUnit::MonthDayNano) | ColumnType::Decimal(_, _) => 16,
+            ColumnType::String | ColumnType::VarStr => 64,
+            ColumnType::Blob | ColumnType::List(_) => 128,
+        }
+    }
 }
 
 bitflags! {

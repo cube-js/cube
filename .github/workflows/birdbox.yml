@@ -53,7 +53,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build client
         run: yarn build
       - name: Lerna tsc
@@ -113,7 +121,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build client
         run: yarn build
       - name: Lerna tsc
@@ -174,7 +190,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
       - name: Birdbox

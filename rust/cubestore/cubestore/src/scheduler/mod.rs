@@ -448,7 +448,7 @@ impl SchedulerImpl {
                 let file_name =
                     ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix());
                 let deadline = Instant::now()
-                    + Duration::from_secs(self.config.meta_store_log_upload_interval() * 2);
+                    + Duration::from_secs(self.config.meta_store_snapshot_interval() * 2);
                 self.gc_loop
                     .send(GCTimedTask {
                         deadline,
@@ -462,7 +462,7 @@ impl SchedulerImpl {
             if partition.get_row().is_active() {
                 if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
                     let deadline = Instant::now()
-                        + Duration::from_secs(self.config.meta_store_log_upload_interval() * 2);
+                        + Duration::from_secs(self.config.meta_store_snapshot_interval() * 2);
                     self.gc_loop
                         .send(GCTimedTask {
                             deadline,
