@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/base-driver",
   "description": "Cube.js Base Driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.68",
+  "version": "0.30.69",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -29,7 +29,7 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/shared": "^0.30.57",
+    "@cubejs-backend/shared": "^0.30.69",
     "ramda": "^0.27.0"
   },
   "devDependencies": {

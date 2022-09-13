@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/clickhouse-driver",
   "description": "Cube.js ClickHouse database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.63",
+  "version": "0.30.69",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -28,8 +28,8 @@
   },
   "dependencies": {
     "@apla/clickhouse": "^1.5.5",
-    "@cubejs-backend/base-driver": "^0.30.68",
-    "@cubejs-backend/shared": "^0.30.57",
+    "@cubejs-backend/base-driver": "^0.30.69",
+    "@cubejs-backend/shared": "^0.30.69",
     "generic-pool": "^3.6.0",
     "sqlstring": "^2.3.1",
     "uuid": "^8.3.2"
