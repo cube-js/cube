@@ -60,11 +60,12 @@ query with.
 
 ### <--{"id" : "Parameters"}--> type
 
-Cube supports three types of pre-aggregations:
+Cube supports the following types of pre-aggregations:
 
 - [`rollup`][self-rollup]
 - [`originalSql`][self-originalsql]
 - [`rollupJoin`][self-rollupjoin]
+- [`rollupLambda`][self-rolluplambda]
 
 The default type is `rollup`.
 
@@ -300,6 +301,23 @@ cube('Orders', {
 ```
 
 </InfoBox>
+
+<h4 id="parameters-type-rolluplambda">rollupLambda</h4>
+
+<WarningBox>
+
+`rollupLambda` pre-aggregations **must** be defined **before** any other
+pre-aggregations in a cube.
+
+</WarningBox>
+
+A `rollupLambda` pre-aggregation is a special type of pre-aggregation that can
+combine data from data sources and other rollups. It is extremely useful in
+scenarios where real-time data is required.
+
+[Lambda pre-aggregations][ref-caching-lambda-preaggs] can be used to combine
+data from a data source and a pre-aggregation, or even from multiple
+pre-aggregations across different schema-compatible cubes.
 
 ### <--{"id" : "Parameters"}--> measures
 
@@ -843,6 +861,31 @@ cube(`Orders`, {
 });
 ```
 
+### <--{"id" : "Parameters"}--> unionWithSourceData
+
+This option allows combining a pre-aggregation with fresh data retrieved from
+the data source; this is extremely useful in scenarios where latency can be
+sacrificed for accuracy.
+
+To configure a pre-aggregation to behave in this way, ensure the pre-aggregation
+is of type `rollupLambda`, and then set `unionWithSourceData` to `true`:
+
+```javascript
+cube(`Orders`, {
+  ...,
+
+  preAggregations: {
+    ...,
+
+    lambda: {
+      type: `rollupLambda`,
+      unionWithSourceData: true,
+      rollups: [Orders.main]
+    },
+  },
+});
+```
+
 ### <--{"id" : "Parameters"}--> indexes
 
 In case of pre-aggregation tables having significant cardinality, you might want
@@ -911,15 +954,18 @@ columns and pre-aggregated measures in the pre-aggregation definition.
 [Queries][ref-api-ref-query-ref] that can target aggregating indexes must have
 the following characteristics:
 
-1. They cannot make use of any `filters` other than for those dimensions that included in that index
+1. They cannot make use of any `filters` other than for those dimensions that
+   are included in that index
 2. **All** dimensions used in the query must be defined in the aggregating index
 
 Queries that do not have the above can still make use of regular indexes so
 performance can still be optimized.
 
 Basically, the aggregating index is a rollup of data in a rollup table itself.
-Data needs to be downloaded from the source DB as many times as many rollups you have.
-Given that having a single rollup and multiple aggregate indexes gives you pretty same performance from the Cube Store side but multiple times less cost from a data warehouse perspective.
+Data needs to be downloaded from the source DB as many times as many rollups you
+have. Given that having a single rollup and multiple aggregate indexes gives you
+pretty much the same performance from the Cube Store side but multiple times
+less cost from a data warehouse perspective.
 
 Aggregating indexes can be defined by adding a `type: 'aggregate'` to the index
 definition:
@@ -949,6 +995,7 @@ cube(`Orders`, {
 ```
 
 [ref-api-ref-query-ref]: https://cube.dev/docs/query-format#query-properties
+[ref-caching-lambda-preaggs]: /caching/pre-aggregations/lambda-pre-aggregations
 [ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]:
   /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries
