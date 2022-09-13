@@ -1563,14 +1563,12 @@ class ApiGateway {
     };
   };
 
-  private handleProbeError(e: any, type: string): 'DOWN' {
+  private logProbeError(e: any, type: string): void {
     this.log({
       type,
       driverType: e.driverType,
       error: (e as Error).stack || (e as Error).toString(),
     });
-
-    return 'DOWN';
   }
 
   protected readiness: RequestHandler = async (req, res) => {
@@ -1578,24 +1576,14 @@ class ApiGateway {
 
     if (this.standalone) {
       const orchestratorApi = await this.adapterApi({});
-
-      const handleError = (e: any) => {
-        health = this.handleProbeError(e, 'Internal Server Error on readiness probe');
-      };
-
       try {
         // todo: test other data sources
         orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
-      } catch (e: any) {
-        handleError(e);
-        return this.healthResponse(res, health);
-      }
-
-      try {
         await orchestratorApi.testOrchestratorConnections();
       } catch (e: any) {
-        handleError(e);
+        this.logProbeError(e, 'Internal Server Error on readiness probe');
+        health = 'DOWN';
       }
     }
 
@@ -1605,22 +1593,13 @@ class ApiGateway {
   protected liveness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
 
-    const handleError = (e: any) => {
-      health = this.handleProbeError(e, 'Internal Server Error on liveness probe');
-    };
-
     try {
       await this.dataSourceStorage.testConnections();
-    } catch (e: any) {
-      handleError(e);
-      return this.healthResponse(res, health);
-    }
-
-    try {
       // @todo Optimize this moment?
       await this.dataSourceStorage.testOrchestratorConnections();
     } catch (e: any) {
-      handleError(e);
+      this.logProbeError(e, 'Internal Server Error on liveness probe');
+      health = 'DOWN';
     }
 
     return this.healthResponse(res, health);
