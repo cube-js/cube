@@ -764,7 +764,8 @@ class ApiGateway {
           ...select.context,
         });
         const cube = meta.cubeDefinitions[preagg.cube];
-        const exist = await orchestrator.isTableExist(
+        const exist = await orchestrator.isPartitionExist(
+          context.requestId,
           preagg.preAggregation.external,
           cube.dataSource,
           compiler.preAggregationsSchema,

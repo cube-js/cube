@@ -540,9 +540,9 @@ export class PreAggregationLoader {
         if (!versionEntryByStructureVersion && throwOnMissingPartition) {
           throw new Error(
             'Your configuration restricts query requests to only be served from ' +
-              'pre-aggregations, and required pre-aggregation partitions were not ' +
-              'built yet. Please make sure your refresh worker is configured ' +
-              'correctly and running.'
+            'pre-aggregations, and required pre-aggregation partitions were not ' +
+            'built yet. Please make sure your refresh worker is configured ' +
+            'correctly and running.'
           );
         }
         if (!versionEntryByStructureVersion) {
@@ -1777,6 +1777,35 @@ export class PreAggregations {
   public async tablesUsed() {
     return (await this.cacheDriver.keysStartingWith(this.tablesUsedRedisKey('')))
       .map(k => k.replace(this.tablesUsedRedisKey(''), ''));
+  }
+
+  /**
+   * Determines whether the partition table is already exists or not.
+   */
+  public async isPartitionExist(
+    request: string,
+    external: boolean,
+    dataSource = 'default',
+    schema: string,
+    table: string,
+  ): Promise<boolean> {
+    const loadCache = new PreAggregationLoadCache(
+      this.redisPrefix,
+      () => this.driverFactory(dataSource),
+      this.queryCache,
+      this,
+      {
+        requestId: request,
+        dataSource,
+        tablePrefixes: [schema],
+      }
+    );
+    let tables: any[] = await loadCache.fetchTables(<PreAggregationDescription>{
+      external,
+      preAggregationsSchema: schema,
+    });
+    tables = tables.filter(row => `${schema}.${row.table_name}` === table);
+    return table.length === 1;
   }
 
   public loadAllPreAggregationsIfNeeded(queryBody) {

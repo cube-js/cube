@@ -127,6 +127,25 @@ export class QueryOrchestrator {
   }
 
   /**
+   * Determines whether the partition table is already exists or not.
+   */
+  public async isPartitionExist(
+    request: string,
+    external: boolean,
+    dataSource = 'default',
+    schema: string,
+    table: string,
+  ): Promise<boolean> {
+    return this.preAggregations.isPartitionExist(
+      request,
+      external,
+      dataSource,
+      schema,
+      table,
+    );
+  }
+
+  /**
    * Push query to the queue, fetch and return result if query takes
    * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
    * error otherwise.

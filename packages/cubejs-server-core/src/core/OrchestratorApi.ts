@@ -216,21 +216,22 @@ export class OrchestratorApi {
   }
 
   /**
-   * Determines whether the table already exists or not.
+   * Determines whether the partition table already exists or not.
    */
-  public async isTableExist(
+  public async isPartitionExist(
+    request: string,
     external: boolean,
     dataSource = 'default',
     schema: string,
     table: string,
   ): Promise<boolean> {
-    const driverFn = external
-      ? this.options.externalDriverFactory
-      : this.driverFactory;
-    const driver = await driverFn(dataSource);
-    let result = await driver.getTablesQuery(schema);
-    result = result.filter(row => `${schema}.${row.table_name}` === table);
-    return result.length > 0;
+    return this.orchestrator.isPartitionExist(
+      request,
+      external,
+      dataSource,
+      schema,
+      table,
+    );
   }
 
   public async release() {
