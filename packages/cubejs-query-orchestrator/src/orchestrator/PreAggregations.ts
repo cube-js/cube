@@ -758,7 +758,7 @@ export class PreAggregationLoader {
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(newVersionEntry, invalidationKeys, client: DriverInterface) {
+  public refresh(newVersionEntry, invalidationKeys, client) {
     let refreshStrategy = this.refreshImplStoreInSourceStrategy;
     if (this.preAggregation.external) {
       const readOnly =
