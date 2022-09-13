@@ -1797,7 +1797,7 @@ export class PreAggregations {
       {
         requestId: request,
         dataSource,
-        tablePrefixes: [schema],
+        tablePrefixes: external ? null : [schema],
       }
     );
     let tables: any[] = await loadCache.fetchTables(<PreAggregationDescription>{
