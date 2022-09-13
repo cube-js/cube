@@ -7,7 +7,7 @@ import {
   BaseDriver, DownloadQueryResultsOptions,
   DownloadTableMemoryData, DriverInterface,
   IndexesSQL, TableStructure, QueryOptions,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import { QuestQuery } from './QuestQuery';
 
 const NativeTypeToQuestType: Record<string, string> = R.invertObj(types.builtins);

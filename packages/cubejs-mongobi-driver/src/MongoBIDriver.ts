@@ -4,7 +4,7 @@ import {
   BaseDriver, DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   DriverInterface, StreamOptions,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import { Readable } from 'stream';
 
 import { getNativeTypeName } from './MySQLType';

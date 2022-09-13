@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { flatbuffers } from 'flatbuffers';
-import { InlineTable } from '@cubejs-backend/query-orchestrator';
+import { InlineTable } from '@cubejs-backend/base-driver';
 import {
   HttpCommand,
   HttpError,

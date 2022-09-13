@@ -12,7 +12,7 @@ import {
 } from '@azure/storage-blob';
 import {
   DownloadTableCSVData,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,

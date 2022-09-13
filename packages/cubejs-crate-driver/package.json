@@ -29,7 +29,6 @@
   },
   "dependencies": {
     "@cubejs-backend/postgres-driver": "^0.30.67",
-    "@cubejs-backend/query-orchestrator": "^0.30.63",
     "@cubejs-backend/shared": "^0.30.57",
     "pg": "^8.7.1"
   },

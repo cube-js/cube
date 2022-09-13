@@ -1,5 +1,5 @@
 const sqlite3 = require('sqlite3');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 
 class SqliteDriver extends BaseDriver {
   /**

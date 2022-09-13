@@ -25,7 +25,7 @@
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.30.63",
+    "@cubejs-backend/base-driver": "^0.30.68",
     "@types/node": "^10.17.60",
     "generic-pool": "^3.6.0",
     "moment": "^2.29.1",

@@ -20,6 +20,9 @@
       "path": "packages/cubejs-api-gateway"
     },
     {
+      "path": "packages/cubejs-base-driver"
+    },
+    {
       "path": "packages/cubejs-query-orchestrator"
     },
     {
