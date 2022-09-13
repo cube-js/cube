@@ -199,8 +199,6 @@ const variables: Record<string, (...args: any) => any> = {
   databrickUrl: () => get('CUBEJS_DB_DATABRICKS_URL')
     .required()
     .asString(),
-  databrickAgent: () => get('CUBEJS_DB_DATABRICKS_AGENT')
-    .asString(),
   databrickToken: () => get('CUBEJS_DB_DATABRICKS_TOKEN')
     .asString(),
   databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
