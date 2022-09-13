@@ -1769,7 +1769,7 @@ mod tests {
     #[tokio::test]
     async fn test_change_user_via_in_filter_thoughtspot() {
         let query_plan = convert_select_to_query_plan(
-            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE (LOWER("ta_1"."__user" IN ('gopher')) = TRUE)"#.to_string(),
+            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE (LOWER("ta_1"."__user") IN ('gopher')) = TRUE"#.to_string(),
             DatabaseProtocol::PostgreSQL,
         )
             .await;
@@ -1790,7 +1790,7 @@ mod tests {
         assert_eq!(cube_scan.request, expected_request);
 
         let query_plan = convert_select_to_query_plan(
-            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE ((LOWER("ta_1"."__user" IN ('gopher')) = TRUE) = TRUE)"#.to_string(),
+            r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE ((LOWER("ta_1"."__user") IN ('gopher') = TRUE) = TRUE)"#.to_string(),
             DatabaseProtocol::PostgreSQL,
         )
             .await;
