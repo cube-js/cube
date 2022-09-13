@@ -10943,6 +10943,87 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_holistics_split_with_literals() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT
+                \"table\".\"maxPrice\" AS \"pu_mn_287b51__0\",
+                MIN(\"table\".\"minPrice\") AS \"m_pu_mn_ad42df__1\",
+                CAST ( NULL AS text ) AS \"h__placeholder_marker_0\",
+                0 AS \"h__model_level\"
+            FROM \"public\".\"KibanaSampleDataEcommerce\" \"table\"
+            GROUP BY
+                1,
+                3,
+                4
+            ORDER BY
+                4 DESC
+            LIMIT 100000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string()
+                ]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT
+                TO_CHAR((CAST ( (DATE_TRUNC ( 'month', (CAST ( \"table\".\"order_date\" AS timestamptz )) AT TIME ZONE 'Etc/UTC' )) AT TIME ZONE 'Etc/UTC' AS timestamptz )) AT TIME ZONE 'Etc/UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS \"dm_pu_ca_754b1e__0\",
+                MAX(\"table\".\"maxPrice\") AS \"m_pu_mn_0844e5__1\",
+                CAST ( NULL AS text ) AS \"h__placeholder_marker_0\",
+                0 AS \"h__model_level\"
+            FROM \"public\".\"KibanaSampleDataEcommerce\" \"table\"
+            GROUP BY
+                1,
+                3,
+                4
+            ORDER BY
+                4 DESC
+            LIMIT 100000".to_string(),
+            DatabaseProtocol::PostgreSQL
+        ).await.as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("month".to_owned()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_column_with_same_name_as_table() -> Result<(), CubeError> {
         init_logger();
 
