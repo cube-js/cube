@@ -72,7 +72,7 @@ use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use std::mem::take;
 
 pub mod cache;
-pub(crate) mod parser;
+pub mod parser;
 
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
