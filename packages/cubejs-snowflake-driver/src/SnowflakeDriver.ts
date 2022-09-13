@@ -134,6 +134,7 @@ interface SnowflakeDriverOptions {
   resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
   executionTimeout?: number,
+  application: string
 }
 
 /**
@@ -176,6 +177,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       exportBucket: this.getExportBucket(),
       resultPrefetch: 1,
       executionTimeout: getEnv('dbQueryTimeout'),
+      application: 'CubeDev_Cube',
       ...config
     };
   }
