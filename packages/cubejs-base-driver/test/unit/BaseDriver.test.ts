@@ -5,6 +5,9 @@ class BaseDriverImplementedMock extends BaseDriver {
     super();
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  public async testConnection(): Promise<void> {}
+
   public async query(_query, _values) {
     return this.response;
   }
@@ -33,6 +36,7 @@ describe('BaseDriver', () => {
 
     const driver = new BaseDriverImplementedMock(rows);
 
+    // @ts-expect-error redundant test case
     expect((await driver.downloadQueryResults()).types).toEqual([
       { name: 'bigint', type: 'bigint' },
       { name: 'bigint_because_int_max', type: 'bigint' },

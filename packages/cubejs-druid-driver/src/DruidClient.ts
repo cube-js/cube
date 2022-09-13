@@ -41,11 +41,11 @@ export class DruidClient {
     });
   }
 
-  public async query(query: string, parameters: { type: string, value: unknown }[]) {
+  public async query<R = unknown>(query: string, parameters: { type: string, value: unknown }[]): Promise<R[]> {
     let cancelled = false;
     const cancelObj: any = {};
 
-    const promise: Promise<unknown[]> & { cancel?: () => void } = (async () => {
+    const promise: Promise<R[]> & { cancel?: () => void } = (async () => {
       cancelObj.cancel = async () => {
         cancelled = true;
       };

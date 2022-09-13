@@ -1,10 +1,11 @@
 /* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
 import { BaseDriver } from '@cubejs-backend/base-driver';
+import { CancelablePromise } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { promisify } from 'util';
-import genericPool from 'generic-pool';
+import genericPool, { Factory, Pool } from 'generic-pool';
 
-import { SupportedDrivers } from './supported-drivers';
+import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { JDBCDriverConfiguration } from './types';
 
@@ -14,12 +15,12 @@ const DatabaseMetaData = require('jdbc/lib/databasemetadata');
 const jinst = require('jdbc/lib/jinst');
 const mvn = require('node-java-maven');
 
-let mvnPromise = null;
+let mvnPromise: Promise<void> | null = null;
 
-const initMvn = (customClassPath) => {
+const initMvn = (customClassPath: any) => {
   if (!mvnPromise) {
     mvnPromise = new Promise((resolve, reject) => {
-      mvn((err, mvnResults) => {
+      mvn((err: any, mvnResults: any) => {
         if (err && !err.message.includes('Could not find java property')) {
           reject(err);
         } else {
@@ -36,7 +37,7 @@ const initMvn = (customClassPath) => {
   return mvnPromise;
 };
 
-const applyParams = (query, params) => SqlString.format(query, params);
+const applyParams = (query: string, params: object | any[]) => SqlString.format(query, params);
 
 // promisify Connection methods
 Connection.prototype.getMetaDataAsync = promisify(Connection.prototype.getMetaData);
@@ -44,25 +45,31 @@ Connection.prototype.getMetaDataAsync = promisify(Connection.prototype.getMetaDa
 DatabaseMetaData.prototype.getSchemasAsync = promisify(DatabaseMetaData.prototype.getSchemas);
 DatabaseMetaData.prototype.getTablesAsync = promisify(DatabaseMetaData.prototype.getTables);
 
+interface ExtendedPool extends Pool<any> {
+  _factory: Factory<any>;
+}
+
 export class JDBCDriver extends BaseDriver {
-  /**
-   * @param {Partial<JDBCDriverConfiguration>} [config]
-   */
-  constructor(config = {}) {
+  protected readonly config: JDBCDriverConfiguration;
+  
+  protected pool: ExtendedPool;
+
+  protected jdbcProps: any;
+
+  public constructor(config: Partial<JDBCDriverConfiguration> = {}) {
     super();
 
     const { poolOptions, ...dbOptions } = config || {};
 
-    const dbTypeDescription = JDBCDriver.dbTypeDescription(config.dbType || process.env.CUBEJS_DB_TYPE);
+    const dbTypeDescription = JDBCDriver.dbTypeDescription((config.dbType || process.env.CUBEJS_DB_TYPE) as string);
 
-    /** @protected */
     this.config = {
       dbType: process.env.CUBEJS_DB_TYPE,
       url: process.env.CUBEJS_JDBC_URL || dbTypeDescription && dbTypeDescription.jdbcUrl(),
       drivername: process.env.CUBEJS_JDBC_DRIVER || dbTypeDescription && dbTypeDescription.driverClass,
       properties: dbTypeDescription && dbTypeDescription.properties,
       ...dbOptions
-    };
+    } as JDBCDriverConfiguration;
 
     if (!this.config.drivername) {
       throw new Error('drivername is required property');
@@ -72,7 +79,6 @@ export class JDBCDriver extends BaseDriver {
       throw new Error('url is required property');
     }
 
-    /** @protected */
     this.pool = genericPool.createPool({
       create: async () => {
         await initMvn(await this.getCustomClassPath());
@@ -85,6 +91,7 @@ export class JDBCDriver extends BaseDriver {
         const getConnection = promisify(DriverManager.getConnection.bind(DriverManager));
         return new Connection(await getConnection(this.config.url, this.jdbcProps));
       },
+      // @ts-expect-error Promise<Function> vs Promise<void>
       destroy: async (connection) => promisify(connection.close.bind(connection)),
       validate: (connection) => {
         const isValid = promisify(connection.isValid.bind(connection));
@@ -104,22 +111,15 @@ export class JDBCDriver extends BaseDriver {
       idleTimeoutMillis: 30000,
       testOnBorrow: true,
       acquireTimeoutMillis: 20000,
-      ...poolOptions
-    });
+      ...(poolOptions || {})
+    }) as ExtendedPool;
   }
 
-  /**
-   * @protected
-   * @return {Promise<string|undefined>}
-   */
-  async getCustomClassPath() {
+  protected async getCustomClassPath() {
     return this.config.customClassPath;
   }
 
-  /**
-   * @protected
-   */
-  getJdbcProperties() {
+  protected getJdbcProperties() {
     const java = jinst.getInstance();
     const Properties = java.import('java.util.Properties');
     const properties = new Properties();
@@ -131,16 +131,12 @@ export class JDBCDriver extends BaseDriver {
     return properties;
   }
 
-  /**
-   * @public
-   * @return {Promise<*>}
-   */
-  async testConnection() {
+  public async testConnection() {
     let err;
     let connection;
     try {
       connection = await this.pool._factory.create();
-    } catch (e) {
+    } catch (e: any) {
       err = e.message;
     }
     if (err) {
@@ -150,33 +146,23 @@ export class JDBCDriver extends BaseDriver {
     }
   }
 
-  /**
-   * @protected
-   */
-  prepareConnectionQueries() {
+  protected prepareConnectionQueries() {
     const dbTypeDescription = JDBCDriver.dbTypeDescription(this.config.dbType);
     return this.config.prepareConnectionQueries ||
       dbTypeDescription && dbTypeDescription.prepareConnectionQueries ||
       [];
   }
 
-  /**
-   * @public
-   * @return {Promise<any>}
-   */
-  async query(query, values) {
+  public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
     const queryWithParams = applyParams(query, values);
-    const cancelObj = {};
+    const cancelObj: {cancel?: Function} = {};
     const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
-    promise.cancel =
+    (promise as CancelablePromise<any>).cancel =
       () => cancelObj.cancel && cancelObj.cancel() || Promise.reject(new Error('Statement is not ready'));
     return promise;
   }
 
-  /**
-   * @protected
-   */
-  async withConnection(fn) {
+  protected async withConnection<T extends Function>(fn: T) {
     const conn = await this.pool.acquire();
 
     try {
@@ -186,10 +172,7 @@ export class JDBCDriver extends BaseDriver {
     }
   }
 
-  /**
-   * @protected
-   */
-  async queryPromised(query, cancelObj, options) {
+  protected async queryPromised(query: string, cancelObj: any, options: any) {
     options = options || {};
     try {
       const conn = await this.pool.acquire();
@@ -202,7 +185,7 @@ export class JDBCDriver extends BaseDriver {
       } finally {
         await this.pool.release(conn);
       }
-    } catch (ex) {
+    } catch (ex: any) {
       if (ex.cause) {
         throw new Error(ex.cause.getMessageSync());
       } else {
@@ -211,10 +194,7 @@ export class JDBCDriver extends BaseDriver {
     }
   }
 
-  /**
-   * @protected
-   */
-  async executeStatement(conn, query, cancelObj) {
+  protected async executeStatement(conn: any, query: any, cancelObj?: any) {
     const createStatementAsync = promisify(conn.createStatement.bind(conn));
     const statement = await createStatementAsync();
     if (cancelObj) {
@@ -231,29 +211,16 @@ export class JDBCDriver extends BaseDriver {
     return toObjArrayAsync();
   }
 
-  /**
-   * @public
-   * @return {Promise<void>}
-   */
-  async release() {
+  public async release() {
     await this.pool.drain();
     await this.pool.clear();
   }
 
-  /**
-   * @public
-   * @return {string[]}
-   */
-  static getSupportedDrivers() {
+  public static getSupportedDrivers(): string[] {
     return Object.keys(SupportedDrivers);
   }
-
-  /**
-   * @public
-   * @param {string} dbType
-   * @return {Object}
-   */
-  static dbTypeDescription(dbType) {
+  
+  public static dbTypeDescription(dbType: string): DriverOptionsInterface {
     return SupportedDrivers[dbType];
   }
 }

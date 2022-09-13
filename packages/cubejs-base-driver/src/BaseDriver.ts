@@ -3,6 +3,7 @@ import fs from 'fs';
 import { getEnv, isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
 
 import { cancelCombinator } from './utils';
+import { CreateTableIndex, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData, DownloadTableData, DownloadTableMemoryData, DriverInterface, ExternalDriverCompatibilities, IndexesSQL, isDownloadTableMemoryData, QueryOptions, Row, Rows, TableColumn, TableColumnQueryResult, TableQueryResult, TableStructure } from './driver.interface';
 
 const sortByKeys = (unordered) => {
   const ordered = {};
@@ -86,17 +87,14 @@ const DbTypeValueMatcher = {
   text: () => true
 };
 
-export class BaseDriver {
-  /**
-   * Workaround for Type 'BaseDriver' has no construct signatures.
-   *
-   * @param {Object} [options]
-   */
-  constructor(_options = {}) {
+export abstract class BaseDriver implements DriverInterface {
+  protected logger: any;
+
+  public constructor(_options = {}) {
     //
   }
 
-  informationSchemaQuery() {
+  protected informationSchemaQuery() {
     return `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
              columns.table_name as ${this.quoteIdentifier('table_name')},
@@ -107,7 +105,7 @@ export class BaseDriver {
    `;
   }
 
-  getSslOptions() {
+  protected getSslOptions() {
     let ssl;
 
     const sslOptions = [
@@ -121,8 +119,7 @@ export class BaseDriver {
 
     if (
       getEnv('dbSsl') ||
-      getEnv('dbSslRejectUnauthorized') ||
-      sslOptions.find(o => !!process.env[o.value])
+      getEnv('dbSslRejectUnauthorized')
     ) {
       ssl = sslOptions.reduce(
         (agg, { name, envKey, canBeFile, validate }) => {
@@ -172,30 +169,12 @@ export class BaseDriver {
     return ssl;
   }
 
-  /**
-   * @abstract
-   */
-  async testConnection() {
-    throw new Error('Not implemented');
-  }
+  abstract testConnection(): Promise<void>;
 
-  /**
-   * @abstract
-   * @param {string} query
-   * @param {Array<unknown>} values
-   * @param {any} [options]
-   * @return {Promise<Array<any>>}
-   */
-  async query(_query, _values, _options = {}) {
-    throw new Error('Not implemented');
-  }
+  abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
 
-  /**
-   * @public
-   * @return {Promise<any>}
-   */
-  async downloadQueryResults(query, values, _options) {
-    const rows = await this.query(query, values);
+  public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    const rows = await this.query<Row>(query, values);
     if (rows.length === 0) {
       throw new Error(
         'Unable to detect column types for pre-aggregation on empty values in readOnly mode.'
@@ -218,14 +197,11 @@ export class BaseDriver {
     };
   }
 
-  readOnly() {
+  public readOnly() {
     return false;
   }
 
-  /**
-   * @protected
-   */
-  informationColumnsSchemaReducer(result, i) {
+  protected informationColumnsSchemaReducer(result, i) {
     let schema = (result[i.table_schema] || {});
     const tables = (schema[i.table_name] || []);
 
@@ -239,17 +215,13 @@ export class BaseDriver {
     return sortByKeys(result);
   }
 
-  tablesSchema() {
+  public tablesSchema() {
     const query = this.informationSchemaQuery();
 
     return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
   }
 
-  /**
-   * @param {string} schemaName
-   * @return {Promise<Array<unknown>>}
-   */
-  async createSchemaIfNotExists(schemaName) {
+  public async createSchemaIfNotExists(schemaName: string): Promise<Array<unknown>> {
     return this.query(
       `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ${this.param(0)}`,
       [schemaName]
@@ -261,64 +233,57 @@ export class BaseDriver {
     });
   }
 
-  getTablesQuery(schemaName) {
-    return this.query(
+  public getTablesQuery(schemaName: string) {
+    return this.query<TableQueryResult>(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
       [schemaName]
     );
   }
 
-  loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options) {
+  public loadPreAggregationIntoTable(_preAggregationTableName: string, loadSql: string, params, options) {
     return this.query(loadSql, params, options);
   }
 
-  /**
-   * @param {string} tableName
-   * @param {unknown} [options]
-   * @return {Promise<unknown>}
-   */
-  dropTable(tableName, options) {
+  public dropTable(tableName: string, options?: unknown): Promise<unknown> {
     return this.query(`DROP TABLE ${tableName}`, [], options);
   }
 
-  /**
-   * @param {number} paramIndex
-   * @return {string}
-   */
-  param(_paramIndex) {
+  public param(_paramIndex: number): string {
     return '?';
   }
 
-  testConnectionTimeout() {
+  public testConnectionTimeout() {
     return 10000;
   }
 
-  async downloadTable(table, _options) {
+  public async downloadTable(table: string, _options: ExternalDriverCompatibilities): Promise<DownloadTableMemoryData | DownloadTableCSVData> {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
-  async uploadTable(table, columns, tableData) {
-    return this.uploadTableWithIndexes(table, columns, tableData, [], null);
+  public async uploadTable(table: string, columns: TableStructure, tableData: DownloadTableData) {
+    return this.uploadTableWithIndexes(table, columns, tableData, [], null, [], [], []);
   }
 
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql, _uniqueKeyColumns, _queryTracingObj, _aggregates, _createTableIndexes) {
-    if (!tableData.rows) {
+  public async uploadTableWithIndexes(table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, _uniqueKeyColumns: string[] | null, _queryTracingObj: any, _aggregates: string[], _createTableIndexes: CreateTableIndex[]) {
+    if (!isDownloadTableMemoryData(tableData)) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }
 
     await this.createTable(table, columns);
     try {
-      for (let i = 0; i < tableData.rows.length; i++) {
-        await this.query(
-          `INSERT INTO ${table}
-        (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
-        VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
-          columns.map(c => this.toColumnValue(tableData.rows[i][c.name], c.type))
-        );
-      }
-      for (let i = 0; i < indexesSql.length; i++) {
-        const [query, params] = indexesSql[i].sql;
-        await this.query(query, params);
+      if (isDownloadTableMemoryData(tableData)) {
+        for (let i = 0; i < tableData.rows.length; i++) {
+          await this.query(
+            `INSERT INTO ${table}
+          (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
+          VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
+            columns.map(c => this.toColumnValue(tableData.rows[i][c.name] as string, c.type))
+          );
+        }
+        for (let i = 0; i < indexesSql.length; i++) {
+          const [query, params] = indexesSql[i].sql;
+          await this.query(query, params);
+        }
       }
     } catch (e) {
       await this.dropTable(table);
@@ -326,14 +291,14 @@ export class BaseDriver {
     }
   }
 
-  toColumnValue(value, _genericType) {
+  protected toColumnValue(value: string, _genericType: string): string | boolean {
     return value;
   }
 
-  async tableColumnTypes(table) {
+  public async tableColumnTypes(table: string) {
     const [schema, name] = table.split('.');
 
-    const columns = await this.query(
+    const columns = await this.query<TableColumnQueryResult>(
       `SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
              columns.table_name as ${this.quoteIdentifier('table_name')},
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
@@ -346,7 +311,7 @@ export class BaseDriver {
     return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
-  createTable(quotedTableName, columns) {
+  public createTable(quotedTableName: string, columns: TableColumn[]) {
     const createTableSql = this.createTableSql(quotedTableName, columns);
     return this.query(createTableSql, []).catch(e => {
       e.message = `Error during create table: ${createTableSql}: ${e.message}`;
@@ -354,44 +319,32 @@ export class BaseDriver {
     });
   }
 
-  createTableSql(quotedTableName, columns) {
-    columns = columns.map(c => `${this.quoteIdentifier(c.name)} ${this.fromGenericType(c.type)}`);
-    return `CREATE TABLE ${quotedTableName} (${columns.join(', ')})`;
+  protected createTableSql(quotedTableName: string, columns: TableColumn[]) {
+    const columnNames = columns.map(c => `${this.quoteIdentifier(c.name)} ${this.fromGenericType(c.type)}`);
+    return `CREATE TABLE ${quotedTableName} (${columnNames.join(', ')})`;
   }
 
-  /**
-   * @param {string} columnType
-   * @return {string}
-   */
-  toGenericType(columnType) {
+  protected toGenericType(columnType: string): string {
     return DbTypeToGenericType[columnType.toLowerCase()] || columnType;
   }
 
-  /**
-   * @param {string} columnType
-   * @return {string}
-   */
-  fromGenericType(columnType) {
+  protected fromGenericType(columnType: string): string {
     return columnType;
   }
 
-  /**
-   * @param {string} identifier
-   * @return {string}
-   */
-  quoteIdentifier(identifier) {
+  protected quoteIdentifier(identifier: string): string {
     return `"${identifier}"`;
   }
 
-  cancelCombinator(fn) {
+  protected cancelCombinator(fn) {
     return cancelCombinator(fn);
   }
 
-  setLogger(logger) {
+  public setLogger(logger) {
     this.logger = logger;
   }
 
-  reportQueryUsage(usage, queryOptions) {
+  protected reportQueryUsage(usage, queryOptions) {
     if (this.logger) {
       this.logger('SQL Query Usage', {
         ...usage,
@@ -400,7 +353,7 @@ export class BaseDriver {
     }
   }
 
-  databasePoolError(error) {
+  protected databasePoolError(error) {
     if (this.logger) {
       this.logger('Database Pool Error', {
         error: (error.stack || error).toString()
@@ -408,18 +361,15 @@ export class BaseDriver {
     }
   }
 
-  /**
-   * @public
-   */
-  async release() {
+  public async release() {
     // override, if it's needed
   }
 
-  capabilities() {
+  public capabilities(): ExternalDriverCompatibilities {
     return {};
   }
 
-  nowTimestamp() {
+  public nowTimestamp() {
     return Date.now();
   }
 }

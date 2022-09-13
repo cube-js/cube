@@ -8,7 +8,7 @@ import {
   BaseDriver,
   DownloadTableCSVData,
   DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
-  StreamTableData,
+  StreamTableData, ExternalDriverCompatibilities,
   StreamingSourceTableData, QueryOptions,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
@@ -109,7 +109,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return sql;
   }
 
-  public createTableWithOptions(tableName, columns, options: CreateTableOptions, queryTracingObj: any) {
+  public createTableWithOptions(tableName: string, columns: Column[], options: CreateTableOptions, queryTracingObj: any) {
     const sql = this.createTableSqlWithOptions(tableName, columns, options);
     const params: string[] = [];
 
@@ -161,7 +161,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[], queryTracingObj?: any, aggregationsColumns?: string[], createTableIndexes?: CreateTableIndex[]) {
+  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns: string[] | null, queryTracingObj?: any, aggregationsColumns?: string[], createTableIndexes?: CreateTableIndex[]) {
     const indexes = createTableIndexes && createTableIndexes.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
 
     let hasAggregatingIndexes = false;
@@ -250,7 +250,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       const { baseUrl } = this;
       let fileCounter = 0;
 
-      const createTableSql = this.createTableSql(table, columns);
+      this.createTableSql(table, columns);
       // eslint-disable-next-line no-unused-vars
       const createTableSqlWithoutLocation = this.createTableSqlWithOptions(table, columns, options);
 
@@ -338,7 +338,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns?: string[], queryTracingObj?: any) {
+  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns: string[] | null, queryTracingObj?: any) {
     if (!uniqueKeyColumns) {
       throw new Error('Older version of orchestrator is being used with newer version of Cube Store driver. Please upgrade cube.js.');
     }
@@ -364,7 +364,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return CubeStoreQuery;
   }
 
-  public capabilities() {
+  public capabilities(): ExternalDriverCompatibilities {
     return {
       csvImport: true,
       streamImport: true,
