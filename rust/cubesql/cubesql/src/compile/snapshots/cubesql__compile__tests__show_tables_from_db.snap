@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 4710
 expression: "execute_query(\"show tables from db;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +---------------------------+
@@ -8,4 +7,5 @@ expression: "execute_query(\"show tables from db;\".to_string(),\n            Da
 +---------------------------+
 | KibanaSampleDataEcommerce |
 | Logs                      |
+| NumberCube                |
 +---------------------------+

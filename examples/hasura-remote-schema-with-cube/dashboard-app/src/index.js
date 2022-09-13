@@ -1,7 +1,6 @@
 import React from 'react';
 import { useState, useEffect } from 'react'
-import { Col, Container, Form, Row } from 'react-bootstrap';
-import 'bootstrap/dist/css/bootstrap.min.css';
+import * as classes from './index.module.css'
 import * as ReactDOM from 'react-dom/client';
 import {
   ApolloClient,
@@ -10,11 +9,20 @@ import {
   useQuery,
   gql,
   createHttpLink,
+  ApolloLink,
+  from,
 } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
-import _ from 'lodash';
-import LineChart from './components/LineChart';
-import LoadingIndicator from './components/LoadingIndicator'
+import {
+  range,
+  tablePivotCube,
+  tablePivotHasura,
+  availableStepRanges,
+  defaultIsFraudSelection,
+  defaultStepSelection,
+  DisplayFraudAmountSum,
+  randomIntFromInterval,
+} from './utils/utils';
 
 const httpLink = createHttpLink({
   uri: `${process.env.HASURA_GRAPHQL_API_URL}`,
@@ -23,12 +31,22 @@ const authLink = setContext((_, { headers }) => {
   return {
     headers: {
       ...headers,
-      'x-hasura-admin-secret': `${process.env.X_HASURA_ADMIN_SECRET}`,
+      'x-hasura-role': `${process.env.X_HASURA_ROLE}`,
     }
   }
 });
+let timestampsGlobal = {};
+const roundTripLink = new ApolloLink((operation, forward) => {
+  operation.setContext({ start: new Date() });
+  timestampsGlobal = {};
+
+  return forward(operation).map((data) => {
+    timestampsGlobal[operation.operationName] = new Date() - operation.getContext().start;
+    return data;
+  });
+});
 const client = new ApolloClient({
-  link: authLink.concat(httpLink),
+  link: from([roundTripLink, authLink.concat(httpLink)]),
   cache: new InMemoryCache()
 });
 
@@ -40,43 +58,34 @@ ReactDOM
     </ApolloProvider>,
   )
 
-const availableStepRanges = [
-  { id: 1, start: 1, end: 50 },
-  { id: 2, start: 50, end: 100 },
-  { id: 3, start: 100, end: 150 },
-  { id: 4, start: 150, end: 200 },
-  { id: 5, start: 200, end: 250 },
-  { id: 6, start: 250, end: 300 },
-  { id: 7, start: 300, end: 350 },
-  { id: 8, start: 400, end: 450 },
-  { id: 9, start: 450, end: 500 },
-  { id: 10, start: 500, end: 550 },
-  { id: 11, start: 550, end: 600 },
-  { id: 12, start: 600, end: 650 },
-  { id: 13, start: 650, end: 700 },
-  { id: 14, start: 700, end: 750 },
-  { id: 15, start: 750, end: 800 },
-];
-
-const defaultStepSelection = 1;
-const defaultIsFraudSelection = 0;
-
 function App() {
-  const [ fraudChartData, setFraudChartData ] = useState([])
+  const [ timestamps, setTimestamps ] = useState(0);
+  useEffect(() => {
+    setTimestamps(timestampsGlobal)
+  }, [ timestampsGlobal ]);
 
+  const [ fraudChartDataCube, setFraudChartDataCube ] = useState([])
+  const [ fraudChartDataHasura, setFraudChartDataHasura ] = useState([])
   const [ stepSelection, setStepSelection ] = useState(defaultStepSelection);
   const selectedStep = availableStepRanges.find(x => x.id === stepSelection);
-
+  const selectedStepRange = range(selectedStep.start, selectedStep.end);
   const [ isFraudSelection, setIsFraudSelection ] = useState(defaultIsFraudSelection);
+  const shuffleAndRun = () => {
+    setStepSelection(randomIntFromInterval(1, 14));
+    setIsFraudSelection(randomIntFromInterval(0, 1));
+  }
 
-  const GET_FRAUD_AMOUNT_SUM_DYNAMIC = gql`
+  const GET_FRAUD_AMOUNT_SUM_CUBE_REMOTE_SCHEMA = gql`
     query CubeQuery  { 
-      cube(where: {fraud: {AND: [
-        {step: {gte: ${selectedStep.start} }},
-        {step: {lte: ${selectedStep.end} }},
-        {isFraud: {equals: "${isFraudSelection}" }}
-      ]}}) {
-        fraud(orderBy: {step: asc}) {
+      cube(
+        where: {fraud: {AND: [
+          {step: {gte: ${selectedStep.start} }},
+          {step: {lte: ${selectedStep.end} }},
+          {isFraud: {equals: "${isFraudSelection}" }}
+        ]}},
+        orderBy: {fraud: {step: asc}}
+      ) {
+        fraud {
           amountSum
           step
           type
@@ -84,86 +93,124 @@ function App() {
       }
     }
   `;
-
-  const { loading, error, data: fraudData } = useQuery(GET_FRAUD_AMOUNT_SUM_DYNAMIC);
+  const {
+    loading: loadingFraudDataCube,
+    error: errorFraudDataCube,
+    data: fraudDataCube,
+  } = useQuery(GET_FRAUD_AMOUNT_SUM_CUBE_REMOTE_SCHEMA);
   useEffect(() => {
-    if (fraudData) {
-      setFraudChartData(
-        _.reduce(_.mapValues(
-          _.groupBy(fraudData.cube.map(({ fraud: { amountSum, step, type } }) => ({ y: amountSum, x: step, type })), 'type'),
-          list => list.map(fraud => _.omit(fraud, 'type'))
-        ), (accumulator, iterator, key) => {
-          accumulator.push({
-            id: key,
-            data: iterator
-          });
+    if (loadingFraudDataCube) { return; }
+    setFraudChartDataCube(tablePivotCube(fraudDataCube));
+  }, [ fraudDataCube ]);
 
-          return accumulator;
-        }, [])
-      )
+  const GET_FRAUD_AMOUNT_SUM_HASURA_FRAUDS = gql`
+    query HasuraQuery{
+      fraud_amount_sum_frauds(
+        where: {
+          fraud__step: {_in: [${selectedStepRange}]}
+        }
+        order_by: { fraud__step: asc }
+      ) {
+        fraud__amount_sum
+        fraud__step
+        fraud__type
+      }
     }
-  }, [ fraudData ])
-
-  function DisplayFraudAmountSum() {
-    if (loading) return <LoadingIndicator />;
-
-    if (error) {
-      console.error(error);
-      return <p>Error :( </p>;
+  `;
+  const GET_FRAUD_AMOUNT_SUM_HASURA_NON_FRAUDS = gql`
+    query HasuraQuery{
+      fraud_amount_sum_non_frauds(
+        where: {
+          fraud__step: {_in: [${selectedStepRange}]}
+        }
+        order_by: { fraud__step: asc }
+      ) {
+        fraud__amount_sum
+        fraud__step
+        fraud__type
+      }
     }
-
-    console.log(fraudChartData);
-    return (
-      <LineChart
-        data={fraudChartData}
-      />
-    );
+  `;
+  let GET_FRAUD_AMOUNT_SUM_HASURA;
+  if (isFraudSelection) {
+    GET_FRAUD_AMOUNT_SUM_HASURA = GET_FRAUD_AMOUNT_SUM_HASURA_FRAUDS;
+  } else {
+    GET_FRAUD_AMOUNT_SUM_HASURA = GET_FRAUD_AMOUNT_SUM_HASURA_NON_FRAUDS;
   }
 
+  const {
+    loading: loadingFraudDataHasura,
+    error: errorFraudDataHasura,
+    data: fraudDataHasura,
+  } = useQuery(GET_FRAUD_AMOUNT_SUM_HASURA);
+  useEffect(() => {
+    if (loadingFraudDataHasura) { return; }
+    if (isFraudSelection) {
+      setFraudChartDataHasura(tablePivotHasura(fraudDataHasura.fraud_amount_sum_frauds));
+    } else {  
+      setFraudChartDataHasura(tablePivotHasura(fraudDataHasura.fraud_amount_sum_non_frauds));
+    }
+  }, [ fraudDataHasura ]);
+
   return <>
-    <Container>
-      <Row className='mb-12'>
-        <Form>
-          <Form.Group className='mb-3' as={Row}>
-            <Form.Label column sm={{ span: 2, offset: 4 }}>Transaction step in time</Form.Label>
-            <Col sm={{ span: 2 }}>
-              <Form.Select
-                value={stepSelection}
-                onChange={e => setStepSelection(parseInt(e.target.value))}
-              >
-                {availableStepRanges.map(stepRange => (
-                  <option key={stepRange.id} value={stepRange.id}>
-                    Start: {stepRange.start}, End: {stepRange.end}
-                  </option>
-                ))}
-              </Form.Select>
-            </Col>
-          </Form.Group>
-        </Form>
-      </Row>
-      <Row className='mb-12'>
-        <Form>
-          <Form.Group className='mb-3' as={Row}>
-            <Form.Label column sm={{ span: 2, offset: 4 }}>Is a fraudulent transaction</Form.Label>
-            <Col sm={{ span: 2 }}>
-              <Form.Select
-                value={isFraudSelection}
-                onChange={e => setIsFraudSelection(parseInt(e.target.value))}
-              >
-                <option key={0} value={0}>
-                  No
-                </option>
-                <option key={1} value={1}>
-                  Yes
-                </option>
-              </Form.Select>
-            </Col>
-          </Form.Group>
-        </Form>
-      </Row>
-      <Row className='mb-12' style={{ height: '400px', margin: '0px' }}>
-        <DisplayFraudAmountSum />
-      </Row>
-    </Container>
+    <div style={{display: 'flex', justifyContent: 'center'}}>
+      <select
+        className={classes.select}
+        value={stepSelection}
+        onChange={e => setStepSelection(parseInt(e.target.value))}
+      >
+        <option value="" disabled>Select transaction step in time...</option>
+        {availableStepRanges.map(stepRange => (
+          <option key={stepRange.id} value={stepRange.id}>
+            Transactions from {stepRange.start} to {stepRange.end}
+          </option>
+        ))}
+      </select>
+      <select
+        className={classes.select}
+        value={isFraudSelection}
+        onChange={e => setIsFraudSelection(parseInt(e.target.value))}
+      >
+        <option value="" disabled>Select if it's a fraudulent transaction...</option>
+        <option key={0} value={0}>
+          Non-fraudulent transactions
+        </option>
+        <option key={1} value={1}>
+          Fraudulent transactions
+        </option>
+      </select>
+      <div className={`${classes.buttonwrp}`}>
+        <button className={`Button Button--size-s Button--pink`} onClick={shuffleAndRun}>
+          Shuffle and Run!
+        </button>
+      </div>
+    </div>
+
+    <table style={{ width: '100%' }}>
+      <tbody>
+        <tr>
+          <td style={{ width: '50%' }}>
+            <div style={{ height: '375px', margin: '20px 0' }}>
+              <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + Cube {timestamps.CubeQuery ? `(${timestamps.CubeQuery / 1000}s)` : ``}</h3>
+              <DisplayFraudAmountSum
+                loading={loadingFraudDataCube}
+                error={errorFraudDataCube}
+                chartData={fraudChartDataCube}
+              />
+            </div>
+          </td>
+          <td style={{ width: '50%' }}>
+            <div style={{ height: '375px', margin: '20px 0' }}>
+              <h3 style={{display: 'flex', justifyContent: 'center'}}>Hasura + PostgreSQL {timestamps.HasuraQuery ? `(${timestamps.HasuraQuery / 1000}s)` : ``}</h3>
+              <DisplayFraudAmountSum
+                loading={loadingFraudDataHasura}
+                error={errorFraudDataHasura}
+                chartData={fraudChartDataHasura}
+              />
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </>
 }

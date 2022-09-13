@@ -12,7 +12,7 @@ import {
 } from '@azure/storage-blob';
 import {
   DownloadTableCSVData,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -101,7 +101,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public constructor(
-    conf: Partial<DatabricksDriverConfiguration>,
+    conf: Partial<DatabricksDriverConfiguration> = {},
   ) {
     const config: DatabricksDriverConfiguration = {
       ...conf,

@@ -1,7 +1,7 @@
 import { InfoCircleOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { Modal, Typography } from 'antd';
 
-import { Flex, Box } from '../../../grid';
+import { Flex, Box } from '../../grid';
 import { useRollupDesignerContext } from '../Context';
 import { RollupDesigner } from '../RollupDesigner';
 

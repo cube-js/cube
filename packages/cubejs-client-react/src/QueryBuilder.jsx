@@ -31,6 +31,24 @@ const granularities = [
 
 export default class QueryBuilder extends React.Component {
   static contextType = CubeContext;
+  
+  static defaultProps = {
+    cubejsApi: null,
+    stateChangeHeuristics: null,
+    disableHeuristics: false,
+    render: null,
+    wrapWithQueryRenderer: true,
+    defaultChartType: 'line',
+    defaultQuery: {},
+    initialVizState: null,
+    onVizStateChanged: null,
+    
+    // deprecated
+    query: null,
+    setQuery: null,
+    vizState: null,
+    setVizState: null,
+  };
 
   // This is an anti-pattern, only kept for backward compatibility
   // https://reactjs.org/blog/2018/06/07/you-probably-dont-need-derived-state.html#anti-pattern-unconditionally-copying-props-to-state
@@ -581,21 +599,3 @@ export default class QueryBuilder extends React.Component {
     }
   }
 }
-
-QueryBuilder.defaultProps = {
-  cubejsApi: null,
-  stateChangeHeuristics: null,
-  disableHeuristics: false,
-  render: null,
-  wrapWithQueryRenderer: true,
-  defaultChartType: 'line',
-  defaultQuery: {},
-  initialVizState: null,
-  onVizStateChanged: null,
-
-  // deprecated
-  query: null,
-  setQuery: null,
-  vizState: null,
-  setVizState: null,
-};

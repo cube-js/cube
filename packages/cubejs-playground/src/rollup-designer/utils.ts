@@ -6,7 +6,7 @@ import {
 } from '@cubejs-client/core';
 import { camelCase } from 'camel-case';
 
-import { QueryMemberKey } from '../../types';
+import { QueryMemberKey } from '../types';
 import { RollupSettings } from './components/Settings';
 
 export type PreAggregationReferences = {

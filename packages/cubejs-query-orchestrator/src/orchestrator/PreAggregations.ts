@@ -14,22 +14,18 @@ import {
   utcToLocalTimeZone,
 } from '@cubejs-backend/shared';
 
-import { cancelCombinator, SaveCancelFn } from '../driver/utils';
+import { cancelCombinator, SaveCancelFn, DriverInterface, BaseDriver,
+  DownloadTableData,
+  InlineTable,
+  StreamOptions,
+  UnloadOptions } from '@cubejs-backend/base-driver';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { CacheDriverInterface } from './cache-driver.interface';
-import {
-  BaseDriver,
-  DownloadTableData,
-  InlineTable,
-  StreamOptions,
-  UnloadOptions
-} from '../driver';
 import { QueryQueue } from './QueryQueue';
-import { DriverInterface } from '../driver/driver.interface';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 
 /// Name of the inline table containing the lambda rows.
@@ -970,7 +966,8 @@ export class PreAggregationLoader {
 
     try {
       const externalDriver = await this.externalDriverFactory();
-      const capabilities = externalDriver.capabilities && externalDriver.capabilities();
+      // TODO: Drop any, awaiting https://github.com/cube-js/cube.js/pull/5233
+      const capabilities: any = externalDriver.capabilities && externalDriver.capabilities();
 
       let tableData: DownloadTableData;
 

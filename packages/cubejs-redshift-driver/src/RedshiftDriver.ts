@@ -1,5 +1,5 @@
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { DownloadTableCSVData, UnloadOptions } from '@cubejs-backend/query-orchestrator';
+import { DownloadTableCSVData, UnloadOptions } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';

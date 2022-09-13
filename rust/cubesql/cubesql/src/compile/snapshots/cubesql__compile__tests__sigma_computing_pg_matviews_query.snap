@@ -1,10 +1,11 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"\n                select table_name\n                from information_schema.tables\n                where\n                    table_type IN ('BASE TABLE', 'VIEW', 'FOREIGN', 'FOREIGN TABLE') and\n                    table_schema = 'public'\n                UNION\n                select matviewname as table_name\n                from pg_catalog.pg_matviews\n                where schemaname = 'public'\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(\"\n                SELECT table_name FROM (\n                    select table_name\n                    from information_schema.tables\n                    where\n                        table_type IN ('BASE TABLE', 'VIEW', 'FOREIGN', 'FOREIGN TABLE') and\n                        table_schema = 'public'\n                    UNION\n                    select matviewname as table_name\n                    from pg_catalog.pg_matviews\n                    where schemaname = 'public'\n                ) t\n                ORDER BY table_name ASC\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------------------------+
 | table_name                |
 +---------------------------+
 | KibanaSampleDataEcommerce |
 | Logs                      |
+| NumberCube                |
 +---------------------------+

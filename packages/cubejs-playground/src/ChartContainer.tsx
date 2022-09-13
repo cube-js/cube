@@ -14,8 +14,9 @@ import styled from 'styled-components';
 import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
 import { ChartType, Meta, Query, ResultSet } from '@cubejs-client/core';
 
+import { FatalError } from './components/Error/FatalError';
 import { SectionRow } from './components';
-import { Button, Card, CubeLoader, FatalError } from './atoms';
+import { Button, Card, CubeLoader } from './atoms';
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
 import { codeSandboxDefinition, copyToClipboard } from './utils';
