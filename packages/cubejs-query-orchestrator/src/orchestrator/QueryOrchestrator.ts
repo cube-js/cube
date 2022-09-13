@@ -158,6 +158,7 @@ export class QueryOrchestrator {
     if (!queryBody.query) {
       if (queryBody.isJob) {
         return preAggregationsTablesToTempTables.map((pa) => ({
+          preAggregation: queryBody.preAggregations[0].preAggregationId,
           tableName: pa[0],
           ...pa[1],
         }));

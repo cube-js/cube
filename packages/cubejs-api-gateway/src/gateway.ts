@@ -32,6 +32,8 @@ import {
   ResponseResultFn,
   QueryRequest,
   PreAggsSelector,
+  PreAggJob,
+  PreAggsJobsRequest,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -594,54 +596,91 @@ class ApiGateway {
    * Post object example:
    * ```
    * {
-   *   "contexts": [
-   *     {"securityContext": {"tenant": "t1"}},
-   *     {"securityContext": {"tenant": "t2"}}
-   *   ],
-   *   "timezones": ["UTC"],
-   *   "datasources": ["default"],
-   *   "cubes": ["Events"],
-   *   "preAggregations": ["Events.TemporaryData"]
+   *   "type": "post",
+   *   "selector": {
+   *     "contexts": [
+   *       {"securityContext": {"tenant": "t1"}},
+   *       {"securityContext": {"tenant": "t2"}}
+   *     ],
+   *     "timezones": ["UTC"],
+   *     "datasources": ["default"],
+   *     "cubes": ["Events"],
+   *     "preAggregations": ["Events.TemporaryData"]
+   *   }
+   * }
+   * // or
+   * {
+   *   "type": "get",
+   *   "selector": [{
+   *     "request": "6b294492-5cd5-4531-b047-84a33c06f52d-span-1",
+   *     "context": {"securityContext": {"tenant": "t1"}},
+   *     "preagg": "Events.TemporaryData",
+   *     "table": "dev_pre_aggregations.events__temporary_data20110101",
+   *     "target": "dev_pre_aggregations.events__temporary_data20110101_sm1cr2sb_yrrj3lnj_1hhuk46",
+   *     "structure": "yrrj3lnj",
+   *     "content": "sm1cr2sb",
+   *     "updated": 1662996614011,
+   *   }]
    * }
    * ```
    * TODO (buntarb): selector object validator.
    */
   private async preAggregationsJobs(req: Request, res: Response) {
     const response = this.resToResultFn(res);
-    const requestStarted = new Date();
+    const started = new Date();
     const context = <RequestContext>req.context;
-    const selector = <PreAggsSelector>req.body;
-    let jobs: {
-      id: string;
-      table: string;
-      target: string;
-      structure: string;
-      content: string;
-      updated: string;
-    }[] = [];
+    const request = <PreAggsJobsRequest>req.body;
     try {
-      if (!selector.contexts?.length) {
-        jobs = await this.postPreAggregationsBuildJobs(context, selector);
-      } else {
-        const promise = Promise.all(
-          selector.contexts.map(async (config) => {
-            const ctx = <RequestContext>{
-              ...context,
-              ...config,
-            };
-            const job = await this.postPreAggregationsBuildJobs(ctx, selector);
-            return job;
-          })
-        );
-        const resolve = await promise;
-        resolve.forEach((j) => {
-          jobs = jobs.concat(j);
-        });
+      let result;
+      switch (request.type) {
+        case 'post':
+          result = await this.preAggregationsJobsPost(
+            context,
+            <PreAggsSelector>request.selector
+          );
+          break;
+        case 'get':
+          result = await this.preAggregationsJobsGet(
+            context,
+            <PreAggJob[]>request.selector,
+          );
+          break;
+        default:
+          throw new Error(`The '${request.type}' type doesn't supported.`);
       }
-      response(jobs, { status: 200 });
+      response(result, { status: 200 });
     } catch (e) {
-      this.handleError({ e, context, res: response, requestStarted });
+      this.handleError({ e, context, res: response, started });
     }
+  }
+
+  /**
+   * Post pre-aggregations build jobs entry point.
+   */
+  private async preAggregationsJobsPost(
+    context: RequestContext,
+    selector: PreAggsSelector,
+  ): Promise<PreAggJob[]> {
+    let jobs: PreAggJob[] = [];
+    if (!selector.contexts?.length) {
+      jobs = await this.postPreAggregationsBuildJobs(context, selector);
+    } else {
+      const promise = Promise.all(
+        selector.contexts.map(async (config) => {
+          const ctx = <RequestContext>{
+            ...context,
+            ...config,
+          };
+          const job = await this.postPreAggregationsBuildJobs(ctx, selector);
+          return job;
+        })
+      );
+      const resolve = await promise;
+      resolve.forEach((j) => {
+        jobs = jobs.concat(j);
+      });
+    }
+    return jobs;
   }
 
   /**
@@ -650,14 +689,7 @@ class ApiGateway {
   private async postPreAggregationsBuildJobs(
     context: RequestContext,
     selector: PreAggsSelector
-  ): Promise<{
-    id: string;
-    table: string;
-    target: string;
-    structure: string;
-    content: string;
-    updated: string;
-  }[]> {
+  ): Promise<PreAggJob[]> {
     const compiler = this.getCompilerApi(context);
     const timezones = selector.timezones && selector.timezones.length
       ? selector.timezones
@@ -665,7 +697,7 @@ class ApiGateway {
     const preaggs = await compiler.preAggregations({
       dataSources: selector.dataSources,
       cubes: selector.cubes,
-      preAggregationIds: selector.preAggregationIds,
+      preAggregationIds: selector.preAggregations,
     });
     const jobs: any[] = await this
       .refreshScheduler()
@@ -684,6 +716,74 @@ class ApiGateway {
         }
       );
     return jobs;
+  }
+
+  /**
+   * Get pre-aggregations build jobs entry point.
+   */
+  private async preAggregationsJobsGet(
+    context: RequestContext,
+    selector: PreAggJob[],
+  ): Promise<any[]> {
+    const result: any[] = [];
+    for (let i = 0; i < selector.length; i++) {
+      let inQueue = false;
+      const select = selector[i];
+      const orchestrator = this.getAdapterApi({
+        ...context,
+        ...select.context,
+      });
+      const queuedList = await orchestrator.getPreAggregationQueueStates();
+      queuedList.forEach((item) => {
+        if (
+          item.queryHandler &&
+          item.queryHandler === 'query' &&
+          item.query &&
+          item.query.requestId === select.request &&
+          item.query.newVersionEntry.table_name === select.table &&
+          item.query.newVersionEntry.structure_version === select.structure &&
+          item.query.newVersionEntry.content_version === select.content &&
+          item.query.newVersionEntry.last_updated_at === select.updated
+        ) {
+          result.push({
+            ...select,
+            status: item.status[0],
+          });
+          inQueue = true;
+        }
+      });
+      if (!inQueue) {
+        const compiler = this.getCompilerApi({
+          ...context,
+          ...select.context,
+        });
+        const preaggs = await compiler.preAggregations();
+        const preagg = preaggs.filter(pa => pa.id === select.preagg)[0];
+        const meta = await compiler.metaConfigExtended({
+          ...context,
+          ...select.context,
+        });
+        const cube = meta.cubeDefinitions[preagg.cube];
+        const exist = await orchestrator.isTableExist(
+          preagg.preAggregation.external,
+          cube.dataSource,
+          compiler.preAggregationsSchema,
+          select.target,
+        );
+        if (exist) {
+          result.push({
+            ...select,
+            status: 'done',
+          });
+        } else {
+          result.push({
+            ...select,
+            status: 'error',
+          });
+        }
+      }
+    }
+    return result;
   }
 
   public async getPreAggregationsInQueue(

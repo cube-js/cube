@@ -44,6 +44,7 @@ type RefreshQueries = {
 };
 
 type JobedPreAggregation = {
+  preAggregation: string,
   tableName: string,
   targetTableName: string,
   // eslint-disable-next-line camelcase
@@ -53,7 +54,9 @@ type JobedPreAggregation = {
 };
 
 type Job = {
-  id: string,
+  request: string,
+  context: { securityContext: any },
+  preagg: string,
   table: string,
   target: string,
   structure: string,
@@ -83,7 +86,9 @@ function getJobsList(context: RequestContext, jobedPA: JobedPreAggregation[][][]
       l2.forEach((l3) => {
         l3.forEach((pa) => {
           jobs.push({
-            id: context.requestId,
+            request: context.requestId,
+            context: { securityContext: context.securityContext },
+            preagg: pa.preAggregation,
             table: pa.tableName,
             target: pa.targetTableName,
             ...getJobHashes(pa.targetTableName),

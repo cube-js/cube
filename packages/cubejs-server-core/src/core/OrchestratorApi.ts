@@ -215,6 +215,24 @@ export class OrchestratorApi {
     }
   }
 
+  /**
+   * Determines whether the table already exists or not.
+   */
+  public async isTableExist(
+    external: boolean,
+    dataSource = 'default',
+    schema: string,
+    table: string,
+  ): Promise<boolean> {
+    const driverFn = external
+      ? this.options.externalDriverFactory
+      : this.driverFactory;
+    const driver = await driverFn(dataSource);
+    let result = await driver.getTablesQuery(schema);
+    result = result.filter(row => `${schema}.${row.table_name}` === table);
+    return result.length > 0;
+  }
+
   public async release() {
     return Promise.all([
       ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),

@@ -120,14 +120,36 @@ type QueryRequest = BaseRequest & {
 };
 
 /**
- * The `/cubejs-system/v1/pre-aggregations/jobs` endpoint object type.
+ * Pre-aggregations selector object.
  */
 type PreAggsSelector = {
   contexts?: {securityContext: any}[],
   timezones?: string[],
   dataSources?: string[],
   cubes?: string[],
-  preAggregationIds?: string[],
+  preAggregations?: string[],
+};
+
+/**
+ * Posted pre-aggs job object.
+ */
+type PreAggJob = {
+  request: string;
+  context: {securityContext: any};
+  preagg: string;
+  table: string;
+  target: string;
+  structure: string;
+  content: string;
+  updated: number;
+};
+
+/**
+ * The `/cubejs-system/v1/pre-aggregations/jobs` endpoint object type.
+ */
+type PreAggsJobsRequest = {
+  type: 'post' | 'get' | 'delete',
+  selector: PreAggsSelector | PreAggJob[],
 };
 
 export {
@@ -141,5 +163,7 @@ export {
   ResponseResultFn,
   BaseRequest,
   QueryRequest,
+  PreAggsJobsRequest,
+  PreAggJob,
   PreAggsSelector,
 };
