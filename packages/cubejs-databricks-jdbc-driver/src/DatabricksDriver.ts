@@ -274,8 +274,9 @@ export class DatabricksDriver extends JDBCDriver {
       await this.unloadWithSql(tableName, options.query.sql, options.query.params) :
       await this.unloadWithTable(tableName);
 
+    const pathname = `${this.config.exportBucket}/${tableName}.csv`;
     const csvFile = await this.getCsvFiles(
-      tableName,
+      pathname,
     );
 
     return {
@@ -307,15 +308,15 @@ export class DatabricksDriver extends JDBCDriver {
    * csv files signed URLs array.
    */
   private async getCsvFiles(
-    table: string,
+    pathname: string,
   ): Promise<string[]> {
     let res;
     switch (this.config.bucketType) {
       case 'azure':
-        res = await this.getSignedAzureUrls(table);
+        res = await this.getSignedAzureUrls(pathname);
         break;
       case 's3':
-        res = await this.getSignedS3Urls(table);
+        res = await this.getSignedS3Urls(pathname);
         break;
       default:
         throw new Error(`Unsupported export bucket type: ${
@@ -375,16 +376,6 @@ export class DatabricksDriver extends JDBCDriver {
         'Please check your export bucket configuration.');
     }
     return csvFile;
-  }
-
-  /**
-   * Saves specified table to the S3 bucket and returns (async) csv files
-   * signed URLs array.
-   */
-  private async getS3CsvFiles(
-    pathname: string,
-  ): Promise<string[]> {
-    return this.getSignedS3Urls(pathname);
   }
 
   /**
