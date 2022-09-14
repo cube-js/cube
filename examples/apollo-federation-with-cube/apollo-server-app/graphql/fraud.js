@@ -1,25 +1,17 @@
 const { gql } = require('apollo-server-express')
 const db = require('../database')
 
-const amountSumFrauds = `
+const amountSumFraudsWithStep = ({ isFraud, stepStart, stepEnd }) => `
   SELECT
     "fraud"."isFraud" as isfraud,
     "fraud"."step" as step,
     "fraud"."type" as type,
     sum("fraud"."amount") as amountsum
   FROM public.fraud AS "fraud"
-  WHERE "fraud"."isFraud" = 1
-  GROUP BY 1, 2, 3
-  ORDER BY 1 ASC;
-`
-const amountSumNonFrauds = `
-  SELECT
-    "fraud"."isFraud" as isfraud,
-    "fraud"."step" as step,
-    "fraud"."type" as type,
-    sum("fraud"."amount") as amountsum
-  FROM public.fraud AS "fraud"
-  WHERE "fraud"."isFraud" = 0
+  WHERE
+    "fraud"."isFraud" = ${isFraud} 
+      AND 
+    "fraud"."step" BETWEEN ${stepStart} AND ${stepEnd}
   GROUP BY 1, 2, 3
   ORDER BY 1 ASC;
 `
@@ -27,33 +19,26 @@ const amountSumNonFrauds = `
 module.exports = {
   typeDefs: gql`
     extend type Query {
-      frauds: [Fraud]
-      fraudsByAmountSum: [Fraud]
-      nonFraudsByAmountSum: [Fraud]
+      fraudsByAmountSumWithStep(isFraud: Int, stepStart: Int, stepEnd: Int): [Fraud]
     }
 
     type Fraud {
       id: ID!
       step: Float
       type: String
-      amount: Float
-      nameOrig: String
-      oldbalanceOrg: Float
-      newbalanceOrg: Float
-      nameDest: String
-      oldbalanceDest: Float
-      newbalanceDest: Float
       isFraud: Int
-      isFlaggedFraud: Int
-
       amountsum: Float
     }
   `,
   resolvers: {
     Query: {
-      frauds: async () => db.models.fraud.findAll(),
-      fraudsByAmountSum: async () => db.sequelize.query(amountSumFrauds, { type: db.sequelize.QueryTypes.SELECT }),
-      nonFraudsByAmountSum: async () => db.sequelize.query(amountSumNonFrauds, { type: db.sequelize.QueryTypes.SELECT }),
+      fraudsByAmountSumWithStep: async (obj, args, context, info) =>
+        db.sequelize.query(
+          amountSumFraudsWithStep(
+            { isFraud: args.isFraud, stepStart: args.stepStart, stepEnd: args.stepEnd }
+          ), 
+          { type: db.sequelize.QueryTypes.SELECT }
+        ),
     },
   }
 }

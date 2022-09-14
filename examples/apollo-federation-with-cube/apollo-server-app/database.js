@@ -1,7 +1,6 @@
 const Sequelize = require('sequelize')
 
-var db = {}
-
+const db = {}
 const sequelize = new Sequelize(
   'fraud',
   'cube',
@@ -23,14 +22,7 @@ const sequelize = new Sequelize(
   }
 )
 
-const initModels = require("./models/init-models");
-const models = initModels(sequelize);
-
-db.models = models
 db.sequelize = sequelize
 db.Sequelize = Sequelize
 
 module.exports = db
-
-
-// sequelize-auto -h demo-db-examples.cube.dev -d fraud -u cube -x 12345 -p 5432  --dialect postgres -c ./sequelize-auto-settings -o ./models
