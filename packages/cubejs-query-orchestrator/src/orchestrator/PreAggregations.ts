@@ -759,7 +759,7 @@ export class PreAggregationLoader {
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(newVersionEntry, invalidationKeys, client) {
+  public refresh(newVersionEntry: VersionEntry, invalidationKeys, client) {
     let refreshStrategy = this.refreshImplStoreInSourceStrategy;
     if (this.preAggregation.external) {
       const readOnly =
@@ -839,7 +839,7 @@ export class PreAggregationLoader {
 
   protected async refreshImplBucketStrategy(
     client,
-    newVersionEntry,
+    newVersionEntry: VersionEntry,
     saveCancelFn,
     invalidationKeys,
   ) {
@@ -1023,7 +1023,7 @@ export class PreAggregationLoader {
 
   protected async downloadExternalPreAggregation(
     client: DriverInterface,
-    newVersionEntry,
+    newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
     queryOptions: any,
     withTempTable: boolean
