@@ -10,7 +10,7 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import { DriverCapabilities, } from '@cubejs-backend/base-driver';
+import { DriverCapabilities, UnloadOptions, } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -263,15 +263,19 @@ export class DatabricksDriver extends JDBCDriver {
     return this.config.exportBucket !== undefined;
   }
 
-  public async unloadWithSql(tableName: string, sql: string, params: unknown[]) {
-    const types = await this.queryColumnTypes(sql, params);
-    const pathname = `${this.config.exportBucket}/${tableName}.csv`;
+  public async unload(tableName: string, options: UnloadOptions) {
+    if (!['azure', 's3'].includes(this.config.bucketType as string)) {
+      throw new Error(`Unsupported export bucket type: ${
+        this.config.bucketType
+      }`);
+    }
+
+    const types = options.query ?
+      await this.unloadWithSql(tableName, options.query.sql, options.query.params) :
+      await this.unloadWithTable(tableName);
 
     const csvFile = await this.getCsvFiles(
       tableName,
-      sql,
-      pathname,
-      params,
     );
 
     return {
@@ -281,23 +285,37 @@ export class DatabricksDriver extends JDBCDriver {
     };
   }
 
+  private async unloadWithSql(tableName: string, sql: string, params: unknown[]) {
+    const types = await this.queryColumnTypes(sql, params);
+
+    await this.createExternalTableFromSql(tableName, sql, params);
+    
+    return types;
+  }
+
+  private async unloadWithTable(tableName: string) {
+    const types = await this.tableColumnTypes(tableName);
+    const columns = types.map(t => t.name).join(', ');
+
+    await this.createExternalTableFromTable(tableName, columns);
+    
+    return types;
+  }
+
   /**
    * Unload table to bucket using Databricks JDBC query and returns (async)
    * csv files signed URLs array.
    */
   private async getCsvFiles(
     table: string,
-    sql: string,
-    pathname: string,
-    params: unknown[],
   ): Promise<string[]> {
     let res;
     switch (this.config.bucketType) {
       case 'azure':
-        res = await this.getAzureCsvFiles(table, sql, pathname, params);
+        res = await this.getSignedAzureUrls(table);
         break;
       case 's3':
-        res = await this.getS3CsvFiles(table, sql, pathname, params);
+        res = await this.getSignedS3Urls(table);
         break;
       default:
         throw new Error(`Unsupported export bucket type: ${
@@ -305,20 +323,6 @@ export class DatabricksDriver extends JDBCDriver {
         }`);
     }
     return res;
-  }
-
-  /**
-   * Saves specified table to the Azure blob storage and returns (async)
-   * csv files signed URLs array.
-   */
-  private async getAzureCsvFiles(
-    table: string,
-    sql: string,
-    pathname: string,
-    params: unknown[],
-  ): Promise<string[]> {
-    await this.createExternalTable(table, sql, params);
-    return this.getSignedAzureUrls(pathname);
   }
 
   /**
@@ -378,12 +382,8 @@ export class DatabricksDriver extends JDBCDriver {
    * signed URLs array.
    */
   private async getS3CsvFiles(
-    table: string,
-    columns: string,
     pathname: string,
-    params: any,
   ): Promise<string[]> {
-    await this.createExternalTable(table, columns, params);
     return this.getSignedS3Urls(pathname);
   }
 
@@ -443,7 +443,7 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
    */
-  private async createExternalTable(table: string, sql: string, params: unknown[]) {
+  private async createExternalTableFromSql(table: string, sql: string, params: unknown[]) {
     await this.query(
       `
       CREATE TABLE ${table}_csv_export
@@ -451,6 +451,17 @@ export class DatabricksDriver extends JDBCDriver {
       AS (${sql})
       `,
       params,
+    );
+  }
+
+  private async createExternalTableFromTable(table: string, columns: string) {
+    await this.query(
+      `
+      CREATE TABLE ${table}_csv_export
+      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
+      AS SELECT ${columns} FROM ${table}
+      `,
+      [],
     );
   }
 
