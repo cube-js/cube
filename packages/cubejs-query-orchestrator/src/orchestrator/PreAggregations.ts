@@ -857,7 +857,7 @@ export class PreAggregationLoader {
   }
 
   /**
-   * Strategy to copy pre-aggregation from source db (with write permissions) to external data
+   * Runs export bucket strategy
    */
   protected async runBucketStrategy(
     client: DriverInterface,
@@ -904,6 +904,9 @@ export class PreAggregationLoader {
     }
   }
 
+  /**
+   * Cleanup tables after bucket strategy
+   */
   protected async cleanupBucketStrategy(
     client: DriverInterface,
     targetTableName: string,
@@ -924,6 +927,9 @@ export class PreAggregationLoader {
     await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
   }
 
+  /**
+   * Create table (if required) and prepares query options object
+   */
   protected async prepareBucketStrategy(
     client: DriverInterface,
     targetTableName: string,
@@ -1021,6 +1027,9 @@ export class PreAggregationLoader {
     };
   }
 
+  /**
+   * prepares download data for future cube store usage
+   */
   protected async downloadExternalPreAggregation(
     client: DriverInterface,
     newVersionEntry: VersionEntry,
@@ -1054,6 +1063,9 @@ export class PreAggregationLoader {
     }
   }
 
+  /**
+   * prepares download data when temp table = true
+   */
   protected async getTableDataWithTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: any, externalDriverCapabilities: DriverCapabilities) {
     let tableData: DownloadTableData;
 
@@ -1085,6 +1097,9 @@ export class PreAggregationLoader {
     return tableData;
   }
 
+  /**
+   * prepares download data when temp table = false
+   */
   protected async getTableDataWithoutTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: any, externalDriverCapabilities: DriverCapabilities) {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];

@@ -286,6 +286,9 @@ export class DatabricksDriver extends JDBCDriver {
     };
   }
 
+  /**
+   * Create table with query and unload it to bucket
+   */
   private async unloadWithSql(tableName: string, sql: string, params: unknown[]) {
     const types = await this.queryColumnTypes(sql, params);
 
@@ -294,6 +297,9 @@ export class DatabricksDriver extends JDBCDriver {
     return types;
   }
 
+  /**
+   * Create table from preaggregation table with location and unload it to bucket
+   */
   private async unloadWithTable(tableName: string) {
     const types = await this.tableColumnTypes(tableName);
     const columns = types.map(t => t.name).join(', ');
@@ -304,8 +310,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Unload table to bucket using Databricks JDBC query and returns (async)
-   * csv files signed URLs array.
+   * return csv files signed URLs array.
    */
   private async getCsvFiles(
     pathname: string,
