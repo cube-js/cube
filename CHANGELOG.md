@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.70](https://github.com/cube-js/cube.js/compare/v0.30.69...v0.30.70) (2022-09-14)
+
+
+### Features
+
+* **cubejs-docker:** latest-jdk image added to the release cycle ([#5288](https://github.com/cube-js/cube.js/issues/5288)) ([155076a](https://github.com/cube-js/cube.js/commit/155076acb33ca748983b499b2944f8a6764330e0))
+
+
+
+
+
 ## [0.30.69](https://github.com/cube-js/cube.js/compare/v0.30.68...v0.30.69) (2022-09-13)
 
 
