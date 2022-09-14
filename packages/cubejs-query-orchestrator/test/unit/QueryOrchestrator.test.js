@@ -1,5 +1,6 @@
 /* globals jest, describe, beforeEach, afterEach, test, expect */
 
+import { BaseDriver } from '@cubejs-backend/base-driver';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
@@ -95,6 +96,10 @@ class MockDriver {
 
   nowTimestamp() {
     return this.now;
+  }
+
+  capabilities() {
+    return {};
   }
 }
 
