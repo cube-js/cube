@@ -156,7 +156,7 @@ class CubejsApi {
         return continueWait();
       }
 
-      if (response.status !== 200) {
+      if (![200, 202].includes(response.status)) {
         await checkMutex();
         if (!options.subscribe && requestInstance.unsubscribe) {
           await requestInstance.unsubscribe();

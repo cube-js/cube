@@ -40,7 +40,7 @@ curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
 ### <--{"id" : "Prerequisites"}--> Continue wait
 
 If the request takes too long to be processed, Cube.js Backend responds with
-`{ "error": "Continue wait" }` and 200 status code.
+`{ "error": "Continue wait" }` and 202 status code.
 This is how the long polling mechanism in Cube is implemented.
 Clients should continuously retry the same query in a loop until they get a successful result.
 Subsequent calls to the Cube endpoints are idempotent and don't lead to scheduling new database queries if not required by `refreshKey`.
