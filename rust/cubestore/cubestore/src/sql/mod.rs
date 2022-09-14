@@ -1657,6 +1657,7 @@ mod tests {
     use crate::cluster::MockCluster;
     use crate::config::{Config, FileStoreProvider};
     use crate::import::MockImportService;
+    use crate::metastore::metastore_fs::RocksMetaStoreFs;
     use crate::metastore::RocksMetaStore;
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
@@ -1685,7 +1686,11 @@ mod tests {
                 Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+            let meta_store = RocksMetaStore::new(
+                path,
+                RocksMetaStoreFs::new(remote_fs.clone()),
+                config.config_obj(),
+            );
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let store = ChunkStore::new(
@@ -1739,7 +1744,11 @@ mod tests {
                 Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+            let meta_store = RocksMetaStore::new(
+                path,
+                RocksMetaStoreFs::new(remote_fs.clone()),
+                config.config_obj(),
+            );
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let chunk_store = ChunkStore::new(

@@ -11,6 +11,7 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
+use crate::metastore::metastore_fs::{MetaStoreFs, RocksMetaStoreFs};
 use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
@@ -1052,26 +1053,27 @@ impl Config {
                 })
                 .await;
         } else {
+            self.injector
+                .register_typed_with_default::<dyn MetaStoreFs, RocksMetaStoreFs, _, _>(
+                    async move |i| {
+                        // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                        let original_remote_fs = i.get_service("original_remote_fs").await;
+                        RocksMetaStoreFs::new(original_remote_fs)
+                    },
+                )
+                .await;
             let path = self.meta_store_path().to_str().unwrap().to_string();
             self.injector
                 .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
                     async move |i| {
                         let config = i.get_service_typed::<dyn ConfigObj>().await;
-                        // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                        let original_remote_fs = i.get_service("original_remote_fs").await;
+                        let metastore_fs = i.get_service_typed::<dyn MetaStoreFs>().await;
                         let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            RocksMetaStore::load_from_dump(
-                                &path,
-                                dump_dir,
-                                original_remote_fs,
-                                config,
-                            )
-                            .await
-                            .unwrap()
-                        } else {
-                            RocksMetaStore::load_from_remote(&path, original_remote_fs, config)
+                            RocksMetaStore::load_from_dump(&path, dump_dir, metastore_fs, config)
                                 .await
                                 .unwrap()
+                        } else {
+                            metastore_fs.load_from_remote(&path, config).await.unwrap()
                         };
                         meta_store.add_listener(event_sender).await;
                         meta_store

@@ -1112,6 +1112,7 @@ mod tests {
     use crate::cluster::MockCluster;
     use crate::config::Config;
     use crate::config::MockConfigObj;
+    use crate::metastore::metastore_fs::RocksMetaStoreFs;
     use crate::metastore::{Column, ColumnType, IndexDef, IndexType, RocksMetaStore};
     use crate::remotefs::LocalDirRemoteFs;
     use crate::store::MockChunkDataStore;
@@ -1470,7 +1471,11 @@ mod tests {
             Some(PathBuf::from(chunk_remote_store_path.clone())),
             PathBuf::from(chunk_store_path.clone()),
         );
-        let metastore = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+        let metastore = RocksMetaStore::new(
+            path,
+            RocksMetaStoreFs::new(remote_fs.clone()),
+            config.config_obj(),
+        );
         let chunk_store = ChunkStore::new(
             metastore.clone(),
             remote_fs.clone(),

@@ -2,6 +2,7 @@ pub mod chunks;
 pub mod index;
 pub mod job;
 pub mod listener;
+pub mod metastore_fs;
 pub mod multi_index;
 pub mod partition;
 pub mod schema;
@@ -11,7 +12,7 @@ pub mod wal;
 
 use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use log::{error, info};
+use log::info;
 use rocksdb::{
     DBIterator, Direction, IteratorMode, MergeOperands, Options, ReadOptions, Snapshot, WriteBatch,
     WriteBatchIterator, DB,
@@ -37,7 +38,7 @@ use crate::metastore::source::{
 };
 use crate::metastore::table::{AggregateColumnIndex, TableIndexKey, TablePath};
 use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
-use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+use crate::remotefs::LocalDirRemoteFs;
 use crate::table::{Row, TableValue};
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::time_span::warn_long;
@@ -51,11 +52,11 @@ use core::{fmt, mem};
 use cubehll::HllSketch;
 use cubezetasketch::HyperLogLogPlusPlus;
 use datafusion::cube_ext;
-use futures::future::join_all;
 use futures_timer::Delay;
 use index::{IndexRocksIndex, IndexRocksTable};
 use itertools::Itertools;
 use log::trace;
+use metastore_fs::{MetaStoreFs, RocksMetaStoreFs};
 use multi_index::{MultiIndex, MultiIndexRocksIndex, MultiIndexRocksTable};
 use parquet::basic::{ConvertedType, Repetition};
 use parquet::{basic::Type, schema::types};
@@ -1304,7 +1305,7 @@ pub struct RocksMetaStore {
     pub db: Arc<DB>,
     seq_store: Arc<Mutex<HashMap<TableId, u64>>>,
     listeners: Arc<RwLock<Vec<Sender<MetaStoreEvent>>>>,
-    remote_fs: Arc<dyn RemoteFs>,
+    metastore_fs: Arc<dyn MetaStoreFs>,
     last_checkpoint_time: Arc<RwLock<SystemTime>>,
     write_notify: Arc<Notify>,
     write_completed_notify: Arc<Notify>,
@@ -2020,7 +2021,7 @@ pub enum WriteBatchEntry {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-struct WriteBatchContainer {
+pub struct WriteBatchContainer {
     entries: Vec<WriteBatchEntry>,
 }
 
@@ -2089,17 +2090,17 @@ impl RocksMetaStore {
     pub fn with_listener(
         path: impl AsRef<Path>,
         listeners: Vec<Sender<MetaStoreEvent>>,
-        remote_fs: Arc<dyn RemoteFs>,
+        metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Arc<RocksMetaStore> {
-        let meta_store = RocksMetaStore::with_listener_impl(path, listeners, remote_fs, config);
+        let meta_store = RocksMetaStore::with_listener_impl(path, listeners, metastore_fs, config);
         Arc::new(meta_store)
     }
 
     pub fn with_listener_impl(
         path: impl AsRef<Path>,
         listeners: Vec<Sender<MetaStoreEvent>>,
-        remote_fs: Arc<dyn RemoteFs>,
+        metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> RocksMetaStore {
         let mut opts = Options::default();
@@ -2131,7 +2132,7 @@ impl RocksMetaStore {
             db: db_arc.clone(),
             seq_store: Arc::new(Mutex::new(HashMap::new())),
             listeners: Arc::new(RwLock::new(listeners)),
-            remote_fs,
+            metastore_fs,
             last_checkpoint_time: Arc::new(RwLock::new(SystemTime::now())),
             write_notify: Arc::new(Notify::new()),
             write_completed_notify: Arc::new(Notify::new()),
@@ -2148,16 +2149,16 @@ impl RocksMetaStore {
 
     pub fn new(
         path: impl AsRef<Path>,
-        remote_fs: Arc<dyn RemoteFs>,
+        metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Arc<RocksMetaStore> {
-        Self::with_listener(path, vec![], remote_fs, config)
+        Self::with_listener(path, vec![], metastore_fs, config)
     }
 
     pub async fn load_from_dump(
         path: impl AsRef<Path>,
         dump_path: impl AsRef<Path>,
-        remote_fs: Arc<dyn RemoteFs>,
+        metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Result<Arc<RocksMetaStore>, CubeError> {
         if !fs::metadata(path.as_ref()).await.is_ok() {
@@ -2175,107 +2176,14 @@ impl RocksMetaStore {
             );
         }
 
-        let meta_store = Self::new(path, remote_fs, config);
+        let meta_store = Self::new(path, metastore_fs, config);
 
         RocksMetaStore::check_all_indexes(&meta_store).await?;
 
         Ok(meta_store)
     }
 
-    pub async fn load_from_remote(
-        path: impl AsRef<Path>,
-        remote_fs: Arc<dyn RemoteFs>,
-        config: Arc<dyn ConfigObj>,
-    ) -> Result<Arc<RocksMetaStore>, CubeError> {
-        if !fs::metadata(path.as_ref()).await.is_ok() {
-            let re = Regex::new(r"^metastore-(\d+)").unwrap();
-
-            if remote_fs.list("metastore-current").await?.iter().len() > 0 {
-                info!("Downloading remote metastore");
-                let current_metastore_file = remote_fs.local_file("metastore-current").await?;
-                if fs::metadata(current_metastore_file.as_str()).await.is_ok() {
-                    fs::remove_file(current_metastore_file.as_str()).await?;
-                }
-                remote_fs.download_file("metastore-current", None).await?;
-
-                let mut file = File::open(current_metastore_file.as_str()).await?;
-                let mut buffer = Vec::new();
-                tokio::io::AsyncReadExt::read_to_end(&mut file, &mut buffer).await?;
-                let last_metastore_snapshot = {
-                    let parse_result = re
-                        .captures(&String::from_utf8(buffer)?)
-                        .map(|c| c.get(1).unwrap().as_str())
-                        .map(|p| u128::from_str(p));
-                    if let Some(Ok(millis)) = parse_result {
-                        Some(millis)
-                    } else {
-                        None
-                    }
-                };
-
-                if let Some(snapshot) = last_metastore_snapshot {
-                    let to_load = remote_fs.list(&format!("metastore-{}", snapshot)).await?;
-                    let meta_store_path = remote_fs.local_file("metastore").await?;
-                    fs::create_dir_all(meta_store_path.to_string()).await?;
-                    for file in to_load.iter() {
-                        // TODO check file size
-                        remote_fs.download_file(file, None).await?;
-                        let local = remote_fs.local_file(file).await?;
-                        let path = Path::new(&local);
-                        fs::copy(
-                            path,
-                            PathBuf::from(&meta_store_path)
-                                .join(path.file_name().unwrap().to_str().unwrap()),
-                        )
-                        .await?;
-                    }
-
-                    let meta_store = Self::new(path.as_ref(), remote_fs.clone(), config);
-
-                    let logs_to_batch = remote_fs
-                        .list(&format!("metastore-{}-logs", snapshot))
-                        .await?;
-                    for log_file in logs_to_batch.iter() {
-                        let path_to_log = remote_fs.local_file(log_file).await?;
-                        let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
-                        if let Ok(batch) = batch {
-                            let db = meta_store.db.clone();
-                            db.write(batch.write_batch())?;
-                        } else if let Err(e) = batch {
-                            error!(
-                                "Corrupted metastore WAL file. Discarding: {:?} {}",
-                                log_file, e
-                            );
-                            break;
-                        }
-                    }
-
-                    RocksMetaStore::check_all_indexes(&meta_store).await?;
-
-                    return Ok(meta_store);
-                }
-            } else {
-                trace!("Can't find metastore-current in {:?}", remote_fs);
-            }
-            info!(
-                "Creating metastore from scratch in {}",
-                path.as_ref().as_os_str().to_string_lossy()
-            );
-        } else {
-            info!(
-                "Using existing metastore in {}",
-                path.as_ref().as_os_str().to_string_lossy()
-            );
-        }
-
-        let meta_store = Self::new(path, remote_fs, config);
-
-        RocksMetaStore::check_all_indexes(&meta_store).await?;
-
-        Ok(meta_store)
-    }
-
-    async fn check_all_indexes(meta_store: &Arc<RocksMetaStore>) -> Result<(), CubeError> {
+    pub async fn check_all_indexes(meta_store: &Arc<RocksMetaStore>) -> Result<(), CubeError> {
         let meta_store_to_move = meta_store.clone();
 
         cube_ext::spawn_blocking(move || {
@@ -2426,10 +2334,7 @@ impl RocksMetaStore {
                 RocksMetaStore::meta_store_path(&checkpoint_time),
                 min.unwrap()
             );
-            let file_name = self.remote_fs.local_file(&log_name).await?;
-            serializer.write_to_file(&file_name).await?;
-            // TODO persist file size
-            self.remote_fs.upload_file(&file_name, &log_name).await?;
+            self.metastore_fs.upload_log(&log_name, &serializer).await?;
             let mut seq = self.last_upload_seq.write().await;
             *seq = max.unwrap();
             self.write_completed_notify.notify_waiters();
@@ -2455,9 +2360,8 @@ impl RocksMetaStore {
         Ok(())
     }
 
-    async fn upload_check_point(&self) -> Result<(), CubeError> {
+    pub async fn upload_check_point(&self) -> Result<(), CubeError> {
         let mut check_point_time = self.last_checkpoint_time.write().await;
-        let remote_fs = self.remote_fs.clone();
 
         let (remote_path, checkpoint_path) = {
             let db = self.db.clone();
@@ -2465,7 +2369,9 @@ impl RocksMetaStore {
             RocksMetaStore::prepare_checkpoint(db, &check_point_time).await?
         };
 
-        RocksMetaStore::upload_checkpoint(remote_fs, remote_path, checkpoint_path).await?;
+        self.metastore_fs
+            .upload_checkpoint(remote_path, checkpoint_path)
+            .await?;
         self.write_completed_notify.notify_waiters();
         Ok(())
     }
@@ -2476,90 +2382,6 @@ impl RocksMetaStore {
 
     async fn last_check_seq(&self) -> u64 {
         *self.last_check_seq.read().await
-    }
-
-    async fn upload_checkpoint(
-        remote_fs: Arc<dyn RemoteFs>,
-        remote_path: String,
-        checkpoint_path: PathBuf,
-    ) -> Result<(), CubeError> {
-        let mut dir = fs::read_dir(checkpoint_path).await?;
-
-        let mut files_to_upload = Vec::new();
-        while let Some(file) = dir.next_entry().await? {
-            let file = file.file_name();
-            files_to_upload.push(format!("{}/{}", remote_path, file.to_string_lossy()));
-        }
-        for v in join_all(
-            files_to_upload
-                .into_iter()
-                .map(|f| {
-                    let remote_fs = remote_fs.clone();
-                    return async move {
-                        let local = remote_fs.local_file(&f).await?;
-                        // TODO persist file size
-                        remote_fs.upload_file(&local, &f).await
-                    };
-                })
-                .collect::<Vec<_>>(),
-        )
-        .await
-        .into_iter()
-        {
-            v?;
-        }
-
-        let existing_metastore_files = remote_fs.list("metastore-").await?;
-        let to_delete = existing_metastore_files
-            .into_iter()
-            .filter_map(|existing| {
-                let path = existing
-                    .split("/")
-                    .nth(0)
-                    .map(|p| u128::from_str(&p.replace("metastore-", "").replace("-logs", "")));
-                if let Some(Ok(millis)) = path {
-                    if SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis()
-                        - millis
-                        > 3 * 60 * 1000
-                    {
-                        return Some(existing);
-                    }
-                }
-                None
-            })
-            .collect::<Vec<_>>();
-        for v in join_all(
-            to_delete
-                .iter()
-                .map(|f| remote_fs.delete_file(&f))
-                .collect::<Vec<_>>(),
-        )
-        .await
-        .into_iter()
-        {
-            v?;
-        }
-
-        let uploads_dir = remote_fs.uploads_dir().await?;
-        let (file, file_path) = cube_ext::spawn_blocking(move || {
-            tempfile::Builder::new()
-                .prefix("metastore-current")
-                .tempfile_in(uploads_dir)
-        })
-        .await??
-        .into_parts();
-
-        tokio::io::AsyncWriteExt::write_all(&mut fs::File::from_std(file), remote_path.as_bytes())
-            .await?;
-
-        remote_fs
-            .upload_file(file_path.keep()?.to_str().unwrap(), "metastore-current")
-            .await?;
-
-        Ok(())
     }
 
     async fn prepare_checkpoint(
@@ -2687,7 +2509,7 @@ impl RocksMetaStore {
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
         let meta_store = RocksMetaStore::new(
             store_path.clone().join("metastore").as_path(),
-            remote_fs.clone(),
+            RocksMetaStoreFs::new(remote_fs.clone()),
             config.config_obj(),
         );
         (remote_fs, meta_store)
@@ -5271,7 +5093,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                remote_fs,
+                RocksMetaStoreFs::new(remote_fs),
                 config.config_obj(),
             );
 
@@ -5458,7 +5280,7 @@ mod tests {
 
         let meta_store = RocksMetaStore::new(
             store_path.join("metastore").as_path(),
-            remote_fs,
+            RocksMetaStoreFs::new(remote_fs),
             config.config_obj(),
         );
 
@@ -5530,7 +5352,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                remote_fs,
+                RocksMetaStoreFs::new(remote_fs),
                 config.config_obj(),
             );
 
@@ -5577,7 +5399,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),
-                remote_fs,
+                RocksMetaStoreFs::new(remote_fs),
                 config.config_obj(),
             );
 
@@ -5678,7 +5500,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),
-                remote_fs,
+                RocksMetaStoreFs::new(remote_fs),
                 config.config_obj(),
             );
 
@@ -5762,7 +5584,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),
-                remote_fs,
+                RocksMetaStoreFs::new(remote_fs),
                 config.config_obj(),
             );
 
@@ -6127,7 +5949,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                remote_fs,
+                RocksMetaStoreFs::new(remote_fs),
                 config.config_obj(),
             );
             meta_store
@@ -6249,7 +6071,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                remote_fs,
+                RocksMetaStoreFs::new(remote_fs),
                 config.config_obj(),
             );
             meta_store
