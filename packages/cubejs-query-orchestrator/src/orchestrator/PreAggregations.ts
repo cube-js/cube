@@ -843,7 +843,7 @@ export class PreAggregationLoader {
     saveCancelFn,
     invalidationKeys,
   ) {
-    const capabilities = client?.capabilities?.();
+    const capabilities = client?.capabilities();
 
     const withTempTable = !(capabilities?.unloadWithoutTempTable);
 
