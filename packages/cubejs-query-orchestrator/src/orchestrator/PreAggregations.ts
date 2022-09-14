@@ -845,7 +845,7 @@ export class PreAggregationLoader {
   ) {
     const capabilities = client?.capabilities?.();
 
-    const withTempTable = !(capabilities?.unloadWithoutTempTable && client.unloadWithSql);
+    const withTempTable = !(capabilities?.unloadWithoutTempTable);
 
     return this.runBucketStrategy(
       client,
@@ -1086,10 +1086,10 @@ export class PreAggregationLoader {
   }
 
   protected async getTableDataWithoutTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: any, externalDriverCapabilities: DriverCapabilities) {
-    const [sql, sqlParams] =
+    const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
-    if (externalDriverCapabilities.csvImport && client.unloadWithSql && await client.isUnloadSupported(this.getUnloadOptions())) {
-      return saveCancelFn(client.unloadWithSql(table, sql, sqlParams, this.getUnloadOptions()));
+    if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
+      return saveCancelFn(client.unload(table, { ...this.getUnloadOptions(), query: { sql, params } }));
     } else {
       throw new Error('download without temp table error');
     }

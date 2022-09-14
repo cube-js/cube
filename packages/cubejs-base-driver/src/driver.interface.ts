@@ -122,8 +122,14 @@ export type CreateTableIndex = {
   columns: string[]
 };
 
+type UnloadQuery = {
+  sql: string,
+  params: unknown[]
+};
+
 export type UnloadOptions = {
   maxFileSize: number,
+  query?: UnloadQuery;
 };
 
 export type QueryOptions = {
@@ -157,7 +163,6 @@ export interface DriverInterface {
   stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
   // Some drivers can implement UNLOAD data to external storage
   unload?: (table: string, options: UnloadOptions) => Promise<DownloadTableCSVData>;
-  unloadWithSql?: (table: string, query: string, params: unknown[], options: UnloadOptions) => Promise<DownloadTableCSVData>;
   // Some drivers can implement UNLOAD data to external storage
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
   // Current timestamp, defaults to new Date().getTime()
