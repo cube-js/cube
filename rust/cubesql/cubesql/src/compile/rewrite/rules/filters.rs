@@ -715,6 +715,11 @@ impl RewriteRules for FilterRules {
                 self.unwrap_datetrunc("?granularity", "second"),
             ),
             rewrite(
+                "not-expt-ilike-to-expr-not-ilike",
+                not_expr(binary_expr("?left", "ILIKE", "?right")),
+                binary_expr("?left", "NOT_ILIKE", "?right"),
+            ),
+            rewrite(
                 "not-expt-like-to-expr-not-like",
                 not_expr(binary_expr("?left", "LIKE", "?right")),
                 binary_expr("?left", "NOT_LIKE", "?right"),
@@ -1162,6 +1167,7 @@ impl FilterRules {
                                     Operator::Like => "contains",
                                     Operator::ILike => "contains",
                                     Operator::NotLike => "notContains",
+                                    Operator::NotILike => "notContains",
                                     // TODO: support regex totally
                                     Operator::RegexMatch => "startsWith",
                                     _ => {
