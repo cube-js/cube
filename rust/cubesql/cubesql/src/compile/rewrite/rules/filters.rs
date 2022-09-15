@@ -543,6 +543,52 @@ impl RewriteRules for FilterRules {
                     "?members",
                 ),
             ),
+            transforming_rewrite(
+                "filter-replacer-date-trunc-equals",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "=",
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), literal_expr("?date")],
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            column_expr("?column"),
+                            ">=",
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), literal_expr("?date")],
+                            ),
+                        ),
+                        "AND",
+                        binary_expr(
+                            column_expr("?column"),
+                            "<",
+                            binary_expr(
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![literal_expr("?granularity"), literal_expr("?date")],
+                                ),
+                                "+",
+                                literal_expr("?interval"),
+                            ),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                self.transform_date_trunc_equals("?granularity", "?interval"),
+            ),
             // TODO define zero
             rewrite(
                 "filter-str-pos-to-like",
@@ -1684,6 +1730,43 @@ impl FilterRules {
                             _ => continue,
                         }
                     }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_date_trunc_equals(
+        &self,
+        granularity_var: &'static str,
+        interval_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let granularity_var = var!(granularity_var);
+        let interval_var = var!(interval_var);
+        move |egraph, subst| {
+            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
+                if let ScalarValue::Utf8(Some(granularity)) = granularity {
+                    let interval = match granularity.as_str() {
+                        "second" => ScalarValue::IntervalDayTime(Some(1000)),
+                        "minute" => ScalarValue::IntervalDayTime(Some(60000)),
+                        "hour" => ScalarValue::IntervalDayTime(Some(3600000)),
+                        "day" => ScalarValue::IntervalDayTime(Some(4294967296)),
+                        "week" => ScalarValue::IntervalDayTime(Some(30064771072)),
+                        "month" => ScalarValue::IntervalYearMonth(Some(1)),
+                        "quarter" => ScalarValue::IntervalYearMonth(Some(3)),
+                        "year" => ScalarValue::IntervalYearMonth(Some(12)),
+                        _ => continue,
+                    };
+
+                    subst.insert(
+                        interval_var,
+                        egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                            interval,
+                        ))),
+                    );
+
+                    return true;
                 }
             }
 
