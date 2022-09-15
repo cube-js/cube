@@ -6,7 +6,7 @@ subCategory: Reference
 menuOrder: 3
 ---
 
-Cube.js can be configured both via environment variables and by providing
+Cube can be configured both via environment variables and by providing
 configuration options in the `cube.js` file.
 
 Example of setting a custom logger in the `cube.js` file.
@@ -21,7 +21,7 @@ module.exports = {
 
 ## Options Reference
 
-You can provide the following configuration options to Cube.js.
+You can provide the following configuration options to Cube:
 
 ```typescript
 interface CubejsConfiguration {
@@ -135,14 +135,14 @@ consider defining [`driverFactory`][self-driver-factory] to return a
 
 </WarningBox>
 
+> ✏️ Called **once** per [`appId`][self-opts-ctx-to-appid]
+
 Either `String` or `Function` could be passed. Providing a `Function` allows to
 dynamically select a database type depending on the user's context. It is
 usually used in [Multitenancy Setup][ref-multitenancy].
 
-If no option is passed, Cube.js will lookup for environment variable
-`CUBEJS_DB_TYPE` to resolve `dbType`.
-
-Called only once per [`appId`][self-opts-ctx-to-appid].
+If no option is passed, Cube will use the environment variable `CUBEJS_DB_TYPE`
+to resolve `dbType`.
 
 ### <--{"id" : "Options Reference"}--> schemaPath
 
@@ -161,7 +161,7 @@ run on the root path.
 
 A function to setup a custom logger. It accepts the following arguments:
 
-- `message`: Cube.js Backend event message
+- `message`: Cube Backend event message
 - `params`: Parameters of the call
 
 ```javascript
@@ -174,14 +174,15 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> driverFactory
 
+> ✏️ Called **once** per [`dataSource`][ref-schema-ref-datasource]
+
 Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
 [Multitenancy Applications][ref-multitenancy].
 
-Called once per [`dataSource`][ref-schema-ref-datasource]. Can return a
-`Promise` which resolves to a `DriverConfig`. `DriverConfig` consists of a
-`type` field corresponding to database type and options passed to a driver
-constructor.
+Can return a `Promise` which resolves to a `DriverConfig`. `DriverConfig`
+consists of a `type` field corresponding to database type and options passed to
+a driver constructor.
 
 ```javascript
 module.exports = {
@@ -207,13 +208,13 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> contextToAppId
 
+> ✏️ Called on **every** request
+
 It is a [Multitenancy Setup][ref-multitenancy] option.
 
 `contextToAppId` is a function to determine an App ID which is used as caching
 key for various in-memory structures like schema compilation results, connection
 pool, etc.
-
-Called on each request.
 
 ```javascript
 module.exports = {
@@ -226,18 +227,18 @@ module.exports = {
 
 <WarningBox>
 
-In versions of Cube.js prior to v0.29, each tenant would have an individual
+In versions of Cube prior to v0.29, each tenant would have an individual
 instance of the Query Orchestrator.
 
 </WarningBox>
+
+> ✏️ Called on **every** request
 
 `contextToOrchestratorId` is a function used to determine a caching key for the
 Query Orchestrator instance. The Query Orchestrator holds database connections,
 execution queues, pre-aggregation table caches. By default, the same instance is
 used for **all** tenants; override this property in situations where each tenant
 requires their own Query Orchestrator.
-
-Called on each request.
 
 ```javascript
 module.exports = {
@@ -250,13 +251,13 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> repositoryFactory
 
-This option allows to customize the repository for Cube.js data schema files. It
-is a function, which accepts a context object and can dynamically select
+> ✏️ Called **once** per [`appId`][self-opts-ctx-to-appid]
+
+This option allows you to customize the repository for Cube data schema files. It is
+a function, which accepts a context object and can dynamically select
 repositories with schema files based on
 [`SchemaFileRepository`][self-schemafilerepo] contract. Learn more about it in
 [Multitenancy guide][ref-multitenancy].
-
-Called only once per [`appId`][self-opts-ctx-to-appid].
 
 ```javascript
 const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
@@ -282,6 +283,8 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> checkAuth
 
+> ✏️ Called on **every** GraphQL/REST/WebSockets API request
+
 Used in both REST and WebSockets API. Can be an `async` function. Default
 implementation parses [JSON Web Tokens (JWT)][link-jwt] in `Authorization`
 header and sets payload to `req.securityContext` if it's verified. More
@@ -289,8 +292,6 @@ information on how to generate these tokens is [here][ref-sec-ctx].
 
 You can set `req.securityContext = userContextObj` inside the middleware if you
 want to customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].
-
-Called on each request.
 
 Also, you can use empty `checkAuth` function to disable built-in security. See
 an example below.
@@ -303,12 +304,12 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> checkSqlAuth
 
+> ✏️ Called on **every** SQL API request
+
 Used in [SQL API][ref-sql-api], and can be an `async` function. Default
 implementation verify username & password from environment variables:
 `CUBEJS_SQL_USER`, `CUBEJS_SQL_PASSWORD`, but in [development
 mode][ref-development-mode] it ignores validation.
-
-Called on each request from Cube SQL API.
 
 For example, you can use `checkSqlAuth` to validate username and password.
 
@@ -329,11 +330,11 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> canSwitchSqlUser
 
+> ✏️ Called on **every** SQL API request for a SQL user change
+
 Used in [SQL API][ref-sql-api], and can be an `async` function. Default
 implementation depends on `CUBEJS_SQL_SUPERUSER` and return `true` when it's
 equal to session's user.
-
-Called on each change request from Cube SQL API.
 
 For example, you can use `canSwitchSqlUser` to define your custom logic:
 
@@ -357,15 +358,15 @@ module.exports = {
 
 <WarningBox>
 
-In previous versions of Cube.js, this was called `queryTransformer`.
+In previous versions of Cube, this was called `queryTransformer`.
 
 </WarningBox>
+
+> ✏️ Called on **every** request
 
 This is a security hook to check your query just before it gets processed. You
 can use this very generic API to implement any type of custom security checks
 your app needs and transform input query accordingly.
-
-Called on each request.
 
 For example, you can use `queryRewrite` to add row level security filter where
 needed.
@@ -387,6 +388,8 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> preAggregationsSchema
 
+> ✏️ Called **once** per [`appId`][self-opts-ctx-to-appid]
+
 Schema name to use for storing pre-aggregations. For some drivers like MySQL
 it's name for pre-aggregation database as there's no database schema concept
 there. Either `String` or `Function` could be passed. Providing a `Function`
@@ -405,8 +408,6 @@ and production environments to avoid pre-aggregation tables clashes.
 
 </WarningBox>
 
-Called once per [`appId`][self-opts-ctx-to-appid].
-
 ```javascript
 // Static usage
 module.exports = {
@@ -422,10 +423,12 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> schemaVersion
 
-Schema version can be used to tell Cube.js schema should be recompiled in case
-schema code depends on dynamic definitions fetched from some external database
-or API. This method is called on each request however `RequestContext` parameter
-is reused per application ID as determined by
+> ✏️ Called on **every** request
+
+Schema version is used to tell Cube that the schema should be recompiled in case
+the schema depends on dynamic definitions fetched from an external database or
+API. This method is called on each request, however the `RequestContext`
+parameter is reused per application ID as determined by
 [`contextToAppId`][self-opts-ctx-to-appid]. If the returned string is different,
 the schema will be recompiled. It can be used in both multi-tenant and single
 tenant environments.
@@ -452,7 +455,7 @@ for pre-aggregations.
 
 </WarningBox>
 
-Cube.js enables background refresh by default using the `CUBEJS_REFRESH_WORKER`
+Cube enables background refresh by default using the `CUBEJS_REFRESH_WORKER`
 environment variable.
 
 ```javascript
@@ -463,7 +466,7 @@ module.exports = {
 
 Learn more about [scheduled refreshes here][ref-caching-up-to-date].
 
-Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js
+Best practice is to run `scheduledRefreshTimer` in a separate worker Cube
 instance. For Serverless deployments, [REST API][ref-rest-api-sched-refresh]
 should be used instead.
 
@@ -473,10 +476,9 @@ You may also need to configure
 
 ### <--{"id" : "Options Reference"}--> scheduledRefreshTimeZones
 
-All time-based calculations performed within Cube.js are timezone-aware. Using
-this property you can specify multiple timezones in [TZ Database
-Name][link-wiki-tz] format e.g. `America/Los_Angeles`. The default value is
-`UTC`.
+All time-based calculations performed within Cube are timezone-aware. Using this
+property you can specify multiple timezones in [TZ Database Name][link-wiki-tz]
+format e.g. `America/Los_Angeles`. The default value is `UTC`.
 
 ```javascript
 module.exports = {
@@ -498,14 +500,14 @@ CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 
 When trying to configure scheduled refreshes for pre-aggregations that use the
 `securityContext` inside `contextToAppId` or `contextToOrchestratorId`, you must
-also set up `scheduledRefreshContexts`. This will allow Cube.js to generate the
+also set up `scheduledRefreshContexts`. This will allow Cube to generate the
 necessary security contexts prior to running the scheduled refreshes.
 
 <WarningBox>
 
 Leaving `scheduledRefreshContexts` unconfigured will lead to issues where the
-security context will be `undefined`. This is because there is no way for
-Cube.js to know how to generate a context without the required input.
+security context will be `undefined`. This is because there is no way for Cube
+to know how to generate a context without the required input.
 
 </WarningBox>
 
@@ -531,8 +533,10 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> extendContext
 
-Option to extend the `RequestContext` with custom values. This method is called
-on each request. Can be async.
+> ✏️ Called on **every** request
+
+Option to extend the `RequestContext` with custom values. Can be an asynchronous
+function.
 
 The function should return an object which gets appended to the
 [`RequestContext`][self-opts-req-ctx]. Make sure to register your value using
@@ -581,7 +585,7 @@ schemas in memory indefinitely.
 ### <--{"id" : "Options Reference"}--> updateCompilerCacheKeepAlive
 
 Providing `updateCompilerCacheKeepAlive: true` keeps frequently used schemas in
-memory by reseting their `maxCompilerCacheKeepAlive` every time they are
+memory by resetting their `maxCompilerCacheKeepAlive` every time they are
 accessed.
 
 ### <--{"id" : "Options Reference"}--> allowUngroupedWithoutPrimaryKey
@@ -591,10 +595,9 @@ check for `ungrouped` queries.
 
 ### <--{"id" : "Options Reference"}--> telemetry
 
-Cube.js collects high-level anonymous usage statistics for servers started in
+Cube collects high-level anonymous usage statistics for servers started in
 development mode. It doesn't track any credentials, schema contents or queries
-issued. This statistics is used solely for the purpose of constant cube.js
-improvement.
+issued. This statistics is used solely for the purpose of constant improvement.
 
 You can opt out of it any time by setting `telemetry` option to `false` or,
 alternatively, by setting `CUBEJS_TELEMETRY` environment variable to `false`.
@@ -609,7 +612,7 @@ module.exports = {
 
 #### cors
 
-CORS settings for the Cube.js REST API can be configured by providing an object
+CORS settings for the Cube REST API can be configured by providing an object
 with options [from here][link-express-cors-opts]:
 
 ```javascript
@@ -666,8 +669,8 @@ Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
 ### <--{"id" : "Options Reference"}--> cacheAndQueueDriver
 
-The cache and queue driver to use for the Cube.js deployment. Defaults to
-`memory` in development, `redis` in production.
+The cache and queue driver to use for the Cube deployment. Defaults to `memory`
+in development, `redis` in production.
 
 ### <--{"id" : "Options Reference"}--> orchestratorOptions
 
@@ -678,7 +681,7 @@ these values can result in application instability and/or downtime.
 
 </WarningBox>
 
-You can pass this object to set advanced options for Cube.js Query Orchestrator.
+You can pass this object to set advanced options for Cube's Query Orchestrator.
 
 | Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                   | Default Value           |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
@@ -691,7 +694,7 @@ You can pass this object to set advanced options for Cube.js Query Orchestrator.
 | preAggregationsOptions                       | Query cache options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                      | `{}`                    |
 | preAggregationsOptions.maxPartitions         | The maximum number of partitions each pre-aggregation in a cube can use.                                                                                                                                                                                                                                                                                                                      | `10000`                 |
 | preAggregationsOptions.queueOptions          | Query queue options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                      | `{}`                    |
-| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube.js to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                    | `false`                 |
+| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                       | `false`                 |
 
 To set options for `queryCache` and `preAggregations`, set an object with key
 queueOptions. `queryCacheOptions` are used while querying database tables, while
