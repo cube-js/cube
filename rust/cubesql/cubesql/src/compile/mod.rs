@@ -1800,7 +1800,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ends_with() {
+    async fn test_ends_with_query() {
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE ends_with(customer_gender, 'emale')"
                 .to_string(),
@@ -5321,6 +5321,24 @@ ORDER BY \"COUNT(count)\" DESC"
             +----+----+----+\n\
             | 1  | 18 | 0  |\n\
             +----+----+----+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_ends_with() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "ends_with",
+            execute_query(
+                "select \
+                    ends_with('rust is killing me', 'me') as r1,
+                    ends_with('rust is killing me', 'no') as r2
+                "
+                .to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         Ok(())
