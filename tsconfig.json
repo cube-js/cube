@@ -80,6 +80,9 @@
       "path": "packages/cubejs-databricks-jdbc-driver"
     },
     {
+      "path": "packages/cubejs-teradata-jdbc-driver"
+    },
+    {
       "path": "rust/cubestore"
     },
     {

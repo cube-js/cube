@@ -174,6 +174,7 @@ export class ServerContainer {
 
     const deepsToIgnore = [
       '@cubejs-backend/databricks-jdbc-driver',
+      '@cubejs-backend/teradata-jdbc-driver',
     ];
 
     if (manifest.dependencies) {

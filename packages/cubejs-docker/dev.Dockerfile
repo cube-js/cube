@@ -96,6 +96,7 @@ RUN yarn install --prod
 FROM prod_base_dependencies as prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
+COPY packages/cubejs-teradata-jdbc-driver/package.json packages/cubejs-teradata-jdbc-driver/package.json
 RUN yarn install --prod --ignore-scripts
 
 FROM base as build
@@ -140,6 +141,8 @@ COPY packages/cubejs-ksql-driver/ packages/cubejs-ksql-driver/
 COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
 COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
 COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-driver/
+COPY packages/cubejs-teradata-jdbc-driver/ packages/cubejs-teradata-jdbc-driver/
+
 # Skip
 # COPY packages/cubejs-testing/ packages/cubejs-testing/
 # COPY packages/cubejs-docker/ packages/cubejs-docker/

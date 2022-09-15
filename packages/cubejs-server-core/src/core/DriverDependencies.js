@@ -26,4 +26,5 @@ module.exports = {
   materialize: '@cubejs-backend/materialize-driver',
   // List for JDBC drivers
   'databricks-jdbc': '@cubejs-backend/databricks-jdbc-driver',
+  teradata: '@cubejs-backend/teradata-jdbc-driver',
 };
