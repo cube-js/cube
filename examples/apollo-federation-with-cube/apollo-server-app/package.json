@@ -4,22 +4,28 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start-local": "nodemon index.js",
+    "start-lambda": "netlify-lambda serve src",
+    "build-lambda": "netlify-lambda build src"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "apollo-server": "^3.10.2",
     "apollo-server-express": "^3",
+    "apollo-server-lambda": "^3.10.2",
     "body-parser": "^1.20.0",
     "cors": "^2.8.5",
+    "encoding": "^0.1.13",
     "express": "^4.18.1",
     "graphql": "^16.6.0",
+    "netlify-lambda": "^2.0.15",
     "pg": "^8.8.0",
     "pg-hstore": "^2.3.4",
-    "sequelize": "^6.21.6",
-    "sequelize-auto": "^0.8.8"
+    "pg-native": "^3.0.1",
+    "sequelize": "^6.21.6"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.19"
   }
 }

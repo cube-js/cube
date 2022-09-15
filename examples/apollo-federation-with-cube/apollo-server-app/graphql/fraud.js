@@ -26,7 +26,7 @@ module.exports = {
       id: ID!
       step: Float
       type: String
-      isFraud: Int
+      isfraud: Int
       amountsum: Float
     }
   `,

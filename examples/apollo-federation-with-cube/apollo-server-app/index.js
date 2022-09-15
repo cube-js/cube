@@ -1,13 +1,13 @@
-const express = require('express')
-const bodyParser = require('body-parser')
-const { ApolloServer } = require('apollo-server-express')
-const cors = require('cors')
-const app = express()
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({ extended: true }))
-app.use(cors())
-
 async function startServer() {
+  const express = require('express')
+  const bodyParser = require('body-parser')
+  const { ApolloServer } = require('apollo-server-express')
+  const cors = require('cors')
+  const app = express()
+  app.use(bodyParser.json())
+  app.use(bodyParser.urlencoded({ extended: true }))
+  app.use(cors())
+
   const server = new ApolloServer({
     modules: [
       require('./graphql/fraud'),

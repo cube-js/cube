@@ -1,0 +1,3 @@
+[build]
+  command = "npm install && npm run build-lambda"
+  functions = "functions"

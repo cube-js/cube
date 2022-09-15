@@ -1,5 +1,5 @@
+const pg = require('pg')
 const Sequelize = require('sequelize')
-
 const db = {}
 const sequelize = new Sequelize(
   'fraud',
@@ -9,6 +9,7 @@ const sequelize = new Sequelize(
     host: 'demo-db-examples.cube.dev',
     port: '5432',
     dialect: 'postgres',
+    dialectModule: pg,
     define: {
       freezeTableName: true,
     },
@@ -24,5 +25,4 @@ const sequelize = new Sequelize(
 
 db.sequelize = sequelize
 db.Sequelize = Sequelize
-
 module.exports = db
