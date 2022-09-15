@@ -538,6 +538,7 @@ mod tests {
     use crate::assert_eq_columns;
     use crate::cluster::MockCluster;
     use crate::config::Config;
+    use crate::metastore::metastore_fs::RocksMetaStoreFs;
     use crate::metastore::{IndexDef, IndexType, RocksMetaStore};
     use crate::remotefs::LocalDirRemoteFs;
     use crate::table::data::{concat_record_batches, rows_to_columns};
@@ -563,7 +564,11 @@ mod tests {
                 PathBuf::from(store_path.clone()),
             );
             let store = WALStore::new(
-                RocksMetaStore::new(path, remote_fs.clone(), config.config_obj()),
+                RocksMetaStore::new(
+                    path,
+                    RocksMetaStoreFs::new(remote_fs.clone()),
+                    config.config_obj(),
+                ),
                 remote_fs.clone(),
                 10,
             );
@@ -647,7 +652,11 @@ mod tests {
                 Some(PathBuf::from(chunk_remote_store_path.clone())),
                 PathBuf::from(chunk_store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+            let meta_store = RocksMetaStore::new(
+                path,
+                RocksMetaStoreFs::new(remote_fs.clone()),
+                config.config_obj(),
+            );
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
                 remote_fs.clone(),
@@ -738,7 +747,11 @@ mod tests {
                 Some(PathBuf::from(chunk_remote_store_path.clone())),
                 PathBuf::from(chunk_store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+            let meta_store = RocksMetaStore::new(
+                path,
+                RocksMetaStoreFs::new(remote_fs.clone()),
+                config.config_obj(),
+            );
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
                 remote_fs.clone(),

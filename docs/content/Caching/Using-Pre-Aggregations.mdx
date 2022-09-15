@@ -453,6 +453,13 @@ it.
 
 ### <--{"id" : "Pre-Aggregation Build Strategies"}--> Export bucket
 
+<WarningBox>
+
+The export bucket strategy requires permission to execute `CREATE TABLE`
+statements in the data source as part of the pre-aggregation build process.
+
+</WarningBox>
+
 When dealing with larger pre-aggregations (more than 100k rows), performance can
 be significantly improved by using an export bucket. This allows the source
 database to temporarily materialize the data locally, which is then loaded into
