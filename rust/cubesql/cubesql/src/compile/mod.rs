@@ -11024,6 +11024,48 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_holistics_str_not_contains_filter() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT COUNT(\"table\".\"count\") AS \"c_pu_c_d4696e\"
+            FROM \"public\".\"KibanaSampleDataEcommerce\" \"table\"
+            WHERE NOT(\"table\".\"customer_gender\" ILIKE ('%' || CAST ( 'test' AS text ) || '%'))
+            ORDER BY 1 DESC
+            LIMIT 100000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "desc".to_string()
+                ]]),
+                limit: Some(50000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("notContains".to_string()),
+                    values: Some(vec!["test".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_column_with_same_name_as_table() -> Result<(), CubeError> {
         init_logger();
 
