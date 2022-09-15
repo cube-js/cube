@@ -14,11 +14,12 @@ use crate::{
             rewriter::RewriteRules,
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_chain_rewrite,
-            transforming_rewrite, BetweenExprNegated, BinaryExprOp, ChangeUserMemberValue,
+            transforming_rewrite, udf_expr, udf_expr_var_arg, udf_fun_expr_args,
+            udf_fun_expr_args_empty_tail, BetweenExprNegated, BinaryExprOp, ChangeUserMemberValue,
             ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit, FilterMemberMember,
             FilterMemberOp, FilterMemberValues, FilterReplacerAliasToCube, InListExprNegated,
-            LimitFetch, LimitSkip, LiteralExprValue, LogicalPlanLanguage, ScalarFunctionExprFun,
-            SegmentMemberMember, TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
+            LimitFetch, LimitSkip, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
+            TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
             TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
         },
     },
@@ -37,7 +38,6 @@ use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::array::{Date32Array, Date64Array, TimestampNanosecondArray},
     logical_plan::{Column, Expr, Operator},
-    physical_plan::functions::BuiltinScalarFunction,
     scalar::ScalarValue,
 };
 use egg::{EGraph, Rewrite, Subst, Var};
@@ -531,15 +531,61 @@ impl RewriteRules for FilterRules {
                     "or",
                 ),
             ),
-            rewrite(
-                "filter-replacer-lower-str",
+            // Unwrap lower for case case insensitive operators
+            transforming_rewrite(
+                "filter-replacer-lower-unwrap",
                 filter_replacer(
-                    binary_expr(fun_expr("Lower", vec!["?lower_param"]), "?op", "?right"),
+                    binary_expr(fun_expr("Lower", vec!["?param"]), "?op", "?right"),
                     "?alias_to_cube",
                     "?members",
                 ),
                 filter_replacer(
-                    binary_expr("?lower_param", "?op", "?right"),
+                    binary_expr("?param", "?op", "?right"),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                self.unwrap_lower_or_upper("?op"),
+            ),
+            // Unwrap lower for case case insensitive operators
+            transforming_rewrite(
+                "filter-replacer-upper-unwrap",
+                filter_replacer(
+                    binary_expr(fun_expr("Upper", vec!["?param"]), "?op", "?right"),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(
+                    binary_expr("?param", "?op", "?right"),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                self.unwrap_lower_or_upper("?op"),
+            ),
+            // Lower(?column) = 'literal'
+            // TODO: Migrate to equalsLower operator, when it will be available in Cube?
+            rewrite(
+                "filter-replacer-lower-equal-workaround",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr("Lower", vec![column_expr("?column")]),
+                        "=",
+                        literal_expr("?str"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "StartsWith",
+                            vec![column_expr("?column"), literal_expr("?str")],
+                        ),
+                        "AND",
+                        udf_expr(
+                            "ends_with",
+                            vec![column_expr("?column"), literal_expr("?str")],
+                        ),
+                    ),
                     "?alias_to_cube",
                     "?members",
                 ),
@@ -678,11 +724,11 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             transforming_chain_rewrite(
-                "filter-left-right",
+                "filter-left",
                 filter_replacer(
                     binary_expr(
                         fun_expr(
-                            "?fun",
+                            "Left",
                             vec!["?expr".to_string(), literal_expr("?literal_length")],
                         ),
                         "=",
@@ -693,11 +739,85 @@ impl RewriteRules for FilterRules {
                 ),
                 vec![("?expr", column_expr("?column"))],
                 filter_member("?filter_member", "?filter_op", "?filter_values"),
-                self.transform_filter_fun(
+                self.transform_filter_prefix(
                     "?column",
-                    "?fun",
+                    "startsWith",
                     "?literal",
-                    "?literal_length",
+                    Some("?literal_length"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            transforming_chain_rewrite(
+                "filter-right",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "Right",
+                            vec!["?expr".to_string(), literal_expr("?literal_length")],
+                        ),
+                        "=",
+                        literal_expr("?literal"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                vec![("?expr", column_expr("?column"))],
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_filter_prefix(
+                    "?column",
+                    "endsWith",
+                    "?literal",
+                    Some("?literal_length"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-starts-with",
+                filter_replacer(
+                    fun_expr(
+                        "StartsWith",
+                        vec![column_expr("?column"), literal_expr("?literal")],
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_filter_prefix(
+                    "?column",
+                    "startsWith",
+                    "?literal",
+                    None,
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-ends-with",
+                filter_replacer(
+                    udf_expr(
+                        "ends_with",
+                        vec![column_expr("?column"), literal_expr("?literal")],
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_filter_prefix(
+                    "?column",
+                    "endsWith",
+                    "?literal",
+                    None,
                     "?alias_to_cube",
                     "?members",
                     "?filter_member",
@@ -864,6 +984,7 @@ impl RewriteRules for FilterRules {
                 filter_cast_unwrap_replacer(column_expr("?column")),
                 column_expr("?column"),
             ),
+            // scalar
             rewrite(
                 "filter-cast-unwrap-scalar-fun-push-down",
                 filter_cast_unwrap_replacer(fun_expr_var_arg("?fun", "?args")),
@@ -882,6 +1003,26 @@ impl RewriteRules for FilterRules {
                 filter_cast_unwrap_replacer(scalar_fun_expr_args_empty_tail()),
                 scalar_fun_expr_args_empty_tail(),
             ),
+            // udf
+            rewrite(
+                "filter-cast-unwrap-udf-fun-push-down",
+                filter_cast_unwrap_replacer(udf_expr_var_arg("?fun", "?args")),
+                udf_expr_var_arg("?fun", filter_cast_unwrap_replacer("?args")),
+            ),
+            rewrite(
+                "filter-cast-unwrap-udf-args-push-down",
+                filter_cast_unwrap_replacer(udf_fun_expr_args("?left", "?right")),
+                udf_fun_expr_args(
+                    filter_cast_unwrap_replacer("?left"),
+                    filter_cast_unwrap_replacer("?right"),
+                ),
+            ),
+            rewrite(
+                "filter-cast-unwrap-udf-args-empty-tail-push-down",
+                filter_cast_unwrap_replacer(udf_fun_expr_args_empty_tail()),
+                udf_fun_expr_args_empty_tail(),
+            ),
+            // case
             rewrite(
                 "filter-cast-unwrap-case-push-down",
                 filter_cast_unwrap_replacer(case_expr_var_arg("?expr", "?when_then", "?else")),
@@ -1178,6 +1319,7 @@ impl FilterRules {
                     return true;
                 }
             }
+
             false
         }
     }
@@ -1212,6 +1354,28 @@ impl FilterRules {
                 }
             }
             false
+        }
+    }
+
+    fn unwrap_lower_or_upper(
+        &self,
+        op_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let op_var = op_var.parse().unwrap();
+
+        move |egraph, subst| {
+            for expr_op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                match expr_op {
+                    Operator::Like | Operator::NotLike | Operator::ILike | Operator::NotILike => {
+                        return true;
+                    }
+                    _ => {
+                        continue;
+                    }
+                };
+            }
+
+            return false;
         }
     }
 
@@ -1369,12 +1533,12 @@ impl FilterRules {
         }
     }
 
-    fn transform_filter_fun(
+    fn transform_filter_prefix(
         &self,
         column_var: &'static str,
-        fun_var: &'static str,
+        filter_member_op: &'static str,
         literal_var: &'static str,
-        literal_length_var: &'static str,
+        literal_length_var: Option<&'static str>,
         alias_to_cube_var: &'static str,
         members_var: &'static str,
         filter_member_var: &'static str,
@@ -1382,28 +1546,26 @@ impl FilterRules {
         filter_values_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let column_var = var!(column_var);
-        let fun_var = var!(fun_var);
         let literal_var = var!(literal_var);
-        let literal_length_var = var!(literal_length_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let members_var = var!(members_var);
         let filter_member_var = var!(filter_member_var);
         let filter_op_var = var!(filter_op_var);
         let filter_values_var = var!(filter_values_var);
         let meta_context = self.cube_context.meta.clone();
+
         move |egraph, subst| {
-            for fun in var_iter!(egraph[subst[fun_var]], ScalarFunctionExprFun) {
-                let op = match fun {
-                    BuiltinScalarFunction::Left => "startsWith",
-                    BuiltinScalarFunction::Right => "endsWith",
+            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                let literal_value = match literal {
+                    ScalarValue::Utf8(Some(literal_value)) => literal_value.to_string(),
                     _ => continue,
                 };
 
-                for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
-                    let literal_value = match literal {
-                        ScalarValue::Utf8(Some(literal_value)) => literal_value.to_string(),
-                        _ => continue,
-                    };
+                let mut found_correct_length = None;
+
+                if let Some(literal_length_var) = literal_length_var {
+                    let literal_length_var = var!(literal_length_var);
+                    found_correct_length = Some(false);
 
                     for literal_length in
                         var_iter!(egraph[subst[literal_length_var]], LiteralExprValue)
@@ -1417,44 +1579,52 @@ impl FilterRules {
                             continue;
                         };
 
-                        if let Some((member_name, cube)) = Self::filter_member_name(
-                            egraph,
-                            subst,
-                            &meta_context,
-                            alias_to_cube_var,
-                            column_var,
-                            members_var,
-                        ) {
-                            if !(cube.lookup_measure_by_member_name(&member_name).is_some()
-                                || cube.lookup_dimension_by_member_name(&member_name).is_some())
-                            {
-                                continue;
-                            }
-
-                            subst.insert(
-                                filter_member_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberMember(
-                                    FilterMemberMember(member_name.to_string()),
-                                )),
-                            );
-
-                            subst.insert(
-                                filter_op_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberOp(FilterMemberOp(
-                                    op.to_string(),
-                                ))),
-                            );
-
-                            subst.insert(
-                                filter_values_var,
-                                egraph.add(LogicalPlanLanguage::FilterMemberValues(
-                                    FilterMemberValues(vec![literal_value.to_string()]),
-                                )),
-                            );
-
-                            return true;
-                        }
+                        found_correct_length = Some(true);
                     }
+                }
+
+                if let Some(found_correct_length) = found_correct_length {
+                    if !found_correct_length {
+                        return false;
+                    }
+                }
+
+                if let Some((member_name, cube)) = Self::filter_member_name(
+                    egraph,
+                    subst,
+                    &meta_context,
+                    alias_to_cube_var,
+                    column_var,
+                    members_var,
+                ) {
+                    if !(cube.lookup_measure_by_member_name(&member_name).is_some()
+                        || cube.lookup_dimension_by_member_name(&member_name).is_some())
+                    {
+                        continue;
+                    }
+
+                    subst.insert(
+                        filter_member_var,
+                        egraph.add(LogicalPlanLanguage::FilterMemberMember(FilterMemberMember(
+                            member_name.to_string(),
+                        ))),
+                    );
+
+                    subst.insert(
+                        filter_op_var,
+                        egraph.add(LogicalPlanLanguage::FilterMemberOp(FilterMemberOp(
+                            filter_member_op.to_string(),
+                        ))),
+                    );
+
+                    subst.insert(
+                        filter_values_var,
+                        egraph.add(LogicalPlanLanguage::FilterMemberValues(FilterMemberValues(
+                            vec![literal_value.to_string()],
+                        ))),
+                    );
+
+                    return true;
                 }
             }
 

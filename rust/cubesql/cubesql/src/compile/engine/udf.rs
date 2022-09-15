@@ -676,6 +676,25 @@ pub fn create_timediff_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_ends_with_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "ends_with is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "ends_with",
+        &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 // https://docs.aws.amazon.com/redshift/latest/dg/r_DATEDIFF_function.html
 pub fn create_datediff_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
