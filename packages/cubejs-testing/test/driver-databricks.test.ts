@@ -2,13 +2,12 @@ import { mainTestSet, databricksTestSet } from './driverTests/testSets';
 import { executeTestSuite } from './driver-test-suite';
 
 executeTestSuite({
-  type: 'postgres',
+  type: 'databricks-jdbc',
   tests: databricksTestSet,
-  
 });
 
 // executeTestSuite({
-//   type: 'postgres',
+//   type: 'databricks',
 //   tests: mainTestSet,
-//   config: { CUBEJS_EXTERNAL_DEFAULT: 'true' }
+//   config: { CUBEJS_EXTERNAL_DEFAULT: 'true' },
 // });

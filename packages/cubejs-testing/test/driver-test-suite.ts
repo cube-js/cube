@@ -7,7 +7,13 @@ import { uniq } from 'ramda';
 import { BirdBox, Env, getBirdbox } from '../src';
 import { DriverTest } from './driverTests/driverTest';
 
-type SupportedDriverType = 'postgres' | 'questdb' | 'firebolt' | 'bigquery' | 'athena';
+type SupportedDriverType =
+  'postgres' |
+  'questdb' |
+  'firebolt' |
+  'bigquery' |
+  'athena' |
+  'databricks-jdbc';
 
 type TestSuite = {
   config?: Partial<Env>
@@ -59,14 +65,20 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
       if (t.type === 'basic') {
         // eslint-disable-next-line no-loop-func
         const cbFn = async () => {
-          const response = await client.load(t.query);
+          try {
+            const response = await client.load(t.query);
 
-          expect(response.rawData()).toMatchSnapshot('query');
+            console.log('responseresponse', response);
 
-          if (t.expectArray) {
-            for (const expectFn of t.expectArray) {
-              expectFn(response);
+            expect(response.rawData()).toMatchSnapshot('query');
+
+            if (t.expectArray) {
+              for (const expectFn of t.expectArray) {
+                expectFn(response);
+              }
             }
+          } catch (error) {
+            console.log('opa error', error);
           }
         };
 
