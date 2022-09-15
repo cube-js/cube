@@ -775,12 +775,23 @@ and sets it to `req.securityContext`.
 
 ## SchemaFileRepository
 
+<WarningBox>
+
+The default implementation of the `SchemaFileRepository` contract is defined by
+the [`FileRepository`][gh-cube-filerepo] class. When using
+[`FileRepository`][gh-cube-filerepo], all schema files must be within the same
+directory.
+
+</WarningBox>
+
+[gh-cube-filerepo]:
+  https://github.com/cube-js/cube.js/blob/master/packages/cubejs-server-core/src/core/FileRepository.ts
+
 The `SchemaFileRepository` contract defines an async `dataSchemaFiles` function
 which returns the files to compile for a schema. Returned by
-[repositoryFactory][self-repofactory].
-`@cubejs-backend/server-core/core/FileRepository` is the default implementation
-of the `SchemaFileRepository` contract which accepts
-[schemaPath][self-schemapath] in the constructor.
+[repositoryFactory][self-repofactory]. The [`FileRepository`][gh-cube-filerepo]
+implementation of the `SchemaFileRepository` contract accepts a
+[`schemaPath`][self-schemapath] in its constructor.
 
 ```javascript
 class ApiFileRepository {
@@ -825,7 +836,7 @@ module.exports = {
 [self-opts-sched-refresh-ctxs]: #scheduled-refresh-contexts
 [self-opts-sched-refresh-tz]: #scheduled-refresh-time-zones
 [self-repofactory]: #repositoryFactory
-[self-schemafilerepo]: #SchemaFileRepository
+[self-schemafilerepo]: #schema-file-repository
 [self-schemapath]: #schemaPath
 [ref-exec-environment-globals]:
   /schema/reference/execution-environment#node-js-globals-process-env-console-log-and-others
