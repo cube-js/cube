@@ -11084,4 +11084,91 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_quicksight_date_trunc_equals() {
+        init_logger();
+
+        let base_date = "2022-08-27 19:43:09";
+        let granularities = vec![
+            (
+                "second",
+                "2022-08-27T19:43:09.000Z",
+                "2022-08-27T19:43:09.999Z",
+            ),
+            (
+                "minute",
+                "2022-08-27T19:43:00.000Z",
+                "2022-08-27T19:43:59.999Z",
+            ),
+            (
+                "hour",
+                "2022-08-27T19:00:00.000Z",
+                "2022-08-27T19:59:59.999Z",
+            ),
+            (
+                "day",
+                "2022-08-27T00:00:00.000Z",
+                "2022-08-27T23:59:59.999Z",
+            ),
+            (
+                "week",
+                "2022-08-22T00:00:00.000Z",
+                "2022-08-28T23:59:59.999Z",
+            ),
+            (
+                "month",
+                "2022-08-01T00:00:00.000Z",
+                "2022-08-31T23:59:59.999Z",
+            ),
+            (
+                "quarter",
+                "2022-07-01T00:00:00.000Z",
+                "2022-09-30T23:59:59.999Z",
+            ),
+            (
+                "year",
+                "2022-01-01T00:00:00.000Z",
+                "2022-12-31T23:59:59.999Z",
+            ),
+        ];
+
+        for (granularity, date_min, date_max) in granularities {
+            let sql = format!(
+                r#"
+                SELECT date_trunc('{}', "order_date") AS "uuid.order_date_tg", COUNT(*) AS "count"
+                FROM "public"."KibanaSampleDataEcommerce"
+                WHERE date_trunc('{}', "order_date") = date_trunc('{}', TO_TIMESTAMP('{}', 'yyyy-MM-dd HH24:mi:ss'))
+                GROUP BY date_trunc('{}', "order_date")
+                ORDER BY date_trunc('{}', "order_date") DESC NULLS LAST
+                LIMIT 2500;
+                "#,
+                granularity, granularity, granularity, base_date, granularity, granularity,
+            );
+            let logical_plan = convert_select_to_query_plan(sql, DatabaseProtocol::PostgreSQL)
+                .await
+                .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                    dimensions: Some(vec![]),
+                    segments: Some(vec![]),
+                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some(granularity.to_string()),
+                        date_range: Some(json!(vec![date_min.to_string(), date_max.to_string()]))
+                    }]),
+                    order: Some(vec![vec![
+                        "KibanaSampleDataEcommerce.order_date".to_string(),
+                        "desc".to_string()
+                    ]]),
+                    limit: Some(2500),
+                    offset: None,
+                    filters: None,
+                }
+            )
+        }
+    }
 }
