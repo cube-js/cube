@@ -147,6 +147,11 @@ const DashboardPage = () => {
       <Row>
         <Dashboard dashboardItems={DashboardItems}>
           {DashboardItems.map(dashboardItem)}
+          <DashboardItem title="Architecture">
+            <div>
+              <img width="100%" src="https://ucarecdn.com/4efc3459-88b4-4a54-8596-8a0e6fa16814/" />
+            </div>
+          </DashboardItem>
         </Dashboard>
       </Row>
     </div>

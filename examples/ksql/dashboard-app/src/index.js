@@ -7,8 +7,7 @@ import DashboardPage from "./pages/DashboardPage";
 
 const exampleDescription = {
   title: "Real-Time Dashboard with Kafka, ksqlDB and Cube",
-  text: `<p>This live demo shows a real-time dashboard built with Kafka, ksqlDB and Cube.</p>
-    <p>Follow the <a href="https://real-time-dashboard.cube.dev/">guide</a> or explore the <a href="https://github.com/cube-js/cube.js/tree/master/examples/real-time-dashboard">source code</a> to learn more.</p>`
+  text: `<p>This live demo shows a real-time dashboard built with Kafka, ksqlDB and Cube.</p>`
 };
 
 createExampleWrapper(exampleDescription);
