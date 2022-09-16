@@ -444,6 +444,7 @@ export class DatabricksDriver extends JDBCDriver {
       `
       CREATE TABLE ${table}_csv_export
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
+      OPTIONS (escape = '"')
       AS (${sql})
       `,
       params,
@@ -455,6 +456,7 @@ export class DatabricksDriver extends JDBCDriver {
       `
       CREATE TABLE ${table}_csv_export
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
+      OPTIONS (escape = '"')
       AS SELECT ${columns} FROM ${table}
       `,
       [],

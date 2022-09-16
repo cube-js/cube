@@ -676,6 +676,35 @@ pub fn create_timediff_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_ends_with_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let string_array = downcast_string_arg!(args[0], "string", i32);
+        let prefix_array = downcast_string_arg!(args[1], "prefix", i32);
+
+        let result = string_array
+            .iter()
+            .zip(prefix_array.iter())
+            .map(|(string, prefix)| match (string, prefix) {
+                (Some(string), Some(prefix)) => Some(string.ends_with(prefix)),
+                _ => None,
+            })
+            .collect::<BooleanArray>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "ends_with",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 // https://docs.aws.amazon.com/redshift/latest/dg/r_DATEDIFF_function.html
 pub fn create_datediff_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {

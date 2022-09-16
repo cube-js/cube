@@ -276,6 +276,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::ScalarUDFExpr(params) => {
+                push_referenced_columns(params[1], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::AggregateFunctionExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
@@ -297,7 +301,8 @@ impl LogicalPlanAnalysis {
             | LogicalPlanLanguage::CaseExprElseExpr(params)
             | LogicalPlanLanguage::CaseExprExpr(params)
             | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
-            | LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
+            | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
+            | LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
                 for p in params.iter() {
                     vec.extend(referenced_columns(*p)?.into_iter());
                 }

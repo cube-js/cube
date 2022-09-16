@@ -508,11 +508,24 @@ fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
 }
 
 fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
-    format!(
-        "(ScalarUDFExpr ScalarUDFExprFun:{} {})",
-        fun_name,
-        list_expr("ScalarUDFExprArgs", args)
-    )
+    udf_expr_var_arg(fun_name, list_expr("ScalarUDFExprArgs", args))
+}
+
+fn udf_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
+    let prefix = if fun_name.to_string().starts_with("?") {
+        ""
+    } else {
+        "ScalarUDFExprFun:"
+    };
+    format!("(ScalarUDFExpr {}{} {})", prefix, fun_name, arg_list)
+}
+
+fn udf_fun_expr_args(left: impl Display, right: impl Display) -> String {
+    format!("(ScalarUDFExprArgs {} {})", left, right)
+}
+
+fn udf_fun_expr_args_empty_tail() -> String {
+    "ScalarUDFExprArgs".to_string()
 }
 
 fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
