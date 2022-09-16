@@ -637,7 +637,7 @@ impl RewriteRules for FilterRules {
                     "?alias_to_cube",
                     "?members",
                 ),
-                self.transform_date_trunc_equals("?granularity", "?interval"),
+                self.transform_granularity_to_interval("?granularity", "?interval"),
             ),
             // TODO define zero
             rewrite(
@@ -910,6 +910,95 @@ impl RewriteRules for FilterRules {
                     "?member",
                     "?values",
                 ),
+            ),
+            transforming_rewrite(
+                "filter-date-trunc-leeq",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "<=",
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), literal_expr("?expr")],
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        column_expr("?column"),
+                        "<",
+                        binary_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), literal_expr("?expr")],
+                            ),
+                            "+",
+                            literal_expr("?interval"),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                self.transform_granularity_to_interval("?granularity", "?interval"),
+            ),
+            transforming_rewrite(
+                "filter-date-trunc-sub-leeq",
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![
+                                    literal_expr("?granularity"),
+                                    binary_expr(
+                                        column_expr("?column"),
+                                        "+",
+                                        literal_expr("?same_interval"),
+                                    ),
+                                ],
+                            ),
+                            "-",
+                            literal_expr("?same_interval"),
+                        ),
+                        "<=",
+                        binary_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), literal_expr("?expr")],
+                            ),
+                            "-",
+                            literal_expr("?same_interval"),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        column_expr("?column"),
+                        "<",
+                        binary_expr(
+                            binary_expr(
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![literal_expr("?granularity"), literal_expr("?expr")],
+                                ),
+                                "-",
+                                literal_expr("?same_interval"),
+                            ),
+                            "+",
+                            literal_expr("?interval"),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                self.transform_granularity_to_interval("?granularity", "?interval"),
             ),
             rewrite(
                 "between-move-interval-beyond-equal-sign",
@@ -2237,7 +2326,7 @@ impl FilterRules {
         }
     }
 
-    fn transform_date_trunc_equals(
+    fn transform_granularity_to_interval(
         &self,
         granularity_var: &'static str,
         interval_var: &'static str,
@@ -2246,19 +2335,7 @@ impl FilterRules {
         let interval_var = var!(interval_var);
         move |egraph, subst| {
             for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
-                if let ScalarValue::Utf8(Some(granularity)) = granularity {
-                    let interval = match granularity.as_str() {
-                        "second" => ScalarValue::IntervalDayTime(Some(1000)),
-                        "minute" => ScalarValue::IntervalDayTime(Some(60000)),
-                        "hour" => ScalarValue::IntervalDayTime(Some(3600000)),
-                        "day" => ScalarValue::IntervalDayTime(Some(4294967296)),
-                        "week" => ScalarValue::IntervalDayTime(Some(30064771072)),
-                        "month" => ScalarValue::IntervalYearMonth(Some(1)),
-                        "quarter" => ScalarValue::IntervalYearMonth(Some(3)),
-                        "year" => ScalarValue::IntervalYearMonth(Some(12)),
-                        _ => continue,
-                    };
-
+                if let Some(interval) = utils::granularity_to_interval(granularity) {
                     subst.insert(
                         interval_var,
                         egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
