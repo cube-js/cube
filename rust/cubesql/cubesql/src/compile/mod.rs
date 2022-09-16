@@ -69,7 +69,8 @@ use crate::{
         dataframe,
         session::DatabaseProtocol,
         statement::{
-            CastReplacer, RedshiftDatePartReplacer, ToTimestampReplacer, UdfWildcardArgReplacer,
+            CastReplacer, RedshiftDatePartReplacer, SensitiveDataSanitizer, ToTimestampReplacer,
+            UdfWildcardArgReplacer,
         },
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
@@ -349,7 +350,7 @@ impl QueryPlanner {
     }
 
     pub async fn plan(&self, stmt: &ast::Statement) -> CompilationResult<QueryPlan> {
-        match (stmt, &self.state.protocol) {
+        let plan = match (stmt, &self.state.protocol) {
             (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q).await,
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -462,6 +463,21 @@ impl QueryPlanner {
                 "Unsupported query type: {}",
                 stmt.to_string()
             ))),
+        };
+
+        match plan {
+            Err(err) => {
+                let meta = Some(HashMap::from([
+                    ("query".to_string(), stmt.to_string()),
+                    (
+                        "sanitizedQuery".to_string(),
+                        SensitiveDataSanitizer::new().replace(stmt).to_string(),
+                    ),
+                ]));
+                let msg = err.message();
+                Err(err.with_message(msg).with_meta(meta))
+            }
+            _ => plan,
         }
     }
 
@@ -1173,7 +1189,16 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let plan = df_query_planner
             .statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))
             .map_err(|err| {
-                CompilationError::internal(format!("Initial planning error: {}", err))
+                let message = format!("Initial planning error: {}", err,);
+                let meta = Some(HashMap::from([
+                    ("query".to_string(), stmt.to_string()),
+                    (
+                        "sanitizedQuery".to_string(),
+                        SensitiveDataSanitizer::new().replace(&stmt).to_string(),
+                    ),
+                ]));
+
+                CompilationError::internal(message).with_meta(meta)
             })?;
 
         let optimized_plan = plan;
@@ -1196,12 +1221,27 @@ WHERE `TABLE_SCHEMA` = '{}'",
                         e.message
                     ),
                     e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
-                    None,
+                    Some(HashMap::from([
+                        ("query".to_string(), stmt.to_string()),
+                        (
+                            "sanitizedQuery".to_string(),
+                            SensitiveDataSanitizer::new().replace(&stmt).to_string(),
+                        ),
+                    ])),
                 ),
-                CubeErrorCauseType::User(_) => CompilationError::user(format!(
-                    "Error during rewrite: {}. Please check logs for additional information.",
-                    e.message
-                )),
+                CubeErrorCauseType::User(_) => CompilationError::User(
+                    format!(
+                        "Error during rewrite: {}. Please check logs for additional information.",
+                        e.message
+                    ),
+                    Some(HashMap::from([
+                        ("query".to_string(), stmt.to_string()),
+                        (
+                            "sanitizedQuery".to_string(),
+                            SensitiveDataSanitizer::new().replace(&stmt).to_string(),
+                        ),
+                    ])),
+                ),
             });
 
         if let Err(_) = &result {
