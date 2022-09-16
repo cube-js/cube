@@ -3,7 +3,7 @@ import { ResponsiveLine } from '@nivo/line';
 const LineChart = ({ data /* see data tab */ }) => (
   <ResponsiveLine
     data={data}
-    colors={{ scheme: 'nivo' }}
+    colors={{ scheme: 'paired' }}
     borderColor={{ from: 'color' }}
     margin={{ top: 20, right: 50, bottom: 100, left: 100 }}
     enableGridX={false}

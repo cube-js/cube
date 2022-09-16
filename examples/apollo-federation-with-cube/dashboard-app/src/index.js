@@ -14,7 +14,6 @@ import {
 } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import {
-  range,
   tablePivotCube,
   tablePivotHasura,
   availableStepRanges,
@@ -25,13 +24,13 @@ import {
 } from './utils/utils';
 
 const httpLink = createHttpLink({
-  uri: `${process.env.HASURA_GRAPHQL_API_URL}`,
+  uri: `${process.env.GRAPHQL_API_URL}`,
 });
 const authLink = setContext((_, { headers }) => {
   return {
     headers: {
       ...headers,
-      'x-hasura-role': `${process.env.X_HASURA_ROLE}`,
+      'Authorization': `${process.env.AUTHORIZATION}`,
     }
   }
 });
@@ -65,10 +64,9 @@ function App() {
   }, [ timestampsGlobal ]);
 
   const [ fraudChartDataCube, setFraudChartDataCube ] = useState([])
-  const [ fraudChartDataHasura, setFraudChartDataHasura ] = useState([])
+  const [ fraudChartDataApollo, setFraudChartDataApollo ] = useState([])
   const [ stepSelection, setStepSelection ] = useState(defaultStepSelection);
   const selectedStep = availableStepRanges.find(x => x.id === stepSelection);
-  const selectedStepRange = range(selectedStep.start, selectedStep.end);
   const [ isFraudSelection, setIsFraudSelection ] = useState(defaultIsFraudSelection);
   const shuffleAndRun = () => {
     setStepSelection(randomIntFromInterval(1, 14));
@@ -76,7 +74,7 @@ function App() {
   }
 
   const GET_FRAUD_AMOUNT_SUM_CUBE_REMOTE_SCHEMA = gql`
-    query CubeQuery  { 
+    query CubeQuery { 
       cube(
         where: {fraud: {AND: [
           {step: {gte: ${selectedStep.start} }},
@@ -103,54 +101,25 @@ function App() {
     setFraudChartDataCube(tablePivotCube(fraudDataCube));
   }, [ fraudDataCube ]);
 
-  const GET_FRAUD_AMOUNT_SUM_HASURA_FRAUDS = gql`
-    query HasuraQuery{
-      fraud_amount_sum_frauds(
-        where: {
-          fraud__step: {_in: [${selectedStepRange}]}
-        }
-        order_by: { fraud__step: asc }
-      ) {
-        fraud__amount_sum
-        fraud__step
-        fraud__type
+  const GET_FRAUD_AMOUNT_SUM_APOLLO = gql`
+    query ApolloQuery {
+      fraudsByAmountSumWithStep(isFraud: ${isFraudSelection}, stepStart: ${selectedStep.start}, stepEnd: ${selectedStep.end}) {
+        step
+        type
+        amountsum
       }
     }
   `;
-  const GET_FRAUD_AMOUNT_SUM_HASURA_NON_FRAUDS = gql`
-    query HasuraQuery{
-      fraud_amount_sum_non_frauds(
-        where: {
-          fraud__step: {_in: [${selectedStepRange}]}
-        }
-        order_by: { fraud__step: asc }
-      ) {
-        fraud__amount_sum
-        fraud__step
-        fraud__type
-      }
-    }
-  `;
-  let GET_FRAUD_AMOUNT_SUM_HASURA;
-  if (isFraudSelection) {
-    GET_FRAUD_AMOUNT_SUM_HASURA = GET_FRAUD_AMOUNT_SUM_HASURA_FRAUDS;
-  } else {
-    GET_FRAUD_AMOUNT_SUM_HASURA = GET_FRAUD_AMOUNT_SUM_HASURA_NON_FRAUDS;
-  }
-
   const {
-    loading: loadingFraudDataHasura,
-    error: errorFraudDataHasura,
-    data: fraudDataHasura,
-  } = useQuery(GET_FRAUD_AMOUNT_SUM_HASURA);
+    loading: loadingFraudDataApollo,
+    error: errorFraudDataApollo,
+    data: fraudDataApollo,
+  } = useQuery(GET_FRAUD_AMOUNT_SUM_APOLLO);
   useEffect(() => {
-    if (loadingFraudDataHasura) { return; }
-    if (isFraudSelection) {
-      setFraudChartDataHasura(tablePivotHasura(fraudDataHasura.fraud_amount_sum_frauds));
-    } else {  
-      setFraudChartDataHasura(tablePivotHasura(fraudDataHasura.fraud_amount_sum_non_frauds));
-    }
-  }, [ fraudDataHasura ]);
+    if (loadingFraudDataApollo) { return; }
+    console.log(fraudDataApollo.fraudsByAmountSumWithStep);
+    setFraudChartDataApollo(tablePivotHasura(fraudDataApollo.fraudsByAmountSumWithStep));
+  }, [ fraudDataApollo ]);
 
   return <>
     <div style={{display: 'flex', justifyContent: 'center'}}>
@@ -201,11 +170,11 @@ function App() {
           </td>
           <td style={{ width: '50%' }}>
             <div style={{ height: '375px', margin: '20px 0' }}>
-              <h3 style={{display: 'flex', justifyContent: 'center'}}>PostgreSQL {timestamps.HasuraQuery ? `(${(timestamps.HasuraQuery / 1000).toFixed(2)}s)` : `(...)`}</h3>
+              <h3 style={{display: 'flex', justifyContent: 'center'}}>PostgreSQL {timestamps.ApolloQuery ? `(${(timestamps.ApolloQuery / 1000).toFixed(2)}s)` : `(...)`}</h3>
               <DisplayFraudAmountSum
-                loading={loadingFraudDataHasura}
-                error={errorFraudDataHasura}
-                chartData={fraudChartDataHasura}
+                loading={loadingFraudDataApollo}
+                error={errorFraudDataApollo}
+                chartData={fraudChartDataApollo}
               />
             </div>
           </td>

@@ -26,16 +26,11 @@ export const availableStepRanges = [
   { id: 14, start: 700, end: 750 },
 ];
 
-export const defaultStepSelection = 1;
-export const defaultIsFraudSelection = 1;
+export const defaultStepSelection = 10;
+export const defaultIsFraudSelection = 0;
 
 export const randomIntFromInterval = (min, max) => { 
   return Math.floor(Math.random() * (max - min + 1) + min)
-}
-
-export function range(start, end) {
-  const arr = [...Array(end - start + 1).keys()].map(x => x + start)
-  return arr;
 }
 
 export function tablePivotCube(data) {
@@ -54,7 +49,7 @@ export function tablePivotCube(data) {
 }
 
 export function tablePivotHasura(data) {
-  const flattened = data.map(i => ({ y: i.fraud__amount_sum, x: i.fraud__step, type: i.fraud__type }));
+  const flattened = data.map(i => ({ y: i.amountsum, x: i.step, type: i.type }));
   const groupedHash = groupByKey(flattened, 'type', {omitKey:true});
   const reduced = Object.keys(groupedHash).reduce((accumulator, iterator, key) => {
     accumulator.push({
