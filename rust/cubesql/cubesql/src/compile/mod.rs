@@ -1445,6 +1445,7 @@ pub async fn convert_sql_to_cube_query(
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
+    use chrono::Datelike;
     use cubeclient::models::{
         V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension, V1LoadResponse,
     };
@@ -11348,6 +11349,8 @@ ORDER BY \"COUNT(count)\" DESC"
         .await
         .as_logical_plan();
 
+        let now = chrono::Utc::now();
+        let current_year = now.naive_utc().date().year();
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
@@ -11358,9 +11361,9 @@ ORDER BY \"COUNT(count)\" DESC"
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2017-01-01T00:00:00.000Z".to_string(),
-                        "2021-12-31T23:59:59.999Z".to_string()
-                    ]))
+                        format!("{}-01-01T00:00:00.000Z", current_year - 5),
+                        format!("{}-12-31T23:59:59.999Z", current_year - 1),
+                    ])),
                 }]),
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.order_date".to_string(),
