@@ -41,13 +41,13 @@ use self::{
             create_current_schemas_udf, create_current_timestamp_udf, create_current_user_udf,
             create_date_add_udf, create_date_sub_udf, create_date_udf, create_dateadd_udf,
             create_datediff_udf, create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf,
-            create_db_udf, create_format_type_udf, create_generate_series_udtf,
-            create_generate_subscripts_udtf, create_has_schema_privilege_udf, create_hour_udf,
-            create_if_udf, create_instr_udf, create_interval_mul_udf, create_isnull_udf,
-            create_json_build_object_udf, create_least_udf, create_locate_udf, create_makedate_udf,
-            create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
-            create_pg_datetime_precision_udf, create_pg_expandarray_udtf,
-            create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
+            create_db_udf, create_ends_with_udf, create_format_type_udf,
+            create_generate_series_udtf, create_generate_subscripts_udtf,
+            create_has_schema_privilege_udf, create_hour_udf, create_if_udf, create_instr_udf,
+            create_interval_mul_udf, create_isnull_udf, create_json_build_object_udf,
+            create_least_udf, create_locate_udf, create_makedate_udf, create_measure_udaf,
+            create_minute_udf, create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
+            create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
             create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
             create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
@@ -1128,6 +1128,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_json_build_object_udf());
         ctx.register_udf(create_regexp_substr_udf());
         ctx.register_udf(create_interval_mul_udf());
+        ctx.register_udf(create_ends_with_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -1762,6 +1763,112 @@ mod tests {
                 limit: None,
                 offset: None,
                 filters: None
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_starts_with() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE starts_with(customer_gender, 'fe')"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("startsWith".to_string()),
+                    values: Some(vec!["fe".to_string()]),
+                    or: None,
+                    and: None
+                }])
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_ends_with_query() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE ends_with(customer_gender, 'emale')"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("endsWith".to_string()),
+                    values: Some(vec!["emale".to_string()]),
+                    or: None,
+                    and: None
+                }])
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_lower_equals_thoughtspot() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'female'"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                // TODO: Migrate to equalsLower operator, when it will be available in Cube?
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("startsWith".to_string()),
+                        values: Some(vec!["female".to_string()]),
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("endsWith".to_string()),
+                        values: Some(vec!["female".to_string()]),
+                        or: None,
+                        and: None
+                    }
+                ])
             }
         )
     }
@@ -5214,6 +5321,24 @@ ORDER BY \"COUNT(count)\" DESC"
             +----+----+----+\n\
             | 1  | 18 | 0  |\n\
             +----+----+----+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_ends_with() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "ends_with",
+            execute_query(
+                "select \
+                    ends_with('rust is killing me', 'me') as r1,
+                    ends_with('rust is killing me', 'no') as r2
+                "
+                .to_string(),
+                DatabaseProtocol::MySQL
+            )
+            .await?
         );
 
         Ok(())
