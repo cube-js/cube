@@ -65,20 +65,14 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
       if (t.type === 'basic') {
         // eslint-disable-next-line no-loop-func
         const cbFn = async () => {
-          try {
-            const response = await client.load(t.query);
+          const response = await client.load(t.query);
 
-            console.log('responseresponse', response);
+          expect(response.rawData()).toMatchSnapshot('query');
 
-            expect(response.rawData()).toMatchSnapshot('query');
-
-            if (t.expectArray) {
-              for (const expectFn of t.expectArray) {
-                expectFn(response);
-              }
+          if (t.expectArray) {
+            for (const expectFn of t.expectArray) {
+              expectFn(response);
             }
-          } catch (error) {
-            console.log('opa error', error);
           }
         };
 

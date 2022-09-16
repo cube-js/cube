@@ -144,7 +144,7 @@ class CubejsApi {
       try {
         text = await response.text();
         body = JSON.parse(text);
-      } catch (e) {
+      } catch (_) {
         body.error = text;
       }
 
