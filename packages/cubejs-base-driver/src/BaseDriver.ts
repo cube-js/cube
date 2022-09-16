@@ -3,7 +3,25 @@ import fs from 'fs';
 import { getEnv, isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
 
 import { cancelCombinator } from './utils';
-import { CreateTableIndex, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData, DownloadTableData, DownloadTableMemoryData, DriverInterface, ExternalDriverCompatibilities, IndexesSQL, isDownloadTableMemoryData, QueryOptions, Row, Rows, TableColumn, TableColumnQueryResult, TableQueryResult, TableStructure } from './driver.interface';
+import {
+  CreateTableIndex,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
+  DownloadTableCSVData,
+  DownloadTableData,
+  DownloadTableMemoryData,
+  DriverInterface,
+  ExternalDriverCompatibilities,
+  IndexesSQL,
+  isDownloadTableMemoryData,
+  QueryOptions,
+  Row,
+  TableColumn,
+  TableColumnQueryResult,
+  TableQueryResult,
+  TableStructure,
+  DriverCapabilities
+} from './driver.interface';
 
 const sortByKeys = (unordered) => {
   const ordered = {};
@@ -365,7 +383,7 @@ export abstract class BaseDriver implements DriverInterface {
     // override, if it's needed
   }
 
-  public capabilities(): ExternalDriverCompatibilities {
+  public capabilities(): DriverCapabilities {
     return {};
   }
 
