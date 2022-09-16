@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  server:
+    image: us-central1-docker.pkg.dev/cube-devrel-team/apollo-server/server
+    build:
+      context: ./
+      dockerfile: Dockerfile.server
+    ports:
+    - '4000:4000'
+  gateway:
+    image: us-central1-docker.pkg.dev/cube-devrel-team/apollo-server/gateway
+    build:
+      context: ./
+      dockerfile: Dockerfile.gateway
+    ports:
+    - '4001:4001'

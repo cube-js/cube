@@ -4,26 +4,24 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start-local": "nodemon index.js",
-    "start-lambda": "netlify-lambda serve src",
-    "build-lambda": "netlify-lambda build src"
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "server": "node src/server.js",
+    "gateway": "node src/gateway.js",
+    "build-images": "docker-compose build",
+    "build-supergraph": "rover supergraph compose --config ./graphql/supergraph.yaml > ./graphql/supergraph.graphql",
+    "push-server": "docker push us-central1-docker.pkg.dev/cube-devrel-team/apollo-server/server",
+    "push-gateway": "docker push us-central1-docker.pkg.dev/cube-devrel-team/apollo-server/gateway"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@apollo/gateway": "^2.1.1",
     "apollo-server-express": "^3",
-    "apollo-server-lambda": "^3.10.2",
-    "body-parser": "^1.20.0",
-    "cors": "^2.8.5",
-    "encoding": "^0.1.13",
     "express": "^4.18.1",
     "graphql": "^16.6.0",
-    "netlify-lambda": "^2.0.15",
-    "pg": "^8.8.0",
-    "pg-hstore": "^2.3.4",
-    "pg-native": "^3.0.1",
-    "sequelize": "^6.21.6"
+    "postgres": "^3.2.4"
   },
   "devDependencies": {
     "nodemon": "^2.0.19"
