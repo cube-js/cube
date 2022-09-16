@@ -43,7 +43,7 @@ export const DATE_CAST = {
   },
   'databricks-jdbc': {
     DATE_PREFIX: 'to_date(',
-    DATE_SUFFIX: ', \'YYYY-MM-DD\')',
+    DATE_SUFFIX: ', \'y-M-d\')',
   },
   questdb: {
     DATE_PREFIX: 'to_date(',

@@ -1,13 +1,13 @@
-import { mainTestSet, databricksTestSet } from './driverTests/testSets';
+import { mainTestSet } from './driverTests/testSets';
 import { executeTestSuite } from './driver-test-suite';
 
 executeTestSuite({
   type: 'databricks-jdbc',
-  tests: databricksTestSet,
+  tests: mainTestSet,
 });
 
 executeTestSuite({
   type: 'databricks-jdbc',
-  tests: databricksTestSet,
+  tests: mainTestSet,
   config: { CUBEJS_EXTERNAL_DEFAULT: 'true' },
 });

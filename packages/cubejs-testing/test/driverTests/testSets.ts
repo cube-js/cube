@@ -126,5 +126,3 @@ export const mainTestSet = testSet([
   ...withOrderingTestSet,
   ...withoutOrderingTestSet,
 ]);
-
-export const databricksTestSet = testSet([queryingCustomersDimensions]);
