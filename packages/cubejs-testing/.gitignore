@@ -27,5 +27,6 @@ birdbox-fixtures/questdb/schema/Products.js
 birdbox-fixtures/questdb/schema/Products.sql.js
 birdbox-fixtures/postgresql.json
 
+birdbox-fixtures/databricks-jdbc.json
 birdbox-fixtures/databricks
 !birdbox-fixtures/databricks/cube.js

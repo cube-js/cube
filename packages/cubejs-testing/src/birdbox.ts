@@ -326,6 +326,7 @@ export async function startBirdBoxFromContainer(
       'BIRDBOX_CUBESTORE_VERSION',
       process.env.BIRDBOX_CUBESTORE_VERSION
     )
+    .withEnv('CUBEJS_TELEMETRY', 'false')
     .up();
 
   const host = '127.0.0.1';
@@ -519,6 +520,8 @@ export async function startBirdBoxFromCli(
     );
   }
 
+  fs.writeFileSync(path.join(testDir, 'package.json'), '{}', { encoding: 'utf-8' });
+
   const env = {
     ...process.env,
     CUBEJS_DB_TYPE: options.type === 'postgresql'
@@ -528,6 +531,7 @@ export async function startBirdBoxFromCli(
     CUBEJS_API_SECRET: 'mysupersecret',
     CUBEJS_WEB_SOCKETS: 'true',
     CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
+    CUBEJS_TELEMETRY: 'false',
     ...options.env
       ? options.env
       : {
@@ -650,7 +654,6 @@ export async function getBirdbox(
     .argv as Args;
   const { mode, log } = args;
 
-  console.log('typetype', type);
   // extract/assert env variables
   if (REQUIRED_ENV_VARS[type] === undefined) {
     if (log === Log.PIPE) {

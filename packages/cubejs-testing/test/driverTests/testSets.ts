@@ -121,10 +121,10 @@ const withoutOrderingTestSet = testSet([
   filteringECommerceEndsWithDimensionsThird
 ]);
 
-export const databricksTestSet = testSet([queryingCustomersDimensions]);
-
 export const mainTestSet = testSet([
   ...skippedTestSet,
   ...withOrderingTestSet,
   ...withoutOrderingTestSet,
 ]);
+
+export const databricksTestSet = testSet([queryingCustomersDimensions]);

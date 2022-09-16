@@ -6,8 +6,8 @@ executeTestSuite({
   tests: databricksTestSet,
 });
 
-// executeTestSuite({
-//   type: 'databricks',
-//   tests: mainTestSet,
-//   config: { CUBEJS_EXTERNAL_DEFAULT: 'true' },
-// });
+executeTestSuite({
+  type: 'databricks-jdbc',
+  tests: databricksTestSet,
+  config: { CUBEJS_EXTERNAL_DEFAULT: 'true' },
+});
