@@ -438,6 +438,7 @@ type LoadPreAggregationResult = {
   lastUpdatedAt: number;
   buildRangeEnd?: string;
   lambdaTable?: InlineTable;
+  queryKey?: any[];
 };
 
 export class PreAggregationLoader {
@@ -450,6 +451,11 @@ export class PreAggregationLoader {
 
   private loadCache: any;
 
+  /**
+   * Determines whether current instance instantiated for a jobed build query
+   * (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint) or
+   * not.
+   */
   private isJob: boolean;
 
   private waitForRenew: boolean;
@@ -520,9 +526,17 @@ export class PreAggregationLoader {
       // is true, either way, synchronously renew what data is needed so that
       // the most current data will be returned fo the current request.
       const result = await this.loadPreAggregationWithKeys();
+      const refreshKeyValues = await this.getInvalidationKeyValues();
       return {
         ...result,
-        refreshKeyValues: await this.getInvalidationKeyValues()
+        refreshKeyValues,
+        queryKey: this.isJob
+          // We need to return a queryKey value for the jobed build query
+          // (initialized by the /cubejs-system/v1/pre-aggregations/jobs 
+          // endpoint) as a part of the response to make it possible to get a
+          // query result from the cache by the other API call.
+          ? this.preAggregationQueryKey(refreshKeyValues)
+          : undefined,
       };
     } else {
       // Case 3: pre-agg is exists
@@ -665,6 +679,8 @@ export class PreAggregationLoader {
         newVersionEntry
       });
       if (this.isJob) {
+        // We don't want to wait for the jobed build query result. So we run the
+        // executeInQueue method and immediately return the LoadPreAggregationResult object.
         this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
         return {
           targetTableName: this.targetTableName(newVersionEntry),
@@ -768,6 +784,7 @@ export class PreAggregationLoader {
         requestId: this.requestId,
         invalidationKeys,
         forceBuild: this.forceBuild,
+        isJob: this.isJob,
         metadata: this.metadata,
         orphanedTimeout: this.orphanedTimeout,
       },
@@ -1313,6 +1330,11 @@ interface PreAggsPartiotionRangeLoaderOpts {
 }
 
 export class PreAggregationPartitionRangeLoader {
+  /**
+   * Determines whether current instance instantiated for a jobed build query
+   * (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint) or
+   * not.
+   */
   protected isJob: boolean;
 
   protected waitForRenew: boolean;
@@ -1788,7 +1810,8 @@ export class PreAggregations {
     dataSource = 'default',
     schema: string,
     table: string,
-  ): Promise<boolean> {
+    key: any[],
+  ): Promise<[boolean, string?]> {
     const loadCache = new PreAggregationLoadCache(
       this.redisPrefix,
       () => this.driverFactory(dataSource),
@@ -1805,7 +1828,18 @@ export class PreAggregations {
       preAggregationsSchema: schema,
     });
     tables = tables.filter(row => `${schema}.${row.table_name}` === table);
-    return tables.length === 1;
+
+    const { queueDriver } = this.queue[dataSource];
+    const conn = await queueDriver.createConnection();
+    const result = await conn.getResult(key);
+    queueDriver.release(conn);
+    if (tables.length === 1) {
+      return result ? [true] : [true, 'repeated fetch'];
+    } else {
+      return result && result.error
+        ? [false, `${result.error}`]
+        : [false, 'repeated fetch'];
+    }
   }
 
   public loadAllPreAggregationsIfNeeded(queryBody) {
@@ -2120,8 +2154,8 @@ export class PreAggregations {
   }
 
   public async getQueueState(dataSource: string) {
-    const query = await this.getQueue(dataSource);
-    const queries = await query.getQueries();
+    const queue = await this.getQueue(dataSource);
+    const queries = await queue.getQueries();
     return queries;
   }
 

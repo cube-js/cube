@@ -49,11 +49,12 @@ type JobedPreAggregation = {
   targetTableName: string,
   // eslint-disable-next-line camelcase
   refreshKeyValues: {refresh_key: string}[][],
+  queryKey: any[],
   lastUpdatedAt: string,
   type: string,
 };
 
-type Job = {
+type PreAggJob = {
   request: string,
   context: { securityContext: any },
   preagg: string,
@@ -62,13 +63,15 @@ type Job = {
   structure: string,
   content: string,
   updated: string,
+  key: any[],
+  status: string;
 };
 
 /**
  * Fetch `structure` and `content` segments from the table (partition) name and
  * returns an object contained these segments.
  */
-function getJobHashes(table: string) {
+function getPreAggJobHashes(table: string) {
   const items = table.split('_');
   return {
     structure: items[items.length - 2],
@@ -79,7 +82,7 @@ function getJobHashes(table: string) {
 /**
  * Convert posted build pre-aggs jobs results structure to the jobs list format.
  */
-function getJobsList(context: RequestContext, jobedPA: JobedPreAggregation[][][][]): Job[] {
+function getPreAggsJobsList(context: RequestContext, jobedPA: JobedPreAggregation[][][][]): PreAggJob[] {
   const jobs = [];
   jobedPA.forEach((l1) => {
     l1.forEach((l2) => {
@@ -91,8 +94,10 @@ function getJobsList(context: RequestContext, jobedPA: JobedPreAggregation[][][]
             preagg: pa.preAggregation,
             table: pa.tableName,
             target: pa.targetTableName,
-            ...getJobHashes(pa.targetTableName),
+            ...getPreAggJobHashes(pa.targetTableName),
             updated: pa.lastUpdatedAt,
+            key: pa.queryKey,
+            status: 'posted',
           });
         });
       });
@@ -663,6 +668,6 @@ export class RefreshScheduler {
       })
     );
     const jobedPAs = await jobsPromise;
-    return getJobsList(context, <JobedPreAggregation[][][][]>jobedPAs);
+    return getPreAggsJobsList(context, <JobedPreAggregation[][][][]>jobedPAs);
   }
 }

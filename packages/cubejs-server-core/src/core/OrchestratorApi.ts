@@ -224,13 +224,15 @@ export class OrchestratorApi {
     dataSource = 'default',
     schema: string,
     table: string,
-  ): Promise<boolean> {
+    key: any[],
+  ): Promise<[boolean, string?]> {
     return this.orchestrator.isPartitionExist(
       request,
       external,
       dataSource,
       schema,
       table,
+      key,
     );
   }
 

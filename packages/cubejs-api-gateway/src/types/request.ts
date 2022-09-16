@@ -142,6 +142,8 @@ type PreAggJob = {
   structure: string;
   content: string;
   updated: number;
+  key: any[];
+  status: string;
 };
 
 /**

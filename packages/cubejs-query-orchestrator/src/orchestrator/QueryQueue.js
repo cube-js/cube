@@ -64,6 +64,10 @@ export class QueryQueue {
       if (!(priority >= -10000 && priority <= 10000)) {
         throw new Error('Priority should be between -10000 and 10000');
       }
+
+      // Result here won't be fetched for a forced build query and a jobed build
+      // query (initialized by the /cubejs-system/v1/pre-aggregations/jobs
+      // endpoint).
       let result = !query.forceBuild && await redisClient.getResult(queryKey);
       
       if (result) {
@@ -119,8 +123,12 @@ export class QueryQueue {
         });
       }
 
-      result = await redisClient.getResultBlocking(queryKey);
-      if (!result) {
+      // Result here won't be fetched for a jobed build query (initialized by
+      // the /cubejs-system/v1/pre-aggregations/jobs endpoint).
+      result = !query.isJob && await redisClient.getResultBlocking(queryKey);
+      
+      // We don't want to throw the ContinueWaitError for  a jobed build query.
+      if (!query.isJob && !result) {
         throw new ContinueWaitError();
       }
 
