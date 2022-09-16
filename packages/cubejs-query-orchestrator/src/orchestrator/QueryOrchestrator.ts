@@ -177,6 +177,9 @@ export class QueryOrchestrator {
     let lastRefreshTimestamp = getLastUpdatedAtTimestamp(preAggregationsTablesToTempTables.map(pa => new Date(pa[1].lastUpdatedAt)));
 
     if (!queryBody.query) {
+      // We want to return a more convenient and filled object for the following
+      // processing for a jobed build query (initialized by the
+      // /cubejs-system/v1/pre-aggregations/jobs endpoint).
       if (queryBody.isJob) {
         return preAggregationsTablesToTempTables.map((pa) => ({
           preAggregation: queryBody.preAggregations[0].preAggregationId,
