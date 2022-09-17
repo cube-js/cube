@@ -118,7 +118,8 @@ impl StreamingService for StreamingServiceImpl {
             Duration::from_secs(self.config_obj.stale_stream_timeout()),
             stream.next(),
         )
-        .await?
+        .await
+        .map_err(|e| CubeError::user(format!("Stale stream timeout: {}", e)))?
         {
             let rows = new_rows?;
             debug!("Received {} rows for {}", rows.len(), location);
