@@ -144,6 +144,7 @@ export class CubeSymbols {
 
       if (preAggregation.external === undefined && preAggregation.type !== 'rollupLambda') {
         preAggregation.external =
+          // TODO remove rollupJoin from this list and update validation
           ['rollup', 'rollupJoin'].includes(preAggregation.type) &&
           getEnv('externalDefault');
       }
