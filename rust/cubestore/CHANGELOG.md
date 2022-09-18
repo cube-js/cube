@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
+
+
+### Bug Fixes
+
+* **cubestore:** Immediately restart stale streaming jobs to avoid processing gaps for sparse streams ([60075af](https://github.com/cube-js/cube.js/commit/60075af851050b5b21b12881d553e318527e4ce7))
+
+
+
+
+
 ## [0.30.71](https://github.com/cube-js/cube.js/compare/v0.30.70...v0.30.71) (2022-09-16)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

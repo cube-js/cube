@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
+
+
+### Bug Fixes
+
+* **cubestore:** Immediately restart stale streaming jobs to avoid processing gaps for sparse streams ([60075af](https://github.com/cube-js/cube.js/commit/60075af851050b5b21b12881d553e318527e4ce7))
+
+
+### Features
+
+* Introduce `rollupLambda` rollup type ([#5315](https://github.com/cube-js/cube.js/issues/5315)) ([6fd5ee4](https://github.com/cube-js/cube.js/commit/6fd5ee4ed3a7fe98f55ce2f3dc900be1f089e590))
+* strategy without creating temp table ([#5299](https://github.com/cube-js/cube.js/issues/5299)) ([8e8f500](https://github.com/cube-js/cube.js/commit/8e8f500216e85676a971b62b57c5af0e48c6a9f9))
+* **cubesql:** starts_with, ends_with, LOWER(?column) = ?literal ([#5310](https://github.com/cube-js/cube.js/issues/5310)) ([321b74f](https://github.com/cube-js/cube.js/commit/321b74f03cc5e929ca18c69d15a0734cfa6613f6))
+
+
+
+
+
 ## [0.30.71](https://github.com/cube-js/cube.js/compare/v0.30.70...v0.30.71) (2022-09-16)
 
 
