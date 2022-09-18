@@ -180,7 +180,6 @@ const BasePreAggregationWithoutPartitionGranularity = {
     sql: Joi.func().required()
   },
   readOnly: Joi.boolean().strict(),
-  unionWithSourceData: Joi.boolean().strict(),
 };
 
 const BasePreAggregation = {
@@ -289,6 +288,28 @@ const RollUpJoinSchema = condition(
   )
 );
 
+const RollupLambdaSchema = condition(
+  (s) => defined(s.granularity) || defined(s.timeDimension),
+  {
+    type: Joi.any().valid('rollupLambda').required(),
+    granularity: GranularitySchema,
+    timeDimension: Joi.func().required(),
+    rollups: Joi.func().required(),
+    measures: Joi.func(),
+    dimensions: Joi.func(),
+    segments: Joi.func(),
+    unionWithSourceData: Joi.boolean().strict(),
+  },
+  {
+    type: Joi.any().valid('rollupLambda').required(),
+    rollups: Joi.func().required(),
+    measures: Joi.func(),
+    dimensions: Joi.func(),
+    segments: Joi.func(),
+    unionWithSourceData: Joi.boolean().strict(),
+  },
+);
+
 const RollUpSchema = condition(
   (s) => defined(s.granularity) || defined(s.timeDimension) || defined(s.timeDimensionReference),
   condition(
@@ -338,6 +359,7 @@ const PreAggregationsAlternatives = Joi.object().pattern(
         { is: 'autoRollup', then: AutoRollupSchema },
         { is: 'originalSql', then: OriginalSqlSchema },
         { is: 'rollupJoin', then: RollUpJoinSchema },
+        { is: 'rollupLambda', then: RollupLambdaSchema },
         { is: 'rollup',
           then: RollUpSchema,
           otherwise: Joi.object().keys({
