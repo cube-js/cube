@@ -302,14 +302,14 @@ impl ChunkStore {
         meta_store: Arc<dyn MetaStore>,
         remote_fs: Arc<dyn RemoteFs>,
         cluster: Arc<dyn Cluster>,
-        _config: Arc<dyn ConfigObj>,
+        config: Arc<dyn ConfigObj>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
         let store = ChunkStore {
             meta_store,
             remote_fs,
             cluster,
-            _config,
+            _config: config,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
         };
