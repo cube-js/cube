@@ -18,8 +18,7 @@ import { cancelCombinator, SaveCancelFn, DriverInterface, BaseDriver,
   DownloadTableData,
   InlineTable,
   StreamOptions,
-  UnloadOptions,
-  DriverCapabilities } from '@cubejs-backend/base-driver';
+  UnloadOptions } from '@cubejs-backend/base-driver';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
@@ -759,19 +758,15 @@ export class PreAggregationLoader {
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(newVersionEntry: VersionEntry, invalidationKeys, client) {
-    let refreshStrategy = this.refreshStoreInSourceStrategy;
+  public refresh(newVersionEntry, invalidationKeys, client) {
+    let refreshStrategy = this.refreshImplStoreInSourceStrategy;
     if (this.preAggregation.external) {
       const readOnly =
         this.preAggregation.readOnly ||
         client.config && client.config.readOnly ||
         client.readOnly && (typeof client.readOnly === 'boolean' ? client.readOnly : client.readOnly());
-
-      if (readOnly) {
-        refreshStrategy = this.refreshReadOnlyExternalStrategy;
-      } else {
-        refreshStrategy = this.refreshWriteStrategy;
-      }
+      refreshStrategy = readOnly ?
+        this.refreshImplStreamExternalStrategy : this.refreshImplTempTableExternalStrategy;
     }
     return cancelCombinator(
       saveCancelFn => refreshStrategy.bind(this)(
@@ -802,7 +797,7 @@ export class PreAggregationLoader {
     };
   }
 
-  protected async refreshStoreInSourceStrategy(
+  protected async refreshImplStoreInSourceStrategy(
     client: DriverInterface,
     newVersionEntry,
     saveCancelFn: SaveCancelFn,
@@ -837,53 +832,39 @@ export class PreAggregationLoader {
     }
   }
 
-  protected async refreshWriteStrategy(
-    client,
-    newVersionEntry: VersionEntry,
-    saveCancelFn,
-    invalidationKeys,
-  ) {
-    const capabilities = client?.capabilities();
-
-    const withTempTable = !(capabilities?.unloadWithoutTempTable);
-
-    return this.runWriteStrategy(
-      client,
-      newVersionEntry,
-      saveCancelFn,
-      invalidationKeys,
-      withTempTable,
-    );
-  }
-
   /**
-   * Runs export strategy with write access in data source
+   * Strategy to copy pre-aggregation from source db (with write permissions) to external data
    */
-  protected async runWriteStrategy(
+  protected async refreshImplTempTableExternalStrategy(
     client: DriverInterface,
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
-    invalidationKeys,
-    withTempTable: boolean
+    invalidationKeys
   ) {
+    const [loadSql, params] =
+        Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
     await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
     const targetTableName = this.targetTableName(newVersionEntry);
-    const queryOptions = this.prepareWriteStrategy(
-      client,
+    const query = QueryCache.replacePreAggregationTableNames(loadSql, this.preAggregationsTablesToTempTables)
+      .replace(
+        this.preAggregation.tableName,
+        targetTableName
+      );
+    const queryOptions = this.queryOptions(invalidationKeys, query, params, targetTableName, newVersionEntry);
+    this.logExecutingSql(queryOptions);
+    await saveCancelFn(client.loadPreAggregationIntoTable(
       targetTableName,
-      newVersionEntry,
-      saveCancelFn,
-      invalidationKeys,
-      withTempTable,
-    );
+      query,
+      params,
+      queryOptions
+    ));
 
     try {
-      const tableData = await this.downloadExternalPreAggregation(
+      const tableData = await this.downloadTempExternalPreAggregation(
         client,
         newVersionEntry,
         saveCancelFn,
-        queryOptions,
-        withTempTable,
+        queryOptions
       );
 
       try {
@@ -894,82 +875,21 @@ export class PreAggregationLoader {
         }
       }
     } finally {
-      await this.cleanupWriteStrategy(
-        client,
-        targetTableName,
-        queryOptions,
-        saveCancelFn,
-        withTempTable
-      );
-    }
-  }
-
-  /**
-   * Cleanup tables after write strategy
-   */
-  protected async cleanupWriteStrategy(
-    client: DriverInterface,
-    targetTableName: string,
-    queryOptions,
-    saveCancelFn: SaveCancelFn,
-    withTempTable: boolean
-  ) {
-    if (withTempTable) {
       const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
       const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
       if (mappedActualTables.includes(targetTableName)) {
         await client.dropTable(targetTableName);
       }
-    }
-
-    // We must clean orphaned in any cases: success or exception
-    await this.loadCache.fetchTables(this.preAggregation);
-    await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
-  }
-
-  /**
-   * Create table (if required) and prepares query options object
-   */
-  protected async prepareWriteStrategy(
-    client: DriverInterface,
-    targetTableName: string,
-    newVersionEntry: VersionEntry,
-    saveCancelFn: SaveCancelFn,
-    invalidationKeys,
-    withTempTable: boolean
-  ) {
-    if (withTempTable) {
-      const [loadSql, params] =
-      Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
-  
-      const query = QueryCache.replacePreAggregationTableNames(loadSql, this.preAggregationsTablesToTempTables)
-        .replace(
-          this.preAggregation.tableName,
-          targetTableName
-        );
-      const queryOptions = this.queryOptions(invalidationKeys, query, params, targetTableName, newVersionEntry);
-      this.logExecutingSql(queryOptions);
-      await saveCancelFn(client.loadPreAggregationIntoTable(
-        targetTableName,
-        query,
-        params,
-        queryOptions
-      ));
-
-      return queryOptions;
-    } else {
-      const [sql, params] =
-        Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
-      const queryOptions = this.queryOptions(invalidationKeys, sql, params, targetTableName, newVersionEntry);
-      this.logExecutingSql(queryOptions);
-      return queryOptions;
+      // We must clean orphaned in any cases: success or exception
+      await this.loadCache.fetchTables(this.preAggregation);
+      await this.dropOrphanedTables(client, targetTableName, saveCancelFn, false, queryOptions);
     }
   }
 
   /**
    * Strategy to copy pre-aggregation from source db (for read-only permissions) to external data
    */
-  protected async refreshReadOnlyExternalStrategy(
+  protected async refreshImplStreamExternalStrategy(
     client: DriverInterface,
     newVersionEntry: VersionEntry,
     saveCancelFn,
@@ -1028,15 +948,19 @@ export class PreAggregationLoader {
   }
 
   /**
-   * prepares download data for future cube store usage
+   * Create table (for db with write permissions) and extract data via memory/stream/unload
    */
-  protected async downloadExternalPreAggregation(
+  protected async downloadTempExternalPreAggregation(
     client: DriverInterface,
-    newVersionEntry: VersionEntry,
+    newVersionEntry,
     saveCancelFn: SaveCancelFn,
-    queryOptions: any,
-    withTempTable: boolean
+    queryOptions: any
   ) {
+    // @todo Deprecated, BaseDriver already implements it, before remove we need to add check for factoryDriver
+    if (!client.downloadTable) {
+      throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadTable()');
+    }
+
     const table = this.targetTableName(newVersionEntry);
     this.logger('Downloading external pre-aggregation', queryOptions);
 
@@ -1045,12 +969,31 @@ export class PreAggregationLoader {
       const capabilities = externalDriver.capabilities && externalDriver.capabilities();
 
       let tableData: DownloadTableData;
-      if (withTempTable) {
-        tableData = await this.getTableDataWithTempTable(client, table, saveCancelFn, queryOptions, capabilities);
+
+      if (capabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
+        tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
+      } else if (capabilities.streamImport && client.stream) {
+        tableData = await saveCancelFn(
+          client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
+        );
+
+        if (client.unload) {
+          const stream = new LargeStreamWarning(this.preAggregation.preAggregationId, (msg) => {
+            this.logger('Downloading external pre-aggregation warning', {
+              ...queryOptions,
+              error: msg
+            });
+          });
+          tableData.rowStream.pipe(stream);
+          tableData.rowStream = stream;
+        }
       } else {
-        tableData = await this.getTableDataWithoutTempTable(client, table, saveCancelFn, queryOptions, capabilities);
+        tableData = await saveCancelFn(client.downloadTable(table, capabilities));
       }
 
+      if (!tableData.types) {
+        tableData.types = await saveCancelFn(client.tableColumnTypes(table));
+      }
       this.logger('Downloading external pre-aggregation completed', queryOptions);
 
       return tableData;
@@ -1061,72 +1004,6 @@ export class PreAggregationLoader {
       });
       throw error;
     }
-  }
-
-  /**
-   * prepares download data when temp table = true
-   */
-  protected async getTableDataWithTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: any, externalDriverCapabilities: DriverCapabilities) {
-    let tableData: DownloadTableData;
-
-    if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
-      tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
-    } else if (externalDriverCapabilities.streamImport && client.stream) {
-      tableData = await saveCancelFn(
-        client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
-      );
-
-      if (client.unload) {
-        const stream = new LargeStreamWarning(this.preAggregation.preAggregationId, (msg) => {
-          this.logger('Downloading external pre-aggregation warning', {
-            ...queryOptions,
-            error: msg
-          });
-        });
-        tableData.rowStream.pipe(stream);
-        tableData.rowStream = stream;
-      }
-    } else {
-      tableData = await saveCancelFn(client.downloadTable(table, externalDriverCapabilities));
-    }
-
-    if (!tableData.types) {
-      tableData.types = await saveCancelFn(client.tableColumnTypes(table));
-    }
-
-    return tableData;
-  }
-
-  /**
-   * prepares download data when temp table = false
-   */
-  protected async getTableDataWithoutTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: any, externalDriverCapabilities: DriverCapabilities) {
-    const [sql, params] =
-        Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
-
-    let tableData: DownloadTableData;
-    if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
-      return saveCancelFn(client.unload(table, { ...this.getUnloadOptions(), query: { sql, params } }));
-    } else if (externalDriverCapabilities.streamImport && client.stream) {
-      tableData = await saveCancelFn(
-        client.stream(sql, params, this.getStreamingOptions())
-      );
-
-      if (client.unload) {
-        const stream = new LargeStreamWarning(this.preAggregation.preAggregationId, (msg) => {
-          this.logger('Downloading external pre-aggregation warning', {
-            ...queryOptions,
-            error: msg
-          });
-        });
-        tableData.rowStream.pipe(stream);
-        tableData.rowStream = stream;
-      }
-    } else {
-      tableData = { rows: await saveCancelFn(client.query(sql, params)) };
-    }
-
-    return tableData;
   }
 
   protected async uploadExternalPreAggregation(

@@ -97,11 +97,6 @@ export interface ExternalDriverCompatibilities {
   csvImport?: true,
   streamImport?: true,
 }
-
-export interface DriverCapabilities extends ExternalDriverCompatibilities {
-  unloadWithoutTempTable?: true,
-}
-
 export type StreamOptions = {
   highWaterMark: number;
 };
@@ -122,14 +117,8 @@ export type CreateTableIndex = {
   columns: string[]
 };
 
-type UnloadQuery = {
-  sql: string,
-  params: unknown[]
-};
-
 export type UnloadOptions = {
   maxFileSize: number,
-  query?: UnloadQuery;
 };
 
 export type QueryOptions = {
@@ -170,5 +159,5 @@ export interface DriverInterface {
   // Shutdown the driver
   release(): Promise<void>
 
-  capabilities(): DriverCapabilities;
+  capabilities(): ExternalDriverCompatibilities;
 }

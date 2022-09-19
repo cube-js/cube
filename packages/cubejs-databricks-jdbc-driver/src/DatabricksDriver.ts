@@ -10,7 +10,9 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import { DriverCapabilities, UnloadOptions, } from '@cubejs-backend/base-driver';
+import {
+  DownloadTableCSVData,
+} from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -192,23 +194,6 @@ export class DatabricksDriver extends JDBCDriver {
     return result;
   }
 
-  private async queryColumnTypes(sql: string, params: unknown[]) {
-    const result = [];
-    // eslint-disable-next-line camelcase
-    const response = await this.query<{col_name: string; data_type: string}>(`DESCRIBE QUERY ${sql}`, params);
-
-    for (const column of response) {
-      // Databricks describe additional info by default after empty line.
-      if (column.col_name === '') {
-        break;
-      }
-
-      result.push({ name: column.col_name, type: this.toGenericType(column.data_type) });
-    }
-
-    return result;
-  }
-
   public async getTablesQuery(schemaName: string) {
     const response = await this.query(`SHOW TABLES IN ${this.quoteIdentifier(schemaName)}`, []);
 
@@ -263,22 +248,21 @@ export class DatabricksDriver extends JDBCDriver {
     return this.config.exportBucket !== undefined;
   }
 
-  public async unload(tableName: string, options: UnloadOptions) {
-    if (!['azure', 's3'].includes(this.config.bucketType as string)) {
-      throw new Error(`Unsupported export bucket type: ${
-        this.config.bucketType
-      }`);
-    }
-
-    const types = options.query ?
-      await this.unloadWithSql(tableName, options.query.sql, options.query.params) :
-      await this.unloadWithTable(tableName);
-
+  /**
+   * Saves pre-aggs table to the bucket and returns links to download
+   * results.
+   */
+  public async unload(
+    tableName: string,
+  ): Promise<DownloadTableCSVData> {
+    const types = await this.tableColumnTypes(tableName);
+    const columns = types.map(t => t.name).join(', ');
     const pathname = `${this.config.exportBucket}/${tableName}.csv`;
     const csvFile = await this.getCsvFiles(
+      tableName,
+      columns,
       pathname,
     );
-
     return {
       csvFile,
       types,
@@ -287,41 +271,21 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Create table with query and unload it to bucket
-   */
-  private async unloadWithSql(tableName: string, sql: string, params: unknown[]) {
-    const types = await this.queryColumnTypes(sql, params);
-
-    await this.createExternalTableFromSql(tableName, sql, params);
-    
-    return types;
-  }
-
-  /**
-   * Create table from preaggregation table with location and unload it to bucket
-   */
-  private async unloadWithTable(tableName: string) {
-    const types = await this.tableColumnTypes(tableName);
-    const columns = types.map(t => t.name).join(', ');
-
-    await this.createExternalTableFromTable(tableName, columns);
-    
-    return types;
-  }
-
-  /**
-   * return csv files signed URLs array.
+   * Unload table to bucket using Databricks JDBC query and returns (async)
+   * csv files signed URLs array.
    */
   private async getCsvFiles(
+    table: string,
+    columns: string,
     pathname: string,
   ): Promise<string[]> {
     let res;
     switch (this.config.bucketType) {
       case 'azure':
-        res = await this.getSignedAzureUrls(pathname);
+        res = await this.getAzureCsvFiles(table, columns, pathname);
         break;
       case 's3':
-        res = await this.getSignedS3Urls(pathname);
+        res = await this.getS3CsvFiles(table, columns, pathname);
         break;
       default:
         throw new Error(`Unsupported export bucket type: ${
@@ -329,6 +293,19 @@ export class DatabricksDriver extends JDBCDriver {
         }`);
     }
     return res;
+  }
+
+  /**
+   * Saves specified table to the Azure blob storage and returns (async)
+   * csv files signed URLs array.
+   */
+  private async getAzureCsvFiles(
+    table: string,
+    columns: string,
+    pathname: string,
+  ): Promise<string[]> {
+    await this.createExternalTable(table, columns);
+    return this.getSignedAzureUrls(pathname);
   }
 
   /**
@@ -381,6 +358,19 @@ export class DatabricksDriver extends JDBCDriver {
         'Please check your export bucket configuration.');
     }
     return csvFile;
+  }
+
+  /**
+   * Saves specified table to the S3 bucket and returns (async) csv files
+   * signed URLs array.
+   */
+  private async getS3CsvFiles(
+    table: string,
+    columns: string,
+    pathname: string,
+  ): Promise<string[]> {
+    await this.createExternalTable(table, columns);
+    return this.getSignedS3Urls(pathname);
   }
 
   /**
@@ -439,19 +429,7 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
    */
-  private async createExternalTableFromSql(table: string, sql: string, params: unknown[]) {
-    await this.query(
-      `
-      CREATE TABLE ${table}_csv_export
-      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
-      OPTIONS (escape = '"')
-      AS (${sql})
-      `,
-      params,
-    );
-  }
-
-  private async createExternalTableFromTable(table: string, columns: string) {
+  private async createExternalTable(table: string, columns: string,) {
     await this.query(
       `
       CREATE TABLE ${table}_csv_export
@@ -461,9 +439,5 @@ export class DatabricksDriver extends JDBCDriver {
       `,
       [],
     );
-  }
-
-  public capabilities(): DriverCapabilities {
-    return { unloadWithoutTempTable: true };
   }
 }
