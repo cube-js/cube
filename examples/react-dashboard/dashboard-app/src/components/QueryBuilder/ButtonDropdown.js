@@ -14,6 +14,8 @@ const StyledButton = styled(Button)`
   border: none;
   color: #43436B;
   //animation-duration: 0s;
+  display: flex;
+  align-items: center;
 
 
   &:hover + a {

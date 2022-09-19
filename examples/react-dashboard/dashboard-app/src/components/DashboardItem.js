@@ -1,5 +1,6 @@
 import React from "react";
-import { Card, Menu, Icon, Dropdown, Modal } from "antd";
+import { Card, Menu, Dropdown, Modal } from "antd";
+import Icon from '@ant-design/icons';
 import styled from 'styled-components';
 import { useMutation } from "@apollo/react-hooks";
 import { Link } from "react-router-dom";

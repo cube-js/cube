@@ -8,7 +8,7 @@ import {
 } from "../graphql/mutations";
 
 const TitleModal = ({
-  history,
+  navigate,
   itemId,
   titleModalVisible,
   setTitleModalVisible,
@@ -50,7 +50,7 @@ const TitleModal = ({
               }
             }
           });
-          history.push("/");
+          navigate("/");
         } finally {
           setAddingToDashboard(false);
         }

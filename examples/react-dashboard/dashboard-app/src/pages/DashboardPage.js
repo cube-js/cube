@@ -1,7 +1,7 @@
 import React from "react";
 import { Spin, Button, Alert, Typography } from "antd";
 import { Link } from "react-router-dom";
-import { useQuery } from "@apollo/react-hooks";
+import { useQuery } from '@apollo/client';
 import { GET_DASHBOARD_ITEMS } from "../graphql/queries";
 import ChartRenderer from "../components/ChartRenderer";
 import Dashboard from "../components/Dashboard";

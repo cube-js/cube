@@ -4,12 +4,12 @@ import { Link } from "react-router-dom";
 import styled from 'styled-components';
 
 const StyledHeader = styled(Layout.Header)`
-  padding: 0 28px
+  padding: 0 28px;
+  line-height: 41px;
 `
 
 const StyledMenu = styled(Menu)`
   background: transparent;
-  line-height: 41px;
   border: none;
 `
 
@@ -20,7 +20,7 @@ const MenuItemStyled = styled(Menu.Item)`
 
     &:hover {
       border-bottom: 4px solid transparent;
-      & > a {
+      & a {
         color: #ffffff;
         opacity: 1;
       }
@@ -31,15 +31,27 @@ const MenuItemStyled = styled(Menu.Item)`
     color: white;
     border-bottom: 4px solid white;
 
-    & > a {
+    & a {
       opacity: 1;
     }
+
+    &:after {
+      border-bottom: 0;
+    }
   }
-  && > a {
+  && a {
     color: #ffffff;
     opacity: 0.60;
     font-weight: bold;
     letter-spacing: 0.01em;
+  }
+  &&:after {
+    border-bottom: 0;
+  }
+  &&:hover {
+    &&:after {
+      border-bottom: 0; 
+    }
   }
 `
 
