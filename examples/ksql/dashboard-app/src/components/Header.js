@@ -9,7 +9,7 @@ const Header = ({ analytics }) => {
     setSendingEvent(true);
     analytics.track("button_clicked");
     setTimeout(() => setSendingEvent(false), 2500);
-  }, []);
+  }, [analytics]);
 
   return (
     <Layout.Header style={{ padding: "0 32px" }}>
