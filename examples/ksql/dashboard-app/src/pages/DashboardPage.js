@@ -78,7 +78,7 @@ const DashboardItems = [
     size: 12
   },
   {
-    id: 4,
+    id: 5,
     name: "Last Events",
     vizState: {
       query: {
@@ -149,7 +149,7 @@ const DashboardPage = () => {
           {DashboardItems.map(dashboardItem)}
           <DashboardItem title="Architecture">
             <div>
-              <img width="100%" git src="https://ucarecdn.com/4efc3459-88b4-4a54-8596-8a0e6fa16814/" alt="Architecture" />
+              <img width="100%" src="https://ucarecdn.com/4efc3459-88b4-4a54-8596-8a0e6fa16814/" alt="Architecture" />
             </div>
           </DashboardItem>
         </Dashboard>
