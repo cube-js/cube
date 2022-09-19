@@ -117,7 +117,6 @@ impl CompactionServiceImpl {
         for chunk in chunks.iter() {
             if count > 0 {
                 let chunk_size = chunk.get_row().get_row_count();
-                //TODO config for magic numbers
                 if (chunk_size > ratio_check_threshold && chunk_size > size * ratio_threshold)
                     || size >= compaction_in_memory_chunks_size_limit
                 {
@@ -370,7 +369,6 @@ impl CompactionService for CompactionServiceImpl {
                     .partition_split_threshold_or_default(self.config.partition_split_threshold()),
             ) as usize)
                 // Do not allow to much of new partitions to limit partition accuracy trade off
-                // TODO config
                 .min(16);
             for _ in 0..new_partitions_count {
                 new_partitions.push(
@@ -627,7 +625,7 @@ impl CompactionService for CompactionServiceImpl {
             self.config.compaction_in_memory_chunks_size_limit();
 
         // Get all in_memory and active chunks
-        let (mem_chunks, pesistent_chunks) = self
+        let (mem_chunks, persistent_chunks) = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?
@@ -648,7 +646,7 @@ impl CompactionService for CompactionServiceImpl {
             });
         self.compact_chunks_to_memory(mem_chunks, &partition, &index, &table)
             .await?;
-        self.compact_chunks_to_persistent(pesistent_chunks, &partition, &index, &table)
+        self.compact_chunks_to_persistent(persistent_chunks, &partition, &index, &table)
             .await?;
         Ok(())
     }

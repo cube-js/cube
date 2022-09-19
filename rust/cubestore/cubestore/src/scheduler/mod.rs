@@ -295,8 +295,7 @@ impl SchedulerImpl {
 
         for chunk in all_inactive_chunks.iter() {
             let seconds = if chunk.get_row().in_memory() {
-                //TODO Config. It is also necessary to study whether this does not lead to inconsistency when executing queries
-                30
+                self.config.in_memory_not_used_timeout()
             } else {
                 self.config.not_used_timeout()
             };
@@ -417,8 +416,7 @@ impl SchedulerImpl {
                     }
                 } else {
                     let seconds = if chunk.get_row().in_memory() {
-                        //TODO Config. It is also necessary to study whether this does not lead to inconsistency when executing queries
-                        30
+                        self.config.in_memory_not_used_timeout()
                     } else {
                         self.config.not_used_timeout()
                     };

@@ -320,6 +320,8 @@ pub trait ConfigObj: DIService {
 
     fn not_used_timeout(&self) -> u64;
 
+    fn in_memory_not_used_timeout(&self) -> u64;
+
     fn import_job_timeout(&self) -> u64;
 
     fn meta_store_snapshot_interval(&self) -> u64;
@@ -392,6 +394,7 @@ pub struct ConfigObjImpl {
     pub query_timeout: u64,
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
+    pub in_memory_not_used_timeout: u64,
     pub import_job_timeout: u64,
     pub meta_store_log_upload_interval: u64,
     pub meta_store_snapshot_interval: u64,
@@ -493,6 +496,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn not_used_timeout(&self) -> u64 {
         self.not_used_timeout
+    }
+
+    fn in_memory_not_used_timeout(&self) -> u64 {
+        self.in_memory_not_used_timeout
     }
 
     fn import_job_timeout(&self) -> u64 {
@@ -717,6 +724,7 @@ impl Config {
                 )),
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                in_memory_not_used_timeout: 30,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
                 meta_store_log_upload_interval: 30,
                 meta_store_snapshot_interval: 300,
@@ -793,6 +801,7 @@ impl Config {
                 http_bind_address: None,
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
                 stale_stream_timeout: 60,
                 select_workers: Vec::new(),
