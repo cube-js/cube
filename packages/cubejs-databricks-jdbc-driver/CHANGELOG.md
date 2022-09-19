@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.73](https://github.com/cube-js/cube.js/compare/v0.30.72...v0.30.73) (2022-09-19)
+
+
+### Reverts
+
+* Revert "feat: strategy without creating temp table (#5299)" ([0a3d646](https://github.com/cube-js/cube.js/commit/0a3d6464c660d34742cfd08570c25284e03a3d14)), closes [#5299](https://github.com/cube-js/cube.js/issues/5299)
+
+
+
+
+
 ## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
 
 

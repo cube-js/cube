@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.73](https://github.com/cube-js/cube.js/compare/v0.30.72...v0.30.73) (2022-09-19)
+
+**Note:** Version bump only for package @cubejs-backend/redshift-driver
+
+
+
+
+
 ## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
 
 **Note:** Version bump only for package @cubejs-backend/redshift-driver

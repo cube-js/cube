@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.73](https://github.com/cube-js/cube.js/compare/v0.30.72...v0.30.73) (2022-09-19)
+
+
+### Features
+
+* **cubesql:** Increase limits for statements/portals/cursors ([#5146](https://github.com/cube-js/cube.js/issues/5146)) ([363b42d](https://github.com/cube-js/cube.js/commit/363b42dd4f48cbef31b1832906ae4069023643ca))
+
+
+
+
+
 ## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
 
 
