@@ -302,9 +302,10 @@ export class RefreshScheduler {
       const { timezones } = queryingOptions;
       const { partitions: partitionsFilter, cacheOnly } = preAggregationsQueryingOptions[preAggregation.id] || {};
 
-      const isRollupJoin = preAggregation?.preAggregation?.type === 'rollupJoin';
+      const type = preAggregation?.preAggregation?.type;
+      const isEphemeralPreAggregation = type === 'rollupJoin' || type === 'rollupLambda';
 
-      const queriesForPreAggregation: RefreshQueries[] = !isRollupJoin && (await Promise.all(
+      const queriesForPreAggregation: RefreshQueries[] = !isEphemeralPreAggregation && (await Promise.all(
         timezones.map(async timezone => this.refreshQueriesForPreAggregation(
           context,
           compilerApi,
