@@ -3,7 +3,29 @@ import PropTypes from "prop-types";
 import moment from "moment";
 import { useCubeQuery } from "@cubejs-client/react";
 import { Spin, Row, Col, Statistic, Table } from "antd";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
 import { Line, Bar, Pie } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 const COLORS_SERIES = ["#FF6492", "#141446", "#7A77FF"];
 const minutesAgo = ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1", "0"];
@@ -14,8 +36,12 @@ const TypeToChartComponent = {
       datasets: resultSet.series().map((s, index) => ({
         label: s.title,
         data: s.series.map(r => r.value),
-        borderColor: COLORS_SERIES[index],
-        fill: false
+        // borderColor: COLORS_SERIES[index],
+        backgroundColor: COLORS_SERIES[index],
+        fill: true,
+        stepped: 'middle',
+        pointRadius: 0,
+        pointHoverRadius: 0
       }))
     };
     const options = {
@@ -23,12 +49,15 @@ const TypeToChartComponent = {
         display: false
       },
       scales: {
-        yAxes: [{
+        yAxes: {
           ticks: {
             precision: 0,
             min: 0
           }
-        }]
+        }
+      },
+      animation: {
+        duration: 0
       }
     };
     return <Line height={157} data={data} options={options} />;
@@ -114,7 +143,7 @@ const TypeToChartComponent = {
         { title: "Event Type", dataIndex: "Events.type" },
         { title: "Time", dataIndex: "Events.time"}
       ]}
-      dataSource={resultSet.tablePivot().map((row) => {
+      dataSource={resultSet.tablePivot().map((row, key) => {
         // const addMinsAgo = (text) => {
         //   if (text.toString().match(/minute/)) {
         //     return text;
@@ -123,6 +152,7 @@ const TypeToChartComponent = {
         //   }
         // }
         return {
+          key,
           "Events.anonymousId": row["Events.anonymousId"],
           "Events.type": row["Events.type"],
           "Events.time": row["Events.time"],
@@ -141,8 +171,8 @@ const TypeToChartComponent = {
       }}
     >
       <Col>
-        {resultSet.seriesNames().map(s => (
-          <Statistic value={resultSet.totalRow()[s.key]} />
+        {resultSet.seriesNames().map((s, key) => (
+          <Statistic key={key} value={resultSet.totalRow()[s.key]} />
         ))}
       </Col>
     </Row>
