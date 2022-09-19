@@ -1,5 +1,5 @@
 const sql = require('mssql');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 
 const GenericTypeToMSSql = {
   string: 'nvarchar(max)',
@@ -21,7 +21,7 @@ class MSSqlDriver extends BaseDriver {
     return 2;
   }
 
-  constructor(config) {
+  constructor(config = {}) {
     super();
     this.config = {
       server: process.env.CUBEJS_DB_HOST,

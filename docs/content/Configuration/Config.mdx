@@ -80,6 +80,8 @@ interface CubejsConfiguration {
     | OrchestratorOptions
     | ((context: RequestContext) => OrchestratorOptions);
   allowJsDuplicatePropsInSchema: boolean;
+  initApp: (app: ExpressApplication) => void;
+  processSubscriptionsInterval: number;
 }
 
 interface OrchestratorOptions {
@@ -712,6 +714,42 @@ module.exports = {
 };
 ```
 
+### <--{"id" : "Options Reference"}--> allowJsDuplicatePropsInSchema
+
+Boolean to enable or disable a check duplicate property names in all objects of
+a schema. The default value is `false`, and it is means the compiler would use
+the additional transpiler for check duplicates.
+
+### <--{"id" : "Options Reference"}--> initApp
+
+<WarningBox>
+
+This configuration option is likely to change in future versions of Cube
+
+</WarningBox>
+
+This function allows you to extend the Cube API server with custom Express
+middleware. This is especially useful for adding monitoring and observability
+solutions.
+
+```typescript
+const myCustomMiddleware = (req, res, next) => {
+  req.foo = 'bar';
+  next();
+};
+
+module.exports = {
+  initApp: (app) => {
+    app.use(myCustomMiddleware);
+  },
+};
+```
+
+### <--{"id" : "Options Reference"}--> processSubscriptionsInterval
+
+This property controls how often Websocket client subscriptions are refreshed.
+Defaults to `5000`.
+
 ## QueueOptions
 
 Timeout and interval options' values are in seconds.
@@ -737,12 +775,23 @@ and sets it to `req.securityContext`.
 
 ## SchemaFileRepository
 
+<WarningBox>
+
+The default implementation of the `SchemaFileRepository` contract is defined by
+the [`FileRepository`][gh-cube-filerepo] class. When using
+[`FileRepository`][gh-cube-filerepo], all schema files must be within the same
+directory.
+
+</WarningBox>
+
+[gh-cube-filerepo]:
+  https://github.com/cube-js/cube.js/blob/master/packages/cubejs-server-core/src/core/FileRepository.ts
+
 The `SchemaFileRepository` contract defines an async `dataSchemaFiles` function
 which returns the files to compile for a schema. Returned by
-[repositoryFactory][self-repofactory].
-`@cubejs-backend/server-core/core/FileRepository` is the default implementation
-of the `SchemaFileRepository` contract which accepts
-[schemaPath][self-schemapath] in the constructor.
+[repositoryFactory][self-repofactory]. The [`FileRepository`][gh-cube-filerepo]
+implementation of the `SchemaFileRepository` contract accepts a
+[`schemaPath`][self-schemapath] in its constructor.
 
 ```javascript
 class ApiFileRepository {
@@ -756,12 +805,6 @@ module.exports = {
   repositoryFactory: ({ securityContext }) => new ApiFileRepository(),
 };
 ```
-
-### <--{"id" : "SchemaFileRepository"}--> allowJsDuplicatePropsInSchema
-
-Boolean to enable or disable a check duplicate property names in all objects of
-a schema. The default value is `false`, and it is means the compiler would use
-the additional transpiler for check duplicates.
 
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported
@@ -793,7 +836,7 @@ the additional transpiler for check duplicates.
 [self-opts-sched-refresh-ctxs]: #scheduled-refresh-contexts
 [self-opts-sched-refresh-tz]: #scheduled-refresh-time-zones
 [self-repofactory]: #repositoryFactory
-[self-schemafilerepo]: #SchemaFileRepository
+[self-schemafilerepo]: #schema-file-repository
 [self-schemapath]: #schemaPath
 [ref-exec-environment-globals]:
   /schema/reference/execution-environment#node-js-globals-process-env-console-log-and-others

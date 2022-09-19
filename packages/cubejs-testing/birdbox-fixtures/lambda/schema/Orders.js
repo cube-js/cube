@@ -2,8 +2,23 @@ cube(`Orders`, {
   sql: `SELECT * FROM public.orders`,
 
   preAggregations: {
-    ordersByCompletedAt: {
+    ordersByCompletedAtLambda: {
+      type: `rollupLambda`,
+      rollups: [ordersByCompletedAt],
       unionWithSourceData: true,
+    },
+
+    ordersByCompletedAtAndUserIdLambda: {
+      type: `rollupLambda`,
+      measures: [count],
+      dimensions: [status, userId],
+      timeDimension: completedAt,
+      granularity: `day`,
+      rollups: [ordersByCompletedAtAndUserId],
+      unionWithSourceData: true,
+    },
+
+    ordersByCompletedAt: {
       measures: [count],
       dimensions: [status],
       timeDimension: completedAt,
@@ -21,7 +36,6 @@ cube(`Orders`, {
     },
 
     ordersByCompletedAtAndUserId: {
-      unionWithSourceData: true,
       measures: [count],
       dimensions: [status, userId],
       timeDimension: completedAt,

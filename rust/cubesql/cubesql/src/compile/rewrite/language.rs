@@ -316,7 +316,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::Sqrt => "Sqrt",
                 BuiltinScalarFunction::Tan => "Tan",
                 BuiltinScalarFunction::Trunc => "Trunc",
-                BuiltinScalarFunction::Array => "Array",
+                BuiltinScalarFunction::MakeArray => "MakeArray",
                 BuiltinScalarFunction::Ascii => "Ascii",
                 BuiltinScalarFunction::BitLength => "BitLength",
                 BuiltinScalarFunction::Btrim => "Btrim",
@@ -433,7 +433,10 @@ macro_rules! variant_field_struct {
             impl FromStr for [<$variant $var_field:camel>] {
                 type Err = CubeError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    match s {
+                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
+                    let name = s.strip_prefix(&prefix).ok_or(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))?;
+
+                    match name {
                         $($name => Ok([<$variant $var_field:camel>]($variant_type)),)*
                         x => Err(CubeError::internal(format!("{} can't be matched against {}", x, std::stringify!($var_field_type))))
                     }
@@ -495,6 +498,39 @@ macro_rules! variant_field_struct {
         }
     };
 
+    ($variant:ident, $var_field:ident, DataType) => {
+        paste::item! {
+            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+            pub struct [<$variant $var_field:camel>](DataType);
+
+            impl FromStr for [<$variant $var_field:camel>] {
+                type Err = CubeError;
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
+                    let typed_str = s.strip_prefix(&prefix).ok_or(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))?;
+
+                    match typed_str {
+                        "Float32" => Ok([<$variant $var_field:camel>](DataType::Float32)),
+                        "Float64" => Ok([<$variant $var_field:camel>](DataType::Float64)),
+                        "Int32" => Ok([<$variant $var_field:camel>](DataType::Int32)),
+                        "Int64" => Ok([<$variant $var_field:camel>](DataType::Int64)),
+                        "Boolean" => Ok([<$variant $var_field:camel>](DataType::Boolean)),
+                        "Utf8" => Ok([<$variant $var_field:camel>](DataType::Utf8)),
+                        "Date32" => Ok([<$variant $var_field:camel>](DataType::Date32)),
+                        "Date64" => Ok([<$variant $var_field:camel>](DataType::Date64)),
+                        _ => Err(CubeError::internal(format!("Can't convert {}. Should contain a valid type, actual: {}", s, typed_str))),
+                    }
+                }
+            }
+
+            impl std::fmt::Display for [<$variant $var_field:camel>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}", self.0)
+                }
+            }
+        }
+    };
+
     ($variant:ident, $var_field:ident, ScalarValue) => {
         paste::item! {
             #[derive(Debug, PartialOrd, Clone)]
@@ -504,10 +540,19 @@ macro_rules! variant_field_struct {
                 type Err = CubeError;
                 fn from_str(s: &str) -> Result<Self, Self::Err> {
                     let prefix = format!("{}:", std::stringify!([<$variant $var_field:camel>]));
-                    if s.starts_with(&prefix) {
-                        return Ok([<$variant $var_field:camel>](ScalarValue::Utf8(Some(s.replace(&prefix, "")))));
+                    let typed_str = s.strip_prefix(&prefix).ok_or(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))?;
+
+                    if let Some(value) = typed_str.strip_prefix("s:") {
+                        Ok([<$variant $var_field:camel>](ScalarValue::Utf8(Some(value.to_string()))))
+                    } else if let Some(value) = typed_str.strip_prefix("b:") {
+                        let n: bool = value.parse().map_err(|err| CubeError::internal(format!("Can't parse boolean scalar value from '{}' with error: {}", typed_str, err)))?;
+                        Ok([<$variant $var_field:camel>](ScalarValue::Boolean(Some(n))))
+                    } else if let Some(value) = typed_str.strip_prefix("i:") {
+                        let n: i64 = value.parse().map_err(|err| CubeError::internal(format!("Can't parse i64 scalar value from '{}' with error: {}", typed_str, err)))?;
+                        Ok([<$variant $var_field:camel>](ScalarValue::Int64(Some(n))))
+                    } else {
+                        Err(CubeError::internal(format!("Can't convert {}. Should contains type type, actual: {}", s, typed_str)))
                     }
-                    Err(CubeError::internal(format!("Can't convert {}. Should start with '{}'", s, prefix)))
                 }
             }
 

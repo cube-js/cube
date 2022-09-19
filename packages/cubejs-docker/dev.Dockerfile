@@ -38,6 +38,7 @@ COPY rust/cubesql/package.json rust/cubesql/package.json
 COPY rust/cubestore/package.json rust/cubestore/package.json
 COPY rust/cubestore/bin rust/cubestore/bin
 COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
+COPY packages/cubejs-base-driver/package.json packages/cubejs-base-driver/package.json
 COPY packages/cubejs-backend-native/package.json packages/cubejs-backend-native/package.json
 COPY packages/cubejs-testing-shared/package.json packages/cubejs-testing-shared/package.json
 COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/package.json
@@ -90,7 +91,6 @@ RUN yarn policies set-version v1.22.5
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
 FROM base as prod_base_dependencies
-RUN npm install -g lerna patch-package
 RUN yarn install --prod
 
 FROM prod_base_dependencies as prod_dependencies
@@ -106,6 +106,7 @@ RUN yarn install
 COPY rust/cubestore/ rust/cubestore/
 COPY rust/cubesql/ rust/cubesql/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
+COPY packages/cubejs-base-driver/ packages/cubejs-base-driver/
 COPY packages/cubejs-backend-native/ packages/cubejs-backend-native/
 COPY packages/cubejs-testing-shared/ packages/cubejs-testing-shared/
 COPY packages/cubejs-backend-cloud/ packages/cubejs-backend-cloud/

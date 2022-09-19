@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 5331
+expression: "execute_query(\"select \\\n                    ends_with('rust is killing me', 'me') as r1,\n                    ends_with('rust is killing me', 'no') as r2\n                \".to_string(),\n            DatabaseProtocol::MySQL).await?"
+---
++------+-------+
+| r1   | r2    |
++------+-------+
+| true | false |
++------+-------+

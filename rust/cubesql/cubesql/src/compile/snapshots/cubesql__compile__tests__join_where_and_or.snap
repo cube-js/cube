@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 9348
 expression: "execute_query(\"\n                SELECT\n                    att.attname,\n                    att.attnum,\n                    cl.oid\n                FROM pg_attribute att\n                JOIN pg_class cl ON\n                    cl.oid = attrelid AND (\n                        cl.relkind = 's' OR\n                        cl.relkind = 'r'\n                    )\n                ORDER BY\n                    cl.oid ASC,\n                    att.attnum ASC\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +--------------------+--------+-------+
@@ -20,4 +19,6 @@ expression: "execute_query(\"\n                SELECT\n                    att.a
 | agentCount         | 1      | 18014 |
 | agentCountApprox   | 2      | 18014 |
 | __user             | 3      | 18014 |
+| someNumber         | 1      | 18020 |
+| __user             | 2      | 18020 |
 +--------------------+--------+-------+

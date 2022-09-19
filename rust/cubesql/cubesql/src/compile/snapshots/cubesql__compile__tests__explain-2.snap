@@ -15,7 +15,6 @@ expression: "execute_query(\"EXPLAIN VERBOSE SELECT 1+1;\".to_string(),\n       
 | logical_plan after filter_push_down                   | SAME TEXT AS ABOVE                   |
 | logical_plan after limit_push_down                    | SAME TEXT AS ABOVE                   |
 | logical_plan after SingleDistinctAggregationToGroupBy | SAME TEXT AS ABOVE                   |
-| logical_plan after ToApproxPerc                       | SAME TEXT AS ABOVE                   |
 | logical_plan                                          | Projection: Int64(2)                 |
 |                                                       |   EmptyRelation                      |
 | initial_physical_plan                                 | ProjectionExec: expr=[2 as Int64(2)] |

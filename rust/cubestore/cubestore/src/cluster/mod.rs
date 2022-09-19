@@ -1577,6 +1577,9 @@ impl ClusterImpl {
                     log::debug!("Startup warmup cancelled");
                     return;
                 }
+                if c.get_row().in_memory() {
+                    continue;
+                }
                 let result = self
                     .remote_fs
                     .download_file(

@@ -1,6 +1,6 @@
 use crate::cluster::{pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
-use crate::metastore::job::{Job, JobType};
+use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::Table;
 use crate::metastore::{
@@ -459,7 +459,7 @@ impl SchedulerImpl {
                 let file_name =
                     ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix());
                 let deadline = Instant::now()
-                    + Duration::from_secs(self.config.meta_store_log_upload_interval() * 2);
+                    + Duration::from_secs(self.config.meta_store_snapshot_interval() * 2);
                 self.gc_loop
                     .send(GCTimedTask {
                         deadline,
@@ -473,7 +473,7 @@ impl SchedulerImpl {
             if partition.get_row().is_active() {
                 if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
                     let deadline = Instant::now()
-                        + Duration::from_secs(self.config.meta_store_log_upload_interval() * 2);
+                        + Duration::from_secs(self.config.meta_store_snapshot_interval() * 2);
                     self.gc_loop
                         .send(GCTimedTask {
                             deadline,
@@ -499,6 +499,21 @@ impl SchedulerImpl {
                         })
                         .await?;
                 }
+            }
+        }
+        if let MetaStoreEvent::UpdateJob(_, new_job) = &event {
+            match new_job.get_row().job_type() {
+                JobType::TableImportCSV(location) if Table::is_stream_location(location) => {
+                    match new_job.get_row().status() {
+                        JobStatus::Error(e) if e.contains("Stale stream timeout") => {
+                            log::info!("Removing stale stream job: {:?}", new_job);
+                            self.meta_store.delete_job(new_job.get_id()).await?;
+                            self.reconcile_table_imports().await?;
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
             }
         }
         if let MetaStoreEvent::DeleteJob(job) = event {

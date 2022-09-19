@@ -7,7 +7,7 @@ import {
   BaseDriver, DownloadQueryResultsOptions,
   DownloadTableMemoryData, DriverInterface,
   IndexesSQL, TableStructure, QueryOptions,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import { QuestQuery } from './QuestQuery';
 
 const NativeTypeToQuestType: Record<string, string> = R.invertObj(types.builtins);
@@ -199,7 +199,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
           `INSERT INTO '${table}'
         (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
         VALUES (${columns.map((c, paramIndex) => this.param(paramIndex)).join(', ')})`,
-          columns.map(c => this.toColumnValue(tableData.rows[i][c.name], c.type))
+          columns.map(c => this.toColumnValue(tableData.rows[i][c.name] as string, c.type))
         );
       }
       // Make sure to commit the data to make it visible for later queries.

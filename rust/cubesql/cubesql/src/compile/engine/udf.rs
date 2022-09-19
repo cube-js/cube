@@ -1,4 +1,4 @@
-use std::{any::type_name, collections::HashMap, sync::Arc, thread};
+use std::{any::type_name, collections::HashMap, convert::TryFrom, sync::Arc, thread};
 
 use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime};
 use datafusion::{
@@ -6,10 +6,10 @@ use datafusion::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
             Float64Array, GenericStringArray, Int32Builder, Int64Array, Int64Builder,
-            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
-            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
-            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
-            UInt32Builder,
+            IntervalDayTimeArray, IntervalDayTimeBuilder, IntervalYearMonthArray, ListArray,
+            ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
+            StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
+            TimestampNanosecondArray, TimestampSecondArray, UInt32Builder,
         },
         compute::{cast, concat},
         datatypes::{
@@ -676,6 +676,75 @@ pub fn create_timediff_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_ends_with_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let string_array = downcast_string_arg!(args[0], "string", i32);
+        let prefix_array = downcast_string_arg!(args[1], "prefix", i32);
+
+        let result = string_array
+            .iter()
+            .zip(prefix_array.iter())
+            .map(|(string, prefix)| match (string, prefix) {
+                (Some(string), Some(prefix)) => Some(string.ends_with(prefix)),
+                _ => None,
+            })
+            .collect::<BooleanArray>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "ends_with",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+// https://docs.aws.amazon.com/redshift/latest/dg/r_DATEDIFF_function.html
+pub fn create_datediff_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "datediff is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "datediff",
+        &Signature::any(3, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+// https://docs.aws.amazon.com/redshift/latest/dg/r_DATEADD_function.html
+pub fn create_dateadd_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "dateadd is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+
+    ScalarUDF::new(
+        "dateadd",
+        &Signature::any(3, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_time_format_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2);
@@ -1158,16 +1227,109 @@ fn last_day_of_month(y: i32, m: u32) -> u32 {
     NaiveDate::from_ymd(y, m + 1, 1).pred().day()
 }
 
+pub fn create_interval_mul_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let multiplicands = downcast_primitive_arg!(args[1], "multiplicand", Int64Type);
+
+        match &args[0].data_type() {
+            DataType::Interval(IntervalUnit::YearMonth) => {
+                let intervals = downcast_primitive_arg!(args[0], "interval", IntervalYearMonthType);
+                let result = intervals
+                    .iter()
+                    .zip(multiplicands.iter())
+                    .map(|values| match values {
+                        (Some(interval), Some(multiplicand)) => {
+                            Some(interval * i32::try_from(multiplicand).ok()?)
+                        }
+                        _ => None,
+                    })
+                    .collect::<IntervalYearMonthArray>();
+                Ok(Arc::new(result))
+            }
+            DataType::Interval(IntervalUnit::DayTime) => {
+                let intervals = downcast_primitive_arg!(args[0], "interval", IntervalDayTimeType);
+                let result = intervals
+                    .iter()
+                    .zip(multiplicands.iter())
+                    .map(|values| match values {
+                        (Some(interval), Some(multiplicand)) => {
+                            let interval_value: u64 = interval as u64;
+                            let days: i32 = ((interval_value & 0xFFFFFFFF00000000) >> 32) as i32;
+                            let milliseconds: i32 = (interval_value & 0xFFFFFFFF) as i32;
+                            let multiplicand = i32::try_from(multiplicand).ok()?;
+                            let days_product = days * multiplicand;
+                            let milliseconds_product = milliseconds * multiplicand;
+                            let interval_product = (((days_product as u64) << 32)
+                                | (milliseconds_product as u64))
+                                as i64;
+                            Some(interval_product)
+                        }
+                        _ => None,
+                    })
+                    .collect::<IntervalDayTimeArray>();
+                Ok(Arc::new(result))
+            }
+            _ => Err(DataFusionError::Execution(
+                "unsupported interval type".to_string(),
+            )),
+        }
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |arg_types| {
+        if arg_types.len() != 2 {
+            return Err(DataFusionError::Execution(format!(
+                "\"interval_mul\" expects 2 arguments, {} given",
+                arg_types.len()
+            )));
+        }
+        match arg_types[0] {
+            DataType::Interval(_) => Ok(Arc::new(arg_types[0].clone())),
+            _ => Err(DataFusionError::Execution(
+                "first argument to \"interval_mul\" must be an interval".to_string(),
+            )),
+        }
+    });
+
+    ScalarUDF::new(
+        "interval_mul",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::YearMonth),
+                    DataType::Int64,
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::DayTime),
+                    DataType::Int64,
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                    DataType::Int64,
+                ]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
 fn postgres_datetime_format_to_iso(format: String) -> String {
     format
         .replace("%i", "%M")
         .replace("%s", "%S")
         .replace(".%f", "%.f")
         .replace("YYYY", "%Y")
+        .replace("yyyy", "%Y")
         .replace("DD", "%d")
+        .replace("dd", "%d")
         .replace("HH24", "%H")
         .replace("MI", "%M")
+        .replace("mi", "%M")
         .replace("SS", "%S")
+        .replace("ss", "%S")
         .replace(".US", "%.f")
         .replace("MM", "%m")
         .replace(".MS", "%.3f")
@@ -1279,7 +1441,12 @@ pub fn create_to_char_udf() -> ScalarUDF {
                     parse_timestamp_arr!(arr, TimestampSecondArray, seconds),
                     str.clone().unwrap_or_default(),
                 ),
-                _ => (None, "".to_string()),
+                dt => {
+                    return Err(DataFusionError::Execution(format!(
+                        "unsupported date type for to_char, actual: {}",
+                        dt
+                    )))
+                }
             };
 
             if durations.is_none() {
@@ -2298,23 +2465,36 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
 
 pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 3);
+        let (users, schemas, privileges) = if args.len() == 3 {
+            (
+                Some(downcast_string_arg!(args[0], "user", i32)),
+                downcast_string_arg!(args[1], "schema", i32),
+                downcast_string_arg!(args[2], "privilege", i32),
+            )
+        } else {
+            (
+                None,
+                downcast_string_arg!(args[0], "schema", i32),
+                downcast_string_arg!(args[1], "privilege", i32),
+            )
+        };
 
-        let users = downcast_string_arg!(args[0], "user", i32);
-        let schemas = downcast_string_arg!(args[1], "schema", i32);
-        let privileges = downcast_string_arg!(args[2], "privilege", i32);
-
-        let result = izip!(users, schemas, privileges)
-            .map(|args| {
+        let result = izip!(schemas, privileges)
+            .enumerate()
+            .map(|(i, args)| {
                 Ok(match args {
-                    (Some(user), Some(schema), Some(privilege)) => {
-                        if let Some(session_user) = state.user() {
-                            if user != session_user {
-                                return Err(DataFusionError::Execution(format!(
-                                    "role \"{}\" does not exist",
-                                    user
-                                )));
+                    (Some(schema), Some(privilege)) => {
+                        match (users, state.user()) {
+                            (Some(users), Some(session_user)) => {
+                                let user = users.value(i);
+                                if user != session_user {
+                                    return Err(DataFusionError::Execution(format!(
+                                        "role \"{}\" does not exist",
+                                        user
+                                    )));
+                                }
                             }
+                            _ => (),
                         }
 
                         match schema {
@@ -2350,8 +2530,11 @@ pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
 
     ScalarUDF::new(
         "has_schema_privilege",
-        &Signature::exact(
-            vec![DataType::Utf8, DataType::Utf8, DataType::Utf8],
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Utf8]),
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+            ],
             Volatility::Immutable,
         ),
         &return_type,

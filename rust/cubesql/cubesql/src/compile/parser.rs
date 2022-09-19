@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use sqlparser::{
     ast::Statement,
     dialect::{Dialect, PostgreSqlDialect},
@@ -41,6 +43,8 @@ pub fn parse_sql_to_statements(
     query: &String,
     protocol: DatabaseProtocol,
 ) -> CompilationResult<Vec<Statement>> {
+    let original_query = query.clone();
+
     log::debug!("Parsing SQL: {}", query);
     // @todo Support without workarounds
     // metabase
@@ -207,10 +211,33 @@ pub fn parse_sql_to_statements(
     };
 
     // Metabase
-    // TODO: To Support InSubquery Node.
+    // TODO: To Support InSubquery Node (waiting for rebase DF)
     let query = query.replace(
         "WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e)",
         "WHERE t.oid = 0",
+    );
+
+    // Holistics.io
+    // TODO: Waiting for rebase DF
+    // Right now, our fork of DF doesn't support ON conditions with this filter
+    let query = query.replace(
+        "ON c.conrelid=ta.attrelid AND ta.attnum=c.conkey[o.ord]",
+        "ON c.conrelid=ta.attrelid",
+    );
+
+    // Holistics.io
+    // TODO: Waiting for rebase DF
+    // Right now, our fork of DF doesn't support ON conditions with this filter
+    let query = query.replace(
+        "ON c.confrelid=fa.attrelid AND fa.attnum=c.confkey[o.ord]",
+        "ON c.confrelid=fa.attrelid",
+    );
+
+    // Holistics.io
+    // TODO: To Support InSubquery Node (waiting for rebase DF)
+    let query = query.replace(
+        "AND c.relname IN (SELECT table_name\nFROM information_schema.tables\nWHERE (table_type = 'BASE TABLE' OR table_type = 'VIEW')\n  AND table_schema NOT IN ('pg_catalog', 'information_schema')\n  AND has_schema_privilege(table_schema, 'USAGE'::text)\n)\n",
+        "",
     );
 
     let parse_result = match protocol {
@@ -218,7 +245,10 @@ pub fn parse_sql_to_statements(
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
     };
 
-    parse_result.map_err(|err| CompilationError::user(format!("Unable to parse: {:?}", err)))
+    parse_result.map_err(|err| {
+        CompilationError::user(format!("Unable to parse: {:?}", err))
+            .with_meta(Some(HashMap::from([("query".to_string(), original_query)])))
+    })
 }
 
 pub fn parse_sql_to_statement(
@@ -242,7 +272,7 @@ pub fn parse_sql_to_statement(
                     ))
                 };
 
-                Err(err)
+                Err(err.with_meta(Some(HashMap::from([("query".to_string(), query.clone())]))))
             }
         }
     }
