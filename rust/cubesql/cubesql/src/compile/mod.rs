@@ -1689,6 +1689,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_select_compound_identifiers() {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(`KibanaSampleDataEcommerce`.`maxPrice`) AS maxPrice, MEASURE(`KibanaSampleDataEcommerce`.`minPrice`) AS minPrice FROM KibanaSampleDataEcommerce".to_string(), DatabaseProtocol::MySQL
         ).await;
@@ -1714,6 +1716,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_select_measure_aggregate_functions() {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             "SELECT MAX(maxPrice), MIN(minPrice), AVG(avgPrice) FROM KibanaSampleDataEcommerce"
                 .to_string(),
@@ -1753,6 +1757,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_change_user_via_filter() {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher'"
                 .to_string(),
@@ -1781,6 +1787,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_change_user_via_in_filter() {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user IN ('gopher')"
                 .to_string(),
@@ -1809,6 +1817,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_starts_with() {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE starts_with(customer_gender, 'fe')"
                 .to_string(),
@@ -1841,6 +1851,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_ends_with_query() {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE ends_with(customer_gender, 'emale')"
                 .to_string(),
@@ -1872,7 +1884,52 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_lower_in_thoughtspot() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) IN ('female')"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                // TODO: Migrate to equalsLower operator, when it will be available in Cube?
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("startsWith".to_string()),
+                        values: Some(vec!["female".to_string()]),
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("endsWith".to_string()),
+                        values: Some(vec!["female".to_string()]),
+                        or: None,
+                        and: None
+                    }
+                ])
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_lower_equals_thoughtspot() {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'female'"
                 .to_string(),
@@ -1915,6 +1972,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_change_user_via_in_filter_thoughtspot() {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             r#"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce "ta_1" WHERE (LOWER("ta_1"."__user") IN ('gopher')) = TRUE"#.to_string(),
             DatabaseProtocol::PostgreSQL,

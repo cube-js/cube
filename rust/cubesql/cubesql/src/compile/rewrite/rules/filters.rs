@@ -264,6 +264,20 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             transforming_rewrite(
+                "change-user-lower-equal-filter",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr("Lower", vec![column_expr("?column")]),
+                        "=",
+                        literal_expr("?literal"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                change_user_member("?user"),
+                self.transform_change_user_eq("?column", "?literal", "?user"),
+            ),
+            transforming_rewrite(
                 "change-user-equal-filter",
                 filter_replacer(
                     binary_expr(column_expr("?column"), "=", literal_expr("?literal")),
@@ -273,31 +287,20 @@ impl RewriteRules for FilterRules {
                 change_user_member("?user"),
                 self.transform_change_user_eq("?column", "?literal", "?user"),
             ),
-            // ?change_user IN (?list..)
+            // ?expr IN (?one_element..)
             transforming_rewrite(
-                "change-user-in-filter",
+                "in-filter-equal",
                 filter_replacer(
-                    inlist_expr(column_expr("?column"), "?list", "?negated"),
+                    inlist_expr("?expr", "?list", "?negated"),
                     "?alias_to_cube",
                     "?members",
                 ),
-                change_user_member("?user"),
-                self.transform_change_user_in("?column", "?list", "?negated", "?user"),
-            ),
-            // LOWER(?change_user) IN (?list..) - It's not safety to replace LOWER fn for all filters
-            transforming_rewrite(
-                "change-user-lower-in-filter",
                 filter_replacer(
-                    inlist_expr(
-                        fun_expr("Lower", vec![column_expr("?column")]),
-                        "?list",
-                        "?negated",
-                    ),
+                    binary_expr("?expr", "=", literal_expr("?literal")),
                     "?alias_to_cube",
                     "?members",
                 ),
-                change_user_member("?user"),
-                self.transform_change_user_in("?column", "?list", "?negated", "?user"),
+                self.transform_filter_in_to_equal("?list", "?negated", "?literal"),
             ),
             rewrite(
                 "filter-in-place-filter-to-true-filter",
@@ -1776,17 +1779,16 @@ impl FilterRules {
         }
     }
 
-    fn transform_change_user_in(
+    // Transform ?expr IN (?literal) to ?expr = ?literal
+    fn transform_filter_in_to_equal(
         &self,
-        column_var: &'static str,
         list_var: &'static str,
         negated_var: &'static str,
-        change_user_member_var: &'static str,
+        return_literal_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let column_var = var!(column_var);
         let list_var = var!(list_var);
         let negated_var = var!(negated_var);
-        let change_user_member_var = change_user_member_var.parse().unwrap();
+        let return_literal_var = var!(return_literal_var);
 
         move |egraph, subst| {
             for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
@@ -1799,23 +1801,14 @@ impl FilterRules {
                         return false;
                     }
 
-                    if let Some(ScalarValue::Utf8(Some(change_user))) = list.first() {
-                        let specified_user = change_user.clone();
+                    if let Some(scalar) = list.first().cloned() {
+                        let first_scalar = egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                            LiteralExprValue(scalar),
+                        ));
 
-                        for column in
-                            var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned()
-                        {
-                            if column.name.eq_ignore_ascii_case("__user") {
-                                subst.insert(
-                                    change_user_member_var,
-                                    egraph.add(LogicalPlanLanguage::ChangeUserMemberValue(
-                                        ChangeUserMemberValue(specified_user),
-                                    )),
-                                );
+                        subst.insert(return_literal_var, first_scalar);
 
-                                return true;
-                            }
-                        }
+                        return true;
                     }
                 }
             }
