@@ -32,7 +32,7 @@ Batch data is coming from pre-aggregation and real-time data is coming from the 
   />
 </div>
 
-First, you need to create pre-aggregations that will contain your batch data. In the following example, we call it **batch.** Please note, it must have `timeDimension`, Cube will use it to union batch data with source data.
+First, you need to create pre-aggregations that will contain your batch data. In the following example, we call it **batch.** Please note, it must have `timeDimension`, and Cube will use it to union batch data with source data.
 
 You control the batch part of your data with `buildRangeStart` and `buildRangeEnd` properties of pre-aggregation to determine specific window for your batched data.
 
