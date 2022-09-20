@@ -859,7 +859,7 @@ export class PreAggregationLoader {
   ) {
     const capabilities = client?.capabilities();
 
-    const withTempTable = true;
+    const withTempTable = !(capabilities?.unloadWithoutTempTable);
 
     return this.runWriteStrategy(
       client,
