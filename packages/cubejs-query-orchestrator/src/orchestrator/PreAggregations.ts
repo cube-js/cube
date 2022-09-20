@@ -868,7 +868,7 @@ export class PreAggregationLoader {
   ) {
     await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
     const targetTableName = this.targetTableName(newVersionEntry);
-    const queryOptions = this.prepareWriteStrategy(
+    const queryOptions = await this.prepareWriteStrategy(
       client,
       targetTableName,
       newVersionEntry,
