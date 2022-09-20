@@ -38,7 +38,8 @@ You control the batch part of your data with `buildRangeStart` and `buildRangeEn
 
 Next, you need to create a lambda pre-aggregation. To do that, create pre-aggregation with type `rollupLambda`, specify rollups you would like to use with `rollups` property, and finally set `unionWithSourceData: true` to use source data as a real-time layer.
 
-Please make sure that the lambda pre-aggreation definition comes first when defining your pre-aggregations.
+Please make sure that the lambda pre-aggregation definition comes first when defining your pre-aggregations.
+
 
 ```js
 lambda: {
