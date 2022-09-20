@@ -294,7 +294,12 @@ impl SchedulerImpl {
         let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
 
         for chunk in all_inactive_chunks.iter() {
-            let deadline = Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+            let seconds = if chunk.get_row().in_memory() {
+                self.config.in_memory_not_used_timeout()
+            } else {
+                self.config.not_used_timeout()
+            };
+            let deadline = Instant::now() + Duration::from_secs(seconds);
             self.gc_loop
                 .send(GCTimedTask {
                     deadline,
@@ -410,8 +415,12 @@ impl SchedulerImpl {
                         self.schedule_repartition(&partition).await?;
                     }
                 } else {
-                    let deadline =
-                        Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+                    let seconds = if chunk.get_row().in_memory() {
+                        self.config.in_memory_not_used_timeout()
+                    } else {
+                        self.config.not_used_timeout()
+                    };
+                    let deadline = Instant::now() + Duration::from_secs(seconds);
                     self.gc_loop
                         .send(GCTimedTask {
                             deadline,
@@ -571,14 +580,6 @@ impl SchedulerImpl {
             .filter(|c| !c.get_row().in_memory())
             .collect::<Vec<_>>();
 
-        let in_memory_chunks = all_chunks
-            .iter()
-            .filter(|c| c.get_row().in_memory())
-            .collect::<Vec<_>>();
-        let min_in_memory_created_at = in_memory_chunks
-            .iter()
-            .filter_map(|c| c.get_row().oldest_insert_at().clone())
-            .min();
         let min_created_at = chunks
             .iter()
             .filter_map(|c| c.get_row().created_at().clone())
@@ -586,8 +587,6 @@ impl SchedulerImpl {
         let check_row_counts = partition.get_row().multi_partition_id().is_none();
         if check_row_counts && chunk_sizes > self.config.compaction_chunks_total_size_threshold()
             || chunks.len() > self.config.compaction_chunks_count_threshold() as usize
-            // Force compaction if in_memory chunks were created far ago
-            || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_in_memory_chunks_max_lifetime_threshold()  as i64).unwrap_or(false)
             // Force compaction if other chunks were created far ago
             || min_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_chunks_max_lifetime_threshold() as i64).unwrap_or(false)
         {
@@ -602,8 +601,6 @@ impl SchedulerImpl {
     ) -> Result<(), CubeError> {
         let compaction_in_memory_chunks_count_threshold =
             self.config.compaction_in_memory_chunks_count_threshold();
-        let compaction_in_memory_chunks_size_limit =
-            self.config.compaction_in_memory_chunks_size_limit();
 
         let partition_id = partition.get_id();
 
@@ -612,21 +609,7 @@ impl SchedulerImpl {
             .get_chunks_by_partition(partition_id, false)
             .await?
             .into_iter()
-            .filter(|c| {
-                c.get_row().in_memory()
-                    && c.get_row().active()
-                    && c.get_row().get_row_count() < compaction_in_memory_chunks_size_limit
-                    && c.get_row()
-                        .oldest_insert_at()
-                        .map(|m| {
-                            Utc::now().signed_duration_since(m).num_seconds()
-                                < self
-                                    .config
-                                    .compaction_in_memory_chunks_max_lifetime_threshold()
-                                    as i64
-                        })
-                        .unwrap_or(true)
-            })
+            .filter(|c| c.get_row().in_memory() && c.get_row().active())
             .collect::<Vec<_>>();
 
         if chunks.len() > compaction_in_memory_chunks_count_threshold {
