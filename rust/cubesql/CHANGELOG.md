@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.74](https://github.com/cube-js/cube.js/compare/v0.30.73...v0.30.74) (2022-09-20)
+
+
+### Features
+
+* **cubesql:** Support LOWER(?column) IN (?literal) ([#5319](https://github.com/cube-js/cube.js/issues/5319)) ([2e85182](https://github.com/cube-js/cube.js/commit/2e85182c8863d5aaeda07157fade2c00fa27f4e5))
+
+
+
+
+
 ## [0.30.73](https://github.com/cube-js/cube.js/compare/v0.30.72...v0.30.73) (2022-09-19)
 
 
