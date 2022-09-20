@@ -7635,6 +7635,28 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_interval_sum() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "interval_sum",
+            execute_query(
+                r#"
+                SELECT
+                    TO_TIMESTAMP('2019-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')
+                    + INTERVAL '1 MONTH'
+                    + INTERVAL '1 WEEK'
+                    + INTERVAL '1 DAY'
+                    AS t
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn superset_meta_queries() -> Result<(), CubeError> {
         init_logger();
 

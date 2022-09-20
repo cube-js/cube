@@ -88,7 +88,7 @@ checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 [[package]]
 name = "arrow"
 version = "11.1.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=0bc721700352afe8267dba82388b81deffc24095#0bc721700352afe8267dba82388b81deffc24095"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=0a23deccf4e589768177fbaa7a3745c8b25f63c9#0a23deccf4e589768177fbaa7a3745c8b25f63c9"
 dependencies = [
  "bitflags",
  "chrono",
@@ -836,7 +836,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=ba127294a6694ec4a90f62b3987df0d84637d432#ba127294a6694ec4a90f62b3987df0d84637d432"
 dependencies = [
  "arrow",
  "chrono",
@@ -918,7 +918,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=ba127294a6694ec4a90f62b3987df0d84637d432#ba127294a6694ec4a90f62b3987df0d84637d432"
 dependencies = [
  "ahash",
  "arrow",
@@ -930,6 +930,7 @@ dependencies = [
  "datafusion-physical-expr",
  "futures",
  "hashbrown 0.12.1",
+ "itertools",
  "lazy_static",
  "log",
  "num_cpus",
@@ -950,7 +951,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=ba127294a6694ec4a90f62b3987df0d84637d432#ba127294a6694ec4a90f62b3987df0d84637d432"
 dependencies = [
  "arrow",
  "ordered-float 2.10.0",
@@ -961,7 +962,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=ba127294a6694ec4a90f62b3987df0d84637d432#ba127294a6694ec4a90f62b3987df0d84637d432"
 dependencies = [
  "async-trait",
  "chrono",
@@ -974,7 +975,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=ba127294a6694ec4a90f62b3987df0d84637d432#ba127294a6694ec4a90f62b3987df0d84637d432"
 dependencies = [
  "ahash",
  "arrow",
@@ -985,7 +986,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=ba127294a6694ec4a90f62b3987df0d84637d432#ba127294a6694ec4a90f62b3987df0d84637d432"
 dependencies = [
  "ahash",
  "arrow",
@@ -2599,7 +2600,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "11.1.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=0bc721700352afe8267dba82388b81deffc24095#0bc721700352afe8267dba82388b81deffc24095"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=0a23deccf4e589768177fbaa7a3745c8b25f63c9#0a23deccf4e589768177fbaa7a3745c8b25f63c9"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -3579,7 +3580,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "sqlparser"
 version = "0.16.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=19f730c8274b39f55224824c98687dc55aa95c92#19f730c8274b39f55224824c98687dc55aa95c92"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=13aff89fcbc3545c92a94ce771bafa739363fad5#13aff89fcbc3545c92a94ce771bafa739363fad5"
 dependencies = [
  "log",
 ]
