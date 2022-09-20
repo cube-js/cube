@@ -91,7 +91,7 @@ export function isDownloadTableMemoryData(tableData: any): tableData is Download
   return Boolean(tableData.rows);
 }
 
-export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData;
+export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData;
 
 export interface ExternalDriverCompatibilities {
   csvImport?: true,
