@@ -1,6 +1,7 @@
 import R from 'ramda';
 import { StartedTestContainer } from 'testcontainers';
 import { pausePromise } from '@cubejs-backend/shared';
+import fetch from 'node-fetch';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -277,5 +278,16 @@ describe('lambda', () => {
   test('refresh', async () => {
     await runScheduledRefresh(client);
     await checkCubestoreState(cubestore);
+  });
+
+  it('Pre-aggregations API', async () => {
+    const preAggs = await fetch(`${birdbox.configuration.playgroundUrl}/cubejs-system/v1/pre-aggregations`, {
+      method: 'GET',
+      headers: {
+        Authorization: ''
+      },
+    });
+    console.log(await preAggs.json());
+    expect(preAggs.status).toBe(200);
   });
 });
