@@ -107,12 +107,7 @@ type VersionEntry = {
   naming_version?: number
 };
 
-// indexesSql: [{
-//   sql: ['CREATE INDEX orders_d_main ON stb_pre_aggregations.orders_d ("orders__created_at")', []],
-//   indexName: 'orders_d_main'
-// }]
-
-type IndexesSql = {sql: [string, unknown[]], indexName: string}[];
+type IndexesSql = { sql: [string, unknown[]], indexName: string }[];
 type InvalidationKeys = unknown[];
 
 type QueryKey = [QueryTuple, IndexesSql, InvalidationKeys] | [QueryTuple, InvalidationKeys];
@@ -864,7 +859,7 @@ export class PreAggregationLoader {
   ) {
     const capabilities = client?.capabilities();
 
-    const withTempTable = !(capabilities?.unloadWithoutTempTable);
+    const withTempTable = true;
 
     return this.runWriteStrategy(
       client,
