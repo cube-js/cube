@@ -357,6 +357,54 @@ impl RewriteRules for SplitRules {
                 outer_aggregate_split_replacer(literal_expr("?expr"), "?cube"),
                 literal_expr("?expr"),
             ),
+            // AggFun with literal
+            transforming_rewrite(
+                "split-push-down-agg-fun-literal-inner-replacer",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr(
+                        "?fun",
+                        vec![cast_expr(literal_expr("?expr"), "?data_type")],
+                        "?distinct",
+                    ),
+                    "?cube",
+                ),
+                literal_expr("?expr"),
+                self.transform_aggr_fun_with_literal("?fun", "?expr"),
+            ),
+            transforming_rewrite(
+                "split-push-down-agg-fun-literal-outer-replacer",
+                outer_projection_split_replacer(
+                    agg_fun_expr(
+                        "?fun",
+                        vec![cast_expr(literal_expr("?expr"), "?data_type")],
+                        "?distinct",
+                    ),
+                    "?cube",
+                ),
+                agg_fun_expr(
+                    "?fun",
+                    vec![cast_expr(literal_expr("?expr"), "?data_type")],
+                    "?distinct",
+                ),
+                self.transform_aggr_fun_with_literal("?fun", "?expr"),
+            ),
+            transforming_rewrite(
+                "split-push-down-agg-fun-literal-outer-aggr-replacer",
+                outer_aggregate_split_replacer(
+                    agg_fun_expr(
+                        "?fun",
+                        vec![cast_expr(literal_expr("?expr"), "?data_type")],
+                        "?distinct",
+                    ),
+                    "?cube",
+                ),
+                agg_fun_expr(
+                    "?fun",
+                    vec![cast_expr(literal_expr("?expr"), "?data_type")],
+                    "?distinct",
+                ),
+                self.transform_aggr_fun_with_literal("?fun", "?expr"),
+            ),
             // Date trunc
             transforming_rewrite(
                 "split-push-down-date-trunc-inner-replacer",
@@ -904,6 +952,60 @@ impl RewriteRules for SplitRules {
                 ),
             ),
             //
+            rewrite(
+                "split-push-down-to-char-date-trunc-literal-inner-replacer",
+                inner_aggregate_split_replacer(
+                    udf_expr(
+                        "to_char",
+                        vec![
+                            cast_expr(
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![
+                                        literal_expr("?granularity"),
+                                        cast_expr(
+                                            cast_expr(literal_expr("?literal"), "?data_type_inner"),
+                                            "?data_type_outer",
+                                        ),
+                                    ],
+                                ),
+                                "?date_trunc_data_type",
+                            ),
+                            literal_expr("?format"),
+                        ],
+                    ),
+                    "?cube",
+                ),
+                literal_expr("?literal"),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-to-char-date-trunc-literal-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?cube"),
+                vec![(
+                    "?expr",
+                    udf_expr(
+                        "to_char",
+                        vec![
+                            cast_expr(
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![
+                                        literal_expr("?granularity"),
+                                        cast_expr(
+                                            cast_expr(literal_expr("?literal"), "?data_type_inner"),
+                                            "?data_type_outer",
+                                        ),
+                                    ],
+                                ),
+                                "?date_trunc_data_type",
+                            ),
+                            literal_expr("?format"),
+                        ],
+                    ),
+                )],
+                alias_expr(literal_expr("?literal"), "?alias"),
+                self.make_alias_like_expression("?expr", "?alias"),
+            ),
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-with-date-trunc-inner-aggr-replacer",
                 inner_aggregate_split_replacer(
@@ -1890,6 +1992,63 @@ impl SplitRules {
                     }
                 }
             }
+            false
+        }
+    }
+
+    fn transform_aggr_fun_with_literal(
+        &self,
+        fun_expr_var: &'static str,
+        expr_val: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let fun_expr_var = var!(fun_expr_var);
+        let expr_val = var!(expr_val);
+        move |egraph, subst| {
+            for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
+                match fun {
+                    AggregateFunction::Count | AggregateFunction::Sum => (),
+                    _ => return true,
+                };
+
+                for expr in var_iter!(egraph[subst[expr_val]], LiteralExprValue) {
+                    match expr {
+                        ScalarValue::Utf8(None) | ScalarValue::LargeUtf8(None) => return true,
+                        _ => (),
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn make_alias_like_expression(
+        &self,
+        expr_val: &'static str,
+        alias_val: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_val = var!(alias_val);
+        let expr_val = var!(expr_val);
+        move |egraph, subst| {
+            let original_expr_id = subst[expr_val];
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )));
+            if let Ok(expr) = res {
+                let name = expr.name(&DFSchema::empty()).unwrap();
+                subst.insert(
+                    alias_val,
+                    egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(name))),
+                );
+                return true;
+            }
+
             false
         }
     }
