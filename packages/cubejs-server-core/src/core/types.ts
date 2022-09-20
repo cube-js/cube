@@ -132,6 +132,7 @@ export type DriverOptions = {
   maxPoolSize?: number,
 };
 export type DriverConfig = {
+  dataSource?: string,
   type: DatabaseType,
 } & DriverOptions;
 

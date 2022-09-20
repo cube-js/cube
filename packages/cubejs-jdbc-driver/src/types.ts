@@ -5,6 +5,7 @@ export type JDBCDriverConfiguration = {
   dbType: string,
   url: string,
   drivername: string,
+  dataSource?: string,
   customClassPath?: string,
   properties: Record<string, any>,
   maxPoolSize?: number;

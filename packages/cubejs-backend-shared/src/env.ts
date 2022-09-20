@@ -44,6 +44,30 @@ export function asPortNumber(input: number, envName: string) {
   return input;
 }
 
+/**
+ * Returns data source specific environment variable name.
+ * @param origin Origin environment variable name.
+ * @param dataSource Data source name.
+ */
+export function keyByDataSource(origin: string, dataSource?: string): string {
+  if (!dataSource) {
+    return origin;
+  } else {
+    const s = origin.split('CUBEJS_');
+    if (s.length === 2) {
+      return `CUBEJS_DS_${dataSource}_${s[1]}`;
+    } else {
+      throw new Error(
+        `The ${
+          origin
+        } environment variable can not be converted for the ${
+          dataSource
+        } data source.`
+      );
+    }
+  }
+}
+
 function asPortOrSocket(input: string, envName: string): number | string {
   if (/^-?\d+$/.test(input)) {
     return asPortNumber(parseInt(input, 10), envName);
@@ -139,53 +163,189 @@ const variables: Record<string, (...args: any) => any> = {
     const value = process.env.CUBEJS_DB_QUERY_TIMEOUT || '10m';
     return convertTimeStrToMs(value, 'CUBEJS_DB_QUERY_TIMEOUT');
   },
-  dbPollMaxInterval: () => {
-    const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
-    return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
-  },
   maxPartitionsPerCube: () => get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
     .default('10000')
     .asInt(),
-  // Common db options
-  dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
-    .required(required)
-    .asString(),
-  // Export Bucket options
-  dbExportBucketType: ({ supported }: { supported: ('s3' | 'gcp' | 'azure')[] }) => get('CUBEJS_DB_EXPORT_BUCKET_TYPE')
-    .asEnum(supported),
-  dbExportBucket: () => get('CUBEJS_DB_EXPORT_BUCKET')
-    .asString(),
-  dbExportBucketMountDir: () => get('CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR')
-    .asString(),
-  // Export bucket options for AWS S3
-  dbExportBucketAwsKey: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY')
-    .asString(),
-  dbExportBucketAwsSecret: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET')
-    .asString(),
-  dbExportBucketAwsRegion: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION')
-    .asString(),
-  // Export bucket options for Integration based
-  dbExportIntegration: () => get('CUBEJS_DB_EXPORT_INTEGRATION')
-    .asString(),
-  // Export bucket options for GCS
-  dbExportGCSCredentials: () => {
-    const credentials = get('CUBEJS_DB_EXPORT_GCS_CREDENTIALS')
-      .asString();
-    if (credentials) {
-      return JSON.parse(Buffer.from(credentials, 'base64').toString('utf8'));
-    }
 
+  /** ****************************************************************
+   * Common db options                                               *
+   ***************************************************************** */
+
+  /**
+   * Configured datasources.
+   */
+  dataSources: () => get('CUBEJS_DATASOURCES').asString(),
+
+  /**
+   * Driver type.
+   */
+  dbType: ({ dataSource }: { dataSource?: string }) => (
+    get(keyByDataSource('CUBEJS_DB_TYPE', dataSource)).asString()
+  ),
+  
+  /**
+   * Database (schema) name.
+   */
+  dbName: ({
+    required,
+    dataSource,
+  }: {
+    required?: boolean,
+    dataSource?: string,
+  }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_NAME', dataSource)
+    ).required(required).asString()
+  ),
+
+  /**
+   * Max polling interval. Currenly used in BigQuery and Databricks.
+   * TODO: clarify this env.
+   */
+  dbPollMaxInterval: ({ dataSource }: { dataSource?: string }) => {
+    const key = keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource);
+    const value = get(key).asString() || '5s';
+    return convertTimeStrToMs(value, key);
+  },
+
+  /** ****************************************************************
+   * Export Bucket options                                           *
+   ***************************************************************** */
+  
+  /**
+   * Export bucket storage type.
+   */
+  dbExportBucketType: ({
+    supported,
+    dataSource,
+  }: {
+    supported: ('s3' | 'gcp' | 'azure')[],
+    dataSource?: string,
+  }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_TYPE', dataSource)
+    ).asEnum(supported)
+  ),
+
+  /**
+   * Export bucket storage URI.
+   */
+  dbExportBucket: ({ dataSource }: { dataSource?: string }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET', dataSource)
+    ).asString()
+  ),
+
+  /**
+   * Mounted export bucket directory for the cases, when the storage
+   * mounted to the datasource.
+   */
+  dbExportBucketMountDir: ({ dataSource }: { dataSource?: string }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR', dataSource)
+    ).asString()
+  ),
+
+  /**
+   * AWS Key for the AWS based export bucket srorage.
+   */
+  dbExportBucketAwsKey: ({ dataSource }: { dataSource?: string }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY', dataSource)
+    ).asString()
+  ),
+
+  /**
+   * AWS Secret for the AWS based export bucket srorage.
+   */
+  dbExportBucketAwsSecret: ({ dataSource }: { dataSource?: string }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET', dataSource)
+    ).asString()
+  ),
+
+  /**
+   * AWS Region for the AWS based export bucket srorage.
+   */
+  dbExportBucketAwsRegion: ({ dataSource }: { dataSource?: string }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION', dataSource)
+    ).asString()
+  ),
+
+  /**
+   * Azure Key for the Azure based export bucket srorage.
+   */
+  dbExportBucketAzureKey: ({ dataSource }: { dataSource?: string }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY', dataSource)
+    ).asString()
+  ),
+
+  /**
+   * Export bucket options for Integration based
+   */
+  dbExportIntegration: ({ dataSource }: { dataSource?: string }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_EXPORT_INTEGRATION', dataSource)
+    ).asString()
+  ),
+
+  /**
+   * Export bucket options for GCS
+   */
+  dbExportGCSCredentials: ({ dataSource }: { dataSource?: string }) => {
+    const credentials = get(
+      keyByDataSource('CUBEJS_DB_EXPORT_GCS_CREDENTIALS', dataSource)
+    ).asString();
+    if (credentials) {
+      return JSON.parse(
+        Buffer.from(credentials, 'base64').toString('utf8')
+      );
+    }
     return undefined;
   },
-  // Export bucket options for Azure
-  dbExportBucketAzureKey:
-    () => get('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY').asString(),
-  // Redshift Driver
+
+  /** ****************************************************************
+   * Databricks Driver                                               *
+   ***************************************************************** */
+
+  /**
+   * Databricks jdbc-connection url.
+   */
+  databrickUrl: ({ dataSource }: { dataSource?: string }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_DATABRICKS_URL', dataSource)
+    ).required().asString()
+  ),
+
+  /**
+   * Databricks jdbc-connection token.
+   */
+  databrickToken: ({ dataSource }: { dataSource?: string }) => (
+    get(
+      keyByDataSource('CUBEJS_DB_DATABRICKS_TOKEN', dataSource)
+    ).asString()
+  ),
+
+  /**
+   * Accept Databricks policy flag.
+   */
+  databrickAcceptPolicy: () => (
+    get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict()
+  ),
+
+  /** ****************************************************************
+   * Redshift Driver                                                 *
+   ***************************************************************** */
+
   dbExportBucketRedshiftArn: () => get('CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN')
     .asString(),
+
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),
+
   // Cube Store
   cubeStoreHost: () => get('CUBEJS_CUBESTORE_HOST')
     .asString(),
@@ -195,14 +355,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
     .asString(),
-  // Databricks
-  databrickUrl: () => get('CUBEJS_DB_DATABRICKS_URL')
-    .required()
-    .asString(),
-  databrickToken: () => get('CUBEJS_DB_DATABRICKS_TOKEN')
-    .asString(),
-  databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
-    .asBoolStrict(),
+
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
     .default('2')
