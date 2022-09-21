@@ -41,7 +41,7 @@ impl NodeConfig {
     ) -> CubeServices {
         let injector = self.config.injector();
 
-        self.config.configure_injector().await;
+        self.config.configure().await;
 
         injector
             .register_typed::<dyn TransportService, _, _, _>(async move |_| transport)

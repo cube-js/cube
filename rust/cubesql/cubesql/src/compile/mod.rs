@@ -1568,6 +1568,8 @@ mod tests {
     }
 
     async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
+        env::set_var("TZ", "UTC");
+
         let query =
             convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db).await)
                 .await;
@@ -4654,6 +4656,8 @@ ORDER BY \"COUNT(count)\" DESC"
         queries: Vec<String>,
         db: DatabaseProtocol,
     ) -> Result<(String, StatusFlags), CubeError> {
+        env::set_var("TZ", "UTC");
+
         let meta = get_test_tenant_ctx();
         let session = get_test_session(db).await;
 
@@ -12439,5 +12443,30 @@ ORDER BY \"COUNT(count)\" DESC"
             }),
             true
         );
+    }
+
+    #[tokio::test]
+    async fn test_cast_to_timestamp_timezone_utc() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_cast_to_timestamp_timezone_utc_1",
+            execute_query(
+                "select CAST ('2020-12-25 22:48:48.000' AS timestamptz)".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "test_cast_to_timestamp_timezone_utc_2",
+            execute_query(
+                "select CAST ('2020-12-25 22:48:48.000' AS timestamp)".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }
