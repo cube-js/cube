@@ -2869,8 +2869,8 @@ mod tests {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2020-12-25 22:48:48.000".to_string(),
-                        "2022-04-01 00:00:00.000".to_string()
+                        "2020-12-25T22:48:48.000Z".to_string(),
+                        "2022-03-31T23:59:59.999Z".to_string()
                     ]))
                 }]),
                 order: None,
@@ -10256,8 +10256,8 @@ ORDER BY \"COUNT(count)\" DESC"
             FROM (
                     SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" FROM \"public\".\"KibanaSampleDataEcommerce\"
                     WHERE \"public\".\"KibanaSampleDataEcommerce\".\"order_date\" 
-                    BETWEEN timestamp with time zone '2022-06-13 12:30:00.000Z' 
-                    AND timestamp with time zone '2022-06-29 12:30:00.000Z'
+                    BETWEEN timestamp with time zone '2022-06-13T12:30:00.000Z' 
+                    AND timestamp with time zone '2022-06-29T12:30:00.000Z'
             ) 
             \"source\""
             .to_string(),
@@ -10276,8 +10276,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2022-06-13 12:30:00.000Z".to_string(),
-                        "2022-06-29 12:30:00.000Z".to_string()
+                        "2022-06-13T12:30:00.000Z".to_string(),
+                        "2022-06-29T12:30:00.000Z".to_string()
                     ]))
                 }]),
                 order: None,
@@ -10797,8 +10797,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("second".to_string()),
                     date_range: Some(json!(vec![
-                        "2022-07-11 18:00:00.000000".to_string(),
-                        "2022-07-11 19:00:00.000000".to_string()
+                        "2022-07-11T18:00:00.000Z".to_string(),
+                        "2022-07-11T19:00:00.000Z".to_string()
                     ])),
                 }]),
                 order: None,
@@ -11608,6 +11608,50 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }),
             true
+        );
+    }
+
+    #[tokio::test]
+    async fn test_holistics_in_dates_list_filter() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT COUNT(\"table\".\"count\") AS \"c_pu_c_d4696e\"
+            FROM \"public\".\"KibanaSampleDataEcommerce\" \"table\"
+            WHERE \"table\".\"order_date\" IN (CAST ( '2022-06-06 13:30:46' AS timestamptz ), CAST ( '2022-06-06 13:30:47' AS timestamptz ))
+            ORDER BY 1 DESC
+            LIMIT 100000".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "desc".to_string()
+                ]]),
+                limit: Some(50000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec![
+                        "2022-06-06T13:30:46.000Z".to_string(),
+                        "2022-06-06T13:30:47.000Z".to_string()
+                    ]),
+                    or: None,
+                    and: None,
+                }]),
+            }
         );
     }
 
