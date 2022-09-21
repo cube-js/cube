@@ -31,7 +31,7 @@
     "vue-grid-layout": "^2.3.12",
     "vue-router": "^3.5.1",
     "vuedraggable": "^2.24.3",
-    "vuetify": "^2.4.9"
+    "vuetify": "^2.6.10"
   },
   "devDependencies": {
     "@types/vue-chartkick": "^0.5.1",
