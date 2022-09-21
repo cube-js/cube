@@ -73,7 +73,7 @@ options][link-config].
 To see a complete list of environment variables for your specific database,
 please use the [database connection guide][link-connecting-to-db].
 
-[link-connecting-to-db]: /connecting-to-the-database
+[link-connecting-to-db]: /config/databases
 
 ## Export Bucket
 
