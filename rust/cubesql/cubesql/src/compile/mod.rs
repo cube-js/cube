@@ -12469,4 +12469,32 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_join_with_distinct() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "test_join_with_distinct",
+            execute_query(
+                "WITH \"holistics__explore_60963d\" AS (
+                    SELECT
+                        1 AS \"dm_pu_ca_754b1e\",
+                        2 AS \"pu_n_fddcd1\"
+                    ), \"holistics__explore_edd38b\" AS (
+                    SELECT DISTINCT
+                        2 AS \"dm_pu_ca_754b1e\",
+                        1 AS \"pu_n_fddcd1\"
+                    )
+                    SELECT
+                        \"holistics__explore_60963d\".\"pu_n_fddcd1\" AS \"pu_n_fddcd1\",
+                        \"holistics__explore_edd38b\".\"dm_pu_ca_754b1e\" AS \"dm_pu_ca_754b1e\"
+                  FROM
+                    \"holistics__explore_60963d\"
+                    INNER JOIN \"holistics__explore_edd38b\" ON (\"holistics__explore_60963d\".\"dm_pu_ca_754b1e\" = \"holistics__explore_edd38b\".\"pu_n_fddcd1\");".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
