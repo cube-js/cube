@@ -639,6 +639,7 @@ impl AggregateFunction {
             },
             Self::MERGE => match col_type {
                 ColumnType::HyperLogLog(_) => true,
+                ColumnType::Bytes => true,
                 _ => false,
             },
         }
