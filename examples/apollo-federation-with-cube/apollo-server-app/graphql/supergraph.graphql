@@ -120,7 +120,7 @@ scalar join__FieldSet
 
 enum join__Graph {
   APOLLOSERVER @join__graph(name: "apolloserver", url: "http://35.192.83.151/graphql")
-  CUBE @join__graph(name: "cube", url: "https://coloured-iguana.aws-eu-central-1.cubecloudapp.dev/cubejs-api/graphql")
+  CUBE @join__graph(name: "cube", url: "https://squealing-marksville.aws-eu-central-1.cubecloudapp.dev/cubejs-api/graphql")
 }
 
 scalar link__Import

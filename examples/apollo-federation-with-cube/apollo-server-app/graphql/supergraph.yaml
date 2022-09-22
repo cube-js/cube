@@ -5,6 +5,6 @@ subgraphs:
     schema:
       file: ./apollo.graphql
   cube:
-    routing_url: https://coloured-iguana.aws-eu-central-1.cubecloudapp.dev/cubejs-api/graphql
+    routing_url: https://squealing-marksville.aws-eu-central-1.cubecloudapp.dev/cubejs-api/graphql
     schema:
       file: ./cube.graphql
