@@ -15,7 +15,7 @@ import {
 import { setContext } from '@apollo/client/link/context';
 import {
   tablePivotCube,
-  tablePivotHasura,
+  tablePivotApollo,
   availableStepRanges,
   defaultIsFraudSelection,
   defaultStepSelection,
@@ -121,7 +121,7 @@ function App() {
   } = useQuery(GET_FRAUD_AMOUNT_SUM_APOLLO);
   useEffect(() => {
     if (loadingFraudDataApollo) { return; }
-    setFraudChartDataApollo(tablePivotHasura(fraudDataApollo.fraudsByAmountSumWithStep));
+    setFraudChartDataApollo(tablePivotApollo(fraudDataApollo.fraudsByAmountSumWithStep));
   }, [ fraudDataApollo ]);
 
   return <>

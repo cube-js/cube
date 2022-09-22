@@ -48,7 +48,7 @@ export function tablePivotCube(data) {
   return reduced;
 }
 
-export function tablePivotHasura(data) {
+export function tablePivotApollo(data) {
   const flattened = data.map(i => ({ y: i.amountsum, x: i.step, type: i.type }));
   const groupedHash = groupByKey(flattened, 'type', {omitKey:true});
   const reduced = Object.keys(groupedHash).reduce((accumulator, iterator, key) => {
