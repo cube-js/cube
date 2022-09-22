@@ -77,7 +77,7 @@ You can create the Supergraph in two ways.
     - Run the rover command below:
     
         ```bash
-        rover supergraph compose --config ./supergraph.yaml > supergraph.graphql
+        rover supergraph compose --config ./graphql/supergraph.yaml > ./graphql/supergraph.graphql
         ```
 
 
