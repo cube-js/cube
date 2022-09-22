@@ -73,7 +73,7 @@ function App() {
     setIsFraudSelection(randomIntFromInterval(0, 1));
   }
 
-  const GET_FRAUD_AMOUNT_SUM_CUBE_REMOTE_SCHEMA = gql`
+  const GET_FRAUD_AMOUNT_SUM_CUBE = gql`
     query CubeQuery { 
       cube(
         where: {fraud: {AND: [
@@ -95,7 +95,7 @@ function App() {
     loading: loadingFraudDataCube,
     error: errorFraudDataCube,
     data: fraudDataCube,
-  } = useQuery(GET_FRAUD_AMOUNT_SUM_CUBE_REMOTE_SCHEMA);
+  } = useQuery(GET_FRAUD_AMOUNT_SUM_CUBE);
   useEffect(() => {
     if (loadingFraudDataCube) { return; }
     setFraudChartDataCube(tablePivotCube(fraudDataCube));
@@ -121,7 +121,6 @@ function App() {
   } = useQuery(GET_FRAUD_AMOUNT_SUM_APOLLO);
   useEffect(() => {
     if (loadingFraudDataApollo) { return; }
-    console.log(fraudDataApollo.fraudsByAmountSumWithStep);
     setFraudChartDataApollo(tablePivotHasura(fraudDataApollo.fraudsByAmountSumWithStep));
   }, [ fraudDataApollo ]);
 
