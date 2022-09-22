@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title></title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="index.js"></script>
+
+    <script type="module">
+      import createExampleWrapper from "@cube-dev/example-wrapper";
+
+      createExampleWrapper({
+        title: "Apollo GraphQL Federation with Apollo Gateway and Cube",
+        text: `
+          <p>
+            This demo shows aggregations of fraudulent financial transactions utilizing Cube's pre-aggregations for maximum performance. <br />It uses Apollo Gateway to create a Federated GraphQL gateway server to merge an Apollo Server Subgraph with Cube's GraphQL API as a Subgraph into a Supergraph!
+          </p>
+          <p>Explore the <a href="https://github.com/cube-js/cube.js/tree/master/examples/apollo-federation-with-cube">source code</a> and check the <a href="#">tutorial</a>.</p>
+        `,
+      });
+    </script>
+  </body>
+</html>

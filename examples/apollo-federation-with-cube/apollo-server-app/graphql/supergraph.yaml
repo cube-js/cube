@@ -1,0 +1,10 @@
+federation_version: 2
+subgraphs:
+  apolloserver:
+    routing_url: http://35.192.83.151/graphql
+    schema:
+      file: ./apollo.graphql
+  cube:
+    routing_url: https://squealing-marksville.aws-eu-central-1.cubecloudapp.dev/cubejs-api/graphql
+    schema:
+      file: ./cube.graphql
