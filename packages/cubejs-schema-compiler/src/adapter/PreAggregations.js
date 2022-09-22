@@ -144,7 +144,7 @@ export class PreAggregations {
   }
  
   preAggregationDescriptionFor(cube, foundPreAggregation) {
-    const { preAggregationName, preAggregation } = foundPreAggregation;
+    const { preAggregationName, preAggregation, references } = foundPreAggregation;
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
@@ -185,10 +185,11 @@ export class PreAggregations {
       uniqueKeyColumns,
       aggregationsColumns,
       dataSource: queryForSqlEvaluation.dataSource,
-      granularity: preAggregation.granularity,
+      // in fact we can reference preAggregation.granularity however accessing timeDimensions is more strict and consistent
+      granularity: references.timeDimensions[0]?.granularity,
       partitionGranularity: preAggregation.partitionGranularity,
       preAggregationStartEndQueries:
-        (preAggregation.partitionGranularity || preAggregation.granularity) &&
+        (preAggregation.partitionGranularity || references.timeDimensions[0]?.granularity) &&
         this.refreshRangeQuery().preAggregationStartEndQueries(cube, preAggregation),
       matchedTimeDimensionDateRange:
         preAggregation.partitionGranularity && (
