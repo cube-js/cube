@@ -15,7 +15,7 @@ import {
   JDBCDriver,
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
-import { getEnv } from '@cubejs-backend/shared';
+import { getEnv, assertDataSource } from '@cubejs-backend/shared';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
@@ -23,6 +23,7 @@ const { version } = require('../../package.json');
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
+    dataSource: string,
     readOnly?: boolean,
     // common bucket config
     bucketType?: string,
@@ -97,12 +98,23 @@ export class DatabricksDriver extends JDBCDriver {
     return 2;
   }
 
+  /**
+   * Class constructor.
+   */
   public constructor(
-    conf: Partial<DatabricksDriverConfiguration> = {},
+    conf: Partial<DatabricksDriverConfiguration> & {
+      dataSource: string,
+      maxPoolSize: number,
+    } = {
+      dataSource: assertDataSource('default'),
+      maxPoolSize: 8,
+    },
   ) {
-    const dataSource = conf?.dataSource;
+    const { dataSource } = conf;
     const config: DatabricksDriverConfiguration = {
       ...conf,
+      dataSource,
+      dbType: 'databricks',
       drivername: 'com.simba.spark.jdbc.Driver',
       customClassPath: undefined,
       properties: {
@@ -111,7 +123,6 @@ export class DatabricksDriver extends JDBCDriver {
         PWD: getEnv('databrickToken', { dataSource }) || '',
         UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
       },
-      dbType: 'databricks',
       database: getEnv('dbName', { required: false, dataSource }),
       url: getEnv('databrickUrl', { dataSource }),
       // common export bucket config

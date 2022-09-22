@@ -8,7 +8,7 @@ import { ApiGateway, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
   createCancelableInterval, formatDuration, getAnonymousId,
-  getEnv, getRealType, internalExceptions, track,
+  getEnv, assertDataSource, getRealType, internalExceptions, track,
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
@@ -744,6 +744,7 @@ export class CubejsServerCore {
       const opts = Object.keys(rest).length
         ? rest
         : {
+          dataSource: assertDataSource(context.dataSource),
           maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
         };
       return CubejsServerCore.createDriver(type, opts);

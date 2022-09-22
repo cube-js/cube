@@ -45,17 +45,50 @@ export function asPortNumber(input: number, envName: string) {
 }
 
 /**
+ * Multiple data sources cache.
+ */
+let dataSourcesCache: string[];
+
+/**
+ * Determines whether multiple data sources were declared or not.
+ */
+function isMultipleDataSources(): boolean {
+  // eslint-disable-next-line no-use-before-define
+  dataSourcesCache = dataSourcesCache || getEnv('dataSources');
+  return dataSourcesCache.length > 0;
+}
+
+/**
+ * Returns the specified data source if assertions are passed, throws
+ * an error otherwise.
+ * @param dataSource The data source to assert.
+ */
+export function assertDataSource(dataSource = 'default'): string {
+  if (!isMultipleDataSources()) {
+    return dataSource;
+  } else if (dataSourcesCache.indexOf(dataSource) >= 0) {
+    return dataSource;
+  } else {
+    throw new Error(
+      `The ${
+        dataSource
+      } data source is missing in the declared CUBEJS_DATASOURCES.`
+    );
+  }
+}
+
+/**
  * Returns data source specific environment variable name.
  * @param origin Origin environment variable name.
  * @param dataSource Data source name.
  */
-export function keyByDataSource(origin: string, dataSource?: string): string {
-  if (!dataSource) {
+function keyByDataSource(origin: string, dataSource: string): string {
+  if (!isMultipleDataSources()) {
     return origin;
   } else {
     const s = origin.split('CUBEJS_');
     if (s.length === 2) {
-      return `CUBEJS_DS_${dataSource}_${s[1]}`;
+      return `CUBEJS_DS_${dataSource.toUpperCase()}_${s[1]}`;
     } else {
       throw new Error(
         `The ${
@@ -174,12 +207,22 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Configured datasources.
    */
-  dataSources: () => get('CUBEJS_DATASOURCES').asString(),
+  dataSources: (): string[] => {
+    const dataSources = get('CUBEJS_DATASOURCES').asString();
+    if (dataSources) {
+      return dataSources.trim().split(',');
+    }
+    return [];
+  },
 
   /**
    * Driver type.
    */
-  dbType: ({ dataSource }: { dataSource?: string }) => (
+  dbType: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
     get(keyByDataSource('CUBEJS_DB_TYPE', dataSource)).asString()
   ),
   
@@ -190,8 +233,8 @@ const variables: Record<string, (...args: any) => any> = {
     required,
     dataSource,
   }: {
+    dataSource: string,
     required?: boolean,
-    dataSource?: string,
   }) => (
     get(
       keyByDataSource('CUBEJS_DB_NAME', dataSource)
@@ -202,7 +245,11 @@ const variables: Record<string, (...args: any) => any> = {
    * Max polling interval. Currenly used in BigQuery and Databricks.
    * TODO: clarify this env.
    */
-  dbPollMaxInterval: ({ dataSource }: { dataSource?: string }) => {
+  dbPollMaxInterval: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
     const key = keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource);
     const value = get(key).asString() || '5s';
     return convertTimeStrToMs(value, key);
@@ -220,7 +267,7 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource,
   }: {
     supported: ('s3' | 'gcp' | 'azure')[],
-    dataSource?: string,
+    dataSource: string,
   }) => (
     get(
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_TYPE', dataSource)
@@ -230,7 +277,11 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Export bucket storage URI.
    */
-  dbExportBucket: ({ dataSource }: { dataSource?: string }) => (
+  dbExportBucket: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
     get(
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET', dataSource)
     ).asString()
@@ -240,7 +291,11 @@ const variables: Record<string, (...args: any) => any> = {
    * Mounted export bucket directory for the cases, when the storage
    * mounted to the datasource.
    */
-  dbExportBucketMountDir: ({ dataSource }: { dataSource?: string }) => (
+  dbExportBucketMountDir: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
     get(
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR', dataSource)
     ).asString()
@@ -249,7 +304,11 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * AWS Key for the AWS based export bucket srorage.
    */
-  dbExportBucketAwsKey: ({ dataSource }: { dataSource?: string }) => (
+  dbExportBucketAwsKey: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
     get(
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY', dataSource)
     ).asString()
@@ -258,7 +317,11 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * AWS Secret for the AWS based export bucket srorage.
    */
-  dbExportBucketAwsSecret: ({ dataSource }: { dataSource?: string }) => (
+  dbExportBucketAwsSecret: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
     get(
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET', dataSource)
     ).asString()
@@ -267,7 +330,11 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * AWS Region for the AWS based export bucket srorage.
    */
-  dbExportBucketAwsRegion: ({ dataSource }: { dataSource?: string }) => (
+  dbExportBucketAwsRegion: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
     get(
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION', dataSource)
     ).asString()
@@ -276,25 +343,37 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Azure Key for the Azure based export bucket srorage.
    */
-  dbExportBucketAzureKey: ({ dataSource }: { dataSource?: string }) => (
+  dbExportBucketAzureKey: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
     get(
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY', dataSource)
     ).asString()
   ),
 
   /**
-   * Export bucket options for Integration based
+   * Export bucket options for Integration based.
    */
-  dbExportIntegration: ({ dataSource }: { dataSource?: string }) => (
+  dbExportIntegration: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
     get(
       keyByDataSource('CUBEJS_DB_EXPORT_INTEGRATION', dataSource)
     ).asString()
   ),
 
   /**
-   * Export bucket options for GCS
+   * Export bucket options for GCS.
    */
-  dbExportGCSCredentials: ({ dataSource }: { dataSource?: string }) => {
+  dbExportGCSCredentials: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
     const credentials = get(
       keyByDataSource('CUBEJS_DB_EXPORT_GCS_CREDENTIALS', dataSource)
     ).asString();
@@ -313,7 +392,11 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Databricks jdbc-connection url.
    */
-  databrickUrl: ({ dataSource }: { dataSource?: string }) => (
+  databrickUrl: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
     get(
       keyByDataSource('CUBEJS_DB_DATABRICKS_URL', dataSource)
     ).required().asString()
@@ -322,7 +405,11 @@ const variables: Record<string, (...args: any) => any> = {
   /**
    * Databricks jdbc-connection token.
    */
-  databrickToken: ({ dataSource }: { dataSource?: string }) => (
+  databrickToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
     get(
       keyByDataSource('CUBEJS_DB_DATABRICKS_TOKEN', dataSource)
     ).asString()

@@ -5,6 +5,7 @@ import cloneDeep from 'lodash.clonedeep';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import {
   getEnv,
+  assertDataSource,
   isDockerImage,
   displayCLIWarning,
 } from '@cubejs-backend/shared';
@@ -196,16 +197,10 @@ export class OptsHandler {
    * Default database factory function.
    */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private defaultDriverFactory(ctx: DriverContext): DriverConfig {
-    let dataSource: undefined | string;
-    const sources: undefined | string = getEnv('dataSources');
-    if (sources) {
-      const elms = sources.split(',').filter(s => s === ctx.dataSource);
-      dataSource = elms.length
-        ? elms[0].toUpperCase()
-        : undefined;
-    }
-    const type = <DatabaseType>getEnv('dbType', { dataSource });
-    return { dataSource, type };
+    const type = <DatabaseType>getEnv('dbType', {
+      dataSource: assertDataSource(ctx.dataSource),
+    });
+    return { type };
   }
 
   /**
