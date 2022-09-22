@@ -103,7 +103,11 @@ function App() {
 
   const GET_FRAUD_AMOUNT_SUM_APOLLO = gql`
     query ApolloQuery {
-      fraudsByAmountSumWithStep(isFraud: ${isFraudSelection}, stepStart: ${selectedStep.start}, stepEnd: ${selectedStep.end}) {
+      fraudsByAmountSumWithStep(
+        isFraud: ${isFraudSelection},
+        stepStart: ${selectedStep.start},
+        stepEnd: ${selectedStep.end}
+      ) {
         step
         type
         amountsum
