@@ -1072,7 +1072,7 @@ export class PreAggregations {
     )(this.rollupMeasures(preAggregationForQuery));
 
     // TODO granularity shouldn't be null?
-    const rollupGranularity = this.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
+    const rollupGranularity = preAggregationForQuery.references.timeDimensions[0]?.granularity || 'day';
 
     return this.query.evaluateSymbolSqlWithContext(
       // eslint-disable-next-line prefer-template
