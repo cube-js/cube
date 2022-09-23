@@ -1,6 +1,10 @@
 /* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
+import {
+  getEnv,
+  assertDataSource,
+  CancelablePromise,
+} from '@cubejs-backend/shared';
 import { BaseDriver } from '@cubejs-backend/base-driver';
-import { CancelablePromise } from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { promisify } from 'util';
 import genericPool, { Factory, Pool } from 'generic-pool';
@@ -56,17 +60,32 @@ export class JDBCDriver extends BaseDriver {
 
   protected jdbcProps: any;
 
-  public constructor(config: Partial<JDBCDriverConfiguration> = {}) {
+  public constructor(
+    config: Partial<JDBCDriverConfiguration> & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {}
+  ) {
     super();
 
-    const { poolOptions, ...dbOptions } = config || {};
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
 
-    const dbTypeDescription = JDBCDriver.dbTypeDescription((config.dbType || process.env.CUBEJS_DB_TYPE) as string);
+    const { poolOptions, ...dbOptions } = config;
+
+    const dbTypeDescription = JDBCDriver.dbTypeDescription(
+      <string>(config.dbType || getEnv('dbType', { dataSource })),
+    );
 
     this.config = {
-      dbType: process.env.CUBEJS_DB_TYPE,
-      url: process.env.CUBEJS_JDBC_URL || dbTypeDescription && dbTypeDescription.jdbcUrl(),
-      drivername: process.env.CUBEJS_JDBC_DRIVER || dbTypeDescription && dbTypeDescription.driverClass,
+      dbType: getEnv('dbType', { dataSource }),
+      url:
+        getEnv('jdbcUrl', { dataSource }) ||
+        dbTypeDescription && dbTypeDescription.jdbcUrl(),
+      drivername:
+        getEnv('jdbcDriver', { dataSource }) ||
+        dbTypeDescription && dbTypeDescription.driverClass,
       properties: dbTypeDescription && dbTypeDescription.properties,
       ...dbOptions
     } as JDBCDriverConfiguration;
@@ -104,8 +123,9 @@ export class JDBCDriver extends BaseDriver {
     }, {
       min: 0,
       max:
-        process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
-        this.config.maxPoolSize || 8,
+        config.maxPoolSize ||
+        getEnv('dbMaxPoolSize', { dataSource }) ||
+        8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

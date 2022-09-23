@@ -2,6 +2,7 @@ const jshs2 = require('jshs2');
 const SqlString = require('sqlstring');
 const genericPool = require('generic-pool');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
+const { getEnv, assertDataSource } = require('@cubejs-backend/shared');
 
 const {
   HS2Util, IDLContainer, HiveConnection, Configuration
@@ -36,6 +37,9 @@ IDLFactory.extractConfig = (config) => {
 
 const TSaslTransport = require('./TSaslTransport');
 
+/**
+ * Hive driver class.
+ */
 class HiveDriver extends BaseDriver {
   /**
    * Returns default concurrency value.
@@ -44,24 +48,36 @@ class HiveDriver extends BaseDriver {
     return 2;
   }
 
+  /**
+   * Class constructor.
+   */
   constructor(config = {}) {
     super();
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
     this.config = {
       auth: 'PLAIN',
-      host: process.env.CUBEJS_DB_HOST,
-      port: process.env.CUBEJS_DB_PORT,
-      dbName: process.env.CUBEJS_DB_NAME || 'default',
+      host: getEnv('dbHost', { dataSource }),
+      port: getEnv('dbPort', { dataSource }),
+      dbName: getEnv('dbName', { dataSource }) || 'default',
       timeout: 10000,
-      username: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
-      hiveType: process.env.CUBEJS_DB_HIVE_TYPE === 'CDH' ? HS2Util.HIVE_TYPE.CDH : HS2Util.HIVE_TYPE.HIVE,
-      hiveVer: process.env.CUBEJS_DB_HIVE_VER || '2.1.1',
-      thriftVer: process.env.CUBEJS_DB_HIVE_THRIFT_VER || '0.9.3',
-      cdhVer: process.env.CUBEJS_DB_HIVE_CDH_VER,
+      username: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
+      hiveType: getEnv('hiveType', { dataSource }) === 'CDH'
+        ? HS2Util.HIVE_TYPE.CDH
+        : HS2Util.HIVE_TYPE.HIVE,
+      hiveVer: getEnv('hiveVer', { dataSource }) || '2.1.1',
+      thriftVer: getEnv('hiveThriftVer', { dataSource }) || '0.9.3',
+      cdhVer: getEnv('hiveCdhVer', { dataSource }),
       authZid: 'cube.js',
       ...config
     };
+
     const configuration = new Configuration(this.config);
+    
     this.pool = genericPool.createPool({
       create: async () => {
         const idl = new IDLContainer();
@@ -102,7 +118,10 @@ class HiveDriver extends BaseDriver {
       destroy: (connection) => connection.close()
     }, {
       min: 0,
-      max: this.config.maxPoolSize || 8,
+      max:
+        config.maxPoolSize ||
+        getEnv('dbMaxPoolSize', { dataSource }) ||
+        8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

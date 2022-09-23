@@ -23,7 +23,6 @@ const { version } = require('../../package.json');
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
-    dataSource: string,
     readOnly?: boolean,
     // common bucket config
     bucketType?: string,
@@ -103,17 +102,16 @@ export class DatabricksDriver extends JDBCDriver {
    */
   public constructor(
     conf: Partial<DatabricksDriverConfiguration> & {
-      dataSource: string,
-      maxPoolSize: number,
-    } = {
-      dataSource: assertDataSource('default'),
-      maxPoolSize: 8,
-    },
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {},
   ) {
-    const { dataSource } = conf;
+    const dataSource =
+      conf.dataSource ||
+      assertDataSource('default');
+
     const config: DatabricksDriverConfiguration = {
       ...conf,
-      dataSource,
       dbType: 'databricks',
       drivername: 'com.simba.spark.jdbc.Driver',
       customClassPath: undefined,

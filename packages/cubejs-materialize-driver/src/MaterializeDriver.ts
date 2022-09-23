@@ -10,6 +10,9 @@ export type ReadableStreamTableDataWithTypes = StreamTableDataWithTypes & {
   rowStream: Readable;
 };
 
+/**
+ * Materialize driver class.
+ */
 export class MaterializeDriver extends PostgresDriver {
   /**
    * Returns default concurrency value.
@@ -18,7 +21,15 @@ export class MaterializeDriver extends PostgresDriver {
     return 2;
   }
 
-  public constructor(options: PostgresDriverConfiguration = {}) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    options: PostgresDriverConfiguration & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {},
+  ) {
     super(options);
   }
 
