@@ -138,16 +138,13 @@ export class CubeSymbols {
         preAggregation.type = 'rollup';
       }
 
-      if (preAggregation.scheduledRefresh === undefined) {
-        if (preAggregation.type === 'rollupJoin') {
-          preAggregation.scheduledRefresh = false;
-        } else {
-          preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
-        }
+      if (preAggregation.scheduledRefresh === undefined && preAggregation.type !== 'rollupJoin' && preAggregation.type !== 'rollupLambda') {
+        preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
       }
 
-      if (preAggregation.external === undefined) {
+      if (preAggregation.external === undefined && preAggregation.type !== 'rollupLambda') {
         preAggregation.external =
+          // TODO remove rollupJoin from this list and update validation
           ['rollup', 'rollupJoin'].includes(preAggregation.type) &&
           getEnv('externalDefault');
       }

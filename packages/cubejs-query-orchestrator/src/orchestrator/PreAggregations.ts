@@ -107,6 +107,20 @@ type VersionEntry = {
   naming_version?: number
 };
 
+type IndexesSql = { sql: [string, unknown[]], indexName: string }[];
+type InvalidationKeys = unknown[];
+
+type QueryKey = [QueryTuple, IndexesSql, InvalidationKeys] | [QueryTuple, InvalidationKeys];
+
+type QueryOptions = {
+  queryKey: QueryKey;
+  newVersionEntry: VersionEntry;
+  query: string;
+  values: unknown[];
+  requestId: string;
+  buildRangeEnd?: string;
+};
+
 type TableCacheEntry = {
   // eslint-disable-next-line camelcase
   table_name?: string;
@@ -748,18 +762,18 @@ export class PreAggregationLoader {
     );
   }
 
-  protected preAggregationQueryKey(invalidationKeys) {
+  protected preAggregationQueryKey(invalidationKeys: InvalidationKeys): QueryKey {
     return this.preAggregation.indexesSql && this.preAggregation.indexesSql.length ?
       [this.preAggregation.loadSql, this.preAggregation.indexesSql, invalidationKeys] :
       [this.preAggregation.loadSql, invalidationKeys];
   }
 
-  protected targetTableName(versionEntry): string {
+  protected targetTableName(versionEntry: VersionEntry): string {
     // eslint-disable-next-line no-use-before-define
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(newVersionEntry: VersionEntry, invalidationKeys, client) {
+  public refresh(newVersionEntry: VersionEntry, invalidationKeys: InvalidationKeys, client) {
     let refreshStrategy = this.refreshStoreInSourceStrategy;
     if (this.preAggregation.external) {
       const readOnly =
@@ -790,7 +804,7 @@ export class PreAggregationLoader {
     );
   }
 
-  protected queryOptions(invalidationKeys, query, params, targetTableName, newVersionEntry) {
+  protected queryOptions(invalidationKeys: InvalidationKeys, query: string, params: unknown[], targetTableName: string, newVersionEntry: VersionEntry) {
     return {
       queryKey: this.preAggregationQueryKey(invalidationKeys),
       query,
@@ -804,9 +818,9 @@ export class PreAggregationLoader {
 
   protected async refreshStoreInSourceStrategy(
     client: DriverInterface,
-    newVersionEntry,
+    newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
-    invalidationKeys
+    invalidationKeys: InvalidationKeys
   ) {
     const [loadSql, params] =
         Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
@@ -838,10 +852,10 @@ export class PreAggregationLoader {
   }
 
   protected async refreshWriteStrategy(
-    client,
+    client: DriverInterface,
     newVersionEntry: VersionEntry,
-    saveCancelFn,
-    invalidationKeys,
+    saveCancelFn: SaveCancelFn,
+    invalidationKeys: InvalidationKeys,
   ) {
     const capabilities = client?.capabilities();
 
@@ -863,12 +877,12 @@ export class PreAggregationLoader {
     client: DriverInterface,
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
-    invalidationKeys,
+    invalidationKeys: InvalidationKeys,
     withTempTable: boolean
   ) {
     await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
     const targetTableName = this.targetTableName(newVersionEntry);
-    const queryOptions = this.prepareWriteStrategy(
+    const queryOptions = await this.prepareWriteStrategy(
       client,
       targetTableName,
       newVersionEntry,
@@ -910,7 +924,7 @@ export class PreAggregationLoader {
   protected async cleanupWriteStrategy(
     client: DriverInterface,
     targetTableName: string,
-    queryOptions,
+    queryOptions: QueryOptions,
     saveCancelFn: SaveCancelFn,
     withTempTable: boolean
   ) {
@@ -935,9 +949,9 @@ export class PreAggregationLoader {
     targetTableName: string,
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
-    invalidationKeys,
+    invalidationKeys: InvalidationKeys,
     withTempTable: boolean
-  ) {
+  ): Promise<QueryOptions> {
     if (withTempTable) {
       const [loadSql, params] =
       Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
@@ -972,8 +986,8 @@ export class PreAggregationLoader {
   protected async refreshReadOnlyExternalStrategy(
     client: DriverInterface,
     newVersionEntry: VersionEntry,
-    saveCancelFn,
-    invalidationKeys
+    saveCancelFn: SaveCancelFn,
+    invalidationKeys: InvalidationKeys
   ) {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
@@ -1034,7 +1048,7 @@ export class PreAggregationLoader {
     client: DriverInterface,
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
-    queryOptions: any,
+    queryOptions: QueryOptions,
     withTempTable: boolean
   ) {
     const table = this.targetTableName(newVersionEntry);
@@ -1066,7 +1080,7 @@ export class PreAggregationLoader {
   /**
    * prepares download data when temp table = true
    */
-  protected async getTableDataWithTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: any, externalDriverCapabilities: DriverCapabilities) {
+  protected async getTableDataWithTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions, externalDriverCapabilities: DriverCapabilities) {
     let tableData: DownloadTableData;
 
     if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
@@ -1100,7 +1114,7 @@ export class PreAggregationLoader {
   /**
    * prepares download data when temp table = false
    */
-  protected async getTableDataWithoutTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: any, externalDriverCapabilities: DriverCapabilities) {
+  protected async getTableDataWithoutTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions, externalDriverCapabilities: DriverCapabilities) {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
 
@@ -1133,7 +1147,7 @@ export class PreAggregationLoader {
     tableData: DownloadTableData,
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
-    queryOptions: any
+    queryOptions: QueryOptions
   ) {
     const externalDriver: DriverInterface = await this.externalDriverFactory();
     const table = this.targetTableName(newVersionEntry);
@@ -1148,7 +1162,7 @@ export class PreAggregationLoader {
         this.preAggregation.uniqueKeyColumns,
         queryOptions,
         this.preAggregation.aggregationsColumns,
-        this.prepareCreateTableIndexes(newVersionEntry, queryOptions),
+        this.prepareCreateTableIndexes(newVersionEntry),
       )
     ).catch((error: any) => {
       this.logger('Uploading external pre-aggregation error', { ...queryOptions, error: error?.stack || error?.message });
@@ -1160,7 +1174,7 @@ export class PreAggregationLoader {
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true, queryOptions);
   }
 
-  protected async createIndexes(driver, newVersionEntry, saveCancelFn, queryOptions) {
+  protected async createIndexes(driver, newVersionEntry: VersionEntry, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions) {
     const indexesSql = this.prepareIndexesSql(newVersionEntry, queryOptions);
     for (let i = 0; i < indexesSql.length; i++) {
       const [query, params] = indexesSql[i].sql;
@@ -1168,7 +1182,7 @@ export class PreAggregationLoader {
     }
   }
 
-  protected prepareIndexesSql(newVersionEntry, queryOptions) {
+  protected prepareIndexesSql(newVersionEntry: VersionEntry, queryOptions: QueryOptions) {
     if (!this.preAggregation.indexesSql || !this.preAggregation.indexesSql.length) {
       return [];
     }
@@ -1190,7 +1204,7 @@ export class PreAggregationLoader {
     });
   }
 
-  protected prepareCreateTableIndexes(newVersionEntry, queryOptions) {
+  protected prepareCreateTableIndexes(newVersionEntry: VersionEntry) {
     if (!this.preAggregation.createTableIndexes || !this.preAggregation.createTableIndexes.length) {
       return [];
     }
@@ -1208,7 +1222,7 @@ export class PreAggregationLoader {
     justCreatedTable: string,
     saveCancelFn: SaveCancelFn,
     external: boolean,
-    queryOptions: any
+    queryOptions: QueryOptions
   ) {
     await this.preAggregations.addTableUsed(justCreatedTable);
 

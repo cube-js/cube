@@ -273,24 +273,19 @@ export class QueryCache {
   }
 
   private async csvQuery(client, q) {
-    const tableData = await client.stream(q.query, q.values, q);
+    const tableData = await client.downloadQueryResults(q.query, q.values, q);
     const headers = tableData.types.map(c => c.name);
     const writer = csvWriter({
       headers,
       sendHeaders: false,
     });
-    const errors = [];
-    const csvPipeline = await pipeline(tableData.rowStream, writer, (err) => {
-      if (err) {
-        errors.push(err);
-      }
-    });
-    const lines = await streamToArray(csvPipeline);
+    tableData.rows.forEach(
+      row => writer.write(row)
+    );
+    writer.end();
+    const lines = await streamToArray(writer);
     if (tableData.release) {
       await tableData.release();
-    }
-    if (errors.length > 0) {
-      throw new Error(`Lambda query errors ${errors.join(', ')}`);
     }
     const rowCount = lines.length;
     const csvRows = lines.join('');

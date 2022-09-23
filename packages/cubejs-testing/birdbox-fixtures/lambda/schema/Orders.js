@@ -2,8 +2,45 @@ cube(`Orders`, {
   sql: `SELECT * FROM public.orders`,
 
   preAggregations: {
-    ordersByCompletedAt: {
+    ordersByCompletedAtMonthLambda: {
+      type: `rollupLambda`,
+      rollups: [ordersByCompletedAtMonth],
       unionWithSourceData: true,
+    },
+
+    ordersByCompletedAtLambda: {
+      type: `rollupLambda`,
+      rollups: [ordersByCompletedAt],
+      unionWithSourceData: true,
+    },
+
+    ordersByCompletedAtAndUserIdLambda: {
+      type: `rollupLambda`,
+      measures: [count],
+      dimensions: [status, userId],
+      timeDimension: completedAt,
+      granularity: `day`,
+      rollups: [ordersByCompletedAtAndUserId],
+      unionWithSourceData: true,
+    },
+
+    ordersByCompletedAtMonth: {
+      measures: [count],
+      timeDimension: completedAt,
+      granularity: `month`,
+      partitionGranularity: `month`,
+      buildRangeStart: {
+        sql: `SELECT DATE('2020-02-7')`,
+      },
+      buildRangeEnd: {
+        sql: `SELECT DATE('2020-05-7')`,
+      },
+      refreshKey: {
+        every: '1 day'
+      },
+    },
+
+    ordersByCompletedAt: {
       measures: [count],
       dimensions: [status],
       timeDimension: completedAt,
@@ -21,7 +58,6 @@ cube(`Orders`, {
     },
 
     ordersByCompletedAtAndUserId: {
-      unionWithSourceData: true,
       measures: [count],
       dimensions: [status, userId],
       timeDimension: completedAt,

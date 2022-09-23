@@ -486,6 +486,22 @@ When using cloud storage, it is important to correctly configure any data
 retention policies to clean up the data in the export bucket as Cube.js does not
 currently manage this. For most use-cases, 1 day is sufficient.
 
+## Streaming pre-aggregations
+
+Streaming pre-aggregations are different from traditional pre-aggregations in the way they are being updated. Traditional pre-aggregations follow the “pull” model — Cube **pulls updates** from the data source based on some cadence and/or condition. Streaming pre-aggregations follow the “push” model — Cube **subscribes to the updates** from the data source and always keeps pre-aggregation up to date. 
+
+You don’t need to define `refreshKey` for streaming pre-aggregations. Whether pre-aggregation is streaming or not is defined by the data source. 
+
+Currently, Cube supports only one streaming data source - [ksqlDB](/config/databases/ksqldb). All pre-aggregations where data source is ksqlDB are streaming. 
+
+We’re working on supporting streaming pre-aggregations for the following data sources -
+
+- Materialize
+- Flink SQL
+- Spark Streaming
+
+Please [let us know](https://cube.dev/contact) if you are interested in early access to any of these drivers or would like Cube to support any other SQL streaming engine.
+
 [ref-caching-in-mem-default-refresh-key]: /caching#default-refresh-keys
 [ref-config-db]: /config/databases
 [ref-config-driverfactory]: /config#driver-factory
