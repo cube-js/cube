@@ -1,7 +1,7 @@
 federation_version: 2
 subgraphs:
   apolloserver:
-    routing_url: http://35.192.83.151/graphql
+    routing_url: https://apollo.examplescube.dev/graphql
     schema:
       file: ./apollo.graphql
   cube:
