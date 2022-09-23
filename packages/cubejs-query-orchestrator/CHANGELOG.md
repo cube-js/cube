@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
+
+
+### Bug Fixes
+
+* Cannot read 'map' property of undefined for `rollupLambda` in BigQuery ([47f700f](https://github.com/cube-js/cube.js/commit/47f700fbece156f0d32ba4a9854ecb826bc4641b))
+
+
+
+
+
 ## [0.30.73](https://github.com/cube-js/cube.js/compare/v0.30.72...v0.30.73) (2022-09-19)
 
 

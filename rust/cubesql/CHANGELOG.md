@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow interval sum chaining ([eabbdc2](https://github.com/cube-js/cube.js/commit/eabbdc27b2a4cd38b4b722ad0c63e2d698868742))
+
+
+
+
+
 ## [0.30.74](https://github.com/cube-js/cube.js/compare/v0.30.73...v0.30.74) (2022-09-20)
 
 

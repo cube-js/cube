@@ -214,6 +214,49 @@ describe('lambda', () => {
     );
   });
 
+  test('query month', async () => {
+    const query: Query = {
+      measures: ['Orders.count'],
+      timeDimensions: [
+        {
+          dimension: 'Orders.completedAt',
+          granularity: 'month'
+        }
+      ],
+      order: {
+        'Orders.completedAt': 'desc',
+      },
+      limit: 3
+    };
+    const response = await client.load(query);
+
+    // @ts-ignore
+    expect(Object.keys(response.loadResponse.results[0].usedPreAggregations)).toEqual([
+      'dev_pre_aggregations.orders_orders_by_completed_at_month'
+    ]);
+
+    // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
+    expect(response.rawData()).toEqual(
+      [
+        {
+          'Orders.completedAt': '2021-12-01T00:00:00.000',
+          'Orders.completedAt.month': '2021-12-01T00:00:00.000',
+          'Orders.count': '2',
+        },
+        {
+          'Orders.completedAt': '2021-01-01T00:00:00.000',
+          'Orders.completedAt.month': '2021-01-01T00:00:00.000',
+          'Orders.count': '127',
+        },
+        {
+          'Orders.completedAt': '2020-12-01T00:00:00.000',
+          'Orders.completedAt.month': '2020-12-01T00:00:00.000',
+          'Orders.count': '808',
+        },
+      ]
+    );
+  });
+
   test('query with 2 dimensions', async () => {
     const response = await client.load({
       measures: ['Orders.count'],

@@ -2576,7 +2576,7 @@ mod tests {
         Config::test("inmemory_compaction")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
-                c.compaction_chunks_count_threshold = 10;
+                c.compaction_chunks_count_threshold = 6;
                 c.not_used_timeout = 0;
                 c.compaction_in_memory_chunks_count_threshold = 5;
                 c.compaction_in_memory_chunks_max_lifetime_threshold = 1;
@@ -2619,15 +2619,20 @@ mod tests {
                     .unwrap();
                 assert_eq!(chunks.len(), 1);
                 assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 6);
+                assert_eq!(chunks.first().unwrap().get_row().in_memory(), true);
                 //waiting for more then compaction_chunks_count_threshold
                 Delay::new(Duration::from_millis(2000)).await;
-                service
-                    .exec_query(&format!(
-                        "INSERT INTO foo.numbers (a, num, __seq) VALUES ({}, {}, {})",
-                        7, 7, 7
-                    ))
-                    .await
-                    .unwrap();
+                for i in 0..6 {
+                    service
+                        .exec_query(&format!(
+                            "INSERT INTO foo.numbers (a, num, __seq) VALUES ({}, {}, {})",
+                            i + 1,
+                            i + 1,
+                            i + 1
+                        ))
+                        .await
+                        .unwrap();
+                }
                 Delay::new(Duration::from_millis(1000)).await;
                 let active_partitions = services
                     .meta_store
@@ -2643,7 +2648,7 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(chunks.len(), 1);
-                assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 1);
+                assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 6);
             })
             .await
     }
