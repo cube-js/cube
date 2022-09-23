@@ -3,14 +3,18 @@ import { Client } from 'twitter-api-sdk'
 
 dotenv.config()
 
-const client = new Client(process.env.TWITTER_BEARER_TOKEN)
+const clients = process.env.TWITTER_BEARER_TOKENS.split(',').map(token => new Client(token))
 
 let requests = 0
 
 export async function load() {
   requests++
 
+  const keyIndex = Math.floor(Math.random() * clients.length)
+  const client = clients[keyIndex]
+
   const response = await client.tweets.listsIdTweets(process.env.TWITTER_LISTS, {
+    max_results: process.env.TWITTER_BATCH_SIZE || 10,
     "tweet.fields": [
       "attachments",
       "author_id",
@@ -64,19 +68,19 @@ export async function load() {
     author: response.includes.users.find(user => user.id === tweet.author_id)
   }))
 
-  log(tweets);
+  log(tweets, keyIndex);
 
   return tweets
 }
 
 const previouslySeenIds = []
 
-async function log(tweets) {
+async function log(tweets, keyIndex = 0) {
   const ids = tweets.map(tweet => tweet.id)
   const newButPreviouslySeenIds = ids.filter(id => previouslySeenIds.includes(id))
 
   console.log(
-    `Twitter API request #${requests}: ` +
+    `Twitter API request #${requests} with key #${keyIndex}: ` +
     `${ids.length} tweets, ` +
     `${ids.length - newButPreviouslySeenIds.length} new`
   )
