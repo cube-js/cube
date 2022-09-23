@@ -91,12 +91,17 @@ export function isDownloadTableMemoryData(tableData: any): tableData is Download
   return Boolean(tableData.rows);
 }
 
-export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData;
+export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData;
 
 export interface ExternalDriverCompatibilities {
   csvImport?: true,
   streamImport?: true,
 }
+
+export interface DriverCapabilities extends ExternalDriverCompatibilities {
+  unloadWithoutTempTable?: true,
+}
+
 export type StreamOptions = {
   highWaterMark: number;
 };
@@ -117,8 +122,14 @@ export type CreateTableIndex = {
   columns: string[]
 };
 
+type UnloadQuery = {
+  sql: string,
+  params: unknown[]
+};
+
 export type UnloadOptions = {
   maxFileSize: number,
+  query?: UnloadQuery;
 };
 
 export type QueryOptions = {
@@ -159,5 +170,5 @@ export interface DriverInterface {
   // Shutdown the driver
   release(): Promise<void>
 
-  capabilities(): ExternalDriverCompatibilities;
+  capabilities(): DriverCapabilities;
 }
