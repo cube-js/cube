@@ -6,6 +6,12 @@ import {
   GenericDataBaseType,
   StreamTableData,
   UnloadOptions,
+  TableColumn,
+  DriverCapabilities,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
+  Rows,
+  MaxFileSizeOptions
 } from '@cubejs-backend/base-driver';
 import * as crypto from 'crypto';
 import { formatToTimeZone } from 'date-fns-timezone';
@@ -97,7 +103,7 @@ const SnowflakeToGenericType: Record<string, GenericDataBaseType> = {
   // It's a limitation for now, because anyway we dont work with JSON objects in Cube Store.
   object: 'HLL_SNOWFLAKE',
   number: 'decimal',
-  timestamp_ntz: 'timestamp'
+  timestamp_ntz: 'timestamp',
 };
 
 // User can create own stage to pass permission restrictions.
@@ -309,8 +315,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
-    const connection = await this.getConnection();
-
     if (!this.config.exportBucket) {
       throw new Error('Unload is not configured');
     }
@@ -320,28 +324,70 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         `Unsupported EXPORT_BUCKET_TYPE, supported: ${['s3', 'gcs'].join(',')}`
       );
     }
-
-    const { bucketType, bucketName } = this.config.exportBucket;
+    
     const exportPathName = crypto.randomBytes(10).toString('hex');
     const optionsString = this.prepareOptionsToExportString(options);
+   
+    const types = options.query ?
+      await this.unloadFromSql(exportPathName, options.query.sql, options.query.params, optionsString) :
+      await this.unloadFromTable(tableName, exportPathName, optionsString);
 
+    const csvFile = await this.getCsvFiles({ exportPathName });
+
+    return {
+      csvFile,
+      types,
+    };
+  }
+
+  private async unloadFromTable(tableName: string, exportPathName: string, optionsString: string): Promise<TableColumn[]> {
+    const connection = await this.getConnection();
+    const { bucketType, bucketName } = <SnowflakeDriverExportBucket> this.config.exportBucket;
     const result = await this.execute<UnloadResponse[]>(
       connection,
       `COPY INTO '${bucketType}://${bucketName}/${exportPathName}/' FROM ${tableName} ${optionsString}`,
       [],
       false
     );
+
     if (!result) {
       throw new Error('Snowflake doesn\'t return anything on UNLOAD operation');
     }
 
     if (result[0].rows_unloaded === '0') {
-      return {
-        csvFile: [],
-      };
+      throw new Error('Snowflake unloads zero rows on UNLOAD operation');
     }
 
-    return this.getCsvFiles({ exportPathName });
+    const types = await this.tableColumnTypes(tableName);
+
+    return types;
+  }
+
+  private async unloadFromSql(exportPathName: string, sql: string, values: unknown[], optionsString: string): Promise<TableColumn[]> {
+    const connection = await this.getConnection();
+    const { bucketType, bucketName } = <SnowflakeDriverExportBucket> this.config.exportBucket;
+
+    const result = await this.execute<UnloadResponse[]>(
+      connection,
+      `COPY INTO '${bucketType}://${bucketName}/${exportPathName}/' FROM (${sql}) ${optionsString}`,
+      values,
+      false
+    );
+
+    if (!result) {
+      throw new Error('Snowflake doesn\'t return anything on UNLOAD operation');
+    }
+
+    if (result[0].rows_unloaded === '0') {
+      throw new Error('Snowflake unloads zero rows on UNLOAD operation');
+    }
+
+    await this.execute(connection, `${sql}`, values, false);
+    const types = await this.execute<TableColumn[]>(connection, 'DESC RESULT last_query_id()', values, false);
+
+    const mappedTypes = types.map(t => ({ name: t.name, type: this.toGenericType(t.type) }));
+
+    return mappedTypes;
   }
 
   protected async getCsvFiles(
@@ -350,7 +396,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }: {
       exportPathName: string;
     }
-  ): Promise<DownloadTableCSVData> {
+  ): Promise<string[]> {
     const { bucketType, bucketName } = <SnowflakeDriverExportBucket> this.config.exportBucket;
     // eslint-disable-next-line default-case
     switch (bucketType) {
@@ -388,7 +434,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private prepareOptionsToExportString(options: UnloadOptions): string {
+  private prepareOptionsToExportString(options: MaxFileSizeOptions): string {
     // @link https://docs.snowflake.com/en/sql-reference/sql/copy-into-location.html
     const optionsToExport: Record<string, string> = {
       HEADER: 'true',
@@ -419,7 +465,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     storage: S3,
     bucketName: string,
     exportPathName: string
-  ): Promise<DownloadTableCSVData> {
+  ): Promise<string[]> {
     const list = await storage.listObjectsV2({
       Bucket: bucketName,
       Prefix: exportPathName,
@@ -435,9 +481,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         })
       );
 
-      return {
-        csvFile,
-      };
+      return csvFile;
     }
 
     throw new Error('Unable to UNLOAD table, there are no files in S3 storage');
@@ -447,7 +491,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     storage: Storage,
     bucketName: string,
     exportPathName: string
-  ): Promise<DownloadTableCSVData> {
+  ): Promise<string[]> {
     const bucket = storage.bucket(bucketName);
 
     const [files] = await bucket.getFiles({ prefix: `${exportPathName}/` });
@@ -461,7 +505,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         return url;
       }));
 
-      return { csvFile };
+      return csvFile;
     }
 
     throw new Error('Unable to UNLOAD table, there are no files in GCS storage');
@@ -585,10 +629,20 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public toGenericType(columnType: string) {
-    return SnowflakeToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
+    const castDataType = (value: string) => {
+      const match = value.match(/^NUMBER\(([0-9]+),([0-9]+)\)$/);
+
+      if (match) {
+        return `decimal(${match[1]},${match[2]})`;
+      }
+
+      return undefined;
+    };
+    
+    return SnowflakeToGenericType[columnType.toLowerCase()] || castDataType(columnType) || super.toGenericType(columnType);
   }
 
-  public async tableColumnTypes(table: string) {
+  public async tableColumnTypes(table: string): Promise<TableColumn[]> {
     const [schema, name] = table.split('.');
 
     const columns = await this.query<{ COLUMN_NAME: string, DATA_TYPE: string }[]>(
@@ -606,5 +660,33 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   public async getTablesQuery(schemaName: string) {
     const tables = await super.getTablesQuery(schemaName.toUpperCase());
     return tables.map(t => ({ table_name: t.TABLE_NAME && t.TABLE_NAME.toLowerCase() }));
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      unloadWithoutTempTable: true,
+    };
+  }
+
+  public readOnly(): boolean {
+    return true;
+  }
+
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    const exportPathName = crypto.randomBytes(10).toString('hex');
+    if (await this.isUnloadSupported()) {
+      const optionString = this.prepareOptionsToExportString({ maxFileSize: options.maxFileSize });
+      const types = await this.unloadFromSql(exportPathName, query, values, optionString);
+
+      const csvFile = await this.getCsvFiles({ exportPathName });
+
+      return { csvFile, types };
+    } else {
+      const connection = await this.getConnection();
+      const rows = await this.execute<Rows>(connection, query, values);
+      const types = await this.execute<TableColumn[]>(connection, 'DESC RESULT last_query_id()', values, false);
+
+      return { rows, types };
+    }
   }
 }

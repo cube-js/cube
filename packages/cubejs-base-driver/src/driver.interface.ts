@@ -106,11 +106,15 @@ export type StreamOptions = {
   highWaterMark: number;
 };
 
+export type MaxFileSizeOptions = {
+  maxFileSize: number;
+};
+
 export interface DownloadQueryResultsBase {
   types: TableStructure
 }
 
-export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities;
+export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities & MaxFileSizeOptions;
 
 export type IndexesSQL = {
   sql: [string, unknown[]];
@@ -127,8 +131,7 @@ type UnloadQuery = {
   params: unknown[]
 };
 
-export type UnloadOptions = {
-  maxFileSize: number,
+export type UnloadOptions = MaxFileSizeOptions & {
   query?: UnloadQuery;
 };
 
@@ -160,7 +163,7 @@ export interface DriverInterface {
   // Download table
   downloadTable: (table: string, options: ExternalDriverCompatibilities) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
   // Some drivers can implement streaming from SQL
-  stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
+  stream?: (query: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
   // Some drivers can implement UNLOAD data to external storage
   unload?: (table: string, options: UnloadOptions) => Promise<DownloadTableCSVData>;
   // Some drivers can implement UNLOAD data to external storage

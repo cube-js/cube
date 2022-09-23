@@ -1009,6 +1009,7 @@ export class PreAggregationLoader {
         ...queryOptions,
         ...capabilities,
         ...this.getStreamingOptions(),
+        ...this.getUnloadOptions(),
       }
     )).catch((error: any) => {
       this.logger('Downloading external pre-aggregation via query error', { ...queryOptions, error: error.stack || error.message });
