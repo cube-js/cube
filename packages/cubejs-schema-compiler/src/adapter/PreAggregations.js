@@ -1000,7 +1000,7 @@ export class PreAggregations {
       .toLowerCase();
   }
 
-  evaluateAllReferences(cube, aggregation, preAggregationName ) {
+  evaluateAllReferences(cube, aggregation, preAggregationName) {
     const evaluateReferences = () => {
       const references = this.query.cubeEvaluator.evaluatePreAggregationReferences(cube, aggregation);
       if (aggregation.type === 'rollupLambda') {
@@ -1019,7 +1019,7 @@ export class PreAggregations {
         }
       }
       return references;
-    }
+    };
     if (!preAggregationName) {
       return evaluateReferences();
     }
