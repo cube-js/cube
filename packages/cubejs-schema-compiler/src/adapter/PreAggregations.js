@@ -736,9 +736,11 @@ export class PreAggregations {
       ['buildRollupJoin', JSON.stringify(preAggObj), JSON.stringify(preAggObjsToJoin)],
       () => {
         const targetJoins = this.resolveJoinMembers(
+          // TODO join hints?
           this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(preAggObj))
         );
         const existingJoins = R.unnest(preAggObjsToJoin.map(
+          // TODO join hints?
           p => this.resolveJoinMembers(this.query.joinGraph.buildJoin(this.cubesFromPreAggregation(p)))
         ));
         const nonExistingJoins = targetJoins.filter(target => !existingJoins.find(

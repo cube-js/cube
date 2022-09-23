@@ -220,7 +220,7 @@ class BaseQuery {
 
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
-        const join = this.joinGraph.buildJoin(this.collectCubeNames(true));
+        const join = this.joinGraph.buildJoin(this.collectJoinHints(true));
         if (!join) {
           return undefined;
         }
@@ -235,7 +235,7 @@ class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
 
-    this.join = this.joinGraph.buildJoin(this.allCubeNames);
+    this.join = this.joinGraph.buildJoin(this.allJoinHints);
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption =
       this.options.preAggregationsSchema != null ? this.options.preAggregationsSchema : DEFAULT_PREAGGREGATIONS_SCHEMA;
@@ -289,6 +289,13 @@ class BaseQuery {
       this.collectedCubeNames = this.collectCubeNames();
     }
     return this.collectedCubeNames;
+  }
+
+  get allJoinHints() {
+    if (!this.collectedJoinHints) {
+      this.collectedJoinHints = this.collectJoinHints();
+    }
+    return this.collectedJoinHints;
   }
 
   get dataSource() {
@@ -1264,8 +1271,8 @@ class BaseQuery {
     );
 
     if (shouldBuildJoinForMeasureSelect) {
-      const cubes = this.collectFrom(measures, this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
-      const measuresJoin = this.joinGraph.buildJoin(cubes);
+      const joinHints = this.collectFrom(measures, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
+      const measuresJoin = this.joinGraph.buildJoin(joinHints);
       if (measuresJoin.multiplicationFactor[keyCubeName]) {
         throw new UserError(
           `'${measures.map(m => m.measure).join(', ')}' reference cubes that lead to row multiplication.`
@@ -1323,9 +1330,10 @@ class BaseQuery {
 
   checkShouldBuildJoinForMeasureSelect(measures, keyCubeName) {
     return measures.map(measure => {
-      const cubeNames = this.collectFrom([measure], this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
-      if (R.any(cubeName => keyCubeName !== cubeName, cubeNames)) {
-        const measuresJoin = this.joinGraph.buildJoin(cubeNames);
+      const cubes = this.collectFrom([measure], this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
+      const joinHints = this.collectFrom([measure], this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
+      if (R.any(cubeName => keyCubeName !== cubeName, cubes)) {
+        const measuresJoin = this.joinGraph.buildJoin(joinHints);
         if (measuresJoin.multiplicationFactor[keyCubeName]) {
           throw new UserError(
             `'${measure.measure}' references cubes that lead to row multiplication. Please rewrite it using sub query.`
@@ -1419,6 +1427,14 @@ class BaseQuery {
       excludeTimeDimensions,
       this.collectCubeNamesFor.bind(this),
       'collectCubeNamesFor'
+    );
+  }
+
+  collectJoinHints(excludeTimeDimensions = false) {
+    return this.collectFromMembers(
+      excludeTimeDimensions,
+      this.collectJoinHintsFor.bind(this),
+      'collectJoinHintsFor'
     );
   }
 
@@ -1643,10 +1659,26 @@ class BaseQuery {
     }
   }
 
+  pushJoinHints(joinHints) {
+    if (this.safeEvaluateSymbolContext().joinHints && joinHints) {
+      if (joinHints.length === 1) {
+        [joinHints] = joinHints;
+      }
+      this.safeEvaluateSymbolContext().joinHints.push(joinHints);
+    }
+  }
+
   pushMemberNameForCollectionIfNecessary(cubeName, name) {
     const pathFromArray = this.cubeEvaluator.pathFromArray([cubeName, name]);
     if (this.cubeEvaluator.byPathAnyType(pathFromArray).ownedByCube) {
-      this.pushCubeNameForCollectionIfNecessary(cubeName);
+      const joinHints = this.cubeEvaluator.joinHints();
+      if (joinHints && joinHints.length) {
+        joinHints.forEach(cube => this.pushCubeNameForCollectionIfNecessary(cube));
+        this.pushJoinHints(joinHints);
+      } else {
+        this.pushCubeNameForCollectionIfNecessary(cubeName);
+        this.pushJoinHints(cubeName);
+      }
     }
     const context = this.safeEvaluateSymbolContext();
     if (context.memberNames && name) {
@@ -1766,6 +1798,7 @@ class BaseQuery {
     options = options || {};
     const self = this;
     const { cubeEvaluator } = this;
+    const joinHints = [];
     return cubeEvaluator.resolveSymbolsCall(sql, (name) => {
       const nextCubeName = cubeEvaluator.symbols[name] && name || cubeName;
       const resolvedSymbol =
@@ -1782,7 +1815,8 @@ class BaseQuery {
       sqlResolveFn: options.sqlResolveFn || ((symbol, cube, n) => self.evaluateSymbolSql(cube, n, symbol)),
       cubeAliasFn: self.cubeAlias.bind(self),
       contextSymbols: this.parametrizedContextSymbols(),
-      query: this
+      query: this,
+      joinHints
     });
   }
 
@@ -1815,6 +1849,16 @@ class BaseQuery {
     );
 
     return R.uniq(context.cubeNames);
+  }
+
+  collectJoinHintsFor(fn) {
+    const context = { joinHints: [] };
+    this.evaluateSymbolSqlWithContext(
+      fn,
+      context
+    );
+
+    return context.joinHints;
   }
 
   collectMemberNamesFor(fn) {

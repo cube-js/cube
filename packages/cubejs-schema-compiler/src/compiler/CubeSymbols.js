@@ -193,6 +193,11 @@ export class CubeSymbols {
     return this.funcArgumentsValues[funcDefinition];
   }
 
+  joinHints() {
+    const { joinHints } = this.resolveSymbolsCallContext || {};
+    return joinHints;
+  }
+
   resolveSymbol(cubeName, name) {
     const { sqlResolveFn, contextSymbols } = this.resolveSymbolsCallContext || {};
     if (CONTEXT_SYMBOLS[name]) {
@@ -226,11 +231,15 @@ export class CubeSymbols {
           }
           return undefined;
         }
-        const { sqlResolveFn, cubeAliasFn, query } = self.resolveSymbolsCallContext || {};
+        const { sqlResolveFn, cubeAliasFn, query, joinHints } = self.resolveSymbolsCallContext || {};
         if (propertyName === 'toString') {
           return () => {
+            if (joinHints && joinHints.length === 0) {
+              joinHints.push(cube.cubeName());
+            }
             if (query) {
               query.pushCubeNameForCollectionIfNecessary(cube.cubeName());
+              query.pushJoinHints(joinHints);
             }
             return cubeAliasFn && cubeAliasFn(cube.cubeName()) || cube.cubeName();
           };
@@ -244,8 +253,17 @@ export class CubeSymbols {
         if (cube[propertyName]) {
           return { toString: () => sqlResolveFn(cube[propertyName], cubeName, propertyName) };
         }
+        if (self.symbols[propertyName]) {
+          if (joinHints) {
+            if (joinHints.length === 0) {
+              joinHints.push(cubeName);
+            }
+            joinHints.push(propertyName);
+          }
+          return this.cubeReferenceProxy(propertyName);
+        }
         if (typeof propertyName === 'string') {
-          throw new UserError(`${cubeName}.${propertyName} cannot be resolved`);
+          throw new UserError(`${cubeName}.${propertyName} cannot be resolved. There's no such member or cube.`);
         }
         return undefined;
       }
