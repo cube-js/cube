@@ -30,9 +30,10 @@ async function startGateway() {
     },
   })
   await server.start()
-  server.applyMiddleware({ app })  
+  server.applyMiddleware({ app, path: "/gateway/graphql" })  
 
   app.get('/', (req, res) => res.send('🚀 Gateway is running!'))
+  app.get('/gateway', (req, res) => res.send('🚀 Gateway is running!'))
   app.listen({ port: 4001 }, () =>
     console.log(`🚀 Gateway ready at http://localhost:4001`),
   )

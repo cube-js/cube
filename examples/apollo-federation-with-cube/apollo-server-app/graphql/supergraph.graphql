@@ -119,7 +119,7 @@ input FraudWhereInput
 scalar join__FieldSet
 
 enum join__Graph {
-  APOLLOSERVER @join__graph(name: "apolloserver", url: "http://35.192.83.151/graphql")
+  APOLLOSERVER @join__graph(name: "apolloserver", url: "https://apollo.examplescube.dev/graphql")
   CUBE @join__graph(name: "cube", url: "https://squealing-marksville.aws-eu-central-1.cubecloudapp.dev/cubejs-api/graphql")
 }
 
