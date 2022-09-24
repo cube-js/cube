@@ -15,6 +15,10 @@ export const DB_CAST = {
     SELECT_PREFIX: '',
     SELECT_SUFFIX: '',
   },
+  'databricks-jdbc': {
+    SELECT_PREFIX: '',
+    SELECT_SUFFIX: '',
+  },
   questdb: {
     SELECT_PREFIX: 'with tmp_tbl as (\n',
     SELECT_SUFFIX: ')\nselect * from tmp_tbl',
@@ -36,6 +40,10 @@ export const DATE_CAST = {
   postgres: {
     DATE_PREFIX: 'to_date(',
     DATE_SUFFIX: ', \'YYYY-MM-DD\')',
+  },
+  'databricks-jdbc': {
+    DATE_PREFIX: 'to_date(',
+    DATE_SUFFIX: ', \'y-M-d\')',
   },
   questdb: {
     DATE_PREFIX: 'to_date(',

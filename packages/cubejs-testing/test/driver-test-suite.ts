@@ -7,7 +7,13 @@ import { uniq } from 'ramda';
 import { BirdBox, Env, getBirdbox } from '../src';
 import { DriverTest } from './driverTests/driverTest';
 
-type SupportedDriverType = 'postgres' | 'questdb' | 'firebolt' | 'bigquery' | 'athena';
+type SupportedDriverType =
+  'postgres' |
+  'questdb' |
+  'firebolt' |
+  'bigquery' |
+  'athena' |
+  'databricks-jdbc';
 
 type TestSuite = {
   config?: Partial<Env>

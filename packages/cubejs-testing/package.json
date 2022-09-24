@@ -44,6 +44,8 @@
     "driver:postgres:snap": "jest --verbose --updateSnapshot -i dist/test/driver-postgres.test.js",
     "driver:questdb": "jest --verbose -i dist/test/driver-questdb.test.js",
     "driver:questdb:snap": "jest --verbose --updateSnapshot -i dist/test/driver-questdb.test.js",
+    "driver:databricks": "jest --verbose -i dist/test/driver-databricks.test.js",
+    "driver:databricks:snap": "jest --verbose --updateSnapshot -i dist/test/driver-databricks.test.js",
     "smoke:athena": "jest --verbose -i dist/test/smoke-athena.test.js",
     "smoke:athena:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-athena.test.js",
     "smoke:bigquery": "jest --verbose -i dist/test/smoke-bigquery.test.js",

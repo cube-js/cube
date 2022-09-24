@@ -48,7 +48,7 @@ interface Args {
   log: Log,
 }
 
-export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift';
+export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift' | 'databricks-jdbc';
 
 export type Schemas = string[];
 
@@ -102,6 +102,7 @@ const driverNameToFolderNameMapper: Record<DriverType, string> = {
   firebolt: 'postgresql',
   questdb: 'postgresql',
   redshift: 'postgresql',
+  'databricks-jdbc': 'databricks-jdbc'
 };
 
 /**
@@ -167,6 +168,9 @@ function clearTestData(type: DriverType) {
 function runSchemasGeneration(type: DriverType, schemas: Schemas) {
   const targetFolder = getTargetFolder(type);
 
+  if (!fs.existsSync(targetFolder)) {
+    fs.mkdirSync(targetFolder, { recursive: true });
+  }
   schemas.forEach((s) => {
     const originalContent = fs.readFileSync(
       path.join(SOURCE, s), 'utf8'
@@ -174,6 +178,7 @@ function runSchemasGeneration(type: DriverType, schemas: Schemas) {
 
     const { base } = path.parse(s);
     const updatedContent = originalContent.replace('_type_', type);
+
     fs.writeFileSync(
       path.join(targetFolder, base),
       updatedContent
@@ -321,6 +326,7 @@ export async function startBirdBoxFromContainer(
       'BIRDBOX_CUBESTORE_VERSION',
       process.env.BIRDBOX_CUBESTORE_VERSION
     )
+    .withEnv('CUBEJS_TELEMETRY', 'false')
     .up();
 
   const host = '127.0.0.1';
@@ -419,12 +425,17 @@ export async function startBirdBoxFromCli(
   let db: StartedTestContainer;
   let cli: ChildProcess;
 
-  if (!options.schemaDir) {
-    options.schemaDir = 'postgresql/schema';
-  }
+  if (options.schemas) {
+    options.schemaDir = `${options.type}/schema`;
+    options.cubejsConfig = `${options.type}/cube.js`;
+  } else {
+    if (!options.schemaDir) {
+      options.schemaDir = 'postgresql/schema';
+    }
 
-  if (!options.cubejsConfig) {
-    options.cubejsConfig = 'postgresql/single/cube.js';
+    if (!options.cubejsConfig) {
+      options.cubejsConfig = 'postgresql/single/cube.js';
+    }
   }
 
   if (options.loadScript) {
@@ -509,6 +520,8 @@ export async function startBirdBoxFromCli(
     );
   }
 
+  fs.writeFileSync(path.join(testDir, 'package.json'), '{}', { encoding: 'utf-8' });
+
   const env = {
     ...process.env,
     CUBEJS_DB_TYPE: options.type === 'postgresql'
@@ -518,6 +531,7 @@ export async function startBirdBoxFromCli(
     CUBEJS_API_SECRET: 'mysupersecret',
     CUBEJS_WEB_SOCKETS: 'true',
     CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
+    CUBEJS_TELEMETRY: 'false',
     ...options.env
       ? options.env
       : {
@@ -672,12 +686,13 @@ export async function getBirdbox(
       case Mode.CLI:
       case Mode.LOCAL: {
         birdbox = await startBirdBoxFromCli({
-          type,
+          type: type === 'postgres' ? 'postgresql' : type,
           env,
           log,
           cubejsConfig: options.cubejsConfig,
           schemaDir: options.schemaDir,
           useCubejsServerBinary: mode === Mode.LOCAL,
+          schemas: options?.schemas,
         });
         break;
       }
