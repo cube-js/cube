@@ -1,0 +1,41 @@
+---
+title: SQL Functions and Operators
+category: SQL API
+permalink: /backend/sql/reference/functions-operators
+subCategory: Reference
+menuOrder: 5
+---
+
+## Aggregation Functions
+
+### COUNT
+
+**Applies to: cube node, post-processing node**
+
+```sql
+COUNT(col)
+COUNT(*)
+```
+
+**In cube node**   
+`COUNT` function is used to query measures with type `count`.
+When * is specified, queries the first measure with type `count` for a given cube.
+
+
+**In post-processing node**    
+Counts the number of rows.
+When * is specified, the count returned is the total number of rows.
+
+
+
+### MEASURE
+
+**Applies to: cube nodes**
+
+```sql
+MEASURE(measure)
+```
+
+Special function that can be used as a wildcard function to query measures. Can be used to query any type of the measure.
+
+Can be used only with measures.
