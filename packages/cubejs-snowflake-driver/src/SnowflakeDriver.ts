@@ -440,7 +440,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       HEADER: 'true',
       INCLUDE_QUERY_ID: 'true',
       // the upper size limit (in bytes) of each file to be generated in parallel per thread
-      MAX_FILE_SIZE: (options.maxFileSize * 1024 * 1024).toFixed(),
+      MAX_FILE_SIZE: ((options.maxFileSize || 64) * 1024 * 1024).toFixed(),
       FILE_FORMAT: '(TYPE = CSV, COMPRESSION = GZIP, FIELD_OPTIONALLY_ENCLOSED_BY = \'"\')',
     };
 
