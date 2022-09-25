@@ -35,6 +35,8 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     awsRegion?: string,
     // Azure export bucket
     azureKey?: string,
+    dbCatalog?: string;
+    databricksStorageCredentialName?: string;
   };
 
 async function fileExistsOr(
@@ -130,6 +132,8 @@ export class DatabricksDriver extends JDBCDriver {
       awsRegion: conf?.awsRegion || getEnv('dbExportBucketAwsRegion'),
       // Azure export bucket
       azureKey: conf?.azureKey || getEnv('dbExportBucketAzureKey'),
+      dbCatalog: conf?.dbCatalog || getEnv('dbCatalog'),
+      databricksStorageCredentialName: conf?.databricksStorageCredentialName || getEnv('databricksStorageCredentialName')
     };
     super(config);
     this.config = config;
@@ -217,16 +221,25 @@ export class DatabricksDriver extends JDBCDriver {
     }));
   }
 
+  private getFullDbName(dbName?: string) {
+    const name = dbName || this.config.database;
+    if (this.config.dbCatalog) {
+      return `${this.quoteIdentifier(this.config.dbCatalog)}.${this.quoteIdentifier(name)}`;
+    }
+
+    return `${this.quoteIdentifier(name)}`;
+  }
+
   protected async getTables(): Promise<ShowTableRow[]> {
     if (this.config.database) {
-      return <any> this.query<ShowTableRow>(`SHOW TABLES IN ${this.quoteIdentifier(this.config.database)}`, []);
+      return <any> this.query<ShowTableRow>(`SHOW TABLES IN ${this.getFullDbName()}`, []);
     }
 
     const databases = await this.query<ShowDatabasesRow>('SHOW DATABASES', []);
 
     const allTables = await Promise.all(
       databases.map(async ({ databaseName }) => this.query<ShowTableRow>(
-        `SHOW TABLES IN ${this.quoteIdentifier(databaseName)}`,
+        `SHOW TABLES IN ${this.getFullDbName(databaseName)}`,
         []
       ))
     );
@@ -444,7 +457,8 @@ export class DatabricksDriver extends JDBCDriver {
       `
       CREATE TABLE ${table}_csv_export
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
-      OPTIONS (escape = '"')
+      ${this.getStorageCredentialsNameString()}
+      ${this.getOptionsSqlPartString()}
       AS (${sql})
       `,
       params,
@@ -456,11 +470,20 @@ export class DatabricksDriver extends JDBCDriver {
       `
       CREATE TABLE ${table}_csv_export
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
-      OPTIONS (escape = '"')
+      ${this.getStorageCredentialsNameString()}
+      ${this.getOptionsSqlPartString()}
       AS SELECT ${columns} FROM ${table}
       `,
       [],
     );
+  }
+
+  private getStorageCredentialsNameString() {
+    return this.config.databricksStorageCredentialName ? `WITH (CREDENTIAL ${this.config.databricksStorageCredentialName})` : '';
+  }
+
+  private getOptionsSqlPartString() {
+    return this.config.dbCatalog ? '' : 'OPTIONS (escape = \'"\')';
   }
 
   public capabilities(): DriverCapabilities {

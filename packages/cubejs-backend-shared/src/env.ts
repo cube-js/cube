@@ -150,6 +150,7 @@ const variables: Record<string, (...args: any) => any> = {
   dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
     .required(required)
     .asString(),
+  dbCatalog: () => get('CUBEJS_DB_CATALOG'),
   // Export Bucket options
   dbExportBucketType: ({ supported }: { supported: ('s3' | 'gcp' | 'azure')[] }) => get('CUBEJS_DB_EXPORT_BUCKET_TYPE')
     .asEnum(supported),
@@ -203,6 +204,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
     .asBoolStrict(),
+  databricksStorageCredentialName: () => get('CUBE_DB_DATABRICKS_STORAGE_CREDENTIAL_NAME'),
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
     .default('2')
