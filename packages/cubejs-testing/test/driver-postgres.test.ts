@@ -4,7 +4,6 @@ import { executeTestSuite } from './driver-test-suite';
 executeTestSuite({
   type: 'postgres',
   tests: mainTestSet,
-  
 });
 
 executeTestSuite({
