@@ -9,7 +9,9 @@ use async_trait::async_trait;
 use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotation};
 use datafusion::{
     arrow::{
-        array::{ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder},
+        array::{
+            ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder, UInt64Builder,
+        },
         datatypes::{DataType, SchemaRef},
         error::Result as ArrowResult,
         record_batch::RecordBatch,
@@ -271,6 +273,34 @@ impl CubeScanExecutionPlan {
                         },
                         {
                             (ScalarValue::Int64(v), builder) => builder.append_option(v.clone())?,
+                        }
+                    )
+                }
+                DataType::UInt64 => {
+                    build_column!(
+                        DataType::UInt64,
+                        UInt64Builder,
+                        response,
+                        field_name,
+                        {
+                            (serde_json::Value::Number(number), builder) => match number.as_u64() {
+                                Some(v) => builder.append_value(v)?,
+                                None => builder.append_null()?,
+                            },
+                            (serde_json::Value::String(s), builder) => match s.parse::<u64>() {
+                                Ok(v) => builder.append_value(v)?,
+                                Err(error) => {
+                                    warn!(
+                                        "Unable to parse value as u64: {}",
+                                        error.to_string()
+                                    );
+
+                                    builder.append_null()?
+                                }
+                            },
+                        },
+                        {
+                            (ScalarValue::UInt64(v), builder) => builder.append_option(v.clone())?,
                         }
                     )
                 }

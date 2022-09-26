@@ -16,8 +16,8 @@ impl CubeColumnPostgresExt for CubeColumn {
     fn get_data_type(&self) -> String {
         match self.get_column_type() {
             ColumnType::Timestamp => "timestamp without time zone".to_string(),
-            ColumnType::Int64 => "bigint".to_string(),
-            ColumnType::Double => "numeric".to_string(),
+            ColumnType::Int64 | ColumnType::UInt64 => "bigint".to_string(),
+            ColumnType::Double => "double precision".to_string(),
             ColumnType::Boolean => "boolean".to_string(),
             _ => "text".to_string(),
         }
@@ -26,8 +26,8 @@ impl CubeColumnPostgresExt for CubeColumn {
     fn get_udt_name(&self) -> String {
         match self.get_column_type() {
             ColumnType::Timestamp => "timestamp".to_string(),
-            ColumnType::Int64 => "int8".to_string(),
-            ColumnType::Double => "numeric".to_string(),
+            ColumnType::Int64 | ColumnType::UInt64 => "int8".to_string(),
+            ColumnType::Double => "float8".to_string(),
             ColumnType::Boolean => "bool".to_string(),
             _ => "text".to_string(),
         }
@@ -47,14 +47,14 @@ impl CubeColumnPostgresExt for CubeColumn {
 
     fn get_numeric_precision(&self) -> Option<u32> {
         match self.get_column_type() {
-            ColumnType::Int64 => Some(64),
+            ColumnType::Int64 | ColumnType::UInt64 => Some(64),
             _ => None,
         }
     }
 
     fn numeric_precision_radix(&self) -> Option<u32> {
         match self.get_column_type() {
-            ColumnType::Int64 => Some(2),
+            ColumnType::Int64 | ColumnType::UInt64 => Some(2),
             ColumnType::Double => Some(10),
             _ => None,
         }
@@ -62,7 +62,7 @@ impl CubeColumnPostgresExt for CubeColumn {
 
     fn numeric_scale(&self) -> Option<u32> {
         match self.get_column_type() {
-            ColumnType::Int64 => Some(0),
+            ColumnType::Int64 | ColumnType::UInt64 => Some(0),
             _ => None,
         }
     }

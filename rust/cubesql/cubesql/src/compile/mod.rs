@@ -1359,6 +1359,7 @@ impl CompiledQuery {
                     meta_field.column_from.as_str(),
                     match meta_field.column_type {
                         ColumnType::Int32 | ColumnType::Int64 => DataType::Int64,
+                        ColumnType::UInt64 => DataType::UInt64,
                         ColumnType::String => DataType::Utf8,
                         ColumnType::Double => DataType::Float64,
                         ColumnType::Int8 => DataType::Boolean,
@@ -11834,5 +11835,21 @@ ORDER BY \"COUNT(count)\" DESC"
                 ]),
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_union_with_cast_count_to_decimal() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_union_with_cast_count_to_decimal",
+            execute_query(
+                "select count(1) from (select 1 a) x union all select cast(null as decimal) order by 1;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }

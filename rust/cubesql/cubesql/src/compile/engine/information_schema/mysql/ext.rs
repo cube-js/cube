@@ -9,7 +9,7 @@ impl CubeColumnMySqlExt for CubeColumn {
     fn get_data_type(&self) -> String {
         match self.get_column_type() {
             ColumnType::Timestamp => "datetime".to_string(),
-            ColumnType::Int64 => "int".to_string(),
+            ColumnType::Int64 | ColumnType::UInt64 => "int".to_string(),
             ColumnType::Double => "numeric".to_string(),
             // bool, boolean is an alias for tinyint(1)
             ColumnType::Boolean => "tinyint(1)".to_string(),
@@ -20,7 +20,7 @@ impl CubeColumnMySqlExt for CubeColumn {
     fn get_mysql_column_type(&self) -> String {
         match self.get_column_type() {
             ColumnType::Timestamp => "datetime".to_string(),
-            ColumnType::Int64 => "int".to_string(),
+            ColumnType::Int64 | ColumnType::UInt64 => "int".to_string(),
             ColumnType::Double => "numeric".to_string(),
             // bool, boolean is an alias for tinyint(1)
             ColumnType::Boolean => "tinyint(1)".to_string(),

@@ -14,6 +14,7 @@ pub enum ColumnType {
     Int8,
     Int32,
     Int64,
+    UInt64,
     Blob,
     // true = Date32
     // false = Date64
@@ -32,7 +33,7 @@ impl ColumnType {
             ColumnType::Double => MysqlColumnType::MYSQL_TYPE_DOUBLE,
             ColumnType::Boolean => MysqlColumnType::MYSQL_TYPE_TINY,
             ColumnType::Int8 | ColumnType::Int32 => MysqlColumnType::MYSQL_TYPE_LONG,
-            ColumnType::Int64 => MysqlColumnType::MYSQL_TYPE_LONGLONG,
+            ColumnType::Int64 | ColumnType::UInt64 => MysqlColumnType::MYSQL_TYPE_LONGLONG,
             _ => MysqlColumnType::MYSQL_TYPE_BLOB,
         }
     }
@@ -44,11 +45,12 @@ impl ColumnType {
             ColumnType::Int64 => PgTypeId::INT8,
             ColumnType::Int8 => PgTypeId::INT2,
             ColumnType::Int32 => PgTypeId::INT4,
+            ColumnType::UInt64 => PgTypeId::INT8,
             ColumnType::String | ColumnType::VarStr => PgTypeId::TEXT,
             ColumnType::Interval(_) => PgTypeId::INTERVAL,
             ColumnType::Date(_) => PgTypeId::DATE,
             ColumnType::Timestamp => PgTypeId::TIMESTAMP,
-            ColumnType::Double => PgTypeId::NUMERIC,
+            ColumnType::Double => PgTypeId::FLOAT8,
             ColumnType::Decimal(_, _) => PgTypeId::NUMERIC,
             ColumnType::List(field) => match field.data_type() {
                 DataType::Binary => PgTypeId::ARRAYBYTEA,
@@ -73,6 +75,7 @@ impl ColumnType {
             | ColumnType::Interval(IntervalUnit::YearMonth) => 4,
             ColumnType::Double
             | ColumnType::Int64
+            | ColumnType::UInt64
             | ColumnType::Date(false)
             | ColumnType::Interval(IntervalUnit::DayTime)
             | ColumnType::Timestamp => 8,

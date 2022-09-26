@@ -6,12 +6,12 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | table_name                       | column_name        | data_type                   |
 +----------------------------------+--------------------+-----------------------------+
 | public.KibanaSampleDataEcommerce | count              | bigint                      |
-| public.KibanaSampleDataEcommerce | maxPrice           | numeric                     |
-| public.KibanaSampleDataEcommerce | minPrice           | numeric                     |
-| public.KibanaSampleDataEcommerce | avgPrice           | numeric                     |
+| public.KibanaSampleDataEcommerce | maxPrice           | double precision            |
+| public.KibanaSampleDataEcommerce | minPrice           | double precision            |
+| public.KibanaSampleDataEcommerce | avgPrice           | double precision            |
 | public.KibanaSampleDataEcommerce | order_date         | timestamp without time zone |
 | public.KibanaSampleDataEcommerce | customer_gender    | text                        |
-| public.KibanaSampleDataEcommerce | taxful_total_price | numeric                     |
+| public.KibanaSampleDataEcommerce | taxful_total_price | double precision            |
 | public.KibanaSampleDataEcommerce | has_subscription   | boolean                     |
 | public.KibanaSampleDataEcommerce | is_male            | boolean                     |
 | public.KibanaSampleDataEcommerce | is_female          | boolean                     |
@@ -19,6 +19,6 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.Logs                      | agentCount         | bigint                      |
 | public.Logs                      | agentCountApprox   | bigint                      |
 | public.Logs                      | __user             | text                        |
-| public.NumberCube                | someNumber         | numeric                     |
+| public.NumberCube                | someNumber         | double precision            |
 | public.NumberCube                | __user             | text                        |
 +----------------------------------+--------------------+-----------------------------+

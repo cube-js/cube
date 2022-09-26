@@ -48,9 +48,9 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
 
         match &self.agg_type {
             Some(agg_type) => match agg_type.as_str() {
-                "count" => ColumnType::Int64,
-                "countDistinct" => ColumnType::Int64,
-                "countDistinctApprox" => ColumnType::Int64,
+                "count" => ColumnType::UInt64,
+                "countDistinct" => ColumnType::UInt64,
+                "countDistinctApprox" => ColumnType::UInt64,
                 "sum" => ColumnType::Double,
                 "avg" => ColumnType::Double,
                 "min" => ColumnType::Double,
@@ -340,6 +340,7 @@ impl V1CubeMetaExt for V1CubeMeta {
 pub fn df_data_type_by_column_type(column_type: ColumnType) -> DataType {
     match column_type {
         ColumnType::Int32 | ColumnType::Int64 | ColumnType::Int8 => DataType::Int64,
+        ColumnType::UInt64 => DataType::UInt64,
         ColumnType::String => DataType::Utf8,
         ColumnType::Double => DataType::Float64,
         ColumnType::Boolean => DataType::Boolean,

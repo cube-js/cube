@@ -590,6 +590,7 @@ impl TableProvider for CubeTableProvider {
                             ColumnType::Int8 => DataType::Int64,
                             ColumnType::Int32 => DataType::Int64,
                             ColumnType::Int64 => DataType::Int64,
+                            ColumnType::UInt64 => DataType::UInt64,
                             ColumnType::Blob => DataType::Utf8,
                             ColumnType::Decimal(p, s) => DataType::Decimal(p, s),
                             ColumnType::List(field) => DataType::List(field.clone()),
