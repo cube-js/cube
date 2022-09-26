@@ -338,7 +338,7 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     get(
       keyByDataSource('CUBEJS_DB_NAME', dataSource)
-    ).required(required).asString()
+    ).required(!!required).asString()
   ),
   
   /**
@@ -426,7 +426,7 @@ const variables: Record<string, (...args: any) => any> = {
 
   /**
    * Query timeout. Currenly used in BigQuery, Dremio, Postgres, Snowflake
-   * and Athena drivers and orchestrator (queues, pre-aggs). For the
+   * and Athena drivers and the orchestrator (queues, pre-aggs). For the
    * orchestrator this variable did not split by the datasource.
    *
    * TODO (buntarb): check the possibility to split this for the
@@ -436,7 +436,7 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource,
   }: {
     dataSource?: string,
-  }) => {
+  } = {}) => {
     const key = keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource);
     const value = get(key).asString() || '10m';
     return convertTimeStrToMs(value, key);
