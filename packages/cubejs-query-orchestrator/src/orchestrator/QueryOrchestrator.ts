@@ -46,7 +46,6 @@ export class QueryOrchestrator {
     protected readonly logger: any,
     options: QueryOrchestratorOptions = {}
   ) {
-    console.log('QueryOrchestrator.options', options)
     this.rollupOnlyMode = options.rollupOnlyMode;
 
     const cacheAndQueueDriver = options.cacheAndQueueDriver || getEnv('cacheAndQueueDriver') || (
