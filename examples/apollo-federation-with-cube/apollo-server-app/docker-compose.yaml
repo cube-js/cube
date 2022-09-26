@@ -15,3 +15,12 @@ services:
       dockerfile: Dockerfile.gateway
     ports:
     - '4001:4001'
+  router:
+    image: ghcr.io/apollographql/router:v1.0.0
+    ports:
+      - '4002:4002'
+    environment:
+      - APOLLO_ROUTER_SUPERGRAPH_PATH=/graphql/supergraph.graphql
+      - APOLLO_ROUTER_CONFIG_PATH=/graphql/router.yaml
+    volumes:
+      - ./graphql:/graphql:ro
