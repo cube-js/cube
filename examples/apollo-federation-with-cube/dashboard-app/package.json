@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@apollo/client": "^3.6.9",
-    "@cube-dev/example-wrapper": "^1.1.9",
+    "@cube-dev/example-wrapper": "^1.1.10",
     "@nivo/colors": "^0.79.1",
     "@nivo/core": "^0.79.0",
     "@nivo/line": "^0.79.1",
