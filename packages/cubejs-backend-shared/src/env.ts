@@ -358,7 +358,7 @@ const variables: Record<string, (...args: any) => any> = {
     );
     return get(
       keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
-    ).required(required).asString();
+    ).required(!!required).asString();
   },
   
   /**
@@ -378,7 +378,7 @@ const variables: Record<string, (...args: any) => any> = {
     );
     return get(
       keyByDataSource('CUBEJS_DATABASE', dataSource)
-    ).required(required).asString();
+    ).required(!!required).asString();
   },
 
   /**
