@@ -112,9 +112,11 @@ export interface DownloadQueryResultsBase {
 
 export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities;
 
-export type IndexesSQL = {
+export type IndexSql = {
   sql: [string, unknown[]];
-}[];
+};
+
+export type IndexesSQL = IndexSql[];
 
 export type CreateTableIndex = {
   indexName: string,

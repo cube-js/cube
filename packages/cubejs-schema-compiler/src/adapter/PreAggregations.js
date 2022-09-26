@@ -180,6 +180,7 @@ export class PreAggregations {
       external: preAggregation.external,
       previewSql: this.query.preAggregationPreviewSql(tableName),
       preAggregationsSchema: this.query.preAggregationSchema(),
+      dbCatalog: this.query.dbCatalog(),
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
       uniqueKeyColumns,

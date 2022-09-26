@@ -213,13 +213,13 @@ export class QueryCache {
     );
   }
 
-  public static replacePreAggregationTableNames(queryAndParams: QueryWithParams, preAggregationsTablesToTempTables) {
+  public static replacePreAggregationTableNames<T>(queryAndParams: T, preAggregationsTablesToTempTables): T {
     const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
     const replacedKeqQuery = preAggregationsTablesToTempTables.reduce(
       (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
       keyQuery
     );
-    return Array.isArray(queryAndParams) ? [replacedKeqQuery, params, queryOptions] : replacedKeqQuery;
+    return Array.isArray(queryAndParams) ? [replacedKeqQuery, params, queryOptions] as QueryWithParams : replacedKeqQuery;
   }
 
   public async queryWithRetryAndRelease(query, values, {

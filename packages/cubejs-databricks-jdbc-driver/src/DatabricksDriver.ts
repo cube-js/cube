@@ -222,6 +222,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   private getFullDbName(dbName?: string) {
+    console.log('this.config.database', this.config.database, dbName);
     const name = dbName || this.config.database;
     if (this.config.dbCatalog) {
       return `${this.quoteIdentifier(this.config.dbCatalog)}.${this.quoteIdentifier(name)}`;
@@ -453,10 +454,9 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.secret.key <aws-secret-key>`
    */
   private async createExternalTableFromSql(table: string, sql: string, params: unknown[]) {
-    const tableName = `${table}_csv_export`;
     await this.query(
       `
-      CREATE TABLE ${this.getCreateTableName(tableName)}
+      CREATE TABLE ${table}_csv_export
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
       ${this.getStorageCredentialsNameString()}
       ${this.getOptionsSqlPartString()}
@@ -467,10 +467,9 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   private async createExternalTableFromTable(table: string, columns: string) {
-    const tableName = `${table}_csv_export`;
     await this.query(
       `
-      CREATE TABLE ${this.getCreateTableName(tableName)}
+      CREATE TABLE ${table}_csv_export
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
       ${this.getStorageCredentialsNameString()}
       ${this.getOptionsSqlPartString()}
@@ -478,14 +477,6 @@ export class DatabricksDriver extends JDBCDriver {
       `,
       [],
     );
-  }
-
-  private getCreateTableName(table: string): string {
-    if (this.config.dbCatalog) {
-      return `${this.config.dbCatalog}.${table}`;
-    }
-
-    return table;
   }
 
   private getStorageCredentialsNameString(): string {

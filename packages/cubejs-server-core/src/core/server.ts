@@ -463,6 +463,7 @@ export class CubejsServerCore {
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
           preAggregationsSchema: this.preAggregationsSchema(context),
+          dbCatalog: this.options.dbCatalog,
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
@@ -619,6 +620,7 @@ export class CubejsServerCore {
         logger: this.logger,
         externalDbType: options.externalDbType,
         preAggregationsSchema: options.preAggregationsSchema,
+        dbCatalog: options.dbCatalog,
         allowUngroupedWithoutPrimaryKey:
             this.options.allowUngroupedWithoutPrimaryKey ||
             getEnv('allowUngroupedWithoutPrimaryKey'),
