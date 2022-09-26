@@ -214,7 +214,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public async getTablesQuery(schemaName: string) {
-    const response = await this.query(`SHOW TABLES IN ${this.quoteIdentifier(schemaName)}`, []);
+    const response = await this.query(`SHOW TABLES IN ${this.getFullDbName(schemaName)}`, []);
 
     return response.map((row: any) => ({
       table_name: row.tableName,
