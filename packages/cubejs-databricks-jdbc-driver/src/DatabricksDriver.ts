@@ -171,7 +171,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public async createSchemaIfNotExists(schemaName: string) {
-    return this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
+    return this.query(`CREATE SCHEMA IF NOT EXISTS ${this.getNameWithCatalog(schemaName)}`, []);
   }
 
   public quoteIdentifier(identifier: string): string {
@@ -179,10 +179,24 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public async tableColumnTypes(table: string) {
-    const [schema, tableName] = table.split('.');
+    const nLevelNamespace = table.split('.');
+
+    let describeString = '';
+
+    if (nLevelNamespace.length === 3) {
+      const [catalog, schema, tableName] = nLevelNamespace;
+
+      describeString = `${this.quoteIdentifier(catalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
+    } else if (nLevelNamespace.length === 2) {
+      const [schema, tableName] = nLevelNamespace;
+
+      describeString = `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
+    } else {
+      throw new Error('please provide schema');
+    }
 
     const result = [];
-    const response: any[] = await this.query(`DESCRIBE ${schema}.${tableName}`, []);
+    const response: any[] = await this.query(`DESCRIBE ${describeString}`, []);
 
     for (const column of response) {
       // Databricks describe additional info by default after empty line.
@@ -214,16 +228,14 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public async getTablesQuery(schemaName: string) {
-    const response = await this.query(`SHOW TABLES IN ${this.getFullDbName(schemaName)}`, []);
+    const response = await this.query(`SHOW TABLES IN ${this.getNameWithCatalog(schemaName)}`, []);
 
     return response.map((row: any) => ({
       table_name: row.tableName,
     }));
   }
 
-  private getFullDbName(dbName?: string) {
-    console.log('this.config.database', this.config.database, dbName);
-    const name = dbName || this.config.database;
+  private getNameWithCatalog(name: string) {
     if (this.config.dbCatalog) {
       return `${this.quoteIdentifier(this.config.dbCatalog)}.${this.quoteIdentifier(name)}`;
     }
@@ -233,14 +245,14 @@ export class DatabricksDriver extends JDBCDriver {
 
   protected async getTables(): Promise<ShowTableRow[]> {
     if (this.config.database) {
-      return <any> this.query<ShowTableRow>(`SHOW TABLES IN ${this.getFullDbName()}`, []);
+      return <any> this.query<ShowTableRow>(`SHOW TABLES IN ${this.getNameWithCatalog(this.config.database)}`, []);
     }
 
     const databases = await this.query<ShowDatabasesRow>('SHOW DATABASES', []);
 
     const allTables = await Promise.all(
       databases.map(async ({ databaseName }) => this.query<ShowTableRow>(
-        `SHOW TABLES IN ${this.getFullDbName(databaseName)}`,
+        `SHOW TABLES IN ${this.getNameWithCatalog(databaseName)}`,
         []
       ))
     );
