@@ -11835,4 +11835,45 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_tableau_filter_by_year() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                COUNT(*) AS "count",
+                CAST(TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) AS "yr:completedAt:ok"
+            FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            WHERE (CAST(TRUNC(EXTRACT(YEAR FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) = 2019)
+            GROUP BY 2
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-01-01".to_string(),
+                        "2019-12-31".to_string(),
+                    ])),
+                },]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
 }
