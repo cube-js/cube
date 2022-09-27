@@ -50,13 +50,10 @@ During this step, the query plan is being rewritten in a way a maximum number of
 Overall, rewriting is a seamless process.
 There're some practical considerations that you should keep in mind while querying, though.
 
+In SQL API every cube is represented as a table. Measures, dimensions, and segments in this table are columns.
+We call these tables **cube tables**.
 
-Queries in SQL API can be broken down into **cube nodes** and **post-processing nodes**.
-
-**Cube node** is part of the query which does projection or aggregation from cube tables. **Cube tables** are tables that represent cubes.
-Measures, dimensions, and segments in this table are columns.
-
-Consider “Orders” cube in your data model, the following query is fully a cube node.
+Consider “Orders” cube in your data model, the following query is performing select from **cube table** "Orders".
 
 ```sql
 select 
@@ -67,9 +64,8 @@ where state = 'CA'
 group by 1
 ```
 
-Cube SQL API pushes down the processing of **cube nodes** to Cube. 
-To perform that, it needs to transform this part of the SQL query into an [internal query format](/query-format). 
-The above SQL query will be translated into the following Cube query. We call that process **cube query pushdown**.
+Cube SQL API transforms query fragments that perfoming select from **cube tables** into [Cube internal query format](/query-format). 
+The above SQL query will be translated into the following Cube query.
 
 ```json
 {
@@ -85,7 +81,7 @@ The above SQL query will be translated into the following Cube query. We call th
 }
 ```
 
-Because of the **cube query pushdown**, not all functions and expressions are supported in **cube nodes**. 
+Because of this transformation, not all functions and expressions are supported in query fragmemnts performing select from cube tables. 
 Please refer to the reference to see whether a specific expression or function is supported. 
 For example, the following query won’t work because Cube SQL API can’t push down `case` expression to Cube to process. 
 It is not possible to translate `case` expression in measure.
@@ -104,17 +100,9 @@ where state = 'CA'
 group by 1
 ```
 
-You can leverage **post-processing** in cases like this. 
-The **post-processing node** is part of the SQL query that isn’t pushed down to Cube for processing. 
-You can rewrite the above query and wrap your cube node into a post-processing node.
-
-```
-post_processing_node (
-  cube_node
-)
-```
-
-In that case, we end up with the following query.
+You can leverage nested queries in cases like this. You can wrap your select from cube table into another select statement to perform calculation with expressions like `CASE`.
+This outer select is not part of the SQL query that being transformed into Cube query and therefore you can use more SQL functions, operators and expressions.
+You can rewrite the above query and wrap your select from cube table into our select. 
 
 ```sql
 select 
@@ -136,15 +124,13 @@ FROM (
 group by 1
 ```
 
-That query would work because post-processing nodes support more expressions and functions. 
+That query would work because `CASE` expression is supported in selects not from cube tables.
 
 
-## Querying cube tables
-
-When querying cube tables it is important to understand fundamentals of **cube query pushdown** process.
-As described above, it is a process of pushing processing of particuluar part of the query, called **cube node**, down to Cube.
-To perform that, Cube needs to transform this part of the SQL query into an [internal query format](/query-format). 
-The following sections provides overview of that process. Please refer to the reference to see whether specific function, operator or expression is supported within **cube nodes**.
+When querying cube tables it is important to understand fundamentals of transformation query fragments into Cube queries as wel as **pushdown** process.
+**Pushdown** is a process of pushing processing of particuluar part of the query down to inner select from cube table.
+The following sections provides overview of selecting from cube tables and pushdown. 
+Please refer to the reference to see whether specific function, operator or expression is supported within selects from **cube tables**.
 
 ### <--{"id" : "Querying cube tables"}--> Aggregated vs Non-aggregated queries
 
@@ -176,16 +162,47 @@ SELECT status, MEASURE(count) FROM Orders GROUP BY 1
 ### <--{"id" : "Querying cube tables"}--> Filtering
 
 Cube supports most of simple equality operators like `=`, `<>`, `<`, `<=`, `>`, `>=` as well as `IN` and `LIKE` operators.
-Cube tries to push down all filters into Cube Query.
+Cube tries to push down all filters into Cube query.
 In some cases, SQL filters aren't available in Cube and can be done in a post-processing phase.
 Time dimension filters will be converted to time dimension date ranges whenever it's possible.
 
 ### <--{"id" : "Querying cube tables"}--> Ordering
 
 Cube tries to push down all `ORDER BY` statements into Cube Query.
+
 If it can't be done ordering part would be done in a post-processing phase.
 In case there're more than 50k rows in the result set, incorrect results can be received in this case.
 Please use `EXPLAIN` in order to check if it's the case.
+
+Consider the following query. 
+
+```sql
+SELECT
+  status, 
+  sum(total_value) + 2 as transformed_amount
+from (
+  select * from Orders
+) orders
+GROUP BY status
+ORDER BY status DESC
+LIMIT 100
+```
+
+Because of the expression `sum(total_value) + 2` in the projection of outer query, Cube can't push down `ORDER`. 
+
+You can run `EXPLAIN` against the above query to look at the plan. As you can see below, the sorting operation is done after Cube query and projection. 
+
+```
++ GlobalLimitExec: skip=None, fetch=100 
++- SortExec: [transformed_amount@1 DESC] 
++-- ProjectionExec: expr=[status@0 as status, SUM(orders.total_value)@1 + CAST(2 AS Float64) as transformed_amount] 
++--- CubeScanExecutionPlan
+```
+
+Because of the default limit in Cube queries (50k rows), there is a possibility of a wrong result if there are more than 50k rows. 
+Given that queries to Cube are usually aggregated, it is rare that they may return more than 50k rows, but keep that limitation in mind when designing your queries. 
+
+
 
 ### <--{"id" : "Querying cube tables"}--> Limit
 
