@@ -65,7 +65,9 @@ group by 1
 ```
 
 Cube SQL API transforms query fragments that perfoming select from **cube tables** into [Cube internal query format](/query-format). 
-The above SQL query will be translated into the following Cube query.
+We call that process **Cube query rewrite**.
+
+The above SQL query will be transformed or rewritten into the following Cube query.
 
 ```json
 {
@@ -87,7 +89,7 @@ For example, the following query won’t work because Cube SQL API can’t push 
 It is not possible to translate `case` expression in measure.
 
 ```sql
--- This query won't work because of the cube query pushdown
+-- This query won't work because of the Cube query rewrite
 select 
   case
     when char_length(city) > 5 then "big"
@@ -127,10 +129,10 @@ group by 1
 That query would work because `CASE` expression is supported in selects not from cube tables.
 
 
-When querying cube tables it is important to understand fundamentals of transformation query fragments into Cube queries as wel as **pushdown** process.
+When querying cube tables it is important to understand fundamentals of Cube query rewrite as well as **pushdown** process.
 **Pushdown** is a process of pushing processing of particuluar part of the query down to inner select from cube table.
-The following sections provides overview of selecting from cube tables and pushdown. 
-Please refer to the reference to see whether specific function, operator or expression is supported within selects from **cube tables**.
+The following sections provides overview of Cube query rewrite and pushdown. 
+Please refer to the reference to see whether specific function, operator or expression is supported in Cube query rewrite.
 
 ### <--{"id" : "Querying cube tables"}--> Aggregated vs Non-aggregated queries
 

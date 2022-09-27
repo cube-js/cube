@@ -10,32 +10,83 @@ menuOrder: 5
 
 ### COUNT
 
-**Applies to: cube node, post-processing node**
-
 ```sql
 COUNT(col)
 COUNT(*)
 ```
 
-**In cube node**   
+**In select from cube table**   
 `COUNT` function is used to query measures with type `count`.
 When * is specified, queries the first measure with type `count` for a given cube.
 
 
-**In post-processing node**    
+**Outside of select from cube table**    
 Counts the number of rows.
 When * is specified, the count returned is the total number of rows.
 
 
-
 ### MEASURE
-
-**Applies to: cube nodes**
 
 ```sql
 MEASURE(measure)
 ```
 
+**In select from cube table**   
 Special function that can be used as a wildcard function to query measures. Can be used to query any type of the measure.
-
 Can be used only with measures.
+
+**Outside of select from cube table**    
+Not supported.
+
+## Date/Time Functions
+
+### <--{"id" : "Date/Time Functions"}--> date_trunc
+
+
+## Conditional Expressions
+
+### <--{"id" : "Conditional Expressions"}--> CASE
+
+The SQL CASE expression is a generic conditional expression, similar to if/else statements in other programming languages. 
+
+```sql
+CASE WHEN condition THEN result
+     [WHEN ...]
+     [ELSE result]
+END
+```
+
+**In select from cube table**    
+`CASE` clasues are partially supported when selecting from cube tables. We recomend [updating your queries to use outer selects](/backend/sql#querying-fundamentals) if you need to use them. 
+
+**Outside of select from cube table**    
+Fully supported.
+
+### COALESCE
+
+The COALESCE function returns the first of its arguments that is not null. Null is returned only if all arguments are null. 
+It is often used to substitute a default value for null values when data is retrieved for display.
+
+```sql
+COALESCE(value [, ...])
+```
+
+**In select from cube table**    
+`COALESCE` function is partially supported when selecting from cube tables. We recomend [updating your queries to use outer selects](/backend/sql#querying-fundamentals) if you need to use them. 
+
+**Outside of select from cube table**    
+Fully supported.
+
+### NULLIF
+
+The `NULLIF` function returns a null value if value1 equals value2; otherwise it returns value1. 
+
+```sql
+NULLIF(value1, value2)
+```
+
+**In select from cube table**    
+`NULLIF` function is partially supported when selecting from cube tables. We recomend [updating your queries to use outer selects](/backend/sql#querying-fundamentals) if you need to use them. 
+
+**Outside of select from cube table**    
+Fully supported.
