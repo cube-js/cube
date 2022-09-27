@@ -421,7 +421,7 @@ export class DevServer {
       body: {
         dataSource?: string,
         variables: {
-          CUBEJS_DB_TYPE: DatabaseType,
+          [env: string]: string,
         },
       },
     };
@@ -460,7 +460,7 @@ export class DevServer {
           // driver configuration parameters. It can be undefined if multiple
           // data source is disabled.
           driver = CubejsServerCore.createDriver(
-            variables.CUBEJS_DB_TYPE,
+            <DatabaseType>variables[type],
             { dataSource },
           );
 

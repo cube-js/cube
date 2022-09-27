@@ -124,7 +124,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       max:
         config.maxPoolSize ||
         getEnv('dbMaxPoolSize', { dataSource }) ||
-        5,
+        8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
