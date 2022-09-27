@@ -200,7 +200,7 @@ const variables: Record<string, (...args: any) => any> = {
   dataSources: (): string[] => {
     const dataSources = get('CUBEJS_DATASOURCES').asString();
     if (dataSources) {
-      return dataSources.trim().split(',');
+      return dataSources.trim().split(',').map(ds => ds.trim());
     }
     return [];
   },
@@ -213,7 +213,7 @@ const variables: Record<string, (...args: any) => any> = {
   }: {
     dataSource: string,
   }) => (
-    get(keyByDataSource('CUBEJS_DB_TYPE', dataSource)).asString()
+    process.env[keyByDataSource('CUBEJS_DB_TYPE', dataSource)]
   ),
 
   /**
@@ -228,9 +228,9 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_SSL', dataSource)
     ] || 'false';
     if (val) {
-      if (val?.toLocaleLowerCase() === 'true') {
+      if (val.toLocaleLowerCase() === 'true') {
         return true;
-      } else if (val?.toLowerCase() === 'false') {
+      } else if (val.toLowerCase() === 'false') {
         return false;
       } else {
         throw new TypeError(
@@ -255,9 +255,9 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED', dataSource)
     ] || 'false';
     if (val) {
-      if (val?.toLocaleLowerCase() === 'true') {
+      if (val.toLocaleLowerCase() === 'true') {
         return true;
-      } else if (val?.toLowerCase() === 'false') {
+      } else if (val.toLowerCase() === 'false') {
         return false;
       } else {
         throw new TypeError(
@@ -318,7 +318,9 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_PORT', dataSource)]
       ? parseInt(
-        <string>process.env[keyByDataSource('CUBEJS_DB_PORT', dataSource)],
+        `${
+          process.env[keyByDataSource('CUBEJS_DB_PORT', dataSource)]
+        }`,
         10,
       )
       : undefined
@@ -355,17 +357,6 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource: string,
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_PASS', dataSource)]
-  ),
-
-  /**
-   * Database catalog.
-   */
-  dbCatalog: ({
-    dataSource,
-  }: {
-    dataSource: string,
-  }) => (
-    process.env[keyByDataSource('CUBEJS_DB_CATALOG', dataSource)]
   ),
   
   /**
@@ -445,7 +436,11 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_MAX_POOL', dataSource)]
       ? parseInt(
-        <string>process.env[keyByDataSource('CUBEJS_DB_MAX_POOL', dataSource)],
+        `${
+          process.env[
+            keyByDataSource('CUBEJS_DB_MAX_POOL', dataSource)
+          ]
+        }`,
         10,
       )
       : undefined
@@ -547,7 +542,6 @@ const variables: Record<string, (...args: any) => any> = {
     if (
       val &&
       supported &&
-      supported.length &&
       supported.indexOf(<'s3' | 'gcp' | 'azure'>val) === -1
     ) {
       throw new TypeError(
@@ -1136,9 +1130,9 @@ const variables: Record<string, (...args: any) => any> = {
       )
     ];
     if (val) {
-      if (val?.toLocaleLowerCase() === 'true') {
+      if (val.toLocaleLowerCase() === 'true') {
         return true;
-      } else if (val?.toLowerCase() === 'false') {
+      } else if (val.toLowerCase() === 'false') {
         return false;
       } else {
         throw new TypeError(
@@ -1204,6 +1198,40 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Presto Driver                                                   *
+   ***************************************************************** */
+
+  /**
+   * Presto catalog.
+   */
+  dbCatalog: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    console.warn(
+      'The CUBEJS_DB_CATALOG is deprecated. ' +
+      'Please, use the CUBEJS_DB_PRESTO_CATALOG instead.'
+    );
+    return process.env[
+      keyByDataSource('CUBEJS_DB_CATALOG', dataSource)
+    ];
+  },
+
+  /**
+   * Presto catalog.
+   */
+  prestoCatalog: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PRESTO_CATALOG', dataSource)
     ]
   ),
 

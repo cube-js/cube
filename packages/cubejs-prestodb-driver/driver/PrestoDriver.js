@@ -30,7 +30,9 @@ class PrestoDriver extends BaseDriver {
     this.config = {
       host: getEnv('dbHost', { dataSource }),
       port: getEnv('dbPort', { dataSource }),
-      catalog: getEnv('dbCatalog', { dataSource }),
+      catalog:
+        getEnv('prestoCatalog', { dataSource }) ||
+        getEnv('dbCatalog', { dataSource }),
       schema:
         getEnv('dbName', { dataSource }) ||
         getEnv('dbSchema', { dataSource }),
