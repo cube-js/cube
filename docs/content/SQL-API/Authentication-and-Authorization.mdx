@@ -30,11 +30,13 @@ module.exports = {
 
 ## Security Context (Row-Level Security)
 
-Cube's SQL API can also use the Security Context for
-[Dynamic Schema Creation][ref-dynamic-schemas] or [`queryRewrite`][ref-config-queryrewrite] property in your [`cube.js`
-configuration file][ref-config-js].
+Cube's SQL API can also use the Security Context for [Dynamic Schema
+Creation][ref-dynamic-schemas] or [`queryRewrite`][ref-config-queryrewrite]
+property in your [`cube.js` configuration file][ref-config-js].
 
-By default, the SQL API uses the current user's Security Context, but this behaviour can be modified so that certain users are allowed to switch. To do this, we must first define which user is allowed to change Security Context:
+By default, the SQL API uses the current user's Security Context, but this
+behaviour can be modified so that certain users are allowed to switch. To do
+this, we must first define which user is allowed to change Security Context:
 
 First, you need to define what user is allowed to change security context:
 
@@ -42,8 +44,9 @@ First, you need to define what user is allowed to change security context:
 CUBEJS_SQL_SUPER_USER=admin
 ```
 
-If it's not enough for your case, you define your logic for check with `canSwitchSqlUser` property in your [`cube.js`
-configuration file][ref-config-js].
+If it's not enough for your case, you define your logic for check with
+`canSwitchSqlUser` property in your [`cube.js` configuration
+file][ref-config-js].
 
 You can change security context for specific query via virtual filter on:
 

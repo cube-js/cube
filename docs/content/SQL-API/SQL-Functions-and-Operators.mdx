@@ -8,46 +8,76 @@ menuOrder: 5
 
 ## Aggregation Functions
 
-### COUNT
+### <--{"id" : "Aggregation Functions"}--> COUNT
 
 ```sql
 COUNT(col)
 COUNT(*)
 ```
 
-**In select from cube table**   
-`COUNT` function is used to query measures with type `count`.
-When * is specified, queries the first measure with type `count` for a given cube.
+**In select from cube table** `COUNT` function is used to query measures with
+type `count`. When \* is specified, queries the first measure with type `count`
+for a given cube.
 
+**Outside of select from cube table** Counts the number of rows. When \* is
+specified, the count returned is the total number of rows.
 
-**Outside of select from cube table**    
-Counts the number of rows.
-When * is specified, the count returned is the total number of rows.
-
-
-### MEASURE
+### <--{"id" : "Aggregation Functions"}--> MEASURE
 
 ```sql
 MEASURE(measure)
 ```
 
-**In select from cube table**   
-Special function that can be used as a wildcard function to query measures. Can be used to query any type of the measure.
-Can be used only with measures.
+**In select from cube table** Special function that can be used as a wildcard
+function to query measures. Can be used to query any type of the measure. Can be
+used only with measures.
 
-**Outside of select from cube table**    
-Not supported.
+**Outside of select from cube table** Not supported.
+
+### <--{"id" : "Aggregation Functions"}--> SUM
+
+```sql
+SUM(col)
+```
+
+Computes the sum of the non-null input values.
+
+### <--{"id" : "Aggregation Functions"}--> AVG
+
+```sql
+AVG(col)
+```
+
+Computes the average (arithmetic mean) of all the non-null input values.
+
+### <--{"id" : "Aggregation Functions"}--> MIN
+
+```sql
+MIN(col)
+```
+
+Computes the minimum of the non-null input values. Available for any numeric,
+string or date/time value.
+
+### <--{"id" : "Aggregation Functions"}--> MAX
+
+```sql
+MAX(col)
+```
+
+Computes the maximum of the non-null input values. Available for any numeric,
+string or date/time value.
 
 ## Date/Time Functions
 
 ### <--{"id" : "Date/Time Functions"}--> date_trunc
 
-
 ## Conditional Expressions
 
 ### <--{"id" : "Conditional Expressions"}--> CASE
 
-The SQL CASE expression is a generic conditional expression, similar to if/else statements in other programming languages. 
+The SQL CASE expression is a generic conditional expression, similar to if/else
+statements in other programming languages.
 
 ```sql
 CASE WHEN condition THEN result
@@ -56,37 +86,74 @@ CASE WHEN condition THEN result
 END
 ```
 
-**In select from cube table**    
-`CASE` clasues are partially supported when selecting from cube tables. We recomend [updating your queries to use outer selects](/backend/sql#querying-fundamentals) if you need to use them. 
+**In select from cube table** `CASE` clasues are partially supported when
+selecting from cube tables. We recomend
+[updating your queries to use outer selects](/backend/sql#querying-fundamentals)
+if you need to use them.
 
-**Outside of select from cube table**    
-Fully supported.
+**Outside of select from cube table** Fully supported.
 
-### COALESCE
+### <--{"id" : "Conditional Expressions"}--> COALESCE
 
-The COALESCE function returns the first of its arguments that is not null. Null is returned only if all arguments are null. 
-It is often used to substitute a default value for null values when data is retrieved for display.
+The COALESCE function returns the first of its arguments that is not null. Null
+is returned only if all arguments are null. It is often used to substitute a
+default value for null values when data is retrieved for display.
 
 ```sql
 COALESCE(value [, ...])
 ```
 
-**In select from cube table**    
-`COALESCE` function is partially supported when selecting from cube tables. We recomend [updating your queries to use outer selects](/backend/sql#querying-fundamentals) if you need to use them. 
+**In select from cube table** `COALESCE` function is partially supported when
+selecting from cube tables. We recomend
+[updating your queries to use outer selects](/backend/sql#querying-fundamentals)
+if you need to use them.
 
-**Outside of select from cube table**    
-Fully supported.
+**Outside of select from cube table** Fully supported.
 
-### NULLIF
+### <--{"id" : "Conditional Expressions"}--> NULLIF
 
-The `NULLIF` function returns a null value if value1 equals value2; otherwise it returns value1. 
+The `NULLIF` function returns a null value if value1 equals value2; otherwise it
+returns value1.
 
 ```sql
 NULLIF(value1, value2)
 ```
 
-**In select from cube table**    
-`NULLIF` function is partially supported when selecting from cube tables. We recomend [updating your queries to use outer selects](/backend/sql#querying-fundamentals) if you need to use them. 
+**In select from cube table** `NULLIF` function is partially supported when
+selecting from cube tables. We recommend updating your queries
+[to use outer selects](/backend/sql#querying-fundamentals) if you need to use
+them.
 
-**Outside of select from cube table**    
-Fully supported.
+**Outside of select from cube table** Fully supported.
+
+## Subquery Expressions
+
+### <--{"id" : "Subquery Expressions"}--> EXISTS
+
+### <--{"id" : "Subquery Expressions"}--> IN
+
+### <--{"id" : "Subquery Expressions"}--> NOT IN
+
+## Row and Array comparisons
+
+### <--{"id" : "Row and Array comparisons"}--> IN
+
+```sql
+expression IN (value [, ...])
+```
+
+The `IN` operator allows specifying multiple values for comparison in a `WHERE`
+clause, and returns `true` if the provided expression matches **any** of the
+values.
+
+### <--{"id" : "Row and Array comparisons"}--> NOT IN
+
+```sql
+expression NOT IN (value [, ...])
+```
+
+The `NOT IN` operator is the reverse of the [`IN`
+operator][self-ref-row-array-in]; it returns `true` if the provided expression
+matches **none** of the values.
+
+[self-ref-row-array-in]: #row-and-array-comparisons-in

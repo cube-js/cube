@@ -5,15 +5,15 @@ permalink: /backend/sql/getting-started
 menuOrder: 2
 ---
 
-### <--{"id" : "SQL API"}--> Cube Cloud
+## Cube Cloud
 
 The first step to get started with the SQL API in Cube Cloud is to create a
 deployment. You can follow this
-[step-by-step guide on creating deployment within Cube Cloud](/cloud/getting-started/create).
+[step-by-step guide on creating a deployment within Cube Cloud](/cloud/getting-started/create).
 
-Once the deployment is ready, click **How to connect** link on the Overview page.
-It will open a modal with instructions on different ways to connect to Cube.
-Navigate to the SQL API tab and enable the SQL API.
+Once the deployment is ready, click **How to connect** link on the Overview
+page. It will open a modal with instructions on different ways to connect to
+Cube. Navigate to the SQL API tab and enable the SQL API.
 
 Once it is enabled, you should see a screen like the one below with your
 connection credentials.
@@ -26,10 +26,10 @@ connection credentials.
   />
 </div>
 
-Since the Cube SQL API is Postgres-compatible, please make sure to select **Postgres** as
-a database type when connecting from BI tools.
+Since the Cube SQL API is Postgres-compatible, please make sure to select
+**Postgres** as a database type when connecting from BI tools.
 
-### <--{"id" : "SQL API"}--> Self-hosted Cube
+## Self-hosted Cube
 
 To enable the SQL API, we first need to add a new environment variable:
 
@@ -37,18 +37,18 @@ To enable the SQL API, we first need to add a new environment variable:
 CUBEJS_PG_SQL_PORT=5432
 ```
 
-If you're running Cube with Docker, remember to add a port mapping to the Cube
-service for `CUBEJS_PG_SQL_PORT`. Docker compose example:
+If you're running Cube through Docker Compose, remember to add a port mapping to
+the Cube service for `CUBEJS_PG_SQL_PORT`:
 
 ```yaml
 services:
-  cube_api:
-    ...
+  cube:
+    image: cubejs/cube
     ports:
       - 5432:5432 # Cube SQL API
 ```
 
-Or running docker from command line:
+Or if running Docker from command line:
 
 ```bash
 docker run -p 4000:4000 -p 5432:5432 \

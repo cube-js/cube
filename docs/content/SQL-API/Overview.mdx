@@ -8,151 +8,166 @@ menuOrder: 1
 
 <WarningBox heading={`Migration to Postgres protocol`}>
 
-  This is documentation of Cube’s SQL API for the Postgres protocol.
-  The MySQL protocol used in the first versions of the Cube SQL API is no longer being developed and will be phased out soon.
-  Please consider migrating to the Postgres protocol.
+This is documentation of Cube’s SQL API for the Postgres protocol. The MySQL
+protocol used in the first versions of the Cube SQL API is no longer being
+developed and will be phased out soon. Please consider migrating to the Postgres
+protocol.
 
 </WarningBox>
 
-The Cube SQL API allows querying Cube via Postgres-compatible SQL. It enables the use
-of BI applications, Python notebooks, reverse ETL tools, and other downstream tools on top of
-Cube.
+The Cube SQL API allows querying Cube via Postgres-compatible SQL. It enables
+the use of BI applications, Python notebooks, reverse ETL tools, and other
+downstream tools on top of Cube.
 
 ### <--{"id" : "SQL API"}--> Supported Tools
 
-Cube SQL API has been tested with 
+Cube SQL API has been tested with
+
 - psql CLI
 - Apache Superset
 - Tableau Cloud
 - Tableau Desktop with JDBC driver
 - Power BI
-- Metabase 
+- Metabase
 - Google Data Studio
 - Excel through Devart plugin
 - Deepnote
 - Hex
 - Observable
-- Streamlit 
+- Streamlit
 - Jupyter notebook
 - Hightouch
 
-Please see [this GitHub issue](https://github.com/cube-js/cube.js/issues/3906) for the tools roadmap and to suggest and vote for tools of your interest.
-
-
+Please see [this GitHub issue](https://github.com/cube-js/cube.js/issues/3906)
+for the tools roadmap and to suggest and vote for tools of your interest.
 
 ## Querying Fundamentals
 
-Under the hood, SQL API uses [Apache Datafusion](https://arrow.apache.org/datafusion/) as its SQL execution engine.
-It's responsible for query planning and execution.
-As the conversion process from SQL to Cube Query is ambiguous, additional step is done before the query is executed.
-This step is called rewriting.
-During this step, the query plan is being rewritten in a way a maximum number of Cube Queries can be detected within the given query plan.
-Overall, rewriting is a seamless process.
-There're some practical considerations that you should keep in mind while querying, though.
+Under the hood, SQL API uses
+[Apache Datafusion](https://arrow.apache.org/datafusion/) as its SQL execution
+engine. It's responsible for query planning and execution. As the conversion
+process from SQL to Cube Query can be ambiguous, an additional step of query
+rewriting is done before the query is executed. During this step, the query plan
+is rewritten such that the maximum number of Cube Queries can be detected within
+the given query plan. Overall, rewriting is a seamless process. There are some
+practical considerations that you should keep in mind while querying, though.
 
-In SQL API every cube is represented as a table. Measures, dimensions, and segments in this table are columns.
-We call these tables **cube tables**.
+In the SQL API, each cube is represented as a table. Measures, dimensions, and
+segments in this table are columns. We call these tables **cube tables**.
 
-Consider “Orders” cube in your data model, the following query is performing select from **cube table** "Orders".
+Consider the `Orders` cube in your data model, the following query is performing
+a `SELECT` from the **cube table** `Orders`.
 
 ```sql
-select 
-  city, 
-  sum(amount) 
-from Orders 
-where state = 'CA' 
+select
+  city,
+  sum(amount)
+from Orders
+where state = 'CA'
 group by 1
 ```
 
-Cube SQL API transforms query fragments that perfoming select from **cube tables** into [Cube internal query format](/query-format). 
-We call that process **Cube query rewrite**.
+The SQL API transforms `SELECT` query fragments from **cube tables** into
+[Cube's internal query format](/query-format). This process is called **Cube
+query rewrite**.
 
-The above SQL query will be transformed or rewritten into the following Cube query.
+The SQL query above would be rewritten into the following Cube query:
 
 ```json
 {
-  measures: ['Orders.amount'],
-  dimensions: ['Orders.city'],
-  filters: [
+  "measures": ["Orders.amount"],
+  "dimensions": ["Orders.city"],
+  "filters": [
     {
-      member: 'Orders.state',
-      operator: 'equals',
-      values: ['CA']
+      "member": "Orders.state",
+      "operator": "equals",
+      "values": ["CA"]
     }
   ]
 }
 ```
 
-Because of this transformation, not all functions and expressions are supported in query fragmemnts performing select from cube tables. 
-Please refer to the reference to see whether a specific expression or function is supported. 
-For example, the following query won’t work because Cube SQL API can’t push down `case` expression to Cube to process. 
-It is not possible to translate `case` expression in measure.
+Because of this transformation, not all functions and expressions are supported
+in query fragments performing `SELECT` from cube tables. Please refer to the
+reference to see whether a specific expression or function is supported. For
+example, the following query won't work because the SQL API can't push down the
+`case` expression to Cube for processing. It is not possible to translate `case`
+expression in measure.
 
 ```sql
 -- This query won't work because of the Cube query rewrite
-select 
-  case
-    when char_length(city) > 5 then "big"
-    else "small"
-  end
-	end city, 
-  sum(amount) 
-from orders 
-where state = 'CA' 
-group by 1
+SELECT
+  CASE
+    WHEN char_length(city) > 5 THEN "big"
+    ELSE "small"
+	END city,
+  SUM(amount)
+FROM Orders
+WHERE status = 'CA'
+GROUP BY 1;
 ```
 
-You can leverage nested queries in cases like this. You can wrap your select from cube table into another select statement to perform calculation with expressions like `CASE`.
-This outer select is not part of the SQL query that being transformed into Cube query and therefore you can use more SQL functions, operators and expressions.
-You can rewrite the above query and wrap your select from cube table into our select. 
+You can leverage nested queries in cases like this. You can wrap your `SELECT`
+statement from a cube table into another `SELECT` statement to perform
+calculations with expressions like `CASE`. This outer select is **not** part of
+the SQL query that being rewritten and thus allows you to use more SQL
+functions, operators and expressions. You can rewrite the above query as
+follows, making sure to wrap the original `SELECT` statement:
 
 ```sql
-select 
+SELECT
   city,
   CASE
     WHEN char_length(city) > 5 THEN "big"
     ELSE "small"
   END
 	END city,
-  sum(amount) 
+  SUM(amount)
 FROM (
-  SELECT 
-    city, 
-    sum(amount) as amount
-  FROM orders 
-  where state = 'CA'
-  group by 1
-) as cube_data 
-group by 1
+  SELECT
+    city,
+    SUM(amount) AS amount
+  FROM Orders
+  WHERE state = 'CA'
+  GROUP BY 1
+) AS cube_data
+GROUP BY 1
 ```
 
-That query would work because `CASE` expression is supported in selects not from cube tables.
+That query would work because `CASE` expression is supported in selects not from
+cube tables.
 
-
-When querying cube tables it is important to understand fundamentals of Cube query rewrite as well as **pushdown** process.
-**Pushdown** is a process of pushing processing of particuluar part of the query down to inner select from cube table.
-The following sections provides overview of Cube query rewrite and pushdown. 
-Please refer to the reference to see whether specific function, operator or expression is supported in Cube query rewrite.
+When querying cube tables it is important to understand fundamentals of Cube
+query rewrite as well as **pushdown** process. **Pushdown** is a process of
+pushing processing of particuluar part of the query down to inner select from
+cube table. The following sections provides overview of Cube query rewrite and
+pushdown. Please refer to the reference to see whether specific function,
+operator or expression is supported in Cube query rewrite.
 
 ### <--{"id" : "Querying cube tables"}--> Aggregated vs Non-aggregated queries
 
-There're two types of queries supported against **cube tables**: aggregated and non-aggregated.
-Aggregated are those with `GROUP BY` statement, and non-aggregated are those without it.
-Cube Queries issued to your database will always be aggregated, and it doesn't matter if you provide `GROUP BY` in a query or not.
+There're two types of queries supported against **cube tables**: aggregated and
+non-aggregated. Aggregated are those with `GROUP BY` statement, and
+non-aggregated are those without it. Cube Queries issued to your database will
+always be aggregated, and it doesn't matter if you provide `GROUP BY` in a query
+or not.
 
-Whenever you use a non-aggregated query you need to provide only column names in SQL:
+Whenever you use a non-aggregated query you need to provide only column names in
+SQL:
 
 ```
 SELECT status, count FROM Orders
 ```
 
-The same aggregated query should always aggregate measure columns using a corresponding aggregating function or special `MEASURE()` function:
+The same aggregated query should always aggregate measure columns using a
+corresponding aggregating function or special `MEASURE()` function:
 
 <WarningBox>
 
-  In cases where measure columns are not aggregated `Projection references non-aggregate values` error will be thrown.
-  It means there're columns that are neither in `GROUP BY` or aggregated.
-  It's a standard SQL `GROUP BY` operation consistency check enforced by SQL API as well.
+In cases where measure columns are not aggregated
+`Projection references non-aggregate values` error will be thrown. It means
+there're columns that are neither in `GROUP BY` or aggregated. It's a standard
+SQL `GROUP BY` operation consistency check enforced by SQL API as well.
 
 </WarningBox>
 
@@ -163,24 +178,25 @@ SELECT status, MEASURE(count) FROM Orders GROUP BY 1
 
 ### <--{"id" : "Querying cube tables"}--> Filtering
 
-Cube supports most of simple equality operators like `=`, `<>`, `<`, `<=`, `>`, `>=` as well as `IN` and `LIKE` operators.
-Cube tries to push down all filters into Cube query.
-In some cases, SQL filters aren't available in Cube and can be done in a post-processing phase.
-Time dimension filters will be converted to time dimension date ranges whenever it's possible.
+Cube supports most of simple equality operators like `=`, `<>`, `<`, `<=`, `>`,
+`>=` as well as `IN` and `LIKE` operators. Cube tries to push down all filters
+into Cube query. In some cases, SQL filters aren't available in Cube and can be
+done in a post-processing phase. Time dimension filters will be converted to
+time dimension date ranges whenever it's possible.
 
 ### <--{"id" : "Querying cube tables"}--> Ordering
 
 Cube tries to push down all `ORDER BY` statements into Cube Query.
 
-If it can't be done ordering part would be done in a post-processing phase.
-In case there're more than 50k rows in the result set, incorrect results can be received in this case.
-Please use `EXPLAIN` in order to check if it's the case.
+If it can't be done ordering part would be done in a post-processing phase. In
+case there're more than 50k rows in the result set, incorrect results can be
+received in this case. Please use `EXPLAIN` in order to check if it's the case.
 
-Consider the following query. 
+Consider the following query.
 
 ```sql
 SELECT
-  status, 
+  status,
   sum(total_value) + 2 as transformed_amount
 from (
   select * from Orders
@@ -190,26 +206,29 @@ ORDER BY status DESC
 LIMIT 100
 ```
 
-Because of the expression `sum(total_value) + 2` in the projection of outer query, Cube can't push down `ORDER`. 
+Because of the expression `sum(total_value) + 2` in the projection of outer
+query, Cube can't push down `ORDER`.
 
-You can run `EXPLAIN` against the above query to look at the plan. As you can see below, the sorting operation is done after Cube query and projection. 
+You can run `EXPLAIN` against the above query to look at the plan. As you can
+see below, the sorting operation is done after Cube query and projection.
 
 ```
-+ GlobalLimitExec: skip=None, fetch=100 
-+- SortExec: [transformed_amount@1 DESC] 
-+-- ProjectionExec: expr=[status@0 as status, SUM(orders.total_value)@1 + CAST(2 AS Float64) as transformed_amount] 
++ GlobalLimitExec: skip=None, fetch=100
++- SortExec: [transformed_amount@1 DESC]
++-- ProjectionExec: expr=[status@0 as status, SUM(orders.total_value)@1 + CAST(2 AS Float64) as transformed_amount]
 +--- CubeScanExecutionPlan
 ```
 
-Because of the default limit in Cube queries (50k rows), there is a possibility of a wrong result if there are more than 50k rows. 
-Given that queries to Cube are usually aggregated, it is rare that they may return more than 50k rows, but keep that limitation in mind when designing your queries. 
-
-
+Because of the default limit in Cube queries (50k rows), there is a possibility
+of a wrong result if there are more than 50k rows. Given that queries to Cube
+are usually aggregated, it is rare that they may return more than 50k rows, but
+keep that limitation in mind when designing your queries.
 
 ### <--{"id" : "Querying cube tables"}--> Limit
 
-Limit push down is supported by Cube however, a limit over 50k can't be overridden.
-In future versions, paging and streaming would be used to avoid this limitation.
+Limit push down is supported by Cube however, a limit over 50k can't be
+overridden. In future versions, paging and streaming would be used to avoid this
+limitation.
 
 ## Examples
 
@@ -298,7 +317,8 @@ cube=> SELECT status FROM Orders;
 Measures can similarly be queried through Cube SQL.
 
 Because measures are already aggregated in Cube there is no need to apply
-aggregate functions to them in SQL API if you don't have a `GROUP BY` statement in query.
+aggregate functions to them in SQL API if you don't have a `GROUP BY` statement
+in query.
 
 ```
 cube=> SELECT count FROM Orders;
@@ -308,9 +328,9 @@ cube=> SELECT count FROM Orders;
 (1 row)
 ```
 
-Some of the BI systems or SQL constraints may require you to apply aggregate functions. To support
-this Cube allows aggregate functions on measures as long as they match the type
-of the measure.
+Some of the BI systems or SQL constraints may require you to apply aggregate
+functions. To support this Cube allows aggregate functions on measures as long
+as they match the type of the measure.
 
 `count` measure in our example is of type `count`, It means we can apply
 `COUNT()` aggregate function to it. The below query is similiar to the above
@@ -324,7 +344,8 @@ cube=> SELECT COUNT(count) FROM Orders;
 (1 row)
 ```
 
-There's also universal aggregate function `MEASURE()` that matches any measure type.
+There's also universal aggregate function `MEASURE()` that matches any measure
+type.
 
 ```
 cube=> SELECT MEASURE(count) FROM Orders;
