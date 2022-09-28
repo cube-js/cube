@@ -186,6 +186,12 @@ const variables: Record<string, (...args: any) => any> = {
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),
+  bigQueryUseCustomStreaming: () => get('CUBEJS_DB_BQ_USE_CUSTOM_STREAMING')
+    .default('false')
+    .asBoolStrict(),
+  bigQueryCustomStreamingLimitPerPage: () => get('CUBEJS_DB_BQ_CUSTOM_STREAMING_LIMIT_PER_PAGE')
+    .default('10000')
+    .asInt(),
   // Cube Store
   cubeStoreHost: () => get('CUBEJS_CUBESTORE_HOST')
     .asString(),

@@ -9,6 +9,7 @@ import {
 import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
+import { createQueryStreamFromJob } from './BigQueryQueryStream';
 
 interface BigQueryDriverOptions extends BigQueryOptions {
   readOnly?: boolean
@@ -19,6 +20,8 @@ interface BigQueryDriverOptions extends BigQueryOptions {
   pollTimeout?: number,
   pollMaxInterval?: number,
   maxPoolSize?: number,
+  customStreaming?: boolean,
+  customStreamLimitPerPage?: number,
 }
 
 type BigQueryDriverOptionsInitialized = Required<BigQueryDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
@@ -51,6 +54,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         undefined,
       exportBucket: getEnv('dbExportBucket') || process.env.CUBEJS_DB_BQ_EXPORT_BUCKET,
       location: getEnv('bigQueryLocation'),
+      customStreaming: getEnv('bigQueryUseCustomStreaming'),
+      customStreamLimitPerPage: getEnv('bigQueryCustomStreamingLimitPerPage'),
       ...config,
       pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout') || getEnv('dbQueryTimeout')) * 1000,
       pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
@@ -168,12 +173,26 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     query: string,
     values: unknown[]
   ): Promise<StreamTableData> {
-    const stream = await this.bigquery.createQueryStream({
+    const bqJobParams = {
       query,
       params: values,
       parameterMode: 'positional',
       useLegacySql: false
-    });
+    };
+
+    if (this.options.customStreaming) {
+      const [job] = await this.bigquery.createQueryJob(bqJobParams);
+
+      const stream = await createQueryStreamFromJob(job, this.options.customStreamLimitPerPage || 10000);
+      const rowStream = new HydrationStream();
+      stream.pipe(rowStream);
+
+      return {
+        rowStream,
+      };
+    }
+
+    const stream = await this.bigquery.createQueryStream(bqJobParams);
 
     const rowStream = new HydrationStream();
     stream.pipe(rowStream);
