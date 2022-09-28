@@ -293,6 +293,14 @@ cube=> SELECT EXTRACT(YEAR FROM NOW()::timestamp);
 
 ### <--{"id" : "Date/Time Functions"}--> DATE_TRUNC
 
+<WarningBox heading={"Cube Query Rewrite"}>
+
+`DATE_TRUNC` is **supported** when **projecting** from cube tables. We recommend
+updating your queries to [use outer selects][ref-backend-sql-query-fundamentals]
+if you need to use them.
+
+</WarningBox>
+
 The `DATE_TRUNC` function is conceptually similar to the `trunc` function for
 numbers.
 
@@ -354,9 +362,9 @@ present, then `null` is returned.
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`COALESCE` is **partially supported** when selecting from cube tables. We
-recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use them.
+`COALESCE` is **not supported** for **selections** or **projections** from cube
+tables. We recommend updating your queries to [use outer
+selects][ref-backend-sql-query-fundamentals] if you need to use this function.
 
 </WarningBox>
 
@@ -375,15 +383,27 @@ cube=> SELECT COALESCE(null, 2);
 -----------
  2
 (1 row)
+
+cube=> SELECT
+cube->   COUNT(*),
+cube->   COALESCE(status, 'unknown') AS state
+cube-> FROM (SELECT * FROM Orders) orders
+cube-> GROUP BY 2;
+ COUNT(UInt8(1)) |   state
+-----------------+------------
+            3354 | processing
+            3346 | completed
+            3300 | shipped
+(3 rows)
 ```
 
 ### <--{"id" : "Conditional Expressions"}--> NULLIF
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`NULLIF` is **partially supported** when selecting from cube tables. We
-recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use them.
+`NULLIF` is **not supported** for **selections** or **projections** from cube
+tables. We recommend updating your queries to [use outer
+selects][ref-backend-sql-query-fundamentals] if you need to use this function.
 
 </WarningBox>
 
@@ -401,54 +421,26 @@ cube=> SELECT NULLIF('foo', 'foo');
 
 (1 row)
 
-cube=> SELECT NULLIF('foo', 'bar');
- Utf8("foo")
--------------
- foo
-(1 row)
-```
-
-## Subquery Expressions
-
-### <--{"id" : "Subquery Expressions"}--> EXISTS
-
-TODO
-
-```sql
---- TODO Signature
-```
-
-```sql
---- TODO Example
-```
-
-### <--{"id" : "Subquery Expressions"}--> IN
-
-TODO
-
-```sql
---- TODO Signature
-```
-
-```sql
---- TODO Example
-```
-
-### <--{"id" : "Subquery Expressions"}--> NOT IN
-
-TODO
-
-```sql
---- TODO Signature
-```
-
-```sql
---- TODO Example
+cube=> SELECT NULLIF(Orders.status, 'completed'), COUNT(*)
+cube-> FROM (SELECT * FROM Orders) orders
+cube-> GROUP BY 1;
+ nullif(Orders.status,Utf8("completed")) | COUNT(UInt8(1))
+-----------------------------------------+-----------------
+ processing                              |            3354
+                                         |            3346
+ shipped                                 |            3300
+(3 rows)
 ```
 
 ## Row and Array comparisons
 
 ### <--{"id" : "Row and Array comparisons"}--> IN
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+`IN` is **supported** for **selections** from cube tables.
+
+</WarningBox>
 
 The `IN` operator allows specifying multiple values for comparison in a `WHERE`
 clause, and returns `true` if the provided expression matches **any** of the
@@ -459,10 +451,20 @@ expression IN (value [, ...])
 ```
 
 ```sql
---- TODO Example
+cube=> SELECT COUNT(*) FROM Orders WHERE status IN ('shipped', 'completed');
+ COUNT(UInt8(1))
+-----------------
+            6646
+(1 row)
 ```
 
 ### <--{"id" : "Row and Array comparisons"}--> NOT IN
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+`NOT IN` is **supported** for **selections** from cube tables.
+
+</WarningBox>
 
 The `NOT IN` operator is the reverse of the [`IN`
 operator][self-ref-row-array-in]; it returns `true` if the provided expression
@@ -473,7 +475,11 @@ expression NOT IN (value [, ...])
 ```
 
 ```sql
---- TODO Example
+cube=> SELECT COUNT(*) FROM Orders WHERE status NOT IN ('shipped', 'completed');
+ COUNT(UInt8(1))
+-----------------
+            3354
+(1 row)
 ```
 
 [pg-docs-datetime-formats]:
