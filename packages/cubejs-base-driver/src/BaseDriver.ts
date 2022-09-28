@@ -258,12 +258,6 @@ export abstract class BaseDriver implements DriverInterface {
     );
   }
 
-  public async getTablesToDrop(schemaName: string) {
-    const actualTables = await this.getTablesQuery(schemaName);
-
-    return actualTables.map(t => `${schemaName}.${t.table_name || t.TABLE_NAME}`);
-  }
-
   public loadPreAggregationIntoTable(_preAggregationTableName: string, loadSql: string, params, options) {
     return this.query(loadSql, params, options);
   }
