@@ -163,7 +163,11 @@ export class DataSchemaCompiler {
     }
     try {
       vm.runInNewContext(file.content, {
-        view: (name, cube) => cubes.push(Object.assign({}, cube, { name, fileName: file.fileName })),
+        view: (name, cube) => (
+          !cube ?
+            this.cubeFactory({ ...name, fileName: file.fileName, isView: true }) :
+            cubes.push(Object.assign({}, cube, { name, fileName: file.fileName, isView: true }))
+        ),
         cube:
           (name, cube) => (
             !cube ?

@@ -98,7 +98,6 @@ export class JoinGraph {
     const key = JSON.stringify(cubesToJoin);
     if (!this.builtJoins[key]) {
       const join = R.pipe(
-        R.filter(cube => typeof cube === 'string'),
         R.map(
           cube => this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))
         ),
@@ -120,12 +119,19 @@ export class JoinGraph {
 
   buildJoinTreeForRoot(root, cubesToJoin) {
     const self = this;
+    if (Array.isArray(root)) {
+      const [newRoot, ...additionalToJoin] = root;
+      if (additionalToJoin.length > 0) {
+        cubesToJoin = [additionalToJoin].concat(cubesToJoin);
+      }
+      root = newRoot;
+    }
     const result = cubesToJoin.map(joinHints => {
       if (!Array.isArray(joinHints)) {
         joinHints = [joinHints];
       }
       let prevNode = root;
-      return joinHints.map(toJoin => {
+      return joinHints.filter(toJoin => toJoin !== prevNode).map(toJoin => {
         const path = this.graph.path(prevNode, toJoin);
         if (!path) {
           return null;
