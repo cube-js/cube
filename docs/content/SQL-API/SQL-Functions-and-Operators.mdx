@@ -326,13 +326,6 @@ cube=> SELECT DATE_TRUNC('month', NOW());
 
 ### <--{"id" : "Conditional Expressions"}--> CASE
 
-<WarningBox heading={"Cube Query Rewrite"}>
-
-`CASE` is **partially supported** when selecting from cube tables. We recommend
-updating your queries to [use outer selects][ref-backend-sql-query-fundamentals]
-if you need to use them.
-
-</WarningBox>
 
 The `CASE` expression is a generic conditional expression, similar to if/else
 statements in other programming languages.
@@ -353,10 +346,32 @@ after `END CASE` and subsequent `WHEN` expressions are not evaluated.
 If no match is found, the `ELSE` statements are executed, if `ELSE` is not
 present, then `null` is returned.
 
+<WarningBox heading={"Cube Query Rewrite"}>
+
+`CASE` is **not supported** in Cube query rewrite. We recommend
+updating your queries to [use outer selects][ref-backend-sql-query-fundamentals]
+if you need to use it.
+
+</WarningBox>
+
+In Cube query rewrite, `CASE` expression is not supported. You can either move that logic into a Cube data schema or leverage post-processing with an outer query.
+
+The example below shows how to use `CASE` expression in post-processing with an outer query. 
+
 ```sql
---- TODO Example with measure of type case in cube
---- TODO Example of outer select with case
+SELECT
+  CASE
+    WHEN char_length(status) > 5 THEN 'big'
+    ELSE 'small'
+  END status,
+  SUM(totalValue) as totalValue
+from (
+  SELECT status, totalValue FROM Orders
+) orders
+GROUP BY 1
 ```
+
+
 
 ### <--{"id" : "Conditional Expressions"}--> COALESCE
 
