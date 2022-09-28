@@ -884,6 +884,33 @@ impl RewriteRules for FilterRules {
                     "?new_literal",
                 ),
             ),
+            transforming_rewrite(
+                "extract-year-equals",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "Trunc",
+                            vec![fun_expr(
+                                "DatePart",
+                                vec![literal_string("YEAR"), column_expr("?column")],
+                            )],
+                        ),
+                        "=",
+                        literal_expr("?year"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                self.transform_filter_extract_year_equals(
+                    "?year",
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?member",
+                    "?values",
+                ),
+            ),
             rewrite(
                 "between-move-interval-beyond-equal-sign",
                 between_expr(
@@ -1683,6 +1710,68 @@ impl FilterRules {
                     );
 
                     return true;
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_filter_extract_year_equals(
+        &self,
+        year_var: &'static str,
+        column_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        member_var: &'static str,
+        values_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let year_var = var!(year_var);
+        let column_var = var!(column_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let member_var = var!(member_var);
+        let values_var = var!(values_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for year in var_iter!(egraph[subst[year_var]], LiteralExprValue) {
+                if let ScalarValue::Int64(Some(year)) = year {
+                    let year = year.clone();
+                    if year < 1000 || year > 9999 {
+                        continue;
+                    }
+
+                    if let Some((member_name, cube)) = Self::filter_member_name(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        column_var,
+                        members_var,
+                    ) {
+                        if !cube.contains_member(&member_name) {
+                            continue;
+                        }
+
+                        subst.insert(
+                            member_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                                FilterMemberMember(member_name.to_string()),
+                            )),
+                        );
+
+                        subst.insert(
+                            values_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                FilterMemberValues(vec![
+                                    format!("{}-01-01", year),
+                                    format!("{}-12-31", year),
+                                ]),
+                            )),
+                        );
+
+                        return true;
+                    }
                 }
             }
 
