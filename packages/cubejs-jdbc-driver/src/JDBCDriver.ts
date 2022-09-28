@@ -63,6 +63,7 @@ export class JDBCDriver extends BaseDriver {
 
     const dbTypeDescription = JDBCDriver.dbTypeDescription((config.dbType || process.env.CUBEJS_DB_TYPE) as string);
 
+    console.log('dbTypeDescription', dbTypeDescription);
     this.config = {
       dbType: process.env.CUBEJS_DB_TYPE,
       url: process.env.CUBEJS_JDBC_URL || dbTypeDescription && dbTypeDescription.jdbcUrl(),
@@ -70,6 +71,8 @@ export class JDBCDriver extends BaseDriver {
       properties: dbTypeDescription && dbTypeDescription.properties,
       ...dbOptions
     } as JDBCDriverConfiguration;
+
+    console.log('MongoDB config', this.config);
 
     if (!this.config.drivername) {
       throw new Error('drivername is required property');
@@ -125,6 +128,7 @@ export class JDBCDriver extends BaseDriver {
     const properties = new Properties();
 
     for (const [name, value] of Object.entries(this.config.properties)) {
+      console.log('name, value', name, value);
       properties.putSync(name, value);
     }
 

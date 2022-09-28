@@ -63,5 +63,20 @@ export const SupportedDrivers: Record<string, DriverOptionsInterface> = {
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
     }
-  }
+  },
+  mongodb: {
+    mavenDependency: {
+      groupId: 'org.mongodb',
+      artifactId: 'mongodb-jdbc',
+      version: '2.0.0'
+    },
+    driverClass: 'com.mongodb.jdbc.MongoDriver',
+    prepareConnectionQueries: [],
+    jdbcUrl: () => '',
+    properties: {
+      // user: process.env.CUBEJS_DB_USER,
+      // password: process.env.CUBEJS_DB_PASS,
+      // database: process.env.CUBEJS_DB_NAME,
+    }
+  },
 };

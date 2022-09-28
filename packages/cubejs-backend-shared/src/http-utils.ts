@@ -63,12 +63,18 @@ export async function streamWithProgress(
   );
 }
 
-type DownloadAndExtractFile = {
+type DownloadAndExtractFileOptions = {
   showProgress: boolean;
   cwd: string;
 };
 
-export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndExtractFile) {
+type DownloadOptions = {
+  showProgress: boolean;
+  cwd: string;
+  filename: string
+};
+
+export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndExtractFileOptions) {
   const request = new Request(url, {
     headers: new Headers({
       'Content-Type': 'application/octet-stream',
@@ -108,6 +114,51 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
   }
 
   bar.stop();
+}
+
+export async function download(url: string, { cwd, filename }: DownloadOptions) {
+  const request = new Request(url, {
+    headers: new Headers({
+      'Content-Type': 'application/octet-stream',
+    }),
+    agent: await getHttpAgentForProxySettings(),
+  });
+
+  const response = await fetch(request);
+  if (!response.ok) {
+    throw new Error(`unexpected response ${response.statusText}`);
+  }
+
+  const bar = new SingleBar({
+    format: 'Downloading [{bar}] {percentage}% | Speed: {speed}',
+  });
+  bar.start(100, 0);
+
+  try {
+    mkdirpSync(cwd);
+  } catch (e) {
+    internalExceptions(e);
+  }
+
+  const savedFilePath = await streamWithProgress(response, ({ progress, speed, eta }) => {
+    bar.update(progress, {
+      speed,
+      eta,
+    });
+  });
+
+  const newPath = path.join(cwd, filename);
+  fs.renameSync(savedFilePath, newPath);
+
+  try {
+    fs.unlinkSync(savedFilePath);
+  } catch (e) {
+    internalExceptions(e);
+  }
+
+  bar.stop();
+
+  return newPath;
 }
 
 export async function downloadAndGunzip(url: string): Promise<string> {

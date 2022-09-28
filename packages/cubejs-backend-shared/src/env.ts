@@ -203,6 +203,12 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
     .asBoolStrict(),
+  // Mongo JDBC
+  mongodbJDBCUrl: () => get('CUBEJS_DB_MONGO_DB_JDBC_URL')
+    .required()
+    .asString(),
+  mongodbJDBCAcceptPolicy: () => get('CUBEJS_DB_MONGO_DB_JDBC_ACCEPT_POLICY')
+    .asBoolStrict(),
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
     .default('2')
