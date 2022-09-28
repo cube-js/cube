@@ -179,13 +179,17 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public async tableColumnTypes(table: string) {
-    const [schema, tableName] = table.split('.');
+    const nLevelNamespace = table.split('.');
 
     let describeString = '';
 
-    if (this.config.dbCatalog) {
-      describeString = `${this.quoteIdentifier(this.config.dbCatalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
+    if (nLevelNamespace.length === 3) {
+      const [catalog, schema, tableName] = nLevelNamespace;
+
+      describeString = `${this.quoteIdentifier(catalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
     } else {
+      const [schema, tableName] = nLevelNamespace;
+
       describeString = `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
     }
 
@@ -498,6 +502,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public capabilities(): DriverCapabilities {
-    return { unloadWithoutTempTable: true };
+    // @ts-ignore
+    return { unloadWithoutTempTable: false };
   }
 }
