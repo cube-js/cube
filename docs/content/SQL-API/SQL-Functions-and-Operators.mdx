@@ -34,64 +34,96 @@ The double-pipe operator (`||`) is used to concatenate strings.
 string || string
 ```
 
-### <--{"id" : "String Functions"}--> bit_length
-
-Returns number of bits in the string (8 times the `octet_length`).
-
 ```sql
-bit_length(string)
+--- TODO Example
 ```
 
-### <--{"id" : "String Functions"}--> char_length
+### <--{"id" : "String Functions"}--> BIT_LENGTH
+
+Returns number of bits in the string (8 times the `OCTET_LENGTH`).
+
+```sql
+BIT_LENGTH(string)
+```
+
+```sql
+--- TODO Example
+```
+
+### <--{"id" : "String Functions"}--> CHAR_LENGTH
 
 Returns the number of characters in the string.
 
 ```sql
-char_length(string)
-character_length(string)
+CHAR_LENGTH(string)
+CHARACTER_LENGTH(string)
 ```
 
-### <--{"id" : "String Functions"}--> lower
+```sql
+--- TODO Example
+```
+
+### <--{"id" : "String Functions"}--> LOWER
 
 Converts `string` to all lower case.
 
 ```sql
-lower(string)
+LOWER(string)
 ```
 
-### <--{"id" : "String Functions"}--> octet_length
+```sql
+--- TODO Example
+```
+
+### <--{"id" : "String Functions"}--> OCTET_LENGTH
 
 Returns number of bytes in the string.
 
 ```sql
-octet_length(string)
+OCTET_LENGTH(string)
 ```
 
-### <--{"id" : "String Functions"}--> substring
+```sql
+--- TODO Example
+```
+
+### <--{"id" : "String Functions"}--> SUBSTRING
 
 Extracts the substring of string starting at the `start` character (if
 specified), and stopping after `count` characters (if specified). Either `start`
 or `count` must be specified.
 
 ```sql
-substring (string [ FROM start integer ] [ FOR count integer ])
+SUBSTRING (string [ FROM start integer ] [ FOR count integer ])
 ```
 
-### <--{"id" : "String Functions"}--> trim
+```sql
+--- TODO Example
+```
+
+### <--{"id" : "String Functions"}--> TRIM
 
 Removes the longest string containing only characters in characters (a space by
 default) from the start, end, or both ends (`BOTH` is the default) of `string`.
 
 ```sql
-trim ([ LEADING | TRAILING | BOTH ] [ characters text ] FROM string)
+TRIM ([ LEADING | TRAILING | BOTH ] [ characters text ] FROM string)
 ```
 
-### <--{"id" : "String Functions"}--> upper
+```sql
+--- TODO Example
+```
+
+### <--{"id" : "String Functions"}--> UPPER
 
 Converts `string` to all upper case.
 
 ```sql
-upper(string)
+UPPER(string)
+```
+
+```sql
+--- TODO Example
 ```
 
 ## Aggregation Functions
@@ -113,6 +145,10 @@ COUNT(col)
 COUNT(*)
 ```
 
+```sql
+--- TODO Example
+```
+
 ### <--{"id" : "Aggregation Functions"}--> MEASURE
 
 <WarningBox heading={"Cube Query Rewrite"}>
@@ -127,6 +163,10 @@ measures][ref-schema-ref-measure-types].
 MEASURE(measure)
 ```
 
+```sql
+--- TODO Example
+```
+
 ### <--{"id" : "Aggregation Functions"}--> SUM
 
 Computes the sum of the non-null input values.
@@ -135,12 +175,20 @@ Computes the sum of the non-null input values.
 SUM(col)
 ```
 
+```sql
+--- TODO Example
+```
+
 ### <--{"id" : "Aggregation Functions"}--> AVG
 
 Computes the average (arithmetic mean) of all the non-null input values.
 
 ```sql
 AVG(col)
+```
+
+```sql
+--- TODO Example
 ```
 
 ### <--{"id" : "Aggregation Functions"}--> MIN
@@ -152,6 +200,10 @@ string or date/time value.
 MIN(col)
 ```
 
+```sql
+--- TODO Example
+```
+
 ### <--{"id" : "Aggregation Functions"}--> MAX
 
 Computes the maximum of the non-null input values. Available for any numeric,
@@ -161,14 +213,18 @@ string or date/time value.
 MAX(col)
 ```
 
+```sql
+--- TODO Example
+```
+
 ## Date/Time Functions
 
-### <--{"id" : "Date/Time Functions"}--> to_timestamp
+### <--{"id" : "Date/Time Functions"}--> TO_TIMESTAMP
 
 Converts a `string` to a `timestamp` according to the given format.
 
 ```sql
-to_timestamp(string, string)
+TO_TIMESTAMP(string, string)
 ```
 
 Valid format patterns can be found [here][pg-docs-datetime-formats].
@@ -181,16 +237,16 @@ cube=> SELECT TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss');
 (1 row)
 ```
 
-### <--{"id" : "Date/Time Functions"}--> localtimestamp
+### <--{"id" : "Date/Time Functions"}--> LOCALTIMESTAMP
 
 Returns the current date and time.
 
 ```sql
-localtimestamp()
+LOCALTIMESTAMP()
 ```
 
 ```sql
-cube=> SELECT localtimestamp();
+cube=> SELECT LOCALTIMESTAMP();
  TimestampNanosecond(1664376736840998420, None)
 ------------------------------------------------
  2022-09-28 14:52:16.840998
@@ -235,13 +291,13 @@ cube=> SELECT EXTRACT(YEAR FROM NOW()::timestamp);
 (1 row)
 ```
 
-### <--{"id" : "Date/Time Functions"}--> date_trunc
+### <--{"id" : "Date/Time Functions"}--> DATE_TRUNC
 
-The `date_trunc` function is conceptually similar to the `trunc` function for
+The `DATE_TRUNC` function is conceptually similar to the `trunc` function for
 numbers.
 
 ```sql
-date_trunc(field, source)
+DATE_TRUNC(field, source)
 ```
 
 `source` is a value expression of type `timestamp`, `timestamp with time zone`,
@@ -251,7 +307,7 @@ The return value is likewise of type `timestamp`, `timestamp with time zone`, or
 one set to zero (or one, for day and month).
 
 ```sql
-cube=> SELECT date_trunc('month', NOW());
+cube=> SELECT DATE_TRUNC('month', NOW());
  TimestampNanosecond(1661990400000000000, Some("UTC"))
 -------------------------------------------------------
  2022-09-01 00:00:00.000000+00
@@ -358,13 +414,37 @@ cube=> SELECT NULLIF('foo', 'bar');
 
 TODO
 
+```sql
+--- TODO Signature
+```
+
+```sql
+--- TODO Example
+```
+
 ### <--{"id" : "Subquery Expressions"}--> IN
 
 TODO
 
+```sql
+--- TODO Signature
+```
+
+```sql
+--- TODO Example
+```
+
 ### <--{"id" : "Subquery Expressions"}--> NOT IN
 
 TODO
+
+```sql
+--- TODO Signature
+```
+
+```sql
+--- TODO Example
+```
 
 ## Row and Array comparisons
 
@@ -378,6 +458,10 @@ values.
 expression IN (value [, ...])
 ```
 
+```sql
+--- TODO Example
+```
+
 ### <--{"id" : "Row and Array comparisons"}--> NOT IN
 
 The `NOT IN` operator is the reverse of the [`IN`
@@ -386,6 +470,10 @@ matches **none** of the values.
 
 ```sql
 expression NOT IN (value [, ...])
+```
+
+```sql
+--- TODO Example
 ```
 
 [pg-docs-datetime-formats]:
