@@ -382,7 +382,7 @@ class PreAggregationLoadCache {
 
   public async getVersionEntries(preAggregation: PreAggregationDescription): Promise<VersionEntriesObj> {
     if (this.tablePrefixes && !this.tablePrefixes.find(p => preAggregation.tableNameBase.startsWith(p))) {
-      throw new Error(`Load cache tries to load table ${preAggregation.tableName} outside of tablePrefixes filter: ${this.tablePrefixes.join(', ')}`);
+      throw new Error(`Load cache tries to load table ${preAggregation.tableNameBase} outside of tablePrefixes filter: ${this.tablePrefixes.join(', ')}`);
     }
     const redisKey = this.tablesRedisKey(preAggregation);
     if (!this.versionEntries[redisKey]) {
