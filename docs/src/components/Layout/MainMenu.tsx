@@ -35,6 +35,7 @@ const menuOrder = [
   'Caching',
   'Authentication & Authorization',
   'API Reference',
+  'SQL API',
   'Frontend Integrations',
   'Deployment',
   'Developer Tools',
