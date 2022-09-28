@@ -19,7 +19,7 @@ import { cancelCombinator, SaveCancelFn, DriverInterface, BaseDriver,
   InlineTable,
   StreamOptions,
   UnloadOptions,
-  DriverCapabilities, IndexSql } from '@cubejs-backend/base-driver';
+  DriverCapabilities, IndexSql, TableQueryResult } from '@cubejs-backend/base-driver';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { Query, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
@@ -84,7 +84,8 @@ export function getLastUpdatedAtTimestamp(timestamps: (number | undefined)[]): n
   }
 }
 
-function getStructureVersion(preAggregation) {
+// eslint-disable-next-line no-use-before-define
+function getStructureVersion(preAggregation: PreAggregationDescription) {
   return version(
     preAggregation.indexesSql && preAggregation.indexesSql.length ?
       [preAggregation.loadSql, preAggregation.indexesSql] :
@@ -151,8 +152,8 @@ export type LambdaQuery = {
 };
 
 export type PreAggregationDescription = {
-  dbCatalog?: string;
   preAggregationsSchema: string;
+  dbCatalog?: string;
   type: 'rollup' | 'originalSql';
   preAggregationId: string;
   priority: number;
@@ -165,6 +166,7 @@ export type PreAggregationDescription = {
   sql: QueryWithParams;
   loadSql: QueryWithParams;
   tableName: string;
+  tableNameBase: string;
   matchedTimeDimensionDateRange: QueryDateRange;
   granularity: string;
   partitionGranularity: string;
@@ -179,6 +181,10 @@ export type PreAggregationDescription = {
   readOnly: boolean;
 };
 
+function getTableNameWithSchemaFromTableQueryResult(preaggregation: PreAggregationDescription, tableQueryResult: TableQueryResult): string {
+  return `${preaggregation.dbCatalog ? `${preaggregation.dbCatalog}.` : ''}${preaggregation.preAggregationsSchema}.${tableQueryResult.table_name || tableQueryResult.TABLE_NAME}`;
+}
+
 const tablesToVersionEntries = (preaggregation: PreAggregationDescription, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
   table => -table.last_updated_at,
   tables.map(table => {
@@ -189,7 +195,7 @@ const tablesToVersionEntries = (preaggregation: PreAggregationDescription, table
     }
 
     const entity = {
-      table_name: `${preaggregation.preAggregationsSchema}.${match[1]}`,
+      table_name: `${preaggregation.dbCatalog ? `${preaggregation.dbCatalog}.` : ''}${preaggregation.preAggregationsSchema}.${match[1]}`,
       content_version: match[2],
       structure_version: match[3],
     } as VersionEntry;
@@ -374,8 +380,8 @@ class PreAggregationLoadCache {
     return { versionEntries, byContent, byStructure, byTableName };
   }
 
-  public async getVersionEntries(preAggregation): Promise<VersionEntriesObj> {
-    if (this.tablePrefixes && !this.tablePrefixes.find(p => preAggregation.tableName.split('.')[1].startsWith(p))) {
+  public async getVersionEntries(preAggregation: PreAggregationDescription): Promise<VersionEntriesObj> {
+    if (this.tablePrefixes && !this.tablePrefixes.find(p => preAggregation.tableNameBase.startsWith(p))) {
       throw new Error(`Load cache tries to load table ${preAggregation.tableName} outside of tablePrefixes filter: ${this.tablePrefixes.join(', ')}`);
     }
     const redisKey = this.tablesRedisKey(preAggregation);
@@ -937,7 +943,7 @@ export class PreAggregationLoader {
   ) {
     if (withTempTable) {
       const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
-      const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
+      const mappedActualTables = actualTables.map(t => getTableNameWithSchemaFromTableQueryResult(this.preAggregation, t));
       if (mappedActualTables.includes(targetTableName)) {
         await client.dropTable(targetTableName);
       }
@@ -1274,7 +1280,7 @@ export class PreAggregationLoader {
           .concat([justCreatedTable]);
 
       const toDrop = actualTables
-        .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`)
+        .map(t => getTableNameWithSchemaFromTableQueryResult(this.preAggregation, t))
         .filter(t => tablesToSave.indexOf(t) === -1);
 
       await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table))));
@@ -1763,7 +1769,7 @@ export class PreAggregations {
   }
 
   public loadAllPreAggregationsIfNeeded(queryBody) {
-    const preAggregations = queryBody.preAggregations || [];
+    const preAggregations: PreAggregationDescription[] = queryBody.preAggregations || [];
 
     const loadCacheByDataSource = queryBody.preAggregationsLoadCacheByDataSource || {};
 
@@ -1783,7 +1789,7 @@ export class PreAggregations {
                 !queryBody.preAggregationsLoadCacheByDataSource ?
                   preAggregations
                     .filter(p => (p.dataSource || 'default') === dataSource)
-                    .map(p => p.tableName.split('.')[1]) : null
+                    .map(p => p.tableNameBase) : null
             }
           );
       }
@@ -2000,7 +2006,7 @@ export class PreAggregations {
     return this.loadCacheQueue[dataSource];
   }
 
-  public static preAggregationQueryCacheKey(preAggregation) {
+  public static preAggregationQueryCacheKey(preAggregation: PreAggregationDescription): string {
     return preAggregation.tableName;
   }
 
@@ -2012,7 +2018,7 @@ export class PreAggregations {
     return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
   }
 
-  public static structureVersion(preAggregation) {
+  public static structureVersion(preAggregation: PreAggregationDescription) {
     return getStructureVersion(preAggregation);
   }
 

@@ -2119,7 +2119,6 @@ class BaseQuery {
       useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
       contextSymbols: this.contextSymbols,
       preAggregationsSchema: this.preAggregationsSchemaOption,
-      dbCatalog: this.options.dbCatalog,
       cubeLatticeCache: this.options.cubeLatticeCache,
       historyQueries: this.options.historyQueries,
       externalQueryClass: this.options.externalQueryClass,
@@ -2220,18 +2219,11 @@ class BaseQuery {
 
   preAggregationTableName(cube, preAggregationName, skipSchema) {
     const tblName = this.aliasName(`${cube}.${preAggregationName}`, true);
-
-    const schemaNamePart = skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`;
-    if (this.dbCatalog()) {
-      const dbCatalogPart = skipSchema ? '' : this.dbCatalog() && `${this.dbCatalog()}.`;
-      return `${dbCatalogPart}${schemaNamePart}${tblName}`;
-    }
-    return `${schemaNamePart}${tblName}`;
+    return `${skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${tblName}`;
   }
 
-  dbCatalog() {
-    return this.options.dbCatalog;
-  }
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  dbCatalog() {}
 
   preAggregationSchema() {
     return this.preAggregationsSchemaOption;

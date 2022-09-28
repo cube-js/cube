@@ -10,7 +10,7 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import { DriverCapabilities, UnloadOptions, } from '@cubejs-backend/base-driver';
+import { DriverCapabilities, UnloadOptions, TableQueryResult } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -132,7 +132,7 @@ export class DatabricksDriver extends JDBCDriver {
       awsRegion: conf?.awsRegion || getEnv('dbExportBucketAwsRegion'),
       // Azure export bucket
       azureKey: conf?.azureKey || getEnv('dbExportBucketAzureKey'),
-      dbCatalog: conf?.dbCatalog || getEnv('dbCatalog'),
+      dbCatalog: getEnv('databricksDbCatalog'),
       databricksStorageCredentialName: conf?.databricksStorageCredentialName || getEnv('databricksStorageCredentialName')
     };
     super(config);
@@ -179,20 +179,14 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public async tableColumnTypes(table: string) {
-    const nLevelNamespace = table.split('.');
+    const [schema, tableName] = table.split('.');
 
     let describeString = '';
 
-    if (nLevelNamespace.length === 3) {
-      const [catalog, schema, tableName] = nLevelNamespace;
-
-      describeString = `${this.quoteIdentifier(catalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
-    } else if (nLevelNamespace.length === 2) {
-      const [schema, tableName] = nLevelNamespace;
-
-      describeString = `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
+    if (this.config.dbCatalog) {
+      describeString = `${this.quoteIdentifier(this.config.dbCatalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
     } else {
-      throw new Error('please provide schema');
+      describeString = `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
     }
 
     const result = [];
@@ -227,10 +221,10 @@ export class DatabricksDriver extends JDBCDriver {
     return result;
   }
 
-  public async getTablesQuery(schemaName: string) {
-    const response = await this.query(`SHOW TABLES IN ${this.getNameWithCatalog(schemaName)}`, []);
+  public async getTablesQuery(schemaName: string): Promise<TableQueryResult[]> {
+    const response = await this.query<{tableName: string}>(`SHOW TABLES IN ${this.getNameWithCatalog(schemaName)}`, []);
 
-    return response.map((row: any) => ({
+    return response.map((row) => ({
       table_name: row.tableName,
     }));
   }
@@ -321,6 +315,10 @@ export class DatabricksDriver extends JDBCDriver {
     await this.createExternalTableFromSql(tableName, sql, params);
     
     return types;
+  }
+
+  public loadPreAggregationIntoTable(_preAggregationTableName: string, loadSql: string, params: unknown[], _options: any) {
+    return this.query(loadSql, params);
   }
 
   /**

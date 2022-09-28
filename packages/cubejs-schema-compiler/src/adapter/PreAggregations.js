@@ -147,6 +147,7 @@ export class PreAggregations {
     const { preAggregationName, preAggregation, references } = foundPreAggregation;
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
+    const tableNameBase = this.preAggregationTableName(cube, preAggregationName, preAggregation, true);
     const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
 
     const matchedTimeDimension =
@@ -175,12 +176,13 @@ export class PreAggregations {
       timezone: this.query.options && this.query.options.timezone,
       timestampFormat: queryForSqlEvaluation.timestampFormat(),
       tableName,
+      tableNameBase,
+      dbCatalog: this.query.dbCatalog && this.query.dbCatalog(),
       invalidateKeyQueries,
       type: preAggregation.type,
       external: preAggregation.external,
       previewSql: this.query.preAggregationPreviewSql(tableName),
       preAggregationsSchema: this.query.preAggregationSchema(),
-      dbCatalog: this.query.dbCatalog(),
       loadSql: this.query.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: this.query.preAggregationSql(cube, preAggregation),
       uniqueKeyColumns,

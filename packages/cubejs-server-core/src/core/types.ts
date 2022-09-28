@@ -179,7 +179,6 @@ export interface CreateOptions {
   queryTransformer?: QueryRewriteFn;
   queryRewrite?: QueryRewriteFn;
   preAggregationsSchema?: string | PreAggregationsSchemaFn;
-  dbCatalog?: string;
   schemaVersion?: (context: RequestContext) => string | Promise<string>;
   extendContext?: ExtendContextFn;
   scheduledRefreshTimer?: boolean | number;

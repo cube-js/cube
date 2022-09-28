@@ -1,5 +1,6 @@
 import R from 'ramda';
 import { BaseFilter, BaseQuery } from '@cubejs-backend/schema-compiler';
+import { getEnv } from '@cubejs-backend/shared';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
@@ -113,5 +114,21 @@ export class DatabricksQuery extends BaseQuery {
 
   public defaultRefreshKeyRenewalThreshold() {
     return 120;
+  }
+
+  public preAggregationTableName(cube: any, preAggregationName: string, skipSchema: boolean): string {
+    const dbCatalog = getEnv('databricksDbCatalog');
+    const tblName = this.aliasName(`${cube}.${preAggregationName}`, true);
+    const schemaNamePart = skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`;
+    if (dbCatalog) {
+      const dbCatalogPart = skipSchema ? '' : dbCatalog && `${dbCatalog}.`;
+      return `${dbCatalogPart}${schemaNamePart}${tblName}`;
+    }
+
+    return `${schemaNamePart}${tblName}`;
+  }
+
+  public dbCatalog() {
+    return getEnv('databricksDbCatalog');
   }
 }

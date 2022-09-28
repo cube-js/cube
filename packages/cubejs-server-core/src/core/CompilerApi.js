@@ -17,7 +17,6 @@ export class CompilerApi {
     this.allowNodeRequire = options.allowNodeRequire == null ? true : options.allowNodeRequire;
     this.logger = this.options.logger;
     this.preAggregationsSchema = this.options.preAggregationsSchema;
-    this.dbCatalog = this.options.dbCatalog;
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
     this.schemaVersion = this.options.schemaVersion;
     this.compileContext = options.compileContext;
@@ -170,7 +169,6 @@ export class CompilerApi {
         externalDialectClass: this.options.externalDialectClass,
         externalDbType: this.options.externalDbType,
         preAggregationsSchema: this.preAggregationsSchema,
-        dbCatalog: this.dbCatalog,
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
         queryFactory: this.queryFactory,
       }
