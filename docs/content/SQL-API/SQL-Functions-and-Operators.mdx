@@ -149,7 +149,7 @@ string or date/time value.
 
 ### <--{"id" : "Conditional Expressions"}--> CASE
 
-The SQL CASE expression is a generic conditional expression, similar to if/else
+The `CASE` expression is a generic conditional expression, similar to if/else
 statements in other programming languages.
 
 ```sql
@@ -159,12 +159,24 @@ CASE WHEN condition THEN result
 END
 ```
 
-**In select from cube table** `CASE` clasues are partially supported when
-selecting from cube tables. We recomend
-[updating your queries to use outer selects](/backend/sql#querying-fundamentals)
-if you need to use them.
+<WarningBox>
 
-**Outside of select from cube table** Fully supported.
+`CASE` clauses are partially supported when selecting from cube tables. We
+recommend updating your queries to [use outer
+selects][ref-backend-sql-query-fundamentals] if you need to use them.
+
+</WarningBox>
+
+[ref-backend-sql-query-fundamentals]: /backend/sql#querying-fundamentals
+
+The simple form of `CASE` provides conditional execution based on the equality
+of operands. The `condition` is evaluated (once) and successively compared to
+each expression in the `WHEN` clauses. If a match is found, then the
+corresponding statements are executed. Control passes to the next statement
+after `END CASE` and subsequent `WHEN` expressions are not evaluated.
+
+If no match is found, the `ELSE` statements are executed; but if `ELSE` is not
+present, then a `CASE_NOT_FOUND` exception is raised.
 
 ### <--{"id" : "Conditional Expressions"}--> COALESCE
 
