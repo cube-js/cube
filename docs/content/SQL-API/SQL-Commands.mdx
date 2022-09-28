@@ -85,7 +85,7 @@ number of rows it actually returned.
 ### Example
 
 ```sql
-cube=> EXPLAIN WITH cte AS (
+EXPLAIN WITH cte AS (
   SELECT o.count as count, p.name as product_name, p.description as product_description
   FROM Orders o
     CROSS JOIN Products p
@@ -116,7 +116,7 @@ SELECT COUNT(*) FROM cte;
 with `ANALYZE`:
 
 ```sql
-cube=> EXPLAIN ANALYZE WITH cte AS (
+EXPLAIN ANALYZE WITH cte AS (
   SELECT o.count as count, p.name as product_name, p.description as product_description
   FROM Orders o
     CROSS JOIN Products p
@@ -149,13 +149,13 @@ if `ALL` is specified.
 ### Example
 
 ```sql
-cube=> SHOW timezone;
+SHOW timezone;
  setting
 ---------
  GMT
 (1 row)
 
-cube=> SHOW ALL;
+SHOW ALL;
             name             |    setting     | description
 -----------------------------+----------------+-------------
  max_index_keys              | 32             |
