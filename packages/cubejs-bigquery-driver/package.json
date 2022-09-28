@@ -33,6 +33,7 @@
     "@cubejs-backend/shared": "^0.30.69",
     "@google-cloud/bigquery": "^5.6.0",
     "@google-cloud/storage": "^5.7.2",
+    "google-auth-library": "^7.11.0",
     "ramda": "^0.27.2"
   },
   "devDependencies": {

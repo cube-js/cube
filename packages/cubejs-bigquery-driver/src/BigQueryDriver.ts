@@ -8,7 +8,17 @@ import {
 } from '@cubejs-backend/base-driver';
 import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
+import { UserRefreshClient } from "google-auth-library";
 import { HydrationStream } from './HydrationStream';
+
+interface OAuthCredentials {
+  accessToken: string;
+  tokenType?: string;
+  expiryDate?: number;
+  refreshToken?: string;
+  clientId?: string;
+  clientSecret?: string;
+}
 
 interface BigQueryDriverOptions extends BigQueryOptions {
   readOnly?: boolean
@@ -19,6 +29,7 @@ interface BigQueryDriverOptions extends BigQueryOptions {
   pollTimeout?: number,
   pollMaxInterval?: number,
   maxPoolSize?: number,
+  oauthCredentials?: OAuthCredentials;
 }
 
 type BigQueryDriverOptionsInitialized = Required<BigQueryDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
@@ -61,6 +72,26 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     });
 
     this.bigquery = new BigQuery(this.options);
+
+    const oauthCredentials: OAuthCredentials | undefined = config.oauthCredentials || (process.env.CUBEJS_DB_BQ_CREDENTIALS ?
+      JSON.parse(Buffer.from(process.env.CUBEJS_DB_BQ_CREDENTIALS, 'base64').toString('utf8')) :
+      undefined);
+
+    if (oauthCredentials) {
+      const refreshClient = new UserRefreshClient();
+
+      refreshClient.fromJSON({
+        type: 'authorized_user',
+        client_id: oauthCredentials.clientId,
+        client_secret: oauthCredentials.clientSecret,
+        refresh_token: oauthCredentials.refreshToken,
+        project_id: config.projectId,
+      });
+
+      // It's ok, look like BQ has some problem with typings
+      this.bigquery.authClient.cachedCredential = refreshClient as any;
+    }
+
     if (this.options.exportBucket) {
       this.storage = new Storage(this.options);
       this.bucket = this.storage.bucket(this.options.exportBucket);
