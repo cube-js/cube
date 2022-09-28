@@ -1834,23 +1834,39 @@ export class PreAggregations {
     }));
   }
 
+  /**
+   * Determines whether range queries for the preAggregations from the
+   * queryBody were cached or not.
+   */
   public async checkPartitionsBuildRangeCache(queryBody) {
     const preAggregations = queryBody.preAggregations || [];
-
-    const result = await Promise.all(preAggregations.map(async preAggregation => {
-      const { preAggregationStartEndQueries } = preAggregation;
-
-      const isCached = preAggregation.partitionGranularity ? (await Promise.all(
-        preAggregationStartEndQueries.map(
-          ([query, values]) => this.queryCache.resultFromCacheIfExists({ query, values })
-        )
-      )).every((res: any) => res?.data) : true;
-      return {
-        preAggregation,
-        isCached
-      };
-    }));
-
+    const result = await Promise.all(
+      preAggregations.map(async (preAggregation) => {
+        const { preAggregationStartEndQueries } = preAggregation;
+        const invalidate =
+          preAggregation.invalidateKeyQueries &&
+          preAggregation.invalidateKeyQueries[0]
+            ? preAggregation.invalidateKeyQueries[0].slice(0, 2)
+            : false;
+        const isCached = preAggregation.partitionGranularity
+          ? (
+            await Promise.all(
+              preAggregationStartEndQueries.map(([query, values]) => (
+                this.queryCache.resultFromCacheIfExists({
+                  query,
+                  values,
+                  invalidate,
+                })
+              ))
+            )
+          ).every((res: any) => res?.data)
+          : true;
+        return {
+          preAggregation,
+          isCached,
+        };
+      })
+    );
     return result;
   }
 
