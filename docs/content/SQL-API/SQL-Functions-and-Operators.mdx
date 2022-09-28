@@ -6,6 +6,76 @@ subCategory: Reference
 menuOrder: 5
 ---
 
+## String Functions and Operators
+
+### Concatenation
+
+```sql
+string || string
+```
+
+The double-pipe operator (`||`) is used to concatenate strings.
+
+### <--{"id" : "String Functions"}--> bit_length
+
+```sql
+bit_length(string)
+```
+
+Returns number of bits in the string (8 times the `octet_length`).
+
+### <--{"id" : "String Functions"}--> char_length
+
+```sql
+char_length(string)
+character_length(string)
+```
+
+Returns the number of characters in the string.
+
+### <--{"id" : "String Functions"}--> lower
+
+```sql
+lower(string)
+```
+
+Converts `string` to all lower case.
+
+### <--{"id" : "String Functions"}--> octet_length
+
+```sql
+octet_length(string)
+```
+
+Returns number of bytes in the string.
+
+### <--{"id" : "String Functions"}--> substring
+
+```sql
+substring (string [ FROM start integer ] [ FOR count integer ])
+```
+
+Extracts the substring of string starting at the `start` character (if
+specified), and stopping after `count` characters (if specified). Either `start`
+or `count` must be specified.
+
+### <--{"id" : "String Functions"}--> trim
+
+```sql
+trim ([ LEADING | TRAILING | BOTH ] [ characters text ] FROM string)
+```
+
+Removes the longest string containing only characters in characters (a space by
+default) from the start, end, or both ends (`BOTH` is the default) of `string`.
+
+### <--{"id" : "String Functions"}--> upper
+
+```sql
+upper(string)
+```
+
+Converts `string` to all upper case.
+
 ## Aggregation Functions
 
 ### <--{"id" : "Aggregation Functions"}--> COUNT
@@ -29,8 +99,11 @@ MEASURE(measure)
 ```
 
 **In select from cube table** Special function that can be used as a wildcard
-function to query measures. Can be used to query any type of the measure. Can be
-used only with measures.
+function to query measures. Can be used to query any [type of
+measure][ref-schema-ref-measure-types]. Can only be used with measures.
+
+[ref-schema-ref-measure-types]:
+  /schema/reference/types-and-formats#measures-types
 
 **Outside of select from cube table** Not supported.
 
