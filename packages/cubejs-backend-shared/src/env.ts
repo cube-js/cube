@@ -83,7 +83,8 @@ export function assertDataSource(dataSource = 'default'): string {
  * @param dataSource Data source name.
  */
 export function keyByDataSource(origin: string, dataSource?: string): string {
-  if (!isMultipleDataSources()) {
+  if (dataSource) assertDataSource(dataSource);
+  if (!isMultipleDataSources() || dataSource === 'default') {
     return origin;
   } else if (!dataSource) {
     return origin;
@@ -198,7 +199,7 @@ const variables: Record<string, (...args: any) => any> = {
    * Configured datasources.
    */
   dataSources: (): string[] => {
-    const dataSources = get('CUBEJS_DATASOURCES').asString();
+    const dataSources = process.env.CUBEJS_DATASOURCES;
     if (dataSources) {
       return dataSources.trim().split(',').map(ds => ds.trim());
     }
@@ -227,20 +228,17 @@ const variables: Record<string, (...args: any) => any> = {
     const val = process.env[
       keyByDataSource('CUBEJS_DB_SSL', dataSource)
     ] || 'false';
-    if (val) {
-      if (val.toLocaleLowerCase() === 'true') {
-        return true;
-      } else if (val.toLowerCase() === 'false') {
-        return false;
-      } else {
-        throw new TypeError(
-          `The ${
-            keyByDataSource('CUBEJS_DB_SSL', dataSource)
-          } must be either 'true' or 'false'.`
-        );
-      }
+    if (val.toLocaleLowerCase() === 'true') {
+      return true;
+    } else if (val.toLowerCase() === 'false') {
+      return false;
+    } else {
+      throw new TypeError(
+        `The ${
+          keyByDataSource('CUBEJS_DB_SSL', dataSource)
+        } must be either 'true' or 'false'.`
+      );
     }
-    return undefined;
   },
 
   /**
@@ -254,20 +252,16 @@ const variables: Record<string, (...args: any) => any> = {
     const val = process.env[
       keyByDataSource('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED', dataSource)
     ] || 'false';
-    if (val) {
-      if (val.toLocaleLowerCase() === 'true') {
-        return true;
-      } else if (val.toLowerCase() === 'false') {
-        return false;
-      } else {
-        throw new TypeError(
-          `The ${
-            keyByDataSource('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED', dataSource)
-          } must be either 'true' or 'false'.`
-        );
-      }
+    if (val.toLocaleLowerCase() === 'true') {
+      return true;
+    } else if (val.toLowerCase() === 'false') {
+      return false;
     } else {
-      return undefined;
+      throw new TypeError(
+        `The ${
+          keyByDataSource('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED', dataSource)
+        } must be either 'true' or 'false'.`
+      );
     }
   },
 
@@ -373,7 +367,11 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_NAME', dataSource)
     ];
     if (required && !val) {
-      throw new Error('The CUBEJS_DB_NAME is required and missing.');
+      throw new Error(
+        `The ${
+          keyByDataSource('CUBEJS_DB_NAME', dataSource)
+        } is required and missing.`
+      );
     }
     return val;
   },
@@ -390,14 +388,21 @@ const variables: Record<string, (...args: any) => any> = {
     required?: boolean,
   }) => {
     console.warn(
-      'The CUBEJS_DB_SCHEMA is deprecated. ' +
-      'Please, use the CUBEJS_DB_NAME instead.'
+      `The ${
+        keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
+      } is deprecated. Please, use the ${
+        keyByDataSource('CUBEJS_DB_NAME', dataSource)
+      } instead.`
     );
     const val = process.env[
       keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
     ];
     if (required && !val) {
-      throw new Error('The CUBEJS_DB_SCHEMA is required and missing.');
+      throw new Error(
+        `The ${
+          keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
+        } is required and missing.`
+      );
     }
     return val;
   },
@@ -414,14 +419,21 @@ const variables: Record<string, (...args: any) => any> = {
     required?: boolean,
   }) => {
     console.warn(
-      'The CUBEJS_DATABASE is deprecated. ' +
-      'Please, use the CUBEJS_DB_NAME instead.'
+      `The ${
+        keyByDataSource('CUBEJS_DATABASE', dataSource)
+      } is deprecated. Please, use the ${
+        keyByDataSource('CUBEJS_DB_NAME', dataSource)
+      } instead.`
     );
     const val = process.env[
       keyByDataSource('CUBEJS_DATABASE', dataSource)
     ];
     if (required && !val) {
-      throw new Error('The CUBEJS_DATABASE is required and missing.');
+      throw new Error(
+        `The ${
+          keyByDataSource('CUBEJS_DATABASE', dataSource)
+        } is required and missing.`
+      );
     }
     return val;
   },
@@ -545,7 +557,9 @@ const variables: Record<string, (...args: any) => any> = {
       supported.indexOf(<'s3' | 'gcp' | 'azure'>val) === -1
     ) {
       throw new TypeError(
-        'The CUBEJS_DB_EXPORT_BUCKET_TYPE must be either "s3", "gcp" or "azure".'
+        `The ${
+          keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_TYPE', dataSource)
+        } must be one of the [${supported.join(', ')}].`
       );
     }
     return val;
@@ -677,7 +691,9 @@ const variables: Record<string, (...args: any) => any> = {
     ];
     if (!val) {
       throw new Error(
-        'The CUBEJS_DB_DATABRICKS_URL is required and missing.'
+        `The ${
+          keyByDataSource('CUBEJS_DB_DATABRICKS_URL', dataSource)
+        } is required and missing.`
       );
     }
     return val;
