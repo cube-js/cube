@@ -287,7 +287,6 @@ impl RewriteRules for FilterRules {
                 change_user_member("?user"),
                 self.transform_change_user_eq("?column", "?literal", "?user"),
             ),
-            // ?expr IN (?one_element..)
             transforming_rewrite(
                 "in-filter-equal",
                 filter_replacer(
@@ -295,12 +294,8 @@ impl RewriteRules for FilterRules {
                     "?alias_to_cube",
                     "?members",
                 ),
-                filter_replacer(
-                    binary_expr("?expr", "=", literal_expr("?literal")),
-                    "?alias_to_cube",
-                    "?members",
-                ),
-                self.transform_filter_in_to_equal("?list", "?negated", "?literal"),
+                filter_replacer("?binary_expr", "?alias_to_cube", "?members"),
+                self.transform_filter_in_to_equal("?expr", "?list", "?negated", "?binary_expr"),
             ),
             rewrite(
                 "filter-in-place-filter-to-true-filter",
@@ -1960,35 +1955,69 @@ impl FilterRules {
     // Transform ?expr IN (?literal) to ?expr = ?literal
     fn transform_filter_in_to_equal(
         &self,
+        expr_val: &'static str,
         list_var: &'static str,
         negated_var: &'static str,
-        return_literal_var: &'static str,
+        return_binary_expr_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let expr_val = var!(expr_val);
         let list_var = var!(list_var);
         let negated_var = var!(negated_var);
-        let return_literal_var = var!(return_literal_var);
+        let return_binary_expr_var = var!(return_binary_expr_var);
 
         move |egraph, subst| {
+            let expr_id = subst[expr_val];
+            let (list, scalar) = match &egraph[subst[list_var]].data.constant_in_list {
+                Some(list) if list.len() > 0 => (list.clone(), list[0].clone()),
+                _ => return false,
+            };
+
             for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
-                if *negated {
-                    return false;
+                let operator = if *negated {
+                    Operator::NotEq
+                } else {
+                    Operator::Eq
+                };
+                let operator =
+                    egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(operator)));
+
+                let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                    LiteralExprValue(scalar),
+                ));
+                let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([literal_expr]));
+
+                let mut return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
+                    expr_id,
+                    operator,
+                    literal_expr,
+                ]));
+
+                for scalar in list.into_iter().skip(1) {
+                    let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                        LiteralExprValue(scalar),
+                    ));
+                    let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([literal_expr]));
+
+                    let right_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
+                        expr_id,
+                        operator,
+                        literal_expr,
+                    ]));
+
+                    let or = egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(
+                        Operator::Or,
+                    )));
+
+                    return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
+                        return_binary_expr,
+                        or,
+                        right_binary_expr,
+                    ]));
                 }
 
-                if let Some(list) = &egraph[subst[list_var]].data.constant_in_list {
-                    if list.len() != 1 {
-                        return false;
-                    }
+                subst.insert(return_binary_expr_var, return_binary_expr);
 
-                    if let Some(scalar) = list.first().cloned() {
-                        let first_scalar = egraph.add(LogicalPlanLanguage::LiteralExprValue(
-                            LiteralExprValue(scalar),
-                        ));
-
-                        subst.insert(return_literal_var, first_scalar);
-
-                        return true;
-                    }
-                }
+                return true;
             }
 
             false
