@@ -1265,6 +1265,20 @@ impl RewriteRules for SplitRules {
                     ],
                 ),
             ),
+            // CharacterLength
+            rewrite(
+                "split-push-down-char-length-inner-replacer",
+                inner_aggregate_split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube"),
+                inner_aggregate_split_replacer("?expr", "?cube"),
+            ),
+            rewrite(
+                "split-push-down-char-length-outer-aggr-replacer",
+                outer_aggregate_split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube"),
+                fun_expr(
+                    "CharacterLength",
+                    vec![outer_aggregate_split_replacer("?expr", "?cube")],
+                ),
+            ),
         ]
     }
 }
