@@ -12097,4 +12097,37 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         );
     }
+
+    #[tokio::test]
+    async fn test_thoughtspot_casts() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT CAST("ta_4"."ca_3" AS FLOAT8), CAST("ta_4"."ca_3" AS INT2), CAST("ta_4"."ca_3" AS BOOL)
+            FROM (
+                SELECT sum("ta_1"."count") AS "ca_3"
+                FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
+            ) AS "ta_4"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
 }
