@@ -747,16 +747,25 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> processSubscriptionsInterval
 
+CUBEJS_CONCURRENCY
+
 This property controls how often Websocket client subscriptions are refreshed.
 Defaults to `5000`.
 
 ## QueueOptions
 
+<WarningBox>
+
+Setting these options is highly discouraged as these are considered to be system-level settings.
+Please use `CUBEJS_DB_QUERY_TIMEOUT` and `CUBEJS_CONCURRENCY` [environment variables][ref-environment-variables] instead.
+
+</WarningBox>
+
 Timeout and interval options' values are in seconds.
 
 | Option              | Description                                                                                                                                    | Default Value |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| concurrency         | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. | `2`           |
+| concurrency         | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. Typically pool size should be at least twice of total concurrency among all queues. | `2`           |
 | continueWaitTimeout | Long polling interval                                                                                                                          | `5`           |
 | executionTimeout    | Total timeout of single query                                                                                                                  | `600`         |
 | orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                                                     | `120`         |
@@ -840,3 +849,5 @@ module.exports = {
 [self-schemapath]: #schemaPath
 [ref-exec-environment-globals]:
   /schema/reference/execution-environment#node-js-globals-process-env-console-log-and-others
+[ref-environment-variables]:
+  /reference/environment-variables
