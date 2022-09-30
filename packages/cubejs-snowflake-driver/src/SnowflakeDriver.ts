@@ -123,7 +123,7 @@ interface SnowflakeDriverExportGCS {
 
 export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDriverExportGCS;
 
-interface SnowflakeDriverOptions {
+export interface SnowflakeDriverOptions {
   account: string,
   username: string,
   password: string,
@@ -140,6 +140,7 @@ interface SnowflakeDriverOptions {
   exportBucket?: SnowflakeDriverExportBucket,
   executionTimeout?: number,
   application: string,
+  readOnly?: boolean
 }
 
 /**
@@ -198,6 +199,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       resultPrefetch: 1,
       executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
       application: 'CubeDev_Cube',
+      readOnly: getEnv('snowflakeReadOnlyUnload', { dataSource }),
       ...config
     };
   }
@@ -342,12 +344,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload is not configured');
     }
 
-    if (!['s3', 'gcs'].includes(this.config.exportBucket.bucketType)) {
-      throw new Error(
-        `Unsupported EXPORT_BUCKET_TYPE, supported: ${['s3', 'gcs'].join(',')}`
-      );
-    }
-    
     const exportPathName = crypto.randomBytes(10).toString('hex');
     const optionsString = this.prepareOptionsToExportString(options);
    
@@ -405,7 +401,12 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       throw new Error('Snowflake unloads zero rows on UNLOAD operation');
     }
 
-    await this.execute(connection, `${sql}`, values, false);
+    await this.execute(connection, `${sql} LIMIT 1`, values, false);
+    const types = await this.getTypesOfLastQuery(connection, values);
+    return types;
+  }
+
+  private async getTypesOfLastQuery(connection: Connection, values: unknown[]) {
     const types = await this.execute<TableColumn[]>(connection, 'DESC RESULT last_query_id()', values, false);
 
     const mappedTypes = types.map(t => ({ name: t.name, type: this.toGenericType(t.type) }));
@@ -692,7 +693,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public readOnly(): boolean {
-    return true;
+    return Boolean(this.config.readOnly);
   }
 
   public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
@@ -706,8 +707,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       return { csvFile, types };
     } else {
       const connection = await this.getConnection();
-      const rows = await this.execute<Rows>(connection, query, values);
-      const types = await this.execute<TableColumn[]>(connection, 'DESC RESULT last_query_id()', values, false);
+      const rows = await this.execute<Rows>(connection, query, values, false);
+      const types = await this.getTypesOfLastQuery(connection, values);
 
       return { rows, types };
     }

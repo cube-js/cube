@@ -22,7 +22,8 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "lint": "eslint src/* --ext .ts",
-    "lint:fix": "eslint --fix src/* --ext .ts"
+    "lint:fix": "eslint --fix src/* --ext .ts",
+    "unit": "jest --coverage dist/test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.16.0",
