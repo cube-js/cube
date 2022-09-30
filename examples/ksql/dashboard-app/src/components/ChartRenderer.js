@@ -153,7 +153,7 @@ const TypeToChartComponent = {
         // }
         return {
           key,
-          "Events.anonymousId": row["Events.anonymousId"],
+          "Events.anonymousId": row["Events.anonymousId"].split('-')[0],
           "Events.type": row["Events.type"],
           "Events.time": row["Events.time"],
           //"Events.minutesAgoHumanized": addMinsAgo(row["Events.minutesAgoHumanized"])
