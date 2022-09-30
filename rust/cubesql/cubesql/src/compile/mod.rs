@@ -1575,8 +1575,8 @@ mod tests {
         query.unwrap()
     }
 
-    fn find_cube_scan_deep_search(parent: Arc<LogicalPlan>) -> CubeScanNode {
-        pub struct FindCubeScanNodeVisitor(Option<CubeScanNode>);
+    fn find_cube_scans_deep_search(parent: Arc<LogicalPlan>) -> Vec<CubeScanNode> {
+        pub struct FindCubeScanNodeVisitor(Vec<CubeScanNode>);
 
         impl PlanVisitor for FindCubeScanNodeVisitor {
             type Error = CubeError;
@@ -1584,22 +1584,29 @@ mod tests {
             fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
                 if let LogicalPlan::Extension(ext) = plan {
                     if let Some(scan_node) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
-                        self.0 = Some(scan_node.clone());
+                        self.0.push(scan_node.clone());
                     }
                 }
                 Ok(true)
             }
         }
 
-        let mut visitor = FindCubeScanNodeVisitor(None);
+        let mut visitor = FindCubeScanNodeVisitor(Vec::new());
         parent.accept(&mut visitor).unwrap();
-        visitor.0.expect("No CubeScanNode was found in plan")
+
+        if visitor.0.len() == 0 {
+            panic!("No CubeScanNode was found in plan");
+        }
+
+        visitor.0
     }
 
     trait LogicalPlanTestUtils {
         fn find_projection_schema(&self) -> DFSchemaRef;
 
         fn find_cube_scan(&self) -> CubeScanNode;
+
+        fn find_cube_scans(&self) -> Vec<CubeScanNode>;
 
         fn find_filter(&self) -> Option<Filter>;
     }
@@ -1632,7 +1639,16 @@ mod tests {
         }
 
         fn find_cube_scan(&self) -> CubeScanNode {
-            find_cube_scan_deep_search(Arc::new(self.clone()))
+            let cube_scans = find_cube_scans_deep_search(Arc::new(self.clone()));
+            if cube_scans.len() != 1 {
+                panic!("The plan includes not 1 cube_scan!");
+            }
+
+            cube_scans[0].clone()
+        }
+
+        fn find_cube_scans(&self) -> Vec<CubeScanNode> {
+            find_cube_scans_deep_search(Arc::new(self.clone()))
         }
 
         fn find_filter(&self) -> Option<Filter> {
@@ -11426,6 +11442,172 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_holistics_aggr_fun_with_null() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT \"table\".\"count\" AS \"pu_c_3dcebf__0\", 
+                \"table\".\"maxPrice\" AS \"pu_mn_287b51__1\",
+                MIN(\"table\".\"minPrice\") AS \"m_pu_mn_ad42df__2\",
+                CAST ( NULL AS text ) AS \"h__placeholder_marker_0\",
+                CAST ( NULL AS text ) AS \"h__placeholder_marker_1\",
+                0 AS \"h__model_level\"
+            FROM \"public\".\"KibanaSampleDataEcommerce\" \"table\"
+            GROUP BY
+                1,
+                2,
+                4,
+                5,
+                6
+            UNION ALL
+            (
+                SELECT
+                    CAST ( NULL AS numeric ) AS \"pu_c_3dcebf__0\",
+                    \"table\".\"maxPrice\" AS \"pu_mn_287b51__1\",
+                    MIN(CAST ( NULL AS numeric )) AS \"m_pu_mn_ad42df__2\",
+                    'total' AS \"h__placeholder_marker_0\",
+                    CAST ( NULL AS text ) AS \"h__placeholder_marker_1\",
+                    2 AS \"h__model_level\"
+                FROM \"public\".\"KibanaSampleDataEcommerce\" \"table\"
+                GROUP BY
+                1,
+                2,
+                4,
+                5,
+                6
+            )
+            ORDER BY
+                6 DESC
+            LIMIT 100000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scans = logical_plan
+            .find_cube_scans()
+            .iter()
+            .map(|cube| cube.request.clone())
+            .collect::<Vec<V1LoadRequestQuery>>();
+
+        assert_eq!(
+            cube_scans.contains(&V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }),
+            true
+        );
+
+        assert_eq!(
+            cube_scans.contains(&V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string()
+                ]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }),
+            true
+        );
+    }
+
+    #[tokio::test]
+    async fn test_holistics_split_with_nulls() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT TO_CHAR((CAST ( (DATE_TRUNC ( 'quarter', (CAST ( \"table\".\"order_date\" AS timestamptz )) AT TIME ZONE 'Etc/UTC' )) AT TIME ZONE 'Etc/UTC' AS timestamptz )) AT TIME ZONE 'Etc/UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS \"dq_pu_ca_6b9696__0\",
+                \"table\".\"maxPrice\" AS \"pu_mn_287b51__1\",
+                MIN(\"table\".\"minPrice\") AS \"m_pu_mn_ad42df__2\",
+                CAST ( NULL AS text ) AS \"h__placeholder_marker_0\",
+                CAST ( NULL AS text ) AS \"h__placeholder_marker_1\",
+                0 AS \"h__model_level\"
+            FROM \"public\".\"KibanaSampleDataEcommerce\" \"table\"
+            GROUP BY
+                1,
+                2,
+                4,
+                5,
+                6
+            UNION ALL
+            (
+                SELECT TO_CHAR((CAST ( (DATE_TRUNC ( 'quarter', (CAST ( CAST ( NULL AS timestamptz ) AS timestamptz )) AT TIME ZONE 'Etc/UTC' )) AT TIME ZONE 'Etc/UTC' AS timestamptz )) AT TIME ZONE 'Etc/UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS \"dq_pu_ca_6b9696__0\",
+                    \"table\".\"maxPrice\" AS \"pu_mn_287b51__1\",
+                    MIN(CAST ( NULL AS numeric )) AS \"m_pu_mn_ad42df__2\",
+                    'total' AS \"h__placeholder_marker_0\",
+                    CAST ( NULL AS text ) AS \"h__placeholder_marker_1\",
+                    2 AS \"h__model_level\"
+                FROM \"public\".\"KibanaSampleDataEcommerce\" \"table\"
+                GROUP BY
+                1,
+                2,
+                4,
+                5,
+                6
+            )
+            ORDER BY 6 DESC
+            LIMIT 100000".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scans = logical_plan
+            .find_cube_scans()
+            .iter()
+            .map(|cube| cube.request.clone())
+            .collect::<Vec<V1LoadRequestQuery>>();
+
+        assert_eq!(
+            cube_scans.contains(&V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }),
+            true
+        );
+
+        assert_eq!(
+            cube_scans.contains(&V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string()
+                ]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("quarter".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }),
+            true
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_column_with_same_name_as_table() -> Result<(), CubeError> {
         init_logger();
 
@@ -12236,9 +12418,14 @@ ORDER BY \"COUNT(count)\" DESC"
         .await
         .as_logical_plan();
 
+        let cube_scans = logical_plan
+            .find_cube_scans()
+            .iter()
+            .map(|cube| cube.request.clone())
+            .collect::<Vec<V1LoadRequestQuery>>();
+
         assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
+            cube_scans.contains(&V1LoadRequestQuery {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
@@ -12249,7 +12436,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
-            }
-        )
+            }),
+            true
+        );
     }
 }
