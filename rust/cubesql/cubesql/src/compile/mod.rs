@@ -10908,6 +10908,37 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_metabase_substring_user() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT \"source\".\"substring131715\" AS \"substring131715\" 
+                FROM (
+                    SELECT 
+                        \"public\".\"KibanaSampleDataEcommerce\".\"__user\" AS \"__user\", 
+                        SUBSTRING(\"public\".\"KibanaSampleDataEcommerce\".\"__user\" FROM 1 FOR 1234) AS \"substring131715\" 
+                    FROM \"public\".\"KibanaSampleDataEcommerce\"
+                ) AS \"source\" 
+                LIMIT 10000".to_string(),
+            DatabaseProtocol::PostgreSQL
+        ).await.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10000),
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_select_asterisk_cross_join() {
         init_logger();
 
