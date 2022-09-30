@@ -743,14 +743,15 @@ class ApiGateway {
     context: RequestContext,
     selector: PreAggJob[],
   ): Promise<PreAggJob[]> {
-    const metaCache: Map<RequestContext, any> = new Map();
+    const metaCache: Map<string, any> = new Map();
     const promise: Promise<PreAggJob[]> = Promise.all(
       selector.map(async (selected) => {
         const ctx = { ...context, ...selected.context };
+        const key = JSON.stringify(ctx);
         const orchestrator = this.getAdapterApi(ctx);
         const compiler = this.getCompilerApi(ctx);
-        if (!metaCache.has(ctx)) {
-          metaCache.set(ctx, await compiler.metaConfigExtended(ctx));
+        if (!metaCache.has(key)) {
+          metaCache.set(key, await compiler.metaConfigExtended(ctx));
         }
         const status = await this.getPreAggJobQueueStatus(
           orchestrator,
@@ -762,7 +763,7 @@ class ApiGateway {
             ctx.requestId,
             orchestrator,
             compiler,
-            metaCache.get(ctx),
+            metaCache.get(key),
             selected,
           )
         };
