@@ -11,11 +11,15 @@ const clickhouseDatabase = process.env.CUBEJS_DB_NAME;
 const clickhouseUser     = process.env.CUBEJS_DB_USER;
 const clickhousePassword = process.env.CUBEJS_DB_PASS;
 
-const mysqlHost      = 'demo-db-examples.cube.dev';
-const mysqlPort      = '5432';
-const mysqlDatabase  = 'ecom';
-const mysqlUser      = 'cube';
-const mysqlPassword  = '12345';
+/**
+ * Demo 1
+ * Multi-tenancy with Data Sources
+ */
+// const mysqlHost      = 'demo-db-examples.cube.dev';
+// const mysqlPort      = '5432';
+// const mysqlDatabase  = 'ecom';
+// const mysqlUser      = 'cube';
+// const mysqlPassword  = '12345';
 
 module.exports = {
   /**
@@ -42,7 +46,7 @@ module.exports = {
         port: clickhousePort,
       };
     }
-  },
+  },  
 
 
   /**

@@ -19,10 +19,10 @@ ReactDOM
   )
 
 function App() {
-  const [ timer, setTimer ] = useState({});
+  const [ timer, setTimer ] = useState({})
 
-  const [ dataSourceId, setDataSourceId ] = useState(defaultDataSourceId);
-  const dataSource = dataSources.find(x => x.id === dataSourceId);
+  const [ dataSourceId, setDataSourceId ] = useState(defaultDataSourceId)
+  const dataSource = dataSources.find(x => x.id === dataSourceId)
 
   const cubejsApi = cubejs(
     dataSource.token,
@@ -30,22 +30,22 @@ function App() {
   )
 
   useEffect(() => {
-    setTimer({});
-    const start = Date.now();
+    setTimer({})
+    const start = Date.now()
 
     cubejsApi
       .meta()
       .then(() => {
-        const end = Date.now();
-        const responseTime = end - start;
-        setTimer({ responseTime });
-      });
+        const end = Date.now()
+        const responseTime = end - start
+        setTimer({ responseTime })
+      })
   }, [
     dataSource.token,
     apiUrl,
-  ]);
+  ])
 
-  const [ ontimeBarData, setOntimeBarData ] = useState({});
+  const [ ontimeBarData, setOntimeBarData ] = useState({})
   useEffect(() => {
     cubejsApi
       .load(jsonQuery())
@@ -53,7 +53,7 @@ function App() {
   }, [
     dataSource.token,
     apiUrl,
-  ]);
+  ])
 
   return <>
     <div style={{ display: 'flex', justifyContent: 'center' }}>

@@ -20,15 +20,15 @@ cube(`Ontime`, {
      * Demo
      * Add custom measures
      */
-    // avgDepDelay: {
-    //   type: `avg`,
-    //   sql: `${CUBE}."DepDelay"`
-    // },
-    // avgDepDelayGreaterThanTenMinutesPercentage: {
-    //   type: `number`,
-    //   sql: `avg(${CUBE}."DepDelay">10)*100`,
-    //   format: `percent`
-    // },
+    avgDepDelay: {
+      type: `avg`,
+      sql: `${CUBE}."DepDelay"`
+    },
+    avgDepDelayGreaterThanTenMinutesPercentage: {
+      type: `number`,
+      sql: `avg(${CUBE}."DepDelay">10)*100`,
+      format: `percent`
+    },
   },
   
   dimensions: {
