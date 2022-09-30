@@ -8,7 +8,7 @@ const Header = ({ analytics }) => {
   const onClick = useCallback(() => {
     setSendingEvent(true);
     analytics.track("button_clicked");
-    setTimeout(() => setSendingEvent(false), 2500);
+    setTimeout(() => setSendingEvent(false), 100);
   }, [analytics]);
 
   return (
@@ -16,13 +16,8 @@ const Header = ({ analytics }) => {
       <div className="top-menu">
         <Button
           onClick={onClick}
-          loading={sendingEvent}
           type="primary"
-        >
-          {sendingEvent
-            ? "Sending Button Click Event"
-            : "Send Button Click Event"}
-        </Button>
+        >Click Me Now</Button>
       </div>
     </Layout.Header>
   )
