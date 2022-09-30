@@ -1146,20 +1146,31 @@ describe('Single datasources', () => {
   });
 
   test('getEnv("snowflakeReadOnlyUnload")', () => {
-    process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD = 'default1';
-    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toEqual('default1');
-    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toEqual('default1');
-    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toEqual('default1');
+    process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD = 'true';
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toEqual(true);
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toEqual(true);
 
-    process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD = 'default2';
-    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toEqual('default2');
-    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toEqual('default2');
-    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toEqual('default2');
+    process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD = 'false';
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toEqual(false);
+
+    process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD = 'wrong';
+    expect(() => getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toThrow(
+      'The CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD must be either \'true\' or \'false\'.'
+    );
+    expect(() => getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toThrow(
+      'The CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD must be either \'true\' or \'false\'.'
+    );
+    expect(() => getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toThrow(
+      'The CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD must be either \'true\' or \'false\'.'
+    );
 
     delete process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD;
-    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toBeUndefined();
-    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toBeUndefined();
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toEqual(false);
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toEqual(false);
   });
 
   test('getEnv("snowflakeRegion")', () => {
