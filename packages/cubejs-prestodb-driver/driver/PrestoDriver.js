@@ -3,8 +3,12 @@ const {
   map, zipObj, prop, concat
 } = require('ramda');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
+const { getEnv, assertDataSource } = require('@cubejs-backend/shared');
 const SqlString = require('sqlstring');
 
+/**
+ * Presto driver class.
+ */
 class PrestoDriver extends BaseDriver {
   /**
    * Returns default concurrency value.
@@ -13,23 +17,35 @@ class PrestoDriver extends BaseDriver {
     return 2;
   }
 
+  /**
+   * Class constructor.
+   */
   constructor(config = {}) {
     super();
 
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+      
     this.config = {
-      host: process.env.CUBEJS_DB_HOST,
-      port: process.env.CUBEJS_DB_PORT,
-      catalog: process.env.CUBEJS_DB_CATALOG,
-      schema: process.env.CUBEJS_DB_SCHEMA,
-      user: process.env.CUBEJS_DB_USER,
-      basic_auth: process.env.CUBEJS_DB_PASS ? {
-        user: process.env.CUBEJS_DB_USER,
-        password: process.env.CUBEJS_DB_PASS
-      } : undefined,
-      ssl: this.getSslOptions(),
+      host: getEnv('dbHost', { dataSource }),
+      port: getEnv('dbPort', { dataSource }),
+      catalog:
+        getEnv('prestoCatalog', { dataSource }) ||
+        getEnv('dbCatalog', { dataSource }),
+      schema:
+        getEnv('dbName', { dataSource }) ||
+        getEnv('dbSchema', { dataSource }),
+      user: getEnv('dbUser', { dataSource }),
+      basic_auth: getEnv('dbPass', { dataSource })
+        ? {
+          user: getEnv('dbUser', { dataSource }),
+          password: getEnv('dbPass', { dataSource }),
+        }
+        : undefined,
+      ssl: this.getSslOptions(dataSource),
       ...config
     };
-
     this.catalog = this.config.catalog;
     this.client = new presto.Client(this.config);
   }

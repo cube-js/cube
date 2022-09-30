@@ -69,14 +69,20 @@ describe('getEnv', () => {
 
   test('dbPollTimeout', () => {
     process.env.CUBEJS_DB_POLL_TIMEOUT = '1m';
-    expect(getEnv('dbPollTimeout')).toBe(60);
+    expect(
+      getEnv('dbPollTimeout', { dataSource: 'default' })
+    ).toBe(60);
   });
 
   test('dbPollMaxInterval', () => {
-    expect(getEnv('dbPollMaxInterval')).toBe(5);
+    expect(
+      getEnv('dbPollMaxInterval', { dataSource: 'default' })
+    ).toBe(5);
 
     process.env.CUBEJS_DB_POLL_MAX_INTERVAL = '10s';
-    expect(getEnv('dbPollMaxInterval')).toBe(10);
+    expect(
+      getEnv('dbPollMaxInterval', { dataSource: 'default' })
+    ).toBe(10);
   });
 
   test('livePreview', () => {

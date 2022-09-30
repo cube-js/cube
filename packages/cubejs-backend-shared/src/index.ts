@@ -1,4 +1,9 @@
-export { getEnv, isDockerImage } from './env';
+export {
+  getEnv,
+  assertDataSource,
+  keyByDataSource,
+  isDockerImage,
+} from './env';
 export * from './enums';
 export * from './package';
 export * from './track';
