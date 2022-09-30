@@ -1,14 +1,17 @@
 import { BaseDriver, TableQueryResult } from '@cubejs-backend/base-driver';
-import { getEnv } from '@cubejs-backend/shared';
-import { DruidClient, DruidClientBaseConfiguration } from './DruidClient';
+import { getEnv, assertDataSource } from '@cubejs-backend/shared';
+import { DruidClient, DruidClientBaseConfiguration, DruidClientConfiguration } from './DruidClient';
 import { DruidQuery } from './DruidQuery';
 
 export type DruidDriverConfiguration = DruidClientBaseConfiguration & {
-  url: string,
+  url?: string,
 };
 
+/**
+ * Druid driver class.
+ */
 export class DruidDriver extends BaseDriver {
-  protected readonly config: DruidDriverConfiguration;
+  protected readonly config: DruidClientConfiguration;
 
   protected readonly client: DruidClient;
 
@@ -23,30 +26,49 @@ export class DruidDriver extends BaseDriver {
     return 2;
   }
 
-  public constructor(config?: DruidDriverConfiguration) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: DruidDriverConfiguration & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {}
+  ) {
     super();
 
-    let url = config?.url || process.env.CUBEJS_DB_URL;
-    if (!url) {
-      const host = process.env.CUBEJS_DB_HOST;
-      const port = process.env.CUBEJS_DB_PORT;
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
 
+    let url = config.url || getEnv('dbUrl', { dataSource });
+
+    if (!url) {
+      const host = getEnv('dbHost', { dataSource });
+      const port = getEnv('dbPort', { dataSource });
       if (host && port) {
-        const protocol = getEnv('dbSsl') ? 'https' : 'http';
+        const protocol = getEnv('dbSsl', { dataSource })
+          ? 'https'
+          : 'http';
         url = `${protocol}://${host}:${port}`;
       } else {
         throw new Error('Please specify CUBEJS_DB_URL');
       }
     }
-
     this.config = {
       url,
-      user: config?.user || process.env.CUBEJS_DB_USER,
-      password: config?.password || process.env.CUBEJS_DB_PASS,
-      database: config?.database || process.env.CUBEJS_DB_NAME || config?.database || 'default',
+      user:
+        config.user ||
+        getEnv('dbUser', { dataSource }),
+      password:
+        config.password ||
+        getEnv('dbPass', { dataSource }),
+      database:
+        config.database ||
+        getEnv('dbName', { dataSource }) ||
+        'default',
       ...config,
     };
-
     this.client = new DruidClient(this.config);
   }
 

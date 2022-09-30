@@ -63,7 +63,8 @@ impl PostgresIntegrationTestSuite {
                 c
             });
 
-            let services = config.configure().await;
+            config.configure().await;
+            let services = config.cube_services().await;
             services.wait_processing_loops().await.unwrap();
         });
 

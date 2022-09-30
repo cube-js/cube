@@ -287,7 +287,6 @@ impl RewriteRules for FilterRules {
                 change_user_member("?user"),
                 self.transform_change_user_eq("?column", "?literal", "?user"),
             ),
-            // ?expr IN (?one_element..)
             transforming_rewrite(
                 "in-filter-equal",
                 filter_replacer(
@@ -295,12 +294,8 @@ impl RewriteRules for FilterRules {
                     "?alias_to_cube",
                     "?members",
                 ),
-                filter_replacer(
-                    binary_expr("?expr", "=", literal_expr("?literal")),
-                    "?alias_to_cube",
-                    "?members",
-                ),
-                self.transform_filter_in_to_equal("?list", "?negated", "?literal"),
+                filter_replacer("?binary_expr", "?alias_to_cube", "?members"),
+                self.transform_filter_in_to_equal("?expr", "?list", "?negated", "?binary_expr"),
             ),
             rewrite(
                 "filter-in-place-filter-to-true-filter",
@@ -637,7 +632,7 @@ impl RewriteRules for FilterRules {
                     "?alias_to_cube",
                     "?members",
                 ),
-                self.transform_date_trunc_equals("?granularity", "?interval"),
+                self.transform_granularity_to_interval("?granularity", "?interval"),
             ),
             // TODO define zero
             rewrite(
@@ -883,6 +878,122 @@ impl RewriteRules for FilterRules {
                     "?literal",
                     "?new_literal",
                 ),
+            ),
+            transforming_rewrite(
+                "extract-year-equals",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "Trunc",
+                            vec![fun_expr(
+                                "DatePart",
+                                vec![literal_string("YEAR"), column_expr("?column")],
+                            )],
+                        ),
+                        "=",
+                        literal_expr("?year"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?values"),
+                self.transform_filter_extract_year_equals(
+                    "?year",
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?member",
+                    "?values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-date-trunc-leeq",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "<=",
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), literal_expr("?expr")],
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        column_expr("?column"),
+                        "<",
+                        binary_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), literal_expr("?expr")],
+                            ),
+                            "+",
+                            literal_expr("?interval"),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                self.transform_granularity_to_interval("?granularity", "?interval"),
+            ),
+            transforming_rewrite(
+                "filter-date-trunc-sub-leeq",
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![
+                                    literal_expr("?granularity"),
+                                    binary_expr(
+                                        column_expr("?column"),
+                                        "+",
+                                        literal_expr("?same_interval"),
+                                    ),
+                                ],
+                            ),
+                            "-",
+                            literal_expr("?same_interval"),
+                        ),
+                        "<=",
+                        binary_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), literal_expr("?expr")],
+                            ),
+                            "-",
+                            literal_expr("?same_interval"),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        column_expr("?column"),
+                        "<",
+                        binary_expr(
+                            binary_expr(
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![literal_expr("?granularity"), literal_expr("?expr")],
+                                ),
+                                "-",
+                                literal_expr("?same_interval"),
+                            ),
+                            "+",
+                            literal_expr("?interval"),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                self.transform_granularity_to_interval("?granularity", "?interval"),
             ),
             rewrite(
                 "between-move-interval-beyond-equal-sign",
@@ -1690,6 +1801,68 @@ impl FilterRules {
         }
     }
 
+    fn transform_filter_extract_year_equals(
+        &self,
+        year_var: &'static str,
+        column_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        member_var: &'static str,
+        values_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let year_var = var!(year_var);
+        let column_var = var!(column_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let member_var = var!(member_var);
+        let values_var = var!(values_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for year in var_iter!(egraph[subst[year_var]], LiteralExprValue) {
+                if let ScalarValue::Int64(Some(year)) = year {
+                    let year = year.clone();
+                    if year < 1000 || year > 9999 {
+                        continue;
+                    }
+
+                    if let Some((member_name, cube)) = Self::filter_member_name(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        column_var,
+                        members_var,
+                    ) {
+                        if !cube.contains_member(&member_name) {
+                            continue;
+                        }
+
+                        subst.insert(
+                            member_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                                FilterMemberMember(member_name.to_string()),
+                            )),
+                        );
+
+                        subst.insert(
+                            values_var,
+                            egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                FilterMemberValues(vec![
+                                    format!("{}-01-01", year),
+                                    format!("{}-12-31", year),
+                                ]),
+                            )),
+                        );
+
+                        return true;
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
     fn transform_segment(
         &self,
         column_var: &'static str,
@@ -1782,35 +1955,69 @@ impl FilterRules {
     // Transform ?expr IN (?literal) to ?expr = ?literal
     fn transform_filter_in_to_equal(
         &self,
+        expr_val: &'static str,
         list_var: &'static str,
         negated_var: &'static str,
-        return_literal_var: &'static str,
+        return_binary_expr_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let expr_val = var!(expr_val);
         let list_var = var!(list_var);
         let negated_var = var!(negated_var);
-        let return_literal_var = var!(return_literal_var);
+        let return_binary_expr_var = var!(return_binary_expr_var);
 
         move |egraph, subst| {
+            let expr_id = subst[expr_val];
+            let (list, scalar) = match &egraph[subst[list_var]].data.constant_in_list {
+                Some(list) if list.len() > 0 => (list.clone(), list[0].clone()),
+                _ => return false,
+            };
+
             for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
-                if *negated {
-                    return false;
+                let operator = if *negated {
+                    Operator::NotEq
+                } else {
+                    Operator::Eq
+                };
+                let operator =
+                    egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(operator)));
+
+                let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                    LiteralExprValue(scalar),
+                ));
+                let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([literal_expr]));
+
+                let mut return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
+                    expr_id,
+                    operator,
+                    literal_expr,
+                ]));
+
+                for scalar in list.into_iter().skip(1) {
+                    let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                        LiteralExprValue(scalar),
+                    ));
+                    let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([literal_expr]));
+
+                    let right_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
+                        expr_id,
+                        operator,
+                        literal_expr,
+                    ]));
+
+                    let or = egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(
+                        Operator::Or,
+                    )));
+
+                    return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
+                        return_binary_expr,
+                        or,
+                        right_binary_expr,
+                    ]));
                 }
 
-                if let Some(list) = &egraph[subst[list_var]].data.constant_in_list {
-                    if list.len() != 1 {
-                        return false;
-                    }
+                subst.insert(return_binary_expr_var, return_binary_expr);
 
-                    if let Some(scalar) = list.first().cloned() {
-                        let first_scalar = egraph.add(LogicalPlanLanguage::LiteralExprValue(
-                            LiteralExprValue(scalar),
-                        ));
-
-                        subst.insert(return_literal_var, first_scalar);
-
-                        return true;
-                    }
-                }
+                return true;
             }
 
             false
@@ -2148,7 +2355,7 @@ impl FilterRules {
         }
     }
 
-    fn transform_date_trunc_equals(
+    fn transform_granularity_to_interval(
         &self,
         granularity_var: &'static str,
         interval_var: &'static str,
@@ -2157,19 +2364,7 @@ impl FilterRules {
         let interval_var = var!(interval_var);
         move |egraph, subst| {
             for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
-                if let ScalarValue::Utf8(Some(granularity)) = granularity {
-                    let interval = match granularity.as_str() {
-                        "second" => ScalarValue::IntervalDayTime(Some(1000)),
-                        "minute" => ScalarValue::IntervalDayTime(Some(60000)),
-                        "hour" => ScalarValue::IntervalDayTime(Some(3600000)),
-                        "day" => ScalarValue::IntervalDayTime(Some(4294967296)),
-                        "week" => ScalarValue::IntervalDayTime(Some(30064771072)),
-                        "month" => ScalarValue::IntervalYearMonth(Some(1)),
-                        "quarter" => ScalarValue::IntervalYearMonth(Some(3)),
-                        "year" => ScalarValue::IntervalYearMonth(Some(12)),
-                        _ => continue,
-                    };
-
+                if let Some(interval) = utils::granularity_to_interval(granularity) {
                     subst.insert(
                         interval_var,
                         egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(

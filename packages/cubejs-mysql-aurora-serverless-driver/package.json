@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.30.73",
+    "@cubejs-backend/shared": "^0.30.69",
     "@types/mysql": "^2.15.15",
     "aws-sdk": "^2.787.0",
     "data-api-client": "^1.1.0"

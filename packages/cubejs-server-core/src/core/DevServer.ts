@@ -11,13 +11,13 @@ import jwt from 'jsonwebtoken';
 import isDocker from 'is-docker';
 import type { Application as ExpressApplication, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
-import { executeCommand, getEnv, packageExists } from '@cubejs-backend/shared';
+import { executeCommand, getEnv, keyByDataSource, packageExists } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
 import { CubejsServerCore } from './server';
-import { ExternalDbTypeFn, ServerCoreInitializedOptions } from './types';
+import { ExternalDbTypeFn, ServerCoreInitializedOptions, DatabaseType } from './types';
 import DriverDependencies from './DriverDependencies';
 
 const repo = {
@@ -414,48 +414,77 @@ export class DevServer {
       }
     }));
 
-    app.post('/playground/test-connection', catchErrors(async (req, res) => {
-      const { variables = {} } = req.body || {};
+    /**
+     * The `/playground/test-connection` endpoint request.
+     */
+    type TestConnectionRequest = {
+      body: {
+        dataSource?: string,
+        variables: {
+          [env: string]: string,
+        },
+      },
+    };
 
-      let driver: BaseDriver | null = null;
+    app.post('/playground/test-connection', catchErrors(
+      async (req: TestConnectionRequest, res) => {
+        const { dataSource, variables } = req.body || {};
 
-      try {
-        if (!variables.CUBEJS_DB_TYPE) {
-          throw new Error('CUBEJS_DB_TYPE is required');
-        }
+        // With multiple data sources enabled, we need to use
+        // CUBEJS_DS_<dataSource>_DB_TYPE environment variable
+        // instead of CUBEJS_DB_TYPE.
+        const type = keyByDataSource('CUBEJS_DB_TYPE', dataSource);
 
-        // Backup env variables for restoring
-        const originalProcessEnv = process.env;
-        process.env = {
-          ...process.env,
-        };
+        let driver: BaseDriver | null = null;
+        
+        try {
+          if (!variables || !variables[type]) {
+            throw new Error(`${type} is required`);
+          }
 
-        for (const [envName, value] of Object.entries(variables)) {
-          process.env[envName] = <string>value;
-        }
+          // Backup env variables for restoring
+          const originalProcessEnv = process.env;
+          process.env = {
+            ...process.env,
+          };
 
-        driver = CubejsServerCore.createDriver(variables.CUBEJS_DB_TYPE);
+          // We suppose that variables names passed to the endpoint have their
+          // final form depending on whether multiple data sources are enabled
+          // or not. So, we don't need to convert anything here.
+          for (const [envName, value] of Object.entries(variables)) {
+            process.env[envName] = <string>value;
+          }
 
-        // Restore original process.env
-        process.env = originalProcessEnv;
+          // With multiple data sources enabled, we need to put the dataSource
+          // parameter to the driver instance to read an appropriate set of
+          // driver configuration parameters. It can be undefined if multiple
+          // data source is disabled.
+          driver = CubejsServerCore.createDriver(
+            <DatabaseType>variables[type],
+            { dataSource },
+          );
 
-        await driver.testConnection();
+          // Restore original process.env
+          process.env = originalProcessEnv;
 
-        this.cubejsServer.event('test_database_connection_success');
+          await driver.testConnection();
 
-        return res.json('ok');
-      } catch (error) {
-        this.cubejsServer.event('test_database_connection_error');
+          this.cubejsServer.event('test_database_connection_success');
 
-        return res.status(400).json({
-          error: error.toString()
-        });
-      } finally {
-        if (driver && (<any>driver).release) {
-          await (<any>driver).release();
+          return res.json('ok');
+        } catch (error) {
+          this.cubejsServer.event('test_database_connection_error');
+
+          return res.status(400).json({
+            error: error.toString()
+          });
+        } finally {
+          if (driver && (<any>driver).release) {
+            await (<any>driver).release();
+          }
         }
       }
-    }));
+    ));
 
     app.post('/playground/env', catchErrors(async (req, res) => {
       let { variables = {} } = req.body || {};

@@ -8,7 +8,7 @@ import { ApiGateway, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
   createCancelableInterval, formatDuration, getAnonymousId,
-  getEnv, getRealType, internalExceptions, track,
+  getEnv, assertDataSource, getRealType, internalExceptions, track,
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
@@ -721,6 +721,7 @@ export class CubejsServerCore {
     context: DriverContext,
     options?: OrchestratorInitedOptions,
   ): Promise<BaseDriver> {
+    // TODO (buntarb): this works fine without multiple data sources.
     if (!this.driver) {
       const driver = await this.resolveDriver(context, options);
       await driver.testConnection(); // TODO mutex
@@ -744,8 +745,10 @@ export class CubejsServerCore {
       const opts = Object.keys(rest).length
         ? rest
         : {
-          maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
+          maxPoolSize:
+            await CubejsServerCore.getDriverMaxPool(context, options),
         };
+      opts.dataSource = assertDataSource(context.dataSource);
       return CubejsServerCore.createDriver(type, opts);
     }
   }
