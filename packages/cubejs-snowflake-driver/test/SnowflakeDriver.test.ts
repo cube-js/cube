@@ -1,3 +1,4 @@
+import { DriverInterface } from '@cubejs-backend/base-driver';
 import type { SnowflakeDriverExportBucket, SnowflakeDriverOptions } from '../src/SnowflakeDriver';
 
 /* eslint-disable no-use-before-define */
@@ -10,8 +11,6 @@ const createExecuteMock = (stubs: Stub[]) => ({ sqlText, complete }: {connection
   if (sqlText === 'ALTER SESSION SET TIMEZONE = \'UTC\'') {
     return complete(undefined, undefined, []);
   }
-
-  console.log('sqlTextsqlText', sqlText);
   for (const s of stubs) {
     if (sqlText.match(s.regexp)) {
       // eslint-disable-next-line consistent-return
@@ -133,8 +132,15 @@ describe('SnowflakeDriver', () => {
   });
 
   describe('unload', () => {
-    it('throws error if no export bucket was passed', () => {
+    it('throws an error if no export bucket was passed', async () => {
+      const stubs: any[] = [];
+      mockSnowflake(stubs);
       
+      const driver = createSnowflakeDriver();
+
+      const promise = () => driver?.unload?.('table_1', { maxFileSize: 60 });
+
+      await expect(promise).rejects.toThrow(/Unload is not configured/);
     });
     it('unloadFromTable success', () => {
       
@@ -165,7 +171,8 @@ describe('SnowflakeDriver', () => {
 function createSnowflakeDriver(config: Partial<SnowflakeDriverOptions> = {} as SnowflakeDriverOptions) {
   // eslint-disable-next-line global-require
   const { SnowflakeDriver } = require('../src/SnowflakeDriver');
-  const driver = new SnowflakeDriver(config);
+
+  const driver: DriverInterface = new SnowflakeDriver(config);
 
   return driver;
 }
