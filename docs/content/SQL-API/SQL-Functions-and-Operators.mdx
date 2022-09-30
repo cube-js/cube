@@ -6,15 +6,264 @@ subCategory: Reference
 menuOrder: 5
 ---
 
+## Comparison Functions and Operators
+
+### <--{"id" : "Comparison Functions and Operators"}--> Less than
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                   | Selections | Projections | Outer Query                              |
+| ----------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&lt;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+Returns true if the first `datatype` is less than the second.
+
+```sql
+datatype < datatype
+```
+
+The example below uses `<` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM Orders WHERE Orders.number < 1000;
+ COUNT(UInt8(1))
+-----------------
+(0 rows)
+```
+
+The example below uses `<` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM Orders) orders
+WHERE orders.number < 1000;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+### <--{"id" : "Comparison Functions and Operators"}--> Greater than
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                   | Selections | Projections | Outer Query                              |
+| ----------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&gt;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+Returns true if the first `datatype` is greater than the second.
+
+```sql
+datatype > datatype
+```
+
+The example below uses `>` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM Orders WHERE Orders.number > 1000;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+The example below uses `>` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM Orders) orders
+WHERE orders.number > 1000;
+ COUNT(UInt8(1))
+-----------------
+               0
+(1 row)
+```
+
+### <--{"id" : "Comparison Functions and Operators"}--> Less than or equal to
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                        | Selections | Projections | Outer Query                              |
+| ---------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&lt;&#61;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+Returns true if the first `datatype` is less than or equal to the second.
+
+```sql
+datatype <= datatype
+```
+
+The example below uses `<=` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM Orders WHERE Orders.number <= 1000;
+ COUNT(UInt8(1))
+-----------------
+(0 rows)
+```
+
+The example below uses `<=` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM Orders) orders
+WHERE orders.number <= 1000;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+### <--{"id" : "Comparison Functions and Operators"}--> Greater than or equal to
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                        | Selections | Projections | Outer Query                              |
+| ---------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&gt;&#61;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+Returns true if the first `datatype` is greater than or equal to the second.
+
+```sql
+datatype >= datatype
+```
+
+The example below uses `>=` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM Orders WHERE Orders.number >= 1000;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+The example below uses `>=` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM Orders) orders
+WHERE orders.number >= 1000;
+ COUNT(UInt8(1))
+-----------------
+               0
+(1 row)
+```
+
+### <--{"id" : "Comparison Functions and Operators"}--> Equal
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                    | Selections | Projections | Outer Query                              |
+| ------------------ | ---------- | ----------- | ---------------------------------------- |
+| <code>&#61;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+Returns true if the first `datatype` is equal to the second.
+
+```sql
+datatype = datatype
+```
+
+The example below uses `=` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM Orders WHERE Orders.status = 'completed';
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+The example below uses `=` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM Orders) orders
+WHERE orders.status = 'completed';
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+### <--{"id" : "Comparison Functions and Operators"}--> Not equal
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                                              | Selections | Projections | Outer Query                              |
+| -------------------------------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>!&#61;</code> or <code>&lt;&gt;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+Returns true if the first `datatype` is equal to the second.
+
+```sql
+datatype = datatype
+```
+
+The example below uses `!=` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM Orders WHERE Orders.status != 'completed';
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+The example below uses `<>` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM Orders) orders
+WHERE orders.status <> 'completed';
+ COUNT(UInt8(1))
+-----------------
+            6654
+(1 row)
+```
+
 ## Mathematical Functions and Operators
 
 ### <--{"id" : "Mathematical Functions and Operators"}--> TRUNC
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`TRUNC` is **only supported** for **projections** from cube tables. We recommend
-updating your queries to [use outer selects][ref-backend-sql-query-fundamentals]
-if you need to use this function in **selections**.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|         | Selections | Projections | Outer Query                              |
+| ------- | ---------- | ----------- | ---------------------------------------- |
+| `TRUNC` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -52,10 +301,12 @@ LIMIT 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-The `||` operator is **only supported** for **selections** from cube tables. We
-recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function in
-**projections**.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|                           | Selections | Projections | Outer Query                              |
+| ------------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&vert;&vert;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -93,9 +344,16 @@ LIMIT 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
 `BIT_LENGTH` is **not supported** for **selections** or **projections** from
 cube tables. We recommend updating your queries to [use outer
 selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+
+|              | Selections | Projections | Outer Query                              |
+| ------------ | ---------- | ----------- | ---------------------------------------- |
+| `BIT_LENGTH` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -121,9 +379,12 @@ LIMIT 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`CHAR_LENGTH` is **not supported** for **selections** or **projections** from
-cube tables. We recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|               | Selections | Projections | Outer Query                              |
+| ------------- | ---------- | ----------- | ---------------------------------------- |
+| `CHAR_LENGTH` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -150,9 +411,12 @@ LIMIT 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`LOWER` is **only supported** for **selections** from cube tables. We recommend
-updating your queries to [use outer selects][ref-backend-sql-query-fundamentals]
-if you need to use this function in **projections**.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|         | Selections | Projections | Outer Query                              |
+| ------- | ---------- | ----------- | ---------------------------------------- |
+| `LOWER` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -162,7 +426,7 @@ Converts `string` to all lower case.
 LOWER(string)
 ```
 
-The example below uses `BIT_LENGTH` in a selection within a Cube query rewrite:
+The example below uses `LOWER` in a selection within a Cube query rewrite:
 
 ```sql
 SELECT COUNT(*) FROM Orders WHERE LOWER(Orders.status) = 'completed';
@@ -172,7 +436,7 @@ SELECT COUNT(*) FROM Orders WHERE LOWER(Orders.status) = 'completed';
 (1 row)
 ```
 
-The example below uses `BIT_LENGTH` in post-processing with an outer query:
+The example below uses `LOWER` in post-processing with an outer query:
 
 ```sql
 SELECT LOWER(Orders.status)
@@ -188,9 +452,12 @@ LIMIT 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`OCTET_LENGTH` is **not supported** for **selections** or **projections** from
-cube tables. We recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|                | Selections | Projections | Outer Query                              |
+| -------------- | ---------- | ----------- | ---------------------------------------- |
+| `OCTET_LENGTH` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -216,10 +483,12 @@ LIMIT 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`SUBSTRING` is **only supported** for **projections** from cube tables. We
-recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function in
-**selections**.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|             | Selections | Projections | Outer Query                              |
+| ----------- | ---------- | ----------- | ---------------------------------------- |
+| `SUBSTRING` | ❌         | ✅          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -257,9 +526,12 @@ LIMIT 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`TRIM` is **not supported** for **selections** or **projections** from cube
-tables. We recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|        | Selections | Projections | Outer Query                              |
+| ------ | ---------- | ----------- | ---------------------------------------- |
+| `TRIM` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -288,9 +560,12 @@ cube=>
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`UPPER` is **not supported** for **selections** or **projections** from cube
-tables. We recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|         | Selections | Projections | Outer Query                              |
+| ------- | ---------- | ----------- | ---------------------------------------- |
+| `UPPER` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -310,6 +585,64 @@ LIMIT 1;
 ----------------------
  PROCESSING
 (1 row)
+```
+
+## Pattern Matching
+
+### <--{"id" : "Pattern Matching"}--> LIKE
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|        | Selections | Projections | Outer Query                              |
+| ------ | ---------- | ----------- | ---------------------------------------- |
+| `LIKE` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+Returns true if `string` matches the supplied `pattern`.
+
+```sql
+string LIKE pattern
+```
+
+The example below uses `LIKE` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*)
+FROM Orders
+WHERE Orders.status LIKE 'completed';
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+### <--{"id" : "Pattern Matching"}--> REGEXP_SUBSTR
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+|                 | Selections | Projections | Outer Query                              |
+| --------------- | ---------- | ----------- | ---------------------------------------- |
+| `REGEXP_SUBSTR` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+Returns the substring of `string` that matches a POSIX regular expression
+`pattern`, or null if there is no match.
+
+```sql
+REGEXP_SUBSTR(string, pattern)
+```
+
+The example below uses `REGEXP_SUBSTR` in post-processing with an outer query:
+
+```sql
+SELECT REGEXP_SUBSTR(Orders.status, '\w+')
+FROM (SELECT * FROM Orders) orders
+LIMIT 1;
 ```
 
 ## Aggregation Functions
