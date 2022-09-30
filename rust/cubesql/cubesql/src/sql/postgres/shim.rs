@@ -19,6 +19,7 @@ use crate::{
     telemetry::ContextLogger,
     CubeError,
 };
+use futures::FutureExt;
 use log::{debug, error, trace};
 use pg_srv::{
     buffer, protocol,
@@ -1369,7 +1370,17 @@ impl AsyncPostgresShim {
             self.write(protocol::EmptyQuery::new()).await?;
         } else {
             for statement in statements {
-                self.handle_simple_query(statement, meta.clone()).await?;
+                match std::panic::AssertUnwindSafe(
+                    self.handle_simple_query(statement, meta.clone()),
+                )
+                .catch_unwind()
+                .await
+                {
+                    Ok(res) => res?,
+                    Err(err) => {
+                        return Err(CubeError::panic(err).into());
+                    }
+                }
             }
         }
 

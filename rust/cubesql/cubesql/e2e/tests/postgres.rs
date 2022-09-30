@@ -793,23 +793,23 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
-    // async fn test_df_panic_handle(&self) -> RunResult<()> {
-    //     // This test only stream call with panic on the Portal
-    //     let err = self
-    //         .test_simple_query(
-    //             "SELECT TIMESTAMP '9999-12-31 00:00:00';".to_string(),
-    //             |_| {},
-    //         )
-    //         .await
-    //         .unwrap_err();
+    async fn test_df_panic_handle(&self) -> RunResult<()> {
+        // This test only stream call with panic on the Portal
+        let err = self
+            .test_simple_query(
+                "SELECT TIMESTAMP '9999-12-31 00:00:00';".to_string(),
+                |_| {},
+            )
+            .await
+            .unwrap_err();
 
-    //     assert_eq!(
-    //         err.to_string(),
-    //         "db error: ERROR: Internal: Unexpected panic. Reason: attempt to multiply with overflow"
-    //     );
+        assert_eq!(
+            err.to_string(),
+            "db error: ERROR: Internal: Unexpected panic. Reason: attempt to multiply with overflow"
+        );
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -840,8 +840,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         .await?;
         self.test_simple_query_deallocate_specific().await?;
         self.test_simple_query_deallocate_all().await?;
-        // TODO: temporary disable
-        // self.test_df_panic_handle().await?;
+        self.test_df_panic_handle().await?;
         self.test_simple_query_discard_all().await?;
         self.test_database_change().await?;
 
