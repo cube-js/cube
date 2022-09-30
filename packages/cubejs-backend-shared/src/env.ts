@@ -1217,6 +1217,28 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  snowflakeReadOnlyUnload: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD', dataSource)
+    ] || 'false';
+
+    if (val.toLocaleLowerCase() === 'true') {
+      return true;
+    } else if (val.toLowerCase() === 'false') {
+      return false;
+    } else {
+      throw new TypeError(
+        `The ${
+          keyByDataSource('CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD', dataSource)
+        } must be either 'true' or 'false'.`
+      );
+    }
+  },
+
   /** ****************************************************************
    * Presto Driver                                                   *
    ***************************************************************** */

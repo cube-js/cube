@@ -1916,6 +1916,48 @@ describe('Multiple datasources', () => {
     );
   });
 
+  test('getEnv("snowflakeReadOnlyUnload")', () => {
+    process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD = 'true';
+    process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_READONLY_UNLOAD = 'true';
+    process.env.CUBEJS_DS_WRONG_DB_SNOWFLAKE_READONLY_UNLOAD = 'true';
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toEqual(true);
+    expect(() => getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD = 'false';
+    process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_READONLY_UNLOAD = 'false';
+    process.env.CUBEJS_DS_WRONG_DB_SNOWFLAKE_READONLY_UNLOAD = 'false';
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toEqual(false);
+    expect(() => getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD = 'wrong';
+    process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_READONLY_UNLOAD = 'wrong';
+    process.env.CUBEJS_DS_WRONG_DB_SNOWFLAKE_READONLY_UNLOAD = 'wrong';
+    expect(() => getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toThrow(
+      'The CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD must be either \'true\' or \'false\'.'
+    );
+    expect(() => getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toThrow(
+      'The CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_READONLY_UNLOAD must be either \'true\' or \'false\'.'
+    );
+    expect(() => getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_READONLY_UNLOAD;
+    delete process.env.CUBEJS_DS_WRONG_DB_SNOWFLAKE_READONLY_UNLOAD;
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toEqual(false);
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toEqual(false);
+    expect(() => getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
   test('getEnv("snowflakeSessionKeepAlive")', () => {
     process.env.CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE = 'true';
     process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE = 'true';

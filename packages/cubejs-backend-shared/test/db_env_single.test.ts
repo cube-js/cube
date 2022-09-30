@@ -1145,6 +1145,23 @@ describe('Single datasources', () => {
     expect(getEnv('snowflakeAccount', { dataSource: 'wrong' })).toBeUndefined();
   });
 
+  test('getEnv("snowflakeReadOnlyUnload")', () => {
+    process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD = 'default1';
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD = 'default2';
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_SNOWFLAKE_READONLY_UNLOAD;
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('snowflakeReadOnlyUnload', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
   test('getEnv("snowflakeRegion")', () => {
     process.env.CUBEJS_DB_SNOWFLAKE_REGION = 'default1';
     expect(getEnv('snowflakeRegion', { dataSource: 'default' })).toEqual('default1');

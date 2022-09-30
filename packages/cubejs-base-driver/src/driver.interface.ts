@@ -107,10 +107,6 @@ export type StreamOptions = {
 };
 
 export type MaxFileSizeOptions = {
-  maxFileSize?: number;
-};
-
-export type MaxFileSizeUnloadOptions = {
   maxFileSize: number;
 };
 
@@ -135,7 +131,7 @@ type UnloadQuery = {
   params: unknown[]
 };
 
-export type UnloadOptions = MaxFileSizeUnloadOptions & {
+export type UnloadOptions = MaxFileSizeOptions & {
   query?: UnloadQuery;
 };
 
