@@ -15,7 +15,8 @@ import {
   JDBCDriver,
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
-import { getEnv } from '@cubejs-backend/shared';
+import { CancelablePromise, getEnv } from '@cubejs-backend/shared';
+import * as SqlString from 'sqlstring';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
@@ -81,6 +82,16 @@ async function resolveJDBCDriver(): Promise<string> {
     )
   );
 }
+
+function replaceAll(replaceThis: string, withThis: string, inThis: string) {
+  withThis = withThis.replace(/\$/g, '$$$$');
+  return inThis.replace(
+    new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'), 'g'),
+    withThis
+  );
+}
+
+const applyParams = (query: string, params: object | any[]) => SqlString.format(query, params);
 
 /**
  * Databricks driver class.
@@ -148,6 +159,25 @@ export class DatabricksDriver extends JDBCDriver {
     this.showUrlTokenDeprecation();
   }
 
+  public async query<R = unknown>(query: string, values: unknown[], options?: any): Promise<R[]> {
+    let newQuery = '';
+
+    console.log('optionsoptionsoptionsoptionsoptionsoptionsoptions', options);
+    if (options?.tableName) {
+      const newTableName = `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${options.tableName}`;
+      newQuery = replaceAll(options.tableName, newTableName, query);
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      newQuery = query;
+    }
+    const queryWithParams = applyParams(query, values);
+    const cancelObj: {cancel?: Function} = {};
+    const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
+    (promise as CancelablePromise<any>).cancel =
+      () => cancelObj.cancel && cancelObj.cancel() || Promise.reject(new Error('Statement is not ready'));
+    return promise;
+  }
+
   public showUrlTokenDeprecation() {
     if (this.config.url) {
       const result = this.config.url
@@ -176,6 +206,13 @@ export class DatabricksDriver extends JDBCDriver {
 
   public quoteIdentifier(identifier: string): string {
     return `\`${identifier}\``;
+  }
+
+  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: unknown[], _options: any) {
+    const newPreAggregationTableName = `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${preAggregationTableName}`;
+    const newSql = replaceAll(preAggregationTableName, newPreAggregationTableName, loadSql);
+
+    return this.query(newSql, params);
   }
 
   public async tableColumnTypes(table: string) {
@@ -225,12 +262,18 @@ export class DatabricksDriver extends JDBCDriver {
     return result;
   }
 
-  public async getTablesQuery(schemaName: string): Promise<TableQueryResult[]> {
+  public async getTablesQuery(schemaName: string, withSchema?: boolean): Promise<TableQueryResult[]> {
     const response = await this.query<{tableName: string}>(`SHOW TABLES IN ${this.getNameWithCatalog(schemaName)}`, []);
 
-    return response.map((row) => ({
+    const result = response.map((row) => ({
       table_name: row.tableName,
     }));
+
+    if (withSchema) {
+      return result.map(t => ({ table_name: `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${schemaName}.${t.table_name}` }));
+    }
+
+    return result;
   }
 
   private getNameWithCatalog(name: string) {
@@ -319,10 +362,6 @@ export class DatabricksDriver extends JDBCDriver {
     await this.createExternalTableFromSql(tableName, sql, params);
     
     return types;
-  }
-
-  public loadPreAggregationIntoTable(_preAggregationTableName: string, loadSql: string, params: unknown[], _options: any) {
-    return this.query(loadSql, params);
   }
 
   /**
@@ -491,6 +530,11 @@ export class DatabricksDriver extends JDBCDriver {
       `,
       [],
     );
+  }
+
+  public dropTable(tableName: string, options?: unknown): Promise<unknown> {
+    const newTableName = `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${tableName}`;
+    return this.query(`DROP TABLE ${newTableName}`, [], options);
   }
 
   private getStorageCredentialsNameString(): string {

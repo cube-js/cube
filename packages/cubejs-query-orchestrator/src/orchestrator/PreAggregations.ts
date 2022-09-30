@@ -181,10 +181,6 @@ export type PreAggregationDescription = {
   readOnly: boolean;
 };
 
-function getTableNameWithSchemaFromTableQueryResult(preaggregation: PreAggregationDescription, tableQueryResult: TableQueryResult): string {
-  return `${preaggregation.dbCatalog ? `${preaggregation.dbCatalog}.` : ''}${preaggregation.preAggregationsSchema}.${tableQueryResult.table_name || tableQueryResult.TABLE_NAME}`;
-}
-
 const tablesToVersionEntries = (preaggregation: PreAggregationDescription, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
   table => -table.last_updated_at,
   tables.map(table => {
@@ -195,7 +191,7 @@ const tablesToVersionEntries = (preaggregation: PreAggregationDescription, table
     }
 
     const entity = {
-      table_name: `${preaggregation.dbCatalog ? `${preaggregation.dbCatalog}.` : ''}${preaggregation.preAggregationsSchema}.${match[1]}`,
+      table_name: `${preaggregation.preAggregationsSchema}.${match[1]}`,
       content_version: match[2],
       structure_version: match[3],
     } as VersionEntry;
@@ -340,7 +336,6 @@ class PreAggregationLoadCache {
   }
 
   private async calculateVersionEntries(preAggregation: PreAggregationDescription): Promise<VersionEntriesObj> {
-    console.log('preAggregationpreAggregation', preAggregation);
     let versionEntries = tablesToVersionEntries(
       preAggregation,
       await this.getTablesQuery(preAggregation)
@@ -942,9 +937,9 @@ export class PreAggregationLoader {
     withTempTable: boolean
   ) {
     if (withTempTable) {
-      const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
-      const mappedActualTables = actualTables.map(t => getTableNameWithSchemaFromTableQueryResult(this.preAggregation, t));
-      if (mappedActualTables.includes(targetTableName)) {
+    const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema, true);
+      const isExist = Boolean(actualTables.find(t => targetTableName.includes(t.table_name || t.TABLE_NAME)));
+      if (isExist) {
         await client.dropTable(targetTableName);
       }
     }
@@ -1280,7 +1275,7 @@ export class PreAggregationLoader {
           .concat([justCreatedTable]);
 
       const toDrop = actualTables
-        .map(t => getTableNameWithSchemaFromTableQueryResult(this.preAggregation, t))
+        .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`)
         .filter(t => tablesToSave.indexOf(t) === -1);
 
       await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table))));
@@ -1763,7 +1758,7 @@ export class PreAggregations {
     return this.cacheDriver.set(this.tablesUsedRedisKey(tableName), true, this.usedTablePersistTime);
   }
 
-  public async tablesUsed() {
+  public async tablesUsed(): Promise<string[]> {
     return (await this.cacheDriver.keysStartingWith(this.tablesUsedRedisKey('')))
       .map(k => k.replace(this.tablesUsedRedisKey(''), ''));
   }
