@@ -408,8 +408,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   private async getTypesOfLastQuery(connection: Connection, values: unknown[]) {
     const types = await this.execute<TableColumn[]>(connection, 'DESC RESULT last_query_id()', values, false);
-
-    const mappedTypes = types.map(t => ({ name: t.name, type: this.toGenericType(t.type) }));
+    const mappedTypes = types.map(t => ({ name: t.name, type: this.sqlResultToType(t.type) }));
 
     return mappedTypes;
   }
@@ -653,17 +652,22 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public toGenericType(columnType: string) {
-    const castDataType = (value: string) => {
-      const match = value.match(/^NUMBER\(([0-9]+),([0-9]+)\)$/);
+    return SnowflakeToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
+  }
 
-      if (match) {
-        return `decimal(${match[1]},${match[2]})`;
+  private sqlResultToType(type: string) {
+    const match = type.match(/^NUMBER\(([0-9]+),([0-9]+)\)$/);
+
+    if (match) {
+      const intRegexp = /^NUMBER\(([0-9]+),(0)\)$/;
+
+      if (intRegexp.test(type)) {
+        return 'int';
       }
+      return `decimal(${match[1]},${match[2]})`;
+    }
 
-      return undefined;
-    };
-    
-    return SnowflakeToGenericType[columnType.toLowerCase()] || castDataType(columnType) || super.toGenericType(columnType);
+    return super.toGenericType(type);
   }
 
   public async tableColumnTypes(table: string): Promise<TableColumn[]> {
