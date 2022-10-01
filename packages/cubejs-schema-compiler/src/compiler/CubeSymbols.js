@@ -178,6 +178,16 @@ export class CubeSymbols {
     }
   }
 
+  withSymbolsCallContext(func, context) {
+    const oldContext = this.resolveSymbolsCallContext;
+    this.resolveSymbolsCallContext = context;
+    try {
+      return func();
+    } finally {
+      this.resolveSymbolsCallContext = oldContext;
+    }
+  }
+
   funcArguments(func) {
     const funcDefinition = func.toString();
     if (!this.funcArgumentsValues[funcDefinition]) {
@@ -199,7 +209,7 @@ export class CubeSymbols {
   }
 
   resolveSymbol(cubeName, name) {
-    const { sqlResolveFn, contextSymbols } = this.resolveSymbolsCallContext || {};
+    const { sqlResolveFn, contextSymbols, collectJoinHints } = this.resolveSymbolsCallContext || {};
     if (CONTEXT_SYMBOLS[name]) {
       // always resolves if contextSymbols aren't passed for transpile step
       const symbol = contextSymbols && contextSymbols[CONTEXT_SYMBOLS[name]] || {};
@@ -210,13 +220,19 @@ export class CubeSymbols {
 
     let cube = this.isCurrentCube(name) && this.symbols[cubeName] || this.symbols[name];
     if (sqlResolveFn && cube) {
-      cube = this.cubeReferenceProxy(this.isCurrentCube(name) ? cubeName : name);
+      cube = this.cubeReferenceProxy(
+        this.isCurrentCube(name) ? cubeName : name,
+        collectJoinHints ? [] : undefined
+      );
     }
 
     return cube || (this.symbols[cubeName] && this.symbols[cubeName][name]);
   }
 
-  cubeReferenceProxy(cubeName) {
+  cubeReferenceProxy(cubeName, joinHints) {
+    if (joinHints) {
+      joinHints = joinHints.concat(cubeName);
+    }
     const self = this;
     return new Proxy({}, {
       get: (v, propertyName) => {
@@ -231,15 +247,15 @@ export class CubeSymbols {
           }
           return undefined;
         }
-        const { sqlResolveFn, cubeAliasFn, query, joinHints } = self.resolveSymbolsCallContext || {};
+        const { sqlResolveFn, cubeAliasFn, query, cubeReferencesUsed } = self.resolveSymbolsCallContext || {};
         if (propertyName === 'toString') {
           return () => {
-            if (joinHints && joinHints.length === 0) {
-              joinHints.push(cube.cubeName());
-            }
             if (query) {
               query.pushCubeNameForCollectionIfNecessary(cube.cubeName());
               query.pushJoinHints(joinHints);
+            }
+            if (cubeReferencesUsed) {
+              cubeReferencesUsed.push(cube.cubeName());
             }
             return cubeAliasFn && cubeAliasFn(cube.cubeName()) || cube.cubeName();
           };
@@ -251,16 +267,15 @@ export class CubeSymbols {
           return true;
         }
         if (cube[propertyName]) {
-          return { toString: () => sqlResolveFn(cube[propertyName], cubeName, propertyName) };
+          return {
+            toString: () => this.withSymbolsCallContext(
+              () => sqlResolveFn(cube[propertyName], cubeName, propertyName),
+              { ...this.resolveSymbolsCallContext, joinHints },
+            ),
+          };
         }
         if (self.symbols[propertyName]) {
-          if (joinHints) {
-            if (joinHints.length === 0) {
-              joinHints.push(cubeName);
-            }
-            joinHints.push(propertyName);
-          }
-          return this.cubeReferenceProxy(propertyName);
+          return this.cubeReferenceProxy(propertyName, joinHints);
         }
         if (typeof propertyName === 'string') {
           throw new UserError(`${cubeName}.${propertyName} cannot be resolved. There's no such member or cube.`);

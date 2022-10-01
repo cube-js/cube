@@ -55,6 +55,11 @@ cube(\`Orders\`, {
       type: \`string\`
     },
     
+    statusProduct: {
+      sql: \`\${CUBE}.status || '_' || \${Products.name}\`,
+      type: \`string\`
+    },
+    
     createdAt: {
       sql: \`created_at\`,
       type: \`time\`
@@ -94,6 +99,11 @@ cube(\`Products\`, {
     name: {
       sql: \`name\`,
       type: \`string\`
+    },
+    
+    proxyName: {
+      sql: \`\${name}\`,
+      type: \`string\`,
     },
   }
 });
@@ -186,7 +196,12 @@ view(\`OrdersView\`, {
     categoryName: {
       sql: \`\${Orders.ProductsAlt.ProductCategories.name}\`,
       type: \`string\`
-    }
+    },
+    
+    productCategory: {
+      sql: \`\${Orders.ProductsAlt.name} || '_' || \${Orders.ProductsAlt.ProductCategories.name} || '_' || \${categoryName}\`,
+      type: \`string\`
+    },
   }
 });
     `);
@@ -254,4 +269,46 @@ view(\`OrdersView\`, {
     console.log(preAggregationsDescription);
     expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/count_by_product_name/);
   }));
+
+  it('proxy dimension', async () => runQueryTest({
+    measures: ['OrdersView.count'],
+    dimensions: [
+      'Products.proxyName'
+    ],
+    order: [{ id: 'Products.proxyName' }],
+  }, [{
+    products__proxy_name: 'Potato',
+    orders_view__count: '1',
+  }, {
+    products__proxy_name: 'Tomato',
+    orders_view__count: '1',
+  }], (query) => {
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/count_by_product_name/);
+  }));
+
+  it('compound dimension', async () => runQueryTest({
+    measures: [],
+    dimensions: [
+      'Orders.statusProduct'
+    ],
+    order: [{ id: 'Orders.statusProduct' }],
+  }, [{
+    orders__status_product: 'completed_Potato',
+  }, {
+    orders__status_product: 'completed_Tomato',
+  }]));
+
+  it('view compound dimension', async () => runQueryTest({
+    measures: [],
+    dimensions: [
+      'OrdersView.productCategory'
+    ],
+    order: [{ id: 'OrdersView.productCategory' }],
+  }, [{
+    orders_view__product_category: 'Tomato_Groceries_Groceries',
+  }, {
+    orders_view__product_category: null,
+  }]));
 });

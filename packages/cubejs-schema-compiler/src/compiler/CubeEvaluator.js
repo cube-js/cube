@@ -3,6 +3,7 @@ import R from 'ramda';
 
 import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';
+import { BaseQuery } from '../adapter';
 
 export class CubeEvaluator extends CubeSymbols {
   constructor(cubeValidator) {
@@ -87,25 +88,29 @@ export class CubeEvaluator extends CubeSymbols {
         }
       }
     }
-    this.transformMembers(cube.measures, cube);
-    this.transformMembers(cube.dimensions, cube);
-    this.transformMembers(cube.segments, cube);
+    this.transformMembers(cube.measures, cube, errorReporter);
+    this.transformMembers(cube.dimensions, cube, errorReporter);
+    this.transformMembers(cube.segments, cube, errorReporter);
   }
 
-  transformMembers(members, cube) {
+  transformMembers(members, cube, errorReporter) {
     members = members || {};
     for (const memberName of Object.keys(members)) {
       const member = members[memberName];
       let ownedByCube = true;
       if (member.sql && !member.subQuery) {
         const funcArgs = this.funcArguments(member.sql);
-        // TODO case when foreign cube is referenced isn't covered
-        // TODO case when other dimension is referenced through CUBE ref is not covered: it'll be rendered as an owned
-        if (funcArgs.length > 0 && funcArgs.every(
-          ref => !cube.measures[ref] && !cube.dimensions[ref] && !cube.segments[ref] && !this.isCurrentCube(ref) && ref !== cube.name
-        )) {
+        const cubeReferences = this.collectUsedCubeReferences(cube.name, member.sql);
+        if (funcArgs.length > 0 && cubeReferences.length === 0) {
           ownedByCube = false;
         }
+        const foreignCubes = cubeReferences.filter(usedCube => usedCube !== cube.name);
+        if (foreignCubes.length > 0) {
+          errorReporter.error(`Member '${cube.name}.${memberName}' references foreign cubes: ${foreignCubes.join(', ')}. Please split and move this definition to corresponding cubes.`);
+        }
+      }
+      if (ownedByCube && cube.isView) {
+        errorReporter.error(`View '${cube.name}' defines own member '${cube.name}.${memberName}'. Please move this member definition to one of the cubes.`);
       }
       members[memberName].ownedByCube = ownedByCube;
     }
@@ -275,6 +280,32 @@ export class CubeEvaluator extends CubeSymbols {
     // Should throw UserError in case of parse error
     this.byPath(type, path);
     return path.split('.');
+  }
+
+  collectUsedCubeReferences(cube, sqlFn) {
+    const cubeEvaluator = this;
+
+    const cubeReferencesUsed = [];
+
+    cubeEvaluator.resolveSymbolsCall(sqlFn, (name) => {
+      const referencedCube = cubeEvaluator.symbols[name] && name || cube;
+      const resolvedSymbol =
+        cubeEvaluator.resolveSymbol(
+          cube,
+          name
+        );
+      // eslint-disable-next-line no-underscore-dangle
+      if (resolvedSymbol._objectWithResolvedProperties) {
+        return resolvedSymbol;
+      }
+      return cubeEvaluator.pathFromArray([referencedCube, name]);
+    }, {
+      // eslint-disable-next-line no-shadow
+      sqlResolveFn: (symbol, cube, n) => cubeEvaluator.pathFromArray([cube, n]),
+      contextSymbols: BaseQuery.emptyParametrizedContextSymbols(this, () => '$empty_param$'),
+      cubeReferencesUsed,
+    });
+    return cubeReferencesUsed;
   }
 
   evaluateReferences(cube, referencesFn, options = {}) {

@@ -1798,7 +1798,6 @@ class BaseQuery {
     options = options || {};
     const self = this;
     const { cubeEvaluator } = this;
-    const joinHints = [];
     return cubeEvaluator.resolveSymbolsCall(sql, (name) => {
       const nextCubeName = cubeEvaluator.symbols[name] && name || cubeName;
       const resolvedSymbol =
@@ -1816,7 +1815,7 @@ class BaseQuery {
       cubeAliasFn: self.cubeAlias.bind(self),
       contextSymbols: this.parametrizedContextSymbols(),
       query: this,
-      joinHints
+      collectJoinHints: true,
     });
   }
 
@@ -2730,7 +2729,21 @@ class BaseQuery {
     return this.parametrizedContextSymbolsValue;
   }
 
+  static emptyParametrizedContextSymbols(cubeEvaluator, allocateParam) {
+    return {
+      filterParams: BaseQuery.filterProxyFromAllFilters({}, cubeEvaluator, allocateParam),
+      sqlUtils: {
+        convertTz: (field) => field,
+      },
+      securityContext: BaseQuery.contextSymbolsProxyFrom({}, allocateParam),
+    };
+  }
+
   contextSymbolsProxy(symbols) {
+    return BaseQuery.contextSymbolsProxyFrom(symbols, this.paramAllocator.allocateParam.bind(this.paramAllocator));
+  }
+
+  static contextSymbolsProxyFrom(symbols, allocateParam) {
     return new Proxy(symbols, {
       get: (target, name) => {
         const propValue = target[name];
@@ -2738,8 +2751,8 @@ class BaseQuery {
           filter: (column) => {
             if (paramValue) {
               const value = Array.isArray(paramValue) ?
-                paramValue.map(this.paramAllocator.allocateParam.bind(this.paramAllocator)) :
-                this.paramAllocator.allocateParam(paramValue);
+                paramValue.map(allocateParam) :
+                allocateParam(paramValue);
               if (typeof column === 'function') {
                 return column(value);
               } else {
@@ -2758,7 +2771,7 @@ class BaseQuery {
           unsafeValue: () => paramValue
         });
         return methods(target)[name] ||
-          typeof propValue === 'object' && propValue !== null && this.contextSymbolsProxy(propValue) ||
+          typeof propValue === 'object' && propValue !== null && BaseQuery.contextSymbolsProxyFrom(propValue, allocateParam) ||
           methods(propValue);
       }
     });
@@ -2766,16 +2779,24 @@ class BaseQuery {
 
   filtersProxy() {
     const { allFilters } = this;
+    return BaseQuery.filterProxyFromAllFilters(
+      allFilters,
+      this.cubeEvaluator,
+      this.paramAllocator.allocateParam.bind(this.paramAllocator)
+    );
+  }
+
+  static filterProxyFromAllFilters(allFilters, cubeEvaluator, allocateParam) {
     return new Proxy({}, {
       get: (target, name) => {
         if (name === '_objectWithResolvedProperties') {
           return true;
         }
-        const cubeName = this.cubeEvaluator.cubeNameFromPath(name);
+        const cubeName = cubeEvaluator.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
           get: (cubeNameObj, propertyName) => {
             const filters =
-              allFilters.filter(f => f.dimension === this.cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
+              allFilters.filter(f => f.dimension === cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
             return {
               filter: (column) => {
                 if (!filters.length) {
@@ -2791,7 +2812,7 @@ class BaseQuery {
                       // eslint-disable-next-line prefer-spread
                       return column.apply(
                         null,
-                        filterParams.map(this.paramAllocator.allocateParam.bind(this.paramAllocator))
+                        filterParams.map(allocateParam),
                       );
                     } else {
                       return filter.conditionSql(column);

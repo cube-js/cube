@@ -23,11 +23,6 @@ describe('MySqlPreAggregations', () => {
           type: 'count'
         },
         
-        checkinsTotal: {
-          sql: \`\${checkinsCount}\`,
-          type: 'sum'
-        },
-        
         uniqueSourceCount: {
           sql: 'source',
           type: 'countDistinct'
@@ -37,11 +32,6 @@ describe('MySqlPreAggregations', () => {
           sql: 'id',
           type: 'countDistinctApprox'
         },
-        
-        ratio: {
-          sql: \`1.0 * \${uniqueSourceCount} / nullif(\${checkinsTotal}, 0)\`,
-          type: 'number'
-        }
       },
 
       dimensions: {
