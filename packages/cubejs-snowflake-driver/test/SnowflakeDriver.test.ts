@@ -1,6 +1,8 @@
 /* eslint-disable no-use-before-define */
 import { DriverInterface } from '@cubejs-backend/base-driver';
 import type { SnowflakeDriverExportBucket, SnowflakeDriverOptions } from '../src/SnowflakeDriver';
+// eslint-disable-next-line global-require
+import { SnowflakeDriver as SnowflakeDriverType } from '../src/SnowflakeDriver';
 
 describe('SnowflakeDriver', () => {
   beforeEach(() => {
@@ -89,7 +91,7 @@ describe('SnowflakeDriver', () => {
       
       const driver = createSnowflakeDriver();
 
-      const promise = () => driver?.unload?.('table_1', { maxFileSize: 60 });
+      const promise = () => driver.unload('table_1', { maxFileSize: 60 });
 
       await expect(promise).rejects.toThrow(/Unload is not configured/);
     });
@@ -110,7 +112,7 @@ describe('SnowflakeDriver', () => {
 
       const driver = createSnowflakeDriver({ exportBucket: bucket });
 
-      const result = await driver?.unload?.(table, { maxFileSize: 60 });
+      const result = await driver.unload(table, { maxFileSize: 60 });
 
       expect(result).toEqual({ csvFile: contents.map(c => c.Key), types: [{ type: 'text', name: 'id' }, { name: 'count', type: 'int' }, { name: 'date', type: 'timestamp' }] });
     });
@@ -140,10 +142,9 @@ describe('SnowflakeDriver', () => {
 });
 
 function createSnowflakeDriver(config: Partial<SnowflakeDriverOptions> = {} as SnowflakeDriverOptions) {
-  // eslint-disable-next-line global-require
+  // eslint-disable-next-line global-require, @typescript-eslint/no-shadow
   const { SnowflakeDriver } = require('../src/SnowflakeDriver');
-
-  const driver: DriverInterface = new SnowflakeDriver(config);
+  const driver: SnowflakeDriverType = new SnowflakeDriver(config);
 
   return driver;
 }
