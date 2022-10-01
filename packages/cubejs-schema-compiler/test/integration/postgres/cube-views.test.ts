@@ -63,7 +63,12 @@ cube(\`Orders\`, {
     createdAt: {
       sql: \`created_at\`,
       type: \`time\`
-    }
+    },
+    
+    productAndCategory: {
+      sql: \`\${Products.name} || '_' || \${Products.ProductCategories.name}\`,
+      type: \`string\`
+    },
   },
 
   dataSource: \`default\`
@@ -298,6 +303,18 @@ view(\`OrdersView\`, {
     orders__status_product: 'completed_Potato',
   }, {
     orders__status_product: 'completed_Tomato',
+  }]));
+
+  it('compound dimension 2', async () => runQueryTest({
+    measures: [],
+    dimensions: [
+      'Orders.productAndCategory'
+    ],
+    order: [{ id: 'Orders.productAndCategory' }],
+  }, [{
+    orders__product_and_category: 'Potato_Groceries',
+  }, {
+    orders__product_and_category: 'Tomato_Groceries',
   }]));
 
   it('view compound dimension', async () => runQueryTest({
