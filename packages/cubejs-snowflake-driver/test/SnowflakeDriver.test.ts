@@ -81,6 +81,46 @@ describe('SnowflakeDriver', () => {
 
         await expect(driver.downloadQueryResults(sql, [], { maxFileSize: 60, highWaterMark: 100 })).rejects.toThrow(/Snowflake unloads zero rows on UNLOAD operation/);
       });
+
+      it('test different type casts', async () => {
+        const bucket: SnowflakeDriverExportBucket = { bucketType: 's3', bucketName: 'some_random_name', keyId: 'random_key', secretKey: 'secrect', region: 'us-east-2' };
+        const sql = 'SELECT * FROM table';
+        const stubs = [
+          { regexp: new RegExp(`COPY INTO '${bucket.bucketType}://${bucket.bucketName}/(.+)' FROM \\(${sql.replace('*', '\\*')}\\)`), rows: [{ rows_unloaded: 1 }] },
+          { regexp: new RegExp(`${sql.replace('*', '\\*')} LIMIT 1`), rows: [] },
+          { regexp: new RegExp('DESC RESULT last_query_id()'),
+            rows: [
+              { type: 'NUMBER(1,1)', name: 'count' },
+              { type: 'DECIMAL(1,1)', name: 'count1' },
+              { type: 'NUMERIC(1,1)', name: 'count2' },
+              { type: 'NUMBER(1,0)', name: 'count' },
+              { type: 'DECIMAL(1,0)', name: 'count1' },
+              { type: 'NUMERIC(1,0)', name: 'count2' },
+              { type: 'float', name: 'float_count' },
+              { type: 'VARCHAR(16)', name: 'test' }
+            ]
+          }
+        ];
+        const contents = [{ Key: 'file1' }, { Key: 'file2' }];
+        mockAwsS3(contents);
+        mockSnowflake(stubs);
+
+        const driver = createSnowflakeDriver({ exportBucket: bucket });
+
+        const result = await driver.downloadQueryResults(sql, [], { maxFileSize: 60, highWaterMark: 100 });
+
+        const expectedTypes = [
+          { type: 'decimal(1,1)', name: 'count' },
+          { type: 'decimal(1,1)', name: 'count1' },
+          { type: 'decimal(1,1)', name: 'count2' },
+          { type: 'int', name: 'count' },
+          { type: 'int', name: 'count1' },
+          { type: 'int', name: 'count2' },
+          { type: 'float', name: 'float_count' },
+          { type: 'VARCHAR(16)', name: 'test' }
+        ];
+        expect(result).toEqual({ csvFile: contents.map(c => c.Key), types: expectedTypes });
+      });
     });
   });
 

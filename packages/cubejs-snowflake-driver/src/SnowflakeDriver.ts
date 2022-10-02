@@ -656,10 +656,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   private sqlResultToType(type: string) {
-    const match = type.match(/^NUMBER\(([0-9]+),([0-9]+)\)$/);
+    const match = type.match(/^(?:NUMBER|DECIMAL|NUMERIC)\(([0-9]+),([0-9])\)$/);
 
     if (match) {
-      const intRegexp = /^NUMBER\(([0-9]+),(0)\)$/;
+      const intRegexp = /^(?:NUMBER|DECIMAL|NUMERIC)\(([0-9]+),([0])\)$/;
 
       if (intRegexp.test(type)) {
         return 'int';
