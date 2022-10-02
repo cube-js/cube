@@ -1,5 +1,9 @@
 /* eslint-disable no-restricted-syntax */
 import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
+import {
   BaseDriver,
   DriverInterface,
 } from '@cubejs-backend/base-driver';
@@ -48,6 +52,9 @@ type KsqlDescribeResponse = {
   }
 };
 
+/**
+ * KSQL driver class.
+ */
 export class KsqlDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns default concurrency value.
@@ -60,13 +67,25 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   protected readonly dropTableMutex: Mutex = new Mutex();
 
-  public constructor(config: Partial<KsqlDriverOptions> = {}) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: Partial<KsqlDriverOptions> & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {}
+  ) {
     super();
 
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
     this.config = {
-      url: <string>process.env.CUBEJS_DB_URL,
-      username: <string>process.env.CUBEJS_DB_USER,
-      password: <string>process.env.CUBEJS_DB_PASS,
+      url: getEnv('dbUrl', { dataSource }),
+      username: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
       ...config,
     };
   }
@@ -81,7 +100,14 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
         },
       });
     } catch (e) {
-      throw new Error(`ksql API error for '${body.ksql}': ${e.response?.data?.message || e.response?.statusCode}`);
+      throw new Error(
+        `ksql API error for '${
+          body.ksql
+        }': ${
+          (<any>e).response?.data?.message ||
+          (<any>e).response?.statusCode
+        }`
+      );
     }
   }
 
@@ -218,6 +244,8 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   }
 
   public static driverEnvVariables() {
+    // TODO (buntarb): check how this method can/must be used with split
+    // names by the data source.
     return [
       'CUBEJS_DB_URL',
       'CUBEJS_DB_USER',

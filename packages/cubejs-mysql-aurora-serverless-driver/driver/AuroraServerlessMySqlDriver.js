@@ -1,12 +1,19 @@
 const crypto = require('crypto');
 const dataApi = require('data-api-client');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
+const {
+  getEnv,
+  assertDataSource,
+} = require('@cubejs-backend/shared');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
   text: 'varchar(255) CHARACTER SET utf8mb4'
 };
 
+/**
+ * Aurora MySQL driver class.
+ */
 class AuroraServerlessMySqlDriver extends BaseDriver {
   /**
    * Returns default concurrency value.
@@ -15,12 +22,29 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
     return 2;
   }
 
+  /**
+   * Class constructor.
+   */
   constructor(config = {}) {
     super();
+    
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+    
     this.config = {
-      secretArn: process.env.CUBEJS_DATABASE_SECRET_ARN || config.secretArn,
-      resourceArn: process.env.CUBEJS_DATABASE_CLUSTER_ARN || config.resourceArm,
-      database: process.env.CUBEJS_DATABASE || config.database,
+      secretArn:
+        config.secretArn ||
+        getEnv('auroraSecretArn', { dataSource }),
+      resourceArn:
+        config.resourceArn ||
+        // TODO (buntarb): this looks like a typo. Deprecate?
+        config.resourceArm ||
+        getEnv('auroraClusterArn', { dataSource }),
+      database:
+        config.database ||
+        getEnv('dbName', { dataSource }) ||
+        getEnv('dbDatabase', { dataSource }),
       ...config
     };
 

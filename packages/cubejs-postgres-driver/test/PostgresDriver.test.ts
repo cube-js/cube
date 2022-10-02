@@ -1,7 +1,5 @@
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
-
 import { StartedTestContainer } from 'testcontainers';
-
 import { PostgresDriver } from '../src';
 
 const streamToArray = require('stream-to-array');
@@ -25,11 +23,7 @@ describe('PostgresDriver', () => {
   });
 
   afterAll(async () => {
-    await driver.release();
-
-    if (container) {
-      await container.stop();
-    }
+    await container.stop();
   });
 
   test('type coercion', async () => {
@@ -120,5 +114,20 @@ describe('PostgresDriver', () => {
         'relation "test.random_name_for_table_that_doesnot_exist_sql_must_fail" does not exist'
       );
     }
+  });
+
+  // Note: This test MUST be the last in the list.
+  test('release', async () => {
+    expect(async () => {
+      await driver.release();
+    }).not.toThrowError(
+      /Called end on pool more than once/
+    );
+
+    expect(async () => {
+      await driver.release();
+    }).not.toThrowError(
+      /Called end on pool more than once/
+    );
   });
 });
