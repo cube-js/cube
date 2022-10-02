@@ -281,11 +281,16 @@ function EventCards({ resultSet }) {
           ...eventStyle,
           opacity: (100 - diff) / 100
         }
+        
+        var eventType = row["Events.type"];
+         if (row["Events.type"] === 'track') {
+          eventType = "button_click"
+         }
 
         return (
           <li key={i} style={eventStyleWithOpacity}>
             <span style={idChipStyle}>{id}</span>
-            <span style={eventChipStyle}>{row["Events.type"]}</span>
+            <span style={eventChipStyle}>{eventType}</span>
             <span style={chipStyle}>{formatDistanceToNowStrict(dateUtc, { includeSeconds: true }) + ' ago'}</span>
           </li>
         )
