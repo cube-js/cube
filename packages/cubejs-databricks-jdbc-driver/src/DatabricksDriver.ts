@@ -567,8 +567,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public capabilities(): DriverCapabilities {
-    // @ts-ignore
-    return { unloadWithoutTempTable: false };
+    return { unloadWithoutTempTable: true };
   }
 
   /**
