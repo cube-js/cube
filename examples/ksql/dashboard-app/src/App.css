@@ -1,9 +1,9 @@
 body {
-  background-color: #f3f3fb !important;
+  background-color: #fff !important;
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-    sans-serif;
+  "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+  sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -19,6 +19,10 @@ body {
   margin-left: 8px;
   position: relative;
   bottom: -2px;
+}
+
+.ant-layout-content {
+  padding: 0 0 50px;
 }
 
 .ant-card {
@@ -39,7 +43,7 @@ body {
 
 .top-menu {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   align-items: center;
   height: 100%;
 }
