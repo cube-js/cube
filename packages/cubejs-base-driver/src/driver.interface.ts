@@ -154,7 +154,7 @@ export interface DriverInterface {
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
   // eslint-disable-next-line camelcase
-  getTablesQuery: (schemaName: string, withSchema?: boolean) => Promise<TableQueryResult[]>;
+  getTablesQuery: (schemaName: string) => Promise<TableQueryResult[]>;
   // Remove table from database
   dropTable: (tableName: string, options?: QueryOptions) => Promise<unknown>;
   // Download data from Query (for readOnly)

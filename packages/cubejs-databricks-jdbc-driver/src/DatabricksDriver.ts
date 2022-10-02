@@ -101,6 +101,8 @@ export class DatabricksDriver extends JDBCDriver {
     return DatabricksQuery;
   }
 
+  private preaggregationSchema?: string;
+
   /**
    * Returns default concurrency value.
    */
@@ -164,10 +166,18 @@ export class DatabricksDriver extends JDBCDriver {
         getEnv('dbExportBucketAzureKey', { dataSource }),
 
       dbCatalog: conf?.dbCatalog || getEnv('databricksDbCatalog', { dataSource }),
-      databricksStorageCredentialName: conf?.databricksStorageCredentialName || getEnv('databricksStorageCredentialName', { dataSource })
+      databricksStorageCredentialName: conf?.databricksStorageCredentialName || getEnv('databricksStorageCredentialName', { dataSource }),
     };
+
     super(config);
     this.config = config;
+
+    if (config.dbCatalog) {
+      this.preaggregationSchema = getEnv('preAggregationsSchema') ||
+      (this.isDevMode()
+        ? 'dev_pre_aggregations'
+        : 'prod_pre_aggregations');
+    }
   }
 
   public readOnly() {
@@ -179,18 +189,16 @@ export class DatabricksDriver extends JDBCDriver {
     this.showUrlTokenDeprecation();
   }
 
-  public async query<R = unknown>(query: string, values: unknown[], options?: any): Promise<R[]> {
-    let newQuery = '';
+  public async query<R = unknown>(query: string, values: unknown[], _options?: unknown): Promise<R[]> {
+    let newQuery = query;
 
-    console.log('optionsoptionsoptionsoptionsoptionsoptionsoptions', options);
-    if (options?.tableName) {
-      const newTableName = `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${options.tableName}`;
-      newQuery = replaceAll(options.tableName, newTableName, query);
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      newQuery = query;
+    if (this.config.dbCatalog) {
+      newQuery = query.replace(
+        new RegExp(`(?<=\\s)${this.preaggregationSchema}\\.(?=[^\\s]+)`, 'g'),
+        `${this.config.dbCatalog}.${this.preaggregationSchema}.`
+      );
     }
-    const queryWithParams = applyParams(query, values);
+    const queryWithParams = applyParams(newQuery, values);
     const cancelObj: {cancel?: Function} = {};
     const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
     (promise as CancelablePromise<any>).cancel =
@@ -230,23 +238,20 @@ export class DatabricksDriver extends JDBCDriver {
 
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: unknown[], _options: any) {
     const newPreAggregationTableName = `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${preAggregationTableName}`;
+
     const newSql = replaceAll(preAggregationTableName, newPreAggregationTableName, loadSql);
 
     return this.query(newSql, params);
   }
 
   public async tableColumnTypes(table: string) {
-    const nLevelNamespace = table.split('.');
+    const [schema, tableName] = table.split('.');
 
     let describeString = '';
 
-    if (nLevelNamespace.length === 3) {
-      const [catalog, schema, tableName] = nLevelNamespace;
-
-      describeString = `${this.quoteIdentifier(catalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
+    if (this.config.dbCatalog) {
+      describeString = `${this.quoteIdentifier(this.config.dbCatalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
     } else {
-      const [schema, tableName] = nLevelNamespace;
-
       describeString = `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
     }
 
@@ -282,16 +287,12 @@ export class DatabricksDriver extends JDBCDriver {
     return result;
   }
 
-  public async getTablesQuery(schemaName: string, withSchema?: boolean): Promise<TableQueryResult[]> {
+  public async getTablesQuery(schemaName: string): Promise<TableQueryResult[]> {
     const response = await this.query<{tableName: string}>(`SHOW TABLES IN ${this.getNameWithCatalog(schemaName)}`, []);
 
     const result = response.map((row) => ({
       table_name: row.tableName,
     }));
-
-    if (withSchema) {
-      return result.map(t => ({ table_name: `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${schemaName}.${t.table_name}` }));
-    }
 
     return result;
   }
@@ -309,7 +310,7 @@ export class DatabricksDriver extends JDBCDriver {
       return <any> this.query<ShowTableRow>(`SHOW TABLES IN ${this.getNameWithCatalog(this.config.database)}`, []);
     }
 
-    const databases = await this.query<ShowDatabasesRow>('SHOW DATABASES', []);
+    const databases = await this.query<ShowDatabasesRow>(`SHOW DATABASES${this.config.dbCatalog ? ` IN ${this.config.dbCatalog}` : ''}`, []);
 
     const allTables = await Promise.all(
       databases.map(async ({ databaseName }) => this.query<ShowTableRow>(
@@ -568,5 +569,16 @@ export class DatabricksDriver extends JDBCDriver {
   public capabilities(): DriverCapabilities {
     // @ts-ignore
     return { unloadWithoutTempTable: false };
+  }
+
+  /**
+   * Determines whether current instance should be bootstraped in the
+   * dev mode or not.
+   */
+  private isDevMode(): boolean {
+    return (
+      process.env.NODE_ENV !== 'production' ||
+        getEnv('devMode')
+    );
   }
 }

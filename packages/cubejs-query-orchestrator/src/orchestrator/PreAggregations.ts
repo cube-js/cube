@@ -936,9 +936,9 @@ export class PreAggregationLoader {
     withTempTable: boolean
   ) {
     if (withTempTable) {
-    const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema, true);
-      const isExist = Boolean(actualTables.find(t => targetTableName.includes(t.table_name || t.TABLE_NAME)));
-      if (isExist) {
+      const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
+      const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
+      if (mappedActualTables.includes(targetTableName)) {
         await client.dropTable(targetTableName);
       }
     }

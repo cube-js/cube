@@ -720,6 +720,22 @@ const variables: Record<string, (...args: any) => any> = {
     get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict()
   ),
 
+  databricksStorageCredentialName: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => process.env[
+    keyByDataSource('CUBEJS_DB_DATABRICKS_STORAGE_CREDENTIAL_NAME', dataSource)
+  ],
+
+  databricksDbCatalog: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => process.env[
+    keyByDataSource('CUBEJS_DB_DATABRICKS_DB_CATALOG', dataSource)
+  ],
+
   /** ****************************************************************
    * Athena Driver                                                   *
    ***************************************************************** */
