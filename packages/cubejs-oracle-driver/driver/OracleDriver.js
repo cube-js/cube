@@ -1,4 +1,8 @@
 const { BaseDriver } = require('@cubejs-backend/base-driver');
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 const oracledb = require('oracledb');
 const { reduce } = require('ramda');
 
@@ -33,6 +37,9 @@ const reduceCb = (result, i) => {
   return sortByKeys(result);
 };
 
+/**
+ * Oracle driver class.
+ */
 class OracleDriver extends BaseDriver {
   /**
    * Returns default concurrency value.
@@ -41,22 +48,32 @@ class OracleDriver extends BaseDriver {
     return 2;
   }
 
+  /**
+   * Class constructor.
+   */
   constructor(config = {}) {
     super();
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
     this.db = oracledb;
     this.db.outFormat = this.db.OBJECT;
     this.db.partRows = 100000;
     this.db.maxRows = 100000;
     this.db.prefetchRows = 500;
-
     this.config = config || {
-      user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
-      db: process.env.CUBEJS_DB_NAME,
-      host: process.env.CUBEJS_DB_HOST,
-      port: process.env.CUBEJS_DB_PORT || 1521,
+      user: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
+      db: getEnv('dbName', { dataSource }),
+      host: getEnv('dbHost', { dataSource }),
+      port: getEnv('dbPort', { dataSource }) || 1521,
       poolMin: 0,
-      poolMax: config.maxPoolSize || 50,
+      poolMax:
+        config.maxPoolSize ||
+        getEnv('dbMaxPoolSize', { dataSource }) ||
+        50,
     };
 
     if (!this.config.connectionString) {

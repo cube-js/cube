@@ -14,8 +14,9 @@ import { DriverCapabilities, UnloadOptions, } from '@cubejs-backend/base-driver'
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
+  applyParams
 } from '@cubejs-backend/jdbc-driver';
-import { getEnv } from '@cubejs-backend/shared';
+import { getEnv, assertDataSource, CancelablePromise } from '@cubejs-backend/shared';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
@@ -99,41 +100,62 @@ export class DatabricksDriver extends JDBCDriver {
     return 2;
   }
 
+  /**
+   * Class constructor.
+   */
   public constructor(
-    conf: Partial<DatabricksDriverConfiguration> = {},
+    conf: Partial<DatabricksDriverConfiguration> & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {},
   ) {
+    const dataSource =
+      conf.dataSource ||
+      assertDataSource('default');
+
     const config: DatabricksDriverConfiguration = {
       ...conf,
+      dbType: 'databricks',
       drivername: 'com.simba.spark.jdbc.Driver',
       customClassPath: undefined,
       properties: {
         // PWD-parameter passed to the connection string has higher priority,
         // so we can set this one to an empty string to avoid a Java error.
-        PWD: getEnv('databrickToken') || '',
-        // CUBEJS_DB_DATABRICKS_AGENT is a predefined way to override the user
-        // agent for the Cloud application.
+        PWD: getEnv('databrickToken', { dataSource }) || '',
         UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
       },
-      dbType: 'databricks',
-      database: getEnv('dbName', { required: false }),
-      url: getEnv('databrickUrl'),
+      database: getEnv('dbName', { required: false, dataSource }),
+      url: getEnv('databrickUrl', { dataSource }),
       // common export bucket config
       bucketType:
         conf?.bucketType ||
-        getEnv('dbExportBucketType', { supported: ['s3', 'azure'] }),
-      exportBucket: conf?.exportBucket || getEnv('dbExportBucket'),
-      exportBucketMountDir: conf?.exportBucketMountDir || getEnv('dbExportBucketMountDir'),
+        getEnv('dbExportBucketType', { supported: ['s3', 'azure'], dataSource }),
+      exportBucket:
+        conf?.exportBucket ||
+        getEnv('dbExportBucket', { dataSource }),
+      exportBucketMountDir:
+        conf?.exportBucketMountDir ||
+        getEnv('dbExportBucketMountDir', { dataSource }),
       pollInterval: (
-        conf?.pollInterval || getEnv('dbPollMaxInterval')
+        conf?.pollInterval ||
+        getEnv('dbPollMaxInterval', { dataSource })
       ) * 1000,
       // AWS export bucket config
-      awsKey: conf?.awsKey || getEnv('dbExportBucketAwsKey'),
-      awsSecret: conf?.awsSecret || getEnv('dbExportBucketAwsSecret'),
-      awsRegion: conf?.awsRegion || getEnv('dbExportBucketAwsRegion'),
+      awsKey:
+        conf?.awsKey ||
+        getEnv('dbExportBucketAwsKey', { dataSource }),
+      awsSecret:
+        conf?.awsSecret ||
+        getEnv('dbExportBucketAwsSecret', { dataSource }),
+      awsRegion:
+        conf?.awsRegion ||
+        getEnv('dbExportBucketAwsRegion', { dataSource }),
       // Azure export bucket
-      azureKey: conf?.azureKey || getEnv('dbExportBucketAzureKey'),
-      dbCatalog: conf?.dbCatalog || getEnv('dbCatalog'),
-      databricksStorageCredentialName: conf?.databricksStorageCredentialName || getEnv('databricksStorageCredentialName')
+      azureKey:
+        conf?.azureKey ||
+        getEnv('dbExportBucketAzureKey', { dataSource }),
+      dbCatalog: conf?.dbCatalog || getEnv('databricksDbCatalog', { dataSource }),
+      databricksStorageCredentialName: conf?.databricksStorageCredentialName || getEnv('databricksStorageCredentialName', { dataSource })
     };
     super(config);
     this.config = config;
@@ -501,5 +523,25 @@ export class DatabricksDriver extends JDBCDriver {
 
   public capabilities(): DriverCapabilities {
     return { unloadWithoutTempTable: true };
+  }
+
+  public async query<R = unknown>(query: string, values: unknown[]): Promise<R[]> {
+    const newQuery = this.enhanceQuery(query);
+    const queryWithParams = applyParams(newQuery, values);
+    const cancelObj: {cancel?: Function} = {};
+    const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
+    (promise as CancelablePromise<any>).cancel =
+      () => cancelObj.cancel && cancelObj.cancel() || Promise.reject(new Error('Statement is not ready'));
+    return promise;
+  }
+
+  private enhanceQuery(query: string) {
+    if (this.config.dbCatalog) {
+      // const match = (query).match(/(.+)_(.+)_(.+)_(.+)/);
+
+      return query;
+    }
+
+    return query;
   }
 }

@@ -215,6 +215,9 @@ crate::plan_to_language! {
             aliases: Option<Vec<String>>,
             split: bool,
         },
+        Distinct {
+            input: Arc<LogicalPlan>,
+        },
         Measure {
             name: String,
             expr: Arc<Expr>,

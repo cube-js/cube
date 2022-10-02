@@ -125,6 +125,7 @@ pub struct ConfigObjImpl {
     pub postgres_bind_address: Option<String>,
     pub nonce: Option<Vec<u8>>,
     pub query_timeout: u64,
+    pub timezone: Option<String>,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -172,12 +173,14 @@ impl Config {
                     .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
                 nonce: None,
                 query_timeout,
+                timezone: Some("UTC".to_string()),
             }),
         }
     }
 
     pub fn test(_name: &str) -> Config {
         let query_timeout = 15;
+        let timezone = Some("UTC".to_string());
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -185,6 +188,7 @@ impl Config {
                 postgres_bind_address: None,
                 nonce: None,
                 query_timeout,
+                timezone,
             }),
         }
     }
@@ -274,10 +278,12 @@ impl Config {
         }
     }
 
-    pub async fn configure(&self) -> CubeServices {
-        self.configure_injector().await;
+    pub async fn configure(&self) {
+        if let Some(timezone) = &self.config_obj.timezone {
+            env::set_var("TZ", timezone.as_str());
+        }
 
-        self.cube_services().await
+        self.configure_injector().await;
     }
 }
 

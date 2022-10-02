@@ -1,6 +1,10 @@
 const sqlite3 = require('sqlite3');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
+const { getEnv, assertDataSource } = require('@cubejs-backend/shared');
 
+/**
+ * SQLight driver class.
+ */
 class SqliteDriver extends BaseDriver {
   /**
    * Returns default concurrency value.
@@ -9,12 +13,21 @@ class SqliteDriver extends BaseDriver {
     return 2;
   }
 
+  /**
+   * Class constructor.
+   */
   constructor(config = {}) {
     super();
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+    
     this.config = {
-      database: process.env.CUBEJS_DB_NAME,
+      database: getEnv('dbName', { dataSource }),
       ...config
     };
+
     if (!this.config.db) {
       this.config.db = new sqlite3.Database(this.config.database);
     }

@@ -765,7 +765,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
         } = expr
         {
             match data_type {
-                ast::DataType::Custom(name) => match name.to_string().as_str() {
+                ast::DataType::Custom(name) => match name.to_string().to_lowercase().as_str() {
                     "name" | "oid" | "information_schema.cardinal_number" | "regproc" => {
                         self.visit_expr(&mut *cast_expr)?;
 
@@ -785,6 +785,16 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                         self.visit_expr(&mut *cast_expr)?;
 
                         *data_type = ast::DataType::BigInt(None)
+                    }
+                    "float8" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::Double;
+                    }
+                    "bool" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::Boolean;
                     }
                     "timestamptz" => {
                         self.visit_expr(&mut *cast_expr)?;

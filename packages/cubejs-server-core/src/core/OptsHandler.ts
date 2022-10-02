@@ -5,6 +5,7 @@ import cloneDeep from 'lodash.clonedeep';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import {
   getEnv,
+  assertDataSource,
   isDockerImage,
   displayCLIWarning,
 } from '@cubejs-backend/shared';
@@ -196,9 +197,10 @@ export class OptsHandler {
    * Default database factory function.
    */ // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private defaultDriverFactory(ctx: DriverContext): DriverConfig {
-    return {
-      type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
-    };
+    const type = <DatabaseType>getEnv('dbType', {
+      dataSource: assertDataSource(ctx.dataSource),
+    });
+    return { type };
   }
 
   /**
