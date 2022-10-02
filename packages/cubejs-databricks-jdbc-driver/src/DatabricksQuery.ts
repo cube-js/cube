@@ -1,6 +1,5 @@
 import R from 'ramda';
 import { BaseFilter, BaseQuery } from '@cubejs-backend/schema-compiler';
-import { getEnv } from '@cubejs-backend/shared';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
@@ -114,9 +113,5 @@ export class DatabricksQuery extends BaseQuery {
 
   public defaultRefreshKeyRenewalThreshold() {
     return 120;
-  }
-
-  public dbCatalog() {
-    return getEnv('databricksDbCatalog');
   }
 }

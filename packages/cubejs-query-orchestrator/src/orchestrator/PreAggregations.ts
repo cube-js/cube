@@ -153,7 +153,6 @@ export type LambdaQuery = {
 
 export type PreAggregationDescription = {
   preAggregationsSchema: string;
-  dbCatalog?: string;
   type: 'rollup' | 'originalSql';
   preAggregationId: string;
   priority: number;
