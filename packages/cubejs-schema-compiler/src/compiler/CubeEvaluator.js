@@ -3,6 +3,7 @@ import R from 'ramda';
 
 import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';
+import { BaseQuery } from '../adapter';
 
 export class CubeEvaluator extends CubeSymbols {
   constructor(cubeValidator) {
@@ -86,6 +87,32 @@ export class CubeEvaluator extends CubeSymbols {
           delete preAggregation.buildRangeEnd;
         }
       }
+    }
+    this.transformMembers(cube.measures, cube, errorReporter);
+    this.transformMembers(cube.dimensions, cube, errorReporter);
+    this.transformMembers(cube.segments, cube, errorReporter);
+  }
+
+  transformMembers(members, cube, errorReporter) {
+    members = members || {};
+    for (const memberName of Object.keys(members)) {
+      const member = members[memberName];
+      let ownedByCube = true;
+      if (member.sql && !member.subQuery) {
+        const funcArgs = this.funcArguments(member.sql);
+        const cubeReferences = this.collectUsedCubeReferences(cube.name, member.sql);
+        if (funcArgs.length > 0 && cubeReferences.length === 0) {
+          ownedByCube = false;
+        }
+        const foreignCubes = cubeReferences.filter(usedCube => usedCube !== cube.name);
+        if (foreignCubes.length > 0) {
+          errorReporter.error(`Member '${cube.name}.${memberName}' references foreign cubes: ${foreignCubes.join(', ')}. Please split and move this definition to corresponding cubes.`);
+        }
+      }
+      if (ownedByCube && cube.isView) {
+        errorReporter.error(`View '${cube.name}' defines own member '${cube.name}.${memberName}'. Please move this member definition to one of the cubes.`);
+      }
+      members[memberName].ownedByCube = ownedByCube;
     }
   }
 
@@ -214,6 +241,16 @@ export class CubeEvaluator extends CubeSymbols {
       this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
   }
 
+  byPathAnyType(path) {
+    const type = ['measures', 'dimensions', 'segments'].find(t => this.isInstanceOfType(t, path));
+
+    if (!type) {
+      throw new UserError(`Can't resolve member '${path.join('.')}'`);
+    }
+
+    return this.byPath(type, path);
+  }
+
   byPath(type, path) {
     if (!type) {
       throw new Error(`Type can't be undefined for '${path}'`);
@@ -243,6 +280,32 @@ export class CubeEvaluator extends CubeSymbols {
     // Should throw UserError in case of parse error
     this.byPath(type, path);
     return path.split('.');
+  }
+
+  collectUsedCubeReferences(cube, sqlFn) {
+    const cubeEvaluator = this;
+
+    const cubeReferencesUsed = [];
+
+    cubeEvaluator.resolveSymbolsCall(sqlFn, (name) => {
+      const referencedCube = cubeEvaluator.symbols[name] && name || cube;
+      const resolvedSymbol =
+        cubeEvaluator.resolveSymbol(
+          cube,
+          name
+        );
+      // eslint-disable-next-line no-underscore-dangle
+      if (resolvedSymbol._objectWithResolvedProperties) {
+        return resolvedSymbol;
+      }
+      return cubeEvaluator.pathFromArray([referencedCube, name]);
+    }, {
+      // eslint-disable-next-line no-shadow
+      sqlResolveFn: (symbol, cube, n) => cubeEvaluator.pathFromArray([cube, n]),
+      contextSymbols: BaseQuery.emptyParametrizedContextSymbols(this, () => '$empty_param$'),
+      cubeReferencesUsed,
+    });
+    return cubeReferencesUsed;
   }
 
   evaluateReferences(cube, referencesFn, options = {}) {

@@ -119,14 +119,28 @@ export class JoinGraph {
 
   buildJoinTreeForRoot(root, cubesToJoin) {
     const self = this;
-    const result = cubesToJoin.map(toJoin => {
-      const path = this.graph.path(root, toJoin);
-      if (!path) {
-        return null;
+    if (Array.isArray(root)) {
+      const [newRoot, ...additionalToJoin] = root;
+      if (additionalToJoin.length > 0) {
+        cubesToJoin = [additionalToJoin].concat(cubesToJoin);
       }
-      const foundJoins = self.joinsByPath(path);
-      return { cubes: path, joins: foundJoins };
-    }).reduce((joined, res) => {
+      root = newRoot;
+    }
+    const result = cubesToJoin.map(joinHints => {
+      if (!Array.isArray(joinHints)) {
+        joinHints = [joinHints];
+      }
+      let prevNode = root;
+      return joinHints.filter(toJoin => toJoin !== prevNode).map(toJoin => {
+        const path = this.graph.path(prevNode, toJoin);
+        if (!path) {
+          return null;
+        }
+        const foundJoins = self.joinsByPath(path);
+        prevNode = toJoin;
+        return { cubes: path, joins: foundJoins };
+      });
+    }).reduce((a, b) => a.concat(b), []).reduce((joined, res) => {
       if (!res || !joined) {
         return null;
       }
