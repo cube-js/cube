@@ -15,7 +15,7 @@ export class VerticaDBRunner extends DbRunnerAbstract {
       .withEnv('VERTICA_DB_NAME', 'test')
       .withExposedPorts(5433)
       .withStartupTimeout(60 * 1000)
-      .withWaitStrategy(new LogWaitStrategy("Node Status: v_test_node0001: (UP)"))
+      .withWaitStrategy(new LogWaitStrategy("Node Status: v_test_node0001: (UP)"));
 
     return container.start();
   }
