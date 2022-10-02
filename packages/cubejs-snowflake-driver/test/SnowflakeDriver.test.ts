@@ -117,26 +117,100 @@ describe('SnowflakeDriver', () => {
       expect(result).toEqual({ csvFile: contents.map(c => c.Key), types: [{ type: 'text', name: 'id' }, { name: 'count', type: 'int' }, { name: 'date', type: 'timestamp' }] });
     });
 
-    it('unloadFromTable throws an error if unload doesn\'t return anything', () => {
-      
+    it('unloadFromTable throws an error if unload doesn\'t return anything', async () => {
+      const bucket: SnowflakeDriverExportBucket = { bucketType: 's3', bucketName: 'some_random_name', keyId: 'random_key', secretKey: 'secrect', region: 'us-east-2' };
+      const table = 'my_main_schema.table';
+      const stubs = [
+        { regexp: new RegExp(`COPY INTO '${bucket.bucketType}://${bucket.bucketName}/(.+)' FROM ${table}`), rows: null },
+        {
+          regexp: new RegExp('ORDER\\s+BY\\s+ORDINAL_POSITION'),
+          statement: createSnowflakeStatementMock([]),
+          rows: [{ COLUMN_NAME: 'id', DATA_TYPE: 'TEXT' }, { COLUMN_NAME: 'count', DATA_TYPE: 'int' }, { COLUMN_NAME: 'date', DATA_TYPE: 'TIMESTAMP_NTZ' }] },
+      ];
+      const contents = [{ Key: 'file1' }, { Key: 'file2' }];
+      mockAwsS3(contents);
+      mockSnowflake(stubs);
+
+      const driver = createSnowflakeDriver({ exportBucket: bucket });
+
+      await expect(driver.unload(table, { maxFileSize: 60 })).rejects.toThrow(/Snowflake doesn't return anything on UNLOAD operation/);
     });
 
-    it('unloadFromTable throws an error if rows unloaded equals zero', () => {
-      
+    it('unloadFromTable throws an error if rows unloaded equals zero', async () => {
+      const bucket: SnowflakeDriverExportBucket = { bucketType: 's3', bucketName: 'some_random_name', keyId: 'random_key', secretKey: 'secrect', region: 'us-east-2' };
+      const table = 'my_main_schema.table';
+      const stubs = [
+        { regexp: new RegExp(`COPY INTO '${bucket.bucketType}://${bucket.bucketName}/(.+)' FROM ${table}`), rows: [{ rows_unloaded: '0' }] },
+        {
+          regexp: new RegExp('ORDER\\s+BY\\s+ORDINAL_POSITION'),
+          statement: createSnowflakeStatementMock([]),
+          rows: [{ COLUMN_NAME: 'id', DATA_TYPE: 'TEXT' }, { COLUMN_NAME: 'count', DATA_TYPE: 'int' }, { COLUMN_NAME: 'date', DATA_TYPE: 'TIMESTAMP_NTZ' }] },
+      ];
+      const contents = [{ Key: 'file1' }, { Key: 'file2' }];
+      mockAwsS3(contents);
+      mockSnowflake(stubs);
+
+      const driver = createSnowflakeDriver({ exportBucket: bucket });
+
+      await expect(driver.unload(table, { maxFileSize: 60 })).rejects.toThrow(/Snowflake unloads zero rows on UNLOAD operation/);
     });
 
-    it('unloadFromSql success', () => {
-      
+    it('unloadFromSql success', async () => {
+      const bucket: SnowflakeDriverExportBucket = { bucketType: 's3', bucketName: 'some_random_name', keyId: 'random_key', secretKey: 'secrect', region: 'us-east-2' };
+      const table = 'my_main_schema.table';
+      const sql = 'SELECT * FROM my_main_schema.table';
+      const stubs = [
+        { regexp: new RegExp(`COPY INTO '${bucket.bucketType}://${bucket.bucketName}/(.+)' FROM \\(${sql.replace('*', '\\*')}\\)`), rows: [{ rows_unloaded: 1 }] },
+        { regexp: new RegExp(`${sql.replace('*', '\\*')} LIMIT 1`), rows: [] },
+        { regexp: new RegExp('DESC RESULT last_query_id()'), rows: [{ type: 'NUMBER(1,1)', name: 'id' }, { type: 'VARCHAR(16)', name: 'test' }] }
+      ];
+      const contents = [{ Key: 'file1' }, { Key: 'file2' }];
+      mockAwsS3(contents);
+      mockSnowflake(stubs);
+
+      const driver = createSnowflakeDriver({ exportBucket: bucket });
+
+      const result = await driver.unload(table, { maxFileSize: 60, query: { sql, params: [] } });
+
+      expect(result).toEqual({ csvFile: contents.map(c => c.Key), types: [{ type: 'decimal(1,1)', name: 'id' }, { type: 'VARCHAR(16)', name: 'test' }] });
     });
 
     it('unloadFromSql test different type casts', () => {});
 
-    it('unloadFromSql throws an error if unload doesn\'t return anything', () => {
-      
+    it('unloadFromSql throws an error if unload doesn\'t return anything', async () => {
+      const bucket: SnowflakeDriverExportBucket = { bucketType: 's3', bucketName: 'some_random_name', keyId: 'random_key', secretKey: 'secrect', region: 'us-east-2' };
+      const table = 'my_main_schema.table';
+      const sql = 'SELECT * FROM my_main_schema.table';
+      const stubs = [
+        { regexp: new RegExp(`COPY INTO '${bucket.bucketType}://${bucket.bucketName}/(.+)' FROM \\(${sql.replace('*', '\\*')}\\)`), rows: null },
+        { regexp: new RegExp(`${sql.replace('*', '\\*')} LIMIT 1`), rows: [] },
+        { regexp: new RegExp('DESC RESULT last_query_id()'), rows: [{ type: 'NUMBER(1,1)', name: 'id' }, { type: 'VARCHAR(16)', name: 'test' }] }
+      ];
+      const contents = [{ Key: 'file1' }, { Key: 'file2' }];
+      mockAwsS3(contents);
+      mockSnowflake(stubs);
+
+      const driver = createSnowflakeDriver({ exportBucket: bucket });
+
+      await expect(driver.unload(table, { maxFileSize: 60, query: { sql, params: [] } })).rejects.toThrow(/Snowflake doesn't return anything on UNLOAD operation/);
     });
 
-    it('unloadFromSql throws an error if rows unloaded equals zero', () => {
-      
+    it('unloadFromSql throws an error if rows unloaded equals zero', async () => {
+      const bucket: SnowflakeDriverExportBucket = { bucketType: 's3', bucketName: 'some_random_name', keyId: 'random_key', secretKey: 'secrect', region: 'us-east-2' };
+      const table = 'my_main_schema.table';
+      const sql = 'SELECT * FROM my_main_schema.table';
+      const stubs = [
+        { regexp: new RegExp(`COPY INTO '${bucket.bucketType}://${bucket.bucketName}/(.+)' FROM \\(${sql.replace('*', '\\*')}\\)`), rows: [{ rows_unloaded: '0' }] },
+        { regexp: new RegExp(`${sql.replace('*', '\\*')} LIMIT 1`), rows: [] },
+        { regexp: new RegExp('DESC RESULT last_query_id()'), rows: [{ type: 'NUMBER(1,1)', name: 'id' }, { type: 'VARCHAR(16)', name: 'test' }] }
+      ];
+      const contents = [{ Key: 'file1' }, { Key: 'file2' }];
+      mockAwsS3(contents);
+      mockSnowflake(stubs);
+
+      const driver = createSnowflakeDriver({ exportBucket: bucket });
+
+      await expect(driver.unload(table, { maxFileSize: 60, query: { sql, params: [] } })).rejects.toThrow(/Snowflake unloads zero rows on UNLOAD operation/);
     });
   });
 });
