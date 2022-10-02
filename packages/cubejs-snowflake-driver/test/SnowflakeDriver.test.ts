@@ -1,5 +1,4 @@
 /* eslint-disable no-use-before-define */
-import { DriverInterface } from '@cubejs-backend/base-driver';
 import type { SnowflakeDriverExportBucket, SnowflakeDriverOptions } from '../src/SnowflakeDriver';
 // eslint-disable-next-line global-require
 import { SnowflakeDriver as SnowflakeDriverType } from '../src/SnowflakeDriver';
@@ -96,8 +95,14 @@ describe('SnowflakeDriver', () => {
               { type: 'NUMBER(1,0)', name: 'count' },
               { type: 'DECIMAL(1,0)', name: 'count1' },
               { type: 'NUMERIC(1,0)', name: 'count2' },
-              { type: 'float', name: 'float_count' },
-              { type: 'VARCHAR(16)', name: 'test' }
+              { type: 'FLOAT', name: 'float_count' },
+              { type: 'VARCHAR(16)', name: 'varchar1' },
+              { type: 'VARCHAR(256)', name: 'varchar2' },
+              { type: 'VARCHAR(10000000)', name: 'varchar3' },
+              { type: 'VARCHAR(1)', name: 'my_char' },
+              { type: 'VARCHAR', name: 'text' },
+              { type: 'BINARY', name: 'binary_string' },
+              { type: 'BOOLEAN', name: 'my_boolean' },
             ]
           }
         ];
@@ -116,8 +121,14 @@ describe('SnowflakeDriver', () => {
           { type: 'int', name: 'count' },
           { type: 'int', name: 'count1' },
           { type: 'int', name: 'count2' },
-          { type: 'float', name: 'float_count' },
-          { type: 'VARCHAR(16)', name: 'test' }
+          { type: 'FLOAT', name: 'float_count' },
+          { type: 'VARCHAR(16)', name: 'varchar1' },
+          { type: 'VARCHAR(256)', name: 'varchar2' },
+          { type: 'VARCHAR(10000000)', name: 'varchar3' },
+          { type: 'VARCHAR(1)', name: 'my_char' },
+          { type: 'text', name: 'text' },
+          { type: 'BINARY', name: 'binary_string' },
+          { type: 'boolean', name: 'my_boolean' },
         ];
         expect(result).toEqual({ csvFile: contents.map(c => c.Key), types: expectedTypes });
       });
