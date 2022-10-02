@@ -114,7 +114,6 @@ export class QueryCache {
 
     const expireSecs = this.getExpireSecs(queryBody);
 
-    console.log('queryBodyqueryBodyqueryBodyqueryBodyqueryBodyqueryBodyqueryBody', queryBody);
     if (!cacheKeyQueries || queryBody.external && this.options.skipExternalCacheAndQueue) {
       return {
         data: await this.queryWithRetryAndRelease(query, values, {
@@ -123,7 +122,6 @@ export class QueryCache {
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
           inlineTables,
-          
         }),
       };
     }

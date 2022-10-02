@@ -81,7 +81,6 @@ export class QueryQueue {
       const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
       const orphanedTime = time + (orphanedTimeout * 1000);
 
-      console.log('tataktaktatk', query, query.preAggregation);
       const [added, _b, _c, queueSize, addedToQueueTime] = await redisClient.addToQueue(
         keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );

@@ -177,7 +177,6 @@ export class PreAggregations {
       timestampFormat: queryForSqlEvaluation.timestampFormat(),
       tableName,
       tableNameBase,
-      dbCatalog: this.query.dbCatalog && this.query.dbCatalog(),
       invalidateKeyQueries,
       type: preAggregation.type,
       external: preAggregation.external,

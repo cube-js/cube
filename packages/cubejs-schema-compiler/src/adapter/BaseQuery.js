@@ -2222,9 +2222,6 @@ class BaseQuery {
     return `${skipSchema ? '' : this.preAggregationSchema() && `${this.preAggregationSchema()}.`}${tblName}`;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  dbCatalog() {}
-
   preAggregationSchema() {
     return this.preAggregationsSchemaOption;
   }

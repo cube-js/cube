@@ -1263,6 +1263,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
     .asString(),
+
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
     .default('2')
