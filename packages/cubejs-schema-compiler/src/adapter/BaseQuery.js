@@ -563,8 +563,9 @@ class BaseQuery {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
     const result = {};
     if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
+      const lambdaPreAgg = preAggForQuery.referencedPreAggregations[0];
       // TODO(cristipp) Use source query instead of preaggregation references.
-      const references = this.cubeEvaluator.evaluatePreAggregationReferences(preAggForQuery.cube, preAggForQuery.preAggregation);
+      const references = this.cubeEvaluator.evaluatePreAggregationReferences(lambdaPreAgg.cube, lambdaPreAgg.preAggregation);
       const lambdaQuery = this.newSubQuery(
         {
           measures: references.measures,
@@ -593,7 +594,7 @@ class BaseQuery {
         () => this.cacheKeyQueries(),
         { preAggregationQuery: true }
       );
-      result[this.preAggregations.preAggregationId(preAggForQuery)] = { sqlAndParams, cacheKeyQueries };
+      result[this.preAggregations.preAggregationId(lambdaPreAgg)] = { sqlAndParams, cacheKeyQueries };
     }
     return result;
   }
@@ -785,6 +786,18 @@ class BaseQuery {
       const regularMeasuresCubes = cubeNames(regularMeasures);
       const multipliedMeasuresCubes = cubeNames(multipliedMeasures);
       if (R.equals(regularMeasuresCubes, multipliedMeasuresCubes)) {
+        const measuresList = regularMeasures.concat(multipliedMeasures);
+        // We need to use original measures sorting to avoid problems
+        // with the query order.
+        measuresList.sort((m1, m2) => {
+          let i1;
+          let i2;
+          this.measures.forEach((m, i) => {
+            if (m.measure === m1.measure) { i1 = i; }
+            if (m.measure === m2.measure) { i2 = i; }
+          });
+          return i1 - i2;
+        });
         toJoin = R.pipe(
           R.groupBy(m => m.cube().name),
           R.toPairs,
@@ -794,7 +807,7 @@ class BaseQuery {
               () => this.aggregateSubQuery(keyCubeName, measures),
             )
           )
-        )(regularMeasures.concat(multipliedMeasures));
+        )(measuresList);
       }
     }
     return this.joinFullKeyQueryAggregate(
@@ -837,7 +850,11 @@ class BaseQuery {
 
     // TODO all having filters should be pushed down
     // subQuery dimensions can introduce projection remapping
-    if (toJoin.length === 1 && this.measureFilters.length === 0 && this.measures.filter(m => m.expression).length === 0) {
+    if (
+      toJoin.length === 1 &&
+      this.measureFilters.length === 0 &&
+      this.measures.filter(m => m.expression).length === 0
+    ) {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
 

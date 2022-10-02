@@ -14,16 +14,17 @@ use crate::{
             original_expr_name, projection, projection_expr, projection_expr_empty_tail,
             referenced_columns, rewrite,
             rewriter::RewriteRules,
-            rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules},
+            rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules, utils},
             segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
             transforming_rewrite, udaf_expr, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AliasExprAlias, ChangeUserCube, ColumnExprColumn,
-            CubeScanAliasToCube, CubeScanAliases, CubeScanLimit, DimensionName, LimitN,
-            LiteralExprValue, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
-            MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
-            MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias,
-            SegmentName, TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, WithColumnRelation,
+            AggregateFunctionExprFun, AliasExprAlias, CastExprDataType, ChangeUserCube,
+            ColumnExprColumn, CubeScanAliasToCube, CubeScanAliases, CubeScanLimit, CubeScanOffset,
+            DimensionName, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberValue,
+            LogicalPlanLanguage, MeasureName, MemberErrorAliasToCube, MemberErrorError,
+            MemberErrorPriority, MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube,
+            ProjectionAlias, SegmentName, TableScanSourceTableName, TableScanTableName,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            WithColumnRelation,
         },
     },
     transport::{V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
@@ -31,6 +32,7 @@ use crate::{
 };
 use cubeclient::models::V1CubeMetaMeasure;
 use datafusion::{
+    arrow::datatypes::DataType,
     logical_plan::{Column, DFSchema, Expr},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
@@ -57,7 +59,7 @@ impl RewriteRules for MemberRules {
                     "?table_name",
                     "?projection",
                     "?filters",
-                    "?limit",
+                    "?fetch",
                 ),
                 cube_scan(
                     "?alias_to_cube",
@@ -116,6 +118,7 @@ impl RewriteRules for MemberRules {
                 None,
                 Some("?distinct"),
                 Some("?aggr_fun"),
+                None,
             ),
             self.measure_rewrite(
                 "named",
@@ -123,11 +126,30 @@ impl RewriteRules for MemberRules {
                 Some("?column"),
                 Some("?distinct"),
                 Some("?aggr_fun"),
+                None,
+            ),
+            // TODO There're two approaches for CAST arg problem: push down to CubeScan and remove casts / cast inside CubeScan or
+            // TODO split it and implement limit, order, filter, etc. pushdown to projection nodes with casts.
+            // TODO First approach is simpler and much faster compute-wise.
+            // TODO Second approach is much more generalized.
+            // TODO We need to weigh in on generalization vs performance tradeoffs here.
+            self.measure_rewrite(
+                "with-cast",
+                agg_fun_expr(
+                    "?aggr_fun",
+                    vec![cast_expr(column_expr("?column"), "?data_type")],
+                    "?distinct",
+                ),
+                Some("?column"),
+                Some("?distinct"),
+                Some("?aggr_fun"),
+                Some("?data_type"),
             ),
             self.measure_rewrite(
                 "measure-fun",
                 udaf_expr("?aggr_fun", vec![column_expr("?column")]),
                 Some("?column"),
+                None,
                 None,
                 None,
             ),
@@ -419,13 +441,14 @@ impl RewriteRules for MemberRules {
             transforming_rewrite(
                 "limit-push-down",
                 limit(
-                    "?limit",
+                    "?skip",
+                    "?fetch",
                     cube_scan(
                         "?alias_to_cube",
                         "?members",
                         "?filters",
                         "?orders",
-                        "?cube_limit",
+                        "?cube_fetch",
                         "?offset",
                         "?aliases",
                         "?split",
@@ -436,12 +459,12 @@ impl RewriteRules for MemberRules {
                     "?members",
                     "?filters",
                     "?orders",
-                    "?new_limit",
-                    "?offset",
+                    "?new_fetch",
+                    "?new_skip",
                     "?aliases",
                     "?split",
                 ),
-                self.push_down_limit("?limit", "?new_limit"),
+                self.push_down_limit("?skip", "?fetch", "?new_skip", "?new_fetch"),
             ),
             // Empty tail merges
             rewrite(
@@ -631,6 +654,15 @@ impl MemberRules {
         rules.push(find_matching_old_member(
             "agg-fun",
             agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+        ));
+        rules.push(find_matching_old_member(
+            "agg-fun-with-cast",
+            // TODO need to check data_type if we can remove the cast
+            agg_fun_expr(
+                "?fun_name",
+                vec![cast_expr(column_expr("?column"), "?data_type")],
+                "?distinct",
+            ),
         ));
         rules.push(transforming_chain_rewrite(
             "member-pushdown-replacer-agg-fun",
@@ -835,15 +867,17 @@ impl MemberRules {
                     )));
 
             for granularity in var_iter!(egraph[subst[outer_granularity_var]], LiteralExprValue) {
-                let outer_granularity = match Self::parse_granularity(granularity, inner_replacer) {
+                let outer_granularity = match utils::parse_granularity(granularity, inner_replacer)
+                {
                     Some(granularity) => granularity,
                     None => continue,
                 };
+
                 let inner_granularity = if outer_granularity_var == inner_granularity_var {
                     outer_granularity.clone()
                 } else {
                     var_iter!(egraph[subst[inner_granularity_var]], LiteralExprValue)
-                        .find_map(|g| Self::parse_granularity(g, inner_replacer))
+                        .find_map(|g| utils::parse_granularity(g, inner_replacer))
                         .unwrap_or(outer_granularity.clone())
                 };
 
@@ -888,9 +922,11 @@ impl MemberRules {
                             ))),
                         );
                     }
+
                     return true;
                 }
             }
+
             false
         }
     }
@@ -1190,24 +1226,48 @@ impl MemberRules {
 
     fn push_down_limit(
         &self,
-        limit_var: &'static str,
-        new_limit_var: &'static str,
+        skip_var: &'static str,
+        fetch_var: &'static str,
+        new_skip_var: &'static str,
+        new_fetch_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let limit_var = var!(limit_var);
-        let new_limit_var = var!(new_limit_var);
+        let skip_var = var!(skip_var);
+        let fetch_var = var!(fetch_var);
+        let new_skip_var = var!(new_skip_var);
+        let new_fetch_var = var!(new_fetch_var);
         move |egraph, subst| {
-            for limit in var_iter!(egraph[subst[limit_var]], LimitN) {
-                let limit = *limit;
-                if limit > 0 {
-                    subst.insert(
-                        new_limit_var,
-                        egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(
-                            limit,
-                        )))),
-                    );
-                    return true;
+            let mut skip_value = None;
+            for skip in var_iter!(egraph[subst[skip_var]], LimitSkip) {
+                if skip.unwrap_or_default() > 0 {
+                    skip_value = *skip;
+                    break;
                 }
             }
+            let mut fetch_value = None;
+            for fetch in var_iter!(egraph[subst[fetch_var]], LimitFetch) {
+                if fetch.unwrap_or_default() > 0 {
+                    fetch_value = *fetch;
+                    break;
+                }
+            }
+
+            if skip_value.is_some() || fetch_value.is_some() {
+                subst.insert(
+                    new_skip_var,
+                    egraph.add(LogicalPlanLanguage::CubeScanOffset(CubeScanOffset(
+                        skip_value,
+                    ))),
+                );
+                subst.insert(
+                    new_fetch_var,
+                    egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(
+                        fetch_value,
+                    ))),
+                );
+
+                return true;
+            }
+
             false
         }
     }
@@ -1412,6 +1472,7 @@ impl MemberRules {
         let original_expr_var = var!(original_expr_var);
         let alias_var = var!(alias_var);
         let meta_context = self.cube_context.meta.clone();
+
         move |egraph, subst| {
             for column in var_iter!(egraph[subst[dimension_var]], ColumnExprColumn).cloned() {
                 for alias_to_cube in var_iter!(egraph[subst[cube_var]], MemberReplacerAliasToCube) {
@@ -1425,52 +1486,44 @@ impl MemberRules {
                             for granularity in
                                 var_iter!(egraph[subst[granularity_var]], LiteralExprValue)
                             {
-                                if let Some(alias) =
+                                let alias = if let Some(alias) =
                                     original_expr_name(egraph, subst[original_expr_var])
                                 {
-                                    match granularity {
-                                        ScalarValue::Utf8(Some(granularity_value)) => {
-                                            let granularity_value =
-                                                granularity_value.to_lowercase();
-                                            subst.insert(
-                                                time_dimension_name_var,
-                                                egraph.add(LogicalPlanLanguage::TimeDimensionName(
-                                                    TimeDimensionName(
-                                                        time_dimension.name.to_string(),
-                                                    ),
-                                                )),
-                                            );
-                                            subst.insert(
-                                                date_range_var,
-                                                egraph.add(
-                                                    LogicalPlanLanguage::TimeDimensionDateRange(
-                                                        TimeDimensionDateRange(None), // TODO
-                                                    ),
-                                                ),
-                                            );
-                                            subst.insert(
-                                                time_dimension_granularity_var,
-                                                egraph.add(
-                                                    LogicalPlanLanguage::TimeDimensionGranularity(
-                                                        TimeDimensionGranularity(Some(
-                                                            granularity_value,
-                                                        )),
-                                                    ),
-                                                ),
-                                            );
+                                    alias
+                                } else {
+                                    continue;
+                                };
 
-                                            let alias_expr = Self::add_alias_column(
-                                                egraph,
-                                                alias,
-                                                Some(cube_alias),
-                                            );
-                                            subst.insert(alias_var, alias_expr);
+                                let granularity_value =
+                                    match utils::parse_granularity(granularity, false) {
+                                        Some(g) => g,
+                                        None => continue,
+                                    };
 
-                                            return true;
-                                        }
-                                        _ => {}
-                                    }
-                                }
+                                subst.insert(
+                                    time_dimension_name_var,
+                                    egraph.add(LogicalPlanLanguage::TimeDimensionName(
+                                        TimeDimensionName(time_dimension.name.to_string()),
+                                    )),
+                                );
+                                subst.insert(
+                                    date_range_var,
+                                    egraph.add(LogicalPlanLanguage::TimeDimensionDateRange(
+                                        TimeDimensionDateRange(None), // TODO
+                                    )),
+                                );
+                                subst.insert(
+                                    time_dimension_granularity_var,
+                                    egraph.add(LogicalPlanLanguage::TimeDimensionGranularity(
+                                        TimeDimensionGranularity(Some(granularity_value)),
+                                    )),
+                                );
+
+                                let alias_expr =
+                                    Self::add_alias_column(egraph, alias, Some(cube_alias));
+                                subst.insert(alias_var, alias_expr);
+
+                                return true;
                             }
                         }
                     }
@@ -1501,6 +1554,7 @@ impl MemberRules {
         measure_var: Option<&'static str>,
         distinct_var: Option<&'static str>,
         fun_var: Option<&'static str>,
+        cast_data_type_var: Option<&'static str>,
     ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
         transforming_chain_rewrite(
             &format!("measure-{}", name),
@@ -1512,6 +1566,7 @@ impl MemberRules {
                 measure_var,
                 distinct_var,
                 fun_var,
+                cast_data_type_var,
                 "?aggr_expr",
                 "?measure",
             ),
@@ -1672,6 +1727,7 @@ impl MemberRules {
         measure_var: Option<&'static str>,
         distinct_var: Option<&'static str>,
         fun_var: Option<&'static str>,
+        cast_data_type_var: Option<&'static str>,
         aggr_expr_var: &'static str,
         measure_out_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
@@ -1680,6 +1736,7 @@ impl MemberRules {
         let fun_var = fun_var.map(|var| var.parse().unwrap());
         let measure_var = measure_var.map(|var| var.parse().unwrap());
         let aggr_expr_var = aggr_expr_var.parse().unwrap();
+        let cast_data_type_var = cast_data_type_var.map(|var| var!(var));
         let measure_out_var = measure_out_var.parse().unwrap();
         let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
@@ -1723,20 +1780,35 @@ impl MemberRules {
                                         original_expr_name(egraph, subst[aggr_expr_var])
                                     {
                                         let alias_to_cube = alias_to_cube.clone();
-                                        Self::measure_output(
-                                            egraph,
-                                            subst,
-                                            measure,
-                                            call_agg_type,
-                                            alias,
-                                            measure_out_var,
-                                            cube_alias,
-                                            subst[aggr_expr_var],
-                                            alias_to_cube,
-                                        );
-                                    }
+                                        let can_remove_cast = cast_data_type_var
+                                            .map(|cast_data_type_var| {
+                                                var_iter!(
+                                                    egraph[subst[cast_data_type_var]],
+                                                    CastExprDataType
+                                                )
+                                                .any(|dt| match dt {
+                                                    DataType::Decimal(_, _) => true,
+                                                    _ => false,
+                                                })
+                                            })
+                                            .unwrap_or(true);
 
-                                    return true;
+                                        if can_remove_cast {
+                                            Self::measure_output(
+                                                egraph,
+                                                subst,
+                                                measure,
+                                                call_agg_type,
+                                                alias,
+                                                measure_out_var,
+                                                cube_alias,
+                                                subst[aggr_expr_var],
+                                                alias_to_cube,
+                                            );
+
+                                            return true;
+                                        }
+                                    }
                                 }
 
                                 if let Some(dimension) = cube.lookup_dimension(&column.name) {
@@ -1773,12 +1845,20 @@ impl MemberRules {
         alias_to_cube: Vec<((String, String), String)>,
     ) {
         if call_agg_type.is_some() && !measure.is_same_agg_type(call_agg_type.as_ref().unwrap()) {
+            let mut agg_type = measure
+                .agg_type
+                .as_ref()
+                .unwrap_or(&"unknown".to_string())
+                .to_uppercase();
+            if agg_type == "NUMBER" {
+                agg_type = "MEASURE".to_string();
+            }
             subst.insert(
                 measure_out_var,
                 add_member_error(egraph, format!(
                     "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",
                     measure.get_real_name(),
-                    measure.agg_type.as_ref().unwrap_or(&"unknown".to_string()).to_uppercase(),
+                    agg_type,
                     call_agg_type.unwrap().to_uppercase(),
                 ), 1, expr, alias_to_cube),
             );
@@ -1881,22 +1961,6 @@ impl MemberRules {
 
     pub fn default_count_measure_name() -> String {
         "count".to_string()
-    }
-
-    pub fn parse_granularity(granularity: &ScalarValue, to_normalize: bool) -> Option<String> {
-        match granularity {
-            ScalarValue::Utf8(Some(granularity)) => {
-                if to_normalize {
-                    match granularity.to_lowercase().as_str() {
-                        "dow" | "doy" => Some("day".to_string()),
-                        _ => Some(granularity.clone()),
-                    }
-                } else {
-                    Some(granularity.clone())
-                }
-            }
-            _ => None,
-        }
     }
 
     fn push_down_cross_join_to_empty_scan(

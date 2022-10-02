@@ -3,6 +3,157 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
+
+
+### Bug Fixes
+
+* **databricks-driver:** using the ILIKE operator in the DatabricksFilter.likeIgnoreCase method ([#5334](https://github.com/cube-js/cube.js/issues/5334)) ([a81ca35](https://github.com/cube-js/cube.js/commit/a81ca3507124ec213ae0158918ac231ab9387b26))
+
+
+
+
+
+## [0.30.73](https://github.com/cube-js/cube.js/compare/v0.30.72...v0.30.73) (2022-09-19)
+
+
+### Reverts
+
+* Revert "feat: strategy without creating temp table (#5299)" ([0a3d646](https://github.com/cube-js/cube.js/commit/0a3d6464c660d34742cfd08570c25284e03a3d14)), closes [#5299](https://github.com/cube-js/cube.js/issues/5299)
+
+
+
+
+
+## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
+
+
+### Features
+
+* strategy without creating temp table ([#5299](https://github.com/cube-js/cube.js/issues/5299)) ([8e8f500](https://github.com/cube-js/cube.js/commit/8e8f500216e85676a971b62b57c5af0e48c6a9f9))
+
+
+
+
+
+## [0.30.71](https://github.com/cube-js/cube.js/compare/v0.30.70...v0.30.71) (2022-09-16)
+
+
+### Bug Fixes
+
+* **@cubesj-backend/databricks-driver:** Incorrect escaping of CSV passed to Cube Store -- Can't parse timestamp errors ([21b139c](https://github.com/cube-js/cube.js/commit/21b139ce84a3e6df223338f272f00ea1b2143a1c))
+
+
+
+
+
+## [0.30.70](https://github.com/cube-js/cube.js/compare/v0.30.69...v0.30.70) (2022-09-14)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.69](https://github.com/cube-js/cube.js/compare/v0.30.68...v0.30.69) (2022-09-13)
+
+
+### Bug Fixes
+
+* **databricks-driver:** remove env user agent ([#5286](https://github.com/cube-js/cube.js/issues/5286)) ([cb903bb](https://github.com/cube-js/cube.js/commit/cb903bbfacdb6cf9e4f624b08433142c5c416d4a))
+* migrate base driver to ts ([#5233](https://github.com/cube-js/cube.js/issues/5233)) ([c24f545](https://github.com/cube-js/cube.js/commit/c24f5450d68896e06ef6830d9348c0370c22b34c))
+
+
+### Features
+
+* **base-driver:** Split BaseDriver to @cubejs-backend/base-driver ([#5283](https://github.com/cube-js/cube.js/issues/5283)) ([ca7f9d2](https://github.com/cube-js/cube.js/commit/ca7f9d280c3518e012683c23b82175ec1f96d2a8))
+
+
+
+
+
+## [0.30.67](https://github.com/cube-js/cube.js/compare/v0.30.66...v0.30.67) (2022-09-09)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.66](https://github.com/cube-js/cube.js/compare/v0.30.65...v0.30.66) (2022-09-08)
+
+
+### Bug Fixes
+
+* driver's constructor parameters initializers ([#5258](https://github.com/cube-js/cube.js/issues/5258)) ([08324a5](https://github.com/cube-js/cube.js/commit/08324a50c29d8f1dad138bfdc1396038cd7ae462))
+
+
+
+
+
+## [0.30.63](https://github.com/cube-js/cube.js/compare/v0.30.62...v0.30.63) (2022-09-05)
+
+
+### Bug Fixes
+
+* **databricks-driver:** add deprecation of token in jdbc connection string ([#5208](https://github.com/cube-js/cube.js/issues/5208)) ([e59d72c](https://github.com/cube-js/cube.js/commit/e59d72cce23fdcb8a2eb6fa076ca13ace4d75a27))
+
+
+
+
+
+## [0.30.61](https://github.com/cube-js/cube.js/compare/v0.30.60...v0.30.61) (2022-09-01)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.60](https://github.com/cube-js/cube.js/compare/v0.30.59...v0.30.60) (2022-08-28)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.57](https://github.com/cube-js/cube.js/compare/v0.30.56...v0.30.57) (2022-08-25)
+
+
+### Bug Fixes
+
+* **databricks-jdbc:** databricks multiple downloads of jar ([#5152](https://github.com/cube-js/cube.js/issues/5152)) ([ccb87bc](https://github.com/cube-js/cube.js/commit/ccb87bcbcf717cde530cb47c5442b0a58892bdef))
+* **databricks-jdbc:** databricks user-agent ([#5144](https://github.com/cube-js/cube.js/issues/5144)) ([a3a8b89](https://github.com/cube-js/cube.js/commit/a3a8b89e0fd83ffae87325dad85f7e9b7060481f))
+
+
+
+
+
+## [0.30.53](https://github.com/cube-js/cube.js/compare/v0.30.52...v0.30.53) (2022-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.51](https://github.com/cube-js/cube.js/compare/v0.30.50...v0.30.51) (2022-08-17)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.30.50](https://github.com/cube-js/cube.js/compare/v0.30.49...v0.30.50) (2022-08-16)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
 ## [0.30.47](https://github.com/cube-js/cube.js/compare/v0.30.46...v0.30.47) (2022-08-12)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

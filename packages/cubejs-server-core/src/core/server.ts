@@ -8,7 +8,7 @@ import { ApiGateway, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
   createCancelableInterval, formatDuration, getAnonymousId,
-  getEnv, getRealType, internalExceptions, track,
+  getEnv, assertDataSource, getRealType, internalExceptions, track,
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication } from 'express';
@@ -97,8 +97,6 @@ export class CubejsServerCore {
   public readonly repository: FileRepository;
 
   protected devServer: DevServer | undefined;
-
-  protected readonly driversStorage: Map<string, BaseDriver> = new Map();
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
@@ -723,6 +721,7 @@ export class CubejsServerCore {
     context: DriverContext,
     options?: OrchestratorInitedOptions,
   ): Promise<BaseDriver> {
+    // TODO (buntarb): this works fine without multiple data sources.
     if (!this.driver) {
       const driver = await this.resolveDriver(context, options);
       await driver.testConnection(); // TODO mutex
@@ -738,24 +737,20 @@ export class CubejsServerCore {
     context: DriverContext,
     options?: OrchestratorInitedOptions,
   ): Promise<BaseDriver> {
-    if (!this.driversStorage.has(context.dataSource)) {
-      const val = await this.options.driverFactory(context);
-      if (isDriver(val)) {
-        this.driversStorage.set(context.dataSource, <BaseDriver>val);
-      } else {
-        const { type, ...rest } = <DriverConfig>val;
-        const opts = Object.keys(rest).length
-          ? rest
-          : {
-            maxPoolSize: await CubejsServerCore.getDriverMaxPool(context, options),
-          };
-        this.driversStorage.set(
-          context.dataSource,
-          CubejsServerCore.createDriver(type, opts),
-        );
-      }
+    const val = await this.options.driverFactory(context);
+    if (isDriver(val)) {
+      return <BaseDriver>val;
+    } else {
+      const { type, ...rest } = <DriverConfig>val;
+      const opts = Object.keys(rest).length
+        ? rest
+        : {
+          maxPoolSize:
+            await CubejsServerCore.getDriverMaxPool(context, options),
+        };
+      opts.dataSource = assertDataSource(context.dataSource);
+      return CubejsServerCore.createDriver(type, opts);
     }
-    return this.driversStorage.get(context.dataSource);
   }
 
   public async testConnections() {

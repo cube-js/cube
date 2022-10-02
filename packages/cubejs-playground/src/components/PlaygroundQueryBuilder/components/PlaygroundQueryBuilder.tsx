@@ -16,7 +16,8 @@ import { Col, Row, Space } from 'antd';
 import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
-import { Card, FatalError } from '../../../atoms';
+import { Card } from '../../../atoms';
+import { FatalError } from '../../../components/Error/FatalError';
 import ChartContainer from '../../../ChartContainer';
 import { SectionHeader, SectionRow } from '../../../components';
 import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
@@ -287,6 +288,7 @@ export function PlaygroundQueryBuilder({
         query,
         error,
         metaError,
+        richMetaError,
         metaErrorStack,
         meta,
         isQueryPresent,
@@ -313,7 +315,7 @@ export function PlaygroundQueryBuilder({
         availableFilterMembers,
       }) => {
         let parsedDateRange;
-
+        
         if (dryRunResponse) {
           const { timeDimensions = [] } = dryRunResponse.pivotQuery || {};
           parsedDateRange = timeDimensions[0]?.dateRange;
@@ -478,9 +480,9 @@ export function PlaygroundQueryBuilder({
               style={{ margin: 0 }}
             >
               <Col span={24}>
-                {!isQueryPresent && metaError ? (
+                {!isQueryPresent && richMetaError ? (
                   <Card>
-                    <FatalError error={metaError} stack={metaErrorStack} />
+                    <FatalError error={richMetaError} stack={metaErrorStack} />
                   </Card>
                 ) : null}
 
@@ -526,8 +528,8 @@ export function PlaygroundQueryBuilder({
                     chartLibraries={frameworkChartLibraries}
                     isFetchingMeta={isFetchingMeta}
                     render={({ framework }) => {
-                      if (metaError) {
-                        return <FatalError error={metaError} stack={metaErrorStack} />;
+                      if (richMetaError) {
+                        return <FatalError error={richMetaError} stack={metaErrorStack} />;
                       }
 
                       return (

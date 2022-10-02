@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.30.74](https://github.com/cube-js/cube.js/compare/v0.30.73...v0.30.74) (2022-09-20)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.30.69](https://github.com/cube-js/cube.js/compare/v0.30.68...v0.30.69) (2022-09-13)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.30.64](https://github.com/cube-js/cube.js/compare/v0.30.63...v0.30.64) (2022-09-07)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.30.60](https://github.com/cube-js/cube.js/compare/v0.30.59...v0.30.60) (2022-08-28)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
 ## [0.30.46](https://github.com/cube-js/cube.js/compare/v0.30.45...v0.30.46) (2022-08-10)
 
 

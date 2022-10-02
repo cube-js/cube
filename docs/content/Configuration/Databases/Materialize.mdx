@@ -24,13 +24,15 @@ CUBEJS_DB_PASS=materialize
 
 ## Environment Variables
 
-| Environment Variable | Description                                                             | Possible Values           | Required |
-| -------------------- | ----------------------------------------------------------------------- | ------------------------- | :------: |
-| `CUBEJS_DB_HOST`     | The host URL for a database                                             | A valid database host URL |    ✅    |
-| `CUBEJS_DB_PORT`     | The port for the database connection                                    | A valid port number       |    ✅    |
-| `CUBEJS_DB_NAME`     | The name of the database to connect to                                  | A valid database name     |    ✅    |
-| `CUBEJS_DB_USER`     | The username used to connect to the database                            | A valid database username |    ✅    |
-| `CUBEJS_DB_PASS`     | The password used to connect to the database                            | A valid database password |    ✅    |
+| Environment Variable | Description                                                                         | Possible Values           | Required |
+| -------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
+| `CUBEJS_DB_HOST`     | The host URL for a database                                                         | A valid database host URL |    ✅    |
+| `CUBEJS_DB_PORT`     | The port for the database connection                                                | A valid port number       |    ✅    |
+| `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name     |    ✅    |
+| `CUBEJS_DB_USER`     | The username used to connect to the database                                        | A valid database username |    ✅    |
+| `CUBEJS_DB_PASS`     | The password used to connect to the database                                        | A valid database password |    ✅    |
+| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the database. Default is `2` | A valid number            |    ❌    |
+| `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |
 
 ## SSL
 

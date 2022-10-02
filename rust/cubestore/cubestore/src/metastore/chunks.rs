@@ -21,6 +21,7 @@ impl Chunk {
             in_memory,
             created_at: Some(Utc::now()),
             oldest_insert_at: Some(Utc::now()),
+            deactivated_at: None,
             suffix: Some(
                 String::from_utf8(thread_rng().sample_iter(&Alphanumeric).take(8).collect())
                     .unwrap()
@@ -79,6 +80,7 @@ impl Chunk {
     pub fn deactivate(&self) -> Chunk {
         let mut to_update = self.clone();
         to_update.active = false;
+        to_update.deactivated_at = Some(Utc::now());
         to_update
     }
 
@@ -100,6 +102,10 @@ impl Chunk {
 
     pub fn oldest_insert_at(&self) -> &Option<DateTime<Utc>> {
         &self.oldest_insert_at
+    }
+
+    pub fn deactivated_at(&self) -> &Option<DateTime<Utc>> {
+        &self.deactivated_at
     }
 
     pub fn suffix(&self) -> &Option<String> {

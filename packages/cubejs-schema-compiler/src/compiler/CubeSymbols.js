@@ -133,23 +133,36 @@ export class CubeSymbols {
   transformPreAggregations(preAggregations) {
     // eslint-disable-next-line no-restricted-syntax
     for (const preAggregation of Object.values(preAggregations)) {
-      // Rollup is a default type for pre-aggregations
-      if (!preAggregation.type) {
-        preAggregation.type = 'rollup';
-      }
+      // We don't want to set the defaults for the empty pre-aggs because
+      // we want to throw instead.
+      if (Object.keys(preAggregation).length > 0) {
+        // Rollup is a default type for pre-aggregations
+        if (!preAggregation.type) {
+          preAggregation.type = 'rollup';
+        }
 
-      if (preAggregation.scheduledRefresh === undefined) {
-        if (preAggregation.type === 'rollupJoin') {
-          preAggregation.scheduledRefresh = false;
-        } else {
+        if (preAggregation.scheduledRefresh === undefined && preAggregation.type !== 'rollupJoin' && preAggregation.type !== 'rollupLambda') {
           preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
         }
-      }
 
-      if (preAggregation.external === undefined) {
-        preAggregation.external =
-          ['rollup', 'rollupJoin'].includes(preAggregation.type) &&
-          getEnv('externalDefault');
+        if (preAggregation.external === undefined && preAggregation.type !== 'rollupLambda') {
+          preAggregation.external =
+            // TODO remove rollupJoin from this list and update validation
+            ['rollup', 'rollupJoin'].includes(preAggregation.type) &&
+            getEnv('externalDefault');
+        }
+
+        if (preAggregation.indexes) {
+          this.transformPreAggregationIndexes(preAggregation.indexes);
+        }
+      }
+    }
+  }
+
+  transformPreAggregationIndexes(indexes) {
+    for (const index of Object.values(indexes)) {
+      if (!index.type) {
+        index.type = 'regular';
       }
     }
   }

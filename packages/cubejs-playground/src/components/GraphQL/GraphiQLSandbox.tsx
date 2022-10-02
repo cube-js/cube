@@ -1,8 +1,6 @@
 import { Meta, Query } from '@cubejs-client/core';
 import { createGraphiQLFetcher } from '@graphiql/toolkit';
 import GraphiQL from 'graphiql';
-import gqlParser from 'prettier/parser-graphql';
-import { format } from 'prettier/standalone';
 import styled from 'styled-components';
 import { useMemo } from 'react';
 import 'graphiql/graphiql.min.css';
@@ -83,16 +81,7 @@ export default function GraphiQLSandbox({
 
     try {
       const converter = new CubeGraphQLConverter(query, types);
-      const gqlQuery = converter.convert();
-
-      try {
-        return format(gqlQuery, {
-          parser: 'graphql',
-          plugins: [gqlParser],
-        });
-      } catch (_) {
-        return gqlQuery;
-      }
+      return converter.convert().replace('{', ' { ').replace('}', ' } ');
     } catch (error) {
       return `# ${error}\n`;
     }

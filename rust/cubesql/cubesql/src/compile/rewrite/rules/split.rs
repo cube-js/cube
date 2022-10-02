@@ -1,17 +1,18 @@
+use super::utils;
 use crate::{
     compile::{
         engine::provider::CubeContext,
         rewrite::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, column_expr, cube_scan, fun_expr,
-            inner_aggregate_split_replacer, literal_expr, literal_string, original_expr_name,
-            outer_aggregate_split_replacer, outer_projection_split_replacer, projection,
-            projection_expr, projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
-            rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
-            udf_expr, AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, ColumnExprColumn,
-            CubeScanAliasToCube, InnerAggregateSplitReplacerAliasToCube, LiteralExprValue,
-            LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
+            binary_expr, cast_expr, cast_expr_explicit, column_expr, cube_scan, fun_expr,
+            inner_aggregate_split_replacer, literal_expr, literal_number, literal_string,
+            original_expr_name, outer_aggregate_split_replacer, outer_projection_split_replacer,
+            projection, projection_expr, projection_expr_empty_tail, rewrite,
+            rewriter::RewriteRules, rules::members::MemberRules, transforming_chain_rewrite,
+            transforming_rewrite, udf_expr, AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp,
+            ColumnExprColumn, CubeScanAliasToCube, InnerAggregateSplitReplacerAliasToCube,
+            LiteralExprValue, LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
             OuterProjectionSplitReplacerAliasToCube, ProjectionAlias,
         },
     },
@@ -19,6 +20,7 @@ use crate::{
     var, var_iter, CubeError,
 };
 use datafusion::{
+    arrow::datatypes::DataType as ArrowDataType,
     logical_plan::{Column, DFSchema, Operator},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
@@ -339,8 +341,72 @@ impl RewriteRules for SplitRules {
                 outer_aggregate_split_replacer(column_expr("?column"), "?cube"),
                 column_expr("?column"),
             ),
-            // Date trunc
+            // Literal rules
             rewrite(
+                "split-push-down-literal-inner-replacer",
+                inner_aggregate_split_replacer(literal_expr("?expr"), "?cube"),
+                literal_expr("?expr"),
+            ),
+            rewrite(
+                "split-push-down-literal-outer-replacer",
+                outer_projection_split_replacer(literal_expr("?expr"), "?cube"),
+                literal_expr("?expr"),
+            ),
+            rewrite(
+                "split-push-down-literal-outer-aggr-replacer",
+                outer_aggregate_split_replacer(literal_expr("?expr"), "?cube"),
+                literal_expr("?expr"),
+            ),
+            // AggFun with literal
+            transforming_rewrite(
+                "split-push-down-agg-fun-literal-inner-replacer",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr(
+                        "?fun",
+                        vec![cast_expr(literal_expr("?expr"), "?data_type")],
+                        "?distinct",
+                    ),
+                    "?cube",
+                ),
+                literal_expr("?expr"),
+                self.transform_aggr_fun_with_literal("?fun", "?expr"),
+            ),
+            transforming_rewrite(
+                "split-push-down-agg-fun-literal-outer-replacer",
+                outer_projection_split_replacer(
+                    agg_fun_expr(
+                        "?fun",
+                        vec![cast_expr(literal_expr("?expr"), "?data_type")],
+                        "?distinct",
+                    ),
+                    "?cube",
+                ),
+                agg_fun_expr(
+                    "?fun",
+                    vec![cast_expr(literal_expr("?expr"), "?data_type")],
+                    "?distinct",
+                ),
+                self.transform_aggr_fun_with_literal("?fun", "?expr"),
+            ),
+            transforming_rewrite(
+                "split-push-down-agg-fun-literal-outer-aggr-replacer",
+                outer_aggregate_split_replacer(
+                    agg_fun_expr(
+                        "?fun",
+                        vec![cast_expr(literal_expr("?expr"), "?data_type")],
+                        "?distinct",
+                    ),
+                    "?cube",
+                ),
+                agg_fun_expr(
+                    "?fun",
+                    vec![cast_expr(literal_expr("?expr"), "?data_type")],
+                    "?distinct",
+                ),
+                self.transform_aggr_fun_with_literal("?fun", "?expr"),
+            ),
+            // Date trunc
+            transforming_rewrite(
                 "split-push-down-date-trunc-inner-replacer",
                 inner_aggregate_split_replacer(
                     fun_expr(
@@ -351,8 +417,13 @@ impl RewriteRules for SplitRules {
                 ),
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
+                    vec![
+                        literal_expr("?rewritten_granularity"),
+                        column_expr("?column"),
+                    ],
                 ),
+                // To validate & de-aliasing granularity
+                self.split_date_trunc("?granularity", "?rewritten_granularity"),
             ),
             transforming_chain_rewrite(
                 "split-push-down-date-trunc-outer-aggr-replacer",
@@ -457,6 +528,7 @@ impl RewriteRules for SplitRules {
                     false,
                 ),
             ),
+            // DatePart ("?expr", DateTrunc)
             transforming_chain_rewrite(
                 "split-push-down-date-part-with-date-trunc-inner-replacer",
                 inner_aggregate_split_replacer(
@@ -612,6 +684,327 @@ impl RewriteRules for SplitRules {
                     Some("?alias"),
                     false,
                 ),
+            ),
+            // (DATEDIFF(day, DATE '1970-01-01', "ta_1"."createdAt") + 3) % 7) + 1)
+            transforming_chain_rewrite(
+                "split-push-down-dow-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            binary_expr(
+                                udf_expr(
+                                    "datediff",
+                                    vec![
+                                        literal_string("day"),
+                                        cast_expr_explicit(
+                                            literal_string("1970-01-01"),
+                                            ArrowDataType::Date32,
+                                        ),
+                                        column_expr("?column"),
+                                    ],
+                                ),
+                                "+",
+                                literal_number(3),
+                            ),
+                            "%",
+                            literal_number(7),
+                        ),
+                        "+",
+                        literal_number(1),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("day"), column_expr("?column")],
+                    ),
+                    "?outer_alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?outer_alias",
+                    "?outer_column",
+                ),
+            ),
+            // (DATEDIFF(day, DATE '1970-01-01', "ta_1"."createdAt") + 3) % 7) + 1)
+            transforming_chain_rewrite(
+                "split-push-down-dow-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            binary_expr(
+                                udf_expr(
+                                    "datediff",
+                                    vec![
+                                        literal_string("day"),
+                                        cast_expr_explicit(
+                                            literal_string("1970-01-01"),
+                                            ArrowDataType::Date32,
+                                        ),
+                                        column_expr("?column"),
+                                    ],
+                                ),
+                                "+",
+                                literal_number(3),
+                            ),
+                            "%",
+                            literal_number(7),
+                        ),
+                        "+",
+                        literal_number(1),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DatePart",
+                        vec![literal_string("dow"), column_expr("?outer_column")],
+                    ),
+                    "?outer_alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?outer_alias",
+                    "?outer_column",
+                ),
+            ),
+            // (DATEDIFF(day, DATEADD(month, CAST(((EXTRACT(MONTH FROM "ta_1"."createdAt") - 1) * -1) AS int), CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."createdAt") * 100) + EXTRACT(MONTH FROM "ta_1"."createdAt")) * 100) + 1) AS varchar) AS date)), "ta_1"."createdAt")
+            transforming_chain_rewrite(
+                "split-push-down-doy-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        udf_expr(
+                            "datediff",
+                            vec![
+                                literal_string("day"),
+                                udf_expr(
+                                    "dateadd",
+                                    vec![
+                                        literal_string("month"),
+                                        cast_expr_explicit(
+                                            binary_expr(
+                                                binary_expr(
+                                                    fun_expr(
+                                                        "DatePart",
+                                                        vec![
+                                                            literal_string("MONTH"),
+                                                            column_expr("?column"),
+                                                        ],
+                                                    ),
+                                                    "-",
+                                                    literal_number(1),
+                                                ),
+                                                "*",
+                                                literal_number(-1),
+                                            ),
+                                            ArrowDataType::Int32,
+                                        ),
+                                        cast_expr_explicit(
+                                            cast_expr_explicit(
+                                                binary_expr(
+                                                    binary_expr(
+                                                        binary_expr(
+                                                            binary_expr(
+                                                                fun_expr(
+                                                                    "DatePart",
+                                                                    vec![
+                                                                        literal_string("YEAR"),
+                                                                        column_expr("?column"),
+                                                                    ],
+                                                                ),
+                                                                "*",
+                                                                literal_number(100),
+                                                            ),
+                                                            "+",
+                                                            fun_expr(
+                                                                "DatePart",
+                                                                vec![
+                                                                    literal_string("MONTH"),
+                                                                    column_expr("?column"),
+                                                                ],
+                                                            ),
+                                                        ),
+                                                        "*",
+                                                        literal_number(100),
+                                                    ),
+                                                    "+",
+                                                    literal_number(1),
+                                                ),
+                                                ArrowDataType::Utf8,
+                                            ),
+                                            ArrowDataType::Date32,
+                                        ),
+                                    ],
+                                ),
+                                column_expr("?column"),
+                            ],
+                        ),
+                        "+",
+                        literal_number(1),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("day"), column_expr("?column")],
+                    ),
+                    "?outer_alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?outer_alias",
+                    "?outer_column",
+                ),
+            ),
+            // (DATEDIFF(day, DATEADD(month, CAST(((EXTRACT(MONTH FROM "ta_1"."createdAt") - 1) * -1) AS int), CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."createdAt") * 100) + EXTRACT(MONTH FROM "ta_1"."createdAt")) * 100) + 1) AS varchar) AS date)), "ta_1"."createdAt")
+            transforming_chain_rewrite(
+                "split-push-down-doy-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        udf_expr(
+                            "datediff",
+                            vec![
+                                literal_string("day"),
+                                udf_expr(
+                                    "dateadd",
+                                    vec![
+                                        literal_string("month"),
+                                        cast_expr_explicit(
+                                            binary_expr(
+                                                binary_expr(
+                                                    fun_expr(
+                                                        "DatePart",
+                                                        vec![
+                                                            literal_string("MONTH"),
+                                                            column_expr("?column"),
+                                                        ],
+                                                    ),
+                                                    "-",
+                                                    literal_number(1),
+                                                ),
+                                                "*",
+                                                literal_number(-1),
+                                            ),
+                                            ArrowDataType::Int32,
+                                        ),
+                                        cast_expr_explicit(
+                                            cast_expr_explicit(
+                                                binary_expr(
+                                                    binary_expr(
+                                                        binary_expr(
+                                                            binary_expr(
+                                                                fun_expr(
+                                                                    "DatePart",
+                                                                    vec![
+                                                                        literal_string("YEAR"),
+                                                                        column_expr("?column"),
+                                                                    ],
+                                                                ),
+                                                                "*",
+                                                                literal_number(100),
+                                                            ),
+                                                            "+",
+                                                            fun_expr(
+                                                                "DatePart",
+                                                                vec![
+                                                                    literal_string("MONTH"),
+                                                                    column_expr("?column"),
+                                                                ],
+                                                            ),
+                                                        ),
+                                                        "*",
+                                                        literal_number(100),
+                                                    ),
+                                                    "+",
+                                                    literal_number(1),
+                                                ),
+                                                ArrowDataType::Utf8,
+                                            ),
+                                            ArrowDataType::Date32,
+                                        ),
+                                    ],
+                                ),
+                                column_expr("?column"),
+                            ],
+                        ),
+                        "+",
+                        literal_number(1),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DatePart",
+                        vec![literal_string("doy"), column_expr("?outer_column")],
+                    ),
+                    "?outer_alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?outer_alias",
+                    "?outer_column",
+                ),
+            ),
+            //
+            rewrite(
+                "split-push-down-to-char-date-trunc-literal-inner-replacer",
+                inner_aggregate_split_replacer(
+                    udf_expr(
+                        "to_char",
+                        vec![
+                            cast_expr(
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![
+                                        literal_expr("?granularity"),
+                                        cast_expr(
+                                            cast_expr(literal_expr("?literal"), "?data_type_inner"),
+                                            "?data_type_outer",
+                                        ),
+                                    ],
+                                ),
+                                "?date_trunc_data_type",
+                            ),
+                            literal_expr("?format"),
+                        ],
+                    ),
+                    "?cube",
+                ),
+                literal_expr("?literal"),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-to-char-date-trunc-literal-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?cube"),
+                vec![(
+                    "?expr",
+                    udf_expr(
+                        "to_char",
+                        vec![
+                            cast_expr(
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![
+                                        literal_expr("?granularity"),
+                                        cast_expr(
+                                            cast_expr(literal_expr("?literal"), "?data_type_inner"),
+                                            "?data_type_outer",
+                                        ),
+                                    ],
+                                ),
+                                "?date_trunc_data_type",
+                            ),
+                            literal_expr("?format"),
+                        ],
+                    ),
+                )],
+                alias_expr(literal_expr("?literal"), "?alias"),
+                self.make_alias_like_expression("?expr", "?alias"),
             ),
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-with-date-trunc-inner-aggr-replacer",
@@ -974,6 +1367,20 @@ impl RewriteRules for SplitRules {
                     ],
                 ),
             ),
+            // CharacterLength
+            rewrite(
+                "split-push-down-char-length-inner-replacer",
+                inner_aggregate_split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube"),
+                inner_aggregate_split_replacer("?expr", "?cube"),
+            ),
+            rewrite(
+                "split-push-down-char-length-outer-aggr-replacer",
+                outer_aggregate_split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube"),
+                fun_expr(
+                    "CharacterLength",
+                    vec![outer_aggregate_split_replacer("?expr", "?cube")],
+                ),
+            ),
         ]
     }
 }
@@ -982,6 +1389,52 @@ impl SplitRules {
     pub fn new(cube_context: Arc<CubeContext>) -> Self {
         Self {
             cube_context: cube_context,
+        }
+    }
+
+    pub fn transform_original_expr_to_alias_and_column(
+        &self,
+        original_expr_var: &'static str,
+        out_alias_expr_var: &'static str,
+        out_column_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let original_expr_var = var!(original_expr_var);
+        let out_alias_expr_var = var!(out_alias_expr_var);
+        let out_column_expr_var = var!(out_column_expr_var);
+
+        move |egraph, subst| {
+            let original_expr_id = subst[original_expr_var];
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )));
+
+            if let Ok(expr) = res {
+                // TODO unwrap
+                let name = expr.name(&DFSchema::empty()).unwrap();
+                let column = Column::from_name(name.to_string());
+
+                subst.insert(
+                    out_alias_expr_var,
+                    egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(name))),
+                );
+
+                subst.insert(
+                    out_column_expr_var,
+                    egraph.add(LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(
+                        column,
+                    ))),
+                );
+
+                return true;
+            }
+
+            false
         }
     }
 
@@ -1248,6 +1701,35 @@ impl SplitRules {
         }
     }
 
+    fn split_date_trunc(
+        &self,
+        granularity_var: &'static str,
+        out_granularity_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let granularity_var = var!(granularity_var);
+        let out_granularity_var = var!(out_granularity_var);
+
+        move |egraph, subst| {
+            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
+                let output_granularity = match utils::parse_granularity(granularity, false) {
+                    Some(g) => g,
+                    None => continue,
+                };
+
+                subst.insert(
+                    out_granularity_var,
+                    egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                        ScalarValue::Utf8(Some(output_granularity)),
+                    ))),
+                );
+
+                return true;
+            }
+
+            return false;
+        }
+    }
+
     fn split_binary(
         &self,
         binary_op_var: &'static str,
@@ -1510,6 +1992,63 @@ impl SplitRules {
                     }
                 }
             }
+            false
+        }
+    }
+
+    fn transform_aggr_fun_with_literal(
+        &self,
+        fun_expr_var: &'static str,
+        expr_val: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let fun_expr_var = var!(fun_expr_var);
+        let expr_val = var!(expr_val);
+        move |egraph, subst| {
+            for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
+                match fun {
+                    AggregateFunction::Count | AggregateFunction::Sum => (),
+                    _ => return true,
+                };
+
+                for expr in var_iter!(egraph[subst[expr_val]], LiteralExprValue) {
+                    match expr {
+                        ScalarValue::Utf8(None) | ScalarValue::LargeUtf8(None) => return true,
+                        _ => (),
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn make_alias_like_expression(
+        &self,
+        expr_val: &'static str,
+        alias_val: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_val = var!(alias_val);
+        let expr_val = var!(expr_val);
+        move |egraph, subst| {
+            let original_expr_id = subst[expr_val];
+            let res =
+                egraph[original_expr_id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .ok_or(CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )));
+            if let Ok(expr) = res {
+                let name = expr.name(&DFSchema::empty()).unwrap();
+                subst.insert(
+                    alias_val,
+                    egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(name))),
+                );
+                return true;
+            }
+
             false
         }
     }

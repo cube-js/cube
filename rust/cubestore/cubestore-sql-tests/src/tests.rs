@@ -52,6 +52,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("in_list", in_list),
         t("in_list_with_union", in_list_with_union),
         t("numeric_cast", numeric_cast),
+        t("cast_timestamp_to_utf8", cast_timestamp_to_utf8),
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
         t("timestamp_select", timestamp_select),
@@ -198,10 +199,13 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             planning_filter_index_selection,
         ),
         t("planning_aggregate_index", planning_aggregate_index),
+
         t("aggregate_index", aggregate_index),
         t("aggregate_index_hll", aggregate_index_hll),
+        t("aggregate_index_with_hll_bytes", aggregate_index_with_hll_bytes),
         t("aggregate_index_errors", aggregate_index_errors),
         t("inline_tables", inline_tables),
+        t("inline_tables_2x", inline_tables_2x),
         t("build_range_end", build_range_end),
     ];
 
@@ -901,6 +905,29 @@ async fn numeric_cast(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
+}
+
+async fn cast_timestamp_to_utf8(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.timestamps (id text, created timestamp)")
+        .await
+        .unwrap();
+
+    service.exec_query(
+        "INSERT INTO foo.timestamps (id, created) VALUES ('a', '2022-01-01T00:00:00Z'), ('b', '2021-01-01T00:00:00Z')"
+    ).await.unwrap();
+
+    let r = service
+        .exec_query("SELECT id, CAST(created AS VARCHAR) from foo.timestamps ORDER BY id ASC")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("a", "2022-01-01 00:00:00"), ("b", "2021-01-01 00:00:00"),])
+    );
 }
 
 async fn numbers_to_bool(service: Box<dyn SqlClient>) {
@@ -2228,15 +2255,17 @@ async fn create_table_with_location_and_hyperloglog_space_separated(service: Box
         file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
 
         file.write_all(
-            format!("0,02 0c 01 00 05 05 7b cf,{}\n", base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])).as_bytes(),
+            format!(
+                "0,02 0c 01 00 05 05 7b cf,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])
+            )
+            .as_bytes(),
         )
         .unwrap();
         file.write_all(
             format!(
                 "1,02 0c 01 00 15 15 7b ff,{}\n",
-                base64::encode(vec![
-                               0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff
-                ])
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff])
             )
             .as_bytes(),
         )
@@ -4450,24 +4479,24 @@ async fn rolling_window_query_timestamps_exceeded(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-        assert_eq!(
-            to_rows(&r),
-            rows(&[
-             (-5, None, None),
-             (-4, None, None),
-             (-3, None, None),
-             (-2, None, None),
-             (-1, None, None),
-             (0, None, None),
-             (1, None, None),
-             (2, None, None),
-             (3, None, None),
-             (4, Some("john"), Some(10)),
-             (4, Some("sara"), Some(7)),
-             (5, Some("john"), Some(19)),
-             (5, Some("sara"), Some(10))
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (-5, None, None),
+            (-4, None, None),
+            (-3, None, None),
+            (-2, None, None),
+            (-1, None, None),
+            (0, None, None),
+            (1, None, None),
+            (2, None, None),
+            (3, None, None),
+            (4, Some("john"), Some(10)),
+            (4, Some("sara"), Some(7)),
+            (5, Some("john"), Some(19)),
+            (5, Some("sara"), Some(10))
         ])
-        );
+    );
 }
 async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
@@ -5470,6 +5499,64 @@ async fn aggregate_index(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn aggregate_index_with_hll_bytes(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, hll bytes)
+                     AGGREGATIONS(merge(hll))
+                     AGGREGATE INDEX agg_index (a, b) 
+                     ",
+        )
+        .await
+        .unwrap();
+    let sparse = "X'020C0200C02FF58941D5F0C6'";
+    let dense = "X'030C004020000001000000000000000000000000000000000000050020000001030100000410000000004102100000000000000051000020000020003220000003102000000000001200042000000001000200000002000000100000030040000000010040003010000000000100002000000000000000000031000020000000000000000000100000200302000000000000000000001002000000000002204000000001000001000200400000000000001000020031100000000080000000002003000000100000000100110000000000000000000010000000000000000000000020000001320205000100000612000000000004100020100000000000000000001000000002200000100000001000001020000000000020000000000000001000010300060000010000000000070100003000000000000020000000000001000010000104000000000000000000101000100000001401000000000000000000000000000100010000000000000000000000000400020000000002002300010000000000040000041000200005100000000000001000000000100000203010000000000000000000000000001006000100000000000000300100001000100254200000000000101100040000000020000010000050000000501000000000101020000000010000000003000000000200000102100000000204007000000200010000033000000000061000000000000000000000000000000000100001000001000000013000000003000000000002000000000000010001000000000000000000020010000020000000100001000000000000001000103000000000000000000020020000001000000000100001000000000000000020220200200000001001000010100000000200000000000001000002000000011000000000101200000000000000000000000000000000000000100130000000000000000000100000120000300040000000002000000000000000000000100000000070000100000000301000000401200002020000000000601030001510000000000000110100000000000000000050000000010000100000000000000000100022000100000101054010001000000000000001000001000000002000000000100000000000021000001000002000000000100000000000000000000951000000100000000000000000000000000102000200000000000000010000010000000000100002000000000000000000010000000000000010000000010000000102010000000010520100000021010100000030000000000000000100000001000000022000330051000000100000000000040003020000010000020000100000013000000102020000000050000000020010000000000000000101200C000100000001200400000000010000001000000000100010000000001000001000000100000000010000000004000000002000013102000100000000000000000000000600000010000000000000020000000000001000000000030000000000000020000000001000001000000000010000003002000003000200070001001003030010000000003000000000000020000006000000000000000011000000010000200000000000500000000000000020500000000003000000000000000004000030000100000000103000001000000000000200002004200000020000000030000000000000000000000002000100000000000000002000000000000000010020101000000005250000010000000000023010000001000000000000500002001000123100030011000020001310600000000000021000023000003000000000000000001000000000000220200000000004040000020201000000010201000000000020000400010000050000000000000000000000010000020000000000000000000000000000000000102000010000000000000000000000002010000200200000000000000000000000000100000000000000000200400000000010000000000000000000000000000000010000200300000000000100110000000000000000000000000010000030000001000000000010000010200013000000000000200000001000001200010000000010000000000001000000000000100000000410000040000001000100010000100000002001010000000000000000001000000000000010000000000000000000000002000000000001100001000000001010000000000000002200000000004000000000000100010000000000600000000100300000000000000000000010000003000000000000000000310000010100006000010001000000000000001010101000100000000000000000000000000000201000000000000000700010000030000000000000021000000000000000001020000000030000100001000000000000000000000004010100000000000000000000004000000040100000040100100001000000000300000100000000010010000300000200000000000001302000000000000000000100100000400030000001001000100100002300000004030000002010000220100000000000002000000010010000000003010500000000300000000005020102000200000000000000020100000000000000000000000011000000023000000000010000101000000000000010020040200040000020000004000020000000001000000000100000200000010000000000030100010001000000100000000000600400000000002000000000000132000000900010000000030021400000000004100006000304000000000000010000106000001300020000'";
+
+    service
+        .exec_query(
+            &format!("INSERT INTO s.Orders (a, b, hll) VALUES (1, 10, {s}), \
+                                                   (2, 20, {d}), \
+                                                   (1, 10, {d}), \
+                                                   (2, 30, {s}), \
+                                                   (1, 10, {d}), \
+                                                   (2, 20, {s}) \
+                                                   ",
+                                                   s = sparse,
+                                                   d = dense
+                                                   ),
+        )
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT a, b, cardinality(merge(hll)) FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
+        .await
+        .unwrap();
+
+     assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::Int(1),
+                TableValue::Int(10),
+                TableValue::Int(657),
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(20),
+                TableValue::Int(657),
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(30),
+                TableValue::Int(2),
+            ],
+        ]
+    ); 
+
+}
+
 async fn aggregate_index_hll(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -5575,8 +5662,8 @@ async fn aggregate_index_errors(service: Box<dyn SqlClient>) {
 }
 
 async fn inline_tables(service: Box<dyn SqlClient>) {
-    let _ = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
-    let _ = service
+    service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    service
         .exec_query(
             "CREATE TABLE Foo.Persons (
                 ID int,
@@ -5653,7 +5740,7 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
         ]),
     ];
     let data = Arc::new(DataFrame::new(columns, rows.clone()));
-    let inline_tables = vec![InlineTable::new("Persons".to_string(), data)];
+    let inline_tables = vec![InlineTable::new(1000, "Persons".to_string(), data)];
 
     let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
     let result = service
@@ -5723,6 +5810,122 @@ async fn inline_tables(service: Box<dyn SqlClient>) {
                 TableValue::Null,
                 TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
             ]),
+        ]
+    );
+}
+
+async fn inline_tables_2x(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    service
+        .exec_query("CREATE TABLE Foo.Persons (ID int, First varchar(255), Last varchar(255))")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE Foo.Persons2 (ID int, First varchar(255), Last varchar(255))")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons
+            (ID, Last, First)
+            VALUES
+            (11, 'last 11', 'first 11'),
+            (12, 'last 12', 'first 12'),
+            (13, 'last 13', 'first 13')",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons2
+            (ID, Last, First)
+            VALUES
+            (31, 'last 31', 'first 31'),
+            (32, 'last 32', 'first 32'),
+            (33, 'last 33', 'first 33')",
+        )
+        .await
+        .unwrap();
+
+    let columns = vec![
+        Column::new("ID".to_string(), ColumnType::Int, 0),
+        Column::new("Last".to_string(), ColumnType::String, 1),
+        Column::new("First".to_string(), ColumnType::String, 2),
+    ];
+    let rows = vec![
+        Row::new(vec![
+            TableValue::Int(41),
+            TableValue::String("last 41".to_string()),
+            TableValue::String("first 41".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(42),
+            TableValue::String("last 42".to_string()),
+            TableValue::String("first 42".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(43),
+            TableValue::String("last 43".to_string()),
+            TableValue::String("first 43".to_string()),
+        ]),
+    ];
+    let rows2 = vec![
+        Row::new(vec![
+            TableValue::Int(21),
+            TableValue::String("last 21".to_string()),
+            TableValue::String("first 21".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(22),
+            TableValue::String("last 22".to_string()),
+            TableValue::String("first 22".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(23),
+            TableValue::String("last 23".to_string()),
+            TableValue::String("first 23".to_string()),
+        ]),
+    ];
+    let data = Arc::new(DataFrame::new(columns.clone(), rows.clone()));
+    let data2 = Arc::new(DataFrame::new(columns.clone(), rows2.clone()));
+    let inline_tables = vec![
+        InlineTable::new(1000, "Persons".to_string(), data),
+        InlineTable::new(1001, "Persons2".to_string(), data2),
+    ];
+
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
+    let result = service
+        .exec_query_with_context(
+            context,
+            r#"
+            SELECT Last
+            FROM (
+                SELECT ID, Last FROM Foo.Persons
+                UNION ALL SELECT ID, Last FROM Foo.Persons2
+                UNION ALL SELECT ID, Last FROM Persons
+                UNION ALL SELECT ID, Last FROM Persons2
+            )
+            ORDER BY Last
+        "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows().to_vec(),
+        vec![
+            Row::new(vec![TableValue::String("last 11".to_string())]),
+            Row::new(vec![TableValue::String("last 12".to_string())]),
+            Row::new(vec![TableValue::String("last 13".to_string())]),
+            Row::new(vec![TableValue::String("last 21".to_string())]),
+            Row::new(vec![TableValue::String("last 22".to_string())]),
+            Row::new(vec![TableValue::String("last 23".to_string())]),
+            Row::new(vec![TableValue::String("last 31".to_string())]),
+            Row::new(vec![TableValue::String("last 32".to_string())]),
+            Row::new(vec![TableValue::String("last 33".to_string())]),
+            Row::new(vec![TableValue::String("last 41".to_string())]),
+            Row::new(vec![TableValue::String("last 42".to_string())]),
+            Row::new(vec![TableValue::String("last 43".to_string())]),
         ]
     );
 }

@@ -6,7 +6,7 @@ use pg_srv::{
     protocol::{ErrorCode, ErrorResponse},
     BindValue, PgType,
 };
-use sqlparser::ast::{self, Expr, Ident, Value};
+use sqlparser::ast::{self, Expr, Function, FunctionArgExpr, Ident, Value};
 use std::{collections::HashMap, error::Error};
 
 use super::types::{ColumnFlags, ColumnType};
@@ -200,6 +200,7 @@ trait Visitor<'ast, E: Error> {
                 self.visit_identifier(field)?;
             }
             Expr::TypedString { .. } => (),
+            Expr::AtTimeZone { timestamp, .. } => self.visit_expr(timestamp)?,
         };
 
         Ok(())
@@ -764,7 +765,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
         } = expr
         {
             match data_type {
-                ast::DataType::Custom(name) => match name.to_string().as_str() {
+                ast::DataType::Custom(name) => match name.to_string().to_lowercase().as_str() {
                     "name" | "oid" | "information_schema.cardinal_number" | "regproc" => {
                         self.visit_expr(&mut *cast_expr)?;
 
@@ -784,6 +785,16 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                         self.visit_expr(&mut *cast_expr)?;
 
                         *data_type = ast::DataType::BigInt(None)
+                    }
+                    "float8" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::Double;
+                    }
+                    "bool" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        *data_type = ast::DataType::Boolean;
                     }
                     "timestamptz" => {
                         self.visit_expr(&mut *cast_expr)?;
@@ -833,6 +844,58 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                 _ => self.visit_expr(&mut *cast_expr)?,
             }
         };
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct RedshiftDatePartReplacer {}
+
+impl RedshiftDatePartReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result).unwrap();
+
+        result
+    }
+}
+
+impl<'ast> Visitor<'ast, ConnectionError> for RedshiftDatePartReplacer {
+    fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
+        let fn_name = fun.name.to_string().to_lowercase();
+        if !((fn_name == "datediff" || fn_name == "dateadd") && fun.args.len() == 3) {
+            return Ok(());
+        }
+
+        match &mut fun.args[0] {
+            ast::FunctionArg::Unnamed(arg) => match arg {
+                FunctionArgExpr::Expr(arg) => {
+                    let granularity_in_identifier = match arg {
+                        Expr::Identifier(ident) => ident.value.to_lowercase(),
+                        _ => return Ok(()),
+                    };
+
+                    match granularity_in_identifier.as_str() {
+                        "second" | "minute" | "hour" | "day" | "qtr" | "week" | "month"
+                        | "year" => {
+                            *arg =
+                                Expr::Value(Value::SingleQuotedString(granularity_in_identifier));
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        };
+
+        self.visit_function_args(&mut fun.args)?;
 
         Ok(())
     }
@@ -1024,6 +1087,37 @@ mod tests {
         run_cast_replacer(
             "SELECT CAST(1 + 1 as Regclass);",
             "SELECT __cube_regclass_cast(1 + 1)",
+        )?;
+
+        Ok(())
+    }
+
+    fn run_redshift_date_part_replacer(input: &str, output: &str) -> Result<(), CubeError> {
+        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+
+        let replacer = RedshiftDatePartReplacer::new();
+        let res = replacer.replace(&stmts[0]);
+
+        assert_eq!(res.to_string(), output);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_redshift_date_part_replacer() -> Result<(), CubeError> {
+        run_redshift_date_part_replacer(
+            r#"SELECT DATEDIFF(day, DATE '1970-01-01', "ta_1"."createdAt")"#,
+            r#"SELECT DATEDIFF('day', DATE '1970-01-01', "ta_1"."createdAt")"#,
+        )?;
+
+        run_redshift_date_part_replacer(
+            r#"SELECT DATEADD(week, '2009-01-01', '2009-12-31')"#,
+            r#"SELECT DATEADD('week', '2009-01-01', '2009-12-31')"#,
+        )?;
+
+        run_redshift_date_part_replacer(
+            r#"SELECT DATEDIFF(day, DATEADD(week, '2009-01-01', '2009-12-31'), "ta_1"."createdAt")"#,
+            r#"SELECT DATEDIFF('day', DATEADD('week', '2009-01-01', '2009-12-31'), "ta_1"."createdAt")"#,
         )?;
 
         Ok(())

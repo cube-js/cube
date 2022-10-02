@@ -79,7 +79,7 @@ checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 [[package]]
 name = "arrow"
 version = "11.1.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=5eec82b6bde95d824bb9f3721789c98e033f812f#5eec82b6bde95d824bb9f3721789c98e033f812f"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=0bc721700352afe8267dba82388b81deffc24095#0bc721700352afe8267dba82388b81deffc24095"
 dependencies = [
  "bitflags",
  "chrono",
@@ -632,7 +632,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=784cff5446bc48549235dcaa087418a49a550978#784cff5446bc48549235dcaa087418a49a550978"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
 dependencies = [
  "arrow",
  "chrono",
@@ -725,7 +725,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=784cff5446bc48549235dcaa087418a49a550978#784cff5446bc48549235dcaa087418a49a550978"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
 dependencies = [
  "ahash",
  "arrow",
@@ -757,7 +757,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=784cff5446bc48549235dcaa087418a49a550978#784cff5446bc48549235dcaa087418a49a550978"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
 dependencies = [
  "arrow",
  "ordered-float 2.10.0",
@@ -768,7 +768,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=784cff5446bc48549235dcaa087418a49a550978#784cff5446bc48549235dcaa087418a49a550978"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
 dependencies = [
  "async-trait",
  "chrono",
@@ -781,7 +781,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=784cff5446bc48549235dcaa087418a49a550978#784cff5446bc48549235dcaa087418a49a550978"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
 dependencies = [
  "ahash",
  "arrow",
@@ -792,7 +792,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=784cff5446bc48549235dcaa087418a49a550978#784cff5446bc48549235dcaa087418a49a550978"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
 dependencies = [
  "ahash",
  "arrow",
@@ -992,9 +992,9 @@ checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
 
 [[package]]
 name = "futures"
-version = "0.3.21"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f73fe65f54d1e12b726f517d3e2135ca3125a437b6d998caf1962961f7172d9e"
+checksum = "ab30e97ab6aacfe635fad58f22c2bb06c8b685f7421eb1e064a729e2a5f481fa"
 dependencies = [
  "futures-channel",
  "futures-core",
@@ -1007,9 +1007,9 @@ dependencies = [
 
 [[package]]
 name = "futures-channel"
-version = "0.3.21"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3083ce4b914124575708913bca19bfe887522d6e2e6d0952943f5eac4a74010"
+checksum = "2bfc52cbddcfd745bf1740338492bb0bd83d76c67b445f91c5fb29fae29ecaa1"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -1017,15 +1017,15 @@ dependencies = [
 
 [[package]]
 name = "futures-core"
-version = "0.3.21"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c09fd04b7e4073ac7156a9539b57a484a8ea920f79c7c675d05d289ab6110d3"
+checksum = "d2acedae88d38235936c3922476b10fced7b2b68136f5e3c03c2d5be348a1115"
 
 [[package]]
 name = "futures-executor"
-version = "0.3.21"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9420b90cfa29e327d0429f19be13e7ddb68fa1cccb09d65e5706b8c7a749b8a6"
+checksum = "1d11aa21b5b587a64682c0094c2bdd4df0076c5324961a40cc3abd7f37930528"
 dependencies = [
  "futures-core",
  "futures-task",
@@ -1034,15 +1034,15 @@ dependencies = [
 
 [[package]]
 name = "futures-io"
-version = "0.3.21"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc4045962a5a5e935ee2fdedaa4e08284547402885ab326734432bed5d12966b"
+checksum = "93a66fc6d035a26a3ae255a6d2bca35eda63ae4c5512bef54449113f7a1228e5"
 
 [[package]]
 name = "futures-macro"
-version = "0.3.21"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33c1e13800337f4d4d7a316bf45a567dbcb6ffe087f16424852d97e97a91f512"
+checksum = "0db9cce532b0eae2ccf2766ab246f114b56b9cf6d445e00c2549fbc100ca045d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1051,21 +1051,21 @@ dependencies = [
 
 [[package]]
 name = "futures-sink"
-version = "0.3.21"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21163e139fa306126e6eedaf49ecdb4588f939600f0b1e770f4205ee4b7fa868"
+checksum = "ca0bae1fe9752cf7fd9b0064c674ae63f97b37bc714d745cbde0afb7ec4e6765"
 
 [[package]]
 name = "futures-task"
-version = "0.3.21"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c66a976bf5909d801bbef33416c41372779507e7a6b3a5e25e4749c58f776a"
+checksum = "842fc63b931f4056a24d59de13fb1272134ce261816e063e634ad0c15cdc5306"
 
 [[package]]
 name = "futures-util"
-version = "0.3.21"
+version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8b7abd5d659d9b90c8cba917f6ec750a74e2dc23902ef9cd4cc8c8b22e6036a"
+checksum = "f0828a5471e340229c11c77ca80017937ce3c58cb788a17e5f1c2d5c485a9577"
 dependencies = [
  "futures-channel",
  "futures-core",
@@ -2071,7 +2071,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "11.1.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=5eec82b6bde95d824bb9f3721789c98e033f812f#5eec82b6bde95d824bb9f3721789c98e033f812f"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=0bc721700352afe8267dba82388b81deffc24095#0bc721700352afe8267dba82388b81deffc24095"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -2121,7 +2121,7 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
 name = "pg-srv"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2919,7 +2919,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "sqlparser"
 version = "0.16.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=ca8131c36325e86fd733f337673e6cae5e946711#ca8131c36325e86fd733f337673e6cae5e946711"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=19f730c8274b39f55224824c98687dc55aa95c92#19f730c8274b39f55224824c98687dc55aa95c92"
 dependencies = [
  "log",
 ]
@@ -3069,18 +3069,18 @@ checksum = "507e9898683b6c43a9aa55b64259b721b52ba226e0f3779137e50ad114a4c90b"
 
 [[package]]
 name = "thiserror"
-version = "1.0.30"
+version = "1.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "854babe52e4df1653706b98fcfc05843010039b406875930a70e4d9644e5c417"
+checksum = "f5f6586b7f764adc0231f4c79be7b920e766bb2f3e51b3661cdb263828f19994"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.30"
+version = "1.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa32fd3f627f367fe16f893e2597ae3c05020f8bba2666a4e6ea73d377e5714b"
+checksum = "12bafc5b54507e0149cdf1b145a5d80ab80a90bcd9275df43d4fff68460f6c21"
 dependencies = [
  "proc-macro2",
  "quote",

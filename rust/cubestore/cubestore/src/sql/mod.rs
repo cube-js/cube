@@ -111,14 +111,15 @@ pub struct QueryPlans {
 
 #[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug)]
 pub struct InlineTable {
+    pub id: u64,
     pub name: String,
     pub data: Arc<DataFrame>,
 }
 pub type InlineTables = Vec<InlineTable>;
 
 impl InlineTable {
-    pub fn new(name: String, data: Arc<DataFrame>) -> Self {
-        Self { name, data }
+    pub fn new(id: u64, name: String, data: Arc<DataFrame>) -> Self {
+        Self { id, name, data }
     }
 }
 
@@ -1159,6 +1160,7 @@ impl SqlService for SqlServiceImpl {
                                         .map(|p| (p.partition.get_id(), RowFilter::default()))
                                 })
                                 .collect(),
+                            context.inline_tables.into_iter().map(|i| i.id).collect(),
                         );
                         let mut mocked_names = HashMap::new();
                         for (_, f, _) in worker_plan.files_to_download() {
@@ -1655,6 +1657,7 @@ mod tests {
     use crate::cluster::MockCluster;
     use crate::config::{Config, FileStoreProvider};
     use crate::import::MockImportService;
+    use crate::metastore::metastore_fs::RocksMetaStoreFs;
     use crate::metastore::RocksMetaStore;
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
@@ -1683,7 +1686,11 @@ mod tests {
                 Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+            let meta_store = RocksMetaStore::new(
+                path,
+                RocksMetaStoreFs::new(remote_fs.clone()),
+                config.config_obj(),
+            );
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let store = ChunkStore::new(
@@ -1737,7 +1744,11 @@ mod tests {
                 Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
             );
-            let meta_store = RocksMetaStore::new(path, remote_fs.clone(), config.config_obj());
+            let meta_store = RocksMetaStore::new(
+                path,
+                RocksMetaStoreFs::new(remote_fs.clone()),
+                config.config_obj(),
+            );
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let chunk_store = ChunkStore::new(
@@ -2485,6 +2496,7 @@ mod tests {
                 c.compaction_chunks_count_threshold = 0;
                 c.not_used_timeout = 0;
                 c.meta_store_log_upload_interval = 1;
+                c.meta_store_snapshot_interval = 1;
                 c.gc_loop_interval = 1;
                 c
             })
@@ -2564,7 +2576,7 @@ mod tests {
         Config::test("inmemory_compaction")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
-                c.compaction_chunks_count_threshold = 10;
+                c.compaction_chunks_count_threshold = 6;
                 c.not_used_timeout = 0;
                 c.compaction_in_memory_chunks_count_threshold = 5;
                 c.compaction_in_memory_chunks_max_lifetime_threshold = 1;
@@ -2607,15 +2619,20 @@ mod tests {
                     .unwrap();
                 assert_eq!(chunks.len(), 1);
                 assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 6);
+                assert_eq!(chunks.first().unwrap().get_row().in_memory(), true);
                 //waiting for more then compaction_chunks_count_threshold
                 Delay::new(Duration::from_millis(2000)).await;
-                service
-                    .exec_query(&format!(
-                        "INSERT INTO foo.numbers (a, num, __seq) VALUES ({}, {}, {})",
-                        7, 7, 7
-                    ))
-                    .await
-                    .unwrap();
+                for i in 0..6 {
+                    service
+                        .exec_query(&format!(
+                            "INSERT INTO foo.numbers (a, num, __seq) VALUES ({}, {}, {})",
+                            i + 1,
+                            i + 1,
+                            i + 1
+                        ))
+                        .await
+                        .unwrap();
+                }
                 Delay::new(Duration::from_millis(1000)).await;
                 let active_partitions = services
                     .meta_store
@@ -2631,7 +2648,7 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(chunks.len(), 1);
-                assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 1);
+                assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 6);
             })
             .await
     }

@@ -85,3 +85,25 @@ Return "true" if the API ingressClassName field is supported
 {{- print "true" -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Create the name of cubejs master service account to use
+*/}}
+{{- define "cubejs.master.serviceAccountName" -}}
+{{- if .Values.master.serviceAccount.create -}}
+  {{ default (printf "%s-master" (include "cubejs.fullname" .)) .Values.master.serviceAccount.name }}
+{{- else -}}
+  {{ default "default" .Values.master.serviceAccount.name }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create the name of cubejs workers service account to use
+*/}}
+{{- define "cubejs.workers.serviceAccountName" -}}
+{{- if .Values.workers.serviceAccount.create -}}
+  {{ default (printf "%s-workers" (include "cubejs.fullname" .)) .Values.workers.serviceAccount.name }}
+{{- else -}}
+  {{ default "default" .Values.workers.serviceAccount.name }}
+{{- end -}}
+{{- end -}}

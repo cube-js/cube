@@ -1161,6 +1161,8 @@ class ApiGateway {
   }: any) {
     const { requestId } = context ?? {};
     
+    const plainError = e.plainMessages;
+    
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
@@ -1168,7 +1170,7 @@ class ApiGateway {
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.message, stack: e.stack, requestId }, { status: e.status });
+      res({ error: e.message, stack: e.stack, requestId, plainError }, { status: e.status });
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
@@ -1196,6 +1198,7 @@ class ApiGateway {
         {
           type: e.type,
           error: e.message,
+          plainError,
           stack: e.stack,
           requestId
         },
@@ -1208,7 +1211,7 @@ class ApiGateway {
         error: e.stack || e.toString(),
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.toString(), stack: e.stack, requestId }, { status: 500 });
+      res({ error: e.toString(), stack: e.stack, requestId, plainError, }, { status: 500 });
     }
   }
 
@@ -1560,6 +1563,14 @@ class ApiGateway {
     };
   };
 
+  private logProbeError(e: any, type: string): void {
+    this.log({
+      type,
+      driverType: e.driverType,
+      error: (e as Error).stack || (e as Error).toString(),
+    });
+  }
+
   protected readiness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
 
@@ -1570,23 +1581,9 @@ class ApiGateway {
         // todo: test other data sources
         orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
-      } catch (e) {
-        this.log({
-          type: 'Internal Server Error on readiness probe',
-          error: (e as Error).stack || (e as Error).toString(),
-        });
-
-        return this.healthResponse(res, 'DOWN');
-      }
-
-      try {
         await orchestratorApi.testOrchestratorConnections();
-      } catch (e) {
-        this.log({
-          type: 'Internal Server Error on readiness probe',
-          error: (e as Error).stack || (e as Error).toString(),
-        });
-
+      } catch (e: any) {
+        this.logProbeError(e, 'Internal Server Error on readiness probe');
         health = 'DOWN';
       }
     }
@@ -1599,24 +1596,10 @@ class ApiGateway {
 
     try {
       await this.dataSourceStorage.testConnections();
-    } catch (e) {
-      this.log({
-        type: 'Internal Server Error on liveness probe',
-        error: (e as Error).stack || (e as Error).toString(),
-      });
-
-      return this.healthResponse(res, 'DOWN');
-    }
-
-    try {
       // @todo Optimize this moment?
       await this.dataSourceStorage.testOrchestratorConnections();
-    } catch (e) {
-      this.log({
-        type: 'Internal Server Error on liveness probe',
-        error: (e as Error).stack || (e as Error).toString(),
-      });
-
+    } catch (e: any) {
+      this.logProbeError(e, 'Internal Server Error on liveness probe');
       health = 'DOWN';
     }
 

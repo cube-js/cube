@@ -1,63 +1,9 @@
-import { AvailableCube, AvailableMembers } from '@cubejs-client/react';
-import { MemberType, BaseCubeMember } from '@cubejs-client/core';
-
 export function notEmpty<T>(value: T | null | undefined): value is T {
   return value != null;
 }
 
 export function ucfirst(s: string): string {
   return s[0].toUpperCase() + s.slice(1);
-}
-
-export function getNameMemberPairs(members: AvailableCube[]) {
-  const items: [memberName: string, member: BaseCubeMember & MemberType][] = [];
-
-  members.forEach((cube) =>
-    cube.members.forEach((member) => {
-      items.push([member.name, member]);
-    })
-  );
-
-  return items;
-}
-
-export type MembersByCube = {
-  cubeName: string;
-  cubeTitle: string;
-  measures: BaseCubeMember[];
-  dimensions: BaseCubeMember[];
-  segments: BaseCubeMember[];
-  timeDimensions: BaseCubeMember[];
-};
-
-export function getMembersByCube(
-  availableMembers: AvailableMembers
-): MembersByCube[] {
-  const membersByCube: Record<string, MembersByCube> = {};
-
-  Object.entries(availableMembers).forEach(([memberType, cubes]) => {
-    cubes.forEach((cube) => {
-      if (!membersByCube[cube.cubeName]) {
-        membersByCube[cube.cubeName] = {
-          cubeName: cube.cubeName,
-          cubeTitle: cube.cubeTitle,
-          measures: [],
-          dimensions: [],
-          segments: [],
-          timeDimensions: [],
-        };
-      }
-
-      cube.members.forEach((member) => {
-        membersByCube[cube.cubeName] = {
-          ...membersByCube[cube.cubeName],
-          [memberType]: [...membersByCube[cube.cubeName][memberType], member],
-        };
-      });
-    });
-  });
-
-  return Object.values(membersByCube);
 }
 
 export function playgroundFetch(url, options: any = {}) {
@@ -85,39 +31,6 @@ export function playgroundFetch(url, options: any = {}) {
     });
 }
 
-type RequestOptions = {
-  token?: string;
-  body?: Record<string, any>;
-  headers?: Record<string, string>;
-};
-
-export async function request(
-  endpoint: string,
-  method: string = 'GET',
-  options: RequestOptions = {}
-) {
-  const { body, token } = options;
-
-  const headers: Record<string, string> = {};
-
-  if (token) {
-    headers.authorization = token;
-  }
-
-  const response = await fetch(endpoint, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-    ...(body ? { body: JSON.stringify(body) } : null),
-  });
-
-  return {
-    ok: response.ok,
-    json: await response.json(),
-  };
-}
 
 type OpenWindowOptions = {
   url: string;

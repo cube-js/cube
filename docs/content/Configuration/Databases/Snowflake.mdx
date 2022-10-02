@@ -41,6 +41,8 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR`             | The type of authenticator to use with Snowflake. Use `SNOWFLAKE` with username/password, or `SNOWFLAKE_JWT` with key pairs. Defaults to `SNOWFLAKE` | `SNOWFLAKE`, `SNOWFLAKE_JWT`                               |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`          | The path to the private RSA key folder                                                                                                              | A valid path to the private RSA key                        |    ❌    |
 | `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`          | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key         |    ❌    |
+| `CUBEJS_CONCURRENCY`                            | The number of concurrent connections each queue has to the database. Default is `5`                                                                 | A valid number                                             |    ❌    |
+| `CUBEJS_DB_MAX_POOL`                            | The maximum number of concurrent database connections to pool. Default is `20`                                                                      | A valid number                                             |    ❌    |
 
 ## Pre-Aggregation Feature Support
 

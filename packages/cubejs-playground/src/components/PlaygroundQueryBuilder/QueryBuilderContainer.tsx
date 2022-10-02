@@ -6,13 +6,11 @@ import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { Button, CubeLoader } from '../../atoms';
+import { useCloud } from '../../cloud';
 import { useAppContext, useCubejsApi, useSecurityContext } from '../../hooks';
+import { useRollupDesignerContext, RollupDesignerContext } from '../../rollup-designer';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
-import {
-  RollupDesignerContext,
-  useRollupDesignerContext,
-} from '../RollupDesigner';
 import {
   PlaygroundQueryBuilder,
   PlaygroundQueryBuilderProps,
@@ -43,7 +41,11 @@ type QueryBuilderContainerProps = Pick<
 
 export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
   const { apiUrl } = useAppContext();
-  const { currentToken, token: securityContextToken, setIsModalOpen } = useSecurityContext();
+  const {
+    currentToken,
+    token: securityContextToken,
+    setIsModalOpen,
+  } = useSecurityContext();
 
   useLayoutEffect(() => {
     if (apiUrl && currentToken) {
@@ -109,6 +111,7 @@ function QueryTabsRenderer({
 }: QueryTabsRendererProps) {
   const { location } = useHistory();
   const { setQuery, toggleModal } = useRollupDesignerContext();
+  const { isAddRollupButtonVisible } = useCloud();
 
   const params = new URLSearchParams(location.search);
   const query = JSON.parse(params.get('query') || 'null');
@@ -128,14 +131,16 @@ function QueryTabsRenderer({
             {securityContextToken ? 'Edit' : 'Add'} Security Context
           </Button>
 
-          <Button
-            data-testid="rd-btn"
-            icon={<ThunderboltOutlined />}
-            size="small"
-            onClick={() => toggleModal()}
-          >
-            Add Rollup to Schema
-          </Button>
+          {isAddRollupButtonVisible == null || isAddRollupButtonVisible ? (
+            <Button
+              data-testid="rd-btn"
+              icon={<ThunderboltOutlined />}
+              size="small"
+              onClick={() => toggleModal()}
+            >
+              Add Rollup to Schema
+            </Button>
+          ) : null}
         </Space>
       }
       onTabChange={(tab) => {

@@ -4,6 +4,7 @@ import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { PrestodbQuery } from '../../../src/adapter/PrestodbQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import { createJoinedCubesSchema } from '../../unit/utils';
 
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
@@ -1917,4 +1918,37 @@ describe('SQL Generation', () => {
       { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
     ]
   ));
+
+  it('columns order for the query with the sub-query', async () => {
+    const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+    await joinedSchemaCompilers.compiler.compile();
+    const query = new PostgresQuery({
+      joinGraph: joinedSchemaCompilers.joinGraph,
+      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
+      compiler: joinedSchemaCompilers.compiler,
+    },
+    {
+      measures: ['B.bval_sum', 'B.count'],
+      dimensions: ['B.aid'],
+      filters: [{
+        member: 'C.did',
+        operator: 'lt',
+        values: ['10']
+      }],
+      order: [{
+        'B.bval_sum': 'desc'
+      }]
+    });
+    const sql = query.buildSqlAndParams();
+    return dbRunner
+      .testQuery(sql)
+      .then((res) => {
+        res.forEach((row) => {
+          const cols = Object.keys(row);
+          expect(cols[0]).toEqual('b__aid');
+          expect(cols[1]).toEqual('b__bval_sum');
+          expect(cols[2]).toEqual('b__count');
+        });
+      });
+  });
 });

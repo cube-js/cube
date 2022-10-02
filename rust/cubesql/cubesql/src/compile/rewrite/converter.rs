@@ -8,17 +8,17 @@ use crate::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
             BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
-            ColumnExprColumn, CubeScanAliases, CubeScanLimit, DimensionName,
+            ColumnExprColumn, CubeScanAliases, CubeScanLimit, CubeScanOffset, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
-            JoinRightOn, LimitN, LiteralExprValue, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
-            OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun, ScalarUDFExprFun,
-            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
-            SortExprAsc, SortExprNullsFirst, TableScanLimit, TableScanProjection,
-            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
-            WindowFunctionExprFun, WindowFunctionExprWindowFrame,
+            JoinRightOn, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberValue,
+            LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc, OrderMember,
+            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun,
+            ScalarUDFExprFun, ScalarVariableExprDataType, ScalarVariableExprVariable,
+            SegmentMemberMember, SortExprAsc, SortExprNullsFirst, TableScanFetch,
+            TableScanProjection, TableScanSourceTableName, TableScanTableName, TableUDFExprFun,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
     sql::AuthContextRef,
@@ -33,8 +33,8 @@ use datafusion::{
     logical_plan::{
         build_join_schema, build_table_udf_schema, exprlist_to_fields, normalize_cols,
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
-        CrossJoin, DFField, DFSchema, DFSchemaRef, EmptyRelation, Expr, Limit, LogicalPlan,
-        LogicalPlanBuilder, TableScan, Union,
+        CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct, EmptyRelation, Expr, Limit,
+        LogicalPlan, LogicalPlanBuilder, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
@@ -407,13 +407,13 @@ impl LogicalPlanToLanguageConverter {
                 let table_name = add_data_node!(self, node.table_name, TableScanTableName);
                 let projection = add_data_node!(self, node.projection, TableScanProjection);
                 let filters = add_expr_list_node!(self, node.filters, TableScanFilters);
-                let limit = add_data_node!(self, node.limit, TableScanLimit);
+                let fetch = add_data_node!(self, node.fetch, TableScanFetch);
                 self.graph.add(LogicalPlanLanguage::TableScan([
                     source_table_name,
                     table_name,
                     projection,
                     filters,
-                    limit,
+                    fetch,
                 ]))
             }
             LogicalPlan::EmptyRelation(rel) => {
@@ -423,9 +423,11 @@ impl LogicalPlanToLanguageConverter {
                     .add(LogicalPlanLanguage::EmptyRelation([produce_one_row]))
             }
             LogicalPlan::Limit(limit) => {
-                let n = add_data_node!(self, limit.n, LimitN);
+                let skip = add_data_node!(self, limit.skip, LimitSkip);
+                let fetch = add_data_node!(self, limit.fetch, LimitFetch);
                 let input = self.add_logical_plan(limit.input.as_ref())?;
-                self.graph.add(LogicalPlanLanguage::Limit([n, input]))
+                self.graph
+                    .add(LogicalPlanLanguage::Limit([skip, fetch, input]))
             }
             LogicalPlan::CreateExternalTable { .. } => {
                 panic!("CreateExternalTable is not supported");
@@ -447,6 +449,10 @@ impl LogicalPlanToLanguageConverter {
                 } else {
                     panic!("Unsupported extension node: {}", ext.node.schema());
                 }
+            }
+            LogicalPlan::Distinct(distinct) => {
+                let input = self.add_logical_plan(distinct.input.as_ref())?;
+                self.graph.add(LogicalPlanLanguage::Distinct([input]))
             }
             // TODO: Support all
             _ => unimplemented!("Unsupported node type: {:?}", plan),
@@ -933,12 +939,6 @@ impl LanguageToLogicalPlanConverter {
             //     let input = self.add_logical_plan(input.as_ref())?;
             //     self.graph.add(LogicalPlanLanguage::Repartition([input]))
             // }
-            // LogicalPlan::Union { inputs, schema: _, alias } => {
-            //     let inputs = inputs.iter().map(|e| self.add_logical_plan(e)).collect::<Result<Vec<_>, _>>()?;
-            //     let inputs = self.graph.add(LogicalPlanLanguage::UnionInputs(inputs));
-            //     let alias = self.graph.add(LogicalPlanLanguage::UnionAlias(UnionAlias(alias.clone())));
-            //     self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
-            // }
             LogicalPlanLanguage::Subquery(params) => {
                 let input = self.to_logical_plan(params[0])?;
                 let subqueries = match_list_node_ids!(node_by_id, params[1], SubquerySubqueries)
@@ -967,7 +967,7 @@ impl LanguageToLogicalPlanConverter {
                 let projection = match_data_node!(node_by_id, params[2], TableScanProjection);
                 let filters =
                     match_expr_list_node!(node_by_id, to_expr, params[3], TableScanFilters);
-                let limit = match_data_node!(node_by_id, params[4], TableScanLimit);
+                let fetch = match_data_node!(node_by_id, params[4], TableScanFetch);
                 let table_parts = source_table_name.split(".").collect::<Vec<_>>();
                 let table_reference = if table_parts.len() == 2 {
                     TableReference::Partial {
@@ -1012,7 +1012,7 @@ impl LanguageToLogicalPlanConverter {
                     projection,
                     projected_schema: Arc::new(projected_schema),
                     filters,
-                    limit,
+                    fetch,
                 })
             }
             LogicalPlanLanguage::EmptyRelation(params) => {
@@ -1026,9 +1026,10 @@ impl LanguageToLogicalPlanConverter {
                 })
             }
             LogicalPlanLanguage::Limit(params) => {
-                let n = match_data_node!(node_by_id, params[0], LimitN);
-                let input = Arc::new(self.to_logical_plan(params[1])?);
-                LogicalPlan::Limit(Limit { n, input })
+                let skip = match_data_node!(node_by_id, params[0], LimitSkip);
+                let fetch = match_data_node!(node_by_id, params[1], LimitFetch);
+                let input = Arc::new(self.to_logical_plan(params[2])?);
+                LogicalPlan::Limit(Limit { skip, fetch, input })
             }
             // LogicalPlan::CreateExternalTable { .. } => {
             //     panic!("CreateExternalTable is not supported");
@@ -1415,6 +1416,13 @@ impl LanguageToLogicalPlanConverter {
                             match_data_node!(node_by_id, cube_scan_params[4], CubeScanLimit)
                                 .map(|n| if n > 50000 { 50000 } else { n as i32 });
 
+                        let offset =
+                            match_data_node!(node_by_id, cube_scan_params[5], CubeScanOffset)
+                                .map(|offset| offset as i32);
+                        if offset.is_some() {
+                            query.offset = offset;
+                        }
+
                         let aliases =
                             match_data_node!(node_by_id, cube_scan_params[6], CubeScanAliases);
 
@@ -1466,13 +1474,12 @@ impl LanguageToLogicalPlanConverter {
                     .map(|n| self.to_logical_plan(n))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let schema = inputs[0].schema().as_ref().clone();
-
                 let alias = match_data_node!(node_by_id, params[1], UnionAlias);
 
+                let schema = inputs[0].schema().as_ref().clone();
                 let schema = match alias {
                     Some(ref alias) => schema.replace_qualifier(alias.as_str()),
-                    None => schema,
+                    None => schema.strip_qualifiers(),
                 };
 
                 LogicalPlan::Union(Union {
@@ -1480,6 +1487,11 @@ impl LanguageToLogicalPlanConverter {
                     schema: Arc::new(schema),
                     alias,
                 })
+            }
+            LogicalPlanLanguage::Distinct(params) => {
+                let input = Arc::new(self.to_logical_plan(params[0])?);
+
+                LogicalPlan::Distinct(Distinct { input })
             }
             x => panic!("Unexpected logical plan node: {:?}", x),
         })

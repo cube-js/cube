@@ -1562,10 +1562,10 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.3.4.tgz#59691edd031eedc431bda1bdf601257c06289a40"
   integrity sha512-8vmPV/nIULFDWsnJalQJDqFLC2uTPx6A/ASA2t27QGp+7oXnbWWXCe0uV8xasIH2rGbI/XoB2vmkdP/94WvMrw==
 
-"@cube-dev/example-wrapper@^1.1.9":
-  version "1.1.9"
-  resolved "https://registry.yarnpkg.com/@cube-dev/example-wrapper/-/example-wrapper-1.1.9.tgz#4820c64315712ccf591788bb51e7a739cabf51f4"
-  integrity sha512-E49SWTLWx1H2S/2fN5+hkiUZKGZuTpaxkqajohzLH8ibbECocYmbr+jK6WhLMpH89CAZr9QaWv92egSCZOSafw==
+"@cube-dev/example-wrapper@^1.1.10":
+  version "1.1.10"
+  resolved "https://registry.yarnpkg.com/@cube-dev/example-wrapper/-/example-wrapper-1.1.10.tgz#e28f12c717ef2b67ab9effaa5b087f69fc18efc5"
+  integrity sha512-ktV2P7n5R1HS6Ozf6kHT18dF8STTvc7ivuLYj7t1yFkdrJ4kmhTdaidW80TAkNeW5jLvV6qcWCbRqg5YKNw+/g==
   dependencies:
     "@cubejs-client/core" "^0.29.33"
     cubedev-tracking "^1.1.0"

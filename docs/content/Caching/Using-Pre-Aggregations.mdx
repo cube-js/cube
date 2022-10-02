@@ -119,7 +119,7 @@ definition][ref-schema-ref-preaggs]. In the example below, the
 separate tables for each month's worth of data. Once built, it will continue to
 refresh on a daily basis the last 3 months of data.
 
-```javascript
+```typescript
 cube(`Orders`, {
   sql: `select * from orders`,
 
@@ -141,6 +141,66 @@ cube(`Orders`, {
   },
 });
 ```
+
+## Using Indexes
+
+For larger pre-aggregations, performance can be significantly improved by adding
+an [index][ref-schema-ref-preaggs-index]. This is done by defining the `indexes`
+property for a pre-aggregation:
+
+```typescript
+cube(`Orders`, {
+  ...,
+
+  preAggregations: {
+    status: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.status, Products.name, ProductCategories.name],
+      timeDimension: CUBE.createdAt,
+      granularity: `day`,
+      indexes: {
+        statusIndex: {
+          columns: [CUBE.status, Products.name],
+        },
+        aggregatedIndex: {
+          columns: [CUBE.status],
+          type: `aggregate`,
+        },
+      },
+    },
+  },
+});
+```
+
+For example, if the pre-aggregated data looks like:
+
+| created_at | status     | products\_\_name | product_categories\_\_name | count |
+| ---------- | ---------- | ---------------- | -------------------------- | ----- |
+| 2022-08-01 | completed  | Plastic Chair    | Furniture                  | 4     |
+| 2022-08-01 | processing | Plastic Chair    | Furniture                  | 11    |
+| 2022-08-01 | shipped    | Plastic Chair    | Furniture                  | 2     |
+| 2022-08-01 | completed  | Keyboard         | Electronics                | 1     |
+| 2022-08-01 | processing | Keyboard         | Electronics                | 3     |
+| 2022-08-01 | shipped    | Keyboard         | Electronics                | 7     |
+
+Then the data within `statusIndex` would look like:
+
+| status     | products\_\_name | created_at | product_categories\_\_name | count |
+| ---------- | ---------------- | ---------- | -------------------------- | ----- |
+| completed  | Plastic Chair    | 2022-08-01 | Furniture                  | 4     |
+| processing | Plastic Chair    | 2022-08-01 | Furniture                  | 11    |
+| shipped    | Plastic Chair    | 2022-08-01 | Furniture                  | 2     |
+| completed  | Keyboard         | 2022-08-01 | Electronics                | 1     |
+| processing | Keyboard         | 2022-08-01 | Electronics                | 3     |
+| shipped    | Keyboard         | 2022-08-01 | Electronics                | 7     |
+
+And the data within `aggregatedIndex` would look like:
+
+| status     | count |
+| ---------- | ----- |
+| completed  | 5     |
+| processing | 14    |
+| shipped    | 9     |
 
 ## Inspecting Pre-Aggregations
 
@@ -171,6 +231,48 @@ SELECT * FROM information_schema.tables;
 
 These pre-aggregations are stored as Parquet files under the `.cubestore/`
 folder in the project root during development.
+
+### <--{"id" : "Inspecting Pre-Aggregations"}--> EXPLAIN queries
+
+Cube Store's MySQL protocol also supports `EXPLAIN` and `EXPLAIN ANALYZE`
+queries both of which are useful for determining how much processing a query
+will require.
+
+`EXPLAIN` queries show the logical plan for a query:
+
+```sql
+ EXPLAIN SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
+ GROUP BY orders__gender, orders__platform;
++-------------------------------------------------------------------------------------------------------------------------------------+
+| logical plan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
++--------------------------------------------------------------------------------------------------------------------------------------+
+| Projection, [dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__platform, dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)]
+  Aggregate
+    ClusterSend, indices: [[96]]
+      Scan dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r, source: CubeTable(index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126]), fields: [orders__gender, orders__platform, orders__count] |
++-------------------------------------------------------------------------------------------------------------------------------------+
+```
+
+`EXPLAIN ANALYZE` queries show the physical plan for the router and all workers
+used for query processing:
+
+```sql
+ EXPLAIN ANALYZE SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
+ GROUP BY orders__gender, orders__platform
+
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+| node type | node name       | physical plan                                                                                                                                                                                                                                                                                                                                                   |
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+| router    |                 | Projection, [orders__platform, orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)@2:SUM(orders__count)]
+  FinalInplaceAggregate
+    ClusterSend, partitions: [[123, 126]]                                                                                                                                         |
+| worker    | 127.0.0.1:10001 | PartialInplaceAggregate
+  Merge
+    Scan, index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126], fields: [orders__gender, orders__platform, orders__count]
+      Projection, [orders__gender, orders__platform, orders__count]
+        ParquetScan, files: /.cubestore/data/126-0qtyakym.parquet |
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+```
 
 ## Pre-Aggregations Storage
 
@@ -351,6 +453,13 @@ it.
 
 ### <--{"id" : "Pre-Aggregation Build Strategies"}--> Export bucket
 
+<WarningBox>
+
+The export bucket strategy requires permission to execute `CREATE TABLE`
+statements in the data source as part of the pre-aggregation build process.
+
+</WarningBox>
+
 When dealing with larger pre-aggregations (more than 100k rows), performance can
 be significantly improved by using an export bucket. This allows the source
 database to temporarily materialize the data locally, which is then loaded into
@@ -377,6 +486,22 @@ When using cloud storage, it is important to correctly configure any data
 retention policies to clean up the data in the export bucket as Cube.js does not
 currently manage this. For most use-cases, 1 day is sufficient.
 
+## Streaming pre-aggregations
+
+Streaming pre-aggregations are different from traditional pre-aggregations in the way they are being updated. Traditional pre-aggregations follow the “pull” model — Cube **pulls updates** from the data source based on some cadence and/or condition. Streaming pre-aggregations follow the “push” model — Cube **subscribes to the updates** from the data source and always keeps pre-aggregation up to date. 
+
+You don’t need to define `refreshKey` for streaming pre-aggregations. Whether pre-aggregation is streaming or not is defined by the data source. 
+
+Currently, Cube supports only one streaming data source - [ksqlDB](/config/databases/ksqldb). All pre-aggregations where data source is ksqlDB are streaming. 
+
+We’re working on supporting streaming pre-aggregations for the following data sources -
+
+- Materialize
+- Flink SQL
+- Spark Streaming
+
+Please [let us know](https://cube.dev/contact) if you are interested in early access to any of these drivers or would like Cube to support any other SQL streaming engine.
+
 [ref-caching-in-mem-default-refresh-key]: /caching#default-refresh-keys
 [ref-config-db]: /config/databases
 [ref-config-driverfactory]: /config#driver-factory
@@ -391,6 +516,7 @@ currently manage this. For most use-cases, 1 day is sufficient.
 [ref-connect-db-snowflake]: /config/databases/snowflake
 [ref-schema-timedimension]: /types-and-formats#types-time
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
+[ref-schema-ref-preaggs-index]: /schema/reference/pre-aggregations#indexes
 [ref-schema-ref-preaggs-refresh-key]:
   /schema/reference/pre-aggregations#refresh-key
 [ref-schema-ref-preaggs-refresh-key-every]:

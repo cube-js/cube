@@ -2,7 +2,8 @@ import React, { CSSProperties } from 'react';
 import { Button, Modal } from 'antd';
 import { useCubeQuery } from '@cubejs-client/react';
 
-import { CubeLoader, FatalError } from '../../atoms';
+import { FatalError } from '../../components/Error/FatalError';
+import { CubeLoader } from '../../atoms';
 
 import { TableQueryRenderer } from './TableQueryRenderer';
 

@@ -24,6 +24,7 @@ const menuOrderCloud = [
   'Deploys',
   'Inspecting Queries',
   'Release Notes',
+  'Cloud Runtime'
 ];
 
 const menuOrder = [
@@ -34,6 +35,7 @@ const menuOrder = [
   'Caching',
   'Authentication & Authorization',
   'API Reference',
+  'SQL API',
   'Frontend Integrations',
   'Deployment',
   'Developer Tools',

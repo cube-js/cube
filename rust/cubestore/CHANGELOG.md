@@ -3,6 +3,114 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
+
+
+### Bug Fixes
+
+* **cubestore:** Immediately restart stale streaming jobs to avoid processing gaps for sparse streams ([60075af](https://github.com/cube-js/cube.js/commit/60075af851050b5b21b12881d553e318527e4ce7))
+
+
+
+
+
+## [0.30.71](https://github.com/cube-js/cube.js/compare/v0.30.70...v0.30.71) (2022-09-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.69](https://github.com/cube-js/cube.js/compare/v0.30.68...v0.30.69) (2022-09-13)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.65](https://github.com/cube-js/cube.js/compare/v0.30.64...v0.30.65) (2022-09-07)
+
+
+### Bug Fixes
+
+* **cubestore:** Fix 'no such file or directory' after cubestore restart ([#5247](https://github.com/cube-js/cube.js/issues/5247)) ([efaf897](https://github.com/cube-js/cube.js/commit/efaf8972c2751cbb5c5852b91a5c22b171f6064b))
+
+
+
+
+
+## [0.30.61](https://github.com/cube-js/cube.js/compare/v0.30.60...v0.30.61) (2022-09-01)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.60](https://github.com/cube-js/cube.js/compare/v0.30.59...v0.30.60) (2022-08-28)
+
+
+### Bug Fixes
+
+* **cubestore:** Read an inline table only on the assigned worker ([#5147](https://github.com/cube-js/cube.js/issues/5147)) ([15c2aa0](https://github.com/cube-js/cube.js/commit/15c2aa0c6ff7460450b432a0cc6ff0bd04126faf))
+
+
+
+
+
+## [0.30.59](https://github.com/cube-js/cube.js/compare/v0.30.58...v0.30.59) (2022-08-26)
+
+
+### Features
+
+* **cubestore:** Support Cast from timestamp to string ([#5163](https://github.com/cube-js/cube.js/issues/5163)) ([651a584](https://github.com/cube-js/cube.js/commit/651a5846fd76b2b4792e6f2b83607581ba564cf8))
+
+
+
+
+
+## [0.30.57](https://github.com/cube-js/cube.js/compare/v0.30.56...v0.30.57) (2022-08-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.56](https://github.com/cube-js/cube.js/compare/v0.30.55...v0.30.56) (2022-08-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.53](https://github.com/cube-js/cube.js/compare/v0.30.52...v0.30.53) (2022-08-18)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.30.50](https://github.com/cube-js/cube.js/compare/v0.30.49...v0.30.50) (2022-08-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
 ## [0.30.47](https://github.com/cube-js/cube.js/compare/v0.30.46...v0.30.47) (2022-08-12)
 
 

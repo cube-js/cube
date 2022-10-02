@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 9873
+expression: "execute_query(\"SELECT CAST('20220101' as DATE) as no_dim, CAST('2022/02/02' as DATE) as slash_dim,  CAST('2022|03|03' as DATE) as pipe_dim;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------------+------------+------------+
+| no_dim     | slash_dim  | pipe_dim   |
++------------+------------+------------+
+| 2022-01-01 | 2022-02-02 | 2022-03-03 |
++------------+------------+------------+

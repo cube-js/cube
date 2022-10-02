@@ -26,4 +26,4 @@ API will restart and its status will be visible in the Playground:
   />
 </div>
 
-[ref-devtools-ide]: /cloud/cube-ide
+[ref-devtools-ide]: /cloud/dev-tools/cube-ide

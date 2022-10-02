@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use sqlparser::{
     ast::Statement,
     dialect::{Dialect, PostgreSqlDialect},
@@ -41,6 +43,8 @@ pub fn parse_sql_to_statements(
     query: &String,
     protocol: DatabaseProtocol,
 ) -> CompilationResult<Vec<Statement>> {
+    let original_query = query.clone();
+
     log::debug!("Parsing SQL: {}", query);
     // @todo Support without workarounds
     // metabase
@@ -135,6 +139,11 @@ pub fn parse_sql_to_statements(
         "and ix.indisprimary = false",
     );
 
+    let query = query.replace(
+        "on t.oid = a.attrelid and a.attnum = ANY(ix.indkey)",
+        "on t.oid = a.attrelid",
+    );
+
     // TODO: Quick workaround for Tableau Desktop (ODBC), waiting for DF rebase...
     // Right now, our fork of DF doesn't support ON conditions with this filter
     let query = query.replace(
@@ -148,8 +157,27 @@ pub fn parse_sql_to_statements(
     // ThoughtSpot (Redshift)
     // Subquery must have alias, It's a default Postgres behaviour, but Redshift is based on top of old Postgres version...
     let query = query.replace(
+        // Subquery must have alias
         "AS REF_GENERATION  FROM svv_tables) WHERE true  AND current_database() = ",
-        "AS REF_GENERATION  FROM svv_tables) as r WHERE true  AND current_database() =",
+        "AS REF_GENERATION  FROM svv_tables) as svv_tables WHERE current_database() =",
+    );
+    let query = query.replace("AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')", "");
+    let query = query.replace(
+        // REGEXP_REPLACE
+        // Subquery must have alias
+        // Incorrect alias for subquery
+        "FROM (select lbv_cols.schemaname, lbv_cols.tablename, lbv_cols.columnname,REGEXP_REPLACE(REGEXP_REPLACE(lbv_cols.columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, lbv_cols.columnnum from pg_get_late_binding_view_cols() lbv_cols( schemaname name, tablename name, columnname name, columntype text, columnnum int)) lbv_columns   WHERE",
+        "FROM (select schemaname, tablename, columnname,columntype as columntype_rep,columntype, columnnum from get_late_binding_view_cols_unpacked) as lbv_columns   WHERE",
+    );
+    let query = query.replace(
+        // Subquery must have alias
+        "ORDER BY TABLE_SCHEM,c.relname,attnum )  UNION ALL SELECT current_database()::VARCHAR(128) AS TABLE_CAT",
+        "ORDER BY TABLE_SCHEM,c.relname,attnum ) as t  UNION ALL SELECT current_database()::VARCHAR(128) AS TABLE_CAT",
+    );
+    let query = query.replace(
+        // Reusage of new column in another column
+        "END AS IS_AUTOINCREMENT, IS_AUTOINCREMENT AS IS_GENERATEDCOLUMN",
+        "END AS IS_AUTOINCREMENT, false AS IS_GENERATEDCOLUMN",
     );
 
     // Sigma Computing WITH query workaround
@@ -183,10 +211,33 @@ pub fn parse_sql_to_statements(
     };
 
     // Metabase
-    // TODO: To Support InSubquery Node.
+    // TODO: To Support InSubquery Node (waiting for rebase DF)
     let query = query.replace(
         "WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e)",
         "WHERE t.oid = 0",
+    );
+
+    // Holistics.io
+    // TODO: Waiting for rebase DF
+    // Right now, our fork of DF doesn't support ON conditions with this filter
+    let query = query.replace(
+        "ON c.conrelid=ta.attrelid AND ta.attnum=c.conkey[o.ord]",
+        "ON c.conrelid=ta.attrelid",
+    );
+
+    // Holistics.io
+    // TODO: Waiting for rebase DF
+    // Right now, our fork of DF doesn't support ON conditions with this filter
+    let query = query.replace(
+        "ON c.confrelid=fa.attrelid AND fa.attnum=c.confkey[o.ord]",
+        "ON c.confrelid=fa.attrelid",
+    );
+
+    // Holistics.io
+    // TODO: To Support InSubquery Node (waiting for rebase DF)
+    let query = query.replace(
+        "AND c.relname IN (SELECT table_name\nFROM information_schema.tables\nWHERE (table_type = 'BASE TABLE' OR table_type = 'VIEW')\n  AND table_schema NOT IN ('pg_catalog', 'information_schema')\n  AND has_schema_privilege(table_schema, 'USAGE'::text)\n)\n",
+        "",
     );
 
     let parse_result = match protocol {
@@ -194,7 +245,10 @@ pub fn parse_sql_to_statements(
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
     };
 
-    parse_result.map_err(|err| CompilationError::user(format!("Unable to parse: {:?}", err)))
+    parse_result.map_err(|err| {
+        CompilationError::user(format!("Unable to parse: {:?}", err))
+            .with_meta(Some(HashMap::from([("query".to_string(), original_query)])))
+    })
 }
 
 pub fn parse_sql_to_statement(
@@ -218,7 +272,7 @@ pub fn parse_sql_to_statement(
                     ))
                 };
 
-                Err(err)
+                Err(err.with_meta(Some(HashMap::from([("query".to_string(), query.clone())]))))
             }
         }
     }

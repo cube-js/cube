@@ -2,7 +2,7 @@ use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta, Snapshots};
-use crate::queryplanner::query_executor::{CubeTable, InlineTableProvider};
+use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableProvider};
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{
@@ -73,6 +73,7 @@ pub struct SerializedPlan {
     logical_plan: Arc<SerializedLogicalPlan>,
     schema_snapshot: Arc<SchemaSnapshot>,
     partition_ids_to_execute: Vec<(u64, RowFilter)>,
+    inline_table_ids_to_execute: Vec<InlineTableId>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -124,6 +125,11 @@ impl PartitionSnapshot {
     pub fn chunks(&self) -> &Vec<IdRow<Chunk>> {
         &self.chunks
     }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct InlineSnapshot {
+    pub id: u64,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -192,7 +198,7 @@ pub enum SerializedLogicalPlan {
     },
     ClusterSend {
         input: Arc<SerializedLogicalPlan>,
-        snapshots: Snapshots,
+        snapshots: Vec<Snapshots>,
     },
     ClusterAggregateTopK {
         limit: usize,
@@ -202,7 +208,7 @@ pub enum SerializedLogicalPlan {
         sort_columns: Vec<SortColumn>,
         having_expr: Option<SerializedExpr>,
         schema: DFSchemaRef,
-        snapshots: Snapshots,
+        snapshots: Vec<Snapshots>,
     },
     CrossJoin {
         left: Arc<SerializedLogicalPlan>,
@@ -244,6 +250,7 @@ pub enum SerializePartitioning {
 pub struct WorkerContext {
     remote_to_local_names: HashMap<String, String>,
     worker_partition_ids: Vec<(u64, RowFilter)>,
+    inline_table_ids_to_execute: Vec<InlineTableId>,
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
 }
@@ -314,7 +321,9 @@ impl SerializedLogicalPlan {
                         worker_context.chunk_id_to_record_batches.clone(),
                         worker_context.parquet_metadata_cache.clone(),
                     )),
-                    SerializedTableSource::InlineTable(v) => Arc::new(v.clone()),
+                    SerializedTableSource::InlineTable(v) => Arc::new(
+                        v.to_worker_table(worker_context.inline_table_ids_to_execute.clone()),
+                    ),
                 },
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),
@@ -478,9 +487,11 @@ impl SerializedLogicalPlan {
             _ => None,
         }
     }
+
     fn remove_unused_tables(
         &self,
         partition_ids_to_execute: &Vec<(u64, RowFilter)>,
+        inline_tables_to_execute: &Vec<InlineTableId>,
     ) -> SerializedLogicalPlan {
         debug_assert!(partition_ids_to_execute
             .iter()
@@ -491,7 +502,8 @@ impl SerializedLogicalPlan {
                 input,
                 schema,
             } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
                 if input.is_empty_relation().is_some() {
                     SerializedLogicalPlan::EmptyRelation {
                         produce_one_row: false,
@@ -506,7 +518,8 @@ impl SerializedLogicalPlan {
                 }
             }
             SerializedLogicalPlan::Filter { predicate, input } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
 
                 if let Some(schema) = input.is_empty_relation() {
                     SerializedLogicalPlan::EmptyRelation {
@@ -526,7 +539,8 @@ impl SerializedLogicalPlan {
                 aggr_expr,
                 schema,
             } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
                 SerializedLogicalPlan::Aggregate {
                     input: Arc::new(input),
                     group_expr: group_expr.clone(),
@@ -535,7 +549,8 @@ impl SerializedLogicalPlan {
                 }
             }
             SerializedLogicalPlan::Sort { expr, input } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
 
                 if let Some(schema) = input.is_empty_relation() {
                     SerializedLogicalPlan::EmptyRelation {
@@ -557,7 +572,10 @@ impl SerializedLogicalPlan {
                 let inputs = inputs
                     .iter()
                     .filter_map(|i| {
-                        let i = i.remove_unused_tables(partition_ids_to_execute);
+                        let i = i.remove_unused_tables(
+                            partition_ids_to_execute,
+                            inline_tables_to_execute,
+                        );
                         if i.is_empty_relation().is_some() {
                             None
                         } else {
@@ -585,7 +603,9 @@ impl SerializedLogicalPlan {
                     SerializedTableSource::CubeTable(table) => {
                         !table.has_partitions(partition_ids_to_execute)
                     }
-                    _ => false,
+                    SerializedTableSource::InlineTable(table) => {
+                        !table.has_inline_table_id(inline_tables_to_execute)
+                    }
                 };
                 if is_empty {
                     SerializedLogicalPlan::EmptyRelation {
@@ -612,7 +632,8 @@ impl SerializedLogicalPlan {
                 schema: schema.clone(),
             },
             SerializedLogicalPlan::Limit { n, input } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
 
                 if let Some(schema) = input.is_empty_relation() {
                     SerializedLogicalPlan::EmptyRelation {
@@ -627,7 +648,8 @@ impl SerializedLogicalPlan {
                 }
             }
             SerializedLogicalPlan::Skip { n, input } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
 
                 if let Some(schema) = input.is_empty_relation() {
                     SerializedLogicalPlan::EmptyRelation {
@@ -649,8 +671,10 @@ impl SerializedLogicalPlan {
                 join_constraint,
                 schema,
             } => {
-                let left = left.remove_unused_tables(partition_ids_to_execute);
-                let right = right.remove_unused_tables(partition_ids_to_execute);
+                let left =
+                    left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                let right =
+                    right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
 
                 SerializedLogicalPlan::Join {
                     left: Arc::new(left),
@@ -665,7 +689,8 @@ impl SerializedLogicalPlan {
                 input,
                 partitioning_scheme,
             } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
 
                 if let Some(schema) = input.is_empty_relation() {
                     SerializedLogicalPlan::EmptyRelation {
@@ -684,7 +709,8 @@ impl SerializedLogicalPlan {
                 alias,
                 schema,
             } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
 
                 if input.is_empty_relation().is_some() {
                     SerializedLogicalPlan::EmptyRelation {
@@ -700,7 +726,8 @@ impl SerializedLogicalPlan {
                 }
             }
             SerializedLogicalPlan::ClusterSend { input, snapshots } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
                 SerializedLogicalPlan::ClusterSend {
                     input: Arc::new(input),
                     snapshots: snapshots.clone(),
@@ -716,7 +743,8 @@ impl SerializedLogicalPlan {
                 schema,
                 snapshots,
             } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
                 SerializedLogicalPlan::ClusterAggregateTopK {
                     limit: *limit,
                     input: Arc::new(input),
@@ -734,8 +762,10 @@ impl SerializedLogicalPlan {
                 on,
                 join_schema,
             } => {
-                let left = left.remove_unused_tables(partition_ids_to_execute);
-                let right = right.remove_unused_tables(partition_ids_to_execute);
+                let left =
+                    left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                let right =
+                    right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
 
                 SerializedLogicalPlan::CrossJoin {
                     left: Arc::new(left),
@@ -753,8 +783,10 @@ impl SerializedLogicalPlan {
                 agg_expr,
                 schema,
             } => {
-                let left = left.remove_unused_tables(partition_ids_to_execute);
-                let right = right.remove_unused_tables(partition_ids_to_execute);
+                let left =
+                    left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                let right =
+                    right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
 
                 SerializedLogicalPlan::CrossJoinAgg {
                     left: Arc::new(left),
@@ -778,7 +810,8 @@ impl SerializedLogicalPlan {
                 group_by_dimension,
                 aggs,
             } => {
-                let input = input.remove_unused_tables(partition_ids_to_execute);
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
                 SerializedLogicalPlan::RollingWindowAgg {
                     schema: schema.clone(),
                     input: Arc::new(input),
@@ -994,20 +1027,23 @@ impl SerializedPlan {
             logical_plan: Arc::new(serialized_logical_plan),
             schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
             partition_ids_to_execute: Vec::new(),
+            inline_table_ids_to_execute: Vec::new(),
         })
     }
 
     pub fn with_partition_id_to_execute(
         &self,
         partition_ids_to_execute: Vec<(u64, RowFilter)>,
+        inline_table_ids_to_execute: Vec<InlineTableId>,
     ) -> Self {
         Self {
             logical_plan: Arc::new(
                 self.logical_plan
-                    .remove_unused_tables(&partition_ids_to_execute),
+                    .remove_unused_tables(&partition_ids_to_execute, &inline_table_ids_to_execute),
             ),
             schema_snapshot: self.schema_snapshot.clone(),
             partition_ids_to_execute,
+            inline_table_ids_to_execute,
         }
     }
 
@@ -1020,6 +1056,7 @@ impl SerializedPlan {
         self.logical_plan.logical_plan(&WorkerContext {
             remote_to_local_names,
             worker_partition_ids: self.partition_ids_to_execute.clone(),
+            inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
             chunk_id_to_record_batches,
             parquet_metadata_cache,
         })

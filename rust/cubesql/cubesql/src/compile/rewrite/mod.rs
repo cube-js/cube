@@ -87,14 +87,15 @@ crate::plan_to_language! {
             projection: Option<Vec<usize>>,
             projected_schema: DFSchemaRef,
             filters: Vec<Expr>,
-            limit: Option<usize>,
+            fetch: Option<usize>,
         },
         EmptyRelation {
             produce_one_row: bool,
             schema: DFSchemaRef,
         },
         Limit {
-            n: usize,
+            skip: Option<usize>,
+            fetch: Option<usize>,
             input: Arc<LogicalPlan>,
         },
         TableUDFs {
@@ -213,6 +214,9 @@ crate::plan_to_language! {
             offset: Option<usize>,
             aliases: Option<Vec<String>>,
             split: bool,
+        },
+        Distinct {
+            input: Arc<LogicalPlan>,
         },
         Measure {
             name: String,
@@ -507,11 +511,24 @@ fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
 }
 
 fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
-    format!(
-        "(ScalarUDFExpr ScalarUDFExprFun:{} {})",
-        fun_name,
-        list_expr("ScalarUDFExprArgs", args)
-    )
+    udf_expr_var_arg(fun_name, list_expr("ScalarUDFExprArgs", args))
+}
+
+fn udf_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
+    let prefix = if fun_name.to_string().starts_with("?") {
+        ""
+    } else {
+        "ScalarUDFExprFun:"
+    };
+    format!("(ScalarUDFExpr {}{} {})", prefix, fun_name, arg_list)
+}
+
+fn udf_fun_expr_args(left: impl Display, right: impl Display) -> String {
+    format!("(ScalarUDFExprArgs {} {})", left, right)
+}
+
+fn udf_fun_expr_args_empty_tail() -> String {
+    "ScalarUDFExprArgs".to_string()
 }
 
 fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
@@ -519,7 +536,12 @@ fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
 }
 
 fn fun_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
-    format!("(ScalarFunctionExpr {} {})", fun_name, arg_list)
+    let prefix = if fun_name.to_string().starts_with("?") {
+        ""
+    } else {
+        "ScalarFunctionExprFun:"
+    };
+    format!("(ScalarFunctionExpr {}{} {})", prefix, fun_name, arg_list)
 }
 
 fn scalar_fun_expr_args(left: impl Display, right: impl Display) -> String {
@@ -547,8 +569,8 @@ fn udaf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
     )
 }
 
-fn limit(n: impl Display, input: impl Display) -> String {
-    format!("(Limit {} {})", n, input)
+fn limit(skip: impl Display, fetch: impl Display, input: impl Display) -> String {
+    format!("(Limit {} {} {})", skip, fetch, input)
 }
 
 fn aggregate(input: impl Display, group: impl Display, aggr: impl Display) -> String {
@@ -596,7 +618,12 @@ fn to_day_interval_expr<D: Display>(period: D, unit: D) -> String {
 }
 
 fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> String {
-    format!("(BinaryExpr {} {} {})", left, op, right)
+    let prefix = if op.to_string().starts_with("?") {
+        ""
+    } else {
+        "BinaryExprOp:"
+    };
+    format!("(BinaryExpr {} {}{} {})", left, prefix, op, right)
 }
 
 fn inlist_expr(expr: impl Display, list: impl Display, negated: impl Display) -> String {
@@ -640,6 +667,10 @@ fn cast_expr(expr: impl Display, data_type: impl Display) -> String {
     format!("(CastExpr {} {})", expr, data_type)
 }
 
+fn cast_expr_explicit(expr: impl Display, data_type: DataType) -> String {
+    format!("(CastExpr {} (CastExprDataType:{}))", expr, data_type)
+}
+
 fn alias_expr(column: impl Display, alias: impl Display) -> String {
     format!("(AliasExpr {} {})", column, alias)
 }
@@ -668,7 +699,15 @@ fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> Str
 }
 
 fn literal_string(literal_str: impl Display) -> String {
-    format!("(LiteralExpr LiteralExprValue:{})", literal_str)
+    format!("(LiteralExpr LiteralExprValue:s:{})", literal_str)
+}
+
+fn literal_number(literal_number: i64) -> String {
+    format!("(LiteralExpr LiteralExprValue:i:{})", literal_number)
+}
+
+fn literal_bool(literal_bool: bool) -> String {
+    format!("(LiteralExpr LiteralExprValue:b:{})", literal_bool)
 }
 
 fn projection(expr: impl Display, input: impl Display, alias: impl Display) -> String {
@@ -846,11 +885,11 @@ fn table_scan(
     table_name: impl Display,
     projection: impl Display,
     filters: impl Display,
-    limit: impl Display,
+    fetch: impl Display,
 ) -> String {
     format!(
         "(TableScan {} {} {} {} {})",
-        source_table_name, table_name, projection, filters, limit
+        source_table_name, table_name, projection, filters, fetch
     )
 }
 

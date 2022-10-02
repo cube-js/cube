@@ -160,7 +160,7 @@ const CreateOwnModal = ({
                   {frameworkItem.title}
                   &nbsp;docs
                 </a>
-                &nbsp;to see on how to use it with Cube.js.
+                &nbsp;to see on how to use it with Cube.
               </span>
             }
           />

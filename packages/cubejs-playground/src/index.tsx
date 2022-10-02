@@ -14,7 +14,6 @@ import {
 } from './pages';
 import { SecurityContextProvider } from './components/SecurityContext/SecurityContextProvider';
 import { AppContextProvider } from './components/AppContext';
-import { RollupDesignerContext } from './components/RollupDesigner';
 
 const history = createHashHistory();
 history.listen((location) => {

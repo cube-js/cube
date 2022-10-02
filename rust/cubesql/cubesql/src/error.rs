@@ -3,6 +3,7 @@ use datafusion::arrow;
 use log::SetLoggerError;
 use sqlparser::parser::ParserError;
 use std::{
+    any::Any,
     backtrace::Backtrace,
     collections::HashMap,
     fmt,
@@ -25,27 +26,35 @@ pub enum CubeErrorCauseType {
 }
 
 impl CubeError {
-    pub fn user(message: String) -> CubeError {
-        CubeError {
+    pub fn user(message: String) -> Self {
+        Self {
             message,
             cause: CubeErrorCauseType::User(None),
             backtrace: Some(Backtrace::capture()),
         }
     }
 
-    pub fn internal(message: String) -> CubeError {
-        CubeError {
+    pub fn internal(message: String) -> Self {
+        Self {
             message,
             cause: CubeErrorCauseType::Internal(None),
             backtrace: Some(Backtrace::capture()),
         }
     }
 
-    pub fn internal_with_bt(message: String, backtrace: Option<Backtrace>) -> CubeError {
-        CubeError {
+    pub fn internal_with_bt(message: String, backtrace: Option<Backtrace>) -> Self {
+        Self {
             message,
             cause: CubeErrorCauseType::Internal(None),
             backtrace,
+        }
+    }
+
+    pub fn panic(error: Box<dyn Any + Send>) -> Self {
+        if let Some(reason) = error.downcast_ref::<&str>() {
+            CubeError::internal(format!("Unexpected panic. Reason: {}", reason))
+        } else {
+            CubeError::internal("Unexpected panic without reason".to_string())
         }
     }
 }
@@ -62,22 +71,12 @@ impl CubeError {
 
 impl fmt::Display for CubeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        fn write_fmt(
-            cause: CubeErrorCauseType,
-            message: String,
-            f: &mut Formatter<'_>,
-        ) -> fmt::Result {
-            match &cause {
-                CubeErrorCauseType::User(meta) => {
-                    f.write_fmt(format_args!("{} {:?}", message, meta))
-                }
-                CubeErrorCauseType::Internal(meta) => {
-                    f.write_fmt(format_args!("{:?}: {} {:?}", cause, message, meta))
-                }
+        match self.cause {
+            CubeErrorCauseType::User(_) => f.write_fmt(format_args!("User: {}", self.message)),
+            CubeErrorCauseType::Internal(_) => {
+                f.write_fmt(format_args!("Internal: {}", self.message))
             }
         }
-
-        write_fmt(self.cause.clone(), self.message.clone(), f)
     }
 }
 
@@ -147,7 +146,12 @@ impl From<rust_decimal::Error> for CubeError {
 
 impl From<tokio::task::JoinError> for CubeError {
     fn from(v: tokio::task::JoinError) -> Self {
-        CubeError::internal(v.to_string())
+        if v.is_panic() {
+            CubeError::panic(v.into_panic())
+        } else {
+            // JoinError can return CanceledError
+            CubeError::internal(v.to_string())
+        }
     }
 }
 

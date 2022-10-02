@@ -10,6 +10,12 @@ import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 
 export type CacheAndQueryDriverType = 'redis' | 'memory';
 
+export enum DriverType {
+  External = 'external',
+  Internal = 'internal',
+  Cache = 'cache',
+}
+
 export interface QueryOrchestratorOptions {
   externalDriverFactory?: DriverFactory;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
@@ -223,9 +229,14 @@ export class QueryOrchestrator {
     return this.queryCache.resultFromCacheIfExists(queryBody);
   }
 
-  public async testConnections() {
+  public async testConnections(): Promise<void> {
     // @todo Possible, We will allow to use different drivers for cache and queue, dont forget to add both
-    return this.queryCache.testConnection();
+    try {
+      await this.queryCache.testConnection();
+    } catch (e: any) {
+      e.driverType = DriverType.Cache;
+      throw e;
+    }
   }
 
   public async cleanup() {

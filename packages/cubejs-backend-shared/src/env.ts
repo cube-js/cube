@@ -44,6 +44,66 @@ export function asPortNumber(input: number, envName: string) {
   return input;
 }
 
+/**
+ * Multiple data sources cache.
+ */
+let dataSourcesCache: string[];
+
+/**
+ * Determines whether multiple data sources were declared or not.
+ */
+function isMultipleDataSources(): boolean {
+  // eslint-disable-next-line no-use-before-define
+  dataSourcesCache = dataSourcesCache || getEnv('dataSources');
+  return dataSourcesCache.length > 0;
+}
+
+/**
+ * Returns the specified data source if assertions are passed, throws
+ * an error otherwise.
+ * @param dataSource The data source to assert.
+ */
+export function assertDataSource(dataSource = 'default'): string {
+  if (!isMultipleDataSources()) {
+    return dataSource;
+  } else if (dataSourcesCache.indexOf(dataSource) >= 0) {
+    return dataSource;
+  } else {
+    throw new Error(
+      `The ${
+        dataSource
+      } data source is missing in the declared CUBEJS_DATASOURCES.`
+    );
+  }
+}
+
+/**
+ * Returns data source specific environment variable name.
+ * @param origin Origin environment variable name.
+ * @param dataSource Data source name.
+ */
+export function keyByDataSource(origin: string, dataSource?: string): string {
+  if (dataSource) assertDataSource(dataSource);
+  if (!isMultipleDataSources() || dataSource === 'default') {
+    return origin;
+  } else if (!dataSource) {
+    return origin;
+  } else {
+    const s = origin.split('CUBEJS_');
+    if (s.length === 2) {
+      return `CUBEJS_DS_${dataSource.toUpperCase()}_${s[1]}`;
+    } else {
+      throw new Error(
+        `The ${
+          origin
+        } environment variable can not be converted for the ${
+          dataSource
+        } data source.`
+      );
+    }
+  }
+}
+
 function asPortOrSocket(input: string, envName: string): number | string {
   if (/^-?\d+$/.test(input)) {
     return asPortNumber(parseInt(input, 10), envName);
@@ -127,66 +187,1074 @@ const variables: Record<string, (...args: any) => any> = {
     .asEnum(['exit', 'log', 'false']),
   preAggregationsSchema: () => get('CUBEJS_PRE_AGGREGATIONS_SCHEMA')
     .asString(),
-  dbPollTimeout: () => {
-    const value = process.env.CUBEJS_DB_POLL_TIMEOUT;
+  maxPartitionsPerCube: () => get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
+    .default('10000')
+    .asInt(),
+
+  /** ****************************************************************
+   * Common db options                                               *
+   ***************************************************************** */
+
+  /**
+   * Configured datasources.
+   */
+  dataSources: (): string[] => {
+    const dataSources = process.env.CUBEJS_DATASOURCES;
+    if (dataSources) {
+      return dataSources.trim().split(',').map(ds => ds.trim());
+    }
+    return [];
+  },
+
+  /**
+   * Driver type.
+   */
+  dbType: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_TYPE', dataSource)]
+  ),
+
+  /**
+   * Use SSL connection flag.
+   */
+  dbSsl: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_SSL', dataSource)
+    ] || 'false';
+    if (val.toLocaleLowerCase() === 'true') {
+      return true;
+    } else if (val.toLowerCase() === 'false') {
+      return false;
+    } else {
+      throw new TypeError(
+        `The ${
+          keyByDataSource('CUBEJS_DB_SSL', dataSource)
+        } must be either 'true' or 'false'.`
+      );
+    }
+  },
+
+  /**
+   * Reject unauthorized SSL connection flag.
+   */
+  dbSslRejectUnauthorized: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED', dataSource)
+    ] || 'false';
+    if (val.toLocaleLowerCase() === 'true') {
+      return true;
+    } else if (val.toLowerCase() === 'false') {
+      return false;
+    } else {
+      throw new TypeError(
+        `The ${
+          keyByDataSource('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED', dataSource)
+        } must be either 'true' or 'false'.`
+      );
+    }
+  },
+
+  /**
+   * Database URL.
+   */
+  dbUrl: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_URL', dataSource)
+    ]
+  ),
+
+  /**
+   * Database host.
+   */
+  dbHost: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_HOST', dataSource)
+    ]
+  ),
+
+  /**
+   * Database domain.
+   */
+  dbDomain: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_DOMAIN', dataSource)]
+  ),
+
+  /**
+   * Database port.
+   */
+  dbPort: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_PORT', dataSource)]
+      ? parseInt(
+        `${
+          process.env[keyByDataSource('CUBEJS_DB_PORT', dataSource)]
+        }`,
+        10,
+      )
+      : undefined
+  ),
+
+  /**
+   * Database socket path.
+   */
+  dbSocketPath: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_SOCKET_PATH', dataSource)]
+  ),
+
+  /**
+   * Database user.
+   */
+  dbUser: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_USER', dataSource)]
+  ),
+
+  /**
+   * Database pass.
+   */
+  dbPass: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_PASS', dataSource)]
+  ),
+  
+  /**
+   * Database name.
+   */
+  dbName: ({
+    required,
+    dataSource,
+  }: {
+    dataSource: string,
+    required?: boolean,
+  }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_NAME', dataSource)
+    ];
+    if (required && !val) {
+      throw new Error(
+        `The ${
+          keyByDataSource('CUBEJS_DB_NAME', dataSource)
+        } is required and missing.`
+      );
+    }
+    return val;
+  },
+  
+  /**
+   * Database name.
+   * @deprecated
+   */
+  dbSchema: ({
+    required,
+    dataSource,
+  }: {
+    dataSource: string,
+    required?: boolean,
+  }) => {
+    console.warn(
+      `The ${
+        keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
+      } is deprecated. Please, use the ${
+        keyByDataSource('CUBEJS_DB_NAME', dataSource)
+      } instead.`
+    );
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
+    ];
+    if (required && !val) {
+      throw new Error(
+        `The ${
+          keyByDataSource('CUBEJS_DB_SCHEMA', dataSource)
+        } is required and missing.`
+      );
+    }
+    return val;
+  },
+  
+  /**
+   * Database name.
+   * @deprecated
+   */
+  dbDatabase: ({
+    required,
+    dataSource,
+  }: {
+    dataSource: string,
+    required?: boolean,
+  }) => {
+    console.warn(
+      `The ${
+        keyByDataSource('CUBEJS_DATABASE', dataSource)
+      } is deprecated. Please, use the ${
+        keyByDataSource('CUBEJS_DB_NAME', dataSource)
+      } instead.`
+    );
+    const val = process.env[
+      keyByDataSource('CUBEJS_DATABASE', dataSource)
+    ];
+    if (required && !val) {
+      throw new Error(
+        `The ${
+          keyByDataSource('CUBEJS_DATABASE', dataSource)
+        } is required and missing.`
+      );
+    }
+    return val;
+  },
+
+  /**
+   * Database max pool size.
+   */
+  dbMaxPoolSize: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_MAX_POOL', dataSource)]
+      ? parseInt(
+        `${
+          process.env[
+            keyByDataSource('CUBEJS_DB_MAX_POOL', dataSource)
+          ]
+        }`,
+        10,
+      )
+      : undefined
+  ),
+
+  /**
+   * Max polling interval. Currenly used in BigQuery and Databricks.
+   * TODO: clarify this env.
+   */
+  dbPollMaxInterval: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    const key = keyByDataSource('CUBEJS_DB_POLL_MAX_INTERVAL', dataSource);
+    const value = process.env[key] || '5s';
+    return convertTimeStrToMs(value, key);
+  },
+
+  /**
+   * Polling timeout. Currenly used in BigQuery, Dremio and Athena.
+   * TODO: clarify this env.
+   */
+  dbPollTimeout: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    const key = keyByDataSource('CUBEJS_DB_POLL_TIMEOUT', dataSource);
+    const value = process.env[key];
     if (value) {
-      return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_TIMEOUT');
+      return convertTimeStrToMs(value, key);
     } else {
       return null;
     }
   },
-  dbQueryTimeout: () => {
-    const value = process.env.CUBEJS_DB_QUERY_TIMEOUT || '10m';
-    return convertTimeStrToMs(value, 'CUBEJS_DB_QUERY_TIMEOUT');
-  },
-  dbPollMaxInterval: () => {
-    const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
-    return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
-  },
-  maxPartitionsPerCube: () => get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
-    .default('10000')
-    .asInt(),
-  // Common db options
-  dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
-    .required(required)
-    .asString(),
-  // Export Bucket options
-  dbExportBucketType: ({ supported }: { supported: ('s3' | 'gcp' | 'azure')[] }) => get('CUBEJS_DB_EXPORT_BUCKET_TYPE')
-    .asEnum(supported),
-  dbExportBucket: () => get('CUBEJS_DB_EXPORT_BUCKET')
-    .asString(),
-  dbExportBucketMountDir: () => get('CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR')
-    .asString(),
-  // Export bucket options for AWS S3
-  dbExportBucketAwsKey: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY')
-    .asString(),
-  dbExportBucketAwsSecret: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET')
-    .asString(),
-  dbExportBucketAwsRegion: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION')
-    .asString(),
-  // Export bucket options for Integration based
-  dbExportIntegration: () => get('CUBEJS_DB_EXPORT_INTEGRATION')
-    .asString(),
-  // Export bucket options for GCS
-  dbExportGCSCredentials: () => {
-    const credentials = get('CUBEJS_DB_EXPORT_GCS_CREDENTIALS')
-      .asString();
-    if (credentials) {
-      return JSON.parse(Buffer.from(credentials, 'base64').toString('utf8'));
-    }
 
+  /**
+   * Query timeout. Currenly used in BigQuery, Dremio, Postgres, Snowflake
+   * and Athena drivers and the orchestrator (queues, pre-aggs). For the
+   * orchestrator this variable did not split by the datasource.
+   *
+   * TODO (buntarb): check the possibility to split this for the
+   * orchestrator. This will allows us to make dataSource required.
+   */
+  dbQueryTimeout: ({
+    dataSource,
+  }: {
+    dataSource?: string,
+  } = {}) => {
+    const key = keyByDataSource('CUBEJS_DB_QUERY_TIMEOUT', dataSource);
+    const value = process.env[key] || '10m';
+    return convertTimeStrToMs(value, key);
+  },
+
+  /** ****************************************************************
+   * JDBC options                                                    *
+   ***************************************************************** */
+
+  /**
+   * JDBC URL.
+   */
+  jdbcUrl: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_JDBC_URL', dataSource)]
+  ),
+
+  /**
+   * JDBC driver.
+   */
+  jdbcDriver: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_JDBC_DRIVER', dataSource)]
+  ),
+
+  /** ****************************************************************
+   * Export Bucket options                                           *
+   ***************************************************************** */
+  
+  /**
+   * Export bucket storage type.
+   */
+  dbExportBucketType: ({
+    supported,
+    dataSource,
+  }: {
+    supported: ('s3' | 'gcp' | 'azure')[],
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_TYPE', dataSource)
+    ];
+    if (
+      val &&
+      supported &&
+      supported.indexOf(<'s3' | 'gcp' | 'azure'>val) === -1
+    ) {
+      throw new TypeError(
+        `The ${
+          keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_TYPE', dataSource)
+        } must be one of the [${supported.join(', ')}].`
+      );
+    }
+    return val;
+  },
+
+  /**
+   * Export bucket storage URI.
+   */
+  dbExportBucket: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_EXPORT_BUCKET', dataSource)]
+  ),
+
+  /**
+   * Mounted export bucket directory for the cases, when the storage
+   * mounted to the datasource.
+   */
+  dbExportBucketMountDir: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR', dataSource)
+    ]
+  ),
+
+  /**
+   * AWS Key for the AWS based export bucket srorage.
+   */
+  dbExportBucketAwsKey: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY', dataSource)
+    ]
+  ),
+
+  /**
+   * AWS Secret for the AWS based export bucket srorage.
+   */
+  dbExportBucketAwsSecret: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET', dataSource)
+    ]
+  ),
+
+  /**
+   * AWS Region for the AWS based export bucket srorage.
+   */
+  dbExportBucketAwsRegion: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AWS_REGION', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Key for the Azure based export bucket srorage.
+   */
+  dbExportBucketAzureKey: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY', dataSource)
+    ]
+  ),
+
+  /**
+   * Export bucket options for Integration based.
+   */
+  dbExportIntegration: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_INTEGRATION', dataSource)
+    ]
+  ),
+
+  /**
+   * Export bucket options for GCS.
+   */
+  dbExportGCSCredentials: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    const credentials = process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_GCS_CREDENTIALS', dataSource)
+    ];
+    if (credentials) {
+      return JSON.parse(
+        Buffer.from(credentials, 'base64').toString('utf8')
+      );
+    }
     return undefined;
   },
-  // Export bucket options for Azure
-  dbExportBucketAzureKey:
-    () => get('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY').asString(),
-  // Redshift Driver
-  dbExportBucketRedshiftArn: () => get('CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN')
-    .asString(),
-  // BigQuery Driver
-  bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
-    .asString(),
-  // Cube Store
+
+  /** ****************************************************************
+   * Databricks Driver                                               *
+   ***************************************************************** */
+
+  /**
+   * Databricks jdbc-connection url.
+   */
+  databrickUrl: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource('CUBEJS_DB_DATABRICKS_URL', dataSource)
+    ];
+    if (!val) {
+      throw new Error(
+        `The ${
+          keyByDataSource('CUBEJS_DB_DATABRICKS_URL', dataSource)
+        } is required and missing.`
+      );
+    }
+    return val;
+  },
+
+  /**
+   * Databricks jdbc-connection token.
+   */
+  databrickToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DATABRICKS_TOKEN', dataSource)
+    ]
+  ),
+
+  /**
+   * Accept Databricks policy flag. This environment variable doesn't
+   * need to be split by the data source.
+   */
+  databrickAcceptPolicy: () => (
+    get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict()
+  ),
+
+  /** ****************************************************************
+   * Athena Driver                                                   *
+   ***************************************************************** */
+
+  /**
+   * Athena AWS key.
+   */
+  athenaAwsKey: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    // TODO (buntarb): this name is a common. Deprecate and replace?
+    process.env[keyByDataSource('CUBEJS_AWS_KEY', dataSource)]
+  ),
+
+  /**
+   * Athena AWS secret.
+   */
+  athenaAwsSecret: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    // TODO (buntarb): this name is a common. Deprecate and replace?
+    process.env[keyByDataSource('CUBEJS_AWS_SECRET', dataSource)]
+  ),
+
+  /**
+   * Athena AWS region.
+   */
+  athenaAwsRegion: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    // TODO (buntarb): this name is a common. Deprecate and replace?
+    process.env[keyByDataSource('CUBEJS_AWS_REGION', dataSource)]
+  ),
+
+  /**
+   * Athena AWS S3 output location.
+   */
+  athenaAwsS3OutputLocation: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    // TODO (buntarb): this name is a common. Deprecate and replace?
+    process.env[
+      keyByDataSource('CUBEJS_AWS_S3_OUTPUT_LOCATION', dataSource)
+    ]
+  ),
+
+  /**
+   * Athena AWS workgroup.
+   */
+  athenaAwsWorkgroup: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    // TODO (buntarb): Deprecate and replace?
+    process.env[
+      keyByDataSource('CUBEJS_AWS_ATHENA_WORKGROUP', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * BigQuery Driver                                                 *
+   ***************************************************************** */
+
+  /**
+   * BigQuery project ID.
+   */
+  bigqueryProjectId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_BQ_PROJECT_ID', dataSource)]
+  ),
+
+  /**
+   * BigQuery Key file.
+   */
+  bigqueryKeyFile: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_BQ_KEY_FILE', dataSource)]
+  ),
+
+  /**
+   * BigQuery credentials.
+   */
+  bigqueryCredentials: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_BQ_CREDENTIALS', dataSource)
+    ]
+  ),
+
+  /**
+   * BigQuery location.
+   */
+  bigqueryLocation: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_BQ_LOCATION', dataSource)]
+  ),
+
+  /**
+   * BigQuery export bucket.
+   * @deprecated
+   */
+  bigqueryExportBucket: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    console.warn(
+      'The CUBEJS_DB_BQ_EXPORT_BUCKET is deprecated. ' +
+      'Please, use the CUBEJS_DB_EXPORT_BUCKET instead.'
+    );
+    return process.env[
+      keyByDataSource('CUBEJS_DB_BQ_EXPORT_BUCKET', dataSource)
+    ];
+  },
+
+  /** ****************************************************************
+   * ClickHouse Driver                                               *
+   ***************************************************************** */
+
+  /**
+   * ClickHouse read only flag.
+   */
+  clickhouseReadOnly: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_CLICKHOUSE_READONLY', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * ElasticSearch Driver                                            *
+   ***************************************************************** */
+
+  /**
+   * ElasticSearch API Id.
+   */
+  elasticApiId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_ELASTIC_APIKEY_ID', dataSource)
+    ]
+  ),
+
+  /**
+   * ElasticSearch API Key.
+   */
+  elasticApiKey: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_ELASTIC_APIKEY_KEY', dataSource)
+    ]
+  ),
+
+  /**
+   * ElasticSearch OpenDistro flag.
+   */
+  elasticOpenDistro: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_ELASTIC_OPENDISTRO', dataSource)
+    ]
+  ),
+
+  /**
+   * ElasticSearch query format.
+   */
+  elasticQueryFormat: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_ELASTIC_QUERY_FORMAT', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Firebolt Driver                                                 *
+   ***************************************************************** */
+
+  /**
+   * Firebolt API endpoint.
+   */
+  fireboltApiEndpoint: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_FIREBOLT_API_ENDPOINT', dataSource)
+    ]
+  ),
+
+  /**
+   * Firebolt engine name.
+   */
+  fireboltEngineName: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_FIREBOLT_ENGINE_NAME', dataSource)
+    ]
+  ),
+
+  /**
+   * Firebolt engine endpoint.
+   */
+  fireboltEngineEndpoint: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_FIREBOLT_ENGINE_ENDPOINT', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Hive Driver                                                     *
+   ***************************************************************** */
+
+  /**
+   * Hive type.
+   */
+  hiveType: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_HIVE_TYPE', dataSource)
+    ]
+  ),
+
+  /**
+   * Hive version.
+   */
+  hiveVer: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_HIVE_VER', dataSource)
+    ]
+  ),
+
+  /**
+   * Hive thrift version.
+   */
+  hiveThriftVer: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_HIVE_THRIFT_VER', dataSource)
+    ]
+  ),
+
+  /**
+   * Hive CDH version.
+   */
+  hiveCdhVer: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_HIVE_CDH_VER', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Aurora Driver                                                   *
+   ***************************************************************** */
+
+  /**
+   * Aurora secret ARN.
+   */
+  auroraSecretArn: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DATABASE_SECRET_ARN', dataSource)
+    ]
+  ),
+
+  /**
+   * Aurora cluster ARN.
+   */
+  auroraClusterArn: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DATABASE_CLUSTER_ARN', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Redshift Driver                                                 *
+   ***************************************************************** */
+
+  /**
+   * Redshift export bucket unload ARN.
+   */
+  redshiftUnloadArn: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Snowflake Driver                                                *
+   ***************************************************************** */
+
+  /**
+   * Snowflake account.
+   */
+  snowflakeAccount: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_ACCOUNT', dataSource)
+    ]
+  ),
+
+  /**
+   * Snowflake region.
+   */
+  snowflakeRegion: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_REGION', dataSource)
+    ]
+  ),
+
+  /**
+   * Snowflake warehouse.
+   */
+  snowflakeWarehouse: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_WAREHOUSE', dataSource)
+    ]
+  ),
+
+  /**
+   * Snowflake role.
+   */
+  snowflakeRole: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_ROLE', dataSource)
+    ]
+  ),
+
+  /**
+   * Snowflake session keep alive flag.
+   */
+  snowflakeSessionKeepAlive: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => {
+    const val = process.env[
+      keyByDataSource(
+        'CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE',
+        dataSource,
+      )
+    ];
+    if (val) {
+      if (val.toLocaleLowerCase() === 'true') {
+        return true;
+      } else if (val.toLowerCase() === 'false') {
+        return false;
+      } else {
+        throw new TypeError(
+          `The ${
+            keyByDataSource(
+              'CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE',
+              dataSource,
+            )
+          } must be either 'true' or 'false'.`
+        );
+      }
+    } else {
+      return undefined;
+    }
+  },
+
+  /**
+   * Snowflake authenticator.
+   */
+  snowflakeAuthenticator: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR', dataSource)
+    ]
+  ),
+
+  /**
+   * Snowflake private key.
+   */
+  snowflakePrivateKey: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY', dataSource)
+    ]
+  ),
+
+  /**
+   * Snowflake private key path.
+   */
+  snowflakePrivateKeyPath: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH', dataSource)
+    ]
+  ),
+
+  /**
+   * Snowflake private key pass.
+   */
+  snowflakePrivateKeyPass: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Presto Driver                                                   *
+   ***************************************************************** */
+
+  /**
+   * Presto catalog.
+   */
+  dbCatalog: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => {
+    console.warn(
+      'The CUBEJS_DB_CATALOG is deprecated. ' +
+      'Please, use the CUBEJS_DB_PRESTO_CATALOG instead.'
+    );
+    return process.env[
+      keyByDataSource('CUBEJS_DB_CATALOG', dataSource)
+    ];
+  },
+
+  /**
+   * Presto catalog.
+   */
+  prestoCatalog: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PRESTO_CATALOG', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Cube Store Driver                                               *
+   ***************************************************************** */
+
   cubeStoreHost: () => get('CUBEJS_CUBESTORE_HOST')
     .asString(),
   cubeStorePort: () => get('CUBEJS_CUBESTORE_PORT')
@@ -195,16 +1263,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
     .asString(),
-  // Databricks
-  databrickUrl: () => get('CUBEJS_DB_DATABRICKS_URL')
-    .required()
-    .asString(),
-  databrickAgent: () => get('CUBEJS_DB_DATABRICKS_AGENT')
-    .asString(),
-  databrickToken: () => get('CUBEJS_DB_DATABRICKS_TOKEN')
-    .asString(),
-  databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
-    .asString(),
+
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
     .default('2')
@@ -281,12 +1340,6 @@ const variables: Record<string, (...args: any) => any> = {
 
     return false;
   },
-  dbSsl: () => get('CUBEJS_DB_SSL')
-    .default('false')
-    .asBoolStrict(),
-  dbSslRejectUnauthorized: () => get('CUBEJS_DB_SSL_REJECT_UNAUTHORIZED')
-    .default('false')
-    .asBoolStrict(),
   nodeEnv: () => get('NODE_ENV')
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')

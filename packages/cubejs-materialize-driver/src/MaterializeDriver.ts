@@ -1,5 +1,5 @@
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { BaseDriver, DownloadTableMemoryData, IndexesSQL, StreamOptions, StreamTableDataWithTypes, TableStructure } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, DownloadTableMemoryData, IndexesSQL, StreamOptions, StreamTableDataWithTypes, TableStructure } from '@cubejs-backend/base-driver';
 import { PoolClient, QueryResult } from 'pg';
 import { Readable } from 'stream';
 
@@ -10,6 +10,9 @@ export type ReadableStreamTableDataWithTypes = StreamTableDataWithTypes & {
   rowStream: Readable;
 };
 
+/**
+ * Materialize driver class.
+ */
 export class MaterializeDriver extends PostgresDriver {
   /**
    * Returns default concurrency value.
@@ -18,7 +21,15 @@ export class MaterializeDriver extends PostgresDriver {
     return 2;
   }
 
-  public constructor(options: PostgresDriverConfiguration) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    options: PostgresDriverConfiguration & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {},
+  ) {
     super(options);
   }
 
@@ -53,7 +64,7 @@ export class MaterializeDriver extends PostgresDriver {
     tableData: DownloadTableMemoryData,
     indexesSql: IndexesSQL
   ) {
-    return BaseDriver.prototype.uploadTableWithIndexes.bind(this)(table, columns, tableData, indexesSql, [], null);
+    return BaseDriver.prototype.uploadTableWithIndexes.bind(this)(table, columns, tableData, indexesSql, [], null, [], []);
   }
 
   /**

@@ -11,6 +11,7 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
+use crate::metastore::metastore_fs::{MetaStoreFs, RocksMetaStoreFs};
 use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
@@ -299,6 +300,10 @@ pub trait ConfigObj: DIService {
 
     fn compaction_in_memory_chunks_count_threshold(&self) -> usize;
 
+    fn compaction_in_memory_chunks_ratio_threshold(&self) -> u64;
+
+    fn compaction_in_memory_chunks_ratio_check_threshold(&self) -> u64;
+
     fn wal_split_threshold(&self) -> u64;
 
     fn select_worker_pool_size(&self) -> usize;
@@ -314,6 +319,8 @@ pub trait ConfigObj: DIService {
     fn query_timeout(&self) -> u64;
 
     fn not_used_timeout(&self) -> u64;
+
+    fn in_memory_not_used_timeout(&self) -> u64;
 
     fn import_job_timeout(&self) -> u64;
 
@@ -373,6 +380,8 @@ pub struct ConfigObjImpl {
     pub compaction_in_memory_chunks_size_limit: u64,
     pub compaction_in_memory_chunks_total_size_limit: u64,
     pub compaction_in_memory_chunks_count_threshold: usize,
+    pub compaction_in_memory_chunks_ratio_threshold: u64,
+    pub compaction_in_memory_chunks_ratio_check_threshold: u64,
     pub wal_split_threshold: u64,
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
@@ -385,6 +394,7 @@ pub struct ConfigObjImpl {
     pub query_timeout: u64,
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
+    pub in_memory_not_used_timeout: u64,
     pub import_job_timeout: u64,
     pub meta_store_log_upload_interval: u64,
     pub meta_store_snapshot_interval: u64,
@@ -448,6 +458,14 @@ impl ConfigObj for ConfigObjImpl {
         self.compaction_in_memory_chunks_count_threshold
     }
 
+    fn compaction_in_memory_chunks_ratio_threshold(&self) -> u64 {
+        self.compaction_in_memory_chunks_ratio_threshold
+    }
+
+    fn compaction_in_memory_chunks_ratio_check_threshold(&self) -> u64 {
+        self.compaction_in_memory_chunks_ratio_check_threshold
+    }
+
     fn wal_split_threshold(&self) -> u64 {
         self.wal_split_threshold
     }
@@ -478,6 +496,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn not_used_timeout(&self) -> u64 {
         self.not_used_timeout
+    }
+
+    fn in_memory_not_used_timeout(&self) -> u64 {
+        self.in_memory_not_used_timeout
     }
 
     fn import_job_timeout(&self) -> u64 {
@@ -653,6 +675,14 @@ impl Config {
                     "CUBESTORE_IN_MEMORY_CHUNKS_COUNT_THRESHOLD",
                     10,
                 ),
+                compaction_in_memory_chunks_ratio_threshold: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_RATIO_THRESHOLD",
+                    3,
+                ),
+                compaction_in_memory_chunks_ratio_check_threshold: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_RATIO_CHECK_THRESHOLD",
+                    1000,
+                ),
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
@@ -694,6 +724,7 @@ impl Config {
                 )),
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                in_memory_not_used_timeout: 30,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
                 meta_store_log_upload_interval: 30,
                 meta_store_snapshot_interval: 300,
@@ -754,6 +785,8 @@ impl Config {
                 compaction_in_memory_chunks_size_limit: 262_144 / 4,
                 compaction_in_memory_chunks_total_size_limit: 262_144,
                 compaction_in_memory_chunks_count_threshold: 10,
+                compaction_in_memory_chunks_ratio_threshold: 3,
+                compaction_in_memory_chunks_ratio_check_threshold: 1000,
                 store_provider: FileStoreProvider::Filesystem {
                     remote_dir: Some(
                         env::current_dir()
@@ -768,6 +801,7 @@ impl Config {
                 http_bind_address: None,
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
                 stale_stream_timeout: 60,
                 select_workers: Vec::new(),
@@ -1052,26 +1086,27 @@ impl Config {
                 })
                 .await;
         } else {
+            self.injector
+                .register_typed_with_default::<dyn MetaStoreFs, RocksMetaStoreFs, _, _>(
+                    async move |i| {
+                        // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                        let original_remote_fs = i.get_service("original_remote_fs").await;
+                        RocksMetaStoreFs::new(original_remote_fs)
+                    },
+                )
+                .await;
             let path = self.meta_store_path().to_str().unwrap().to_string();
             self.injector
                 .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
                     async move |i| {
                         let config = i.get_service_typed::<dyn ConfigObj>().await;
-                        // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                        let original_remote_fs = i.get_service("original_remote_fs").await;
+                        let metastore_fs = i.get_service_typed::<dyn MetaStoreFs>().await;
                         let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            RocksMetaStore::load_from_dump(
-                                &path,
-                                dump_dir,
-                                original_remote_fs,
-                                config,
-                            )
-                            .await
-                            .unwrap()
-                        } else {
-                            RocksMetaStore::load_from_remote(&path, original_remote_fs, config)
+                            RocksMetaStore::load_from_dump(&path, dump_dir, metastore_fs, config)
                                 .await
                                 .unwrap()
+                        } else {
+                            metastore_fs.load_from_remote(&path, config).await.unwrap()
                         };
                         meta_store.add_listener(event_sender).await;
                         meta_store

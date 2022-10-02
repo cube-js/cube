@@ -276,6 +276,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::ScalarUDFExpr(params) => {
+                push_referenced_columns(params[1], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::AggregateFunctionExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
@@ -297,7 +301,8 @@ impl LogicalPlanAnalysis {
             | LogicalPlanLanguage::CaseExprElseExpr(params)
             | LogicalPlanLanguage::CaseExprExpr(params)
             | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
-            | LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
+            | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
+            | LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
                 for p in params.iter() {
                     vec.extend(referenced_columns(*p)?.into_iter());
                 }
@@ -355,6 +360,7 @@ impl LogicalPlanAnalysis {
                         || &fun.name == "date_add"
                         || &fun.name == "date_sub"
                         || &fun.name == "date"
+                        || &fun.name == "interval_mul"
                     {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
@@ -419,10 +425,15 @@ impl LogicalPlanAnalysis {
                 )
                 .ok()?;
 
-                // Ignore any string casts as local timestamps casted incorrectly
-                if let Expr::Cast { expr, .. } = &expr {
-                    if let Expr::Literal(ScalarValue::Utf8(_)) = expr.as_ref() {
-                        return None;
+                // Some casts from string can have unpredictable behavior
+                if let Expr::Cast { expr, data_type } = &expr {
+                    match expr.as_ref() {
+                        Expr::Literal(ScalarValue::Utf8(value)) => match (value, data_type) {
+                            // Timezone set in Config
+                            (Some(_), DataType::Timestamp(_, _)) => (),
+                            _ => return None,
+                        },
+                        _ => (),
                     }
                 }
 

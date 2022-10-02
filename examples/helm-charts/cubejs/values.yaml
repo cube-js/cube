@@ -454,6 +454,14 @@ cubestore:
   port:
 
 master:
+  ## Service account for cubejs master to use
+  ##
+  serviceAccount:
+    create: false
+    name: ""
+    automountServiceAccountToken: true
+    annotations: {}
+
   ## Affinity for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
@@ -508,6 +516,14 @@ master:
   nodeSelector: {}
 
 workers:
+  ## Service account for cubejs master to use
+  ##
+  serviceAccount:
+    create: false
+    name: ""
+    automountServiceAccountToken: true
+    annotations: {}
+
   workersCount: 1
 
   ## Affinity for pod assignment

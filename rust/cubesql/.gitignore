@@ -7,3 +7,4 @@ dist
 node_modules
 .vscode
 /cubesql/egraph-debug
+egraph-debug

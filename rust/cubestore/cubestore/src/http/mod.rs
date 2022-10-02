@@ -562,6 +562,7 @@ impl HttpMessage {
                                 vec![]
                             };
                             inline_tables.push(InlineTable::new(
+                                inline_tables.len() as u64 + 1,
                                 name,
                                 Arc::new(DataFrame::new(columns, rows)),
                             ));
@@ -704,6 +705,7 @@ mod tests {
                 command: HttpCommand::Query {
                     query: "query".to_string(),
                     inline_tables: vec![InlineTable::new(
+                        1,
                         "table".to_string(),
                         Arc::new(DataFrame::new(columns, rows.clone()))
                     )],
