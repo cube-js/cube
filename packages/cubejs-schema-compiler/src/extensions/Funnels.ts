@@ -84,7 +84,7 @@ ${eventJoin.join('\nLEFT JOIN\n')}
       null,
       (step.eventsCube || step.eventsView || step.eventsTable).sql
     );
-    const fromSql = (sql.indexOf('select') !== -1 ? `(${sql}) e` : sql);
+    const fromSql = (sql.toLowerCase().trim().startsWith('select') ? `(${sql}) e` : sql);
     const timeToConvertCondition =
       step.timeToConvert ?
         ` AND ${this.compiler.contextQuery().convertTz(`${this.eventsTableName(step)}.t`)} <= ${this.compiler.contextQuery().addInterval(this.compiler.contextQuery().convertTz(`${this.eventsTableName(prevStep)}.t`), step.timeToConvert)}` :
