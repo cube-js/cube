@@ -29,7 +29,7 @@ describe('SnowflakeDriver', () => {
       const searchSchema = 'dev_pre_aggregations_opa';
       process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = searchSchema;
       const dbCatalog = 'main';
-      const queryWichShouldBeRepalcedInFlight = `SELECT 
+      const queryWhichShouldBeReplacedInFlight = `SELECT 
       line_item__l_linestatus
       line_item__l_linestatus,
       line_item__l_shipmode
@@ -75,7 +75,7 @@ describe('SnowflakeDriver', () => {
         { dbCatalog }
       );
 
-      const res1 = await driver.query(queryWichShouldBeRepalcedInFlight, []);
+      const res1 = await driver.query(queryWhichShouldBeReplacedInFlight, []);
       const res2 = await driver.query(ignoreQuery1, []);
       const res3 = await driver.query(ignoreQuery2, []);
       const res4 = await driver.query(ignoreQuery3, []);
@@ -91,11 +91,14 @@ describe('SnowflakeDriver', () => {
 
   describe('createSchemaIfNotExists()', () => {
     it('success', async () => {
+      const schemaName = 'my_schema'
       const driver = createDatabricksDriver(
         [
           
         ],
       );
+
+      const result = await driver.createSchemaIfNotExists(schemaName);
     });
 
     it('success with db catalog', () => {
