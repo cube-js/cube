@@ -1,13 +1,25 @@
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
 import { BaseDriver, DownloadTableMemoryData, IndexesSQL, StreamOptions, StreamTableDataWithTypes, TableStructure } from '@cubejs-backend/base-driver';
 import { PoolClient, QueryResult } from 'pg';
+import { reduce } from 'ramda';
 import { Readable } from 'stream';
+import semver from 'semver';
 
 export type ReadableStreamTableDataWithTypes = StreamTableDataWithTypes & {
   /**
    * Compatibility with streamToArray method from '@cubejs-backend/shared'
    */
   rowStream: Readable;
+};
+
+export type SchemaResponse = {
+  [schema: string]: {
+    [schemaObject: string]: {
+      name: string;
+      type: string;
+      attributes: any[];
+  }[];
+  }
 };
 
 /**
@@ -53,7 +65,7 @@ export class MaterializeDriver extends PostgresDriver {
       `SHOW SCHEMAS WHERE name = '${schemaName}'`, []
     );
     if (schemas.length === 0) {
-      this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
+      await this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
     }
     return [];
   }
@@ -72,8 +84,9 @@ export class MaterializeDriver extends PostgresDriver {
    * Returns materialized sources, materialized views, and tables
    * @returns {string} schemaQuery
    */
-  public informationSchemaQuery(): string {
-    const materializationFilter = `
+  public informationSchemaQueryWithFilter(version: string): string {
+    console.log(version);
+    const materializationFilter = semver.lt(version, 'v0.27.0-alpha') ? `
         table_name IN (
           SELECT name
           FROM mz_catalog.mz_sources
@@ -85,9 +98,38 @@ export class MaterializeDriver extends PostgresDriver {
           UNION
           SELECT t.name
           FROM mz_catalog.mz_tables t
-        )`;
+        )` : `
+        table_name IN (
+          SELECT name
+          FROM mz_catalog.mz_sources
+          UNION
+          SELECT name
+          FROM mz_catalog.mz_tables t
+          UNION
+          SELECT name
+          FROM mz_catalog.mz_materialized_views t
+        )
+        `;
 
     return `${super.informationSchemaQuery()} AND ${materializationFilter}`;
+  }
+
+  /**
+   * Materialize instance version
+   * @returns {Promise<string>} version
+   */
+  public async getMaterializeVersion(): Promise<string> {
+    const [{ version }] = await this.query<{version: string}>('SELECT mz_version() as version;', []);
+
+    // Materialzie returns the version as follows: 'v0.24.3-alpha.5 (65778f520)'
+    return version.split(' ')[0];
+  }
+
+  public async tablesSchema(): Promise<SchemaResponse> {
+    const version = await this.getMaterializeVersion();
+    const query = this.informationSchemaQueryWithFilter(version);
+
+    return this.query(query, []).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
   }
 
   protected async* asyncFetcher<R extends unknown>(conn: PoolClient, cursorId: string): AsyncGenerator<R> {
