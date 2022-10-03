@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
+
+
+### Bug Fixes
+
+* **postgres-driver:** release method should not throw ([#5395](https://github.com/cube-js/cube.js/issues/5395)) ([9423f46](https://github.com/cube-js/cube.js/commit/9423f46141eb73eaac24d9b16c449ff2dbc2918a))
+
+
+### Features
+
+* multiple data source ([#5326](https://github.com/cube-js/cube.js/issues/5326)) ([334af8c](https://github.com/cube-js/cube.js/commit/334af8c56cd02ae551844e9d1e9ab5e107fb1555))
+
+
+
+
+
 ## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver

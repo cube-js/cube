@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
+
+
+### Features
+
+* **testing:** databricks test suite ([#5311](https://github.com/cube-js/cube.js/issues/5311)) ([b77f33b](https://github.com/cube-js/cube.js/commit/b77f33ba9d804d8ca8746fe99d6050ebe26b4528))
+
+
+
+
+
 ## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
 
 
