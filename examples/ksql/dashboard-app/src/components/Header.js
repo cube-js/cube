@@ -9,6 +9,12 @@ const Header = ({ analytics }) => {
   const [sendingEvent, setSendingEvent] = useState(false);
   const [ i, setI ] = useState(0);
 
+  const onClick = useCallback(() => {
+    setSendingEvent(true);
+    analytics.track("button_clicked");
+    setTimeout(() => setSendingEvent(false), 500);
+  }, [analytics]);
+
   useEffect(() => {
     const interval = setTimeout(() => {
       setI(i => i + 1);
@@ -18,13 +24,7 @@ const Header = ({ analytics }) => {
       }
     }, DELAY);
     return () => clearTimeout(interval);
-  }, [ i ]);
-
-  const onClick = useCallback(() => {
-    setSendingEvent(true);
-    analytics.track("button_clicked");
-    setTimeout(() => setSendingEvent(false), 500);
-  }, [analytics]);
+  }, [i, onClick]);
 
   return (
     <Layout.Header style={{ padding: "0 32px" }}>
