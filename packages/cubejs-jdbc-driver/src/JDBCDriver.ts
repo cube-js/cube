@@ -98,7 +98,14 @@ export class JDBCDriver extends BaseDriver {
       throw new Error('url is required property');
     }
 
-    this.pool = genericPool.createPool({
+    this.pool = this.getPool(dataSource, config, poolOptions);
+  }
+
+  protected getPool(dataSource: string, config: Partial<JDBCDriverConfiguration> & {
+    dataSource?: string,
+    maxPoolSize?: number,
+  }, poolOptions?: genericPool.Options) {
+    return genericPool.createPool({
       create: async () => {
         await initMvn(await this.getCustomClassPath());
 
@@ -193,6 +200,7 @@ export class JDBCDriver extends BaseDriver {
   }
 
   protected async queryPromised(query: string, cancelObj: any, options: any) {
+    console.log('queryPromisedqueryPromised',);
     options = options || {};
     try {
       const conn = await this.pool.acquire();
@@ -216,6 +224,7 @@ export class JDBCDriver extends BaseDriver {
 
   protected async executeStatement(conn: any, query: any, cancelObj?: any) {
     const createStatementAsync = promisify(conn.createStatement.bind(conn));
+
     const statement = await createStatementAsync();
     if (cancelObj) {
       cancelObj.cancel = promisify(statement.cancel.bind(statement));

@@ -38,6 +38,7 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     azureKey?: string,
     dbCatalog?: string;
     databricksStorageCredentialName?: string;
+    url?: string;
   };
 
 async function fileExistsOr(
@@ -124,7 +125,6 @@ export class DatabricksDriver extends JDBCDriver {
       assertDataSource('default');
 
     const config: DatabricksDriverConfiguration = {
-      ...conf,
       dbType: 'databricks',
       drivername: 'com.simba.spark.jdbc.Driver',
       customClassPath: undefined,
@@ -135,7 +135,7 @@ export class DatabricksDriver extends JDBCDriver {
         UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
       },
       database: getEnv('dbName', { required: false, dataSource }),
-      url: getEnv('databrickUrl', { dataSource }),
+      url: conf?.url || getEnv('databrickUrl', { dataSource }),
       // common export bucket config
       bucketType:
         conf?.bucketType ||
@@ -167,6 +167,7 @@ export class DatabricksDriver extends JDBCDriver {
 
       dbCatalog: conf?.dbCatalog || getEnv('databricksDbCatalog', { dataSource }),
       databricksStorageCredentialName: conf?.databricksStorageCredentialName || getEnv('databricksStorageCredentialName', { dataSource }),
+      ...conf,
     };
 
     super(config);
@@ -190,6 +191,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public async query<R = unknown>(query: string, values: unknown[], _options?: unknown): Promise<R[]> {
+    console.log('Databricks.Query');
     let newQuery = query;
 
     if (this.config.dbCatalog) {
