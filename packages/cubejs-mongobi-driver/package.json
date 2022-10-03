@@ -29,7 +29,7 @@
     "@cubejs-backend/shared": "^0.31.0",
     "@types/node": "^10.17.60",
     "generic-pool": "^3.6.0",
-    "moment": "^2.29.1",
+    "moment": "^2.29.4",
     "mysql2": "^2.2.5"
   },
   "license": "Apache-2.0",
