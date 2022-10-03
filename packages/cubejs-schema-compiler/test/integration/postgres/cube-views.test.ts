@@ -12,6 +12,10 @@ cube(\`Orders\`, {
   UNION ALL
   SELECT 2 as id, 2 as product_id, 'completed' as status, '2022-01-02T00:00:00.000Z'::timestamptz as created_at
   \`,
+  
+  refreshKey: {
+    sql: \`SELECT MAX(created_at) FROM \${Orders.sql()} orders WHERE \${FILTER_PARAMS.Orders.createdAt.filter('created_at')}\`
+  },
 
   preAggregations: {
     countByProductName: {
@@ -65,9 +69,20 @@ cube(\`Orders\`, {
       type: \`time\`
     },
     
+    productId: {
+      sql: \`product_id\`,
+      type: \`number\`,
+    },
+    
     productAndCategory: {
       sql: \`\${Products.name} || '_' || \${Products.ProductCategories.name}\`,
       type: \`string\`
+    },
+  },
+  
+  segments: {
+    potatoOnly: {
+      sql: \`\${CUBE}.product_id = 2 AND \${FILTER_PARAMS.Orders.productId.filter(\`\${CUBE.productId}\`)}\`,
     },
   },
 
@@ -217,6 +232,8 @@ view(\`OrdersView\`, {
 
     console.log(query.buildSqlAndParams());
 
+    console.log(query.cacheKeyQueries());
+
     const res = await dbRunner.evaluateQueryWithPreAggregations(query);
     console.log(JSON.stringify(res));
 
@@ -327,5 +344,19 @@ view(\`OrdersView\`, {
     orders_view__product_category: 'Tomato_Groceries_Groceries',
   }, {
     orders_view__product_category: null,
+  }]));
+
+  it('segment with filter params', async () => runQueryTest({
+    measures: ['Orders.count'],
+    segments: [
+      'Orders.potatoOnly'
+    ],
+    filters: [{
+      member: 'Orders.productId',
+      operator: 'equals',
+      values: ['2'],
+    }]
+  }, [{
+    orders__count: '1',
   }]));
 });

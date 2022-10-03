@@ -2731,7 +2731,7 @@ class BaseQuery {
 
   static emptyParametrizedContextSymbols(cubeEvaluator, allocateParam) {
     return {
-      filterParams: BaseQuery.filterProxyFromAllFilters({}, cubeEvaluator, allocateParam),
+      filterParams: BaseQuery.filterProxyFromAllFilters(null, cubeEvaluator, allocateParam),
       sqlUtils: {
         convertTz: (field) => field,
       },
@@ -2792,14 +2792,16 @@ class BaseQuery {
         if (name === '_objectWithResolvedProperties') {
           return true;
         }
-        const cubeName = cubeEvaluator.cubeNameFromPath(name);
+        // allFilters is null whenever it's used to test if the member is owned by cube so it should always render to `1 = 1`
+        // and do not check cube validity as it's part of compilation step.
+        const cubeName = allFilters && cubeEvaluator.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
           get: (cubeNameObj, propertyName) => {
             const filters =
-              allFilters.filter(f => f.dimension === cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
+              allFilters?.filter(f => f.dimension === cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
             return {
               filter: (column) => {
-                if (!filters.length) {
+                if (!filters || !filters.length) {
                   return '1 = 1';
                 }
 
