@@ -101,6 +101,8 @@ export class CubeEvaluator extends CubeSymbols {
       if (member.sql && !member.subQuery) {
         const funcArgs = this.funcArguments(member.sql);
         const cubeReferences = this.collectUsedCubeReferences(cube.name, member.sql);
+        // We won't check for FILTER_PARAMS here as it shouldn't affect ownership and it should obey the same reference rules.
+        // To affect ownership FILTER_PARAMS can be declared as `${FILTER_PARAMS.Foo.bar.filter(`${Foo.bar}`)}`.
         if (funcArgs.length > 0 && cubeReferences.length === 0) {
           ownedByCube = false;
         }
