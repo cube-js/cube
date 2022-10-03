@@ -200,7 +200,6 @@ export class JDBCDriver extends BaseDriver {
   }
 
   protected async queryPromised(query: string, cancelObj: any, options: any) {
-    console.log('queryPromisedqueryPromised',);
     options = options || {};
     try {
       const conn = await this.pool.acquire();

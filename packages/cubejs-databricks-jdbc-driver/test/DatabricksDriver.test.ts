@@ -91,18 +91,31 @@ describe('SnowflakeDriver', () => {
 
   describe('createSchemaIfNotExists()', () => {
     it('success', async () => {
-      const schemaName = 'my_schema'
+      const schemaName = 'my_schema';
       const driver = createDatabricksDriver(
         [
-          
+          { regexp: new RegExp(`CREATE SCHEMA IF NOT EXISTS \`${schemaName}\``), rows: ['ok'] }
         ],
       );
 
       const result = await driver.createSchemaIfNotExists(schemaName);
+
+      expect(result).toEqual(['ok']);
     });
 
-    it('success with db catalog', () => {
-      
+    it('success with db catalog', async () => {
+      const dbCatalog = 'main';
+      const schemaName = 'my_schema';
+      const driver = createDatabricksDriver(
+        [
+          { regexp: new RegExp(`CREATE SCHEMA IF NOT EXISTS \`${dbCatalog}\`\\.\`${schemaName}\``), rows: ['ok'] }
+        ],
+        { dbCatalog }
+      );
+
+      const result = await driver.createSchemaIfNotExists(schemaName);
+
+      expect(result).toEqual(['ok']);
     });
   });
 
