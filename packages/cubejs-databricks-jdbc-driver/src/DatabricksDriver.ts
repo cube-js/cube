@@ -191,7 +191,6 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public async query<R = unknown>(query: string, values: unknown[], _options?: unknown): Promise<R[]> {
-    console.log('Databricks.Query');
     let newQuery = query;
 
     if (this.config.dbCatalog) {
