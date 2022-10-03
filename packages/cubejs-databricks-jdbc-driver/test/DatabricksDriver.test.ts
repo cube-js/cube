@@ -44,13 +44,13 @@ describe('SnowflakeDriver', () => {
             SELECT * FROM ${searchSchema}.line_item__monthly_data19980101_xtjvt42f_epa5vpcl_1hjjgo6
           ) AS \`line_item___monthly_data\`  GROUP BY \`line_item__l_linestatus\`, \`line_item__l_shipmode\` ORDER BY 1 ASC LIMIT 10000`;
          
-      // such queries shouldn't be replaces in flight by catalog feature
-      // these two should be ignore because it doesn't contains required schema
+      // such queries shouldn't be replaced in flight by catalog feature
+      // these two should be ignored because they don't contain required schema
       const ignoreQuery1 = 'SELECT * FROM random_table';
       const ignoreQuery2 = 'SELECT * FROM some_other_schema.line_item__monthly_data19980101_xtjvt42f_epa5vpcl';
-      // we can ignore it because it's already contains catalog
+      // we can ignore it because it already contains catalog
       const ignoreQuery3 = `SELECT * FROM ${dbCatalog}.${searchSchema}.line_item__monthly_data19980101_xtjvt42f`;
-      // we should ignore it because it's contains another unity catalog
+      // we should ignore it because it contains another unity catalog
       const ignoreQuery4 = 'SELECT * FROM tpch.random_schema.table';
 
       const driver = createDatabricksDriver(
@@ -90,8 +90,12 @@ describe('SnowflakeDriver', () => {
   });
 
   describe('createSchemaIfNotExists()', () => {
-    it('success', () => {
-      
+    it('success', async () => {
+      const driver = createDatabricksDriver(
+        [
+          
+        ],
+      );
     });
 
     it('success with db catalog', () => {
