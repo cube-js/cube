@@ -1,8 +1,8 @@
-import React from 'react';
+import React from 'react'
 import { useState, useEffect } from 'react'
 import * as classes from './index.module.css'
-import * as ReactDOM from 'react-dom/client';
-import cubejs from '@cubejs-client/core';
+import * as ReactDOM from 'react-dom/client'
+import cubejs from '@cubejs-client/core'
 
 import {
   DisplayBarChart,
@@ -11,7 +11,7 @@ import {
   defaultYearId,
   token,
   jsonQuery,
-} from './utils/utils';
+} from './utils/utils'
 
 ReactDOM
   .createRoot(document.getElementById('app'))
@@ -20,48 +20,51 @@ ReactDOM
   )
 
 function App() {
-  const [ timer, setTimer ] = useState({});
-  const apiUrl = defaultApiUrl;
+  const [ timerClickhouse, setTimerClickhouse ] = useState({})
+  const [ timerMysql, setTimerMysql ] = useState({})
+  const apiUrl = defaultApiUrl
 
-  const [ yearId, setYearId ] = useState(defaultYearId);
-  const year = years.find(x => x.id === yearId);
+  const [ yearId, setYearId ] = useState(defaultYearId)
+  const year = years.find(x => x.id === yearId)
 
   const cubejsApi = cubejs(
     token,
     { apiUrl },
-  );
+  )
 
+  const [ clickhouseOntimeBarData, setClickhouseOntimeBarData ] = useState({})
   useEffect(() => {
-    setTimer({});
-    const start = Date.now();
-    cubejsApi
-      .meta()
-      .then(() => {
-        const end = Date.now();
-        const responseTime = end - start;
-        setTimer({ responseTime });
-      })
-  }, [
-    year.year,
-  ]);
+    setTimerClickhouse({})
+    const start = Date.now()
 
-  const [ clickhouseOntimeBarData, setClickhouseOntimeBarData ] = useState({});
-  useEffect(() => {
     cubejsApi
       .load(jsonQuery({ year: year.year, dataSource: 'clickhouse' }))
       .then(setClickhouseOntimeBarData)
+      .then(() => {
+        const end = Date.now()
+        const responseTime = end - start
+        setTimerClickhouse({ responseTime })
+      })
   }, [
     year.year,
-  ]);
+  ])
 
-  const [ mysqlOntimeBarData, setMysqlOntimeBarData ] = useState({});
+  const [ mysqlOntimeBarData, setMysqlOntimeBarData ] = useState({})
   useEffect(() => {
+    setTimerMysql({})
+    const start = Date.now()
+
     cubejsApi
-      .load(jsonQuery({ year: year.year, dataSource: 'clickhouse' })) // edit to use mysql once we get endpoint
+      .load(jsonQuery({ year: year.year, dataSource: 'mysql' })) // edit to use mysql once we get endpoint
       .then(setMysqlOntimeBarData)
+      .then(() => {
+        const end = Date.now()
+        const responseTime = end - start
+        setTimerMysql({ responseTime })
+      })
   }, [
     year.year,
-  ]);
+  ])
 
   return <>
     <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -85,7 +88,7 @@ function App() {
           <tr>
             <td style={{ width: '50%' }}>
               <div style={{ height: '375px', margin: '20px 0' }}>
-                <h3 style={{display: 'flex', justifyContent: 'center'}}>ClickHouse { (timer.responseTime / 1000) || '...' } seconds</h3>
+                <h3 style={{display: 'flex', justifyContent: 'center'}}>ClickHouse { (timerClickhouse.responseTime) ? `${timerClickhouse.responseTime / 1000} seconds` : '...' }</h3>
                 <DisplayBarChart
                   chartData={clickhouseOntimeBarData}
                 />
@@ -93,7 +96,7 @@ function App() {
             </td>
             <td style={{ width: '50%' }}>
               <div style={{ height: '375px', margin: '20px 0' }}>
-                <h3 style={{display: 'flex', justifyContent: 'center'}}>MySQL { (timer.responseTime / 1000) || '...' } seconds</h3>
+                <h3 style={{display: 'flex', justifyContent: 'center'}}>MySQL { (timerMysql.responseTime) ? `${timerMysql.responseTime / 1000} seconds` : '...' }</h3>
                 <DisplayBarChart
                   chartData={mysqlOntimeBarData}
                 />

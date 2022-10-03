@@ -5,48 +5,47 @@
 // enabled for your account.  You are still allowed to require
 // @cubejs-backend/*-driver packages.
 
-const clickhouseHost     = process.env.CUBEJS_DB_HOST;
-const clickhousePort     = process.env.CUBEJS_DB_PORT;
-const clickhouseDatabase = process.env.CUBEJS_DB_NAME;
-const clickhouseUser     = process.env.CUBEJS_DB_USER;
-const clickhousePassword = process.env.CUBEJS_DB_PASS;
-
 /**
  * Demo 1
  * Multi-tenancy with Data Sources
- */
-// const mysqlHost      = 'demo-db-examples.cube.dev';
-// const mysqlPort      = '5432';
-// const mysqlDatabase  = 'ecom';
-// const mysqlUser      = 'cube';
-// const mysqlPassword  = '12345';
+//  */
+// const clickhouseHost     = process.env.CUBEJS_DB_HOST;
+// const clickhousePort     = process.env.CUBEJS_DB_PORT;
+// const clickhouseDatabase = process.env.CUBEJS_DB_NAME;
+// const clickhouseUser     = process.env.CUBEJS_DB_USER;
+// const clickhousePassword = process.env.CUBEJS_DB_PASS;
+// const mysqlHost      = 'demo-mysql-rhodges.czuu1tdfcpyt.us-east-1.rds.amazonaws.com';
+// const mysqlPort      = '3306';
+// const mysqlDatabase  = 'test';
+// const mysqlUser      = 'admin';
+// const mysqlPassword  = 'YIDrkjMThI9ZHtdOfjj7';
 
 module.exports = {
   /**
    * Demo 1
    * Multi-tenancy with Data Sources
    */
-  driverFactory: ({ dataSource }) => {
-    if (dataSource === 'mysql') {
-      return {
-        type: 'postgres', // replace with mysql once we get an endpoint
-        database: mysqlDatabase,
-        host: mysqlHost,
-        user: mysqlUser,
-        password: mysqlPassword,
-        port: mysqlPort,
-      };
-    } else {
-      return {
-        type: 'clickhouse',
-        database: clickhouseDatabase,
-        host: clickhouseHost,
-        user: clickhouseUser,
-        password: clickhousePassword,
-        port: clickhousePort,
-      };
-    }
-  },  
+  // driverFactory: ({ dataSource }) => {
+  //   if (dataSource === 'mysql') {
+  //     return {
+  //       type: 'mysql',
+  //       database: mysqlDatabase,
+  //       host: mysqlHost,
+  //       user: mysqlUser,
+  //       password: mysqlPassword,
+  //       port: mysqlPort,
+  //     };
+  //   } else {
+  //     return {
+  //       type: 'clickhouse',
+  //       database: clickhouseDatabase,
+  //       host: clickhouseHost,
+  //       user: clickhouseUser,
+  //       password: clickhousePassword,
+  //       port: clickhousePort,
+  //     };
+  //   }
+  // },
 
 
   /**

@@ -29,27 +29,20 @@ function App() {
     { apiUrl },
   )
 
+  const [ ontimeBarData, setOntimeBarData ] = useState({})
   useEffect(() => {
     setTimer({})
     const start = Date.now()
 
+    setOntimeBarData({})
     cubejsApi
-      .meta()
+      .load(jsonQuery())
+      .then(setOntimeBarData)
       .then(() => {
         const end = Date.now()
         const responseTime = end - start
         setTimer({ responseTime })
       })
-  }, [
-    dataSource.token,
-    apiUrl,
-  ])
-
-  const [ ontimeBarData, setOntimeBarData ] = useState({})
-  useEffect(() => {
-    cubejsApi
-      .load(jsonQuery())
-      .then(setOntimeBarData)
   }, [
     dataSource.token,
     apiUrl,

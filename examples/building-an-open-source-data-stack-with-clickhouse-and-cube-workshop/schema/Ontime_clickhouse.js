@@ -1,5 +1,5 @@
-cube(`Ontime`, {
-  sql: `SELECT * FROM default.ontime`,
+cube(`Ontime_clickhouse`, {
+  sql: `SELECT * FROM ontime`,
   dataSource: `clickhouse`,
 
   preAggregations: {
@@ -20,132 +20,132 @@ cube(`Ontime`, {
      * Demo
      * Add custom measures
      */
-    avgDepDelay: {
-      type: `avg`,
-      sql: `${CUBE}."DepDelay"`
-    },
-    avgDepDelayGreaterThanTenMinutesPercentage: {
-      type: `number`,
-      sql: `avg(${CUBE}."DepDelay">10)*100`,
-      format: `percent`
-    },
+    // avgDepDelay: {
+    //   type: `avg`,
+    //   sql: `${CUBE}.DepDelay`
+    // },
+    // avgDepDelayGreaterThanTenMinutesPercentage: {
+    //   type: `number`,
+    //   sql: `avg(${CUBE}.DepDelay>10)*100`,
+    //   format: `percent`
+    // },
   },
   
   dimensions: {
     year: {
-      sql: `${CUBE}."Year"`,
+      sql: `${CUBE}.Year`,
       type: `number`
     },
     quarter: {
-      sql: `${CUBE}."Quarter"`,
+      sql: `${CUBE}.Quarter`,
       type: `number`
     },
     month: {
-      sql: `${CUBE}."Month"`,
+      sql: `${CUBE}.Month`,
       type: `number`
     },
     dayofmonth: {
-      sql: `${CUBE}."DayofMonth"`,
+      sql: `${CUBE}.DayofMonth`,
       type: `number`
     },
     dayofweek: {
-      sql: `${CUBE}."DayOfWeek"`,
+      sql: `${CUBE}.DayOfWeek`,
       type: `number`
     },
     airlineid: {
-      sql: `${CUBE}."AirlineID"`,
+      sql: `${CUBE}.AirlineID`,
       type: `number`
     },
     uniquecarrier: {
-      sql: `${CUBE}."UniqueCarrier"`,
+      sql: `${CUBE}.UniqueCarrier`,
       type: `string`
     },
     carrier: {
-      sql: `${CUBE}."Carrier"`,
+      sql: `${CUBE}.Carrier`,
       type: `string`
     },
     tailnum: {
-      sql: `${CUBE}."TailNum"`,
+      sql: `${CUBE}.TailNum`,
       type: `string`
     },
     flightnum: {
-      sql: `${CUBE}."FlightNum"`,
+      sql: `${CUBE}.FlightNum`,
       type: `string`
     },
     origin: {
-      sql: `${CUBE}."Origin"`,
+      sql: `${CUBE}.Origin`,
       type: `string`
     },
     origincityname: {
-      sql: `${CUBE}."OriginCityName"`,
+      sql: `${CUBE}.OriginCityName`,
       type: `string`
     },
     originstate: {
-      sql: `${CUBE}."OriginState"`,
+      sql: `${CUBE}.OriginState`,
       type: `string`
     },
     originstatefips: {
-      sql: `${CUBE}."OriginStateFips"`,
+      sql: `${CUBE}.OriginStateFips`,
       type: `string`
     },
     originstatename: {
-      sql: `${CUBE}."OriginStateName"`,
+      sql: `${CUBE}.OriginStateName`,
       type: `string`
     },
     dest: {
-      sql: `${CUBE}."Dest"`,
+      sql: `${CUBE}.Dest`,
       type: `string`
     },
     destcityname: {
-      sql: `${CUBE}."DestCityName"`,
+      sql: `${CUBE}.DestCityName`,
       type: `string`
     },
     deststate: {
-      sql: `${CUBE}."DestState"`,
+      sql: `${CUBE}.DestState`,
       type: `string`
     },
     deststatefips: {
-      sql: `${CUBE}."DestStateFips"`,
+      sql: `${CUBE}.DestStateFips`,
       type: `string`
     },
     deststatename: {
-      sql: `${CUBE}."DestStateName"`,
+      sql: `${CUBE}.DestStateName`,
       type: `string`
     },
     depdelay: {
-      sql: `${CUBE}."DepDelay"`,
+      sql: `${CUBE}.DepDelay`,
       type: `number`
     },
     departuredelaygroups: {
-      sql: `${CUBE}."DepartureDelayGroups"`,
+      sql: `${CUBE}.DepartureDelayGroups`,
       type: `string`
     },
     deptimeblk: {
-      sql: `${CUBE}."DepTimeBlk"`,
+      sql: `${CUBE}.DepTimeBlk`,
       type: `string`
     },
     arrtimeblk: {
-      sql: `${CUBE}."ArrTimeBlk"`,
+      sql: `${CUBE}.ArrTimeBlk`,
       type: `string`
     },
     cancellationcode: {
-      sql: `${CUBE}."CancellationCode"`,
+      sql: `${CUBE}.CancellationCode`,
       type: `string`
     },
     firstdeptime: {
-      sql: `${CUBE}."FirstDepTime"`,
+      sql: `${CUBE}.FirstDepTime`,
       type: `string`
     },
     totaladdgtime: {
-      sql: `${CUBE}."TotalAddGTime"`,
+      sql: `${CUBE}.TotalAddGTime`,
       type: `string`
     },
     longestaddgtime: {
-      sql: `${CUBE}."LongestAddGTime"`,
+      sql: `${CUBE}.LongestAddGTime`,
       type: `string`
     },
     flightdate: {
-      sql: `${CUBE}."FlightDate"`,
+      sql: `${CUBE}.FlightDate`,
       type: `time`
     }
   }
