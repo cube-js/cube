@@ -8,7 +8,7 @@
 /**
  * Demo 1
  * Multi-tenancy with Data Sources
-//  */
+*/
 // const clickhouseHost     = process.env.CUBEJS_DB_HOST;
 // const clickhousePort     = process.env.CUBEJS_DB_PORT;
 // const clickhouseDatabase = process.env.CUBEJS_DB_NAME;
