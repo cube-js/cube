@@ -1,16 +1,16 @@
 /* eslint-disable no-use-before-define */
 // eslint-disable-next-line global-require
-import { JDBCDriver, JDBCDriverConfiguration } from '@cubejs-backend/jdbc-driver';
-import { DatabricksDriver as DatabricksDriverType, DatabricksDriverConfiguration } from '../src/DatabricksDriver';
+import { JDBCDriverConfiguration } from '@cubejs-backend/jdbc-driver';
+import { DatabricksDriver, DatabricksDriverConfiguration } from '../src/DatabricksDriver';
 
-describe('SnowflakeDriver', () => {
+describe('DatabricksDriver', () => {
   const { env } = process;
   beforeEach(() => {
-    jest.resetModules();
     process.env = { ...env };
   });
   afterEach(() => {
     jest.clearAllMocks();
+    
     process.env = env;
   });
 
@@ -26,7 +26,7 @@ describe('SnowflakeDriver', () => {
     });
 
     it('success with db catalog', async () => {
-      const searchSchema = 'dev_pre_aggregations_opa';
+      const searchSchema = 'dev_pre_aggregations';
       process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA = searchSchema;
       const dbCatalog = 'main';
       const queryWhichShouldBeReplacedInFlight = `SELECT 
@@ -57,20 +57,20 @@ describe('SnowflakeDriver', () => {
         [
           {
             regexp: new RegExp(escapeCharacters(
-              `SELECT * FROM ${dbCatalog}.${searchSchema}.line_item__monthly_data19920101_rsizerlt_jsof0d5e_1hjjmcc UNION ALL`
+              `SELECT * FROM ${dbCatalog}\\.${searchSchema}\\.line_item__monthly_data19920101_rsizerlt_jsof0d5e_1hjjmcc UNION ALL`
             )),
             rows: [{}]
           },
           {
-            regexp: new RegExp(escapeCharacters(ignoreQuery1)),
+            regexp: new RegExp(escapeCharacters(`^${ignoreQuery1}`)),
             rows: [{}, {}]
           },
           {
-            regexp: new RegExp(escapeCharacters(ignoreQuery2)),
+            regexp: new RegExp(escapeCharacters(`^${ignoreQuery2}`)),
             rows: [{}, {}, {}]
           },
-          { regexp: new RegExp(escapeCharacters(ignoreQuery3)), rows: [{}, {}, {}, {}] },
-          { regexp: new RegExp(escapeCharacters(ignoreQuery4)), rows: [{}, {}, {}, {}, {}] }
+          { regexp: new RegExp(escapeCharacters(`^${ignoreQuery3}`)), rows: [{}, {}, {}, {}] },
+          { regexp: new RegExp(escapeCharacters(`${ignoreQuery4}`)), rows: [{}, {}, {}, {}, {}] }
         ],
         { dbCatalog }
       );
@@ -89,59 +89,113 @@ describe('SnowflakeDriver', () => {
     });
   });
 
-  describe('createSchemaIfNotExists()', () => {
+  it('createSchemaIfNotExists() success', async () => {
+    const schemaName = 'my_schema';
+    const rows = ['ok'];
+    const driver = createDatabricksDriver(
+      [
+        { regexp: new RegExp(`^CREATE SCHEMA IF NOT EXISTS \`${schemaName}\``), rows }
+      ],
+    );
+
+    const result = await driver.createSchemaIfNotExists(schemaName);
+
+    expect(result).toEqual(rows);
+  });
+
+  it('createSchemaIfNotExists() success with db catalog', async () => {
+    const dbCatalog = 'main';
+    const schemaName = 'my_schema';
+    const rows = ['ok'];
+    const driver = createDatabricksDriver(
+      [
+        { regexp: new RegExp(`^CREATE SCHEMA IF NOT EXISTS \`${dbCatalog}\`\\.\`${schemaName}\``), rows }
+      ],
+      { dbCatalog }
+    );
+
+    const result = await driver.createSchemaIfNotExists(schemaName);
+
+    expect(result).toEqual(rows);
+  });
+
+  describe('loadPreAggregationIntoTable()', () => {
     it('success', async () => {
-      const schemaName = 'my_schema';
+      const tableName = 'my_schema.my_super_table';
+      const rows = ['ok'];
+
+      const sql = 'CREATE TABLE my_schema.my_super_table AS (SELECT * from random_table)';
       const driver = createDatabricksDriver(
         [
-          { regexp: new RegExp(`CREATE SCHEMA IF NOT EXISTS \`${schemaName}\``), rows: ['ok'] }
+          { regexp: /^CREATE TABLE my_schema\.my_super_table/, rows }
         ],
       );
 
-      const result = await driver.createSchemaIfNotExists(schemaName);
+      const result = await driver.loadPreAggregationIntoTable(tableName, sql, [], {});
 
-      expect(result).toEqual(['ok']);
+      expect(result).toEqual(rows);
     });
 
     it('success with db catalog', async () => {
       const dbCatalog = 'main';
-      const schemaName = 'my_schema';
+      const tableName = 'my_schema.my_super_table';
+      const rows = ['ok'];
+
+      const sql = 'CREATE TABLE my_schema.my_super_table AS (SELECT * from random_table)';
       const driver = createDatabricksDriver(
         [
-          { regexp: new RegExp(`CREATE SCHEMA IF NOT EXISTS \`${dbCatalog}\`\\.\`${schemaName}\``), rows: ['ok'] }
+          { regexp: /^CREATE TABLE main\.my_schema\.my_super_table/, rows }
         ],
         { dbCatalog }
       );
 
-      const result = await driver.createSchemaIfNotExists(schemaName);
+      const result = await driver.loadPreAggregationIntoTable(tableName, sql, [], {});
 
-      expect(result).toEqual(['ok']);
+      expect(result).toEqual(rows);
     });
   });
 
-  describe('loadPreAggregationIntoTable()', () => {
+  describe('tableColumnTypes()', () => {
     it('success', () => {
       
     });
+  });
 
-    it('success with db catalog', () => {
+  describe('queryColumnTypes()', () => {
+    it('success', () => {
       
     });
   });
 
-  describe('tableColumnTypes()', () => {});
+  describe('getTablesQuery()', () => {
+    it('success', () => {
+      
+    });
+  });
 
-  describe('queryColumnTypes()', () => {});
+  describe('getTables()', () => {
+    it('success', () => {
+      
+    });
+  });
 
-  describe('getTablesQuery()', () => {});
+  describe('tablesSchema()', () => {
+    it('success', () => {
+      
+    });
+  });
 
-  describe('getTables()', () => {});
+  describe('unload()', () => {
+    it('success', () => {
+      
+    });
+  });
 
-  describe('tablesSchema()', () => {});
-
-  describe('unload()', () => {});
-
-  describe('dropTable()', () => {});
+  describe('dropTable()', () => {
+    it('success', () => {
+      
+    });
+  });
 });
 
 function escapeCharacters(val: string) {
@@ -156,12 +210,12 @@ function createDatabricksDriver(stubs: Stub[], databricksConfig: Partial<Databri
     setQueryTimeout: (_smth: any, cb: any) => cb(null, {}),
     execute: (query: string, cb: any) => {
       for (const s of stubs) {
-        if (query.match(s.regexp)) {
+        if (s.regexp.test(query)) {
           // eslint-disable-next-line consistent-return
           return cb(null, s.rows);
         }
       }
-    
+
       throw new Error(`unmatched query: ${query}`);
     }
   };
@@ -170,29 +224,17 @@ function createDatabricksDriver(stubs: Stub[], databricksConfig: Partial<Databri
     acquire: () => Promise.resolve(mockConnection),
     release: () => Promise.resolve({})
   };
-  jest.mock('@cubejs-backend/jdbc-driver', () => {
-    const originalModule = jest.requireActual('@cubejs-backend/jdbc-driver');
-
-    const JDBCDriverOriginal: typeof JDBCDriver = originalModule.JDBCDriver;
-
-    class MockJDBCDriver extends JDBCDriverOriginal {
-      public constructor(config: JDBCDriverConfiguration) {
-        super(config);
-      }
-
-      protected getPool(_dataSource: string, _config: JDBCDriverConfiguration) {
-        return mockPool as any;
-      }
+  class MockDatabricksDriver extends DatabricksDriver {
+    public constructor(config: Partial<DatabricksDriverConfiguration>) {
+      super(config);
     }
-    return {
-      ...originalModule,
-      JDBCDriver: MockJDBCDriver
-    };
-  });
-  // eslint-disable-next-line global-require, @typescript-eslint/no-shadow
-  const { DatabricksDriver } = require('../src/DatabricksDriver');
 
-  const driver: DatabricksDriverType = new DatabricksDriver({ url: 'random_url', ...databricksConfig });
+    protected getPool(_dataSource: string, _config: JDBCDriverConfiguration) {
+      return mockPool as any;
+    }
+  }
+
+  const driver = new MockDatabricksDriver({ url: 'random_url', ...databricksConfig });
 
   return driver;
 }

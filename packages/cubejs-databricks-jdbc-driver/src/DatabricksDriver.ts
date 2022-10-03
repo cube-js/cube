@@ -237,7 +237,7 @@ export class DatabricksDriver extends JDBCDriver {
     return `\`${identifier}\``;
   }
 
-  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: unknown[], _options: any) {
+  public async loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: unknown[], _options: any) {
     const newPreAggregationTableName = `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${preAggregationTableName}`;
 
     const newSql = replaceAll(preAggregationTableName, newPreAggregationTableName, loadSql);
