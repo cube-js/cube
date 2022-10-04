@@ -21,7 +21,7 @@
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts",
     "postinstall": "node bin/post-install",
-    "unit": "jest --runInBand dist/test"
+    "unit": "jest --coverage dist/test"
   },
   "files": [
     "README.md",
