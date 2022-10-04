@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
+
+
+### Bug Fixes
+
+* **cubestore:** Aggregate function MERGE not allowed for column type bytes ([#5166](https://github.com/cube-js/cube.js/issues/5166)) ([7626ed5](https://github.com/cube-js/cube.js/commit/7626ed5fa308854ba625f0956c29b21c84484b67))
+* **cubestore:** Fix error: Internal: channel closed on the next request after cubestore cloud process got OOM ([#5238](https://github.com/cube-js/cube.js/issues/5238)) ([cb81fdb](https://github.com/cube-js/cube.js/commit/cb81fdb79c5b768892831437659e1591773d8e15))
+
+
+
+
+
 ## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

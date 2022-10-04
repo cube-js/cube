@@ -35,7 +35,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
       CallExpression: (path) => {
         if (t.isIdentifier(path.node.callee)) {
           const args = path.get('arguments');
-          if (path.node.callee.name === 'cube') {
+          if (path.node.callee.name === 'cube' || path.node.callee.name === 'view') {
             if (args?.[args.length - 1]) {
               const cubeName = args[0].node.type === 'StringLiteral' && args[0].node.value ||
                 args[0].node.type === 'TemplateLiteral' &&

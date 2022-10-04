@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
+
+
+### Features
+
+* multiple data source ([#5326](https://github.com/cube-js/cube.js/issues/5326)) ([334af8c](https://github.com/cube-js/cube.js/commit/334af8c56cd02ae551844e9d1e9ab5e107fb1555))
+
+
+
+
+
 ## [0.30.69](https://github.com/cube-js/cube.js/compare/v0.30.68...v0.30.69) (2022-09-13)
 
 
