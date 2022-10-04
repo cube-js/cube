@@ -85,6 +85,7 @@ const jwtSecret = defaultJwtSecret
 export const token = jwt.sign({
   exp: 5000000000,
 }, jwtSecret);
+export const apiUrl = defaultApiUrl
 
 export const jsonQuery = ({ year, month, dataSource }) => ({
   measures: [ `Ontime_${dataSource}.avgDepDelayGreaterThanTenMinutesPercentage` ],

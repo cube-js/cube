@@ -9,7 +9,12 @@ import {
   defaultDataSourceId,
   dataSources,
   DisplayBarChart,
+  years,
+  months,
+  defaultYearId,
+  defaultMonthId,
   jsonQuery,
+  randomIntFromInterval,
 } from './utils/utils'
 
 ReactDOM
@@ -24,6 +29,17 @@ function App() {
   const [ dataSourceId, setDataSourceId ] = useState(defaultDataSourceId)
   const dataSource = dataSources.find(x => x.id === dataSourceId)
 
+  const [ yearId, setYearId ] = useState(defaultYearId)
+  const year = years.find(x => x.id === yearId)
+
+  const [ monthId, setMonthId ] = useState(defaultMonthId)
+  const month = months.find(x => x.id === monthId)
+
+  const shuffleAndRun = () => {
+    setYearId(randomIntFromInterval(1, 34))
+    setMonthId(randomIntFromInterval(1, 12))
+  }
+
   const cubejsApi = cubejs(
     dataSource.token,
     { apiUrl },
@@ -36,7 +52,7 @@ function App() {
 
     setOntimeBarData({})
     cubejsApi
-      .load(jsonQuery())
+      .load(jsonQuery({ year, month }))
       .then(setOntimeBarData)
       .then(() => {
         const end = Date.now()
@@ -46,12 +62,14 @@ function App() {
   }, [
     dataSource.token,
     apiUrl,
+    year.year,
+    month.id,
   ])
 
   return <>
-    <div style={{ display: 'flex', justifyContent: 'center' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '0 0 20px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <label style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Authorization token</label>
+        <label style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Auth token</label>
         <textarea 
           readOnly
           value={dataSource.token}
@@ -74,12 +92,44 @@ function App() {
     </div>
 
     <div style={{ display: 'flex', justifyContent: 'center' }}>
+      <select
+        className={classes.select}
+        value={yearId}
+        onChange={e => setYearId(parseInt(e.target.value))}
+      >
+        <option value="" disabled>Select year...</option>
+        {years.map(year => (
+          <option key={year.id} value={year.id}>
+            {year.year}
+          </option>
+        ))}
+      </select>
+      <select
+        className={classes.select}
+        value={monthId}
+        onChange={e => setMonthId(parseInt(e.target.value))}
+      >
+        <option value="" disabled>Select month...</option>
+        {months.map(month => (
+          <option key={month.id} value={month.id}>
+            {month.month}
+          </option>
+        ))}
+      </select>
+      <div className={`${classes.buttonwrp}`}>
+        <button className={`Button Button--size-s Button--pink`} onClick={shuffleAndRun}>
+          Shuffle and Run!
+        </button>
+      </div>
+    </div>
+
+    <div style={{ display: 'flex', justifyContent: 'center' }}>
       <table style={{ width: '80%' }}>
         <tbody>
           <tr>
             <td style={{ width: '100%' }}>
               <div style={{ height: '375px', margin: '20px 0' }}>
-                <h3 style={{display: 'flex', justifyContent: 'center'}}>{ (timer.responseTime / 1000) || '...' } seconds</h3>
+                <h3 style={{display: 'flex', justifyContent: 'center'}}>{ (timer.responseTime) ? `${timer.responseTime / 1000} seconds` : '' }</h3>
                 <DisplayBarChart
                   chartData={ontimeBarData}
                 />

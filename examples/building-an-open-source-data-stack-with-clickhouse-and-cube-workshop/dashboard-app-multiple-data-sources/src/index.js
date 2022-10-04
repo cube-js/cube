@@ -8,7 +8,7 @@ import {
   DisplayBarChart,
   years,
   months,
-  defaultApiUrl,
+  apiUrl,
   defaultYearId,
   defaultMonthId,
   token,
@@ -25,7 +25,6 @@ ReactDOM
 function App() {
   const [ timerClickhouse, setTimerClickhouse ] = useState({})
   const [ timerMysql, setTimerMysql ] = useState({})
-  const apiUrl = defaultApiUrl
 
   const [ yearId, setYearId ] = useState(defaultYearId)
   const year = years.find(x => x.id === yearId)
