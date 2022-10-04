@@ -246,13 +246,18 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public async tableColumnTypes(table: string) {
-    const [schema, tableName] = table.split('.');
+    const nLevelNamespace = table.split('.');
 
     let describeString = '';
 
-    if (this.config.dbCatalog) {
+    if (nLevelNamespace.length === 3) {
+      const [catalog, schema, tableName] = nLevelNamespace;
+      describeString = `${this.quoteIdentifier(catalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
+    } else if (this.config.dbCatalog) {
+      const [schema, tableName] = nLevelNamespace;
       describeString = `${this.quoteIdentifier(this.config.dbCatalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
     } else {
+      const [schema, tableName] = nLevelNamespace;
       describeString = `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
     }
 

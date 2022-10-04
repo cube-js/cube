@@ -453,12 +453,38 @@ describe('DatabricksDriver', () => {
       expect(result).toEqual({ csvFile: ['file1.csv', 'file1.csv'], types: [{ type: 'bigint', name: 'id' }], csvNoHeader: true });
     });
 
-    it('success unloadWithTable', () => {
+    it('success unloadWithTable', async () => {
+      const bucketConf: Partial<DatabricksDriverConfiguration> = { bucketType: 's3', exportBucket: 's3://some_random_name', awsKey: 'random_key', awsSecret: 'secrect', awsRegion: 'us-east-2' };
+      const table = 'my_main_schema.my_super_table';
+      const describeRows = [{ col_name: 'id', data_type: 'decimal(10,0)' }];
+      const stubs = [
+        { regexp: /^DESCRIBE `my_main_schema`\.`my_super_table`/, rows: describeRows },
+        { regexp: new RegExp(`CREATE TABLE my_main_schema\\.my_super_table_csv_export\\s+USING CSV LOCATION '${bucketConf.exportBucket?.replace('/', '\\/')}\\/my_main_schema\\.my_super_table\\.csv'\\s+OPTIONS.*\\s+AS SELECT id FROM my_main_schema.my_super_table`), rows: ['ok'] },
+      ];
       
+      const driver = createDatabricksDriver(stubs, { ...bucketConf });
+
+      const result = await driver.unload(table, { maxFileSize: 60 });
+
+      expect(result).toEqual({ csvFile: ['file1.csv', 'file1.csv'], types: [{ type: 'bigint', name: 'id' }], csvNoHeader: true });
     });
 
-    it('success unloadWithTable with dbCatalog', () => {
+    it('success unloadWithTable with dbCatalog', async () => {
+      const dbCatalog = 'main';
+      const bucketConf: Partial<DatabricksDriverConfiguration> = { bucketType: 's3', exportBucket: 's3://some_random_name', awsKey: 'random_key', awsSecret: 'secrect', awsRegion: 'us-east-2' };
+      const table = 'my_main_schema.my_super_table';
+      const databricksStorageCredentialName = 'STORAGE_ITEM_NAME';
+      const describeRows = [{ col_name: 'id', data_type: 'decimal(10,0)' }];
+      const stubs = [
+        { regexp: /^DESCRIBE `main`\.`my_main_schema`\.`my_super_table`/, rows: describeRows },
+        { regexp: new RegExp(`CREATE TABLE main\\.my_main_schema\\.my_super_table_csv_export\\s+USING CSV LOCATION '${bucketConf.exportBucket?.replace('/', '\\/')}\\/main\\.my_main_schema\\.my_super_table\\.csv'\\s+WITH \\(CREDENTIAL STORAGE_ITEM_NAME\\).*\\s+AS SELECT id FROM main.my_main_schema.my_super_table`), rows: ['ok'] },
+      ];
       
+      const driver = createDatabricksDriver(stubs, { ...bucketConf, dbCatalog, databricksStorageCredentialName });
+
+      const result = await driver.unload(table, { maxFileSize: 60 });
+
+      expect(result).toEqual({ csvFile: ['file1.csv', 'file1.csv'], types: [{ type: 'bigint', name: 'id' }], csvNoHeader: true });
     });
 
     it('throws an error if passed dbCatalog but databricksStorageCredentialName is null', async () => {
