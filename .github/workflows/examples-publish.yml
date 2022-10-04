@@ -11,6 +11,58 @@ on:
 
 jobs:
 
+  clickhouse-multi-tenancy:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/building-an-open-source-data-stack-with-clickhouse-and-cube-workshop/*,examples/building-an-open-source-data-stack-with-clickhouse-and-cube-workshop/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: building-an-open-source-data-stack-with-clickhouse-and-cube-workshop
+          EXAMPLE_FRONTEND_SUBDIRECTORY: dashboard-app-multi-tenancy
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_CUBE_SKIP: 1
+
+  clickhouse-multiple-sources:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: pheel/path-watcher-action@v1
+        id: modified
+        with:
+          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/building-an-open-source-data-stack-with-clickhouse-and-cube-workshop/*,examples/building-an-open-source-data-stack-with-clickhouse-and-cube-workshop/**'
+
+      - if: steps.modified.outputs.modified
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - if: steps.modified.outputs.modified
+        run: .github/actions/deploy-example.sh
+        env:
+          EXAMPLE_SLUG: building-an-open-source-data-stack-with-clickhouse-and-cube-workshop
+          EXAMPLE_FRONTEND_SUBDIRECTORY: dashboard-app-multiple-data-sources
+          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          EXAMPLE_CUBE_SKIP: 1
+
   apollo-federation:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
