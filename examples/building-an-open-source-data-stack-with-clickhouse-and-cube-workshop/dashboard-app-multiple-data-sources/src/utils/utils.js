@@ -1,8 +1,26 @@
 import BarChart from '../components/BarChart';
 import LoadingIndicator from '../components/LoadingIndicator';
 import jwt from 'jsonwebtoken';
+import moment from "moment";
+import numeral from "numeral";
+
+export const ticksFormmater = (ticksCount, value, data, dateFormatter) => {
+  const valueIndex = data.map(i => i.x).indexOf(value)
+  if (valueIndex % Math.floor(data.length / ticksCount) === 0) {
+    return dateFormatter(value)
+  }
+
+  return ""
+}
+export const numberFormatter = (item) => numeral(item/100).format("0%")
+export const dateFormatter = (item) => moment(item).format("YYYY")
+export const colors = ["#7DB3FF", "#49457B", "#FF7C78"]
 
 const isEmpty = (obj) => Object.keys(obj).length === 0;
+
+export const randomIntFromInterval = (min, max) => { 
+  return Math.floor(Math.random() * (max - min + 1) + min)
+}
 
 export const years = [
   { id: 1, year: 1988 },
@@ -41,8 +59,24 @@ export const years = [
   { id: 34, year: 2021 },
 ];
 
+export const months = [
+  { id: 1, month: 'January', end: 31 },
+  { id: 2, month: 'February', end: 28 },
+  { id: 3, month: 'March', end: 31 },
+  { id: 4, month: 'April', end: 30 },
+  { id: 5, month: 'May', end: 31 },
+  { id: 6, month: 'June', end: 30 },
+  { id: 7, month: 'July', end: 31 },
+  { id: 8, month: 'August', end: 31 },
+  { id: 9, month: 'September', end: 30 },
+  { id: 10, month: 'October', end: 31 },
+  { id: 11, month: 'November', end: 30 },
+  { id: 12, month: 'December', end: 31 },
+];
+
 export const defaultJwtSecret = '1c7548fdc11622f711fd0113139feefc4cbd88826d3107b29b4950b0b1df159c'
 export const defaultYearId = 1
+export const defaultMonthId = 1
 /** OSS Cube */
 // const defaultApiUrl = 'http://localhost:4000/cubejs-api/v1'
 /** Cube Cloud */
@@ -51,18 +85,18 @@ const jwtSecret = defaultJwtSecret
 export const token = jwt.sign({
   exp: 5000000000,
 }, jwtSecret);
+export const apiUrl = defaultApiUrl
 
-export const jsonQuery = ({ year, dataSource }) => ({
+export const jsonQuery = ({ year, month, dataSource }) => ({
   measures: [ `Ontime_${dataSource}.avgDepDelayGreaterThanTenMinutesPercentage` ],
-  timeDimensions: [ {
+  timeDimensions: [{
     dimension: `Ontime_${dataSource}.flightdate`,
-    granularity: 'month',
-  } ],
-  filters: [ {
-    member: `Ontime_${dataSource}.year`,
-    operator: 'equals',
-    values: [ `${year}` ]
-  } ],
+    granularity: 'day',
+    dateRange: [
+      `${year.year}-${month.id}-01`,
+      `${year.year}-${month.id}-${month.end}`
+    ]  
+  }]
 })
 
 export function DisplayBarChart({ chartData }) {

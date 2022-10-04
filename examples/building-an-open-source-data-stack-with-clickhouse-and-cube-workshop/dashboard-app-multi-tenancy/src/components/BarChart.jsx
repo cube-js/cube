@@ -22,7 +22,7 @@ const BarChart = ({ data /* see data tab */ }) => {
       }}
       axisBottom={{
         format: value =>
-          ticksFormmater(20, value, data.chartPivot(), dateFormatter)
+          ticksFormmater(15, value, data.chartPivot(), dateFormatter)
       }}
       tooltip={({ id, value, color }) => (
         <strong style={{ color, backgroundColor: 'white', padding: '5px', borderRadius: '5px' }}>

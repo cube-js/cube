@@ -14,11 +14,11 @@
 // const clickhouseDatabase = process.env.CUBEJS_DB_NAME;
 // const clickhouseUser     = process.env.CUBEJS_DB_USER;
 // const clickhousePassword = process.env.CUBEJS_DB_PASS;
-// const mysqlHost      = 'demo-mysql-rhodges.czuu1tdfcpyt.us-east-1.rds.amazonaws.com';
-// const mysqlPort      = '3306';
-// const mysqlDatabase  = 'test';
-// const mysqlUser      = 'admin';
-// const mysqlPassword  = 'YIDrkjMThI9ZHtdOfjj7';
+// const mysqlHost          = '<host>';
+// const mysqlPort          = '3306';
+// const mysqlDatabase      = '<db>';
+// const mysqlUser          = '<user>';
+// const mysqlPassword      = '<pass>';
 
 module.exports = {
   /**
