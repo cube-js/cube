@@ -252,6 +252,46 @@ WHERE orders.status <> 'completed';
 (1 row)
 ```
 
+### <--{"id" : "Comparison Functions and Operators"}--> BETWEEN
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|           | Selections | Projections | Outer Query                              |
+| --------- | ---------- | ----------- | ---------------------------------------- |
+| `BETWEEN` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+Returns true if the first `datatype` is between the second and third.
+
+```sql
+datatype BETWEEN datatype AND datatype
+```
+
+The example below uses `BETWEEN` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM Orders WHERE Orders.number BETWEEN(Orders.status) 1 AND 100000;
+ COUNT(UInt8(1))
+-----------------
+(0 rows)
+```
+
+The example below uses `BETWEEN` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM Orders) orders
+WHERE orders.number BETWEEN 1 AND 100000;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
 ## Mathematical Functions and Operators
 
 ### <--{"id" : "Mathematical Functions and Operators"}--> TRUNC
