@@ -165,7 +165,6 @@ export type PreAggregationDescription = {
   sql: QueryWithParams;
   loadSql: QueryWithParams;
   tableName: string;
-  tableNameBase: string;
   matchedTimeDimensionDateRange: QueryDateRange;
   granularity: string;
   partitionGranularity: string;
@@ -375,8 +374,8 @@ class PreAggregationLoadCache {
   }
 
   public async getVersionEntries(preAggregation: PreAggregationDescription): Promise<VersionEntriesObj> {
-    if (this.tablePrefixes && !this.tablePrefixes.find(p => preAggregation.tableNameBase.startsWith(p))) {
-      throw new Error(`Load cache tries to load table ${preAggregation.tableNameBase} outside of tablePrefixes filter: ${this.tablePrefixes.join(', ')}`);
+    if (this.tablePrefixes && !this.tablePrefixes.find(p => preAggregation.tableName.split('.')[1].startsWith(p))) {
+      throw new Error(`Load cache tries to load table ${preAggregation.tableName} outside of tablePrefixes filter: ${this.tablePrefixes.join(', ')}`);
     }
     const redisKey = this.tablesRedisKey(preAggregation);
     if (!this.versionEntries[redisKey]) {
@@ -1783,7 +1782,7 @@ export class PreAggregations {
                 !queryBody.preAggregationsLoadCacheByDataSource ?
                   preAggregations
                     .filter(p => (p.dataSource || 'default') === dataSource)
-                    .map(p => p.tableNameBase) : null
+                    .map(p => p.tableName.split('.')[1]) : null
             }
           );
       }
