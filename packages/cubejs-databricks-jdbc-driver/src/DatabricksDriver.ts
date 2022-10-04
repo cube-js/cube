@@ -311,7 +311,7 @@ export class DatabricksDriver extends JDBCDriver {
       return <any> this.query<ShowTableRow>(`SHOW TABLES IN ${this.getNameWithCatalog(this.config.database)}`, []);
     }
 
-    const databases = await this.query<ShowDatabasesRow>(`SHOW DATABASES${this.config.dbCatalog ? ` IN ${this.config.dbCatalog}` : ''}`, []);
+    const databases = await this.query<ShowDatabasesRow>(`SHOW DATABASES${this.config.dbCatalog ? ` IN ${this.quoteIdentifier(this.config.dbCatalog)}` : ''}`, []);
 
     const allTables = await Promise.all(
       databases.map(async ({ databaseName }) => this.query<ShowTableRow>(

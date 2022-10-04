@@ -256,25 +256,110 @@ describe('DatabricksDriver', () => {
     });
   });
 
-  describe('getTables()', () => {
-    it('success', () => {
-      
+  describe('tablesSchema()', () => {
+    it('success when config.database exist and config.dbCatalog exist', async () => {
+      const dbCatalog = 'main';
+      const database = 'my_schema';
+      const rows = [{ database, tableName: 'my_table' }];
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^SHOW TABLES IN `main`\.`my_schema`/, rows },
+          { regexp: /^DESCRIBE `main`\.`my_schema`\.`my_table`/, rows: [{ col_name: 'id', data_type: 'decimal(10,0)' }] }
+        ],
+        { dbCatalog, database }
+      );
+
+      const result = await driver.tablesSchema();
+
+      expect(result).toEqual({ [database]: { my_table: [{ name: 'id', type: 'bigint' }] } });
+    });
+
+    it('success when config.database exist and config.dbCatalog doesn\'t exist', async () => {
+      const database = 'my_schema';
+      const rows = [{ database, tableName: 'my_table' }];
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^SHOW TABLES IN `my_schema`/, rows },
+          { regexp: /^DESCRIBE `my_schema`\.`my_table`/, rows: [{ col_name: 'id', data_type: 'decimal(10,0)' }] }
+        ],
+        { database }
+      );
+
+      const result = await driver.tablesSchema();
+
+      expect(result).toEqual({ [database]: { my_table: [{ name: 'id', type: 'bigint' }] } });
+    });
+
+    it('success when config.database doesn\'t exist and config.dbCatalog exist', async () => {
+      const dbCatalog = 'main';
+      const showDatabasesRows = [{ databaseName: 'default' }, { databaseName: 'dev_pre_aggregations' }];
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^SHOW DATABASES IN `main`/, rows: showDatabasesRows },
+          { regexp: /^SHOW TABLES IN `main`\.`default`/, rows: [{ database: 'default', tableName: 'table1' }, { database: 'default', tableName: 'table2' }] },
+          { regexp: /^SHOW TABLES IN `main`\.`dev_pre_aggregations`/, rows: [{ database: 'dev_pre_aggregations', tableName: 'table3' }, { database: 'dev_pre_aggregations', tableName: 'table4' }] },
+          { regexp: /^DESCRIBE `main`\.`default`\.`table1`/, rows: [{ col_name: 'id', data_type: 'decimal(10,0)' }] },
+          { regexp: /^DESCRIBE `main`\.`default`\.`table2`/, rows: [{ col_name: 'comment', data_type: 'text' }] },
+          { regexp: /^DESCRIBE `main`\.`dev_pre_aggregations`\.`table3`/, rows: [{ col_name: 'count', data_type: 'int' }] },
+          { regexp: /^DESCRIBE `main`\.`dev_pre_aggregations`\.`table4`/, rows: [{ col_name: 'status', data_type: 'varchar' }] }
+        ],
+        { dbCatalog }
+      );
+
+      const result = await driver.tablesSchema();
+
+      expect(result).toEqual({
+        default: {
+          table1: [{ name: 'id', type: 'bigint' }],
+          table2: [{ name: 'comment', type: 'text' }]
+        },
+        dev_pre_aggregations: {
+          table3: [{ name: 'count', type: 'int' }],
+          table4: [{ name: 'status', type: 'text' }]
+        }
+      });
+    });
+
+    it('success when config.database doesn\'t exist and config.dbCatalog doesn\'t exist', async () => {
+      const showDatabasesRows = [{ databaseName: 'default' }, { databaseName: 'dev_pre_aggregations' }];
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^SHOW DATABASES$/, rows: showDatabasesRows },
+          { regexp: /^SHOW TABLES IN `default`/, rows: [{ database: 'default', tableName: 'table1' }, { database: 'default', tableName: 'table2' }] },
+          { regexp: /^SHOW TABLES IN `dev_pre_aggregations`/, rows: [{ database: 'dev_pre_aggregations', tableName: 'table3' }, { database: 'dev_pre_aggregations', tableName: 'table4' }] },
+          { regexp: /^DESCRIBE `default`\.`table1`/, rows: [{ col_name: 'id', data_type: 'decimal(10,0)' }] },
+          { regexp: /^DESCRIBE `default`\.`table2`/, rows: [{ col_name: 'comment', data_type: 'text' }] },
+          { regexp: /^DESCRIBE `dev_pre_aggregations`\.`table3`/, rows: [{ col_name: 'count', data_type: 'int' }] },
+          { regexp: /^DESCRIBE `dev_pre_aggregations`\.`table4`/, rows: [{ col_name: 'status', data_type: 'varchar' }] }
+        ],
+      );
+
+      const result = await driver.tablesSchema();
+
+      expect(result).toEqual({
+        default: {
+          table1: [{ name: 'id', type: 'bigint' }],
+          table2: [{ name: 'comment', type: 'text' }]
+        },
+        dev_pre_aggregations: {
+          table3: [{ name: 'count', type: 'int' }],
+          table4: [{ name: 'status', type: 'text' }]
+        }
+      });
     });
   });
 
-  describe('tablesSchema()', () => {
+  describe('dropTable()', () => {
     it('success', () => {
       
     });
   });
 
   describe('unload()', () => {
-    it('success', () => {
-      
-    });
-  });
-
-  describe('dropTable()', () => {
     it('success', () => {
       
     });
