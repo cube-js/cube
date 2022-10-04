@@ -3,6 +3,8 @@
 import { JDBCDriverConfiguration } from '@cubejs-backend/jdbc-driver';
 import { DatabricksDriver, DatabricksDriverConfiguration } from '../src/DatabricksDriver';
 
+jest.useFakeTimers();
+
 class MockS3 {
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   public constructor() {}
