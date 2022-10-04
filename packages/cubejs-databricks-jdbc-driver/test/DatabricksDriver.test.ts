@@ -3,6 +3,37 @@
 import { JDBCDriverConfiguration } from '@cubejs-backend/jdbc-driver';
 import { DatabricksDriver, DatabricksDriverConfiguration } from '../src/DatabricksDriver';
 
+class MockS3 {
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  public constructor() {}
+
+  public async listObjectsV2() {
+    return { Contents: [{ Key: 'file1.csv' }, { Key: 'file2.csv' }] };
+  }
+}
+
+function MockS3Factory() {
+  return new MockS3();
+}
+
+class MockGetObjectCommand {
+  public Key: string;
+
+  public constructor({
+    Key,
+  }: {Key: string}) {
+    this.Key = Key;
+  }
+}
+
+function MockGetObjectCommandFactory() {
+  return new MockGetObjectCommand({ Key: 'file1.csv' });
+}
+
+jest.mock('@aws-sdk/client-s3', () => ({ S3: MockS3Factory, GetObjectCommand: MockGetObjectCommandFactory }));
+
+jest.mock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: (_storage: any, command: MockGetObjectCommand) => command.Key }));
+
 describe('DatabricksDriver', () => {
   const { env } = process;
   beforeEach(() => {
@@ -386,8 +417,73 @@ describe('DatabricksDriver', () => {
   });
 
   describe('unload()', () => {
-    it('success', () => {
+    it('success unloadWithSql', async () => {
+      const bucketConf: Partial<DatabricksDriverConfiguration> = { bucketType: 's3', exportBucket: 's3://some_random_name', awsKey: 'random_key', awsSecret: 'secrect', awsRegion: 'us-east-2' };
+      const table = 'my_main_schema.my_super_table';
+      const sql = 'SELECT * FROM my_main_schema.my_super_table';
+      const describeQueryRows = [{ col_name: 'id', data_type: 'decimal(10,0)' }];
+      const stubs = [
+        { regexp: /^DESCRIBE QUERY SELECT \* FROM my_main_schema\.my_super_table/, rows: describeQueryRows },
+        { regexp: new RegExp(`CREATE TABLE my_main_schema\\.my_super_table_csv_export\\s+USING CSV LOCATION '${bucketConf.exportBucket?.replace('/', '\\/')}\\/my_main_schema\\.my_super_table\\.csv'\\s+OPTIONS.*\\s+AS \\(${escapeCharacters(sql)}\\)`), rows: ['ok'] },
+      ];
       
+      const driver = createDatabricksDriver(stubs, { ...bucketConf });
+
+      const result = await driver.unload(table, { maxFileSize: 60, query: { sql, params: [] } });
+
+      expect(result).toEqual({ csvFile: ['file1.csv', 'file1.csv'], types: [{ type: 'bigint', name: 'id' }], csvNoHeader: true });
+    });
+
+    it('success unloadWithSql with dbCatalog', async () => {
+      const bucketConf: Partial<DatabricksDriverConfiguration> = { bucketType: 's3', exportBucket: 's3://some_random_name', awsKey: 'random_key', awsSecret: 'secrect', awsRegion: 'us-east-2' };
+      const dbCatalog = 'main';
+      const databricksStorageCredentialName = 'STORAGE_ITEM_NAME';
+      const table = 'my_main_schema.my_super_table';
+      const sql = 'SELECT * FROM my_main_schema.my_super_table';
+      const describeQueryRows = [{ col_name: 'id', data_type: 'decimal(10,0)' }];
+      const stubs = [
+        { regexp: /^DESCRIBE QUERY SELECT \* FROM my_main_schema\.my_super_table/, rows: describeQueryRows },
+        { regexp: new RegExp(`CREATE TABLE main\\.my_main_schema\\.my_super_table_csv_export\\s+USING CSV LOCATION '${bucketConf.exportBucket?.replace('/', '\\/')}\\/main.\\my_main_schema\\.my_super_table\\.csv'\\s+WITH \\(CREDENTIAL STORAGE_ITEM_NAME\\).*\\s+AS \\(${escapeCharacters(sql)}\\)`), rows: ['ok'] },
+      ];
+      
+      const driver = createDatabricksDriver(stubs, { ...bucketConf, dbCatalog, databricksStorageCredentialName });
+
+      const result = await driver.unload(table, { maxFileSize: 60, query: { sql, params: [] } });
+
+      expect(result).toEqual({ csvFile: ['file1.csv', 'file1.csv'], types: [{ type: 'bigint', name: 'id' }], csvNoHeader: true });
+    });
+
+    it('success unloadWithTable', () => {
+      
+    });
+
+    it('success unloadWithTable with dbCatalog', () => {
+      
+    });
+
+    it('throws an error if passed dbCatalog but databricksStorageCredentialName is null', async () => {
+      const bucketConf: Partial<DatabricksDriverConfiguration> = { bucketType: 's3', exportBucket: 's3://some_random_name', awsKey: 'random_key', awsSecret: 'secrect', awsRegion: 'us-east-2' };
+      const dbCatalog = 'main';
+      const table = 'my_main_schema.my_super_table';
+      const sql = 'SELECT * FROM my_main_schema.my_super_table';
+      const stubs: any = [
+      ];
+      
+      const driver = createDatabricksDriver(stubs, { ...bucketConf, dbCatalog });
+
+      await expect(driver.unload(table, { maxFileSize: 60, query: { sql, params: [] } })).rejects.toThrow(/You should set CUBEJS_DB_DATABRICKS_STORAGE_CREDENTIAL_NAME if you are using unity catalog/);
+    });
+
+    it('throws an error is passed unsupported bucket type', async () => {
+      const bucketConf: Partial<DatabricksDriverConfiguration> = { bucketType: 'random_bucket_type', exportBucket: 's3://some_random_name', awsKey: 'random_key', awsSecret: 'secrect', awsRegion: 'us-east-2' };
+      const table = 'my_main_schema.my_super_table';
+      const sql = 'SELECT * FROM my_main_schema.my_super_table';
+      const stubs: any = [
+      ];
+      
+      const driver = createDatabricksDriver(stubs, { ...bucketConf });
+
+      await expect(driver.unload(table, { maxFileSize: 60, query: { sql, params: [] } })).rejects.toThrow(/Unsupported export bucket type/);
     });
   });
 });

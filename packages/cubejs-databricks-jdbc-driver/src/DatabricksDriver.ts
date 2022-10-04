@@ -359,11 +359,19 @@ export class DatabricksDriver extends JDBCDriver {
       }`);
     }
 
-    const types = options.query ?
-      await this.unloadWithSql(tableName, options.query.sql, options.query.params) :
-      await this.unloadWithTable(tableName);
+    if (this.config.dbCatalog) {
+      if (!this.config.databricksStorageCredentialName) {
+        throw new Error('You should set CUBEJS_DB_DATABRICKS_STORAGE_CREDENTIAL_NAME if you are using unity catalog');
+      }
+    }
 
-    const pathname = `${this.config.exportBucket}/${tableName}.csv`;
+    const newTableName = `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${tableName}`;
+
+    const types = options.query ?
+      await this.unloadWithSql(newTableName, options.query.sql, options.query.params) :
+      await this.unloadWithTable(newTableName);
+
+    const pathname = `${this.config.exportBucket}/${newTableName}.csv`;
     const csvFile = await this.getCsvFiles(
       pathname,
     );
