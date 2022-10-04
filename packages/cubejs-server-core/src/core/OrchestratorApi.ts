@@ -228,7 +228,8 @@ export class OrchestratorApi {
     schema: string,
     table: string,
     key: any[],
-  ): Promise<[boolean, string?]> {
+    token: string,
+  ): Promise<[boolean, string]> {
     return this.orchestrator.isPartitionExist(
       request,
       external,
@@ -236,6 +237,7 @@ export class OrchestratorApi {
       schema,
       table,
       key,
+      token,
     );
   }
 

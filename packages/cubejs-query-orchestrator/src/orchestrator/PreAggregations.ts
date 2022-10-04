@@ -141,6 +141,21 @@ type IndexDescription = {
   indexName: string;
 };
 
+type PreAggJob = {
+  request: string,
+  context: { securityContext: any },
+  preagg: string,
+  table: string,
+  target: string,
+  structure: string,
+  content: string,
+  updated: string,
+  key: any[],
+  status: string;
+  timezone: string,
+  dataSource: string,
+};
+
 export type LambdaOptions = {
   maxSourceRows: number
 };
@@ -1811,7 +1826,9 @@ export class PreAggregations {
     schema: string,
     table: string,
     key: any[],
-  ): Promise<[boolean, string?]> {
+    token: string,
+  ): Promise<[boolean, string]> {
+    // fetching tables
     const loadCache = new PreAggregationLoadCache(
       this.redisPrefix,
       () => this.driverFactory(dataSource),
@@ -1829,17 +1846,44 @@ export class PreAggregations {
     });
     tables = tables.filter(row => `${schema}.${row.table_name}` === table);
 
+    // fetching query result
     const { queueDriver } = this.queue[dataSource];
     const conn = await queueDriver.createConnection();
     const result = await conn.getResult(key);
     queueDriver.release(conn);
+
+    // calculating status
+    let status: string;
     if (tables.length === 1) {
-      return result ? [true] : [true, 'repeated fetch'];
+      status = 'done';
     } else {
-      return result && result.error
-        ? [false, `${result.error}`]
-        : [false, 'repeated fetch'];
+      status = `error: ${
+        result && result.error ? result.error : 'no result'
+      }`;
     }
+
+    // updating jobs cache if needed
+    if (result) {
+      const preAggJob: PreAggJob = await this
+        .queryCache
+        .getCacheDriver()
+        .get(`PRE_AGG_JOB_${token}`);
+
+      await this
+        .queryCache
+        .getCacheDriver()
+        .set(
+          `PRE_AGG_JOB_${token}`,
+          {
+            ...preAggJob,
+            status,
+          },
+          86400,
+        );
+    }
+
+    // returning response
+    return [true, status];
   }
 
   public loadAllPreAggregationsIfNeeded(queryBody) {

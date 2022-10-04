@@ -144,15 +144,36 @@ type PreAggJob = {
   updated: number;
   key: any[];
   status: string;
+  timezone: string;
+  dataSource: string;
 };
 
 /**
  * The `/cubejs-system/v1/pre-aggregations/jobs` endpoint object type.
  */
 type PreAggsJobsRequest = {
-  type: 'post' | 'get' | 'delete',
-  selector: PreAggsSelector | PreAggJob[],
+  action: 'post' | 'get' | 'delete',
+  selector?: PreAggsSelector,
+  tokens?: string[]
+  resType?: 'object' | 'array'
 };
+
+type PreAggJobStatusItem = {
+  token: string;
+  status: string;
+  selector: PreAggsSelector;
+};
+
+type PreAggJobStatusObject = {
+  [token: string]: {
+    status: string;
+    selector: PreAggsSelector;
+  }
+};
+
+type PreAggJobStatusResponse =
+  | PreAggJobStatusItem[]
+  | PreAggJobStatusObject;
 
 export {
   RequestContext,
@@ -166,6 +187,9 @@ export {
   BaseRequest,
   QueryRequest,
   PreAggsJobsRequest,
-  PreAggJob,
   PreAggsSelector,
+  PreAggJob,
+  PreAggJobStatusItem,
+  PreAggJobStatusObject,
+  PreAggJobStatusResponse,
 };

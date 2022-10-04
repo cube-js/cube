@@ -31,9 +31,12 @@ import {
   ExtendContextFn,
   ResponseResultFn,
   QueryRequest,
+  PreAggsJobsRequest,
   PreAggsSelector,
   PreAggJob,
-  PreAggsJobsRequest,
+  PreAggJobStatusItem,
+  PreAggJobStatusObject,
+  PreAggJobStatusResponse,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -596,49 +599,38 @@ class ApiGateway {
    * Post object example:
    * ```
    * {
-   *   "type": "post",
+   *   "action": "post",
    *   "selector": {
    *     "contexts": [
    *       {"securityContext": {"tenant": "t1"}},
    *       {"securityContext": {"tenant": "t2"}}
    *     ],
    *     "timezones": ["UTC"],
-   *     "datasources": ["default"],
+   *     "dataSources": ["default"],
    *     "cubes": ["Events"],
    *     "preAggregations": ["Events.TemporaryData"]
    *   }
    * }
    * // or
    * {
-   *   "type": "get",
-   *   "selector": [{
-   *     "request": "6b294492-5cd5-4531-b047-84a33c06f52d-span-1",
-   *     "context": {"securityContext": {"tenant": "t1"}},
-   *     "preagg": "Events.TemporaryData",
-   *     "table": "dev_pre_aggregations.events__temporary_data20110101",
-   *     "target": "dev_pre_aggregations.events__temporary_data20110101_sm1cr2sb_yrrj3lnj_1hhuk46",
-   *     "structure": "yrrj3lnj",
-   *     "content": "sm1cr2sb",
-   *     "updated": 1662996614011,
-   *     "key": [
-   *       [
-   *         "CREATE TABLE dev_pre_aggregations.events__temporary_data20110101 AS SELECT\n      `events`.type `events__type`, date_trunc('month', from_utc_timestamp(`events`.created_at, 'UTC')) `events__created_month`, count(*) `events__count`\n    FROM\n      (\n    SELECT id, public, type, payload, other, created_at FROM events\n  ) AS `events`  WHERE (`events`.created_at >= from_utc_timestamp(replace(replace(?, 'T', ' '), 'Z', ''), 'UTC') AND `events`.created_at <= from_utc_timestamp(replace(replace(?, 'T', ' '), 'Z', ''), 'UTC')) GROUP BY `events__type`, `events__created_month`",
-   *         [
-   *           "2011-01-01T00:00:00.000Z",
-   *           "2011-12-31T23:59:59.999Z"
-   *         ],
-   *         {}
-   *       ],
-   *       [
-   *         [
-   *           {
-   *             "refresh_key": "462034"
-   *           }
-   *         ]
-   *       ]
-   *     ],
-   *     "status": "posted"
-   *   }]
+   *   "action": "get",
+   *   "tokens": [
+   *     "ec1232ea3356f04f8be313fecf3deb4d",
+   *     "48b75d5c466fa579c936dc451f498f69",
+   *     "76509837091396dc204abb1016c48e75",
+   *     "52264769f81f6ff62062a93d6f6fbdb2"
+   *   ]
+   * }
+   * // or
+   * {
+   *   "action": "get",
+   *   "resType": "object",
+   *   "tokens": [
+   *     "ec1232ea3356f04f8be313fecf3deb4d",
+   *     "48b75d5c466fa579c936dc451f498f69",
+   *     "76509837091396dc204abb1016c48e75",
+   *     "52264769f81f6ff62062a93d6f6fbdb2"
+   *   ]
    * }
    * ```
    * TODO (buntarb): selector object validator.
@@ -647,28 +639,35 @@ class ApiGateway {
     const response = this.resToResultFn(res);
     const started = new Date();
     const context = <RequestContext>req.context;
-    const request = <PreAggsJobsRequest>req.body;
+    const query = <PreAggsJobsRequest>req.body;
     try {
       let result;
-      switch (request.type) {
+      switch (query.action) {
         case 'post':
           result = await this.preAggregationsJobsPOST(
             context,
-            <PreAggsSelector>request.selector
+            <PreAggsSelector>query.selector
           );
+          if (result.length === 0) {
+            throw new UserError(
+              'A user\'s selector doesn\'t match any of the ' +
+              'pre-aggregations described by the Cube schemas.'
+            );
+          }
           break;
         case 'get':
           result = await this.preAggregationsJobsGET(
             context,
-            <PreAggJob[]>request.selector,
+            <string[]>query.tokens,
+            query.resType,
           );
           break;
         default:
-          throw new Error(`The '${request.type}' type doesn't supported.`);
+          throw new Error(`The '${query.action}' type doesn't supported.`);
       }
       response(result, { status: 200 });
     } catch (e) {
-      this.handleError({ e, context, res: response, started });
+      this.handleError({ e, context, query, res: response, started });
     }
   }
 
@@ -678,8 +677,8 @@ class ApiGateway {
   private async preAggregationsJobsPOST(
     context: RequestContext,
     selector: PreAggsSelector,
-  ): Promise<PreAggJob[]> {
-    let jobs: PreAggJob[] = [];
+  ): Promise<string[]> {
+    let jobs: string[] = [];
     if (!selector.contexts?.length) {
       jobs = await this.postPreAggregationsBuildJobs(context, selector);
     } else {
@@ -707,7 +706,7 @@ class ApiGateway {
   private async postPreAggregationsBuildJobs(
     context: RequestContext,
     selector: PreAggsSelector
-  ): Promise<PreAggJob[]> {
+  ): Promise<string[]> {
     const compiler = this.getCompilerApi(context);
     const timezones = selector.timezones && selector.timezones.length
       ? selector.timezones
@@ -717,23 +716,27 @@ class ApiGateway {
       cubes: selector.cubes,
       preAggregationIds: selector.preAggregations,
     });
-    const jobs: any[] = await this
-      .refreshScheduler()
-      .postPreAggregationsBuildJobs(
-        context,
-        {
-          metadata: undefined,
-          timezones,
-          preAggregations: preaggs.map(p => ({
-            id: p.id,
-            cacheOnly: undefined, // boolean
-            partitions: undefined, // string[]
-          })),
-          forceBuildPreAggregations: undefined,
-          throwErrors: false,
-        }
-      );
-    return jobs;
+    if (preaggs.length === 0) {
+      return [];
+    } else {
+      const jobs: string[] = await this
+        .refreshScheduler()
+        .postBuildJobs(
+          context,
+          {
+            metadata: undefined,
+            timezones,
+            preAggregations: preaggs.map(p => ({
+              id: p.id,
+              cacheOnly: undefined, // boolean
+              partitions: undefined, // string[]
+            })),
+            forceBuildPreAggregations: undefined,
+            throwErrors: false,
+          }
+        );
+      return jobs;
+    }
   }
 
   /**
@@ -741,36 +744,101 @@ class ApiGateway {
    */
   private async preAggregationsJobsGET(
     context: RequestContext,
-    selector: PreAggJob[],
-  ): Promise<PreAggJob[]> {
+    tokens: string[],
+    resType = 'array',
+  ): Promise<PreAggJobStatusResponse> {
+    const objResponse: PreAggJobStatusObject = {};
+    const selector: PreAggJob[] = await this
+      .refreshScheduler()
+      .getCachedBuildJobs(context, tokens);
     const metaCache: Map<string, any> = new Map();
-    const promise: Promise<PreAggJob[]> = Promise.all(
-      selector.map(async (selected) => {
+    const promise: Promise<(PreAggJobStatusItem | undefined)[]> = Promise.all(
+      selector.map(async (selected, i) => {
         const ctx = { ...context, ...selected.context };
-        const key = JSON.stringify(ctx);
         const orchestrator = this.getAdapterApi(ctx);
         const compiler = this.getCompilerApi(ctx);
-        if (!metaCache.has(key)) {
-          metaCache.set(key, await compiler.metaConfigExtended(ctx));
-        }
-        const status = await this.getPreAggJobQueueStatus(
-          orchestrator,
-          selected,
-        );
-        return {
-          ...selected,
-          status: status || await this.getPreAggJobResultStatus(
-            ctx.requestId,
-            orchestrator,
-            compiler,
-            metaCache.get(key),
-            selected,
-          )
+        const sel: PreAggsSelector = {
+          cubes: [selected.preagg.split('.')[0]],
+          preAggregations: [selected.preagg],
+          contexts: [selected.context],
+          timezones: [selected.timezone],
+          dataSources: [selected.dataSource],
         };
+        if (
+          selected.status.indexOf('done') === 0 ||
+          (
+            selected.status.indexOf('error') === 0 &&
+            selected.status !== 'error: no result'
+          )
+        ) {
+          // returning from the cache
+          if (resType === 'object') {
+            objResponse[tokens[i]] = {
+              status: selected.status,
+              selector: sel,
+            };
+          } else {
+            return {
+              token: tokens[i],
+              status: selected.status,
+              selector: sel,
+            };
+          }
+        } else {
+          // checking the queue
+          const status = await this.getPreAggJobQueueStatus(
+            orchestrator,
+            selected,
+          );
+          if (status) {
+            // returning queued status
+            if (resType === 'object') {
+              objResponse[tokens[i]] = {
+                status,
+                selector: sel,
+              };
+            } else {
+              return {
+                token: tokens[i],
+                status,
+                selector: sel,
+              };
+            }
+          } else {
+            const key = JSON.stringify(ctx);
+            if (!metaCache.has(key)) {
+              metaCache.set(key, await compiler.metaConfigExtended(ctx));
+            }
+            // checking and fetching result status
+            const s = await this.getPreAggJobResultStatus(
+              ctx.requestId,
+              orchestrator,
+              compiler,
+              metaCache.get(key),
+              selected,
+              tokens[i],
+            );
+            if (resType === 'object') {
+              objResponse[tokens[i]] = {
+                status: s,
+                selector: sel,
+              };
+            } else {
+              return {
+                token: tokens[i],
+                status: s,
+                selector: sel,
+              };
+            }
+          }
+        }
+        return undefined;
       })
     );
-    const result: PreAggJob[] = await promise;
-    return result;
+    const arrResponse: (PreAggJobStatusItem | undefined)[] = await promise;
+    return resType === 'object'
+      ? objResponse
+      : <PreAggJobStatusItem[]>arrResponse;
   }
 
   /**
@@ -810,23 +878,22 @@ class ApiGateway {
     compiler: any,
     metadata: any,
     job: PreAggJob,
+    token: string,
   ): Promise<string> {
     const preaggs = await compiler.preAggregations();
     const preagg = preaggs.filter(pa => pa.id === job.preagg)[0];
     const cube = metadata.cubeDefinitions[preagg.cube];
-    const exist: [boolean, string?] = await orchestrator.isPartitionExist(
-      requestId,
-      preagg.preAggregation.external,
-      cube.dataSource,
-      compiler.preAggregationsSchema,
-      job.target,
-      job.key,
-    );
-    if (exist[0]) {
-      return `done${exist[1] ? `: ${exist[1]}` : ''}`;
-    } else {
-      return `error: ${exist[1]}`;
-    }
+    const [, status]: [boolean, string] =
+      await orchestrator.isPartitionExist(
+        requestId,
+        preagg.preAggregation.external,
+        cube.dataSource,
+        compiler.preAggregationsSchema,
+        job.target,
+        job.key,
+        token,
+      );
+    return status;
   }
 
   public async getPreAggregationsInQueue(

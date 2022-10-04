@@ -1,5 +1,6 @@
 import R from 'ramda';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 import { Required } from '@cubejs-backend/shared';
 import { PreAggregationDescription } from '@cubejs-backend/query-orchestrator';
 
@@ -52,6 +53,8 @@ type JobedPreAggregation = {
   queryKey: any[],
   lastUpdatedAt: string,
   type: string,
+  timezone: string,
+  dataSource: string,
 };
 
 type PreAggJob = {
@@ -65,6 +68,8 @@ type PreAggJob = {
   updated: string,
   key: any[],
   status: string;
+  timezone: string,
+  dataSource: string,
 };
 
 /**
@@ -82,7 +87,10 @@ function getPreAggJobHashes(table: string) {
 /**
  * Convert posted build pre-aggs jobs results structure to the jobs list format.
  */
-function getPreAggsJobsList(context: RequestContext, jobedPA: JobedPreAggregation[][][][]): PreAggJob[] {
+function getPreAggsJobsList(
+  context: RequestContext,
+  jobedPA: JobedPreAggregation[][][][]
+): PreAggJob[] {
   const jobs = [];
   jobedPA.forEach((l1) => {
     l1.forEach((l2) => {
@@ -98,12 +106,24 @@ function getPreAggsJobsList(context: RequestContext, jobedPA: JobedPreAggregatio
             updated: pa.lastUpdatedAt,
             key: pa.queryKey,
             status: 'posted',
+            timezone: pa.timezone,
+            dataSource: pa.dataSource,
           });
         });
       });
     });
   });
   return jobs;
+}
+
+/**
+ * Returns MD5 hash token of the job object.
+ */
+function getPreAggJobToken(job: PreAggJob) {
+  return crypto
+    .createHash('md5')
+    .update(JSON.stringify(job))
+    .digest('hex');
 }
 
 export class RefreshScheduler {
@@ -633,10 +653,10 @@ export class RefreshScheduler {
   /**
    * Post pre-aggregations build jobs and returns jobs identifier objects.
    */
-  public async postPreAggregationsBuildJobs(
+  public async postBuildJobs(
     context: RequestContext,
     queryingOptions: PreAggregationsQueryingOptions
-  ): Promise<any[]> {
+  ): Promise<string[]> {
     const orchestratorApi = this.serverCore.getOrchestratorApi(context);
     const preAggregations = await this.preAggregationPartitions(context, queryingOptions);
     const preAggregationsLoadCacheByDataSource = {};
@@ -646,28 +666,65 @@ export class RefreshScheduler {
         return Promise.all(
           partitionsWithDependencies.map(({ partitions, dependencies }) => (
             Promise.all(
-              partitions.map(async (partition) => {
-                const job = await orchestratorApi.executeQuery({
-                  preAggregations: dependencies.concat([partition]),
-                  continueWait: true,
-                  renewQuery: true,
-                  forceBuildPreAggregations: true,
-                  orphanedTimeout: 60 * 60,
-                  requestId: context.requestId,
-                  timezone: partition.timezone,
-                  scheduledRefresh: false,
-                  preAggregationsLoadCacheByDataSource,
-                  metadata: queryingOptions.metadata,
-                  isJob: true,
-                });
-                return job;
-              })
+              partitions.map(
+                async (partition): Promise<JobedPreAggregation[]> => {
+                  const job = await orchestratorApi.executeQuery({
+                    preAggregations: dependencies.concat([partition]),
+                    continueWait: true,
+                    renewQuery: true,
+                    forceBuildPreAggregations: true,
+                    orphanedTimeout: 60 * 60,
+                    requestId: context.requestId,
+                    timezone: partition.timezone,
+                    scheduledRefresh: false,
+                    preAggregationsLoadCacheByDataSource,
+                    metadata: queryingOptions.metadata,
+                    isJob: true,
+                  });
+                  job[0].dataSource = partition.dataSource;
+                  job[0].timezone = partition.timezone;
+                  return job;
+                }
+              )
             )
           ))
         );
       })
     );
     const jobedPAs = await jobsPromise;
-    return getPreAggsJobsList(context, <JobedPreAggregation[][][][]>jobedPAs);
+    return getPreAggsJobsList(
+      context,
+      <JobedPreAggregation[][][][]>jobedPAs,
+    ).map((job: PreAggJob) => {
+      const key = getPreAggJobToken(job);
+      orchestratorApi
+        .getQueryOrchestrator()
+        .getQueryCache()
+        .getCacheDriver()
+        .set(`PRE_AGG_JOB_${key}`, job, 86400);
+      return key;
+    });
+  }
+
+  /**
+   * Returns pre-aggregations build jobs from the cache.
+   */
+  public async getCachedBuildJobs(
+    context: RequestContext,
+    tokens: string[],
+  ): Promise<PreAggJob[]> {
+    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const jobsPromise = Promise.all(
+      tokens.map(async (key) => {
+        const job = <PreAggJob>(await orchestratorApi
+          .getQueryOrchestrator()
+          .getQueryCache()
+          .getCacheDriver()
+          .get(`PRE_AGG_JOB_${key}`));
+        return job;
+      })
+    );
+    const jobs = await jobsPromise;
+    return jobs;
   }
 }
