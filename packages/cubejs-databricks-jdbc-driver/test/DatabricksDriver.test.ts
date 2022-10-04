@@ -354,8 +354,34 @@ describe('DatabricksDriver', () => {
   });
 
   describe('dropTable()', () => {
-    it('success', () => {
-      
+    it('success', async () => {
+      const tableName = 'my_schema.my_table';
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^DROP TABLE my_schema\.my_table/, rows: ['ok'] }
+        ],
+      );
+
+      const result = await driver.dropTable(tableName);
+
+      expect(result).toEqual(['ok']);
+    });
+    
+    it('success with db catalog', async () => {
+      const dbCatalog = 'main';
+      const tableName = 'my_schema.my_table';
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^DROP TABLE main\.my_schema\.my_table/, rows: ['ok'] }
+        ],
+        { dbCatalog }
+      );
+
+      const result = await driver.dropTable(tableName);
+
+      expect(result).toEqual(['ok']);
     });
   });
 
