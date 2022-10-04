@@ -7,10 +7,13 @@ import cubejs from '@cubejs-client/core'
 import {
   DisplayBarChart,
   years,
+  months,
   defaultApiUrl,
   defaultYearId,
+  defaultMonthId,
   token,
   jsonQuery,
+  randomIntFromInterval,
 } from './utils/utils'
 
 ReactDOM
@@ -27,6 +30,14 @@ function App() {
   const [ yearId, setYearId ] = useState(defaultYearId)
   const year = years.find(x => x.id === yearId)
 
+  const [ monthId, setMonthId ] = useState(defaultMonthId)
+  const month = months.find(x => x.id === monthId)
+
+  const shuffleAndRun = () => {
+    setYearId(randomIntFromInterval(1, 34));
+    setMonthId(randomIntFromInterval(1, 12));
+  }
+
   const cubejsApi = cubejs(
     token,
     { apiUrl },
@@ -37,8 +48,9 @@ function App() {
     setTimerClickhouse({})
     const start = Date.now()
 
+    setClickhouseOntimeBarData({})
     cubejsApi
-      .load(jsonQuery({ year: year.year, dataSource: 'clickhouse' }))
+      .load(jsonQuery({ year, month, dataSource: 'clickhouse' }))
       .then(setClickhouseOntimeBarData)
       .then(() => {
         const end = Date.now()
@@ -47,6 +59,7 @@ function App() {
       })
   }, [
     year.year,
+    month.id,
   ])
 
   const [ mysqlOntimeBarData, setMysqlOntimeBarData ] = useState({})
@@ -54,8 +67,9 @@ function App() {
     setTimerMysql({})
     const start = Date.now()
 
+    setMysqlOntimeBarData({})
     cubejsApi
-      .load(jsonQuery({ year: year.year, dataSource: 'mysql' })) // edit to use mysql once we get endpoint
+      .load(jsonQuery({ year, month, dataSource: 'mysql' }))
       .then(setMysqlOntimeBarData)
       .then(() => {
         const end = Date.now()
@@ -64,6 +78,7 @@ function App() {
       })
   }, [
     year.year,
+    month.id,
   ])
 
   return <>
@@ -80,6 +95,23 @@ function App() {
           </option>
         ))}
       </select>
+      <select
+        className={classes.select}
+        value={monthId}
+        onChange={e => setMonthId(parseInt(e.target.value))}
+      >
+        <option value="" disabled>Select month...</option>
+        {months.map(month => (
+          <option key={month.id} value={month.id}>
+            {month.month}
+          </option>
+        ))}
+      </select>
+      <div className={`${classes.buttonwrp}`}>
+        <button className={`Button Button--size-s Button--pink`} onClick={shuffleAndRun}>
+          Shuffle and Run!
+        </button>
+      </div>
     </div>
 
     <div style={{ display: 'flex', justifyContent: 'center' }}>
