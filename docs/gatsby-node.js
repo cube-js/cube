@@ -31,6 +31,10 @@ exports.createPages = ({ actions, graphql }) => {
     }
 
     result.data.allMdx.edges.forEach(({ node }) => {
+      if (!node.frontmatter.permalink && node.frontmatter.category === 'Internal') {
+        return;
+      }
+
       createPage({
         path: node.frontmatter.permalink,
         title: node.frontmatter.title,
