@@ -627,6 +627,47 @@ LIMIT 1;
 (1 row)
 ```
 
+### <--{"id" : "String Functions and Operators"}--> STARTS_WITH
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|               | Selections | Projections | Outer Query                              |
+| ------------- | ---------- | ----------- | ---------------------------------------- |
+| `STARTS_WITH` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+Returns true if `string` starts with `prefix`.
+
+```sql
+starts_with (string, prefix)
+```
+
+The example below uses `STARTS_WITH` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM Orders WHERE STARTS_WITH(Orders.status, 'complete');
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+The example below uses `STARTS_WITH` in post-processing with an outer query:
+
+```sql
+SELECT STARTS_WITH(Orders.status, 'complete')
+FROM (SELECT * FROM Orders) orders
+LIMIT 1;
+ startswith(Orders.status,Utf8("complete"))
+--------------------------------------------
+ f
+(1 row)
+```
+
 ## Pattern Matching
 
 ### <--{"id" : "Pattern Matching"}--> LIKE
