@@ -13,7 +13,7 @@ export const ticksFormmater = (ticksCount, value, data, dateFormatter) => {
   return ""
 }
 export const numberFormatter = (item) => numeral(item/100).format("0%")
-export const dateFormatter = (item) => moment(item).format("YYYY")
+export const dateFormatter = (item) => moment(item).format("DD")
 export const colors = ["#7DB3FF", "#49457B", "#FF7C78"]
 
 const isEmpty = (obj) => Object.keys(obj).length === 0;
