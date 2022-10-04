@@ -387,6 +387,29 @@ describe('PreAggregations', () => {
         }
       }
     })
+    
+    cube('VisitorView', {
+      sql: \`SELECT 1\`,
+      
+      measures: {
+        checkinsTotal: {
+          sql: \`\${visitors.checkinsTotal}\`,
+          type: 'number',
+        }
+      },
+      
+      dimensions: {
+        source: {
+          sql: \`\${visitors.source}\`,
+          type: 'string',
+        },
+        
+        createdAt: {
+          sql: \`\${visitors.createdAt}\`,
+          type: 'time'
+        }
+      },
+    });
     `);
 
   it('simple pre-aggregation', () => compiler.compile().then(() => {
@@ -1496,6 +1519,111 @@ describe('PreAggregations', () => {
             visitors__source: 'google',
             visitors__created_at_day: '2017-01-06T00:00:00.000Z',
             visitors__checkins_total: '1'
+          }
+        ]
+      );
+    });
+  }));
+
+  it('simple view', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'VisitorView.checkinsTotal'
+      ],
+      dimensions: [
+        'VisitorView.source'
+      ],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+      timeDimensions: [{
+        dimension: 'VisitorView.createdAt',
+        granularity: 'day',
+        dateRange: ['2016-12-30', '2017-01-05']
+      }],
+      order: [{
+        id: 'VisitorView.createdAt'
+      }],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+    expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/visitors_partitioned/);
+
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [
+          {
+            visitor_view__source: 'some',
+            visitor_view__created_at_day: '2017-01-02T00:00:00.000Z',
+            visitor_view__checkins_total: '3'
+          },
+          {
+            visitor_view__source: 'some',
+            visitor_view__created_at_day: '2017-01-04T00:00:00.000Z',
+            visitor_view__checkins_total: '2'
+          },
+          {
+            visitor_view__source: 'google',
+            visitor_view__created_at_day: '2017-01-05T00:00:00.000Z',
+            visitor_view__checkins_total: '1'
+          }
+        ]
+      );
+    });
+  }));
+
+  it('simple view non matching time-dimension granularity', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'VisitorView.checkinsTotal'
+      ],
+      dimensions: [
+        'VisitorView.source'
+      ],
+      timezone: 'America/Los_Angeles',
+      preAggregationsSchema: '',
+      timeDimensions: [{
+        dimension: 'VisitorView.createdAt',
+        granularity: 'month',
+        dateRange: ['2016-12-30', '2017-01-05']
+      }],
+      order: [{
+        id: 'VisitorView.createdAt'
+      }],
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+    expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/visitors_partitioned/);
+
+    const queries = dbRunner.tempTablePreAggregations(preAggregationsDescription);
+
+    console.log(JSON.stringify(queries.concat(queryAndParams)));
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [
+          {
+            visitor_view__source: 'google',
+            visitor_view__created_at_month: '2017-01-01T00:00:00.000Z',
+            visitor_view__checkins_total: '1'
+          },
+          {
+            visitor_view__source: 'some',
+            visitor_view__created_at_month: '2017-01-01T00:00:00.000Z',
+            visitor_view__checkins_total: '5'
           }
         ]
       );
