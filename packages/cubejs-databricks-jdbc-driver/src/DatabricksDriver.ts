@@ -271,7 +271,7 @@ export class DatabricksDriver extends JDBCDriver {
     return result;
   }
 
-  private async queryColumnTypes(sql: string, params: unknown[]) {
+  public async queryColumnTypes(sql: string, params: unknown[]) {
     const result = [];
     // eslint-disable-next-line camelcase
     const response = await this.query<{col_name: string; data_type: string}>(`DESCRIBE QUERY ${sql}`, params);

@@ -156,20 +156,103 @@ describe('DatabricksDriver', () => {
   });
 
   describe('tableColumnTypes()', () => {
-    it('success', () => {
-      
+    it('success', async () => {
+      const tableName = 'my_schema.my_super_table';
+      const rows = [{ col_name: 'id', data_type: 'decimal(10,0)' }];
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^DESCRIBE `my_schema`\.`my_super_table`/, rows }
+        ],
+      );
+
+      const result = await driver.tableColumnTypes(tableName);
+
+      expect(result).toEqual([{ name: 'id', type: 'bigint' }]);
+    });
+
+    it('success with db catalog', async () => {
+      const dbCatalog = 'main';
+      const tableName = 'my_schema.my_super_table';
+      const rows = [{ col_name: 'id', data_type: 'decimal(10,0)' }];
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^DESCRIBE `main`\.`my_schema`\.`my_super_table`/, rows }
+        ],
+        { dbCatalog }
+      );
+
+      const result = await driver.tableColumnTypes(tableName);
+
+      expect(result).toEqual([{ name: 'id', type: 'bigint' }]);
     });
   });
 
   describe('queryColumnTypes()', () => {
-    it('success', () => {
-      
+    it('success', async () => {
+      const sql = 'SELECT * FROM my_schema.my_super_table';
+      const rows = [{ col_name: 'id', data_type: 'decimal(10,0)' }];
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^DESCRIBE QUERY SELECT \* FROM my_schema.my_super_table/, rows }
+        ],
+      );
+
+      const result = await driver.queryColumnTypes(sql, []);
+
+      expect(result).toEqual([{ name: 'id', type: 'bigint' }]);
+    });
+
+    it('success with db catalog', async () => {
+      const dbCatalog = 'main';
+      const sql = 'SELECT * FROM dev_pre_aggregations.my_super_table';
+      const rows = [{ col_name: 'id', data_type: 'decimal(10,0)' }];
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^DESCRIBE QUERY SELECT \* FROM main\.dev_pre_aggregations\.my_super_table/, rows }
+        ],
+        { dbCatalog }
+      );
+
+      const result = await driver.queryColumnTypes(sql, []);
+
+      expect(result).toEqual([{ name: 'id', type: 'bigint' }]);
     });
   });
 
   describe('getTablesQuery()', () => {
-    it('success', () => {
-      
+    it('success', async () => {
+      const schema = 'my_schema';
+      const rows = [{ database: schema, tableName: 'my_table' }];
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^SHOW TABLES IN `my_schema`/, rows }
+        ],
+      );
+
+      const result = await driver.getTablesQuery(schema);
+
+      expect(result).toEqual([{ table_name: 'my_table' }]);
+    });
+    it('success with db catalog', async () => {
+      const dbCatalog = 'main';
+      const schema = 'my_schema';
+      const rows = [{ database: schema, tableName: 'my_table' }];
+
+      const driver = createDatabricksDriver(
+        [
+          { regexp: /^SHOW TABLES IN `main`\.`my_schema`/, rows }
+        ],
+        { dbCatalog }
+      );
+
+      const result = await driver.getTablesQuery(schema);
+
+      expect(result).toEqual([{ table_name: 'my_table' }]);
     });
   });
 
