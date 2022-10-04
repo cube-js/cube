@@ -67,7 +67,7 @@ module.exports = {
 
   //   if (securityContext.dataSource === 'mysql') {
   //     return {
-  //       type: 'postgres', // replace with mysql once we get an endpoint
+  //       type: 'mysql',
   //       database: mysqlDatabase,
   //       host: mysqlHost,
   //       user: mysqlUser,
