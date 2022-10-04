@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.1](https://github.com/cube-js/cube.js/compare/v0.31.0...v0.31.1) (2022-10-04)
+
+
+### Bug Fixes
+
+* **playground:** bar chart pivot config ([36b9ec2](https://github.com/cube-js/cube.js/commit/36b9ec2f3de5ba3b6b047f3669f8e162321d854e))
+
+
+### Features
+
+* **console-ui:** show error stack trace ([7ab15c6](https://github.com/cube-js/cube.js/commit/7ab15c6fbd46696d36c95f197711284d316c9f70))
+
+
+
+
+
 # [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
 
 **Note:** Version bump only for package @cubejs-client/playground
