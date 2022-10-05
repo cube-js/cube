@@ -31,7 +31,9 @@
     "@cubejs-backend/postgres-driver": "^0.31.1",
     "@cubejs-backend/shared": "^0.31.0",
     "@types/pg": "^8.6.0",
-    "pg": "^8.6.0"
+    "pg": "^8.6.0",
+    "ramda": "0.27.2",
+    "semver": "7.3.7"
   },
   "license": "Apache-2.0",
   "devDependencies": {
