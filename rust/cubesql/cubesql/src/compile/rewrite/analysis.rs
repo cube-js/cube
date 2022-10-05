@@ -425,10 +425,15 @@ impl LogicalPlanAnalysis {
                 )
                 .ok()?;
 
-                // Ignore any string casts as local timestamps casted incorrectly
-                if let Expr::Cast { expr, .. } = &expr {
-                    if let Expr::Literal(ScalarValue::Utf8(_)) = expr.as_ref() {
-                        return None;
+                // Some casts from string can have unpredictable behavior
+                if let Expr::Cast { expr, data_type } = &expr {
+                    match expr.as_ref() {
+                        Expr::Literal(ScalarValue::Utf8(value)) => match (value, data_type) {
+                            // Timezone set in Config
+                            (Some(_), DataType::Timestamp(_, _)) => (),
+                            _ => return None,
+                        },
+                        _ => (),
                     }
                 }
 

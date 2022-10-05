@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** pre-aggs build range queries cache key alignment ([#5377](https://github.com/cube-js/cube.js/issues/5377)) ([5896c4a](https://github.com/cube-js/cube.js/commit/5896c4aa4d5a469a892ca9f0e758dc5c6ef6c350))
+
+
+### Features
+
+* **query-orchestrator:** introduce unload without temp table ([#5324](https://github.com/cube-js/cube.js/issues/5324)) ([3dcbd2e](https://github.com/cube-js/cube.js/commit/3dcbd2ed1d214d56bfde2183538fce3ec7d65595))
+
+
+
+
+
 ## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
 
 

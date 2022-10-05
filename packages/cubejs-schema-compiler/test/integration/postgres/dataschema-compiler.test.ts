@@ -465,4 +465,57 @@ describe('DataSchemaCompiler', () => {
       ['Marketing']
     );
   });
+
+  it('views should not contain own members', () => {
+    const { compiler } = prepareCompiler(`
+    view('Visitors', {
+      dimensions: {
+        id: {
+          type: 'number',
+          sql: 'id',
+        }
+      }
+    })
+    `);
+    return compiler.compile().then(() => {
+      compiler.throwIfAnyErrors();
+      throw new Error();
+    }).catch((error) => {
+      console.log(error);
+      expect(error).toBeInstanceOf(CompileError);
+    });
+  });
+
+  it('foreign cubes', () => {
+    const { compiler } = prepareCompiler(`
+    cube('Visitors', {
+      sql: 'select * from visitors',
+      
+      dimensions: {
+        foo: {
+          type: 'number',
+          sql: \`$\{Foreign}.bar\`,
+        }
+      }
+    });
+    
+    cube('Foreign', {
+      sql: 'select * from foreign',
+      
+      dimensions: {
+        bar: {
+          type: 'number',
+          sql: 'id',
+        }
+      }
+    })
+    `);
+    return compiler.compile().then(() => {
+      compiler.throwIfAnyErrors();
+      throw new Error();
+    }).catch((error) => {
+      console.log(error);
+      expect(error).toBeInstanceOf(CompileError);
+    });
+  });
 });

@@ -432,7 +432,15 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
 
 const cubeSchema = Joi.object().keys({
   name: identifier,
-  sql: Joi.func().required(),
+  sql: Joi.alternatives().conditional(
+    Joi.ref('..isView'), [
+      {
+        is: true,
+        then: Joi.forbidden(),
+        otherwise: Joi.func().required()
+      }
+    ]
+  ),
   refreshKey: CubeRefreshKeySchema,
   fileName: Joi.string().required(),
   extends: Joi.func(),
@@ -442,6 +450,7 @@ const cubeSchema = Joi.object().keys({
   dataSource: Joi.string(),
   description: Joi.string(),
   rewriteQueries: Joi.boolean().strict(),
+  isView: Joi.boolean().strict(),
   joins: Joi.object().pattern(identifierRegex, Joi.object().keys({
     sql: Joi.func().required(),
     relationship: Joi.any().valid('hasMany', 'belongsTo', 'hasOne').required()

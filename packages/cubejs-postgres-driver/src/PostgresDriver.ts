@@ -66,6 +66,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     return 2;
   }
 
+  private enabled: boolean = false;
+
   protected readonly pool: Pool;
 
   protected readonly config: Partial<Config>;
@@ -107,6 +109,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
       ...config,
     };
+    this.enabled = true;
   }
 
   /**
@@ -114,6 +117,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
    * you cannot call method in RedshiftDriver.constructor before super.
    */
   protected getInitialConfiguration(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     dataSource: string,
   ): Partial<PostgresDriverConfiguration> {
     return {
@@ -334,8 +338,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
-  public release() {
-    return this.pool.end();
+  public async release() {
+    if (this.enabled) {
+      this.pool.end();
+      this.enabled = false;
+    }
   }
 
   public param(paramIndex: number) {

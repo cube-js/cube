@@ -147,7 +147,10 @@ export class CubeStoreQuery extends BaseQuery {
         wrapQuery: true,
         wrappedGranularity: timeDimension?.granularity || rollupGranularity,
         rollupGranularity: granularityOverride,
-        topLevelMerge: false
+        topLevelMerge: false,
+        renderedReference: {
+          [timeDimension.dimension]: timeDimension.cumulativeSelectColumns()[0]
+        }
       }
     );
   }
