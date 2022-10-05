@@ -696,12 +696,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return tables.map(t => ({ table_name: t.TABLE_NAME && t.TABLE_NAME.toLowerCase() }));
   }
 
-  public capabilities(): DriverCapabilities {
-    return {
-      unloadWithoutTempTable: true,
-    };
-  }
-
   public readOnly(): boolean {
     return Boolean(this.config.readOnly);
   }
@@ -715,6 +709,13 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       const csvFile = await this.getCsvFiles({ exportPathName });
 
       return { csvFile, types };
+    } else if (this.stream) {
+      const connection = await this.getConnection();
+      await this.execute<Rows>(connection, `${query} LIMIT 1`, values, false);
+      const types = await this.getTypesOfLastQuery(connection, values);
+      const data = await this.stream(query, values);
+
+      return { types, ...data };
     } else {
       const connection = await this.getConnection();
       const rows = await this.execute<Rows>(connection, query, values, false);
