@@ -656,18 +656,24 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   private sqlResultToType(type: string) {
-    const match = type.match(/^(?:NUMBER|DECIMAL|NUMERIC)\(([0-9]+),([0-9])\)$/);
+    const decimalMatch = type.match(/^(?:NUMBER|DECIMAL|NUMERIC)\(([0-9]+),([0-9])\)$/);
 
-    if (match) {
+    if (decimalMatch) {
       const intRegexp = /^(?:NUMBER|DECIMAL|NUMERIC)\(([0-9]+),([0])\)$/;
 
       if (intRegexp.test(type)) {
         return 'int';
       }
-      return `decimal(${match[1]},${match[2]})`;
+      return `decimal(${decimalMatch[1]},${decimalMatch[2]})`;
     }
 
-    return super.toGenericType(type);
+    const timeStampMatch = type.match(/^(?:TIMESTAMP|TIMESTAMP_NTZ)\(([0-9]+)\)$/);
+
+    if (timeStampMatch) {
+      return `timestamp(${timeStampMatch[1]})`;
+    }
+
+    return SnowflakeToGenericType[type.toLowerCase()] || super.toGenericType(type);
   }
 
   public async tableColumnTypes(table: string): Promise<TableColumn[]> {
