@@ -670,7 +670,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const timeStampMatch = type.match(/^(?:TIMESTAMP|TIMESTAMP_NTZ)\(([0-9]+)\)$/);
 
     if (timeStampMatch) {
-      return `timestamp(${timeStampMatch[1]})`;
+      return 'timestamp';
     }
 
     return SnowflakeToGenericType[type.toLowerCase()] || super.toGenericType(type);

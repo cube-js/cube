@@ -138,9 +138,9 @@ describe('SnowflakeDriver', () => {
           { type: 'HLL_SNOWFLAKE', name: 'my_object' },
           { type: 'timestamp', name: 'my_datetime' },
           { type: 'TIMESTAMP', name: 'my_timestamp' },
-          { type: 'timestamp(9)', name: 'my_timestamp_nine' },
+          { type: 'timestamp', name: 'my_timestamp_nine' },
           { type: 'timestamp', name: 'my_timestamp_ntz' },
-          { type: 'timestamp(9)', name: 'my_timestamp_ntz_nine' },
+          { type: 'timestamp', name: 'my_timestamp_ntz_nine' },
         ];
         expect(result).toEqual({ csvFile: contents.map(c => c.Key), types: expectedTypes });
       });
