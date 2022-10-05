@@ -732,11 +732,18 @@ LIMIT 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`COUNT` can **only** be used to query measures of type
-[`count`][ref-schema-ref-measure-types-count] inside Cube query rewrites. If `*`
-is specified, Cube will query the **first** measure of type `count` for the
-specified cube. We recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|         | Selections | Projections                  | Outer Query                              |
+| ------- | ---------- | ---------------------------- | ---------------------------------------- |
+| `COUNT` | ❌         | ✅ <sup>1</sup> <sup>2</sup> | [✅][ref-backend-sql-query-fundamentals] |
+
+1. `COUNT` can **only** be used to query measures of type
+   [`count`][ref-schema-ref-measure-types-count] inside Cube query rewrites.
+
+2. If `*` is specified, Cube will query the **first** measure of type `count`
+   found in the cube
 
 </WarningBox>
 
@@ -797,10 +804,15 @@ SELECT MEASURE(Orders.count) FROM Orders;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`SUM` can **only** be used to query measures of type
-[`sum`][ref-schema-ref-measure-types-sum] inside Cube query rewrites. We
-recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|       | Selections | Projections     | Outer Query                              |
+| ----- | ---------- | --------------- | ---------------------------------------- |
+| `SUM` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
+
+1. `SUM` can **only** be used to query measures of type
+   [`sum`][ref-schema-ref-measure-types-sum] inside Cube query rewrites.
 
 </WarningBox>
 
@@ -825,10 +837,15 @@ SELECT SUM(number) FROM Orders;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`AVG` can **only** be used to query measures of type
-[`avg`][ref-schema-ref-measure-types-avg] inside Cube query rewrites. We
-recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|       | Selections | Projections     | Outer Query                              |
+| ----- | ---------- | --------------- | ---------------------------------------- |
+| `AVG` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
+
+1. `AVG` can **only** be used to query measures of type
+   [`avg`][ref-schema-ref-measure-types-avg] inside Cube query rewrites.
 
 </WarningBox>
 
@@ -853,10 +870,15 @@ SELECT AVG(avgNumber) FROM Orders;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`MIN` can **only** be used to query measures of type
-[`min`][ref-schema-ref-measure-types-min] inside Cube query rewrites. We
-recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|       | Selections | Projections     | Outer Query                              |
+| ----- | ---------- | --------------- | ---------------------------------------- |
+| `MIN` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
+
+1. `MIN` can **only** be used to query measures of type
+   [`min`][ref-schema-ref-measure-types-min] inside Cube query rewrites.
 
 </WarningBox>
 
@@ -882,10 +904,15 @@ SELECT MIN(minNumber) FROM Orders;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`MAX` can **only** be used to query measures of type
-[`max`][ref-schema-ref-measure-types-max] inside Cube query rewrites. We
-recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|       | Selections | Projections     | Outer Query                              |
+| ----- | ---------- | --------------- | ---------------------------------------- |
+| `MAX` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
+
+1. `MAX` can **only** be used to query measures of type
+   [`max`][ref-schema-ref-measure-types-max] inside Cube query rewrites.
 
 </WarningBox>
 
@@ -913,9 +940,12 @@ SELECT MAX(maxNumber) FROM Orders;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`TO_TIMESTAMP` is **not supported** in Cube query rewrite. We recommend updating
-your queries to [use outer selects][ref-backend-sql-query-fundamentals] if you
-need to use it.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|                | Selections | Projections | Outer Query                              |
+| -------------- | ---------- | ----------- | ---------------------------------------- |
+| `TO_TIMESTAMP` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -943,9 +973,12 @@ WHERE TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss') < Orders.crea
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`LOCALTIMESTAMP` is **not supported** in Cube query rewrite. We recommend
-updating your queries to [use outer selects][ref-backend-sql-query-fundamentals]
-if you need to use it.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|                  | Selections | Projections | Outer Query                              |
+| ---------------- | ---------- | ----------- | ---------------------------------------- |
+| `LOCALTIMESTAMP` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -971,9 +1004,12 @@ WHERE LOCALTIMESTAMP() > Orders.createdAt;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`NOW` is **not supported** in Cube query rewrite. We recommend updating your
-queries to [use outer selects][ref-backend-sql-query-fundamentals] if you need
-to use it.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|       | Selections | Projections | Outer Query                              |
+| ----- | ---------- | ----------- | ---------------------------------------- |
+| `NOW` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -999,10 +1035,12 @@ WHERE NOW() > Orders.createdAt;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`EXTRACT` is **only supported** for **projections** from cube tables. We
-recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function in
-**selections**.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|           | Selections | Projections | Outer Query                              |
+| --------- | ---------- | ----------- | ---------------------------------------- |
+| `EXTRACT` | ❌         | ✅          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -1034,10 +1072,12 @@ LIMIT 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`DATE_TRUNC` is **only supported** for **projections** from cube tables. We
-recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function in
-**selections**.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|              | Selections | Projections | Outer Query                              |
+| ------------ | ---------- | ----------- | ---------------------------------------- |
+| `DATE_TRUNC` | ❌         | ✅          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -1072,9 +1112,12 @@ LIMIT 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`CASE` is **not supported** in Cube query rewrite. We recommend updating your
-queries to [use outer selects][ref-backend-sql-query-fundamentals] if you need
-to use it.
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|        | Selections | Projections | Outer Query                              |
+| ------ | ---------- | ----------- | ---------------------------------------- |
+| `CASE` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -1120,9 +1163,12 @@ GROUP BY 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`COALESCE` is **not supported** for **selections** or **projections** from cube
-tables. We recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|            | Selections | Projections | Outer Query                              |
+| ---------- | ---------- | ----------- | ---------------------------------------- |
+| `COALESCE` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -1155,9 +1201,12 @@ GROUP BY 2;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`NULLIF` is **not supported** for **selections** or **projections** from cube
-tables. We recommend updating your queries to [use outer
-selects][ref-backend-sql-query-fundamentals] if you need to use this function.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|          | Selections | Projections | Outer Query                              |
+| -------- | ---------- | ----------- | ---------------------------------------- |
+| `NULLIF` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -1188,9 +1237,12 @@ GROUP BY 1;
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`IN` is **only supported** for **selections** from cube tables. We recommend
-updating your queries to [use outer selects][ref-backend-sql-query-fundamentals]
-if you need to use this function in **projections**.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|      | Selections | Projections | Outer Query                              |
+| ---- | ---------- | ----------- | ---------------------------------------- |
+| `IN` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
@@ -1216,9 +1268,12 @@ SELECT COUNT(*) FROM Orders WHERE status IN ('shipped', 'completed');
 
 <WarningBox heading={"Cube Query Rewrite"}>
 
-`NOT IN` is **only supported** for **selections** from cube tables. We recommend
-updating your queries to [use outer selects][ref-backend-sql-query-fundamentals]
-if you need to use this function in **projections**.
+Within a Cube Query Rewrite, this function may behave differently. Use the table
+below for support:
+
+|          | Selections | Projections | Outer Query                              |
+| -------- | ---------- | ----------- | ---------------------------------------- |
+| `NOT IN` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 </WarningBox>
 
