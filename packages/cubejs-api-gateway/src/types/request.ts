@@ -124,7 +124,7 @@ type QueryRequest = BaseRequest & {
  */
 type PreAggsSelector = {
   contexts?: {securityContext: any}[],
-  timezones?: string[],
+  timezones: string[],
   dataSources?: string[],
   cubes?: string[],
   preAggregations?: string[],
@@ -160,12 +160,14 @@ type PreAggsJobsRequest = {
 
 type PreAggJobStatusItem = {
   token: string;
+  table: string;
   status: string;
   selector: PreAggsSelector;
 };
 
 type PreAggJobStatusObject = {
   [token: string]: {
+    table: string;
     status: string;
     selector: PreAggsSelector;
   }

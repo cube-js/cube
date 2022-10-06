@@ -84,6 +84,15 @@ import {
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
 
+// const timeoutPromise = (timeout) => (
+//   new Promise((resolve) => (
+//     setTimeout(
+//       () => resolve(null),
+//       timeout,
+//     )
+//   ))
+// );
+
 /**
  * API gateway server class.
  */
@@ -644,6 +653,39 @@ class ApiGateway {
       let result;
       switch (query.action) {
         case 'post':
+          if (
+            !(<PreAggsSelector>query.selector).timezones ||
+            (<PreAggsSelector>query.selector).timezones.length === 0
+          ) {
+            throw new UserError(
+              'A user\'s selector must contain at least one time zone.'
+            );
+          }
+          if (
+            !(<PreAggsSelector>query.selector).contexts ||
+            (
+              <{securityContext: any}[]>(
+                <PreAggsSelector>query.selector
+              ).contexts
+            ).length === 0
+          ) {
+            throw new UserError(
+              'A user\'s selector must contain at least one context element.'
+            );
+          } else {
+            let e = false;
+            (<{securityContext: any}[]>(
+              <PreAggsSelector>query.selector
+            ).contexts).forEach((c) => {
+              if (!c.securityContext) e = true;
+            });
+            if (e) {
+              throw new UserError(
+                'Every context element must contain the ' +
+                '\'securityContext\' property.'
+              );
+            }
+          }
           result = await this.preAggregationsJobsPOST(
             context,
             <PreAggsSelector>query.selector
@@ -680,21 +722,39 @@ class ApiGateway {
   ): Promise<string[]> {
     let jobs: string[] = [];
     if (!selector.contexts?.length) {
-      jobs = await this.postPreAggregationsBuildJobs(context, selector);
+      jobs = await this.postPreAggregationsBuildJobs(
+        context,
+        selector,
+      );
     } else {
+      // for (let i = 0; i < selector.contexts.length; i++) {
+      //   const cfg = selector.contexts[i];
+      //   const ctx = <RequestContext>{
+      //     ...context,
+      //     ...cfg,
+      //   };
+      //   const _jobs = await this.postPreAggregationsBuildJobs(
+      //     ctx,
+      //     selector,
+      //   );
+      //   jobs = jobs.concat(_jobs);
+      // }
       const promise = Promise.all(
         selector.contexts.map(async (config) => {
           const ctx = <RequestContext>{
             ...context,
             ...config,
           };
-          const job = await this.postPreAggregationsBuildJobs(ctx, selector);
-          return job;
+          const _jobs = await this.postPreAggregationsBuildJobs(
+            ctx,
+            selector,
+          );
+          return _jobs;
         })
       );
       const resolve = await promise;
-      resolve.forEach((j) => {
-        jobs = jobs.concat(j);
+      resolve.forEach((_jobs) => {
+        jobs = jobs.concat(_jobs);
       });
     }
     return jobs;
@@ -708,9 +768,7 @@ class ApiGateway {
     selector: PreAggsSelector
   ): Promise<string[]> {
     const compiler = this.getCompilerApi(context);
-    const timezones = selector.timezones && selector.timezones.length
-      ? selector.timezones
-      : undefined;
+    const { timezones } = selector;
     const preaggs = await compiler.preAggregations({
       dataSources: selector.dataSources,
       cubes: selector.cubes,
@@ -774,12 +832,14 @@ class ApiGateway {
           // returning from the cache
           if (resType === 'object') {
             objResponse[tokens[i]] = {
+              table: selected.target,
               status: selected.status,
               selector: sel,
             };
           } else {
             return {
               token: tokens[i],
+              table: selected.target,
               status: selected.status,
               selector: sel,
             };
@@ -794,12 +854,14 @@ class ApiGateway {
             // returning queued status
             if (resType === 'object') {
               objResponse[tokens[i]] = {
+                table: selected.target,
                 status,
                 selector: sel,
               };
             } else {
               return {
                 token: tokens[i],
+                table: selected.target,
                 status,
                 selector: sel,
               };
@@ -820,12 +882,14 @@ class ApiGateway {
             );
             if (resType === 'object') {
               objResponse[tokens[i]] = {
+                table: selected.target,
                 status: s,
                 selector: sel,
               };
             } else {
               return {
                 token: tokens[i],
+                table: selected.target,
                 status: s,
                 selector: sel,
               };

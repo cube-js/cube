@@ -720,7 +720,7 @@ export async function getBirdbox(
     }
   } catch (e) {
     clearTestData(type);
-    process.stderr.write(e.toString());
+    process.stderr.write((<any>e).toString());
     process.exit(1);
   }
   return birdbox;
