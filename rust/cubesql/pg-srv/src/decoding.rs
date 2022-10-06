@@ -9,7 +9,7 @@ use byteorder::{ByteOrder, LittleEndian};
 /// This trait explains how to decode values from the protocol
 /// It's used in the Bind message
 pub trait FromProtocolValue {
-    // Converts native type to raw value in text format
+    // Converts native type to raw value in specific format
     fn from_protocol(raw: &Vec<u8>, format: Format) -> Result<Self, ProtocolError>
     where
         Self: Sized,
@@ -67,14 +67,9 @@ impl FromProtocolValue for i64 {
 
 impl FromProtocolValue for bool {
     fn from_text(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        let as_str = String::from_utf8(raw.clone()).map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
-        })?;
-
-        match as_str.as_str() {
-            "t" => Ok(true),
-            "f" => Ok(false),
+        match raw[0] {
+            b't' => Ok(true),
+            b'f' => Ok(false),
             other => Err(ErrorResponse::error(
                 ErrorCode::ProtocolViolation,
                 format!("Unable to decode bool from text, actual: {}", other),
@@ -84,7 +79,15 @@ impl FromProtocolValue for bool {
     }
 
     fn from_binary(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        Ok(raw[0] == 1)
+        match raw[0] {
+            1 => Ok(true),
+            0 => Ok(false),
+            other => Err(ErrorResponse::error(
+                ErrorCode::ProtocolViolation,
+                format!("Unable to decode bool from binary, actual: {}", other),
+            )
+            .into(): ProtocolError),
+        }
     }
 }
 
@@ -92,30 +95,43 @@ impl FromProtocolValue for bool {
 mod tests {
     use crate::*;
 
+    use crate::protocol::Format;
     use bytes::BytesMut;
 
     fn assert_test_decode<T: ToProtocolValue + FromProtocolValue + std::cmp::PartialEq>(
         value: T,
+        format: Format,
     ) -> Result<(), ProtocolError> {
         let mut buf = BytesMut::new();
-        value.to_text(&mut buf)?;
+        value.to_protocol(&mut buf, format)?;
 
         // skip length
         let mut encoded = Vec::with_capacity(buf.len() - 4);
         encoded.extend_from_slice(&buf.as_ref()[4..]);
 
-        assert_eq!(value, T::from_text(&encoded)?);
+        assert_eq!(value, T::from_protocol(&encoded, format)?);
 
         Ok(())
     }
 
     #[test]
     fn test_text_decoders() -> Result<(), ProtocolError> {
-        assert_test_decode("test".to_string())?;
-        assert_test_decode(true)?;
-        assert_test_decode(false)?;
-        assert_test_decode(1_i64)?;
-        assert_test_decode(100_i64)?;
+        assert_test_decode("test".to_string(), Format::Text)?;
+        assert_test_decode(true, Format::Text)?;
+        assert_test_decode(false, Format::Text)?;
+        assert_test_decode(1_i64, Format::Text)?;
+        assert_test_decode(100_i64, Format::Text)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_binary_decoders() -> Result<(), ProtocolError> {
+        assert_test_decode("test".to_string(), Format::Binary)?;
+        assert_test_decode(true, Format::Binary)?;
+        assert_test_decode(false, Format::Binary)?;
+        assert_test_decode(1_i64, Format::Binary)?;
+        assert_test_decode(100_i64, Format::Binary)?;
 
         Ok(())
     }

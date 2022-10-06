@@ -1,6 +1,6 @@
 //! Encoding native values to the Protocol representation
 
-use crate::ProtocolError;
+use crate::{protocol::Format, ProtocolError};
 use bytes::{BufMut, BytesMut};
 #[cfg(feature = "with-chrono")]
 use chrono::{NaiveDate, NaiveDateTime};
@@ -8,6 +8,17 @@ use std::io::{Error, ErrorKind};
 
 /// This trait explains how to encode values to the protocol format
 pub trait ToProtocolValue: std::fmt::Debug {
+    // Converts raw value to native type in specific format
+    fn to_protocol(&self, buf: &mut BytesMut, format: Format) -> Result<(), ProtocolError>
+    where
+        Self: Sized,
+    {
+        match format {
+            Format::Text => self.to_text(buf),
+            Format::Binary => self.to_binary(buf),
+        }
+    }
+
     /// Converts native type to raw value in text format
     fn to_text(&self, buf: &mut BytesMut) -> Result<(), ProtocolError>
     where
