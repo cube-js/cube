@@ -767,6 +767,9 @@ impl Bind {
                     PgTypeId::TEXT => {
                         BindValue::String(String::from_protocol(raw_value, param_format)?)
                     }
+                    PgTypeId::BOOL => {
+                        BindValue::Bool(bool::from_protocol(raw_value, param_format)?)
+                    }
                     PgTypeId::INT8 => {
                         BindValue::Int64(i64::from_protocol(raw_value, param_format)?)
                     }

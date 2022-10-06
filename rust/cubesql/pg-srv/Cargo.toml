@@ -15,12 +15,12 @@ default = ["with-chrono"]
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
 async-trait = "0.1.36"
-log = "=0.4.11"
-bytes = "0.5.4"
-byteorder = "1.4.3"
+log = "0.4"
+bytes = "1.2"
+byteorder = "1.4"
 thiserror = "=1.0.32"
 anyhow = "1.0"
-chrono = { version = "0.4.16", package = "chrono", default-features = false, features = [
+chrono = { version = "0.4", package = "chrono", default-features = false, features = [
     "clock",
 ], optional = true }
 
