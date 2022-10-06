@@ -126,9 +126,7 @@ export class CubeEvaluator extends CubeSymbols {
     const types = ['measures', 'dimensions', 'segments'];
     for (const type of types) {
       const includes = cube.includes && this.membersFromIncludeExclude(cube.includes, cube.name, type) || [];
-      console.log('includes:', includes);
       const excludes = cube.excludes && this.membersFromIncludeExclude(cube.excludes, cube.name, type) || [];
-      console.log('excludes:', excludes);
       const finalIncludes = R.difference(includes, excludes);
       const includeMembers = this.generateIncludeMembers(finalIncludes, cube.name, type);
       for (const [memberName, memberDefinition] of includeMembers) {
