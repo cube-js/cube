@@ -4,7 +4,7 @@ use crate::{
     protocol::{ErrorCode, ErrorResponse, Format},
     ProtocolError,
 };
-use byteorder::{ByteOrder, LittleEndian};
+use byteorder::{BigEndian, ByteOrder};
 
 /// This trait explains how to decode values from the protocol
 /// It's used in the Bind message
@@ -61,7 +61,7 @@ impl FromProtocolValue for i64 {
     }
 
     fn from_binary(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        Ok(LittleEndian::read_i64(&raw[..]))
+        Ok(BigEndian::read_i64(&raw[..]))
     }
 }
 
