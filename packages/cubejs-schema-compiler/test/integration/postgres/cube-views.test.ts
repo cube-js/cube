@@ -191,16 +191,14 @@ cube(\`ProductCategories\`, {
 
 view(\`OrdersView\`, {
   measures: {
-    count: {
-      sql: \`\${Orders.count}\`,
-      type: \`number\`
-    },
-    
     productCategoryCount: {
       sql: \`\${Orders.ProductsAlt.ProductCategories.count}\`,
       type: \`number\`
     }
   },
+  
+  includes: [Orders],
+  excludes: [Orders.createdAt],
 
   dimensions: {
     createdAt: {

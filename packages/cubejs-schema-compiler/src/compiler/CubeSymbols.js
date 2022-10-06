@@ -122,7 +122,7 @@ export class CubeSymbols {
     }
 
     return Object.assign(
-      { cubeName: () => cube.name },
+      { cubeName: () => cube.name, cubeObj: () => cube },
       cube.measures || {},
       cube.dimensions || {},
       cube.segments || {},

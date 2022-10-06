@@ -14,6 +14,8 @@ const transpiledFieldsPatterns: Array<RegExp> = [
   /^preAggregations\.[_a-zA-Z][_a-zA-Z0-9]*\.indexes\.[_a-zA-Z][_a-zA-Z0-9]*\.columns$/,
   /^preAggregations\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensionReference|timeDimension|segments|dimensions|measures|rollups|segmentReferences|dimensionReferences|measureReferences|rollupReferences)$/,
   /^contextMembers$/,
+  /^includes$/,
+  /^excludes$/,
 ];
 
 const transpiledFields: Set<String> = new Set<String>();
