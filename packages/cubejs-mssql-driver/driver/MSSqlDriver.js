@@ -6,6 +6,7 @@ import {
 } from '@cubejs-backend/shared';
 
 const GenericTypeToMSSql = {
+  boolean: 'bit',
   string: 'nvarchar(max)',
   text: 'nvarchar(max)',
   timestamp: 'datetime2',
@@ -13,6 +14,7 @@ const GenericTypeToMSSql = {
 };
 
 const MSSqlToGenericType = {
+  bit: 'boolean',
   uniqueidentifier: 'uuid',
   datetime2: 'timestamp'
 }
@@ -33,11 +35,11 @@ class MSSqlDriver extends BaseDriver {
    */
   constructor(config = {}) {
     super();
-    
+
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-  
+
     this.config = {
       server: getEnv('dbHost', { dataSource }),
       database: getEnv('dbName', { dataSource }),
