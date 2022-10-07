@@ -194,6 +194,10 @@ export class OrchestratorApi {
       try {
         const driver = await driverFn(dataSource);
         await driver.testConnection();
+        this.logger('Connection test completed successfully', {
+          driverType,
+          dataSource,
+        });
       } catch (e: any) {
         e.driverType = driverType;
         throw e;
