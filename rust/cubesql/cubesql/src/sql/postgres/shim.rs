@@ -34,7 +34,7 @@ pub struct AsyncPostgresShim {
     socket: TcpStream,
     // Extended query
     cursors: HashMap<String, Cursor>,
-    portals: HashMap<String, Option<Portal>>,
+    portals: HashMap<String, Portal>,
     // Shared
     session: Arc<Session>,
     logger: Arc<dyn ContextLogger>,
@@ -578,26 +578,23 @@ impl AsyncPostgresShim {
     }
 
     pub async fn describe_portal(&mut self, name: String) -> Result<(), ConnectionError> {
-        match self.portals.get(&name) {
-            None => {
-                self.write(protocol::ErrorResponse::new(
-                    protocol::ErrorSeverity::Error,
-                    protocol::ErrorCode::InvalidCursorName,
-                    "missing cursor".to_string(),
-                ))
-                .await?;
-
-                return Ok(());
-            }
-            Some(portal) => match portal {
-                // We use None for Portal on empty query
-                None => self.write(protocol::NoData::new()).await,
-                Some(named) => match named.get_description()? {
+        if let Some(portal) = self.portals.get(&name) {
+            if portal.is_empty() {
+                self.write(protocol::NoData::new()).await
+            } else {
+                match portal.get_description()? {
                     // If Query doesnt return data, no fields in response.
                     None => self.write(protocol::NoData::new()).await,
                     Some(packet) => self.write(packet).await,
-                },
-            },
+                }
+            }
+        } else {
+            self.write(protocol::ErrorResponse::new(
+                protocol::ErrorSeverity::Error,
+                protocol::ErrorCode::InvalidCursorName,
+                "missing cursor".to_string(),
+            ))
+            .await
         }
     }
 
@@ -670,43 +667,39 @@ impl AsyncPostgresShim {
     /// https://github.com/postgres/postgres/blob/REL_14_4/src/backend/commands/portalcmds.c#L167
     pub async fn execute(&mut self, execute: protocol::Execute) -> Result<(), ConnectionError> {
         if let Some(portal) = self.portals.get_mut(&execute.portal) {
-            match portal {
-                // We use None for Statement on empty query
-                None => {
-                    self.write(protocol::EmptyQueryResponse::new()).await?;
-                }
-                Some(portal) => {
-                    let cancel = self
-                        .session
-                        .state
-                        .begin_query(format!("portal #{}", execute.portal));
-                    let mut writer = BatchWriter::new(portal.get_format());
+            if portal.is_empty() {
+                self.write(protocol::EmptyQueryResponse::new()).await?;
+            } else {
+                let cancel = self
+                    .session
+                    .state
+                    .begin_query(format!("portal #{}", execute.portal));
+                let mut writer = BatchWriter::new(portal.get_format());
 
-                    tokio::select! {
-                        _ = cancel.cancelled() => {
-                            self.session.state.end_query();
+                tokio::select! {
+                    _ = cancel.cancelled() => {
+                        self.session.state.end_query();
 
+                        return Err(protocol::ErrorResponse::query_canceled().into());
+                    },
+                    res = portal.execute(&mut writer, execute.max_rows as usize) => {
+                        self.session.state.end_query();
+
+                        // Unwrap result after ending query
+                        let completion = res?;
+
+                        if cancel.is_cancelled() {
                             return Err(protocol::ErrorResponse::query_canceled().into());
-                        },
-                        res = portal.execute(&mut writer, execute.max_rows as usize) => {
-                            self.session.state.end_query();
+                        }
 
-                            // Unwrap result after ending query
-                            let completion = res?;
+                        if writer.has_data() {
+                            buffer::write_direct(&mut self.socket, writer).await?
+                        }
 
-                            if cancel.is_cancelled() {
-                                return Err(protocol::ErrorResponse::query_canceled().into());
-                            }
-
-                            if writer.has_data() {
-                                buffer::write_direct(&mut self.socket, writer).await?
-                            }
-
-                            self.write_completion(completion).await?;
-                        },
-                    }
+                        self.write_completion(completion).await?;
+                    },
                 }
-            }
+            };
 
             Ok(())
         } else {
@@ -740,11 +733,12 @@ impl AsyncPostgresShim {
             )
         })?;
 
+        let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
         let portal = match source_statement {
             PreparedStatement::Empty { .. } => {
                 drop(statements_guard);
 
-                None
+                Portal::new_empty(format, PortalFrom::Extended)
             }
             PreparedStatement::Query { parameters, .. } => {
                 let prepared_statement =
@@ -765,8 +759,7 @@ impl AsyncPostgresShim {
                 )
                 .await?;
 
-                let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
-                Some(Portal::new(plan, format, PortalFrom::Extended))
+                Portal::new(plan, format, PortalFrom::Extended)
             }
         };
 
@@ -1034,22 +1027,12 @@ impl AsyncPostgresShim {
                     }
                 };
 
-                if let Some(portal) = self.portals.remove(&name.value) {
-                    if let Some(mut portal) = portal {
-                        self.write_portal(&mut portal, limit, CancellationToken::new())
-                            .await?;
-                        self.portals.insert(name.value.clone(), Some(portal));
+                if let Some(mut portal) = self.portals.remove(&name.value) {
+                    self.write_portal(&mut portal, limit, CancellationToken::new())
+                        .await?;
+                    self.portals.insert(name.value.clone(), portal);
 
-                        return Ok(());
-                    } else {
-                        return Err(ConnectionError::Protocol(
-                            protocol::ErrorResponse::error(
-                                protocol::ErrorCode::InternalError,
-                                "Unable to unwrap Plan without plan, unexpected error".to_string(),
-                            )
-                            .into(),
-                        ));
-                    }
+                    return Ok(());
                 } else {
                     trace!(
                         r#"Unable to find portal for cursor: "{}". Maybe it was not created. Opening..."#,
@@ -1087,7 +1070,7 @@ impl AsyncPostgresShim {
                 let mut portal = Portal::new(plan, cursor.format, PortalFrom::Fetch);
 
                 self.write_portal(&mut portal, limit, cancel).await?;
-                self.portals.insert(name.value, Some(portal));
+                self.portals.insert(name.value, portal);
             }
             Statement::Declare {
                 name,
