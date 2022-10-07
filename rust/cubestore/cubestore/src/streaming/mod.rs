@@ -392,6 +392,12 @@ impl KSqlStreamingSource {
         let res = builder.json(&json).send().await?;
         if res.status() != 200 {
             let error = res.json::<KSqlError>().await?;
+            if error.message.contains("does not exist") {
+                return Err(CubeError::corrupt_data(format!(
+                    "ksql api error: {}",
+                    error.message
+                )));
+            }
             return Err(CubeError::user(format!(
                 "ksql api error: {}",
                 error.message
