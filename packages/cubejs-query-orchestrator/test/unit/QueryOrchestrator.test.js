@@ -138,12 +138,19 @@ class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
   }
 }
 
+class StreamingSourceMockDriver extends MockDriver {
+  capabilities() {
+    return { streamingSource: true };
+  }
+}
+
 describe('QueryOrchestrator', () => {
   jest.setTimeout(15000);
   let mockDriver = null;
   let fooMockDriver = null;
   let barMockDriver = null;
   let mockDriverUnloadWithoutTempTableSupport = null;
+  let streamingSourceMockDriver = null;
   let externalMockDriver = null;
   let queryOrchestrator = null;
   let queryOrchestratorExternalRefresh = null;
@@ -155,6 +162,7 @@ describe('QueryOrchestrator', () => {
     const barMockDriverLocal = new MockDriver();
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
     const mockDriverUnloadWithoutTempTableSupportLocal = new MockDriverUnloadWithoutTempTableSupport();
+    const streamingSourceMockDriverLocal = new StreamingSourceMockDriver();
     const externalMockDriverLocal = new ExternalMockDriver();
 
     const redisPrefix = `ORCHESTRATOR_TEST_${testCount++}`;
@@ -165,6 +173,8 @@ describe('QueryOrchestrator', () => {
         return barMockDriverLocal;
       } else if (dataSource === 'mockDriverUnloadWithoutTempTableSupport') {
         return mockDriverUnloadWithoutTempTableSupportLocal;
+      } else if (dataSource === 'streaming') {
+        return streamingSourceMockDriverLocal;
       } else if (dataSource === 'csv') {
         return csvMockDriverLocal;
       } else {
@@ -205,6 +215,7 @@ describe('QueryOrchestrator', () => {
     barMockDriver = barMockDriverLocal;
     externalMockDriver = externalMockDriverLocal;
     mockDriverUnloadWithoutTempTableSupport = mockDriverUnloadWithoutTempTableSupportLocal;
+    streamingSourceMockDriver = streamingSourceMockDriverLocal;
   });
 
   afterEach(async () => {
@@ -1183,5 +1194,31 @@ describe('QueryOrchestrator', () => {
     const promise = queryOrchestrator.fetchQuery(query);
     const result = await promise;
     expect(result.data[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
+  });
+
+  test('streaming source tables are not dropped', async () => {
+    streamingSourceMockDriver.now = 12345000;
+    const query = {
+      query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
+      values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_number_and_count20191101',
+        sql: ['SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+        dataSource: 'streaming',
+        external: true,
+      }],
+      renewQuery: true,
+
+      requestId: 'basic'
+    };
+    await queryOrchestrator.fetchQuery(query);
+    expect(streamingSourceMockDriver.tables[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
   });
 });
