@@ -32,7 +32,7 @@ class IndexPage extends Component<Props> {
           <meta name="description" content={"Main | Documentation for working with Cube, the open-source analytics framework"}></meta>
         </Helmet>
         <h1>Documentation</h1>
-        
+
         <Row>
           <Col span={24}>
             <p>
@@ -83,7 +83,7 @@ class IndexPage extends Component<Props> {
               title="Deployment"
               img={imgInsights}
               desc="Deploying your application to Cube Cloud, a public cloud, or on-premise"
-              to="/deployment"
+              to="/deployment/overview"
               right
             />
           </Row>
