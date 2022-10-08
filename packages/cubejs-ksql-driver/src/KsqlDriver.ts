@@ -4,7 +4,7 @@ import {
   assertDataSource,
 } from '@cubejs-backend/shared';
 import {
-  BaseDriver,
+  BaseDriver, DriverCapabilities,
   DriverInterface,
 } from '@cubejs-backend/base-driver';
 import { format as formatSql } from 'sqlstring';
@@ -105,7 +105,9 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
           body.ksql
         }': ${
           (<any>e).response?.data?.message ||
-          (<any>e).response?.statusCode
+          (<any>e).response?.statusCode ||
+          (<any>e).message ||
+          (<any>e).toString()
         }`
       );
     }
@@ -255,5 +257,11 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public static dialectClass() {
     return KsqlQuery;
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      streamingSource: true
+    };
   }
 }

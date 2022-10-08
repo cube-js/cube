@@ -4933,20 +4933,30 @@ pub async fn deactivate_table_on_corrupt_data_res<'a, T: 'static>(
                 .await?
                 .get_row()
                 .table_id();
-            let table = meta_store.get_table_by_id(table_id).await?;
-            let schema = meta_store
-                .get_schema_by_id(table.get_row().get_schema_id())
-                .await?;
-            log::info!(
-                "Deactivating table {}.{} (#{}) due to corrupt data error: {}",
-                schema.get_row().get_name(),
-                table.get_row().get_table_name(),
-                table_id,
-                e
-            );
-            meta_store.table_ready(table_id, false).await?;
+            let message = e.message.to_string();
+            deactivate_table_due_to_corrupt_data(meta_store, table_id, message).await?;
         }
     }
+    Ok(())
+}
+
+pub async fn deactivate_table_due_to_corrupt_data(
+    meta_store: Arc<dyn MetaStore>,
+    table_id: u64,
+    message: String,
+) -> Result<(), CubeError> {
+    let table = meta_store.get_table_by_id(table_id).await?;
+    let schema = meta_store
+        .get_schema_by_id(table.get_row().get_schema_id())
+        .await?;
+    info!(
+        "Deactivating table {}.{} (#{}) due to corrupt data error: {}",
+        schema.get_row().get_name(),
+        table.get_row().get_table_name(),
+        table_id,
+        message,
+    );
+    meta_store.table_ready(table_id, false).await?;
     Ok(())
 }
 
