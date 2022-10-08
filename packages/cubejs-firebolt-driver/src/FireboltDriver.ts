@@ -1,4 +1,13 @@
-import { getEnv, assertDataSource } from '@cubejs-backend/shared';
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `FireboltDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import {
   BaseDriver,
   DriverInterface,

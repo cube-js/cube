@@ -1,8 +1,17 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `DremioDriver` and related types declaration.
+ */
+
+const {
+  getEnv,
+  assertDataSource,
+  pausePromise,
+} = require('@cubejs-backend/shared');
 const axios = require('axios');
 const SqlString = require('sqlstring');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
-const { getEnv, assertDataSource, pausePromise } = require('@cubejs-backend/shared');
-
 const DremioQuery = require('./DremioQuery');
 
 // limit - Determines how many rows are returned (maximum of 500). Default: 100

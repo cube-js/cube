@@ -1,4 +1,15 @@
-/* eslint-disable no-underscore-dangle */
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `BigQueryDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+  pausePromise,
+  Required,
+} from '@cubejs-backend/shared';
 import R from 'ramda';
 import {
   BigQuery,
@@ -12,12 +23,6 @@ import {
   BaseDriver, DownloadTableCSVData,
   DriverInterface, QueryOptions, StreamTableData,
 } from '@cubejs-backend/base-driver';
-import {
-  getEnv,
-  assertDataSource,
-  pausePromise,
-  Required,
-} from '@cubejs-backend/shared';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
 

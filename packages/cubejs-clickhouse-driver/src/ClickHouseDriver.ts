@@ -1,4 +1,13 @@
-/* eslint-disable no-restricted-syntax */
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `ClickHouseDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import {
   BaseDriver,
   DownloadQueryResultsOptions,
@@ -7,7 +16,6 @@ import {
   StreamOptions,
   StreamTableDataWithTypes,
 } from '@cubejs-backend/base-driver';
-import { getEnv, assertDataSource } from '@cubejs-backend/shared';
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';
 import sqlstring from 'sqlstring';

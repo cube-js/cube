@@ -1,8 +1,14 @@
-const { BaseDriver } = require('@cubejs-backend/base-driver');
-import {
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `OracleDriver` and related types declaration.
+ */
+
+const {
   getEnv,
   assertDataSource,
-} from '@cubejs-backend/shared';
+} = require('@cubejs-backend/shared');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 const oracledb = require('oracledb');
 const { reduce } = require('ramda');
 

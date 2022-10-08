@@ -1,3 +1,16 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `AthenaDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+  checkNonNullable,
+  pausePromise,
+  Required,
+} from '@cubejs-backend/shared';
 import { Athena, GetQueryResultsCommandOutput } from '@aws-sdk/client-athena';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -9,13 +22,6 @@ import {
   QueryOptions, StreamOptions,
   StreamTableData, TableName
 } from '@cubejs-backend/base-driver';
-import {
-  getEnv,
-  assertDataSource,
-  checkNonNullable,
-  pausePromise,
-  Required,
-} from '@cubejs-backend/shared';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
 import { URL } from 'url';
@@ -125,6 +131,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);
