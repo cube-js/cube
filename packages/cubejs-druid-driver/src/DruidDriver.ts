@@ -1,5 +1,14 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `DruidDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import { BaseDriver, TableQueryResult } from '@cubejs-backend/base-driver';
-import { getEnv, assertDataSource } from '@cubejs-backend/shared';
 import { DruidClient, DruidClientBaseConfiguration, DruidClientConfiguration } from './DruidClient';
 import { DruidQuery } from './DruidQuery';
 

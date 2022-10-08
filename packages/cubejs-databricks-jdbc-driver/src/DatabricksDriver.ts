@@ -1,4 +1,13 @@
-/* eslint-disable no-restricted-syntax */
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `DatabricksDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import fs from 'fs';
 import path from 'path';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -15,7 +24,6 @@ import {
   JDBCDriver,
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
-import { getEnv, assertDataSource } from '@cubejs-backend/shared';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 

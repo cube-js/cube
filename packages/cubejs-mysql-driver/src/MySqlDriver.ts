@@ -1,10 +1,16 @@
-import mysql, { Connection, ConnectionConfig, FieldInfo, QueryOptions } from 'mysql';
-import genericPool from 'generic-pool';
-import { promisify } from 'util';
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `MySqlDriver` and related types declaration.
+ */
+
 import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
+import mysql, { Connection, ConnectionConfig, FieldInfo, QueryOptions } from 'mysql';
+import genericPool from 'generic-pool';
+import { promisify } from 'util';
 import {
   BaseDriver,
   GenericDataBaseType,

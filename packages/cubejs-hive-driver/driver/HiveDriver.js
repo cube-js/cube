@@ -1,15 +1,25 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `HiveDriver` and related types declaration.
+ */
+
+const {
+  getEnv,
+  assertDataSource,
+} = require('@cubejs-backend/shared');
 const jshs2 = require('jshs2');
 const SqlString = require('sqlstring');
 const genericPool = require('generic-pool');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
-const { getEnv, assertDataSource } = require('@cubejs-backend/shared');
-
-const {
-  HS2Util, IDLContainer, HiveConnection, Configuration
-} = jshs2;
 const Connection = require('jshs2/lib/Connection');
-
 const IDLFactory = require('jshs2/lib/common/IDLFactory');
+const {
+  HS2Util,
+  IDLContainer,
+  HiveConnection,
+  Configuration,
+} = jshs2;
 
 const newIDL = [
   "2.1.1",

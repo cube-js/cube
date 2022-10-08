@@ -1,4 +1,9 @@
-/* eslint-disable no-restricted-syntax */
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `KsqlDriver` and related types declaration.
+ */
+
 import {
   getEnv,
   assertDataSource,
@@ -202,14 +207,17 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return fields.map(c => ({ name: c.name, type: this.toGenericType(c.schema.type) }));
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
     return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async downloadTable(table: string, options: any): Promise<any> {
     return this.getStreamingTableData(this.tableDashName(table));
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async downloadQueryResults(query: string, params: any, options: any) {
     const table = KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(query);
     if (!table) {

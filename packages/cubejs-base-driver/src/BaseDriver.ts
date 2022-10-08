@@ -1,7 +1,18 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `BaseDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  keyByDataSource,
+  isFilePath,
+  isSslKey,
+  isSslCert,
+} from '@cubejs-backend/shared';
 import { reduce } from 'ramda';
 import fs from 'fs';
-import { getEnv, keyByDataSource, isFilePath, isSslKey, isSslCert } from '@cubejs-backend/shared';
-
 import { cancelCombinator } from './utils';
 import {
   CreateTableIndex,

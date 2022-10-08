@@ -1,3 +1,13 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `QuestDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import { types, Pool, PoolConfig, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
@@ -8,7 +18,6 @@ import {
   DownloadTableMemoryData, DriverInterface,
   IndexesSQL, TableStructure, QueryOptions,
 } from '@cubejs-backend/base-driver';
-import { getEnv, assertDataSource } from '@cubejs-backend/shared';
 import { QuestQuery } from './QuestQuery';
 
 const NativeTypeToQuestType: Record<string, string> = R.invertObj(types.builtins);
