@@ -5,7 +5,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Cube Views', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+  const { compiler, joinGraph, cubeEvaluator, metaTransformer } = prepareCompiler(`
 cube(\`Orders\`, {
   sql: \`
   SELECT 1 as id, 1 as product_id, 'completed' as status, '2022-01-01T00:00:00.000Z'::timestamptz as created_at
@@ -190,15 +190,15 @@ cube(\`ProductCategories\`, {
 });
 
 view(\`OrdersView\`, {
+  includes: [Orders],
+  excludes: [Orders.createdAt],
+  
   measures: {
     productCategoryCount: {
       sql: \`\${Orders.ProductsAlt.ProductCategories.count}\`,
       type: \`number\`
     }
   },
-  
-  includes: [Orders],
-  excludes: [Orders.createdAt],
 
   dimensions: {
     createdAt: {
@@ -357,4 +357,10 @@ view(\`OrdersView\`, {
   }, [{
     orders__count: '1',
   }]));
+
+  it('check includes are exposed in meta', async () => {
+    await compiler.compile();
+    const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
+    expect(cube.config.measures.find((({ name }) => name === 'OrdersView.count')).name).toBe('OrdersView.count');
+  });
 });
