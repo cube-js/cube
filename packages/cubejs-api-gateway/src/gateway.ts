@@ -1582,6 +1582,7 @@ class ApiGateway {
         orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
         await orchestratorApi.testOrchestratorConnections();
+        this.log({ type: 'Readiness probe completed successfully' });
       } catch (e: any) {
         this.logProbeError(e, 'Internal Server Error on readiness probe');
         health = 'DOWN';
@@ -1598,6 +1599,7 @@ class ApiGateway {
       await this.dataSourceStorage.testConnections();
       // @todo Optimize this moment?
       await this.dataSourceStorage.testOrchestratorConnections();
+      this.log({ type: 'Liveness probe completed successfully' });
     } catch (e: any) {
       this.logProbeError(e, 'Internal Server Error on liveness probe');
       health = 'DOWN';
