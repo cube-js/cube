@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.2](https://github.com/cube-js/cube.js/compare/v0.31.1...v0.31.2) (2022-10-08)
+
+
+### Bug Fixes
+
+* Added connection test completed successfully log ([#5444](https://github.com/cube-js/cube.js/issues/5444)) ([a8e1180](https://github.com/cube-js/cube.js/commit/a8e1180d4c05e8de94b116f46f40db531d91e0eb))
+
+
+
+
+
 ## [0.31.1](https://github.com/cube-js/cube.js/compare/v0.31.0...v0.31.1) (2022-10-04)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

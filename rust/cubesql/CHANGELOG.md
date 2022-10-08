@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.2](https://github.com/cube-js/cube.js/compare/v0.31.1...v0.31.2) (2022-10-08)
+
+
+### Bug Fixes
+
+* **cubesql:** Handle Panic on simple query executiony ([#5394](https://github.com/cube-js/cube.js/issues/5394)) ([84dc442](https://github.com/cube-js/cube.js/commit/84dc442eb1c42bc3c7b7b03fe365c7c0a948e328))
+
+
+### Features
+
+* **cubesql:** Support boolean decoding in pg-wire ([#5436](https://github.com/cube-js/cube.js/issues/5436)) ([4fd2ee6](https://github.com/cube-js/cube.js/commit/4fd2ee6cd238161f889896739a00f09e6dc11651))
+
+
+
+
+
 # [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
 
 

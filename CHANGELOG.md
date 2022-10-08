@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.2](https://github.com/cube-js/cube.js/compare/v0.31.1...v0.31.2) (2022-10-08)
+
+
+### Bug Fixes
+
+* Added connection test completed successfully log ([#5444](https://github.com/cube-js/cube.js/issues/5444)) ([a8e1180](https://github.com/cube-js/cube.js/commit/a8e1180d4c05e8de94b116f46f40db531d91e0eb))
+* Temp tables dropped for ksql after successfully created ([#5445](https://github.com/cube-js/cube.js/issues/5445)) ([7726c82](https://github.com/cube-js/cube.js/commit/7726c82fc833a6b14eeeb498a31df62ba9818336))
+* **cubesql:** Handle Panic on simple query executiony ([#5394](https://github.com/cube-js/cube.js/issues/5394)) ([84dc442](https://github.com/cube-js/cube.js/commit/84dc442eb1c42bc3c7b7b03fe365c7c0a948e328))
+
+
+### Features
+
+* **mssql-driver:** add column type mapping for a bit type ([#5442](https://github.com/cube-js/cube.js/issues/5442)) ([0ed7ba4](https://github.com/cube-js/cube.js/commit/0ed7ba4b483fff8653602f89f43bd1b03b458859))
+* Includes and Excludes directives for Cube Views ([#5437](https://github.com/cube-js/cube.js/issues/5437)) ([7c35604](https://github.com/cube-js/cube.js/commit/7c356049b56a0ea58a4ad8f2628ffaff2ac307d4))
+* **cubesql:** Support boolean decoding in pg-wire ([#5436](https://github.com/cube-js/cube.js/issues/5436)) ([4fd2ee6](https://github.com/cube-js/cube.js/commit/4fd2ee6cd238161f889896739a00f09e6dc11651))
+
+
+
+
+
 ## [0.31.1](https://github.com/cube-js/cube.js/compare/v0.31.0...v0.31.1) (2022-10-04)
 
 
