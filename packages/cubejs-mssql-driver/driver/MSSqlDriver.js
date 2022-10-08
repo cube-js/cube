@@ -1,9 +1,9 @@
 const sql = require('mssql');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
-import {
+const {
   getEnv,
   assertDataSource,
-} from '@cubejs-backend/shared';
+} = require('@cubejs-backend/shared');
 
 const GenericTypeToMSSql = {
   boolean: 'bit',
