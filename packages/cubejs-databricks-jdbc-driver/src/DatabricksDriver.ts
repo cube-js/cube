@@ -10,12 +10,13 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import { DriverCapabilities, UnloadOptions, } from '@cubejs-backend/base-driver';
+import { DriverCapabilities, UnloadOptions, TableQueryResult } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
+  applyParams
 } from '@cubejs-backend/jdbc-driver';
-import { getEnv, assertDataSource } from '@cubejs-backend/shared';
+import { getEnv, assertDataSource, CancelablePromise } from '@cubejs-backend/shared';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
@@ -35,6 +36,9 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     awsRegion?: string,
     // Azure export bucket
     azureKey?: string,
+    dbCatalog?: string;
+    databricksStorageCredentialName?: string;
+    url?: string;
   };
 
 async function fileExistsOr(
@@ -80,6 +84,14 @@ async function resolveJDBCDriver(): Promise<string> {
   );
 }
 
+function replaceAll(replaceThis: string, withThis: string, inThis: string) {
+  withThis = withThis.replace(/\$/g, '$$$$');
+  return inThis.replace(
+    new RegExp(replaceThis.replace(/([/,!\\^${}[\]().*+?|<>\-&])/g, '\\$&'), 'g'),
+    withThis
+  );
+}
+
 /**
  * Databricks driver class.
  */
@@ -89,6 +101,8 @@ export class DatabricksDriver extends JDBCDriver {
   public static dialectClass() {
     return DatabricksQuery;
   }
+
+  private preaggregationSchema?: string;
 
   /**
    * Returns default concurrency value.
@@ -111,7 +125,6 @@ export class DatabricksDriver extends JDBCDriver {
       assertDataSource('default');
 
     const config: DatabricksDriverConfiguration = {
-      ...conf,
       dbType: 'databricks',
       drivername: 'com.simba.spark.jdbc.Driver',
       customClassPath: undefined,
@@ -122,7 +135,7 @@ export class DatabricksDriver extends JDBCDriver {
         UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
       },
       database: getEnv('dbName', { required: false, dataSource }),
-      url: getEnv('databrickUrl', { dataSource }),
+      url: conf?.url || getEnv('databrickUrl', { dataSource }),
       // common export bucket config
       bucketType:
         conf?.bucketType ||
@@ -151,9 +164,21 @@ export class DatabricksDriver extends JDBCDriver {
       azureKey:
         conf?.azureKey ||
         getEnv('dbExportBucketAzureKey', { dataSource }),
+
+      dbCatalog: conf?.dbCatalog || getEnv('databricksDbCatalog', { dataSource }),
+      databricksStorageCredentialName: conf?.databricksStorageCredentialName || getEnv('databricksStorageCredentialName', { dataSource }),
+      ...conf,
     };
+
     super(config);
     this.config = config;
+
+    if (config.dbCatalog) {
+      this.preaggregationSchema = getEnv('preAggregationsSchema') ||
+      (this.isDevMode()
+        ? 'dev_pre_aggregations'
+        : 'prod_pre_aggregations');
+    }
   }
 
   public readOnly() {
@@ -163,6 +188,23 @@ export class DatabricksDriver extends JDBCDriver {
   public setLogger(logger: any) {
     super.setLogger(logger);
     this.showUrlTokenDeprecation();
+  }
+
+  public async query<R = unknown>(query: string, values: unknown[], _options?: unknown): Promise<R[]> {
+    let newQuery = query;
+
+    if (this.config.dbCatalog) {
+      newQuery = query.replace(
+        new RegExp(`(?<=\\s)${this.preaggregationSchema}\\.(?=[^\\s]+)`, 'g'),
+        `${this.config.dbCatalog}.${this.preaggregationSchema}.`
+      );
+    }
+    const queryWithParams = applyParams(newQuery, values);
+    const cancelObj: {cancel?: Function} = {};
+    const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
+    (promise as CancelablePromise<any>).cancel =
+      () => cancelObj.cancel && cancelObj.cancel() || Promise.reject(new Error('Statement is not ready'));
+    return promise;
   }
 
   public showUrlTokenDeprecation() {
@@ -188,18 +230,39 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   public async createSchemaIfNotExists(schemaName: string) {
-    return this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
+    return this.query(`CREATE SCHEMA IF NOT EXISTS ${this.getNameWithCatalog(schemaName)}`, []);
   }
 
   public quoteIdentifier(identifier: string): string {
     return `\`${identifier}\``;
   }
 
+  public async loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: unknown[], _options: any) {
+    const newPreAggregationTableName = `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${preAggregationTableName}`;
+
+    const newSql = replaceAll(preAggregationTableName, newPreAggregationTableName, loadSql);
+
+    return this.query(newSql, params);
+  }
+
   public async tableColumnTypes(table: string) {
-    const [schema, tableName] = table.split('.');
+    const nLevelNamespace = table.split('.');
+
+    let describeString = '';
+
+    if (nLevelNamespace.length === 3) {
+      const [catalog, schema, tableName] = nLevelNamespace;
+      describeString = `${this.quoteIdentifier(catalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
+    } else if (this.config.dbCatalog) {
+      const [schema, tableName] = nLevelNamespace;
+      describeString = `${this.quoteIdentifier(this.config.dbCatalog)}.${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
+    } else {
+      const [schema, tableName] = nLevelNamespace;
+      describeString = `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(tableName)}`;
+    }
 
     const result = [];
-    const response: any[] = await this.query(`DESCRIBE ${schema}.${tableName}`, []);
+    const response: any[] = await this.query(`DESCRIBE ${describeString}`, []);
 
     for (const column of response) {
       // Databricks describe additional info by default after empty line.
@@ -213,7 +276,7 @@ export class DatabricksDriver extends JDBCDriver {
     return result;
   }
 
-  private async queryColumnTypes(sql: string, params: unknown[]) {
+  public async queryColumnTypes(sql: string, params: unknown[]) {
     const result = [];
     // eslint-disable-next-line camelcase
     const response = await this.query<{col_name: string; data_type: string}>(`DESCRIBE QUERY ${sql}`, params);
@@ -230,24 +293,34 @@ export class DatabricksDriver extends JDBCDriver {
     return result;
   }
 
-  public async getTablesQuery(schemaName: string) {
-    const response = await this.query(`SHOW TABLES IN ${this.quoteIdentifier(schemaName)}`, []);
+  public async getTablesQuery(schemaName: string): Promise<TableQueryResult[]> {
+    const response = await this.query<{tableName: string}>(`SHOW TABLES IN ${this.getNameWithCatalog(schemaName)}`, []);
 
-    return response.map((row: any) => ({
+    const result = response.map((row) => ({
       table_name: row.tableName,
     }));
+
+    return result;
+  }
+
+  private getNameWithCatalog(name: string) {
+    if (this.config.dbCatalog) {
+      return `${this.quoteIdentifier(this.config.dbCatalog)}.${this.quoteIdentifier(name)}`;
+    }
+
+    return `${this.quoteIdentifier(name)}`;
   }
 
   protected async getTables(): Promise<ShowTableRow[]> {
     if (this.config.database) {
-      return <any> this.query<ShowTableRow>(`SHOW TABLES IN ${this.quoteIdentifier(this.config.database)}`, []);
+      return <any> this.query<ShowTableRow>(`SHOW TABLES IN ${this.getNameWithCatalog(this.config.database)}`, []);
     }
 
-    const databases = await this.query<ShowDatabasesRow>('SHOW DATABASES', []);
+    const databases = await this.query<ShowDatabasesRow>(`SHOW DATABASES${this.config.dbCatalog ? ` IN ${this.quoteIdentifier(this.config.dbCatalog)}` : ''}`, []);
 
     const allTables = await Promise.all(
       databases.map(async ({ databaseName }) => this.query<ShowTableRow>(
-        `SHOW TABLES IN ${this.quoteIdentifier(databaseName)}`,
+        `SHOW TABLES IN ${this.getNameWithCatalog(databaseName)}`,
         []
       ))
     );
@@ -291,11 +364,19 @@ export class DatabricksDriver extends JDBCDriver {
       }`);
     }
 
-    const types = options.query ?
-      await this.unloadWithSql(tableName, options.query.sql, options.query.params) :
-      await this.unloadWithTable(tableName);
+    if (this.config.dbCatalog) {
+      if (!this.config.databricksStorageCredentialName) {
+        throw new Error('You should set CUBEJS_DB_DATABRICKS_STORAGE_CREDENTIAL_NAME if you are using unity catalog');
+      }
+    }
 
-    const pathname = `${this.config.exportBucket}/${tableName}.csv`;
+    const newTableName = `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${tableName}`;
+
+    const types = options.query ?
+      await this.unloadWithSql(newTableName, options.query.sql, options.query.params) :
+      await this.unloadWithTable(newTableName);
+
+    const pathname = `${this.config.exportBucket}/${newTableName}.csv`;
     const csvFile = await this.getCsvFiles(
       pathname,
     );
@@ -465,7 +546,8 @@ export class DatabricksDriver extends JDBCDriver {
       `
       CREATE TABLE ${table}_csv_export
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
-      OPTIONS (escape = '"')
+      ${this.getStorageCredentialsNameString()}
+      ${this.getOptionsSqlPartString()}
       AS (${sql})
       `,
       params,
@@ -477,14 +559,39 @@ export class DatabricksDriver extends JDBCDriver {
       `
       CREATE TABLE ${table}_csv_export
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
-      OPTIONS (escape = '"')
+      ${this.getStorageCredentialsNameString()}
+      ${this.getOptionsSqlPartString()}
       AS SELECT ${columns} FROM ${table}
       `,
       [],
     );
   }
 
+  public dropTable(tableName: string, options?: unknown): Promise<unknown> {
+    const newTableName = `${this.config.dbCatalog ? `${this.config.dbCatalog}.` : ''}${tableName}`;
+    return this.query(`DROP TABLE ${newTableName}`, [], options);
+  }
+
+  private getStorageCredentialsNameString(): string {
+    return this.config.databricksStorageCredentialName ? `WITH (CREDENTIAL ${this.config.databricksStorageCredentialName})` : '';
+  }
+
+  private getOptionsSqlPartString(): string {
+    return this.config.dbCatalog ? '' : 'OPTIONS (escape = \'"\')';
+  }
+
   public capabilities(): DriverCapabilities {
     return { unloadWithoutTempTable: true };
+  }
+
+  /**
+   * Determines whether current instance should be bootstraped in the
+   * dev mode or not.
+   */
+  private isDevMode(): boolean {
+    return (
+      process.env.NODE_ENV !== 'production' ||
+        getEnv('devMode')
+    );
   }
 }

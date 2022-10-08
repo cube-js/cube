@@ -113,9 +113,11 @@ export interface DownloadQueryResultsBase {
 
 export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities;
 
-export type IndexesSQL = {
+export type IndexSql = {
   sql: [string, unknown[]];
-}[];
+};
+
+export type IndexesSQL = IndexSql[];
 
 export type CreateTableIndex = {
   indexName: string,
@@ -147,7 +149,7 @@ export interface DriverInterface {
   uploadTableWithIndexes(
     table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], queryTracingObj: any, aggregationsColumns: string[], createTableIndexes: CreateTableIndex[]
   ): Promise<void>;
-  loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
+  loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: unknown[], options: any) => Promise<any>;
   //
   query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;
   //

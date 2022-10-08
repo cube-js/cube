@@ -41,7 +41,7 @@ const initMvn = (customClassPath: any) => {
   return mvnPromise;
 };
 
-const applyParams = (query: string, params: object | any[]) => SqlString.format(query, params);
+export const applyParams = (query: string, params: object | any[]) => SqlString.format(query, params);
 
 // promisify Connection methods
 Connection.prototype.getMetaDataAsync = promisify(Connection.prototype.getMetaData);
@@ -98,7 +98,14 @@ export class JDBCDriver extends BaseDriver {
       throw new Error('url is required property');
     }
 
-    this.pool = genericPool.createPool({
+    this.pool = this.getPool(dataSource, config, poolOptions);
+  }
+
+  protected getPool(dataSource: string, config: Partial<JDBCDriverConfiguration> & {
+    dataSource?: string,
+    maxPoolSize?: number,
+  }, poolOptions?: genericPool.Options) {
+    return genericPool.createPool({
       create: async () => {
         await initMvn(await this.getCustomClassPath());
 

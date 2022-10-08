@@ -20,7 +20,8 @@
     "watch": "tsc -w",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts",
-    "postinstall": "node bin/post-install"
+    "postinstall": "node bin/post-install",
+    "unit": "jest --forceExit --detectOpenHandles dist/test"
   },
   "files": [
     "README.md",
@@ -59,6 +60,12 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      ".*\\.d\\.ts"
+    ],
+    "testMatch": [
+      "<rootDir>/dist/test/**/*.(test|spec).(ts|js)"
+    ]
   }
 }
