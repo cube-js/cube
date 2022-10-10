@@ -1,3 +1,4 @@
+use crate::metastore::ColumnFamilyName;
 use sqlparser::ast::{
     HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement, Value,
 };
@@ -54,12 +55,29 @@ pub enum Statement {
         credentials: Vec<SqlOption>,
         or_update: bool,
     },
+    CacheSet {
+        key: Ident,
+        value: String,
+        ttl: Option<u32>,
+        nx: bool,
+    },
+    CacheGet {
+        key: Ident,
+    },
+    CacheKeys {
+        prefix: Ident,
+    },
+    CacheRemove {
+        key: Ident,
+    },
+    CacheTruncate {},
     System(SystemCommand),
     Dump(Box<Query>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SystemCommand {
+    Compaction { cf: ColumnFamilyName },
     KillAllJobs,
     Repartition { partition_id: u64 },
     PanicWorker,
@@ -85,6 +103,10 @@ impl<'a> CubeStoreParser<'a> {
                 _ if w.value.eq_ignore_ascii_case("sys") => {
                     self.parser.next_token();
                     self.parse_system()
+                }
+                Keyword::CACHE => {
+                    self.parser.next_token();
+                    self.parse_cache()
                 }
                 Keyword::CREATE => {
                     self.parser.next_token();
@@ -123,12 +145,85 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
+    fn parse_cache(&mut self) -> Result<Statement, ParserError> {
+        let command = match self.parser.next_token() {
+            Token::Word(w) => w.value.to_ascii_lowercase(),
+            _ => {
+                return Err(ParserError::ParserError(
+                    "Unknown cache command, available: SET|REMOVE|TRUNCATE".to_string(),
+                ))
+            }
+        };
+
+        match command.as_str() {
+            "set" => {
+                let nx = self.parse_custom_token(&"nx");
+                let ttl = if self.parse_custom_token(&"ttl") {
+                    match self.parser.parse_number_value()? {
+                        Value::Number(ttl, false) => {
+                            let r = ttl.parse::<u32>().map_err(|err| {
+                                ParserError::ParserError(format!(
+                                    "TTL must be a positive integer, error: {}",
+                                    err
+                                ))
+                            })?;
+
+                            Some(r)
+                        }
+                        x => {
+                            return Err(ParserError::ParserError(format!(
+                                "TTL must be a positive integer, actual: {:?}",
+                                x
+                            )))
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                Ok(Statement::CacheSet {
+                    key: self.parser.parse_identifier()?,
+                    value: self.parser.parse_literal_string()?,
+                    ttl,
+                    nx,
+                })
+            }
+            "get" => Ok(Statement::CacheGet {
+                key: self.parser.parse_identifier()?,
+            }),
+            "keys" => Ok(Statement::CacheKeys {
+                prefix: self.parser.parse_identifier()?,
+            }),
+            "remove" => Ok(Statement::CacheRemove {
+                key: self.parser.parse_identifier()?,
+            }),
+            "truncate" => Ok(Statement::CacheTruncate {}),
+            command => Err(ParserError::ParserError(format!(
+                "Unknown cache command: {}",
+                command
+            ))),
+        }
+    }
+
     fn parse_system(&mut self) -> Result<Statement, ParserError> {
         if self.parse_custom_token("kill")
             && self.parser.parse_keywords(&[Keyword::ALL])
             && self.parse_custom_token("jobs")
         {
             Ok(Statement::System(SystemCommand::KillAllJobs))
+        } else if self.parse_custom_token("compaction") {
+            let cf = match self.parser.parse_literal_string()?.to_lowercase().as_str() {
+                "default" => ColumnFamilyName::Default,
+                "cache" => ColumnFamilyName::Cache,
+                other => {
+                    return Err(ParserError::ParserError(format!(
+                        "Unknown column family for compaction: {}",
+                        other
+                    )))
+                }
+            };
+
+            Ok(Statement::System(SystemCommand::Compaction { cf }))
         } else if self.parse_custom_token("repartition") {
             match self.parser.parse_number_value()? {
                 Value::Number(id, _) => Ok(Statement::System(SystemCommand::Repartition {

@@ -1,9 +1,9 @@
 use super::{
-    AggregateFunction, BaseRocksSecondaryIndex, Column, ColumnType, DataFrameValue, IndexId,
+    AggregateFunction, BaseRocksSecondaryIndex, Column, DataFrameValue, IndexId,
     RocksSecondaryIndex, RocksTable, TableId,
 };
 use crate::data_frame_from;
-use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
+use crate::metastore::{ColumnFamilyName, IdRow, ImportFormat, MetaStoreEvent, Schema};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::CubeAggregateUDFKind;
 use crate::rocks_table_impl;
@@ -341,38 +341,13 @@ impl Table {
     }
 }
 
-impl Column {
-    pub fn new(name: String, column_type: ColumnType, column_index: usize) -> Column {
-        Column {
-            name,
-            column_type,
-            column_index,
-        }
-    }
-    pub fn get_name(&self) -> &String {
-        &self.name
-    }
-
-    pub fn get_column_type(&self) -> &ColumnType {
-        &self.column_type
-    }
-
-    pub fn get_index(&self) -> usize {
-        self.column_index
-    }
-
-    pub fn replace_index(&self, column_index: usize) -> Column {
-        Column {
-            name: self.name.clone(),
-            column_type: self.column_type.clone(),
-            column_index,
-        }
-    }
-}
-
-rocks_table_impl!(Table, TableRocksTable, TableId::Tables, {
-    vec![Box::new(TableRocksIndex::Name)]
-});
+rocks_table_impl!(
+    Table,
+    TableRocksTable,
+    TableId::Tables,
+    { vec![Box::new(TableRocksIndex::Name)] },
+    ColumnFamilyName::Default
+);
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum TableRocksIndex {

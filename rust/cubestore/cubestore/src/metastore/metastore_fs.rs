@@ -275,7 +275,8 @@ impl RocksMetaStoreFs {
         if let Some(snapshot) = snapshot {
             self.load_metastore_logs(snapshot, &meta_store).await?;
         }
-        RocksMetaStore::check_all_indexes(&meta_store).await?;
+
+        RocksMetaStore::migrate(&meta_store).await?;
 
         Ok(meta_store)
     }

@@ -1,6 +1,6 @@
 use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, TableId, WAL};
 use crate::base_rocks_secondary_index;
-use crate::metastore::{IdRow, MetaStoreEvent};
+use crate::metastore::{ColumnFamilyName, IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
 use rocksdb::DB;
@@ -45,9 +45,13 @@ pub(crate) enum WALRocksIndex {
     TableID = 1,
 }
 
-rocks_table_impl!(WAL, WALRocksTable, TableId::WALs, {
-    vec![Box::new(WALRocksIndex::TableID)]
-});
+rocks_table_impl!(
+    WAL,
+    WALRocksTable,
+    TableId::WALs,
+    { vec![Box::new(WALRocksIndex::TableID)] },
+    ColumnFamilyName::Default
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum WALIndexKey {

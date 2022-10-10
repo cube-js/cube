@@ -2,7 +2,7 @@ use super::{
     BaseRocksSecondaryIndex, Column, Index, IndexId, IndexType, RocksSecondaryIndex, RocksTable,
     TableId,
 };
-use crate::metastore::{IdRow, MetaStoreEvent};
+use crate::metastore::{ColumnFamilyName, IdRow, MetaStoreEvent};
 use crate::{rocks_table_impl, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use rocksdb::DB;
@@ -83,13 +83,19 @@ pub(crate) enum IndexRocksIndex {
 
 crate::base_rocks_secondary_index!(Index, IndexRocksIndex);
 
-rocks_table_impl!(Index, IndexRocksTable, TableId::Indexes, {
-    vec![
-        Box::new(IndexRocksIndex::TableID),
-        Box::new(IndexRocksIndex::Name),
-        Box::new(IndexRocksIndex::MultiIndexId),
-    ]
-});
+rocks_table_impl!(
+    Index,
+    IndexRocksTable,
+    TableId::Indexes,
+    {
+        vec![
+            Box::new(IndexRocksIndex::TableID),
+            Box::new(IndexRocksIndex::Name),
+            Box::new(IndexRocksIndex::MultiIndexId),
+        ]
+    },
+    ColumnFamilyName::Default
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum IndexIndexKey {

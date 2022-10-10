@@ -8,7 +8,8 @@
 use super::RocksTable;
 use crate::data_frame_from;
 use crate::metastore::{
-    BaseRocksSecondaryIndex, Column, IdRow, IndexId, MetaStoreEvent, RocksSecondaryIndex, TableId,
+    BaseRocksSecondaryIndex, Column, ColumnFamilyName, IdRow, IndexId, MetaStoreEvent,
+    RocksSecondaryIndex, TableId,
 };
 use crate::rocks_table_impl;
 use crate::table::Row;
@@ -56,9 +57,13 @@ pub(crate) enum MultiIndexRocksIndex {
 
 crate::base_rocks_secondary_index!(MultiIndex, MultiIndexRocksIndex);
 
-rocks_table_impl!(MultiIndex, MultiIndexRocksTable, TableId::MultiIndexes, {
-    vec![Box::new(MultiIndexRocksIndex::ByName)]
-});
+rocks_table_impl!(
+    MultiIndex,
+    MultiIndexRocksTable,
+    TableId::MultiIndexes,
+    { vec![Box::new(MultiIndexRocksIndex::ByName)] },
+    ColumnFamilyName::Default
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum MultiIndexIndexKey {
@@ -95,6 +100,10 @@ impl RocksSecondaryIndex<MultiIndex, MultiIndexIndexKey> for MultiIndexRocksInde
         match self {
             MultiIndexRocksIndex::ByName => 1,
         }
+    }
+
+    fn is_ttl(&self) -> bool {
+        false
     }
 
     fn get_id(&self) -> IndexId {
@@ -209,7 +218,8 @@ rocks_table_impl!(
             Box::new(MultiPartitionRocksIndex::ByMultiIndexId),
             Box::new(MultiPartitionRocksIndex::ByParentId),
         ]
-    }
+    },
+    ColumnFamilyName::Default
 );
 
 #[derive(Hash, Clone, Debug)]

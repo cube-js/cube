@@ -1,7 +1,7 @@
 use super::{
     BaseRocksSecondaryIndex, IndexId, Partition, RocksSecondaryIndex, RocksTable, TableId,
 };
-use crate::metastore::{IdRow, MetaStoreEvent};
+use crate::metastore::{ColumnFamilyName, IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use crate::table::Row;
 use crate::{base_rocks_secondary_index, CubeError};
@@ -176,15 +176,21 @@ pub(crate) enum PartitionRocksIndex {
     ParentPartitionId = 5,
 }
 
-rocks_table_impl!(Partition, PartitionRocksTable, TableId::Partitions, {
-    vec![
-        Box::new(PartitionRocksIndex::IndexId),
-        Box::new(PartitionRocksIndex::MultiPartitionId),
-        Box::new(PartitionRocksIndex::Active),
-        Box::new(PartitionRocksIndex::JustCreated),
-        Box::new(PartitionRocksIndex::ParentPartitionId),
-    ]
-});
+rocks_table_impl!(
+    Partition,
+    PartitionRocksTable,
+    TableId::Partitions,
+    {
+        vec![
+            Box::new(PartitionRocksIndex::IndexId),
+            Box::new(PartitionRocksIndex::MultiPartitionId),
+            Box::new(PartitionRocksIndex::Active),
+            Box::new(PartitionRocksIndex::JustCreated),
+            Box::new(PartitionRocksIndex::ParentPartitionId),
+        ]
+    },
+    ColumnFamilyName::Default
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum PartitionIndexKey {

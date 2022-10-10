@@ -20,13 +20,11 @@ use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{IdRow, MetaStore};
-use crate::queryplanner::info_schema::info_schema_schemata::SchemataInfoSchemaTableDef;
-use crate::queryplanner::info_schema::info_schema_tables::TablesInfoSchemaTableDef;
-use crate::queryplanner::info_schema::system_chunks::SystemChunksTableDef;
-use crate::queryplanner::info_schema::system_indexes::SystemIndexesTableDef;
-use crate::queryplanner::info_schema::system_jobs::SystemJobsTableDef;
-use crate::queryplanner::info_schema::system_partitions::SystemPartitionsTableDef;
-use crate::queryplanner::info_schema::system_tables::SystemTablesTableDef;
+use crate::queryplanner::info_schema::{
+    InfoSchemaCacheDef, SchemataInfoSchemaTableDef, SystemChunksTableDef, SystemIndexesTableDef,
+    SystemJobsTableDef, SystemPartitionsTableDef, SystemRocksdbStatsDef, SystemTablesTableDef,
+    TablesInfoSchemaTableDef,
+};
 use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
 use crate::queryplanner::query_executor::{
@@ -309,6 +307,14 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 self.meta_store.clone(),
                 InfoSchemaTable::SystemJobs,
             ))),
+            ("system", "rocksdb_stats") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::SystemRocksdbStats,
+            ))),
+            ("system", "cache") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                InfoSchemaTable::SystemCache,
+            ))),
             _ => None,
         })
     }
@@ -342,6 +348,8 @@ pub enum InfoSchemaTable {
     Tables,
     Schemata,
     SystemJobs,
+    SystemCache,
+    SystemRocksdbStats,
     SystemTables,
     SystemIndexes,
     SystemPartitions,
@@ -400,6 +408,8 @@ impl InfoSchemaTable {
         match self {
             InfoSchemaTable::Tables => Box::new(TablesInfoSchemaTableDef),
             InfoSchemaTable::Schemata => Box::new(SchemataInfoSchemaTableDef),
+            InfoSchemaTable::SystemCache => Box::new(InfoSchemaCacheDef),
+            InfoSchemaTable::SystemRocksdbStats => Box::new(SystemRocksdbStatsDef),
             InfoSchemaTable::SystemTables => Box::new(SystemTablesTableDef),
             InfoSchemaTable::SystemIndexes => Box::new(SystemIndexesTableDef),
             InfoSchemaTable::SystemChunks => Box::new(SystemChunksTableDef),

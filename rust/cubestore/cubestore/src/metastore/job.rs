@@ -1,6 +1,6 @@
 use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, TableId};
 use crate::base_rocks_secondary_index;
-use crate::metastore::{IdRow, MetaStoreEvent, RowKey};
+use crate::metastore::{ColumnFamilyName, IdRow, MetaStoreEvent, RowKey};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
@@ -108,12 +108,18 @@ pub enum JobRocksIndex {
 
 base_rocks_secondary_index!(Job, JobRocksIndex);
 
-rocks_table_impl!(Job, JobRocksTable, TableId::Jobs, {
-    vec![
-        Box::new(JobRocksIndex::RowReference),
-        Box::new(JobRocksIndex::ByShard),
-    ]
-});
+rocks_table_impl!(
+    Job,
+    JobRocksTable,
+    TableId::Jobs,
+    {
+        vec![
+            Box::new(JobRocksIndex::RowReference),
+            Box::new(JobRocksIndex::ByShard),
+        ]
+    },
+    ColumnFamilyName::Default
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum JobIndexKey {

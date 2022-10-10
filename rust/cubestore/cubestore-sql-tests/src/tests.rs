@@ -23,6 +23,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::io::{AsyncWriteExt, BufWriter};
+use tokio::time::sleep;
 
 pub type TestFn = Box<
     dyn Fn(Box<dyn SqlClient>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -215,6 +216,11 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("inline_tables", inline_tables),
         t("inline_tables_2x", inline_tables_2x),
         t("build_range_end", build_range_end),
+        t("cache_set_get_rm", cache_set_get_rm),
+        t("cache_set_get_set_get", cache_set_get_set_get),
+        t("cache_compaction", cache_compaction),
+        t("cache_set_nx", cache_set_nx),
+        t("cache_prefix_keys", cache_prefix_keys),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -531,9 +537,7 @@ async fn logical_alias(service: Box<dyn SqlClient>) {
         .unwrap();
 
     service
-        .exec_query(
-            "INSERT INTO s.logical (id, n) VALUES (1, 1), (2, 2), (3, 3), (1, 1), (2, 2)",
-        )
+        .exec_query("INSERT INTO s.logical (id, n) VALUES (1, 1), (2, 2), (3, 3), (1, 1), (2, 2)")
         .await
         .unwrap();
 
@@ -541,10 +545,8 @@ async fn logical_alias(service: Box<dyn SqlClient>) {
         .exec_query("SELECT  sum(n) from (select id, sum(n) n from s.logical group by 1) `test` ")
         .await
         .unwrap();
-    assert_eq!(
-        to_rows(&result),
-        rows(&[(9)])
-    ); }
+    assert_eq!(to_rows(&result), rows(&[(9)]));
+}
 
 async fn float_decimal_scale(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA foo").await.unwrap();
@@ -5331,7 +5333,7 @@ async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) {
             VALUES
             (1, 1, 1, 1, 10, 1),
             (2, 2, 2, 2, 20, 2)
-            "
+            ",
         )
         .await
         .unwrap();
@@ -5344,7 +5346,7 @@ async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) {
             VALUES
             (11, 11, 11, 11, 110, 11),
             (22, 22, 22, 22, 220, 21)
-            "
+            ",
         )
         .await
         .unwrap();
@@ -5357,7 +5359,7 @@ async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) {
             VALUES
             (3, 3, 3, 3, 30, 3),
             (4, 4, 4, 4, 40, 4)
-            "
+            ",
         )
         .await
         .unwrap();
@@ -5640,27 +5642,28 @@ async fn aggregate_index_with_hll_bytes(service: Box<dyn SqlClient>) {
     let dense = "X'030C004020000001000000000000000000000000000000000000050020000001030100000410000000004102100000000000000051000020000020003220000003102000000000001200042000000001000200000002000000100000030040000000010040003010000000000100002000000000000000000031000020000000000000000000100000200302000000000000000000001002000000000002204000000001000001000200400000000000001000020031100000000080000000002003000000100000000100110000000000000000000010000000000000000000000020000001320205000100000612000000000004100020100000000000000000001000000002200000100000001000001020000000000020000000000000001000010300060000010000000000070100003000000000000020000000000001000010000104000000000000000000101000100000001401000000000000000000000000000100010000000000000000000000000400020000000002002300010000000000040000041000200005100000000000001000000000100000203010000000000000000000000000001006000100000000000000300100001000100254200000000000101100040000000020000010000050000000501000000000101020000000010000000003000000000200000102100000000204007000000200010000033000000000061000000000000000000000000000000000100001000001000000013000000003000000000002000000000000010001000000000000000000020010000020000000100001000000000000001000103000000000000000000020020000001000000000100001000000000000000020220200200000001001000010100000000200000000000001000002000000011000000000101200000000000000000000000000000000000000100130000000000000000000100000120000300040000000002000000000000000000000100000000070000100000000301000000401200002020000000000601030001510000000000000110100000000000000000050000000010000100000000000000000100022000100000101054010001000000000000001000001000000002000000000100000000000021000001000002000000000100000000000000000000951000000100000000000000000000000000102000200000000000000010000010000000000100002000000000000000000010000000000000010000000010000000102010000000010520100000021010100000030000000000000000100000001000000022000330051000000100000000000040003020000010000020000100000013000000102020000000050000000020010000000000000000101200C000100000001200400000000010000001000000000100010000000001000001000000100000000010000000004000000002000013102000100000000000000000000000600000010000000000000020000000000001000000000030000000000000020000000001000001000000000010000003002000003000200070001001003030010000000003000000000000020000006000000000000000011000000010000200000000000500000000000000020500000000003000000000000000004000030000100000000103000001000000000000200002004200000020000000030000000000000000000000002000100000000000000002000000000000000010020101000000005250000010000000000023010000001000000000000500002001000123100030011000020001310600000000000021000023000003000000000000000001000000000000220200000000004040000020201000000010201000000000020000400010000050000000000000000000000010000020000000000000000000000000000000000102000010000000000000000000000002010000200200000000000000000000000000100000000000000000200400000000010000000000000000000000000000000010000200300000000000100110000000000000000000000000010000030000001000000000010000010200013000000000000200000001000001200010000000010000000000001000000000000100000000410000040000001000100010000100000002001010000000000000000001000000000000010000000000000000000000002000000000001100001000000001010000000000000002200000000004000000000000100010000000000600000000100300000000000000000000010000003000000000000000000310000010100006000010001000000000000001010101000100000000000000000000000000000201000000000000000700010000030000000000000021000000000000000001020000000030000100001000000000000000000000004010100000000000000000000004000000040100000040100100001000000000300000100000000010010000300000200000000000001302000000000000000000100100000400030000001001000100100002300000004030000002010000220100000000000002000000010010000000003010500000000300000000005020102000200000000000000020100000000000000000000000011000000023000000000010000101000000000000010020040200040000020000004000020000000001000000000100000200000010000000000030100010001000000100000000000600400000000002000000000000132000000900010000000030021400000000004100006000304000000000000010000106000001300020000'";
 
     service
-        .exec_query(
-            &format!("INSERT INTO s.Orders (a, b, hll) VALUES (1, 10, {s}), \
+        .exec_query(&format!(
+            "INSERT INTO s.Orders (a, b, hll) VALUES (1, 10, {s}), \
                                                    (2, 20, {d}), \
                                                    (1, 10, {d}), \
                                                    (2, 30, {s}), \
                                                    (1, 10, {d}), \
                                                    (2, 20, {s}) \
                                                    ",
-                                                   s = sparse,
-                                                   d = dense
-                                                   ),
-        )
+            s = sparse,
+            d = dense
+        ))
         .await
         .unwrap();
 
     let res = service
-        .exec_query("SELECT a, b, cardinality(merge(hll)) FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
+        .exec_query(
+            "SELECT a, b, cardinality(merge(hll)) FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2",
+        )
         .await
         .unwrap();
 
-     assert_eq!(
+    assert_eq!(
         to_rows(&res),
         [
             [
@@ -5673,14 +5676,9 @@ async fn aggregate_index_with_hll_bytes(service: Box<dyn SqlClient>) {
                 TableValue::Int(20),
                 TableValue::Int(657),
             ],
-            [
-                TableValue::Int(2),
-                TableValue::Int(30),
-                TableValue::Int(2),
-            ],
+            [TableValue::Int(2), TableValue::Int(30), TableValue::Int(2),],
         ]
-    ); 
-
+    );
 }
 
 async fn aggregate_index_hll(service: Box<dyn SqlClient>) {
@@ -6110,6 +6108,184 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
                 TableValue::String("t1".to_string()),
                 TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
             ]),
+        ]
+    );
+}
+
+async fn cache_set_get_rm(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("CACHE SET 'key_to_rm' 'myvalue';")
+        .await
+        .unwrap();
+
+    let get_response = service.exec_query("CACHE GET 'key_to_rm'").await.unwrap();
+
+    assert_eq!(
+        get_response.get_columns(),
+        &vec![Column::new("value".to_string(), ColumnType::String, 0),]
+    );
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::String("myvalue".to_string()),]),]
+    );
+
+    service
+        .exec_query("CACHE REMOVE 'key_to_rm' 'myvalue';")
+        .await
+        .unwrap();
+
+    let get_response = service
+        .exec_query("CACHE GET 'key_compaction'")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Null,]),]
+    );
+}
+
+async fn cache_set_get_set_get(service: Box<dyn SqlClient>) {
+    // Initial set
+    {
+        service
+            .exec_query("CACHE SET 'key_for_update' '1';")
+            .await
+            .unwrap();
+
+        let get_response = service
+            .exec_query("CACHE GET 'key_for_update'")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+        );
+    }
+
+    // update
+    {
+        service
+            .exec_query("CACHE SET 'key_for_update' '2';")
+            .await
+            .unwrap();
+
+        let get_response = service
+            .exec_query("CACHE GET 'key_for_update'")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![TableValue::String("2".to_string()),]),]
+        );
+    }
+}
+
+async fn cache_compaction(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("CACHE SET NX TTL 4 'my_prefix:my_key' 'myvalue';")
+        .await
+        .unwrap();
+
+    let get_response = service
+        .exec_query("CACHE GET 'my_prefix:my_key'")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::String("myvalue".to_string()),]),]
+    );
+
+    sleep(Duration::new(5, 0)).await;
+    service.exec_query("SYS COMPACTION 'cache';").await.unwrap();
+
+    let get_response = service
+        .exec_query("CACHE GET 'my_prefix:my_key'")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Null,]),]
+    );
+
+    // system.cache table doesn't check expire
+    let cache_resp = service
+        .exec_query(
+            "select count(*) from system.cache where id = 'my_key' and prefix = 'my_prefix'",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        cache_resp.get_rows(),
+        &vec![Row::new(vec![TableValue::Int(0)]),]
+    );
+}
+
+async fn cache_set_nx(service: Box<dyn SqlClient>) {
+    let set_nx_key_sql = "CACHE SET NX TTL 4 'mykey' 'myvalue';";
+
+    let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
+
+    assert_eq!(
+        set_response.get_columns(),
+        &vec![Column::new("success".to_string(), ColumnType::Boolean, 0),]
+    );
+
+    assert_eq!(
+        set_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true),]),]
+    );
+
+    // key was already defined
+    let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
+
+    assert_eq!(
+        set_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(false),]),]
+    );
+
+    sleep(Duration::new(5, 0)).await;
+
+    // key was expired
+    let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
+
+    assert_eq!(
+        set_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true),]),]
+    );
+}
+
+async fn cache_prefix_keys(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("CACHE SET 'locks:key1' '1';")
+        .await
+        .unwrap();
+    service
+        .exec_query("CACHE SET 'locks:key2' '2';")
+        .await
+        .unwrap();
+    service
+        .exec_query("CACHE SET 'locks:key3' '3';")
+        .await
+        .unwrap();
+
+    let keys_response = service.exec_query("CACHE KEYS 'locks'").await.unwrap();
+    assert_eq!(
+        keys_response.get_columns(),
+        &vec![Column::new("key".to_string(), ColumnType::String, 0),]
+    );
+    assert_eq!(
+        keys_response.get_rows(),
+        &vec![
+            Row::new(vec![TableValue::String("locks:key1".to_string())]),
+            Row::new(vec![TableValue::String("locks:key2".to_string())]),
+            Row::new(vec![TableValue::String("locks:key3".to_string())]),
         ]
     );
 }

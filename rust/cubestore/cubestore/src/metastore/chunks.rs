@@ -1,5 +1,5 @@
 use super::{BaseRocksSecondaryIndex, Chunk, IndexId, RocksSecondaryIndex, RocksTable, TableId};
-use crate::metastore::{IdRow, MetaStoreEvent};
+use crate::metastore::{ColumnFamilyName, IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
@@ -129,9 +129,13 @@ pub(crate) enum ChunkRocksIndex {
     PartitionId = 1,
 }
 
-rocks_table_impl!(Chunk, ChunkRocksTable, TableId::Chunks, {
-    vec![Box::new(ChunkRocksIndex::PartitionId)]
-});
+rocks_table_impl!(
+    Chunk,
+    ChunkRocksTable,
+    TableId::Chunks,
+    { vec![Box::new(ChunkRocksIndex::PartitionId)] },
+    ColumnFamilyName::Default
+);
 
 base_rocks_secondary_index!(Chunk, ChunkRocksIndex);
 

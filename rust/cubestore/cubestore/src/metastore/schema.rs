@@ -1,5 +1,5 @@
 use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, Schema, TableId};
-use crate::metastore::{IdRow, MetaStoreEvent};
+use crate::metastore::{ColumnFamilyName, IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
@@ -23,9 +23,13 @@ pub(crate) enum SchemaRocksIndex {
     Name = 1,
 }
 
-rocks_table_impl!(Schema, SchemaRocksTable, TableId::Schemas, {
-    vec![Box::new(SchemaRocksIndex::Name)]
-});
+rocks_table_impl!(
+    Schema,
+    SchemaRocksTable,
+    TableId::Schemas,
+    { vec![Box::new(SchemaRocksIndex::Name)] },
+    ColumnFamilyName::Default
+);
 
 impl RocksSecondaryIndex<Schema, String> for SchemaRocksIndex {
     fn typed_key_by(&self, row: &Schema) -> String {
