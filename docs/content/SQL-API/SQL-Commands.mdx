@@ -6,6 +6,14 @@ subCategory: Reference
 menuOrder: 4
 ---
 
+<InfoBox>
+
+This page describes the difference in behaviour of SQL commands when using them
+within a Cube Query Rewrite. Outside a Cube Query Rewrite, the behaviour is the
+same as described in the [PostgreSQL documentation][pg-docs].
+
+</InfoBox>
+
 ## SELECT
 
 ### Synopsis
@@ -28,30 +36,6 @@ SELECT select_expr [, ...]
 The `FROM` clause specifies one or more source **cube tables** for the `SELECT`.
 Qualification conditions can be added (via `WHERE`) to restrict the returned
 rows to a small subset of the original dataset.
-
-The optional `WHERE` clause specifies a `where_condition` as any expression that
-evaluates to a result of type boolean. Any row that does not satisfy this
-condition is eliminated from the result dataset. A row satisfies the condition
-if it returns `true`.
-
-The optional `GROUP BY` clause will condense all selected rows that share the
-same values for the grouped expressions into a single row. An expression used
-inside a `grouping_expression` can be an input column name, or the name or
-ordinal number of an output column (SELECT list item), or an arbitrary
-expression formed from input-column values. In case of ambiguity, a `GROUP BY`
-name will be interpreted as an input-column name rather than an output column
-name.
-
-The optional `HAVING` clause eliminates group rows that do not satisfy the
-condition. `HAVING` is different from `WHERE` in that `WHERE` filters individual
-rows before the application of `GROUP BY`, while `HAVING` filters group rows
-created by `GROUP BY`. Each column referenced in condition must unambiguously
-reference a grouping column.
-
-The `LIMIT` clause allows specifying the maximum number of rows to return, while
-`OFFSET` specifies the number of rows to skip before starting to return rows.
-When both are specified, `OFFSET` rows are skipped before starting to count the
-count rows to be returned.
 
 ### Example
 
@@ -169,3 +153,5 @@ SHOW ALL;
  lc_collate                  | en_US.utf8     |
 (9 rows)
 ```
+
+[pg-docs]: https://www.postgresql.org/docs/current/
