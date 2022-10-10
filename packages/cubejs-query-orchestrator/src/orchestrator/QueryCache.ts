@@ -1,13 +1,13 @@
 import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
 import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
+import { CubeStoreCacheDriver } from '@cubejs-backend/cubestore-driver';
+import { BaseDriver, InlineTables, CacheDriverInterface } from '@cubejs-backend/base-driver';
 
-import { BaseDriver, InlineTables } from '@cubejs-backend/base-driver';
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
-import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
@@ -129,14 +129,25 @@ export class QueryCache {
       }>;
       redisPool?: any;
       continueWaitTimeout?: number;
-      cacheAndQueueDriver?: 'redis' | 'memory';
+      cacheAndQueueDriver?: 'redis' | 'memory' | 'cubestore';
       maxInMemoryCacheEntries?: number;
       skipExternalCacheAndQueue?: boolean;
     } = {}
   ) {
-    this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
-      new RedisCacheDriver({ pool: options.redisPool }) :
-      new LocalCacheDriver();
+    switch (options.cacheAndQueueDriver || 'memory') {
+      case 'redis':
+        this.cacheDriver = new RedisCacheDriver({ pool: options.redisPool });
+        break;
+      case 'memory':
+        this.cacheDriver = new LocalCacheDriver();
+        break;
+      case 'cubestore':
+        this.cacheDriver = new CubeStoreCacheDriver({});
+        break;
+      default:
+        throw new Error(`Unknown cache driver: ${options.cacheAndQueueDriver}`);
+    }
+
     this.memoryCache = new LRUCache<string, CacheEntry>({
       max: options.maxInMemoryCacheEntries || 10000
     });

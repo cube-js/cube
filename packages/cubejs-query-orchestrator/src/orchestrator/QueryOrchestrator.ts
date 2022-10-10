@@ -55,8 +55,8 @@ export class QueryOrchestrator {
     );
     this.cacheAndQueueDriver = cacheAndQueueDriver;
 
-    if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
-      throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
+    if (!['redis', 'memory', 'cubestore'].includes(cacheAndQueueDriver)) {
+      throw new Error('Only \'redis\', \'memory\' or \'cubestore\' are supported for cacheAndQueueDriver option');
     }
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;

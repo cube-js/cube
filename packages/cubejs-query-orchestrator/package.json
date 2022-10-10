@@ -20,7 +20,8 @@
     "test": "npm run unit && npm run integration",
     "unit": "jest --runInBand --coverage --verbose dist/test/unit",
     "integration": "npm run integration:redis dist/test/integration",
-    "integration:redis": "jest --runInBand --verbose dist/test/integration",
+    "integration:redis": "jest --runInBand --verbose dist/test/integration/redis",
+    "integration:cubestore": "jest --runInBand --verbose dist/test/integration/cubestore",
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
   },
@@ -33,6 +34,7 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.31.32",
     "@cubejs-backend/shared": "^0.31.32",
+    "@cubejs-backend/cubestore-driver": "^0.31.0",
     "csv-write-stream": "^2.0.0",
     "es5-ext": "0.10.53",
     "generic-pool": "^3.7.1",

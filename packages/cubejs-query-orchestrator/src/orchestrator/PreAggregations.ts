@@ -23,7 +23,7 @@ import {
   InlineTable,
   SaveCancelFn,
   StreamOptions,
-  UnloadOptions,
+  UnloadOptions
 } from '@cubejs-backend/base-driver';
 import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';

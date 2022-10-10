@@ -86,7 +86,7 @@ export class OptsHandler {
         'must be specified'
       );
     }
-    
+
     // TODO (buntarb): this assertion should be restored after documentation
     // will be added.
     //
@@ -372,7 +372,7 @@ export class OptsHandler {
         })
       );
 
-    let externalDialectFactory = () => (
+    const externalDialectFactory = () => (
       typeof externalDbType === 'string' &&
       lookupDriverClass(externalDbType).dialectClass &&
       lookupDriverClass(externalDbType).dialectClass()
@@ -430,8 +430,6 @@ export class OptsHandler {
           // Lazy loading for Cube Store
           externalDriverFactory =
             () => new cubeStorePackage.CubeStoreDevDriver(cubeStoreHandler);
-          externalDialectFactory =
-            () => cubeStorePackage.CubeStoreDevDriver.dialectClass();
         } else {
           this.core.logger('Cube Store is not supported on your system', {
             warning: (

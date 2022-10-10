@@ -1,7 +1,7 @@
 import { createCancelablePromise, MaybeCancelablePromise } from '@cubejs-backend/shared';
+import { CacheDriverInterface } from '@cubejs-backend/base-driver';
 
 import { RedisPool } from './RedisPool';
-import { CacheDriverInterface } from './cache-driver.interface';
 
 interface RedisCacheDriverOptions {
   pool: RedisPool,

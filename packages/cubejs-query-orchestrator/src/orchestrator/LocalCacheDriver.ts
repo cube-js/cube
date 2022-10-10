@@ -1,6 +1,5 @@
 import { createCancelablePromise, MaybeCancelablePromise } from '@cubejs-backend/shared';
-
-import { CacheDriverInterface } from './cache-driver.interface';
+import { CacheDriverInterface } from '@cubejs-backend/base-driver';
 
 interface ItemBucket {
   value: any,

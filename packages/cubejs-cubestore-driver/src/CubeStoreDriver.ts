@@ -10,15 +10,14 @@ import {
   ExternalCreateTableOptions,
   DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
   StreamTableData,
-  DriverCapabilities,
   StreamingSourceTableData,
   QueryOptions,
+  ExternalDriverCompatibilities,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { format as formatSql, escape } from 'sqlstring';
 import fetch from 'node-fetch';
 
-import { CubeStoreQuery } from './CubeStoreQuery';
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
 
@@ -390,11 +389,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return this.createTableWithOptions(table, columns, options, queryTracingObj);
   }
 
-  public static dialectClass() {
-    return CubeStoreQuery;
-  }
-
-  public capabilities(): DriverCapabilities {
+  public capabilities(): ExternalDriverCompatibilities {
     return {
       csvImport: true,
       streamImport: true,
