@@ -1,9 +1,18 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `PrestoDriver` and related types declaration.
+ */
+
+const {
+  getEnv,
+  assertDataSource,
+} = require('@cubejs-backend/shared');
 const presto = require('presto-client');
 const {
   map, zipObj, prop, concat
 } = require('ramda');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
-const { getEnv, assertDataSource } = require('@cubejs-backend/shared');
 const SqlString = require('sqlstring');
 
 /**

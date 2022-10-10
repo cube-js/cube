@@ -860,6 +860,7 @@ export class PreAggregationLoader {
     const capabilities = client?.capabilities();
 
     const withTempTable = !(capabilities?.unloadWithoutTempTable);
+    const dropSourceTempTable = !capabilities?.streamingSource;
 
     return this.runWriteStrategy(
       client,
@@ -867,6 +868,7 @@ export class PreAggregationLoader {
       saveCancelFn,
       invalidationKeys,
       withTempTable,
+      dropSourceTempTable
     );
   }
 
@@ -878,7 +880,8 @@ export class PreAggregationLoader {
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys,
-    withTempTable: boolean
+    withTempTable: boolean,
+    dropSourceTempTable: boolean,
   ) {
     await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
     const targetTableName = this.targetTableName(newVersionEntry);
@@ -913,7 +916,8 @@ export class PreAggregationLoader {
         targetTableName,
         queryOptions,
         saveCancelFn,
-        withTempTable
+        withTempTable,
+        dropSourceTempTable,
       );
     }
   }
@@ -926,9 +930,10 @@ export class PreAggregationLoader {
     targetTableName: string,
     queryOptions: QueryOptions,
     saveCancelFn: SaveCancelFn,
-    withTempTable: boolean
+    withTempTable: boolean,
+    dropSourceTempTable: boolean,
   ) {
-    if (withTempTable) {
+    if (withTempTable && dropSourceTempTable) {
       const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
       const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
       if (mappedActualTables.includes(targetTableName)) {

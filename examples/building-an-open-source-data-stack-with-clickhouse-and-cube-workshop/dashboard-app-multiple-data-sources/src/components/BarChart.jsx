@@ -1,18 +1,10 @@
 import { ResponsiveBar } from '@nivo/bar'
-import moment from "moment";
-import numeral from "numeral";
-
-const ticksFormmater = (ticksCount, value, data, dateFormatter) => {
-  const valueIndex = data.map(i => i.x).indexOf(value)
-  if (valueIndex % Math.floor(data.length / ticksCount) === 0) {
-    return dateFormatter(value)
-  }
-
-  return ""
-}
-const numberFormatter = (item) => numeral(item/100).format("0%")
-const dateFormatter = (item) => moment(item).format("MM")
-const colors = ["#7DB3FF", "#49457B", "#FF7C78"]
+import {
+  colors,
+  numberFormatter,
+  dateFormatter,
+  ticksFormmater,
+} from '../utils/utils'
 
 const BarChart = ({ data /* see data tab */ }) => {
   const prodData = data.chartPivot()
@@ -34,7 +26,7 @@ const BarChart = ({ data /* see data tab */ }) => {
       }}
       axisBottom={{
         format: value =>
-          ticksFormmater(12, value, prodData, dateFormatter)
+          ticksFormmater(15, value, prodData, dateFormatter)
       }}
       tooltip={({ id, value, color }) => (
         <strong style={{ color, backgroundColor: 'white', padding: '5px', borderRadius: '5px' }}>

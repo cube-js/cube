@@ -1,11 +1,19 @@
-const sql = require('mssql');
-const { BaseDriver } = require('@cubejs-backend/base-driver');
-import {
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `MSSqlDriver` and related types declaration.
+ */
+
+const {
   getEnv,
   assertDataSource,
-} from '@cubejs-backend/shared';
+} = require('@cubejs-backend/shared');
+const sql = require('mssql');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
+
 
 const GenericTypeToMSSql = {
+  boolean: 'bit',
   string: 'nvarchar(max)',
   text: 'nvarchar(max)',
   timestamp: 'datetime2',
@@ -13,6 +21,7 @@ const GenericTypeToMSSql = {
 };
 
 const MSSqlToGenericType = {
+  bit: 'boolean',
   uniqueidentifier: 'uuid',
   datetime2: 'timestamp'
 }
@@ -33,11 +42,11 @@ class MSSqlDriver extends BaseDriver {
    */
   constructor(config = {}) {
     super();
-    
+
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-  
+
     this.config = {
       server: getEnv('dbHost', { dataSource }),
       database: getEnv('dbName', { dataSource }),

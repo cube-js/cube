@@ -1,10 +1,16 @@
-import { createConnection, Connection, ConnectionOptions, RowDataPacket, Field } from 'mysql2';
-import genericPool, { Pool } from 'generic-pool';
-import { Readable } from 'stream';
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `MongoBIDriver` and related types declaration.
+ */
+
 import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
+import { createConnection, Connection, ConnectionOptions, RowDataPacket, Field } from 'mysql2';
+import genericPool, { Pool } from 'generic-pool';
+import { Readable } from 'stream';
 import {
   BaseDriver,
   DownloadQueryResultsOptions,

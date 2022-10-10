@@ -1,4 +1,13 @@
-/* eslint-disable no-restricted-syntax */
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `SnowflakeDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import snowflake, { Column, Connection, Statement } from 'snowflake-sdk';
 import {
   BaseDriver, DownloadTableCSVData,
@@ -12,7 +21,6 @@ import { formatToTimeZone } from 'date-fns-timezone';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Storage } from '@google-cloud/storage';
-import { getEnv, assertDataSource } from '@cubejs-backend/shared';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 // eslint-disable-next-line import/order

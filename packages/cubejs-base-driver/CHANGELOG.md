@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.3](https://github.com/cube-js/cube.js/compare/v0.31.2...v0.31.3) (2022-10-08)
+
+
+### Bug Fixes
+
+* drivers imports alignment ([#5448](https://github.com/cube-js/cube.js/issues/5448)) ([ab12426](https://github.com/cube-js/cube.js/commit/ab1242650ba0368b855176b9c6ca2d73073acf0e))
+
+
+
+
+
+## [0.31.2](https://github.com/cube-js/cube.js/compare/v0.31.1...v0.31.2) (2022-10-08)
+
+
+### Bug Fixes
+
+* Temp tables dropped for ksql after successfully created ([#5445](https://github.com/cube-js/cube.js/issues/5445)) ([7726c82](https://github.com/cube-js/cube.js/commit/7726c82fc833a6b14eeeb498a31df62ba9818336))
+
+
+
+
+
 # [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
 
 

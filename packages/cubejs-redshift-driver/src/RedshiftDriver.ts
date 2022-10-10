@@ -1,6 +1,12 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `RedshiftDriver` and related types declaration.
+ */
+
+import { getEnv } from '@cubejs-backend/shared';
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
 import { DownloadTableCSVData, UnloadOptions } from '@cubejs-backend/base-driver';
-import { getEnv } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';

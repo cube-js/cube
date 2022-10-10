@@ -1,10 +1,17 @@
-const crypto = require('crypto');
-const dataApi = require('data-api-client');
-const { BaseDriver } = require('@cubejs-backend/base-driver');
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `AuroraServerlessMySqlDriver` and related types
+ * declaration.
+ */
+
 const {
   getEnv,
   assertDataSource,
 } = require('@cubejs-backend/shared');
+const crypto = require('crypto');
+const dataApi = require('data-api-client');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 
 const GenericTypeToMySql = {
   string: 'varchar(255) CHARACTER SET utf8mb4',

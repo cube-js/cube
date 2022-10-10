@@ -4,7 +4,8 @@ use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::Table;
 use crate::metastore::{
-    deactivate_table_on_corrupt_data, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId,
+    deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, IdRow, MetaStore,
+    MetaStoreEvent, Partition, RowKey, TableId,
 };
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkStore, WALStore};
@@ -507,6 +508,18 @@ impl SchedulerImpl {
                             log::info!("Removing stale stream job: {:?}", new_job);
                             self.meta_store.delete_job(new_job.get_id()).await?;
                             self.reconcile_table_imports().await?;
+                        }
+                        JobStatus::Error(e) if e.contains("CorruptData") => {
+                            let table_id = match new_job.get_row().row_reference() {
+                                RowKey::Table(TableId::Tables, table_id) => table_id,
+                                x => panic!("Unexpected job key: {:?}", x),
+                            };
+                            deactivate_table_due_to_corrupt_data(
+                                self.meta_store.clone(),
+                                *table_id,
+                                e.to_string(),
+                            )
+                            .await?;
                         }
                         _ => {}
                     }

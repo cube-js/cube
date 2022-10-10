@@ -1,7 +1,16 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `PostgresDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import { types, Pool, PoolConfig, PoolClient, FieldDef } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
-import { getEnv, assertDataSource } from '@cubejs-backend/shared';
 import * as moment from 'moment';
 import {
   BaseDriver,

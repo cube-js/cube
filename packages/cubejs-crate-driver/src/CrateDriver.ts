@@ -1,3 +1,9 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `CrateDriver` and related types declaration.
+ */
+
 import { PostgresDriver } from '@cubejs-backend/postgres-driver';
 import { PoolClient } from 'pg';
 

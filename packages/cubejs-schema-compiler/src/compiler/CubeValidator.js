@@ -497,7 +497,9 @@ const cubeSchema = Joi.object().keys({
     description: Joi.string(),
     meta: Joi.any()
   })),
-  preAggregations: PreAggregationsAlternatives
+  preAggregations: PreAggregationsAlternatives,
+  includes: Joi.func(),
+  excludes: Joi.func(),
 });
 
 function formatErrorMessageFromDetails(explain, d) {

@@ -1,3 +1,9 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `JDBCDriver` and related types declaration.
+ */
+
 /* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
 import {
   getEnv,
