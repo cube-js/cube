@@ -2545,6 +2545,7 @@ mod tests {
                     "KibanaSampleDataEcommerce.maxPrice".to_string(),
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                    "KibanaSampleDataEcommerce.countDistinct".to_string(),
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![
@@ -11020,6 +11021,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.maxPrice".to_string(),
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                    "KibanaSampleDataEcommerce.countDistinct".to_string(),
                     "Logs.agentCount".to_string(),
                     "Logs.agentCountApprox".to_string(),
                 ]),
@@ -12528,6 +12530,106 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }),
             true
+        );
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_count_distinct_with_year_and_month() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                EXTRACT(MONTH FROM "ta_1"."order_date") "ca_1",
+                CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."order_date") * 100) + 1) * 100) + 1) AS varchar) AS date) "ca_2",
+                count(DISTINCT "ta_1"."countDistinct") "ca_3"
+            FROM "database"."public"."KibanaSampleDataEcommerce" "ta_1"
+            GROUP BY
+                "ca_1",
+                "ca_2"
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.countDistinct".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                        granularity: Some("month".to_owned()),
+                        date_range: None
+                    },
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                        granularity: Some("year".to_owned()),
+                        date_range: None
+                    }
+                ]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                EXTRACT(MONTH FROM "ta_1"."order_date") "ca_1",
+                CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."order_date") * 100) + 1) * 100) + 1) AS varchar) AS date) "ca_2",
+                ((((EXTRACT(DAY FROM "ta_1"."order_date") * 100) + 1) * 100) + 1) "ca_3",
+                count(DISTINCT "ta_1"."countDistinct") "ca_4",
+                count("ta_1"."count") "ca_5"
+            FROM "database"."public"."KibanaSampleDataEcommerce" "ta_1"
+            GROUP BY
+                "ca_1",
+                "ca_2",
+                "ca_3"
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                        granularity: Some("month".to_owned()),
+                        date_range: None
+                    },
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                        granularity: Some("year".to_owned()),
+                        date_range: None
+                    },
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                        granularity: Some("day".to_owned()),
+                        date_range: None
+                    }
+                ]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
         );
     }
 

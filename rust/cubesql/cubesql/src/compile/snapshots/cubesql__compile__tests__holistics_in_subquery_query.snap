@@ -9,6 +9,7 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.KibanaSampleDataEcommerce | maxPrice           | numeric                     |
 | public.KibanaSampleDataEcommerce | minPrice           | numeric                     |
 | public.KibanaSampleDataEcommerce | avgPrice           | numeric                     |
+| public.KibanaSampleDataEcommerce | countDistinct      | bigint                      |
 | public.KibanaSampleDataEcommerce | order_date         | timestamp without time zone |
 | public.KibanaSampleDataEcommerce | customer_gender    | text                        |
 | public.KibanaSampleDataEcommerce | taxful_total_price | numeric                     |

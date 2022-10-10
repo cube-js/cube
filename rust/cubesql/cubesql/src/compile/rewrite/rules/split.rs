@@ -11,13 +11,13 @@ use crate::{
             literal_number, literal_string, original_expr_name, outer_aggregate_split_replacer,
             outer_projection_split_replacer, projection, projection_expr,
             projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
-            rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
-            udf_expr, AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
-            BinaryExprOp, ColumnExprColumn, CubeScanAliasToCube,
-            GroupAggregateSplitReplacerAliasToCube, GroupExprSplitReplacerAliasToCube,
-            InnerAggregateSplitReplacerAliasToCube, LiteralExprValue, LogicalPlanLanguage,
-            OuterAggregateSplitReplacerAliasToCube, OuterProjectionSplitReplacerAliasToCube,
-            ProjectionAlias,
+            rules::members::MemberRules, transforming_anchors_rewrite, transforming_chain_rewrite,
+            transforming_rewrite, udf_expr, AggregateFunctionExprDistinct,
+            AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, ColumnExprColumn,
+            CubeScanAliasToCube, GroupAggregateSplitReplacerAliasToCube,
+            GroupExprSplitReplacerAliasToCube, InnerAggregateSplitReplacerAliasToCube,
+            LiteralExprValue, LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
+            OuterProjectionSplitReplacerAliasToCube, ProjectionAlias,
         },
     },
     transport::V1CubeMetaExt,
@@ -1104,6 +1104,86 @@ impl RewriteRules for SplitRules {
                     false,
                 ),
             ),
+            transforming_anchors_rewrite(
+                "split-push-down-count-distinct-year-and-month-outer-aggr-replacer",
+                aggregate(
+                    "?inner_aggregate",
+                    outer_aggregate_split_replacer("?aggr_group_expr", "?outer_aggregate_cube"),
+                    "?aggr_aggr_expr",
+                ),
+                vec![
+                    (
+                        "?aggr_group_expr",
+                        aggr_group_expr("?group_expr_first", "?group_expr_second"),
+                        fun_expr(
+                            "DatePart",
+                            vec![literal_string("MONTH"), column_expr("?month_column")],
+                        ),
+                    ),
+                    (
+                        "?aggr_group_expr",
+                        aggr_group_expr("?group_expr_third", "?group_expr_fourth"),
+                        cast_expr(
+                            cast_expr(
+                                binary_expr(
+                                    binary_expr(
+                                        binary_expr(
+                                            binary_expr(
+                                                fun_expr(
+                                                    "DatePart",
+                                                    vec![
+                                                        literal_string("YEAR"),
+                                                        column_expr("?year_column"),
+                                                    ],
+                                                ),
+                                                "*",
+                                                literal_number(100),
+                                            ),
+                                            "+",
+                                            literal_number(1),
+                                        ),
+                                        "*",
+                                        literal_number(100),
+                                    ),
+                                    "+",
+                                    literal_number(1),
+                                ),
+                                "?inner_type",
+                            ),
+                            "?outer_type",
+                        ),
+                    ),
+                ],
+                (
+                    "?aggr_aggr_expr",
+                    aggr_aggr_expr("?aggr_expr_first", "?aggr_expr_second"),
+                    outer_aggregate_split_replacer("?agg_fun", "?cube"),
+                ),
+                vec![
+                    ("?agg_fun", agg_fun_expr("?fun", vec!["?arg"], "?distinct")),
+                    ("?arg", column_expr("?column")),
+                ],
+                alias_expr(
+                    agg_fun_expr(
+                        "?output_fun",
+                        vec!["?alias".to_string()],
+                        "?output_distinct",
+                    ),
+                    "?outer_alias",
+                ),
+                self.transform_outer_aggr_fun(
+                    "?cube",
+                    "?agg_fun",
+                    "?fun",
+                    "?arg",
+                    Some("?column"),
+                    "?alias",
+                    "?outer_alias",
+                    "?output_fun",
+                    true,
+                    "?output_distinct",
+                ),
+            ),
             // Aggregate function
             transforming_rewrite(
                 "split-push-down-aggr-fun-inner-replacer",
@@ -1162,6 +1242,8 @@ impl RewriteRules for SplitRules {
                     "?alias",
                     "?outer_alias",
                     "?output_fun",
+                    false,
+                    "?output_distinct",
                 ),
             ),
             transforming_chain_rewrite(
@@ -1184,6 +1266,8 @@ impl RewriteRules for SplitRules {
                     "?alias",
                     "?outer_alias",
                     "?output_fun",
+                    false,
+                    "?output_distinct",
                 ),
             ),
             transforming_rewrite(
@@ -2302,6 +2386,8 @@ impl SplitRules {
         alias_expr_var: &'static str,
         outer_alias_expr_var: &'static str,
         output_fun_var: &'static str,
+        allow_count_distinct: bool,
+        output_distinct_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let original_expr_var = var!(original_expr_var);
@@ -2311,6 +2397,7 @@ impl SplitRules {
         let alias_expr_var = var!(alias_expr_var);
         let outer_alias_expr_var = var!(outer_alias_expr_var);
         let output_fun_var = var!(output_fun_var);
+        let output_distinct_var = var!(output_distinct_var);
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
             for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
@@ -2376,6 +2463,15 @@ impl SplitRules {
                                     AggregateFunctionExprFun(output_fun),
                                 )),
                             );
+
+                            if allow_count_distinct {
+                                subst.insert(
+                                    output_distinct_var,
+                                    egraph.add(LogicalPlanLanguage::AggregateFunctionExprDistinct(
+                                        AggregateFunctionExprDistinct(false),
+                                    )),
+                                );
+                            }
 
                             return true;
                         }
