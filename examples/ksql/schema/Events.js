@@ -4,9 +4,14 @@ cube(`Events`, {
   preAggregations: {
     main: {
       measures: [count],
-      dimensions: [type],
+      dimensions: [type, anonymousId, time],
       timeDimension: time,
       granularity: `second`
+    },
+    userCountHour: {
+      measures: [userCount],
+      timeDimension: time,
+      granularity: `hour`
     }
   },
 
@@ -16,8 +21,8 @@ cube(`Events`, {
     },
 
     userCount: {
-      sql: `ANONYMOUSID`,
-      type: `countDistinct`
+      sql: `COUNT_DISTINCT(ANONYMOUSID)`,
+      type: `number`
     },
   },
 
