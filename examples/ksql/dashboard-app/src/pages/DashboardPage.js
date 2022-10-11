@@ -89,7 +89,7 @@ const DashboardPage = () => {
     dimensions: [
       "Events.anonymousId",
       "Events.type",
-      "Events.time"
+      "Events.time.second"
     ],
     order: {
       "Events.time": "desc"
@@ -271,7 +271,7 @@ function EventCards({ resultSet }) {
           fontWeight: 'bolder'
         }
 
-        const dateUtc = new Date(row["Events.time"] + 'Z')
+        const dateUtc = new Date(row["Events.time.second"] + 'Z')
         const diff = differenceInSeconds(new Date(), dateUtc)
         
         const eventStyleWithOpacity = {

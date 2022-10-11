@@ -4,7 +4,7 @@ cube(`Events`, {
   preAggregations: {
     main: {
       measures: [count],
-      dimensions: [type, anonymousId, time],
+      dimensions: [type, anonymousId],
       timeDimension: time,
       granularity: `second`
     },
