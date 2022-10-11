@@ -86,9 +86,6 @@ const DashboardPage = () => {
   }
 
   const realTimeEventsQuery = {
-    timeDimensions: [ {
-      dimension: "Events.time"
-    } ],
     dimensions: [
       "Events.anonymousId",
       "Events.type",
