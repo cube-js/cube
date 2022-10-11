@@ -1,0 +1,130 @@
+---
+title: Views
+permalink: /schema/reference/view
+scope: cubejs
+category: Data Schema
+menuOrder: 8.1
+subCategory: Reference
+---
+
+Views sit on top of the data graph of cubes and create a facade of your whole data model with which data consumers can interact. 
+They’re the place to define metrics, manage governance and data access, and control ambiguous join paths.
+
+Views **can't** have their own members. You can use `includes` property to include measures and dimensions into view from cubes.
+
+```js
+view(`ActiveUsers`, {
+  description: `14 days rolling count of active users`,
+  includes: [
+    // Measure
+    Users.rollingCount, 
+    // Dimensions
+    Users.isPaying,
+    Users.signupDate
+  ]
+});
+```
+
+You also can reference measures and dimensions one by one. It is helpful when you need to control join path, apply filter, or rename measures/dimensions. 
+
+```js
+view(`CompletedOrders`, {
+  description: 'Count of completed orders',
+
+  // You can use filters on measures to reduce views to the subset of the data
+  measures: {
+    count: {
+      sql: `${Orders.count}`,
+      type: `number`
+      filters: [
+        { sql: `${Orders.status} = 'completed'` }
+      ]
+    }
+  },
+
+  // in the example below we are controlling join path
+  // and rename dimensions
+  dimensions: {
+    orderWarehouseCountry: {
+      sql: `${Orders.Countries.name}`,
+      type: `string`
+    },
+    userCountry: {
+      sql: `${Orders.Users.Countries.name}`,
+      type: `string`
+    }
+  }
+});
+```
+
+Views can be queries the same way as cubes. Example below show how to query the above view with SQL API.
+
+```sql
+SELECT
+  count,
+  userCountry
+FROM CompletedOrders
+GROUP BY 2
+```
+
+## Parameters
+
+### <--{"id" : "Parameters"}--> description
+
+Use a description in your cubes to allow your team to better understand what
+this view is about. It is a very simple and yet useful tool that gives a hint to
+everyone and makes sure data is interpreted correctly by users.
+
+```js
+view(`Active Users`, {
+  description: `14 days rolling count of active users`,
+});
+```
+
+### <--{"id" : "Parameters"}--> includes
+
+`includes` property is used to bulk add measures or dimensions to view.
+
+```js
+view(`ActiveUsers`, {
+  description: `14 days rolling count of active users`,
+  includes: [
+    // Measure
+    Users.rollingCount, 
+    // Dimensions
+    Users.isPaying,
+    Users.signupDate
+  ]
+});
+```
+
+### <--{"id" : "Parameters"}--> shown
+
+You can use `shown` property to manage visibility of the specific view.
+Some data may be available only to specific roles within an organization or to specific customers.
+In the example below, we’re making the `ARR` view only visible to users with finance permissions.
+
+
+```js
+view(`ARR`, {
+  description: `Annual Recurring Recurring Revenue`,
+  shown: COMPILE_CONTEXT.permissions['finance'],
+  includes: [
+    Revenue.arr,
+    Revenue.date,
+    Customers.plan
+  ]
+});
+```
+
+
+
+[ref-config-driverfactory]: /config#driver-factory
+[ref-config-ext-ctx]: /config#extend-context
+[ref-config-queryrewrite]: /config#query-rewrite
+[ref-config-req-ctx]: /config#request-context
+[ref-dev-playground]: /dev-tools/dev-playground
+[ref-restapi-meta]: /rest-api#v-1-meta
+[ref-restapi-sql]: /rest-api#v-1-sql
+[ref-sec-ctx]: /security/context
+[wiki-camelcase]: https://en.wikipedia.org/wiki/Camel_case
