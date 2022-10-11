@@ -1,10 +1,24 @@
 cube(`Events`, {
   sql: `SELECT * FROM EVENTS`,
 
+  preAggregations: {
+    main: {
+      measures: [count],
+      dimensions: [type],
+      timeDimension: time,
+      granularity: `second`
+    }
+  },
+
   measures: {
     count: {
       type: `count`
-    }
+    },
+
+    userCount: {
+      sql: `ANONYMOUSID`,
+      type: `countDistinct`
+    },
   },
 
   dimensions: {
@@ -22,13 +36,5 @@ cube(`Events`, {
       sql: `TYPE`,
       type: `string`
     }
-  },
-
-  preAggregations: {
-    original: {
-      external: true,
-      type: `originalSql`,
-      uniqueKeyColumns: [ '`MESSAGEID`' ]
-    }
   }
-})
+});

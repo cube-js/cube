@@ -1,25 +1,31 @@
 cube('OnlineUsers', {
-  sql: `SELECT * FROM USERS_LAST_TIMESTAMP`,
+  sql: `SELECT * FROM USERS_LAST_TIMESTAMP_NEW`,
 
   preAggregations: {
-    original: {
-      external: true,
-      type: `originalSql`,
-      uniqueKeyColumns: [ '`ANONYMOUSID`' ]
+    main: {
+      measures: [count],
+      dimensions: [anonymousId],
+      timeDimension: lastSeen,
+      granularity: `second`
     }
   },
 
   measures: {
     count: {
-      type: `countDistinct`,
+      type: `count`,
       sql: `ANONYMOUSID`
     }
   },
 
   dimensions: {
+    anonymousId: {
+      sql: `ANONYMOUSID`,
+      type: `string`
+    },
+
     lastSeen: {
       type: `time`,
-      sql: `KSQL_COL_0`
+      sql: `MAX_TIME`
     }
   }
 });
