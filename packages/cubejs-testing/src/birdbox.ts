@@ -476,6 +476,8 @@ export async function startBirdBoxFromCli(
         `[Birdbox] Script ${loadScript} finished successfully\n`
       );
     }
+  } else if (!options.env?.CUBEJS_DB_HOST) {
+    db = await PostgresDBRunner.startContainer({});
   }
 
   const testDir = path.join(process.cwd(), 'birdbox-test-project');
@@ -695,7 +697,6 @@ export async function getBirdbox(
           schemaDir: options.schemaDir,
           useCubejsServerBinary: mode === Mode.LOCAL,
           schemas: options?.schemas,
-          loadScript: type === 'postgres' ? 'postgres-load-events.sh' : undefined,
         });
         break;
       }
