@@ -387,9 +387,9 @@ class ApiGateway {
       .map((cube) => ({
         config: {
           ...cube.config,
-          measures: cube.config.measures.filter(visibilityFilter),
-          dimensions: cube.config.dimensions.filter(visibilityFilter),
-          segments: cube.config.segments.filter(visibilityFilter),
+          measures: cube.config.measures?.filter(visibilityFilter),
+          dimensions: cube.config.dimensions?.filter(visibilityFilter),
+          segments: cube.config.segments?.filter(visibilityFilter),
         },
       }));
   }
@@ -426,14 +426,14 @@ class ApiGateway {
       });
       const { metaConfig, cubeDefinitions } = metaConfigExtended;
 
-      const cubes = metaConfig
+      const cubes = this.filterVisibleItemsInMeta(context, metaConfig)
         .map((meta) => meta.config)
         .map((cube) => ({
           ...transformCube(cube, cubeDefinitions),
-          measures: cube.measures?.filter(visibilityFilter).map((measure) => ({
+          measures: cube.measures?.map((measure) => ({
             ...transformMeasure(measure, cubeDefinitions),
           })),
-          dimensions: cube.dimensions?.filter(visibilityFilter).map((dimension) => ({
+          dimensions: cube.dimensions?.map((dimension) => ({
             ...transformDimension(dimension, cubeDefinitions),
           })),
           segments: cube.segments?.map((segment) => ({
