@@ -40,6 +40,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
         t("group_by_nulls", group_by_nulls),
+        t("logical_alias", logical_alias),
         t("float_decimal_scale", float_decimal_scale),
         t("float_merge", float_merge),
         t("join", join),
@@ -479,6 +480,30 @@ async fn group_by_nulls(service: Box<dyn SqlClient>) {
         rows(&[(Some(1), 1), (Some(2), 2), (None, 6)])
     );
 }
+
+async fn logical_alias(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE s.logical (id int, n int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.logical (id, n) VALUES (1, 1), (2, 2), (3, 3), (1, 1), (2, 2)",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT  sum(n) from (select id, sum(n) n from s.logical group by 1) `test` ")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        rows(&[(9)])
+    ); }
 
 async fn float_decimal_scale(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA foo").await.unwrap();
