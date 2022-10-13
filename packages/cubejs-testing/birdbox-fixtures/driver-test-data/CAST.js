@@ -23,6 +23,10 @@ export const DB_CAST = {
     SELECT_PREFIX: 'with tmp_tbl as (\n',
     SELECT_SUFFIX: ')\nselect * from tmp_tbl',
   },
+  vertica: {
+    SELECT_PREFIX: '',
+    SELECT_SUFFIX: '',
+  },
 };
 export const DATE_CAST = {
   athena: {
@@ -46,6 +50,10 @@ export const DATE_CAST = {
     DATE_SUFFIX: ', \'y-M-d\')',
   },
   questdb: {
+    DATE_PREFIX: 'to_date(',
+    DATE_SUFFIX: ', \'YYYY-MM-DD\')',
+  },
+  vertica: {
     DATE_PREFIX: 'to_date(',
     DATE_SUFFIX: ', \'YYYY-MM-DD\')',
   },
