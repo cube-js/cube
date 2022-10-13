@@ -16,6 +16,7 @@ on:
     branches:
       - 'master'
 
+# touch to trigger
 jobs:
   cli:
     runs-on: ubuntu-20.04

@@ -522,7 +522,9 @@ export async function startBirdBoxFromCli(
     );
   }
 
-  fs.writeFileSync(path.join(testDir, 'package.json'), '{}', { encoding: 'utf-8' });
+  if (!fs.existsSync(path.join(testDir, 'package.json'))) {
+    fs.writeFileSync(path.join(testDir, 'package.json'), '{}', { encoding: 'utf-8' });
+  }
 
   const env = {
     ...process.env,
