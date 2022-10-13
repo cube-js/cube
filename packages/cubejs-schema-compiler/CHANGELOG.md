@@ -3,6 +3,102 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.3](https://github.com/cube-js/cube.js/compare/v0.31.2...v0.31.3) (2022-10-08)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.31.2](https://github.com/cube-js/cube.js/compare/v0.31.1...v0.31.2) (2022-10-08)
+
+
+### Features
+
+* Includes and Excludes directives for Cube Views ([#5437](https://github.com/cube-js/cube.js/issues/5437)) ([7c35604](https://github.com/cube-js/cube.js/commit/7c356049b56a0ea58a4ad8f2628ffaff2ac307d4))
+
+
+
+
+
+## [0.31.1](https://github.com/cube-js/cube.js/compare/v0.31.0...v0.31.1) (2022-10-04)
+
+
+### Bug Fixes
+
+* Cube not found for path due to FILTER_PARAMS are used in members ([#5417](https://github.com/cube-js/cube.js/issues/5417)) ([bfe76bf](https://github.com/cube-js/cube.js/commit/bfe76bfbf3bd5f51a408088f8f5fefb35e17e22f))
+* **extensions:** fix SELECT handling in the Funnels extensions ([#5397](https://github.com/cube-js/cube.js/issues/5397)) ([041f591](https://github.com/cube-js/cube.js/commit/041f591482cc75d840310a9b7592158c1b33fa37))
+
+
+
+
+
+# [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
+
+
+* feat!: Cube Views implementation (#5278) ([9937356](https://github.com/cube-js/cube.js/commit/99373563b610d1f15dfc44fafac0c329c1dc9a0d)), closes [#5278](https://github.com/cube-js/cube.js/issues/5278)
+
+
+### Bug Fixes
+
+* **schema-compiler:** throw an error for the empty pre-aggs ([#5392](https://github.com/cube-js/cube.js/issues/5392)) ([4afd604](https://github.com/cube-js/cube.js/commit/4afd6041dae8175fb8d292e9ee0db15969239c81))
+
+
+### BREAKING CHANGES
+
+* The logic of how cubes are included in joins has been changed. There are multiple member reference constructs that are now forbidden and should be rewritten. You can't reference foreign cubes anymore to define members inside other cubes: `${ForeignCube}.foo`. `foo` member should be defined in `ForeignCube` and referenced as `${ForeignCube.foo}`. You also can't mix references and members without `CUBE` self-reference. For example `${ForeignCube.foo} + bar` is invalid and `${ForeignCube.foo} + ${CUBE}.bar` should be used instead. If not fixed, it'll lead to missing tables in the `FROM` clause.
+
+
+
+
+
+## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
+
+
+### Bug Fixes
+
+* Invalid identifier day for month `lambdaRollup` ([#5338](https://github.com/cube-js/cube.js/issues/5338)) ([bacc643](https://github.com/cube-js/cube.js/commit/bacc64309b09c99cddc0a57bfcca94ee01dd5877))
+
+
+
+
+
+## [0.30.73](https://github.com/cube-js/cube.js/compare/v0.30.72...v0.30.73) (2022-09-19)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
+
+
+### Features
+
+* Introduce `rollupLambda` rollup type ([#5315](https://github.com/cube-js/cube.js/issues/5315)) ([6fd5ee4](https://github.com/cube-js/cube.js/commit/6fd5ee4ed3a7fe98f55ce2f3dc900be1f089e590))
+
+
+
+
+
+## [0.30.70](https://github.com/cube-js/cube.js/compare/v0.30.69...v0.30.70) (2022-09-14)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.30.69](https://github.com/cube-js/cube.js/compare/v0.30.68...v0.30.69) (2022-09-13)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
 ## [0.30.67](https://github.com/cube-js/cube.js/compare/v0.30.66...v0.30.67) (2022-09-09)
 
 

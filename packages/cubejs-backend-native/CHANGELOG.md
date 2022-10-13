@@ -3,6 +3,81 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.2](https://github.com/cube-js/cube.js/compare/v0.31.1...v0.31.2) (2022-10-08)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+# [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
+
+
+### Bug Fixes
+
+* **cubesql:** cast strings to timestamp ([#5331](https://github.com/cube-js/cube.js/issues/5331)) ([a706258](https://github.com/cube-js/cube.js/commit/a706258f85faa3f99150127a2c78f885e99e3aaf))
+
+
+### Features
+
+* **cubesql:** Holistics - in dates list filter ([#5333](https://github.com/cube-js/cube.js/issues/5333)) ([94b6509](https://github.com/cube-js/cube.js/commit/94b650928a81be9ea203e50612ea194d9558b298))
+
+
+
+
+
+## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.30.74](https://github.com/cube-js/cube.js/compare/v0.30.73...v0.30.74) (2022-09-20)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.30.73](https://github.com/cube-js/cube.js/compare/v0.30.72...v0.30.73) (2022-09-19)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.30.71](https://github.com/cube-js/cube.js/compare/v0.30.70...v0.30.71) (2022-09-16)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.30.69](https://github.com/cube-js/cube.js/compare/v0.30.68...v0.30.69) (2022-09-13)
+
+
+### Features
+
+* **base-driver:** Split BaseDriver to @cubejs-backend/base-driver ([#5283](https://github.com/cube-js/cube.js/issues/5283)) ([ca7f9d2](https://github.com/cube-js/cube.js/commit/ca7f9d280c3518e012683c23b82175ec1f96d2a8))
+
+
+
+
+
 ## [0.30.68](https://github.com/cube-js/cube.js/compare/v0.30.67...v0.30.68) (2022-09-09)
 
 

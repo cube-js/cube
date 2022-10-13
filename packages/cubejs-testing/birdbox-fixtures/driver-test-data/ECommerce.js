@@ -47,6 +47,11 @@ cube(`ECommerce`, {
       sql: 'profit',
       type: 'sum',
     },
+    hiddenSum: {
+      sql: 'profit',
+      type: 'sum',
+      shown: false,
+    },
   },
   dimensions: {
     rowId: {

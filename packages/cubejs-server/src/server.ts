@@ -127,7 +127,7 @@ export class CubejsServer {
         server: this.server,
         version
       };
-    } catch (e) {
+    } catch (e: any) {
       if (this.core.event) {
         await this.core.event('Dev Server Fatal Error', {
           error: (e.stack || e.message || e).toString()
@@ -175,7 +175,7 @@ export class CubejsServer {
       this.server = null;
 
       await this.core.releaseConnections();
-    } catch (e) {
+    } catch (e: any) {
       if (this.core.event) {
         await this.core.event('Dev Server Fatal Error', {
           error: (e.stack || e.message || e).toString()
@@ -186,6 +186,11 @@ export class CubejsServer {
     }
   }
 
+  /**
+   * Create driver instance.
+   *
+   * TODO (buntarb): there is no usage of this method across the project.
+   */
   public static createDriver(dbType: DatabaseType, opt: DriverOptions) {
     return CubeCore.createDriver(dbType, opt);
   }
@@ -245,7 +250,7 @@ export class CubejsServer {
       await timeoutKiller.cancel();
 
       return 0;
-    } catch (e) {
+    } catch (e: any) {
       console.error('Fatal error during server shutting down: ');
       console.error(e.stack || e);
 

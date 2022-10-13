@@ -34,7 +34,7 @@ export class CubeToMetaTransformer {
         measures: R.compose(
           R.map((nameToMetric) => ({
             ...this.measureConfig(cube.name, cubeTitle, nameToMetric),
-            isVisible: this.isVisible(nameToMetric[1], true)
+            isVisible: this.isVisible(nameToMetric[1], this.isVisible(cube, true))
           })),
           R.toPairs
         )(cube.measures || {}),
@@ -49,7 +49,7 @@ export class CubeToMetaTransformer {
               nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
             format: nameToDimension[1].format,
             meta: nameToDimension[1].meta,
-            isVisible: this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
+            isVisible: this.isVisible(nameToDimension[1], this.isVisible(cube, !nameToDimension[1].primaryKey))
           })),
           R.toPairs
         )(cube.dimensions || {}),
@@ -60,7 +60,7 @@ export class CubeToMetaTransformer {
             shortTitle: this.title(cubeTitle, nameToSegment, true),
             description: nameToSegment[1].description,
             meta: nameToSegment[1].meta,
-            isVisible: this.isVisible(nameToSegment[1], true)
+            isVisible: this.isVisible(nameToSegment[1], this.isVisible(cube, true))
           })),
           R.toPairs
         )(cube.segments || {})

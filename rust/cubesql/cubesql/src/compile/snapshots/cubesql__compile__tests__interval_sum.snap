@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                SELECT\n                    TO_TIMESTAMP('2019-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')\n                    + INTERVAL '1 MONTH'\n                    + INTERVAL '1 WEEK'\n                    + INTERVAL '1 DAY'\n                    AS t\n                \"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------------------+
+| t                       |
++-------------------------+
+| 2019-02-09T00:00:00.000 |
++-------------------------+

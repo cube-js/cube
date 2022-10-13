@@ -3,6 +3,98 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.3](https://github.com/cube-js/cube.js/compare/v0.31.2...v0.31.3) (2022-10-08)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.31.2](https://github.com/cube-js/cube.js/compare/v0.31.1...v0.31.2) (2022-10-08)
+
+
+### Bug Fixes
+
+* Temp tables dropped for ksql after successfully created ([#5445](https://github.com/cube-js/cube.js/issues/5445)) ([7726c82](https://github.com/cube-js/cube.js/commit/7726c82fc833a6b14eeeb498a31df62ba9818336))
+
+
+
+
+
+# [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** pre-aggs build range queries cache key alignment ([#5377](https://github.com/cube-js/cube.js/issues/5377)) ([5896c4a](https://github.com/cube-js/cube.js/commit/5896c4aa4d5a469a892ca9f0e758dc5c6ef6c350))
+
+
+### Features
+
+* **query-orchestrator:** introduce unload without temp table ([#5324](https://github.com/cube-js/cube.js/issues/5324)) ([3dcbd2e](https://github.com/cube-js/cube.js/commit/3dcbd2ed1d214d56bfde2183538fce3ec7d65595))
+
+
+
+
+
+## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
+
+
+### Bug Fixes
+
+* Cannot read 'map' property of undefined for `rollupLambda` in BigQuery ([47f700f](https://github.com/cube-js/cube.js/commit/47f700fbece156f0d32ba4a9854ecb826bc4641b))
+
+
+
+
+
+## [0.30.73](https://github.com/cube-js/cube.js/compare/v0.30.72...v0.30.73) (2022-09-19)
+
+
+### Reverts
+
+* Revert "feat: strategy without creating temp table (#5299)" ([0a3d646](https://github.com/cube-js/cube.js/commit/0a3d6464c660d34742cfd08570c25284e03a3d14)), closes [#5299](https://github.com/cube-js/cube.js/issues/5299)
+
+
+
+
+
+## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
+
+
+### Features
+
+* strategy without creating temp table ([#5299](https://github.com/cube-js/cube.js/issues/5299)) ([8e8f500](https://github.com/cube-js/cube.js/commit/8e8f500216e85676a971b62b57c5af0e48c6a9f9))
+
+
+
+
+
+## [0.30.70](https://github.com/cube-js/cube.js/compare/v0.30.69...v0.30.70) (2022-09-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.30.69](https://github.com/cube-js/cube.js/compare/v0.30.68...v0.30.69) (2022-09-13)
+
+
+### Bug Fixes
+
+* migrate base driver to ts ([#5233](https://github.com/cube-js/cube.js/issues/5233)) ([c24f545](https://github.com/cube-js/cube.js/commit/c24f5450d68896e06ef6830d9348c0370c22b34c))
+
+
+### Features
+
+* **base-driver:** Split BaseDriver to @cubejs-backend/base-driver ([#5283](https://github.com/cube-js/cube.js/issues/5283)) ([ca7f9d2](https://github.com/cube-js/cube.js/commit/ca7f9d280c3518e012683c23b82175ec1f96d2a8))
+
+
+
+
+
 ## [0.30.63](https://github.com/cube-js/cube.js/compare/v0.30.62...v0.30.63) (2022-09-05)
 
 

@@ -1,7 +1,19 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `MSSqlDriver` and related types declaration.
+ */
+
+const {
+  getEnv,
+  assertDataSource,
+} = require('@cubejs-backend/shared');
 const sql = require('mssql');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
+
 
 const GenericTypeToMSSql = {
+  boolean: 'bit',
   string: 'nvarchar(max)',
   text: 'nvarchar(max)',
   timestamp: 'datetime2',
@@ -9,10 +21,14 @@ const GenericTypeToMSSql = {
 };
 
 const MSSqlToGenericType = {
+  bit: 'boolean',
   uniqueidentifier: 'uuid',
   datetime2: 'timestamp'
 }
 
+/**
+ * MS SQL driver class.
+ */
 class MSSqlDriver extends BaseDriver {
   /**
    * Returns default concurrency value.
@@ -21,23 +37,33 @@ class MSSqlDriver extends BaseDriver {
     return 2;
   }
 
+  /**
+   * Class constructor.
+   */
   constructor(config = {}) {
     super();
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
     this.config = {
-      server: process.env.CUBEJS_DB_HOST,
-      database: process.env.CUBEJS_DB_NAME,
-      port: process.env.CUBEJS_DB_PORT && parseInt(process.env.CUBEJS_DB_PORT, 10),
-      user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
-      domain: process.env.CUBEJS_DB_DOMAIN && process.env.CUBEJS_DB_DOMAIN.trim().length > 0 ?
-        process.env.CUBEJS_DB_DOMAIN : undefined,
+      server: getEnv('dbHost', { dataSource }),
+      database: getEnv('dbName', { dataSource }),
+      port: getEnv('dbPort', { dataSource }),
+      user: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
+      domain: getEnv('dbDomain', { dataSource }),
       requestTimeout: 10 * 60 * 1000, // 10 minutes
       options: {
-        encrypt: process.env.CUBEJS_DB_SSL === 'true',
+        encrypt: getEnv('dbSsl', { dataSource }),
         useUTC: false
       },
       pool: {
-        max: config.maxPoolSize || 8,
+        max:
+          config.maxPoolSize ||
+          getEnv('dbMaxPoolSize', { dataSource }) ||
+          8,
         min: 0,
         evictionRunIntervalMillis: 10000,
         softIdleTimeoutMillis: 30000,
@@ -52,6 +78,8 @@ class MSSqlDriver extends BaseDriver {
   }
 
   static driverEnvVariables() {
+    // TODO (buntarb): check how this method can/must be used with split
+    // names by the data source.
     return [
       'CUBEJS_DB_HOST', 'CUBEJS_DB_NAME', 'CUBEJS_DB_PORT', 'CUBEJS_DB_USER', 'CUBEJS_DB_PASS', 'CUBEJS_DB_DOMAIN'
     ];

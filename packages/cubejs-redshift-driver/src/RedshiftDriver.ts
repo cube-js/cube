@@ -1,6 +1,12 @@
-import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { DownloadTableCSVData, UnloadOptions } from '@cubejs-backend/query-orchestrator';
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `RedshiftDriver` and related types declaration.
+ */
+
 import { getEnv } from '@cubejs-backend/shared';
+import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
+import { DownloadTableCSVData, UnloadOptions } from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -30,6 +36,9 @@ export interface RedshiftDriverConfiguration extends PostgresDriverConfiguration
   exportBucket?: RedshiftDriverExportAWS;
 }
 
+/**
+ * Redshift driver class.
+ */
 export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> {
   /**
    * Returns default concurrency value.
@@ -38,34 +47,50 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     return 4;
   }
 
-  public constructor(options: RedshiftDriverConfiguration = {}) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    options: RedshiftDriverConfiguration & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {}
+  ) {
     super(options);
   }
 
-  protected getInitialConfiguration(): Partial<RedshiftDriverConfiguration> {
+  /**
+   * @override
+   */
+  protected getInitialConfiguration(
+    dataSource: string,
+  ): Partial<RedshiftDriverConfiguration> {
     return {
       // @todo It's not possible to support UNLOAD in readOnly mode, because we need column types (CREATE TABLE?)
       readOnly: false,
-      exportBucket: this.getExportBucket(),
+      exportBucket: this.getExportBucket(dataSource),
     };
   }
 
-  protected getExportBucket(): RedshiftDriverExportAWS | undefined {
+  protected getExportBucket(
+    dataSource: string,
+  ): RedshiftDriverExportAWS | undefined {
     const supportedBucketTypes = ['s3'];
 
     const requiredExportBucket: Partial<RedshiftDriverExportRequiredAWS> = {
       bucketType: getEnv('dbExportBucketType', {
-        supported: supportedBucketTypes
+        supported: supportedBucketTypes,
+        dataSource,
       }),
-      bucketName: getEnv('dbExportBucket'),
-      region: getEnv('dbExportBucketAwsRegion'),
+      bucketName: getEnv('dbExportBucket', { dataSource }),
+      region: getEnv('dbExportBucketAwsRegion', { dataSource }),
     };
 
     const exportBucket: Partial<RedshiftDriverExportAWS> = {
       ...requiredExportBucket,
-      keyId: getEnv('dbExportBucketAwsKey'),
-      secretKey: getEnv('dbExportBucketAwsSecret'),
-      unloadArn: getEnv('dbExportBucketRedshiftArn')
+      keyId: getEnv('dbExportBucketAwsKey', { dataSource }),
+      secretKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
+      unloadArn: getEnv('redshiftUnloadArn', { dataSource }),
     };
 
     if (exportBucket.bucketType) {

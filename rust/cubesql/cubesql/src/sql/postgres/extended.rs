@@ -154,6 +154,7 @@ impl fmt::Debug for InExecutionStreamState {
 
 #[derive(Debug)]
 pub enum PortalState {
+    Empty,
     Prepared(PreparedState),
     #[allow(dead_code)]
     InExecutionFrame(InExecutionFrameState),
@@ -189,15 +190,33 @@ impl Portal {
         }
     }
 
+    pub fn new_empty(format: protocol::Format, from: PortalFrom) -> Self {
+        Self {
+            format,
+            from,
+            state: Some(PortalState::Empty),
+        }
+    }
+
     pub fn get_description(&self) -> Result<Option<protocol::RowDescription>, ConnectionError> {
         match &self.state {
             Some(PortalState::Prepared(state)) => state.plan.to_row_description(self.format),
             Some(PortalState::InExecutionFrame(state)) => Ok(state.description.clone()),
             Some(PortalState::InExecutionStream(state)) => Ok(state.description.clone()),
             Some(PortalState::Finished(state)) => Ok(state.description.clone()),
-            _ => Err(ConnectionError::Cube(CubeError::internal(
+            Some(PortalState::Empty) => Err(ConnectionError::Cube(CubeError::internal(
+                "Unable to get description on empty Portal. It's a bug.".to_string(),
+            ))),
+            None => Err(ConnectionError::Cube(CubeError::internal(
                 "Unable to get description on Portal without state. It's a bug.".to_string(),
             ))),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match &self.state {
+            Some(PortalState::Empty) => true,
+            _ => false,
         }
     }
 
@@ -386,7 +405,16 @@ impl Portal {
             .state
             .take()
             .ok_or_else(|| CubeError::internal("Unable to take portal state".to_string()))?;
+
         match state {
+            PortalState::Empty => {
+                self.state = Some(PortalState::Empty);
+
+                Err(
+                    CubeError::internal("Unable to execute empty portal, it's a bug".to_string())
+                        .into(),
+                )
+            }
             PortalState::Prepared(state) => {
                 let description = state.plan.to_row_description(self.format)?;
                 match state.plan {

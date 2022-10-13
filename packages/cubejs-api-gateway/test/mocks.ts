@@ -79,14 +79,17 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
           measures: [
             {
               name: 'Foo.bar',
+              isVisible: true,
             },
           ],
           dimensions: [
             {
               name: 'Foo.id',
+              isVisible: true,
             },
             {
               name: 'Foo.time',
+              isVisible: true,
             },
           ],
         },

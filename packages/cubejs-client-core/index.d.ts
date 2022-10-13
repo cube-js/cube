@@ -151,7 +151,7 @@ declare module '@cubejs-client/core' {
     measureToLeafMeasures?: Record<string, LeafMeasure[]>;
   };
 
-  export type PreAggregationType = 'rollup' | 'rollupJoin' | 'originalSql';
+  export type PreAggregationType = 'rollup' | 'rollupJoin' | 'rollupLambda' | 'originalSql';
 
   type UsedPreAggregation = {
     targetTableName: string;

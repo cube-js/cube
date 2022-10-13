@@ -33,8 +33,8 @@ use datafusion::{
     logical_plan::{
         build_join_schema, build_table_udf_schema, exprlist_to_fields, normalize_cols,
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
-        CrossJoin, DFField, DFSchema, DFSchemaRef, EmptyRelation, Expr, Limit, LogicalPlan,
-        LogicalPlanBuilder, TableScan, Union,
+        CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct, EmptyRelation, Expr, Limit,
+        LogicalPlan, LogicalPlanBuilder, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
@@ -449,6 +449,10 @@ impl LogicalPlanToLanguageConverter {
                 } else {
                     panic!("Unsupported extension node: {}", ext.node.schema());
                 }
+            }
+            LogicalPlan::Distinct(distinct) => {
+                let input = self.add_logical_plan(distinct.input.as_ref())?;
+                self.graph.add(LogicalPlanLanguage::Distinct([input]))
             }
             // TODO: Support all
             _ => unimplemented!("Unsupported node type: {:?}", plan),
@@ -934,12 +938,6 @@ impl LanguageToLogicalPlanConverter {
             // LogicalPlan::Repartition { input, partitioning_scheme: _ } => {
             //     let input = self.add_logical_plan(input.as_ref())?;
             //     self.graph.add(LogicalPlanLanguage::Repartition([input]))
-            // }
-            // LogicalPlan::Union { inputs, schema: _, alias } => {
-            //     let inputs = inputs.iter().map(|e| self.add_logical_plan(e)).collect::<Result<Vec<_>, _>>()?;
-            //     let inputs = self.graph.add(LogicalPlanLanguage::UnionInputs(inputs));
-            //     let alias = self.graph.add(LogicalPlanLanguage::UnionAlias(UnionAlias(alias.clone())));
-            //     self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
             // }
             LogicalPlanLanguage::Subquery(params) => {
                 let input = self.to_logical_plan(params[0])?;
@@ -1476,13 +1474,12 @@ impl LanguageToLogicalPlanConverter {
                     .map(|n| self.to_logical_plan(n))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let schema = inputs[0].schema().as_ref().clone();
-
                 let alias = match_data_node!(node_by_id, params[1], UnionAlias);
 
+                let schema = inputs[0].schema().as_ref().clone();
                 let schema = match alias {
                     Some(ref alias) => schema.replace_qualifier(alias.as_str()),
-                    None => schema,
+                    None => schema.strip_qualifiers(),
                 };
 
                 LogicalPlan::Union(Union {
@@ -1490,6 +1487,11 @@ impl LanguageToLogicalPlanConverter {
                     schema: Arc::new(schema),
                     alias,
                 })
+            }
+            LogicalPlanLanguage::Distinct(params) => {
+                let input = Arc::new(self.to_logical_plan(params[0])?);
+
+                LogicalPlan::Distinct(Distinct { input })
             }
             x => panic!("Unexpected logical plan node: {:?}", x),
         })

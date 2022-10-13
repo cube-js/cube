@@ -1,9 +1,19 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `FireboltDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import {
   BaseDriver,
   DriverInterface,
   StreamTableData,
   DownloadTableCSVData,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import {
   Firebolt,
   ConnectionOptions,
@@ -13,6 +23,7 @@ import {
   Row,
   isNumberType
 } from 'firebolt-sdk';
+import { version } from 'firebolt-sdk/package.json';
 import { FireboltQuery } from './FireboltQuery';
 
 export type FireboltDriverConfiguration = {
@@ -27,6 +38,9 @@ const FireboltTypeToGeneric: Record<string, string> = {
 
 const COMPLEX_TYPE = /(nullable|array)\((.+)\)/;
 
+/**
+ * Firebolt driver class.
+ */
 export class FireboltDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns default concurrency value.
@@ -41,23 +55,41 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
   private connection: Promise<Connection> | null = null;
 
-  public constructor(config: Partial<FireboltDriverConfiguration> = {}) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: Partial<FireboltDriverConfiguration> & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {},
+  ) {
     super(config);
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
 
     this.config = {
       readOnly: true,
-      apiEndpoint: process.env.CUBEJS_FIREBOLT_API_ENDPOINT,
+      apiEndpoint: getEnv('fireboltApiEndpoint', { dataSource }),
       ...config,
       connection: {
-        username: <string>process.env.CUBEJS_DB_USER,
-        password: <string>process.env.CUBEJS_DB_PASS,
-        database: <string>process.env.CUBEJS_DB_NAME,
+        username: getEnv('dbUser', { dataSource }),
+        password: getEnv('dbPass', { dataSource }),
+        database: getEnv('dbName', { dataSource }),
         // The propery `account` is deprecated according to Firebolt SDK docs
         // and will be removed in the future.
         // account: <string>process.env.CUBEJS_FIREBOLT_ACCOUNT,
-        engineName: <string>process.env.CUBEJS_FIREBOLT_ENGINE_NAME,
+        engineName: getEnv('fireboltEngineName', { dataSource }),
         // engineEndpoint was deprecated in favor of engineName + account
-        engineEndpoint: <string>process.env.CUBEJS_FIREBOLT_ENGINE_ENDPOINT,
+        engineEndpoint: getEnv('fireboltEngineEndpoint', { dataSource }),
+        additionalParameters: {
+          userClients: [{
+            name: 'CubeDev+Cube',
+            version,
+          }]
+        },
         ...(config.connection || {}),
       },
     };
@@ -193,11 +225,11 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
         types,
       };
     } catch (error) {
-      if (error.status === 401 && retry) {
+      if ((<any>error).status === 401 && retry) {
         this.connection = null;
         return this.streamResponse(query, parameters, false);
       }
-      if (error.status === 404 && retry) {
+      if ((<any>error).status === 404 && retry) {
         await this.ensureEngineRunning();
         return this.streamResponse(query, parameters, false);
       }
@@ -231,11 +263,11 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       const response = await statement.fetchResult();
       return response;
     } catch (error) {
-      if (error.status === 401 && retry) {
+      if ((<any>error).status === 401 && retry) {
         this.connection = null;
         return this.queryResponse(query, parameters, false);
       }
-      if (error.status === 404 && retry) {
+      if ((<any>error).status === 404 && retry) {
         await this.ensureEngineRunning();
         return this.queryResponse(query, parameters, false);
       }

@@ -1,4 +1,13 @@
-/* eslint-disable no-restricted-syntax */
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `ClickHouseDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import {
   BaseDriver,
   DownloadQueryResultsOptions,
@@ -6,8 +15,7 @@ import {
   DriverInterface,
   StreamOptions,
   StreamTableDataWithTypes,
-} from '@cubejs-backend/query-orchestrator';
-import { getEnv } from '@cubejs-backend/shared';
+} from '@cubejs-backend/base-driver';
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';
 import sqlstring from 'sqlstring';
@@ -45,9 +53,11 @@ interface ClickHouseDriverOptions {
   database?: string,
   readOnly?: boolean,
   queryOptions?: object,
-  maxPoolSize?: number,
 }
 
+/**
+ * ClickHouse driver class.
+ */
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns default concurrency value.
@@ -62,20 +72,44 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   protected readonly config: any;
 
-  public constructor(config: ClickHouseDriverOptions = {}) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: ClickHouseDriverOptions & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {},
+  ) {
     super();
 
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
     this.config = {
-      host: process.env.CUBEJS_DB_HOST,
-      port: process.env.CUBEJS_DB_PORT,
-      auth: process.env.CUBEJS_DB_USER || process.env.CUBEJS_DB_PASS ? `${process.env.CUBEJS_DB_USER}:${process.env.CUBEJS_DB_PASS}` : '',
-      protocol: getEnv('dbSsl') ? 'https:' : 'http:',
+      host: getEnv('dbHost', { dataSource }),
+      port: getEnv('dbPort', { dataSource }),
+      auth:
+        getEnv('dbUser', { dataSource }) ||
+        getEnv('dbPass', { dataSource })
+          ? `${
+            getEnv('dbUser', { dataSource })
+          }:${
+            getEnv('dbPass', { dataSource })
+          }`
+          : '',
+      protocol: getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:',
       queryOptions: {
-        database: process.env.CUBEJS_DB_NAME || config && config.database || 'default'
+        database:
+          getEnv('dbName', { dataSource }) ||
+          config && config.database ||
+          'default'
       },
       ...config
     };
-    this.readOnlyMode = process.env.CUBEJS_DB_CLICKHOUSE_READONLY === 'true';
+    this.readOnlyMode =
+      getEnv('clickhouseReadOnly', { dataSource }) === 'true';
     this.pool = genericPool.createPool({
       create: async () => new ClickHouse({
         ...this.config,
@@ -95,7 +129,10 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       destroy: () => Promise.resolve()
     }, {
       min: 0,
-      max: this.config.maxPoolSize || 8,
+      max:
+        config.maxPoolSize ||
+        getEnv('dbMaxPoolSize', { dataSource }) ||
+        8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

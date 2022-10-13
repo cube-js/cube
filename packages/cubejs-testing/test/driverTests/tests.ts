@@ -1206,3 +1206,14 @@ export const queryingEcommerceTotalQuantifyAvgDiscountTotal = driverTestWithErro
   schemas: commonSchemas,
   skip: true
 });
+
+export const hiddenMember = driverTestWithError({
+  name: 'hidden member',
+  query: {
+    measures: [
+      'ECommerce.hiddenSum'
+    ]
+  },
+  schemas: commonSchemas,
+  expectArray: [(e) => expect(e.toString()).toMatch(/hidden/)],
+});

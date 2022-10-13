@@ -844,6 +844,7 @@ describe('transformData helpers', () => {
         data.query as unknown as NormalizedQuery,
         data.data as { [sqlAlias: string]: DBResponseValue }[],
         data.aliasToMemberNameMap,
+        data.annotation,
       );
     }).toThrow(
       'You requested hidden member: \'e_commerce_records_us2021__postal_code\'. ' +
@@ -862,6 +863,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     )).toEqual({});
 
     data = JSON.parse(
@@ -872,6 +874,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     )).toEqual({
       'ECommerceRecordsUs2021.postalCode': 'e_commerce_records_us2021__postal_code',
       'ECommerceRecordsUs2021.avg_profit': 'e_commerce_records_us2021__avg_profit'
@@ -887,6 +890,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     )).toEqual({});
 
     data = JSON.parse(
@@ -897,6 +901,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     )).toEqual({
       'ECommerceRecordsUs2021.orderDate.day': 'e_commerce_records_us2021__order_date_day',
       'ECommerceRecordsUs2021.orderDate': 'e_commerce_records_us2021__order_date_day',
@@ -912,6 +917,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     )).toEqual({
       'ECommerceRecordsUs2021.orderDate.day': 'e_commerce_records_us2021__order_date_day',
       'ECommerceRecordsUs2021.orderDate': 'e_commerce_records_us2021__order_date_day',
@@ -933,6 +939,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     )).toEqual({});
 
     data = JSON.parse(
@@ -947,6 +954,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     )).toEqual({
       'ECommerceRecordsUs2021.orderDate.month': 'e_commerce_records_us2021__order_date_month',
       'ECommerceRecordsUs2021.orderDate': 'e_commerce_records_us2021__order_date_month',
@@ -966,6 +974,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     )).toEqual({
       'ECommerceRecordsUs2021.orderDate.month': 'e_commerce_records_us2021__order_date_month',
       'ECommerceRecordsUs2021.orderDate': 'e_commerce_records_us2021__order_date_month',
@@ -988,6 +997,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     );
     members = Object.keys(membersMap);
     expect(getCompactRow(
@@ -1007,6 +1017,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     );
     members = Object.keys(membersMap);
     expect(getCompactRow(
@@ -1027,6 +1038,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     );
     members = Object.keys(membersMap);
     expect(getCompactRow(
@@ -1051,6 +1063,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     );
     members = Object.keys(membersMap);
     expect(getCompactRow(
@@ -1076,6 +1089,7 @@ describe('transformData helpers', () => {
       data.query as unknown as NormalizedQuery,
       data.data as { [sqlAlias: string]: DBResponseValue }[],
       data.aliasToMemberNameMap,
+      data.annotation,
     );
     members = Object.keys(membersMap);
     expect(getCompactRow(

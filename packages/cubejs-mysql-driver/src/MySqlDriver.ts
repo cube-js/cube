@@ -1,3 +1,13 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `MySqlDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import mysql, { Connection, ConnectionConfig, FieldInfo, QueryOptions } from 'mysql';
 import genericPool from 'generic-pool';
 import { promisify } from 'util';
@@ -6,8 +16,12 @@ import {
   GenericDataBaseType,
   DriverInterface,
   StreamOptions,
-  DownloadQueryResultsOptions, TableStructure, DownloadTableData, IndexesSQL, DownloadTableMemoryData,
-} from '@cubejs-backend/query-orchestrator';
+  DownloadQueryResultsOptions,
+  TableStructure,
+  DownloadTableData,
+  IndexesSQL,
+  DownloadTableMemoryData,
+} from '@cubejs-backend/base-driver';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
   string: 'varchar(255) CHARACTER SET utf8mb4',
@@ -56,7 +70,6 @@ export interface MySqlDriverConfiguration extends ConnectionConfig {
   readOnly?: boolean,
   loadPreAggregationWithoutMetaLock?: boolean,
   storeTimezone?: string,
-  maxPoolSize?: number,
   pool?: any,
 }
 
@@ -64,6 +77,9 @@ interface MySQLConnection extends Connection {
   execute: (options: string | QueryOptions, values?: any) => Promise<any>
 }
 
+/**
+ * MySQL driver class.
+ */
 export class MySqlDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns default concurrency value.
@@ -76,25 +92,35 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
 
   protected readonly pool: genericPool.Pool<MySQLConnection>;
 
-  public constructor(config: MySqlDriverConfiguration = {}) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: MySqlDriverConfiguration & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {}
+  ) {
     super();
 
-    const { pool, ...restConfig } = config;
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
 
+    const { pool, ...restConfig } = config;
     this.config = {
-      host: process.env.CUBEJS_DB_HOST,
-      database: process.env.CUBEJS_DB_NAME,
-      port: <any>process.env.CUBEJS_DB_PORT,
-      user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
-      socketPath: process.env.CUBEJS_DB_SOCKET_PATH,
+      host: getEnv('dbHost', { dataSource }),
+      database: getEnv('dbName', { dataSource }),
+      port: getEnv('dbPort', { dataSource }),
+      user: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
+      socketPath: getEnv('dbSocketPath', { dataSource }),
       timezone: 'Z',
-      ssl: this.getSslOptions(),
+      ssl: this.getSslOptions(dataSource),
       dateStrings: true,
       readOnly: true,
       ...restConfig,
     };
-
     this.pool = genericPool.createPool({
       create: async () => {
         const conn: any = mysql.createConnection(this.config);
@@ -124,8 +150,9 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     }, {
       min: 0,
       max:
-        process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
-        config.maxPoolSize || 8,
+        config.maxPoolSize ||
+        getEnv('dbMaxPoolSize', { dataSource }) ||
+        8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

@@ -215,6 +215,9 @@ crate::plan_to_language! {
             aliases: Option<Vec<String>>,
             split: bool,
         },
+        Distinct {
+            input: Arc<LogicalPlan>,
+        },
         Measure {
             name: String,
             expr: Arc<Expr>,
@@ -508,11 +511,24 @@ fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
 }
 
 fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
-    format!(
-        "(ScalarUDFExpr ScalarUDFExprFun:{} {})",
-        fun_name,
-        list_expr("ScalarUDFExprArgs", args)
-    )
+    udf_expr_var_arg(fun_name, list_expr("ScalarUDFExprArgs", args))
+}
+
+fn udf_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
+    let prefix = if fun_name.to_string().starts_with("?") {
+        ""
+    } else {
+        "ScalarUDFExprFun:"
+    };
+    format!("(ScalarUDFExpr {}{} {})", prefix, fun_name, arg_list)
+}
+
+fn udf_fun_expr_args(left: impl Display, right: impl Display) -> String {
+    format!("(ScalarUDFExprArgs {} {})", left, right)
+}
+
+fn udf_fun_expr_args_empty_tail() -> String {
+    "ScalarUDFExprArgs".to_string()
 }
 
 fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
@@ -520,7 +536,12 @@ fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
 }
 
 fn fun_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
-    format!("(ScalarFunctionExpr {} {})", fun_name, arg_list)
+    let prefix = if fun_name.to_string().starts_with("?") {
+        ""
+    } else {
+        "ScalarFunctionExprFun:"
+    };
+    format!("(ScalarFunctionExpr {}{} {})", prefix, fun_name, arg_list)
 }
 
 fn scalar_fun_expr_args(left: impl Display, right: impl Display) -> String {
@@ -597,7 +618,12 @@ fn to_day_interval_expr<D: Display>(period: D, unit: D) -> String {
 }
 
 fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> String {
-    format!("(BinaryExpr {} {} {})", left, op, right)
+    let prefix = if op.to_string().starts_with("?") {
+        ""
+    } else {
+        "BinaryExprOp:"
+    };
+    format!("(BinaryExpr {} {}{} {})", left, prefix, op, right)
 }
 
 fn inlist_expr(expr: impl Display, list: impl Display, negated: impl Display) -> String {

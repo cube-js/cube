@@ -266,7 +266,8 @@ type OidType = UInt32Type;
 // TODO: Combine with downcast
 fn cast_oid_arg(argument: &ArrayRef, name: &str) -> Result<ArrayRef> {
     match argument.data_type() {
-        DataType::Int32 | DataType::Int64 => {
+        // TODO: rm Utf8 && LargeUtf8 when Prepared Statements support integer types
+        DataType::Int32 | DataType::Int64 | DataType::Utf8 | DataType::LargeUtf8 => {
             cast(&argument, &DataType::UInt32).map_err(|err| err.into())
         }
         // We use UInt32 for OID
@@ -671,6 +672,35 @@ pub fn create_timediff_udf() -> ScalarUDF {
     ScalarUDF::new(
         "timediff",
         &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_ends_with_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let string_array = downcast_string_arg!(args[0], "string", i32);
+        let prefix_array = downcast_string_arg!(args[1], "prefix", i32);
+
+        let result = string_array
+            .iter()
+            .zip(prefix_array.iter())
+            .map(|(string, prefix)| match (string, prefix) {
+                (Some(string), Some(prefix)) => Some(string.ends_with(prefix)),
+                _ => None,
+            })
+            .collect::<BooleanArray>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "ends_with",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
         &return_type,
         &fun,
     )
@@ -1495,7 +1525,8 @@ pub fn create_format_type_udf() -> ScalarUDF {
         let tmp = cast_oid_arg(&args[0], "oid")?;
         let oids = downcast_primitive_arg!(tmp, "oid", OidType);
         // TODO: See pg_attribute.atttypmod
-        let typemods = downcast_primitive_arg!(args[1], "typemod", Int64Type);
+        let typemods = cast(&args[1], &DataType::Int64)?;
+        let typemods = downcast_primitive_arg!(typemods, "typemod", Int64Type);
 
         let result = oids
             .iter()

@@ -11,9 +11,7 @@ use crate::{
         df_type_to_pg_tid,
         extended::{Cursor, Portal, PortalFrom},
         session::DatabaseProtocol,
-        statement::{
-            PostgresStatementParamsFinder, SensitiveDataSanitizer, StatementPlaceholderReplacer,
-        },
+        statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
         writer::BatchWriter,
         AuthContextRef, Session, StatusFlags,
@@ -21,6 +19,7 @@ use crate::{
     telemetry::ContextLogger,
     CubeError,
 };
+use futures::FutureExt;
 use log::{debug, error, trace};
 use pg_srv::{
     buffer, protocol,
@@ -35,7 +34,7 @@ pub struct AsyncPostgresShim {
     socket: TcpStream,
     // Extended query
     cursors: HashMap<String, Cursor>,
-    portals: HashMap<String, Option<Portal>>,
+    portals: HashMap<String, Portal>,
     // Shared
     session: Arc<Session>,
     logger: Arc<dyn ContextLogger>,
@@ -241,24 +240,19 @@ impl AsyncPostgresShim {
         // When an error is detected while processing any extended-query message, the backend issues ErrorResponse,
         // then reads and discards messages until a Sync is reached, then issues ReadyForQuery and returns to normal message processing.
         let mut tracked_error: Option<ConnectionError> = None;
-        let mut tracked_error_query: Option<String> = None;
 
         loop {
             let mut doing_extended_query_message = false;
 
-            let (result, query) = match buffer::read_message(&mut self.socket).await? {
-                protocol::FrontendMessage::Query(body) => {
-                    let query = body.query.clone();
-                    (self.process_query(body.query).await, Some(query))
-                }
-                protocol::FrontendMessage::Flush => (self.flush().await, None),
+            let result = match buffer::read_message(&mut self.socket).await? {
+                protocol::FrontendMessage::Query(body) => self.process_query(body.query).await,
+                protocol::FrontendMessage::Flush => self.flush().await,
                 protocol::FrontendMessage::Terminate => return Ok(()),
                 // Extended
                 protocol::FrontendMessage::Parse(body) => {
                     if tracked_error.is_none() {
                         doing_extended_query_message = true;
-                        let query = body.query.clone();
-                        (self.parse(body).await, Some(query))
+                        self.parse(body).await
                     } else {
                         continue;
                     }
@@ -266,7 +260,7 @@ impl AsyncPostgresShim {
                 protocol::FrontendMessage::Bind(body) => {
                     if tracked_error.is_none() {
                         doing_extended_query_message = true;
-                        (self.bind(body).await, None)
+                        self.bind(body).await
                     } else {
                         continue;
                     }
@@ -274,29 +268,28 @@ impl AsyncPostgresShim {
                 protocol::FrontendMessage::Execute(body) => {
                     if tracked_error.is_none() {
                         doing_extended_query_message = true;
-                        (self.execute(body).await, None)
+                        self.execute(body).await
                     } else {
                         continue;
                     }
                 }
                 protocol::FrontendMessage::Close(body) => {
                     if tracked_error.is_none() {
-                        (self.close(body).await, None)
+                        self.close(body).await
                     } else {
                         continue;
                     }
                 }
                 protocol::FrontendMessage::Describe(body) => {
                     if tracked_error.is_none() {
-                        (self.describe(body).await, None)
+                        self.describe(body).await
                     } else {
                         continue;
                     }
                 }
                 protocol::FrontendMessage::Sync => {
                     if let Some(err) = tracked_error.take() {
-                        self.handle_connection_error(err, tracked_error_query.take())
-                            .await?;
+                        self.handle_connection_error(err).await?;
                     };
 
                     self.write_ready().await?;
@@ -316,9 +309,8 @@ impl AsyncPostgresShim {
             if let Err(err) = result {
                 if doing_extended_query_message {
                     tracked_error = Some(err);
-                    tracked_error_query = query;
                 } else {
-                    self.handle_connection_error(err, query).await?;
+                    self.handle_connection_error(err).await?;
                 }
             }
         }
@@ -327,7 +319,6 @@ impl AsyncPostgresShim {
     pub async fn handle_connection_error(
         &mut self,
         err: ConnectionError,
-        query: Option<String>,
     ) -> Result<(), ConnectionError> {
         let (message, props) = match &err {
             ConnectionError::CompilationError(err) => match err {
@@ -349,32 +340,28 @@ impl AsyncPostgresShim {
             ),
         };
 
-        let mut props = props.unwrap_or_default();
-        match query {
-            Some(query) => {
-                if let Ok(statement) = parse_sql_to_statement(&query, DatabaseProtocol::PostgreSQL)
-                {
-                    props.insert(
-                        "sanitizedQuery".to_string(),
-                        SensitiveDataSanitizer::new()
-                            .replace(&statement)
-                            .to_string(),
-                    );
-                }
-                props.insert("query".to_string(), query);
-            }
-            _ => (),
-        }
-
-        self.logger.error(message.as_str(), Some(props));
-
         if let Some(bt) = err.backtrace() {
             trace!("{}", bt);
         } else {
             trace!("Backtrace: not found");
         }
 
-        self.write(err.to_error_response()).await?;
+        let err_response = match &props {
+            Some(props) => {
+                let query = props.get(&"query".to_string());
+                let mut err_response = err.to_error_response();
+                if let Some(query) = query {
+                    err_response.message = format!("{}\nQUERY: {}", message, query);
+                }
+
+                err_response
+            }
+            None => err.to_error_response(),
+        };
+
+        self.logger.error(message.as_str(), props);
+
+        self.write(err_response).await?;
 
         Ok(())
     }
@@ -591,26 +578,23 @@ impl AsyncPostgresShim {
     }
 
     pub async fn describe_portal(&mut self, name: String) -> Result<(), ConnectionError> {
-        match self.portals.get(&name) {
-            None => {
-                self.write(protocol::ErrorResponse::new(
-                    protocol::ErrorSeverity::Error,
-                    protocol::ErrorCode::InvalidCursorName,
-                    "missing cursor".to_string(),
-                ))
-                .await?;
-
-                return Ok(());
-            }
-            Some(portal) => match portal {
-                // We use None for Portal on empty query
-                None => self.write(protocol::NoData::new()).await,
-                Some(named) => match named.get_description()? {
+        if let Some(portal) = self.portals.get(&name) {
+            if portal.is_empty() {
+                self.write(protocol::NoData::new()).await
+            } else {
+                match portal.get_description()? {
                     // If Query doesnt return data, no fields in response.
                     None => self.write(protocol::NoData::new()).await,
                     Some(packet) => self.write(packet).await,
-                },
-            },
+                }
+            }
+        } else {
+            self.write(protocol::ErrorResponse::new(
+                protocol::ErrorSeverity::Error,
+                protocol::ErrorCode::InvalidCursorName,
+                "missing cursor".to_string(),
+            ))
+            .await
         }
     }
 
@@ -683,43 +667,39 @@ impl AsyncPostgresShim {
     /// https://github.com/postgres/postgres/blob/REL_14_4/src/backend/commands/portalcmds.c#L167
     pub async fn execute(&mut self, execute: protocol::Execute) -> Result<(), ConnectionError> {
         if let Some(portal) = self.portals.get_mut(&execute.portal) {
-            match portal {
-                // We use None for Statement on empty query
-                None => {
-                    self.write(protocol::EmptyQueryResponse::new()).await?;
-                }
-                Some(portal) => {
-                    let cancel = self
-                        .session
-                        .state
-                        .begin_query(format!("portal #{}", execute.portal));
-                    let mut writer = BatchWriter::new(portal.get_format());
+            if portal.is_empty() {
+                self.write(protocol::EmptyQueryResponse::new()).await?;
+            } else {
+                let cancel = self
+                    .session
+                    .state
+                    .begin_query(format!("portal #{}", execute.portal));
+                let mut writer = BatchWriter::new(portal.get_format());
 
-                    tokio::select! {
-                        _ = cancel.cancelled() => {
-                            self.session.state.end_query();
+                tokio::select! {
+                    _ = cancel.cancelled() => {
+                        self.session.state.end_query();
 
+                        return Err(protocol::ErrorResponse::query_canceled().into());
+                    },
+                    res = portal.execute(&mut writer, execute.max_rows as usize) => {
+                        self.session.state.end_query();
+
+                        // Unwrap result after ending query
+                        let completion = res?;
+
+                        if cancel.is_cancelled() {
                             return Err(protocol::ErrorResponse::query_canceled().into());
-                        },
-                        res = portal.execute(&mut writer, execute.max_rows as usize) => {
-                            self.session.state.end_query();
+                        }
 
-                            // Unwrap result after ending query
-                            let completion = res?;
+                        if writer.has_data() {
+                            buffer::write_direct(&mut self.socket, writer).await?
+                        }
 
-                            if cancel.is_cancelled() {
-                                return Err(protocol::ErrorResponse::query_canceled().into());
-                            }
-
-                            if writer.has_data() {
-                                buffer::write_direct(&mut self.socket, writer).await?
-                            }
-
-                            self.write_completion(completion).await?;
-                        },
-                    }
+                        self.write_completion(completion).await?;
+                    },
                 }
-            }
+            };
 
             Ok(())
         } else {
@@ -753,11 +733,12 @@ impl AsyncPostgresShim {
             )
         })?;
 
+        let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
         let portal = match source_statement {
             PreparedStatement::Empty { .. } => {
                 drop(statements_guard);
 
-                None
+                Portal::new_empty(format, PortalFrom::Extended)
             }
             PreparedStatement::Query { parameters, .. } => {
                 let prepared_statement =
@@ -778,8 +759,7 @@ impl AsyncPostgresShim {
                 )
                 .await?;
 
-                let format = body.result_formats.first().unwrap_or(&Format::Text).clone();
-                Some(Portal::new(plan, format, PortalFrom::Extended))
+                Portal::new(plan, format, PortalFrom::Extended)
             }
         };
 
@@ -1047,22 +1027,12 @@ impl AsyncPostgresShim {
                     }
                 };
 
-                if let Some(portal) = self.portals.remove(&name.value) {
-                    if let Some(mut portal) = portal {
-                        self.write_portal(&mut portal, limit, CancellationToken::new())
-                            .await?;
-                        self.portals.insert(name.value.clone(), Some(portal));
+                if let Some(mut portal) = self.portals.remove(&name.value) {
+                    self.write_portal(&mut portal, limit, CancellationToken::new())
+                        .await?;
+                    self.portals.insert(name.value.clone(), portal);
 
-                        return Ok(());
-                    } else {
-                        return Err(ConnectionError::Protocol(
-                            protocol::ErrorResponse::error(
-                                protocol::ErrorCode::InternalError,
-                                "Unable to unwrap Plan without plan, unexpected error".to_string(),
-                            )
-                            .into(),
-                        ));
-                    }
+                    return Ok(());
                 } else {
                     trace!(
                         r#"Unable to find portal for cursor: "{}". Maybe it was not created. Opening..."#,
@@ -1100,7 +1070,7 @@ impl AsyncPostgresShim {
                 let mut portal = Portal::new(plan, cursor.format, PortalFrom::Fetch);
 
                 self.write_portal(&mut portal, limit, cancel).await?;
-                self.portals.insert(name.value, Some(portal));
+                self.portals.insert(name.value, portal);
             }
             Statement::Declare {
                 name,
@@ -1383,7 +1353,17 @@ impl AsyncPostgresShim {
             self.write(protocol::EmptyQuery::new()).await?;
         } else {
             for statement in statements {
-                self.handle_simple_query(statement, meta.clone()).await?;
+                match std::panic::AssertUnwindSafe(
+                    self.handle_simple_query(statement, meta.clone()),
+                )
+                .catch_unwind()
+                .await
+                {
+                    Ok(res) => res?,
+                    Err(err) => {
+                        return Err(CubeError::panic(err).into());
+                    }
+                }
             }
         }
 
@@ -1394,7 +1374,7 @@ impl AsyncPostgresShim {
         debug!("Query: {}", query);
 
         if let Err(err) = self.execute_query(&query).await {
-            self.handle_connection_error(err, Some(query)).await?;
+            self.handle_connection_error(err).await?;
         };
 
         self.write_ready().await

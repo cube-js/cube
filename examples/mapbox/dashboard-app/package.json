@@ -4,7 +4,7 @@
   "private": true,
   "dependencies": {
     "@ant-design/icons": "^4.7.0",
-    "@cube-dev/example-wrapper": "^1.1.9",
+    "@cube-dev/example-wrapper": "^1.1.10",
     "@cubejs-client/core": "^0.30.29",
     "@cubejs-client/react": "^0.30.40",
     "@testing-library/jest-dom": "^5.16.4",

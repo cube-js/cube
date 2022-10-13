@@ -60,21 +60,23 @@ A simple configuration with two data sources might look like:
 module.exports = {
   driverFactory: ({ dataSource } = {}) => {
     if (dataSource === 'db1') {
-      return new PostgresDriver({
-        database: DB1_NAME,
-        host: DB1_HOST,
-        user: DB1_USER,
-        password: DB1_PASS,
-        port: DB1_PORT,
-      });
+      return {
+        type: 'postgres',
+        database: process.env.DB1_NAME,
+        host: process.env.DB1_HOST,
+        user: process.env.DB1_USER,
+        password: process.env.DB1_PASS,
+        port: process.env.DB1_PORT,
+      };
     } else {
-      return new PostgresDriver({
-        database: DB2_NAME,
-        host: DB2_HOST,
-        user: DB2_USER,
-        password: DB2_PASS,
-        port: DB2_PORT,
-      });
+      return {
+        type: 'postgres',
+        database: process.env.DB2_NAME,
+        host: process.env.DB2_HOST,
+        user: process.env.DB2_USER,
+        password: process.env.DB2_PASS,
+        port: process.env.DB2_PORT,
+      };
     }
   },
 };
@@ -231,17 +233,15 @@ schema or data of one tenant being used for another.
 **cube.js:**
 
 ```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-
 module.exports = {
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
   contextToOrchestratorId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
-  driverFactory: ({ securityContext }) =>
-    new PostgresDriver({
-      database: `my_app_${securityContext.appId}_${securityContext.userId}`,
-    }),
+  driverFactory: ({ securityContext }) => ({
+    type: 'postgres',
+    database: `my_app_${securityContext.appId}_${securityContext.userId}`,
+  }),
 };
 ```
 
@@ -280,9 +280,6 @@ to dynamically set a repository with schema files depending on the `appId`:
 **cube.js:**
 
 ```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-const MongoBIDriver = require('@cubejs-backend/mongobi-driver');
-
 module.exports = {
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
@@ -320,15 +317,14 @@ setup.
 
 ```javascript
 const AWSHandlers = require('@cubejs-backend/serverless-aws');
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
 
 module.exports = new AWSHandlers({
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}`,
-  driverFactory: ({ securityContext }) =>
-    new PostgresDriver({
-      database: `my_app_${securityContext.appId}`,
-    }),
+  driverFactory: ({ securityContext }) => ({
+    type: 'postgres',
+    database: `my_app_${securityContext.appId}`,
+  }),
 });
 ```
 

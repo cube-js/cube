@@ -1,4 +1,13 @@
-/* eslint-disable no-restricted-syntax */
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `DatabricksDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import fs from 'fs';
 import path from 'path';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -10,14 +19,11 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import {
-  DownloadTableCSVData,
-} from '@cubejs-backend/query-orchestrator';
+import { DriverCapabilities, UnloadOptions, } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
-import { getEnv } from '@cubejs-backend/shared';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
@@ -26,7 +32,6 @@ const { version } = require('../../package.json');
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
     readOnly?: boolean,
-    maxPoolSize?: number,
     // common bucket config
     bucketType?: string,
     exportBucket?: string,
@@ -100,39 +105,60 @@ export class DatabricksDriver extends JDBCDriver {
     return 2;
   }
 
+  /**
+   * Class constructor.
+   */
   public constructor(
-    conf: Partial<DatabricksDriverConfiguration> = {},
+    conf: Partial<DatabricksDriverConfiguration> & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {},
   ) {
+    const dataSource =
+      conf.dataSource ||
+      assertDataSource('default');
+
     const config: DatabricksDriverConfiguration = {
       ...conf,
+      dbType: 'databricks',
       drivername: 'com.simba.spark.jdbc.Driver',
       customClassPath: undefined,
       properties: {
         // PWD-parameter passed to the connection string has higher priority,
         // so we can set this one to an empty string to avoid a Java error.
-        PWD: getEnv('databrickToken') || '',
-        // CUBEJS_DB_DATABRICKS_AGENT is a predefined way to override the user
-        // agent for the Cloud application.
-        UserAgentEntry: getEnv('databrickAgent') || `CubeDev+Cube/${version} (Databricks)`,
+        PWD: getEnv('databrickToken', { dataSource }) || '',
+        UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
       },
-      dbType: 'databricks',
-      database: getEnv('dbName', { required: false }),
-      url: getEnv('databrickUrl'),
+      database: getEnv('dbName', { required: false, dataSource }),
+      url: getEnv('databrickUrl', { dataSource }),
       // common export bucket config
       bucketType:
         conf?.bucketType ||
-        getEnv('dbExportBucketType', { supported: ['s3', 'azure'] }),
-      exportBucket: conf?.exportBucket || getEnv('dbExportBucket'),
-      exportBucketMountDir: conf?.exportBucketMountDir || getEnv('dbExportBucketMountDir'),
+        getEnv('dbExportBucketType', { supported: ['s3', 'azure'], dataSource }),
+      exportBucket:
+        conf?.exportBucket ||
+        getEnv('dbExportBucket', { dataSource }),
+      exportBucketMountDir:
+        conf?.exportBucketMountDir ||
+        getEnv('dbExportBucketMountDir', { dataSource }),
       pollInterval: (
-        conf?.pollInterval || getEnv('dbPollMaxInterval')
+        conf?.pollInterval ||
+        getEnv('dbPollMaxInterval', { dataSource })
       ) * 1000,
       // AWS export bucket config
-      awsKey: conf?.awsKey || getEnv('dbExportBucketAwsKey'),
-      awsSecret: conf?.awsSecret || getEnv('dbExportBucketAwsSecret'),
-      awsRegion: conf?.awsRegion || getEnv('dbExportBucketAwsRegion'),
+      awsKey:
+        conf?.awsKey ||
+        getEnv('dbExportBucketAwsKey', { dataSource }),
+      awsSecret:
+        conf?.awsSecret ||
+        getEnv('dbExportBucketAwsSecret', { dataSource }),
+      awsRegion:
+        conf?.awsRegion ||
+        getEnv('dbExportBucketAwsRegion', { dataSource }),
       // Azure export bucket
-      azureKey: conf?.azureKey || getEnv('dbExportBucketAzureKey'),
+      azureKey:
+        conf?.azureKey ||
+        getEnv('dbExportBucketAzureKey', { dataSource }),
     };
     super(config);
     this.config = config;
@@ -195,6 +221,23 @@ export class DatabricksDriver extends JDBCDriver {
     return result;
   }
 
+  private async queryColumnTypes(sql: string, params: unknown[]) {
+    const result = [];
+    // eslint-disable-next-line camelcase
+    const response = await this.query<{col_name: string; data_type: string}>(`DESCRIBE QUERY ${sql}`, params);
+
+    for (const column of response) {
+      // Databricks describe additional info by default after empty line.
+      if (column.col_name === '') {
+        break;
+      }
+
+      result.push({ name: column.col_name, type: this.toGenericType(column.data_type) });
+    }
+
+    return result;
+  }
+
   public async getTablesQuery(schemaName: string) {
     const response = await this.query(`SHOW TABLES IN ${this.quoteIdentifier(schemaName)}`, []);
 
@@ -205,13 +248,13 @@ export class DatabricksDriver extends JDBCDriver {
 
   protected async getTables(): Promise<ShowTableRow[]> {
     if (this.config.database) {
-      return <any> this.query(`SHOW TABLES IN ${this.quoteIdentifier(this.config.database)}`, []);
+      return <any> this.query<ShowTableRow>(`SHOW TABLES IN ${this.quoteIdentifier(this.config.database)}`, []);
     }
 
-    const databases: ShowDatabasesRow[] = await this.query('SHOW DATABASES', []);
+    const databases = await this.query<ShowDatabasesRow>('SHOW DATABASES', []);
 
-    const allTables: (ShowTableRow[])[] = await Promise.all(
-      databases.map(async ({ databaseName }) => this.query(
+    const allTables = await Promise.all(
+      databases.map(async ({ databaseName }) => this.query<ShowTableRow>(
         `SHOW TABLES IN ${this.quoteIdentifier(databaseName)}`,
         []
       ))
@@ -249,21 +292,22 @@ export class DatabricksDriver extends JDBCDriver {
     return this.config.exportBucket !== undefined;
   }
 
-  /**
-   * Saves pre-aggs table to the bucket and returns links to download
-   * results.
-   */
-  public async unload(
-    tableName: string,
-  ): Promise<DownloadTableCSVData> {
-    const types = await this.tableColumnTypes(tableName);
-    const columns = types.map(t => t.name).join(', ');
+  public async unload(tableName: string, options: UnloadOptions) {
+    if (!['azure', 's3'].includes(this.config.bucketType as string)) {
+      throw new Error(`Unsupported export bucket type: ${
+        this.config.bucketType
+      }`);
+    }
+
+    const types = options.query ?
+      await this.unloadWithSql(tableName, options.query.sql, options.query.params) :
+      await this.unloadWithTable(tableName);
+
     const pathname = `${this.config.exportBucket}/${tableName}.csv`;
     const csvFile = await this.getCsvFiles(
-      tableName,
-      columns,
       pathname,
     );
+
     return {
       csvFile,
       types,
@@ -272,21 +316,41 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Unload table to bucket using Databricks JDBC query and returns (async)
-   * csv files signed URLs array.
+   * Create table with query and unload it to bucket
+   */
+  private async unloadWithSql(tableName: string, sql: string, params: unknown[]) {
+    const types = await this.queryColumnTypes(sql, params);
+
+    await this.createExternalTableFromSql(tableName, sql, params);
+    
+    return types;
+  }
+
+  /**
+   * Create table from preaggregation table with location and unload it to bucket
+   */
+  private async unloadWithTable(tableName: string) {
+    const types = await this.tableColumnTypes(tableName);
+    const columns = types.map(t => t.name).join(', ');
+
+    await this.createExternalTableFromTable(tableName, columns);
+    
+    return types;
+  }
+
+  /**
+   * return csv files signed URLs array.
    */
   private async getCsvFiles(
-    table: string,
-    columns: string,
     pathname: string,
   ): Promise<string[]> {
     let res;
     switch (this.config.bucketType) {
       case 'azure':
-        res = await this.getAzureCsvFiles(table, columns, pathname);
+        res = await this.getSignedAzureUrls(pathname);
         break;
       case 's3':
-        res = await this.getS3CsvFiles(table, columns, pathname);
+        res = await this.getSignedS3Urls(pathname);
         break;
       default:
         throw new Error(`Unsupported export bucket type: ${
@@ -294,19 +358,6 @@ export class DatabricksDriver extends JDBCDriver {
         }`);
     }
     return res;
-  }
-
-  /**
-   * Saves specified table to the Azure blob storage and returns (async)
-   * csv files signed URLs array.
-   */
-  private async getAzureCsvFiles(
-    table: string,
-    columns: string,
-    pathname: string,
-  ): Promise<string[]> {
-    await this.createExternalTable(table, columns);
-    return this.getSignedAzureUrls(pathname);
   }
 
   /**
@@ -359,19 +410,6 @@ export class DatabricksDriver extends JDBCDriver {
         'Please check your export bucket configuration.');
     }
     return csvFile;
-  }
-
-  /**
-   * Saves specified table to the S3 bucket and returns (async) csv files
-   * signed URLs array.
-   */
-  private async getS3CsvFiles(
-    table: string,
-    columns: string,
-    pathname: string,
-  ): Promise<string[]> {
-    await this.createExternalTable(table, columns);
-    return this.getSignedS3Urls(pathname);
   }
 
   /**
@@ -430,14 +468,31 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
    */
-  private async createExternalTable(table: string, columns: string,) {
+  private async createExternalTableFromSql(table: string, sql: string, params: unknown[]) {
     await this.query(
       `
       CREATE TABLE ${table}_csv_export
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
+      OPTIONS (escape = '"')
+      AS (${sql})
+      `,
+      params,
+    );
+  }
+
+  private async createExternalTableFromTable(table: string, columns: string) {
+    await this.query(
+      `
+      CREATE TABLE ${table}_csv_export
+      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${table}.csv'
+      OPTIONS (escape = '"')
       AS SELECT ${columns} FROM ${table}
       `,
       [],
     );
+  }
+
+  public capabilities(): DriverCapabilities {
+    return { unloadWithoutTempTable: true };
   }
 }

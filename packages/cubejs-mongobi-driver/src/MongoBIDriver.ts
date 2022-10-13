@@ -1,19 +1,32 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `MongoBIDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import { createConnection, Connection, ConnectionOptions, RowDataPacket, Field } from 'mysql2';
 import genericPool, { Pool } from 'generic-pool';
-import {
-  BaseDriver, DownloadQueryResultsOptions,
-  DownloadQueryResultsResult,
-  DriverInterface, StreamOptions,
-} from '@cubejs-backend/query-orchestrator';
 import { Readable } from 'stream';
-
+import {
+  BaseDriver,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
+  DriverInterface,
+  StreamOptions,
+} from '@cubejs-backend/base-driver';
 import { getNativeTypeName } from './MySQLType';
 
 export interface MongoBIDriverConfiguration extends ConnectionOptions {
   storeTimezone?: string;
-  maxPoolSize?: number;
 }
 
+/**
+ * MongoBI driver class.
+ */
 export class MongoBIDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns default concurrency value.
@@ -26,26 +39,42 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
 
   protected readonly pool: Pool<Connection>;
 
-  public constructor(config: MongoBIDriverConfiguration = {}) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: MongoBIDriverConfiguration & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {}
+  ) {
     super();
 
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
     this.config = {
-      host: process.env.CUBEJS_DB_HOST,
-      database: process.env.CUBEJS_DB_NAME,
-      port: <any>process.env.CUBEJS_DB_PORT,
-      user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
-      ssl: this.getSslOptions(),
+      host: getEnv('dbHost', { dataSource }),
+      database: getEnv('dbName', { dataSource }),
+      port: getEnv('dbPort', { dataSource }),
+      user: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
+      ssl: this.getSslOptions(dataSource),
       authPlugins: {
         mysql_clear_password: () => async () => {
-          const password = config.password || process.env.CUBEJS_DB_PASS || '';
+          const password =
+            config.password ||
+            getEnv('dbPass', { dataSource }) ||
+            '';
           return Buffer.from((password).concat('\0')).toString();
         }
       },
       typeCast: (field: Field, next) => {
         if (field.type === 'DATETIME') {
           // Example value 1998-08-02 00:00:00
-          // Here we just omit Date parsing and avoiding Date.toString() done by driver. MongoBI original format is just fine.
+          // Here we just omit Date parsing and avoiding Date.toString()
+          // done by driver. MongoBI original format is just fine.
           return field.string();
         }
 
@@ -82,7 +111,10 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       }
     }, {
       min: 0,
-      max: this.config.maxPoolSize || 8,
+      max:
+        config.maxPoolSize ||
+        getEnv('dbMaxPoolSize', { dataSource }) ||
+        8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

@@ -4,13 +4,13 @@ import LRUCache from 'lru-cache';
 import { pipeline } from 'stream';
 import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 
+import { BaseDriver, InlineTables } from '@cubejs-backend/base-driver';
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { BaseDriver, InlineTables } from '../driver';
 import { PreAggregationDescription } from './PreAggregations';
 
 type QueryOptions = {
@@ -273,24 +273,19 @@ export class QueryCache {
   }
 
   private async csvQuery(client, q) {
-    const tableData = await client.stream(q.query, q.values, q);
+    const tableData = await client.downloadQueryResults(q.query, q.values, q);
     const headers = tableData.types.map(c => c.name);
     const writer = csvWriter({
       headers,
       sendHeaders: false,
     });
-    const errors = [];
-    const csvPipeline = await pipeline(tableData.rowStream, writer, (err) => {
-      if (err) {
-        errors.push(err);
-      }
-    });
-    const lines = await streamToArray(csvPipeline);
+    tableData.rows.forEach(
+      row => writer.write(row)
+    );
+    writer.end();
+    const lines = await streamToArray(writer);
     if (tableData.release) {
       await tableData.release();
-    }
-    if (errors.length > 0) {
-      throw new Error(`Lambda query errors ${errors.join(', ')}`);
     }
     const rowCount = lines.length;
     const csvRows = lines.join('');

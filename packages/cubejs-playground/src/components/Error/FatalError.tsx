@@ -14,8 +14,14 @@ export const Code = styled.pre`
   margin: 0;
 `;
 
+type CubeError = Error & {
+  response?: {
+    stack: string;
+  }
+}
+
 type FatalErrorProps = {
-  error: Error | string;
+  error: CubeError | string;
   stack?: string | null;
 };
 
@@ -25,6 +31,8 @@ export function FatalError({ error, stack }: FatalErrorProps) {
   const ansiHtmlError = useMemo(() => {
     return generateAnsiHTML(error.toString()).replace(/(Error:\s)/g, '');
   }, [error])
+  
+  const errorStack = stack || (typeof error !== 'string' ? error.response?.stack  : null);
 
   return (
     <Space direction="vertical">
@@ -54,15 +62,15 @@ export function FatalError({ error, stack }: FatalErrorProps) {
               }}
             />
 
-            {stack ? (
+            {errorStack ? (
               <>
                 {!visible ? (
-                  <Button danger ghost onClick={() => setVisible(true)}>
+                  <Button danger ghost size="small" onClick={() => setVisible(true)}>
                     Show stack trace
                   </Button>
                 ) : null}
 
-                {visible && <pre>{stack}</pre>}
+                {visible && <pre>{errorStack}</pre>}
               </>
             ) : null}
           </Space>

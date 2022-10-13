@@ -35,7 +35,7 @@ export class DruidQuery extends BaseQuery {
     const minutes = parseInt(hour, 10) * 60 + parseInt(minute, 10);
 
     if (minutes > 0) {
-      return `TIMESTAMPADD(MINUTES, ${minutes}, ${field})`;
+      return `TIMESTAMPADD(MINUTE, ${minutes}, ${field})`;
     }
 
     return field;

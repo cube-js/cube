@@ -3,6 +3,97 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.3](https://github.com/cube-js/cube.js/compare/v0.31.2...v0.31.3) (2022-10-08)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.31.2](https://github.com/cube-js/cube.js/compare/v0.31.1...v0.31.2) (2022-10-08)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.31.1](https://github.com/cube-js/cube.js/compare/v0.31.0...v0.31.1) (2022-10-04)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+# [0.31.0](https://github.com/cube-js/cube.js/compare/v0.30.75...v0.31.0) (2022-10-03)
+
+
+### Features
+
+* multiple data source ([#5326](https://github.com/cube-js/cube.js/issues/5326)) ([334af8c](https://github.com/cube-js/cube.js/commit/334af8c56cd02ae551844e9d1e9ab5e107fb1555))
+
+
+
+
+
+## [0.30.75](https://github.com/cube-js/cube.js/compare/v0.30.74...v0.30.75) (2022-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.30.74](https://github.com/cube-js/cube.js/compare/v0.30.73...v0.30.74) (2022-09-20)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.30.73](https://github.com/cube-js/cube.js/compare/v0.30.72...v0.30.73) (2022-09-19)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.30.72](https://github.com/cube-js/cube.js/compare/v0.30.71...v0.30.72) (2022-09-18)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.30.71](https://github.com/cube-js/cube.js/compare/v0.30.70...v0.30.71) (2022-09-16)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.30.70](https://github.com/cube-js/cube.js/compare/v0.30.69...v0.30.70) (2022-09-14)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
+## [0.30.69](https://github.com/cube-js/cube.js/compare/v0.30.68...v0.30.69) (2022-09-13)
+
+**Note:** Version bump only for package @cubejs-backend/server
+
+
+
+
+
 ## [0.30.68](https://github.com/cube-js/cube.js/compare/v0.30.67...v0.30.68) (2022-09-09)
 
 **Note:** Version bump only for package @cubejs-backend/server

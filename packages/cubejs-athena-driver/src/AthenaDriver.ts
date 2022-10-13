@@ -1,3 +1,16 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `AthenaDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+  checkNonNullable,
+  pausePromise,
+  Required,
+} from '@cubejs-backend/shared';
 import { Athena, GetQueryResultsCommandOutput } from '@aws-sdk/client-athena';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -8,8 +21,7 @@ import {
   DriverInterface,
   QueryOptions, StreamOptions,
   StreamTableData, TableName
-} from '@cubejs-backend/query-orchestrator';
-import { checkNonNullable, getEnv, pausePromise, Required } from '@cubejs-backend/shared';
+} from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
 import { URL } from 'url';
@@ -23,7 +35,6 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   exportBucket?: string
   pollTimeout?: number
   pollMaxInterval?: number
-  maxPoolSize?: number
 }
 
 type AthenaDriverOptionsInitialized = Required<AthenaDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
@@ -48,21 +59,56 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
   private athena: Athena;
 
-  public constructor(config: AthenaDriverOptions = {}) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: AthenaDriverOptions & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {},
+  ) {
     super();
 
-    const accessKeyId = config.accessKeyId || process.env.CUBEJS_AWS_KEY;
-    const secretAccessKey = config.secretAccessKey || process.env.CUBEJS_AWS_SECRET;
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
+    const accessKeyId =
+      config.accessKeyId ||
+      getEnv('athenaAwsKey', { dataSource });
+
+    const secretAccessKey =
+      config.secretAccessKey ||
+      getEnv('athenaAwsSecret', { dataSource });
 
     this.config = {
       ...config,
-      credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
-      region: config.region || process.env.CUBEJS_AWS_REGION,
-      S3OutputLocation: config.S3OutputLocation || process.env.CUBEJS_AWS_S3_OUTPUT_LOCATION,
-      workGroup: config.workGroup || process.env.CUBEJS_AWS_ATHENA_WORKGROUP || 'primary',
-      exportBucket: config.exportBucket || getEnv('dbExportBucket'),
-      pollTimeout: (config.pollTimeout || getEnv('dbPollTimeout') || getEnv('dbQueryTimeout')) * 1000,
-      pollMaxInterval: (config.pollMaxInterval || getEnv('dbPollMaxInterval')) * 1000,
+      credentials: accessKeyId && secretAccessKey
+        ? { accessKeyId, secretAccessKey }
+        : undefined,
+      region:
+        config.region ||
+        getEnv('athenaAwsRegion', { dataSource }),
+      S3OutputLocation:
+        config.S3OutputLocation ||
+        getEnv('athenaAwsS3OutputLocation', { dataSource }),
+      workGroup:
+        config.workGroup ||
+        getEnv('athenaAwsWorkgroup', { dataSource }) ||
+        'primary',
+      exportBucket:
+        config.exportBucket ||
+        getEnv('dbExportBucket', { dataSource }),
+      pollTimeout: (
+        config.pollTimeout ||
+        getEnv('dbPollTimeout', { dataSource }) ||
+        getEnv('dbQueryTimeout', { dataSource })
+      ) * 1000,
+      pollMaxInterval: (
+        config.pollMaxInterval ||
+        getEnv('dbPollMaxInterval', { dataSource })
+      ) * 1000,
     };
     if (this.config.exportBucket) {
       this.config.exportBucket = AthenaDriver.normalizeS3Path(this.config.exportBucket);
@@ -85,6 +131,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);

@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.64",
+  "version": "0.31.1",
   "engines": {},
   "repository": {
     "type": "git",
@@ -14,7 +14,7 @@
     "unit": "react-scripts test",
     "dev": "kill-port 3080 && yarn start",
     "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
-    "watch": "rollup -c -w",
+    "watch": "tsc --noEmit false --watch",
     "build": "yarn build:playground && yarn build:lib",
     "build:lib": "tsc --noEmit false && node postbuild.js && cp -R src/img/ lib/img/",
     "build:playground": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
@@ -66,8 +66,8 @@
     "@ant-design/icons": "^4.7.0",
     "@babel/cli": "^7.5.5",
     "@babel/plugin-proposal-optional-chaining": "^7.11.0",
-    "@cubejs-client/core": "^0.30.64",
-    "@cubejs-client/react": "^0.30.64",
+    "@cubejs-client/core": "^0.31.0",
+    "@cubejs-client/react": "^0.31.0",
     "@types/flexsearch": "^0.7.3",
     "@types/jest": "^26.0.20",
     "@types/node": "^14.14.35",

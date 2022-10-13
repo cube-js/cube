@@ -1,4 +1,13 @@
-/* eslint-disable no-restricted-syntax */
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `SnowflakeDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import snowflake, { Column, Connection, Statement } from 'snowflake-sdk';
 import {
   BaseDriver, DownloadTableCSVData,
@@ -6,14 +15,12 @@ import {
   GenericDataBaseType,
   StreamTableData,
   UnloadOptions,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import * as crypto from 'crypto';
 import { formatToTimeZone } from 'date-fns-timezone';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Storage } from '@google-cloud/storage';
-import { getEnv } from '@cubejs-backend/shared';
-
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 // eslint-disable-next-line import/order
@@ -134,9 +141,12 @@ interface SnowflakeDriverOptions {
   resultPrefetch?: number,
   exportBucket?: SnowflakeDriverExportBucket,
   executionTimeout?: number,
+  application: string,
 }
 
 /**
+ * Snowflake driver class.
+ *
  * Attention:
  * Snowflake is using UPPER_CASE for table, schema and column names
  * Similar to data in response, column_name will be COLUMN_NAME
@@ -153,50 +163,67 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   protected readonly config: SnowflakeDriverOptions;
 
-  public constructor(config: Partial<SnowflakeDriverOptions> = {}) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: Partial<SnowflakeDriverOptions> & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {}
+  ) {
     super();
 
-    let privateKey = process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY;
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
+    let privateKey = getEnv('snowflakePrivateKey', { dataSource });
     if (privateKey && !privateKey.endsWith('\n')) {
       privateKey += '\n';
     }
+
     this.config = {
-      account: <string>process.env.CUBEJS_DB_SNOWFLAKE_ACCOUNT,
-      region: process.env.CUBEJS_DB_SNOWFLAKE_REGION,
-      warehouse: process.env.CUBEJS_DB_SNOWFLAKE_WAREHOUSE,
-      role: process.env.CUBEJS_DB_SNOWFLAKE_ROLE,
-      clientSessionKeepAlive: process.env.CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE === 'true',
-      database: process.env.CUBEJS_DB_NAME,
-      username: <string>process.env.CUBEJS_DB_USER,
-      password: <string>process.env.CUBEJS_DB_PASS,
-      authenticator: process.env.CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR,
-      privateKeyPath: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH,
-      privateKeyPass: process.env.CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS,
+      account: getEnv('snowflakeAccount', { dataSource }),
+      region: getEnv('snowflakeRegion', { dataSource }),
+      warehouse: getEnv('snowflakeWarehouse', { dataSource }),
+      role: getEnv('snowflakeRole', { dataSource }),
+      clientSessionKeepAlive: getEnv('snowflakeSessionKeepAlive', { dataSource }),
+      database: getEnv('dbName', { dataSource }),
+      username: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
+      authenticator: getEnv('snowflakeAuthenticator', { dataSource }),
+      privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource }),
+      privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource }),
       privateKey,
-      exportBucket: this.getExportBucket(),
+      exportBucket: this.getExportBucket(dataSource),
       resultPrefetch: 1,
-      executionTimeout: getEnv('dbQueryTimeout'),
+      executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
+      application: 'CubeDev_Cube',
       ...config
     };
   }
 
-  protected createExportBucket(bucketType: string): SnowflakeDriverExportBucket {
+  protected createExportBucket(
+    dataSource: string,
+    bucketType: string,
+  ): SnowflakeDriverExportBucket {
     if (bucketType === 's3') {
       return {
         bucketType,
-        bucketName: getEnv('dbExportBucket'),
-        keyId: getEnv('dbExportBucketAwsKey'),
-        secretKey: getEnv('dbExportBucketAwsSecret'),
-        region: getEnv('dbExportBucketAwsRegion'),
+        bucketName: getEnv('dbExportBucket', { dataSource }),
+        keyId: getEnv('dbExportBucketAwsKey', { dataSource }),
+        secretKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
+        region: getEnv('dbExportBucketAwsRegion', { dataSource }),
       };
     }
 
     if (bucketType === 'gcs') {
       return {
         bucketType,
-        bucketName: getEnv('dbExportBucket'),
-        integrationName: getEnv('dbExportIntegration'),
-        credentials: getEnv('dbExportGCSCredentials'),
+        bucketName: getEnv('dbExportBucket', { dataSource }),
+        integrationName: getEnv('dbExportIntegration', { dataSource }),
+        credentials: getEnv('dbExportGCSCredentials', { dataSource }),
       };
     }
 
@@ -208,12 +235,16 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * @todo Move to BaseDriver in the future?
    */
-  protected getExportBucket(): SnowflakeDriverExportBucket | undefined {
+  protected getExportBucket(
+    dataSource: string,
+  ): SnowflakeDriverExportBucket | undefined {
     const bucketType = getEnv('dbExportBucketType', {
-      supported: ['s3', 'gcs']
+      dataSource,
+      supported: ['s3', 'gcs'],
     });
     if (bucketType) {
       const exportBucket = this.createExportBucket(
+        dataSource,
         bucketType,
       );
 
@@ -232,6 +263,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   public static driverEnvVariables() {
+    // TODO (buntarb): check how this method can/must be used with split
+    // names by the data source.
     return [
       'CUBEJS_DB_NAME',
       'CUBEJS_DB_USER',

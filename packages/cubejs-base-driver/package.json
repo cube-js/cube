@@ -1,0 +1,65 @@
+{
+  "name": "@cubejs-backend/base-driver",
+  "description": "Cube.js Base Driver",
+  "author": "Cube Dev, Inc.",
+  "version": "0.31.3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-base-driver"
+  },
+  "engines": {
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+  },
+  "main": "dist/src/index.js",
+  "typings": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "test": "npm run unit && npm run integration",
+    "unit": "jest --runInBand --coverage --verbose dist/test/unit",
+    "lint": "eslint src/* test/* --ext .ts,.js",
+    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
+  },
+  "files": [
+    "README.md",
+    "driver/*",
+    "orchestrator/*",
+    "dist/src/*"
+  ],
+  "dependencies": {
+    "@cubejs-backend/shared": "^0.31.0",
+    "ramda": "^0.27.0"
+  },
+  "devDependencies": {
+    "@cubejs-backend/linter": "^0.31.0",
+    "@types/jest": "^26.0.15",
+    "@types/node": "^12",
+    "@types/ramda": "^0.27.32",
+    "jest": "^26.6.3",
+    "typescript": "~4.1.5"
+  },
+  "license": "Apache-2.0",
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  },
+  "jest": {
+    "collectCoverage": false,
+    "coverageDirectory": "coverage/",
+    "collectCoverageFrom": [
+      "dist/src/**/*.js",
+      "dist/src/**/*.ts"
+    ],
+    "coveragePathIgnorePatterns": [
+      ".*\\.d\\.ts"
+    ]
+  },
+  "resolutions": {
+    "es5-ext": "0.10.53",
+    "minimist": "^1.2.6"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

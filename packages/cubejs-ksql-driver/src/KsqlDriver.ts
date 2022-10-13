@@ -1,8 +1,17 @@
-/* eslint-disable no-restricted-syntax */
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `KsqlDriver` and related types declaration.
+ */
+
 import {
-  BaseDriver,
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
+import {
+  BaseDriver, DriverCapabilities,
   DriverInterface,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import { format as formatSql } from 'sqlstring';
 import axios, { AxiosResponse } from 'axios';
 import { Mutex } from 'async-mutex';
@@ -48,6 +57,9 @@ type KsqlDescribeResponse = {
   }
 };
 
+/**
+ * KSQL driver class.
+ */
 export class KsqlDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns default concurrency value.
@@ -60,13 +72,25 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   protected readonly dropTableMutex: Mutex = new Mutex();
 
-  public constructor(config: Partial<KsqlDriverOptions> = {}) {
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: Partial<KsqlDriverOptions> & {
+      dataSource?: string,
+      maxPoolSize?: number,
+    } = {}
+  ) {
     super();
 
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
     this.config = {
-      url: <string>process.env.CUBEJS_DB_URL,
-      username: <string>process.env.CUBEJS_DB_USER,
-      password: <string>process.env.CUBEJS_DB_PASS,
+      url: getEnv('dbUrl', { dataSource }),
+      username: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
       ...config,
     };
   }
@@ -81,7 +105,16 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
         },
       });
     } catch (e) {
-      throw new Error(`ksql API error for '${body.ksql}': ${e.response?.data?.message || e.response?.statusCode}`);
+      throw new Error(
+        `ksql API error for '${
+          body.ksql
+        }': ${
+          (<any>e).response?.data?.message ||
+          (<any>e).response?.statusCode ||
+          (<any>e).message ||
+          (<any>e).toString()
+        }`
+      );
     }
   }
 
@@ -174,14 +207,17 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return fields.map(c => ({ name: c.name, type: this.toGenericType(c.schema.type) }));
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
     return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async downloadTable(table: string, options: any): Promise<any> {
     return this.getStreamingTableData(this.tableDashName(table));
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async downloadQueryResults(query: string, params: any, options: any) {
     const table = KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(query);
     if (!table) {
@@ -218,6 +254,8 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   }
 
   public static driverEnvVariables() {
+    // TODO (buntarb): check how this method can/must be used with split
+    // names by the data source.
     return [
       'CUBEJS_DB_URL',
       'CUBEJS_DB_USER',
@@ -227,5 +265,11 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public static dialectClass() {
     return KsqlQuery;
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      streamingSource: true
+    };
   }
 }

@@ -204,6 +204,13 @@ describe('SQLInterface', () => {
         }
       }
 
+      {
+        const [result] = await connection.query('select CAST(\'2020-12-25 22:48:48.000\' AS timestamp)');
+        console.log(result);
+
+        expect(result).toEqual([{"TimestampNanosecond(1608936528000000000, None)": "2020-12-25T22:48:48.000"}]);
+      }
+
       // Increment it in case you throw Error
       setTimeout(_ => {
         expect(logger.mock.calls.length).toEqual(1);

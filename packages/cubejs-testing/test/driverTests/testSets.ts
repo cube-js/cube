@@ -51,7 +51,7 @@ import {
   filteringECommerceEndsWithDimensionsFirst,
   filteringECommerceEndsWithDimensionsSecond,
   filteringECommerceEndsWithDimensionsThird,
-  queryingEcommerceTotalQuantifyAvgDiscountTotal,
+  queryingEcommerceTotalQuantifyAvgDiscountTotal, hiddenMember,
 } from './tests';
 import { testSet } from './driverTest';
 
@@ -125,4 +125,8 @@ export const mainTestSet = testSet([
   ...skippedTestSet,
   ...withOrderingTestSet,
   ...withoutOrderingTestSet,
+]);
+
+export const productionTestSet = testSet([
+  hiddenMember
 ]);

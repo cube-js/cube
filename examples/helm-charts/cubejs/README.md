@@ -206,7 +206,7 @@ cubestore:
 
 | Name                            | Description                                                                                                                                              | Value |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| `redis.url`                     | The host URL for a Redis server                                                                                                                          |       |
+| `redis.url`                     | The host URL for a Redis server. Note that this must include the `redis://` protocol prefix.                                                              |       |
 | `redis.password`                | The password used to connect to the Redis server                                                                                                         |       |
 | `redis.passwordFromSecret.name` | The password used to connect to the Redis server (using secret)                                                                                          |       |
 | `redis.passwordFromSecret.key`  | The password used to connect to the Redis server (using secret)                                                                                          |       |

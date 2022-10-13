@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -7,7 +8,13 @@ import { uniq } from 'ramda';
 import { BirdBox, Env, getBirdbox } from '../src';
 import { DriverTest } from './driverTests/driverTest';
 
-type SupportedDriverType = 'postgres' | 'questdb' | 'firebolt' | 'bigquery' | 'athena';
+type SupportedDriverType =
+  'postgres' |
+  'questdb' |
+  'firebolt' |
+  'bigquery' |
+  'athena' |
+  'databricks-jdbc';
 
 type TestSuite = {
   config?: Partial<Env>
@@ -17,6 +24,8 @@ type TestSuite = {
 
 export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
   const testSchemas = uniq(tests.flatMap(t => t.schemas));
+
+  const apiSecret = 'mysupersecret';
 
   const overridedConfig = {
     CUBEJS_DEV_MODE: 'true',
@@ -41,8 +50,9 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
       );
       transport = new WebSocketTransport({
         apiUrl: box.configuration.apiUrl,
+        authorization: jwt.sign({}, apiSecret)
       });
-      client = cubejs(async () => 'test', {
+      client = cubejs(async () => jwt.sign({}, apiSecret), {
         apiUrl: box.configuration.apiUrl,
         // transport,
       });
@@ -81,7 +91,14 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
           const promise = async () => {
             await client.load(t.query);
           };
-          await expect(promise).rejects.toThrow('error');
+          if (t.expectArray) {
+            const promiseInstance = promise();
+            for (const expectFn of t.expectArray) {
+              await promiseInstance.catch((e) => expectFn(e as Error));
+            }
+          } else {
+            await expect(promise).rejects.toMatchSnapshot('error');
+          }
         };
         if (t.skip) {
           test.skip(testNameWithHash, cbFnError);
