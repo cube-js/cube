@@ -28,8 +28,13 @@ describe('DruidQuery', () => {
         name: {
           type: 'string',
           sql: 'name'
+        },
+        createdAt: {
+            sql: \`created_at\`,
+            type: 'time',
         }
       }
+      
     })
     `,{});
 
@@ -53,4 +58,23 @@ describe('DruidQuery', () => {
       const queryAndParams = query.buildSqlAndParams();
       expect(queryAndParams[0]).toContain("LIKE CONCAT('%', ?, '%'))");
     }));
+
+    it('druid query timezone shift test',
+        () => compiler.compile().then(() => {
+            const query = new DruidQuery(
+                { joinGraph, cubeEvaluator, compiler },
+                {
+                    timeDimensions: [
+                        {
+                            dimension: "visitors.createdAt",
+                            granularity: 'day'
+                        }
+                    ],
+                    measures: [],
+                    timezone: 'Europe/Kiev'
+                }
+            );
+            const queryAndParams = query.buildSqlAndParams();
+            expect(queryAndParams[0]).toContain("DATE_TRUNC('day', TIMESTAMPADD(MINUTE, 180, \"visitors\".created_at)) \"visitors__created_at_day\"");
+        }));
 });
