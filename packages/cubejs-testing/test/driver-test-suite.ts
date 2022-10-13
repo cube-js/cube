@@ -91,7 +91,14 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
           const promise = async () => {
             await client.load(t.query);
           };
-          await expect(promise).rejects.toMatchSnapshot('error');
+          if (t.expectArray) {
+            const promiseInstance = promise();
+            for (const expectFn of t.expectArray) {
+              await promiseInstance.catch((e) => expectFn(e as Error));
+            }
+          } else {
+            await expect(promise).rejects.toMatchSnapshot('error');
+          }
         };
         if (t.skip) {
           test.skip(testNameWithHash, cbFnError);
