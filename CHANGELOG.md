@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.4](https://github.com/cube-js/cube.js/compare/v0.31.3...v0.31.4) (2022-10-13)
+
+
+### Bug Fixes
+
+* **cubestore:** Extension planner for LogicalAlias error ([#5459](https://github.com/cube-js/cube.js/issues/5459)) ([8153459](https://github.com/cube-js/cube.js/commit/8153459c70ddf9acef7e886a6e44971c1aa82660))
+* **druid-driver:** query timezone fix ([#5372](https://github.com/cube-js/cube.js/issues/5372)) ([ccad5fc](https://github.com/cube-js/cube.js/commit/ccad5fc58e23c55283c8e3014908cb51fa5b5fbc))
+
+
+### Features
+
+* `shown` flag for cubes and views ([#5455](https://github.com/cube-js/cube.js/issues/5455)) ([e7ef446](https://github.com/cube-js/cube.js/commit/e7ef4467adfc581e07c14b315a43c0eb4d1e8c11))
+
+
+
+
+
 ## [0.31.3](https://github.com/cube-js/cube.js/compare/v0.31.2...v0.31.3) (2022-10-08)
 
 

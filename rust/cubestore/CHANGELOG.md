@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.4](https://github.com/cube-js/cube.js/compare/v0.31.3...v0.31.4) (2022-10-13)
+
+
+### Bug Fixes
+
+* **cubestore:** Extension planner for LogicalAlias error ([#5459](https://github.com/cube-js/cube.js/issues/5459)) ([8153459](https://github.com/cube-js/cube.js/commit/8153459c70ddf9acef7e886a6e44971c1aa82660))
+
+
+
+
+
 ## [0.31.2](https://github.com/cube-js/cube.js/compare/v0.31.1...v0.31.2) (2022-10-08)
 
 

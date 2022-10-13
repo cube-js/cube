@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.4](https://github.com/cube-js/cube.js/compare/v0.31.3...v0.31.4) (2022-10-13)
+
+
+### Bug Fixes
+
+* **druid-driver:** query timezone fix ([#5372](https://github.com/cube-js/cube.js/issues/5372)) ([ccad5fc](https://github.com/cube-js/cube.js/commit/ccad5fc58e23c55283c8e3014908cb51fa5b5fbc))
+
+
+
+
+
 ## [0.31.3](https://github.com/cube-js/cube.js/compare/v0.31.2...v0.31.3) (2022-10-08)
 
 
