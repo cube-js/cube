@@ -427,15 +427,15 @@ export async function startBirdBoxFromCli(
 
   if (options.schemas) {
     options.schemaDir = `${options.type}/schema`;
-    options.cubejsConfig = `${options.type}/cube.js`;
-  } else {
-    if (!options.schemaDir) {
-      options.schemaDir = 'postgresql/schema';
+    const cubejsConfigByType = `${options.type}/cube.js`;
+    if (fs.existsSync(cubejsConfigByType)) {
+      options.cubejsConfig = cubejsConfigByType;
     }
-
-    if (!options.cubejsConfig) {
-      options.cubejsConfig = 'postgresql/single/cube.js';
-    }
+  } else if (!options.schemaDir) {
+    options.schemaDir = 'postgresql/schema';
+  }
+  if (!options.cubejsConfig) {
+    options.cubejsConfig = 'postgresql/single/cube.js';
   }
 
   if (options.loadScript) {
@@ -476,6 +476,8 @@ export async function startBirdBoxFromCli(
         `[Birdbox] Script ${loadScript} finished successfully\n`
       );
     }
+  } else if (!options.env?.CUBEJS_DB_HOST) {
+    db = await PostgresDBRunner.startContainer({});
   }
 
   const testDir = path.join(process.cwd(), 'birdbox-test-project');
@@ -532,15 +534,17 @@ export async function startBirdBoxFromCli(
     CUBEJS_WEB_SOCKETS: 'true',
     CUBEJS_PLAYGROUND_AUTH_SECRET: 'mysupersecret',
     CUBEJS_TELEMETRY: 'false',
-    ...options.env
-      ? options.env
+    CUBEJS_CACHE_AND_QUEUE_DRIVER: 'memory',
+    ...(options.env?.CUBEJS_DB_HOST
+      ? undefined
       : {
         CUBEJS_DB_HOST: db!.getHost(),
         CUBEJS_DB_PORT: `${db!.getMappedPort(5432)}`,
         CUBEJS_DB_NAME: 'test',
         CUBEJS_DB_USER: 'test',
         CUBEJS_DB_PASS: 'test',
-      }
+      }),
+    ...options.env,
   };
 
   try {

@@ -152,7 +152,7 @@ export class CubeEvaluator extends CubeSymbols {
       } else {
         throw new Error(`Unexpected path length ${path.length} for ${ref}`);
       }
-    }));
+    })).filter(Boolean);
   }
 
   generateIncludeMembers(members, cubeName, type) {

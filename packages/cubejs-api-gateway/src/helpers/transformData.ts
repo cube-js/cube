@@ -134,6 +134,7 @@ function getMembers(
   query: NormalizedQuery,
   dbData: { [sqlAlias: string]: DBResponseValue }[],
   aliasToMemberNameMap: AliasToMemberMap,
+  annotation: { [member: string]: ConfigItem },
 ): { [member: string]: string } {
   const members: { [member: string]: string } = {};
   if (!dbData.length) {
@@ -141,7 +142,7 @@ function getMembers(
   }
   const columns = Object.keys(dbData[0]);
   columns.forEach((column) => {
-    if (!aliasToMemberNameMap[column]) {
+    if (!aliasToMemberNameMap[column] || !annotation[aliasToMemberNameMap[column]]) {
       throw new UserError(
         `You requested hidden member: '${
           column
@@ -319,6 +320,7 @@ function transformData(
     query,
     d,
     aliasToMemberNameMap,
+    annotation,
   );
   const members: string[] = Object.keys(membersToAliasMap);
   const dataset: DBResponsePrimitive[][] | {

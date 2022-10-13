@@ -13,6 +13,8 @@ cube(\`Orders\`, {
   SELECT 2 as id, 2 as product_id, 'completed' as status, '2022-01-02T00:00:00.000Z'::timestamptz as created_at
   \`,
   
+  shown: false,
+  
   refreshKey: {
     sql: \`SELECT MAX(created_at) FROM \${Orders.sql()} orders WHERE \${FILTER_PARAMS.Orders.createdAt.filter('created_at')}\`
   },
@@ -222,6 +224,10 @@ view(\`OrdersView\`, {
     },
   }
 });
+
+view(\`OrdersView2\`, {
+  includes: [Orders.count],
+});
     `);
 
   async function runQueryTest(q: any, expectedResult: any, additionalTest?: (query: BaseQuery) => any) {
@@ -362,5 +368,11 @@ view(\`OrdersView\`, {
     await compiler.compile();
     const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
     expect(cube.config.measures.find((({ name }) => name === 'OrdersView.count')).name).toBe('OrdersView.count');
+  });
+
+  it('orders are hidden', async () => {
+    await compiler.compile();
+    const cube = metaTransformer.cubes.find(c => c.config.name === 'Orders');
+    expect(cube.config.measures.filter((({ isVisible }) => isVisible)).length).toBe(0);
   });
 });

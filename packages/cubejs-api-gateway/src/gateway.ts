@@ -160,9 +160,10 @@ class ApiGateway {
       const compilerApi = this.getCompilerApi(req.context);
       let schema = compilerApi.getGraphQLSchema();
       if (!schema) {
-        const metaConfig = await compilerApi.metaConfig({
+        let metaConfig = await compilerApi.metaConfig({
           requestId: req.context.requestId,
         });
+        metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
         schema = makeSchema(metaConfig);
         compilerApi.setGraphQLSchema(schema);
       }
@@ -377,24 +378,30 @@ class ApiGateway {
     }
   }
 
-  public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
-    const requestStarted = new Date();
-
+  private filterVisibleItemsInMeta(context: RequestContext, metaConfig: any) {
     function visibilityFilter(item) {
       return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
+
+    return metaConfig
+      .map((cube) => ({
+        config: {
+          ...cube.config,
+          measures: cube.config.measures?.filter(visibilityFilter),
+          dimensions: cube.config.dimensions?.filter(visibilityFilter),
+          segments: cube.config.segments?.filter(visibilityFilter),
+        },
+      }));
+  }
+
+  public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
 
     try {
       const metaConfig = await this.getCompilerApi(context).metaConfig({
         requestId: context.requestId,
       });
-      const cubes = metaConfig
-        .map((meta) => meta.config)
-        .map((cube) => ({
-          ...cube,
-          measures: cube.measures.filter(visibilityFilter),
-          dimensions: cube.dimensions.filter(visibilityFilter),
-        }));
+      const cubes = this.filterVisibleItemsInMeta(context, metaConfig).map(cube => cube.config);
       res({ cubes });
     } catch (e) {
       this.handleError({
@@ -419,14 +426,14 @@ class ApiGateway {
       });
       const { metaConfig, cubeDefinitions } = metaConfigExtended;
 
-      const cubes = metaConfig
+      const cubes = this.filterVisibleItemsInMeta(context, metaConfig)
         .map((meta) => meta.config)
         .map((cube) => ({
           ...transformCube(cube, cubeDefinitions),
-          measures: cube.measures?.filter(visibilityFilter).map((measure) => ({
+          measures: cube.measures?.map((measure) => ({
             ...transformMeasure(measure, cubeDefinitions),
           })),
-          dimensions: cube.dimensions?.filter(visibilityFilter).map((dimension) => ({
+          dimensions: cube.dimensions?.map((dimension) => ({
             ...transformDimension(dimension, cubeDefinitions),
           })),
           segments: cube.segments?.map((segment) => ({
@@ -953,10 +960,12 @@ class ApiGateway {
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
 
-      const metaConfigResult = await this
+      let metaConfigResult = await this
         .getCompilerApi(context).metaConfig({
           requestId: context.requestId
         });
+
+      metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
 
       const sqlQueries = await this
         .getSqlQueriesInternal(context, normalizedQueries);
