@@ -224,6 +224,10 @@ view(\`OrdersView\`, {
     },
   }
 });
+
+view(\`OrdersView2\`, {
+  includes: [Orders.count],
+});
     `);
 
   async function runQueryTest(q: any, expectedResult: any, additionalTest?: (query: BaseQuery) => any) {
