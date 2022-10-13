@@ -705,7 +705,7 @@ class ApiGateway {
           );
           break;
         default:
-          throw new Error(`The '${query.action}' type doesn't supported.`);
+          throw new Error(`The '${query.action}' action type doesn't supported.`);
       }
       response(result, { status: 200 });
     } catch (e) {
@@ -727,18 +727,6 @@ class ApiGateway {
         selector,
       );
     } else {
-      // for (let i = 0; i < selector.contexts.length; i++) {
-      //   const cfg = selector.contexts[i];
-      //   const ctx = <RequestContext>{
-      //     ...context,
-      //     ...cfg,
-      //   };
-      //   const _jobs = await this.postPreAggregationsBuildJobs(
-      //     ctx,
-      //     selector,
-      //   );
-      //   jobs = jobs.concat(_jobs);
-      // }
       const promise = Promise.all(
         selector.contexts.map(async (config) => {
           const ctx = <RequestContext>{
@@ -824,10 +812,7 @@ class ApiGateway {
         };
         if (
           selected.status.indexOf('done') === 0 ||
-          (
-            selected.status.indexOf('error') === 0 &&
-            selected.status !== 'error: no result'
-          )
+          selected.status.indexOf('failure') === 0
         ) {
           // returning from the cache
           if (resType === 'object') {
@@ -927,7 +912,17 @@ class ApiGateway {
         item.query.newVersionEntry.last_updated_at === job.updated
       ) {
         inQueue = true;
-        status = <string>item.status[0];
+        switch (<string>item.status[0]) {
+          case 'toProcess':
+            status = 'scheduled';
+            break;
+          case 'active':
+            status = 'processing';
+            break;
+          default:
+            status = <string>item.status[0];
+            break;
+        }
       }
     });
     return inQueue ? status : false;

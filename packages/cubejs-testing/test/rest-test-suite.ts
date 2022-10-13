@@ -51,7 +51,7 @@ export function executeTestSuite({ type, config = {}, driver }: TestSuite) {
     } driver and the environment variables ${
       JSON.stringify(overridedConfig, undefined, 2)
     }`,
-    async () => {
+    () => {
       jest.setTimeout(60 * 5 * 1000);
       let box: BirdBox;
       // let client: CubejsApi;
@@ -207,10 +207,10 @@ export function executeTestSuite({ type, config = {}, driver }: TestSuite) {
          * Test cases.
          */
         const statuses = [
-          'toProcess',
-          'active',
+          'scheduled',
+          'processing',
+          'missing_partition', // TODO (buntarb): wtf?!!
           'done',
-          'error: no result', // TODO (buntarb): wtf?!!
         ];
         let result: any;
         let tables: string[];

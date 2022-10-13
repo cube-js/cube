@@ -1857,9 +1857,9 @@ export class PreAggregations {
     if (tables.length === 1) {
       status = 'done';
     } else {
-      status = `error: ${
-        result && result.error ? result.error : 'no result'
-      }`;
+      status = result && result.error
+        ? `failure: ${result.error}`
+        : 'missing_partition';
     }
 
     // updating jobs cache if needed

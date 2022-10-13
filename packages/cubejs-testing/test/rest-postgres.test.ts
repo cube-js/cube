@@ -1,11 +1,11 @@
-import { PostgresDriver } from '@cubejs-backend/postgres-driver';
-import { executeTestSuite } from './rest-test-suite';
+// import { PostgresDriver } from '@cubejs-backend/postgres-driver';
+// import { executeTestSuite } from './rest-test-suite';
 
-executeTestSuite({
-  type: 'postgres',
-  config: {},
-  driver: new PostgresDriver(),
-});
+// executeTestSuite({
+//   type: 'postgres',
+//   config: {},
+//   driver: new PostgresDriver(),
+// });
 
 // executeTestSuite({
 //   type: 'postgres',
