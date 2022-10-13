@@ -7,57 +7,69 @@ menuOrder: 8.1
 subCategory: Reference
 ---
 
-Views sit on top of the data graph of cubes and create a facade of your whole data model with which data consumers can interact. 
-They’re the place to define metrics, manage governance and data access, and control ambiguous join paths.
+Views sit on top of the data graph of cubes and create a facade of your whole
+data model with which data consumers can interact. They’re the place to define
+metrics, manage governance and data access, and control ambiguous join paths.
 
-Views **can't** have their own members. You can use `includes` property to include measures and dimensions into view from cubes.
+<div style="text-align: center">
+  <img
+    alt="Architecture diagram of queries being sent to cubes and views"
+    src="https://ucarecdn.com/060f4bb9-3103-40b8-8291-b22e3931ebb2/"
+    style="border: none"
+    width="100%"
+  />
+</div>
 
-```js
+Views **can not** have their own members. Instead, use the `includes` property
+to include measures and dimensions from other cubes into the view. In the
+example below, we create a new view `ActiveUsers` which is made up of properties
+from the `Users` cube:
+
+```typescript
 view(`ActiveUsers`, {
   description: `14 days rolling count of active users`,
   includes: [
     // Measure
-    Users.rollingCount, 
+    Users.rollingCount,
     // Dimensions
-    Users.isPaying,
-    Users.signupDate
-  ]
+    Users.city,
+    Users.createdAt,
+  ],
 });
 ```
 
-You also can reference measures and dimensions one by one. It is helpful when you need to control join path, apply filter, or rename measures/dimensions. 
+You also can reference measures and dimensions one-by-one. This is helpful when
+there is a need to control the join path, apply filters and/or rename
+measures/dimensions. In the example below, we create a view `CompletedOrders`
+which filters only completed orders from the `Orders` cube and also brings in
+dimensions from the `Countries` and `Users` cubes through nested joins:
 
-```js
+```typescript
 view(`CompletedOrders`, {
   description: 'Count of completed orders',
 
-  // You can use filters on measures to reduce views to the subset of the data
+  // You can use filters to reduce views to the subset of the data
   measures: {
     count: {
-      sql: `${Orders.count}`,
-      type: `number`
-      filters: [
-        { sql: `${Orders.status} = 'completed'` }
-      ]
-    }
+      sql: `${Orders.status}`,
+      type: `count`,
+      filters: [{ sql: `${Orders.status} = 'completed'` }],
+    },
   },
 
   // in the example below we are controlling join path
   // and rename dimensions
   dimensions: {
-    orderWarehouseCountry: {
-      sql: `${Orders.Countries.name}`,
-      type: `string`
+    userCity: {
+      sql: `${Orders.Users.city}`,
+      type: `string`,
     },
-    userCountry: {
-      sql: `${Orders.Users.Countries.name}`,
-      type: `string`
-    }
-  }
+  },
 });
 ```
 
-Views can be queries the same way as cubes. Example below show how to query the above view with SQL API.
+Views can be queried the same way as cubes; the example below show how to query
+the above view with SQL API.
 
 ```sql
 SELECT
@@ -67,15 +79,18 @@ FROM CompletedOrders
 GROUP BY 2
 ```
 
+Views also do not define any pre-aggregations, instead they re-use
+pre-aggregations defined by the underlying cubes.
+
 ## Parameters
 
 ### <--{"id" : "Parameters"}--> description
 
-Use a description in your cubes to allow your team to better understand what
-this view is about. It is a very simple and yet useful tool that gives a hint to
-everyone and makes sure data is interpreted correctly by users.
+A description of the view allows your team to better understand what its purpose
+is. It is a very simple and yet useful tool that gives a hint to everyone and
+ensures that data is interpreted correctly by users.
 
-```js
+```typescript
 view(`Active Users`, {
   description: `14 days rolling count of active users`,
 });
@@ -83,48 +98,32 @@ view(`Active Users`, {
 
 ### <--{"id" : "Parameters"}--> includes
 
-`includes` property is used to bulk add measures or dimensions to view.
+The `includes` property is used to bulk add measures or dimensions to a view.
 
-```js
+```typescript
 view(`ActiveUsers`, {
   description: `14 days rolling count of active users`,
   includes: [
     // Measure
-    Users.rollingCount, 
+    Users.rollingCount,
     // Dimensions
-    Users.isPaying,
-    Users.signupDate
-  ]
+    Users.city,
+    Users.createdAt,
+  ],
 });
 ```
 
 ### <--{"id" : "Parameters"}--> shown
 
-You can use `shown` property to manage visibility of the specific view.
-Some data may be available only to specific roles within an organization or to specific customers.
-In the example below, we’re making the `ARR` view only visible to users with finance permissions.
+The `shown` property is used to manage the visibility of a view. Some data may
+be available only to specific roles within an organization or to specific
+customers. In the example below, we’re making the `ARR` view only visible to
+users with finance permissions:
 
-
-```js
+```typescript
 view(`ARR`, {
-  description: `Annual Recurring Recurring Revenue`,
+  description: `Annual Recurring Revenue`,
   shown: COMPILE_CONTEXT.permissions['finance'],
-  includes: [
-    Revenue.arr,
-    Revenue.date,
-    Customers.plan
-  ]
+  includes: [Revenue.arr, Revenue.date, Customers.plan],
 });
 ```
-
-
-
-[ref-config-driverfactory]: /config#driver-factory
-[ref-config-ext-ctx]: /config#extend-context
-[ref-config-queryrewrite]: /config#query-rewrite
-[ref-config-req-ctx]: /config#request-context
-[ref-dev-playground]: /dev-tools/dev-playground
-[ref-restapi-meta]: /rest-api#v-1-meta
-[ref-restapi-sql]: /rest-api#v-1-sql
-[ref-sec-ctx]: /security/context
-[wiki-camelcase]: https://en.wikipedia.org/wiki/Camel_case

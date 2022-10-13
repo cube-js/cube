@@ -437,11 +437,11 @@ cube('Customers', {
 });
 ```
 
-The first case is to calculate the total orders revenue. Let's name this metric
-`totalRevenue`. We also need to be aware of the fact that orders can be placed
-without customer registration (anonymous customers/guest checkouts). Because of
-anonymous customers, we should start the join from the `Orders` onto the
-`Customers` cube so that we do not lose data from anonymous orders:
+The first case is to calculate the total revenue per customer. Let's name this
+metric `totalRevenue`. We also need to be aware of the fact that orders can be
+placed without customer registration (anonymous customers/guest checkouts).
+Because of anonymous customers, we should start the join from the `Orders` onto
+the `Customers` cube so that we do not lose data from anonymous orders:
 
 ```javascript
 cube('Orders', {
@@ -475,6 +475,20 @@ cube('Orders', {
     },
   },
 });
+```
+
+After adding the join to the schema, we can query the cube as follows:
+
+```json
+{
+  "dimensions": ["Users.company"],
+  "measures": ["Orders.totalRevenue"],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.createdAt"
+    }
+  ]
+}
 ```
 
 The second case is to find customers without any orders. Let's call this metric
@@ -512,6 +526,57 @@ cube('Customers', {
     customerId: {
       sql: `customer_id`,
       type: `number`,
+    },
+  },
+});
+```
+
+We can then query the cube as follows:
+
+```json
+{
+  "dimensions": ["Users.company"],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.createdAt"
+    }
+  ],
+  "filters": [
+    {
+      "member": "Orders.count",
+      "operator": "equals",
+      "values": ["0"]
+    }
+  ]
+}
+```
+
+### <--{"id" : "Directions of joins"}--> Using views
+
+Views can also be used in Cube to represent the previous two scenarios;
+
+```javascript
+view('TotalRevenuePerCustomer', {
+  description: `Total revenue per customer`,
+
+  includes: [Orders.totalRevenue, Users.company],
+});
+
+view('CustomersWithoutOrders', {
+  description: `Customers without orders`,
+
+  includes: [Users.company],
+
+  measures: {
+    count: {
+      // Note the nested path to Orders.count
+      sql: `${Users.Orders.count}`,
+      // Here we explicitly set the type as `number`, as we don't want to re-calculate
+      // the count
+      type: `number`,
+      // We use the nested path to Orders.count again, but this time to filter
+      // results so that we only get users with no orders
+      filters: [{ sql: `${Users.Orders.count} = 0` }],
     },
   },
 });
@@ -632,9 +697,7 @@ cube(`OrganizationUsers`, {
 });
 ```
 
-[ref-schema-ref-joins]: /schema/reference/joins
-[ref-schema-ref-joins-relationship]:
-  /schema/reference/joins#parameters-relationship
-[self-many-to-many-no-assoc-table]:
-  #many-to-many-relationship#many-to-many-relationship-without-an-associative-table
-[self-join-direction]: /schema/fundamentals/joins#directions-of-joins
+[ref-schema-ref-joins] /schema/reference/joins
+[ref-schema-ref-joins-relationship]/schema/reference/joins#parameters-relationship
+[self-many-to-many-no-assoc-table]#many-to-many-relationship#many-to-many-relationship-without-an-associative-table
+[self-join-direction] /schema/fundamentals/joins#directions-of-joins
