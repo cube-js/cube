@@ -33,6 +33,7 @@
     "@cubejs-backend/server": "^0.31.3",
     "@cubejs-backend/snowflake-driver": "^0.31.3",
     "@cubejs-backend/sqlite-driver": "^0.31.3",
+    "@cubejs-backend/vertica-driver": "^0.31.3",
     "cubejs-cli": "^0.31.3",
     "typescript": "~4.1.5"
   },

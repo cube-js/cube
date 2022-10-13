@@ -13,7 +13,8 @@ type SupportedDriverType =
   'firebolt' |
   'bigquery' |
   'athena' |
-  'databricks-jdbc';
+  'databricks-jdbc' |
+  'vertica';
 
 type TestSuite = {
   config?: Partial<Env>
