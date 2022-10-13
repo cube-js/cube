@@ -1215,5 +1215,5 @@ export const hiddenMember = driverTestWithError({
     ]
   },
   schemas: commonSchemas,
-  expectArray: [(e) => expect(e).toContain('hidden')],
+  expectArray: [(e) => expect(e.toString()).toMatch(/hidden/)],
 });
