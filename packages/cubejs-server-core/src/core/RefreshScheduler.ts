@@ -1,5 +1,6 @@
 import R from 'ramda';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 import { Required } from '@cubejs-backend/shared';
 import { PreAggregationDescription } from '@cubejs-backend/query-orchestrator';
 
@@ -42,6 +43,88 @@ type RefreshQueries = {
   partitions: PreAggregationDescription[],
   groupedPartitions: PreAggregationDescription[][],
 };
+
+type JobedPreAggregation = {
+  preAggregation: string,
+  tableName: string,
+  targetTableName: string,
+  // eslint-disable-next-line camelcase
+  refreshKeyValues: {refresh_key: string}[][],
+  queryKey: any[],
+  lastUpdatedAt: string,
+  type: string,
+  timezone: string,
+  dataSource: string,
+};
+
+type PreAggJob = {
+  request: string,
+  context: { securityContext: any },
+  preagg: string,
+  table: string,
+  target: string,
+  structure: string,
+  content: string,
+  updated: string,
+  key: any[],
+  status: string;
+  timezone: string,
+  dataSource: string,
+};
+
+/**
+ * Fetch `structure` and `content` segments from the table (partition) name and
+ * returns an object contained these segments.
+ */
+function getPreAggJobHashes(table: string) {
+  const items = table.split('_');
+  return {
+    structure: items[items.length - 2],
+    content: items[items.length - 3],
+  };
+}
+
+/**
+ * Convert posted build pre-aggs jobs results structure to the jobs list format.
+ */
+function getPreAggsJobsList(
+  context: RequestContext,
+  jobedPA: JobedPreAggregation[][][][]
+): PreAggJob[] {
+  const jobs = [];
+  jobedPA.forEach((l1) => {
+    l1.forEach((l2) => {
+      l2.forEach((l3) => {
+        l3.forEach((pa) => {
+          jobs.push({
+            request: context.requestId,
+            context: { securityContext: context.securityContext },
+            preagg: pa.preAggregation,
+            table: pa.tableName,
+            target: pa.targetTableName,
+            ...getPreAggJobHashes(pa.targetTableName),
+            updated: pa.lastUpdatedAt,
+            key: pa.queryKey,
+            status: 'posted',
+            timezone: pa.timezone,
+            dataSource: pa.dataSource,
+          });
+        });
+      });
+    });
+  });
+  return jobs;
+}
+
+/**
+ * Returns MD5 hash token of the job object.
+ */
+function getPreAggJobToken(job: PreAggJob) {
+  return crypto
+    .createHash('md5')
+    .update(JSON.stringify(job))
+    .digest('hex');
+}
 
 export class RefreshScheduler {
   public constructor(
@@ -565,5 +648,83 @@ export class RefreshScheduler {
     }
 
     return true;
+  }
+
+  /**
+   * Post pre-aggregations build jobs and returns jobs identifier objects.
+   */
+  public async postBuildJobs(
+    context: RequestContext,
+    queryingOptions: PreAggregationsQueryingOptions
+  ): Promise<string[]> {
+    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const preAggregations = await this.preAggregationPartitions(context, queryingOptions);
+    const preAggregationsLoadCacheByDataSource = {};
+    const jobsPromise = Promise.all(
+      preAggregations.map(async (p: any) => {
+        const { partitionsWithDependencies } = p;
+        return Promise.all(
+          partitionsWithDependencies.map(({ partitions, dependencies }) => (
+            Promise.all(
+              partitions.map(
+                async (partition): Promise<JobedPreAggregation[]> => {
+                  const job = await orchestratorApi.executeQuery({
+                    preAggregations: dependencies.concat([partition]),
+                    continueWait: true,
+                    renewQuery: true,
+                    forceBuildPreAggregations: true,
+                    orphanedTimeout: 60 * 60,
+                    requestId: context.requestId,
+                    timezone: partition.timezone,
+                    scheduledRefresh: false,
+                    preAggregationsLoadCacheByDataSource,
+                    metadata: queryingOptions.metadata,
+                    isJob: true,
+                  });
+                  job[0].dataSource = partition.dataSource;
+                  job[0].timezone = partition.timezone;
+                  return job;
+                }
+              )
+            )
+          ))
+        );
+      })
+    );
+    const jobedPAs = await jobsPromise;
+    return getPreAggsJobsList(
+      context,
+      <JobedPreAggregation[][][][]>jobedPAs,
+    ).map((job: PreAggJob) => {
+      const key = getPreAggJobToken(job);
+      orchestratorApi
+        .getQueryOrchestrator()
+        .getQueryCache()
+        .getCacheDriver()
+        .set(`PRE_AGG_JOB_${key}`, job, 86400);
+      return key;
+    });
+  }
+
+  /**
+   * Returns pre-aggregations build jobs from the cache.
+   */
+  public async getCachedBuildJobs(
+    context: RequestContext,
+    tokens: string[],
+  ): Promise<PreAggJob[]> {
+    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const jobsPromise = Promise.all(
+      tokens.map(async (key) => {
+        const job = <PreAggJob>(await orchestratorApi
+          .getQueryOrchestrator()
+          .getQueryCache()
+          .getCacheDriver()
+          .get(`PRE_AGG_JOB_${key}`));
+        return job;
+      })
+    );
+    const jobs = await jobsPromise;
+    return jobs;
   }
 }

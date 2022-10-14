@@ -78,6 +78,13 @@ export class QueryCache {
   }
 
   /**
+   * Returns cache driver instance.
+   */
+  public getCacheDriver(): CacheDriverInterface {
+    return this.cacheDriver;
+  }
+
+  /**
    * Force reconcile queue logic to be executed.
    */
   public async forceReconcile(datasource = 'default') {

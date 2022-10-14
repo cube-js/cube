@@ -32,8 +32,10 @@
     "birdbox:local:postgresql:snapshot": "USE_LOCAL_CUBEJS_BINARY=true jest --verbose --updateSnapshot -i dist/test/cli-postgresql.test.js",
     "birdbox:local:postgresql-pre-aggregations": "USE_LOCAL_CUBEJS_BINARY=true jest --verbose -i dist/test/cli-postgresql-pre-aggregations.test.js",
     "birdbox:local:postgresql-pre-aggregations:snapshot": "USE_LOCAL_CUBEJS_BINARY=true jest --verbose --updateSnapshot -i dist/test/cli-postgresql-pre-aggregations.test.js",
+
     "cypress:install": "cypress install",
     "cypress:birdbox": "node dist/test/bin/cypress-birdbox.js",
+
     "driver:athena": "jest --verbose -i dist/test/driver-athena.test.js",
     "driver:athena:snap": "jest --verbose --updateSnapshot -i dist/test/driver-athena.test.js",
     "driver:bigquery": "jest --verbose -i dist/test/driver-bigquery.test.js",
@@ -46,6 +48,9 @@
     "driver:questdb:snap": "jest --verbose --updateSnapshot -i dist/test/driver-questdb.test.js",
     "driver:databricks": "jest --verbose -i dist/test/driver-databricks.test.js",
     "driver:databricks:snap": "jest --verbose --updateSnapshot -i dist/test/driver-databricks.test.js",
+  
+    "rest:postgres": "yarn tsc && clear && jest --verbose -i dist/test/rest-postgres.test.js",
+  
     "smoke:athena": "jest --verbose -i dist/test/smoke-athena.test.js",
     "smoke:athena:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-athena.test.js",
     "smoke:bigquery": "jest --verbose -i dist/test/smoke-bigquery.test.js",

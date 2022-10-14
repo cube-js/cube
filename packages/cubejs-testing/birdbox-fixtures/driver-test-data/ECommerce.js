@@ -20,6 +20,22 @@ cube(`ECommerce`, {
         every: `1 hour`,
       },
     },
+    manual: {
+      external: false,
+      scheduledRefresh: false,
+      timeDimension: CUBE.orderDate,
+      granularity: `month`,
+      partitionGranularity: `month`,
+      dimensions: [
+        CUBE.productName,
+      ],
+      measures: [
+        CUBE.totalQuantity,
+        CUBE.avgDiscount,
+        CUBE.totalSales,
+        CUBE.totalProfit,
+      ],
+    },
   },
   joins: {
     Customers: {

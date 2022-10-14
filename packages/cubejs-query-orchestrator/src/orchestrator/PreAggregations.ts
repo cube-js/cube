@@ -141,6 +141,21 @@ type IndexDescription = {
   indexName: string;
 };
 
+type PreAggJob = {
+  request: string,
+  context: { securityContext: any },
+  preagg: string,
+  table: string,
+  target: string,
+  structure: string,
+  content: string,
+  updated: string,
+  key: any[],
+  status: string;
+  timezone: string,
+  dataSource: string,
+};
+
 export type LambdaOptions = {
   maxSourceRows: number
 };
@@ -438,6 +453,7 @@ type LoadPreAggregationResult = {
   lastUpdatedAt: number;
   buildRangeEnd?: string;
   lambdaTable?: InlineTable;
+  queryKey?: any[];
 };
 
 export class PreAggregationLoader {
@@ -449,6 +465,13 @@ export class PreAggregationLoader {
   private preAggregationsTablesToTempTables: any;
 
   private loadCache: any;
+
+  /**
+   * Determines whether current instance instantiated for a jobed build query
+   * (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint) or
+   * not.
+   */
+  private isJob: boolean;
 
   private waitForRenew: boolean;
 
@@ -482,6 +505,7 @@ export class PreAggregationLoader {
     this.preAggregation = preAggregation;
     this.preAggregationsTablesToTempTables = preAggregationsTablesToTempTables;
     this.loadCache = loadCache;
+    this.isJob = !!options.isJob;
     this.waitForRenew = options.waitForRenew;
     this.forceBuild = options.forceBuild;
     this.orphanedTimeout = options.orphanedTimeout;
@@ -510,9 +534,28 @@ export class PreAggregationLoader {
   ): Promise<null | LoadPreAggregationResult> {
     const notLoadedKey = (this.preAggregation.invalidateKeyQueries || [])
       .find(keyQuery => !this.loadCache.hasKeyQueryResult(keyQuery));
-    if (notLoadedKey && !this.waitForRenew) {
-      const structureVersion = getStructureVersion(this.preAggregation);
 
+    if (this.isJob || !(notLoadedKey && !this.waitForRenew)) {
+      // Case 1: pre-agg build job processing.
+      // Case 2: either we have no data cached for this rollup or waitForRenew
+      // is true, either way, synchronously renew what data is needed so that
+      // the most current data will be returned fo the current request.
+      const result = await this.loadPreAggregationWithKeys();
+      const refreshKeyValues = await this.getInvalidationKeyValues();
+      return {
+        ...result,
+        refreshKeyValues,
+        queryKey: this.isJob
+          // We need to return a queryKey value for the jobed build query
+          // (initialized by the /cubejs-system/v1/pre-aggregations/jobs 
+          // endpoint) as a part of the response to make it possible to get a
+          // query result from the cache by the other API call.
+          ? this.preAggregationQueryKey(refreshKeyValues)
+          : undefined,
+      };
+    } else {
+      // Case 3: pre-agg is exists
+      const structureVersion = getStructureVersion(this.preAggregation);
       const getVersionsStarted = new Date();
       const { byStructure } = await this.loadCache.getVersionEntries(this.preAggregation);
       this.logger('Load PreAggregations Tables', {
@@ -566,14 +609,6 @@ export class PreAggregationLoader {
         // no rollup has been built yet - build it synchronously as part of responding to this request
         return this.loadPreAggregationWithKeys();
       }
-    } else {
-      // either we have no data cached for this rollup or waitForRenew is true, either way,
-      // synchronously renew what data is needed so that the most current data will be returned for the current request
-      const result = await this.loadPreAggregationWithKeys();
-      return {
-        ...result,
-        refreshKeyValues: await this.getInvalidationKeyValues()
-      };
     }
   }
 
@@ -658,8 +693,19 @@ export class PreAggregationLoader {
         queryKey: this.preAggregationQueryKey(invalidationKeys),
         newVersionEntry
       });
-      await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
-      return mostRecentResult();
+      if (this.isJob) {
+        // We don't want to wait for the jobed build query result. So we run the
+        // executeInQueue method and immediately return the LoadPreAggregationResult object.
+        this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+        return {
+          targetTableName: this.targetTableName(newVersionEntry),
+          refreshKeyValues: [],
+          lastUpdatedAt: newVersionEntry.last_updated_at,
+        };
+      } else {
+        await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+        return mostRecentResult();
+      }
     }
 
     if (versionEntry) {
@@ -742,8 +788,8 @@ export class PreAggregationLoader {
   }
 
   protected async executeInQueue(invalidationKeys, priority, newVersionEntry) {
-    const query = await this.preAggregations.getQueue(this.preAggregation.dataSource);
-    return query.executeInQueue(
+    const queue = await this.preAggregations.getQueue(this.preAggregation.dataSource);
+    return queue.executeInQueue(
       'query',
       this.preAggregationQueryKey(invalidationKeys),
       {
@@ -753,6 +799,7 @@ export class PreAggregationLoader {
         requestId: this.requestId,
         invalidationKeys,
         forceBuild: this.forceBuild,
+        isJob: this.isJob,
         metadata: this.metadata,
         orphanedTimeout: this.orphanedTimeout,
       },
@@ -1294,9 +1341,17 @@ interface PreAggsPartiotionRangeLoaderOpts {
   metadata?: any;
   orphanedTimeout?: number;
   lambdaQuery?: LambdaQuery;
+  isJob?: boolean;
 }
 
 export class PreAggregationPartitionRangeLoader {
+  /**
+   * Determines whether current instance instantiated for a jobed build query
+   * (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint) or
+   * not.
+   */
+  protected isJob: boolean;
+
   protected waitForRenew: boolean;
 
   protected requestId: string;
@@ -1320,6 +1375,7 @@ export class PreAggregationPartitionRangeLoader {
       maxSourceRowLimit: 10000,
     },
   ) {
+    this.isJob = !!options.isJob;
     this.waitForRenew = options.waitForRenew;
     this.requestId = options.requestId;
     this.lambdaQuery = options.lambdaQuery;
@@ -1760,6 +1816,76 @@ export class PreAggregations {
       .map(k => k.replace(this.tablesUsedRedisKey(''), ''));
   }
 
+  /**
+   * Determines whether the partition table is already exists or not.
+   */
+  public async isPartitionExist(
+    request: string,
+    external: boolean,
+    dataSource = 'default',
+    schema: string,
+    table: string,
+    key: any[],
+    token: string,
+  ): Promise<[boolean, string]> {
+    // fetching tables
+    const loadCache = new PreAggregationLoadCache(
+      this.redisPrefix,
+      () => this.driverFactory(dataSource),
+      this.queryCache,
+      this,
+      {
+        requestId: request,
+        dataSource,
+        tablePrefixes: external ? null : [schema],
+      }
+    );
+    let tables: any[] = await loadCache.fetchTables(<PreAggregationDescription>{
+      external,
+      preAggregationsSchema: schema,
+    });
+    tables = tables.filter(row => `${schema}.${row.table_name}` === table);
+
+    // fetching query result
+    const { queueDriver } = this.queue[dataSource];
+    const conn = await queueDriver.createConnection();
+    const result = await conn.getResult(key);
+    queueDriver.release(conn);
+
+    // calculating status
+    let status: string;
+    if (tables.length === 1) {
+      status = 'done';
+    } else {
+      status = result && result.error
+        ? `failure: ${result.error}`
+        : 'missing_partition';
+    }
+
+    // updating jobs cache if needed
+    if (result) {
+      const preAggJob: PreAggJob = await this
+        .queryCache
+        .getCacheDriver()
+        .get(`PRE_AGG_JOB_${token}`);
+
+      await this
+        .queryCache
+        .getCacheDriver()
+        .set(
+          `PRE_AGG_JOB_${token}`,
+          {
+            ...preAggJob,
+            status,
+          },
+          86400,
+        );
+    }
+
+    // returning response
+    return [true, status];
+  }
+
   public loadAllPreAggregationsIfNeeded(queryBody) {
     const preAggregations = queryBody.preAggregations || [];
 
@@ -1804,6 +1930,7 @@ export class PreAggregations {
         {
           maxPartitions: this.options.maxPartitions,
           maxSourceRowLimit: this.options.maxSourceRowLimit,
+          isJob: queryBody.isJob,
           waitForRenew: queryBody.renewQuery,
           // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
           forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,
@@ -2071,8 +2198,8 @@ export class PreAggregations {
   }
 
   public async getQueueState(dataSource: string) {
-    const query = await this.getQueue(dataSource);
-    const queries = await query.getQueries();
+    const queue = await this.getQueue(dataSource);
+    const queries = await queue.getQueries();
     return queries;
   }
 

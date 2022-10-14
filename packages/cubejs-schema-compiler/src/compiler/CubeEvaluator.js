@@ -207,12 +207,34 @@ export class CubeEvaluator extends CubeSymbols {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
+  /**
+   * Returns pre-aggregations filtered by the spcified selector.
+   * @param {{
+   *  scheduled: boolean,
+   *  dataSource: Array<string>,
+   *  cubes: Array<string>,
+   *  preAggregationIds: Array<string>
+   * }} filter pre-aggregations selector
+   * @returns {*}
+   */
   preAggregations(filter) {
-    const { scheduled, cubes, preAggregationIds } = filter || {};
+    const { scheduled, dataSources, cubes, preAggregationIds } = filter || {};
     const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
 
     return Object.keys(this.evaluatedCubes)
-      .filter(cube => !cubes || cubes.includes(cube))
+      .filter((cube) => (
+        (
+          !cubes ||
+          (cubes && cubes.length === 0) ||
+          cubes.includes(cube)
+        ) && (
+          !dataSources ||
+          (dataSources && dataSources.length === 0) ||
+          dataSources.includes(
+            this.evaluatedCubes[cube].dataSource || 'default'
+          )
+        )
+      ))
       .map(cube => {
         const preAggregations = this.preAggregationsForCube(cube);
         return Object.keys(preAggregations)
@@ -222,6 +244,7 @@ export class CubeEvaluator extends CubeSymbols {
               preAggregations[preAggregationName].scheduledRefresh
             ) && (
               !preAggregationIds ||
+              (preAggregationIds && preAggregationIds.length === 0) ||
               preAggregationIds.includes(idFactory({
                 cube, preAggregationName
               }))

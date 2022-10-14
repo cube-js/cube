@@ -52,6 +52,11 @@ export class OrchestratorApi {
     await this.orchestrator.forceReconcile(datasource);
   }
 
+  /**
+   * Push query to the queue, fetch and return result if query takes
+   * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
+   * error otherwise.
+   */
   public async executeQuery(query) {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
@@ -67,6 +72,14 @@ export class OrchestratorApi {
         this.orchestrator.loadRefreshKeys(query) :
         this.orchestrator.fetchQuery(query);
 
+      if (query.isJob) {
+        // We want to immediately resolve and return a jobed build query result
+        // (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint)
+        // because the following stack was optimized for such behavior.
+        const job = await fetchQueryPromise;
+        return job;
+      }
+      
       fetchQueryPromise = pt.timeout(fetchQueryPromise, this.continueWaitTimeout * 1000);
 
       const data = await fetchQueryPromise;
@@ -203,6 +216,29 @@ export class OrchestratorApi {
         throw e;
       }
     }
+  }
+
+  /**
+   * Determines whether the partition table already exists or not.
+   */
+  public async isPartitionExist(
+    request: string,
+    external: boolean,
+    dataSource = 'default',
+    schema: string,
+    table: string,
+    key: any[],
+    token: string,
+  ): Promise<[boolean, string]> {
+    return this.orchestrator.isPartitionExist(
+      request,
+      external,
+      dataSource,
+      schema,
+      table,
+      key,
+      token,
+    );
   }
 
   public async release() {
