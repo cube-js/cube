@@ -3,22 +3,22 @@ pub mod minio;
 pub mod queue;
 pub mod s3;
 
-use crate::config::injection::DIService;
-use crate::di_service;
-use crate::util::lock::acquire_lock;
-use crate::CubeError;
+use crate::{config::injection::DIService, di_service, util::lock::acquire_lock, CubeError};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::cube_ext;
-use futures::future::BoxFuture;
-use futures::FutureExt;
+use futures::{future::BoxFuture, FutureExt};
 use log::debug;
-use std::fmt::Debug;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::{
+    fmt::Debug,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tempfile::{NamedTempFile, PathPersistError};
-use tokio::fs;
-use tokio::sync::{Mutex, RwLock};
+use tokio::{
+    fs,
+    sync::{Mutex, RwLock},
+};
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
@@ -389,12 +389,13 @@ impl LocalDirRemoteFs {
 
 #[cfg(test)]
 mod tests {
-    use super::s3::S3RemoteFs;
-    use super::*;
-    use std::io::prelude::*;
-    use std::path::{Path, PathBuf};
-    use std::sync::Arc;
-    use std::{env, fs};
+    use super::{s3::S3RemoteFs, *};
+    use std::{
+        env, fs,
+        io::prelude::*,
+        path::{Path, PathBuf},
+        sync::Arc,
+    };
     use uuid::Uuid;
 
     #[derive(Clone)]

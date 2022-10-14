@@ -4,38 +4,37 @@ use std::sync::Arc;
 
 use warp::{Filter, Rejection, Reply};
 
-use crate::codegen::http_message_generated::{
-    get_root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
-    HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
-    HttpRowArgs,
+use crate::{
+    codegen::http_message_generated::{
+        get_root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
+        HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
+        HttpRowArgs,
+    },
+    metastore::{Column, ColumnType, ImportFormat},
+    mysql::SqlAuthService,
+    sql::{InlineTable, InlineTables, SqlQueryContext, SqlService},
+    store::DataFrame,
+    table::TableValue,
+    util::WorkerLoop,
+    CubeError,
 };
-use crate::metastore::{Column, ColumnType, ImportFormat};
-use crate::mysql::SqlAuthService;
-use crate::sql::{InlineTable, InlineTables, SqlQueryContext, SqlService};
-use crate::store::DataFrame;
-use crate::table::TableValue;
-use crate::util::WorkerLoop;
-use crate::CubeError;
 use async_std::fs::File;
 use datafusion::cube_ext;
 use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
 use hex::ToHex;
 use http_auth_basic::Credentials;
-use log::error;
-use log::info;
-use log::trace;
+use log::{error, info, trace};
 use serde::Deserialize;
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::net::SocketAddr;
+use std::{collections::HashMap, convert::TryFrom, net::SocketAddr};
 use tempfile::NamedTempFile;
-use tokio::io::BufReader;
-use tokio::sync::mpsc;
+use tokio::{io::BufReader, sync::mpsc};
 use tokio_util::sync::CancellationToken;
-use warp::filters::ws::{Message, Ws};
-use warp::http::StatusCode;
-use warp::reject::Reject;
+use warp::{
+    filters::ws::{Message, Ws},
+    http::StatusCode,
+    reject::Reject,
+};
 
 pub struct HttpServer {
     bind_address: String,
@@ -587,14 +586,16 @@ impl HttpMessage {
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::http_message_generated::{
-        HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs,
+    use crate::{
+        codegen::http_message_generated::{
+            HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs,
+        },
+        http::{HttpCommand, HttpMessage},
+        metastore::{Column, ColumnType},
+        sql::{timestamp_from_string, InlineTable},
+        store::DataFrame,
+        table::{Row, TableValue},
     };
-    use crate::http::{HttpCommand, HttpMessage};
-    use crate::metastore::{Column, ColumnType};
-    use crate::sql::{timestamp_from_string, InlineTable};
-    use crate::store::DataFrame;
-    use crate::table::{Row, TableValue};
     use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
     use indoc::indoc;
     use std::sync::Arc;

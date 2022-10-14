@@ -1,15 +1,18 @@
-use crate::queryplanner::planning::WorkerExec;
-use crate::queryplanner::query_executor::ClusterSendExec;
-use datafusion::error::DataFusionError;
-use datafusion::physical_plan::expressions::Column;
-use datafusion::physical_plan::filter::FilterExec;
-use datafusion::physical_plan::hash_aggregate::{AggregateStrategy, HashAggregateExec};
-use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::merge_sort::MergeSortExec;
-use datafusion::physical_plan::planner::compute_aggregation_strategy;
-use datafusion::physical_plan::projection::ProjectionExec;
-use datafusion::physical_plan::union::UnionExec;
-use datafusion::physical_plan::ExecutionPlan;
+use crate::queryplanner::{planning::WorkerExec, query_executor::ClusterSendExec};
+use datafusion::{
+    error::DataFusionError,
+    physical_plan::{
+        expressions::Column,
+        filter::FilterExec,
+        hash_aggregate::{AggregateStrategy, HashAggregateExec},
+        merge::MergeExec,
+        merge_sort::MergeSortExec,
+        planner::compute_aggregation_strategy,
+        projection::ProjectionExec,
+        union::UnionExec,
+        ExecutionPlan,
+    },
+};
 use std::sync::Arc;
 
 /// Attempts to replace hash aggregate with sorted aggregate.

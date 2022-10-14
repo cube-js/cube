@@ -22,6 +22,5 @@ mod sketch;
 mod sparse;
 mod state;
 
-pub use error::Result;
-pub use error::ZetaError;
+pub use error::{Result, ZetaError};
 pub use sketch::HyperLogLogPlusPlus;

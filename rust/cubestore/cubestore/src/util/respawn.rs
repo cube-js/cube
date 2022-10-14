@@ -1,15 +1,22 @@
-use std::collections::HashMap;
-use std::process::{exit, Child};
+use std::{
+    collections::HashMap,
+    process::{exit, Child},
+};
 
 use ipc_channel::ipc::{IpcOneShotServer, IpcSender};
-use mysql_common::serde::de::DeserializeOwned;
-use mysql_common::serde::Serialize;
+use mysql_common::serde::{de::DeserializeOwned, Serialize};
 
-use crate::sys::process::{avoid_child_zombies, die_with_parent};
-use crate::CubeError;
-use std::any::type_name;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::RwLock;
+use crate::{
+    sys::process::{avoid_child_zombies, die_with_parent},
+    CubeError,
+};
+use std::{
+    any::type_name,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        RwLock,
+    },
+};
 
 /// Handler for [Args] must be registered prior to this call, both in main and child processes.
 pub fn respawn<Args: Serialize + DeserializeOwned>(

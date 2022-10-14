@@ -1,8 +1,10 @@
-use crate::config::ConfigObj;
-use crate::di_service;
-use crate::remotefs::{RemoteFile, RemoteFs};
-use crate::util::lock::acquire_lock;
-use crate::CubeError;
+use crate::{
+    config::ConfigObj,
+    di_service,
+    remotefs::{RemoteFile, RemoteFs},
+    util::lock::acquire_lock,
+    CubeError,
+};
 use async_trait::async_trait;
 use core::fmt;
 use datafusion::cube_ext;
@@ -10,13 +12,11 @@ use deadqueue::unlimited;
 use futures::future::join_all;
 use log::error;
 use smallvec::alloc::fmt::Formatter;
-use std::collections::HashSet;
-use std::fmt::Debug;
-use std::fs::Metadata;
-use std::path::Path;
-use std::sync::Arc;
-use tokio::sync::{broadcast, watch, RwLock};
-use tokio::time::Duration;
+use std::{collections::HashSet, fmt::Debug, fs::Metadata, path::Path, sync::Arc};
+use tokio::{
+    sync::{broadcast, watch, RwLock},
+    time::Duration,
+};
 
 pub struct QueueRemoteFs {
     config: Arc<dyn ConfigObj>,
@@ -451,11 +451,8 @@ impl QueueRemoteFs {
 mod test {
 
     use super::*;
-    use crate::config::Config;
-    use crate::remotefs::LocalDirRemoteFs;
-    use std::env;
-    use std::fs::File;
-    use std::io::Write;
+    use crate::{config::Config, remotefs::LocalDirRemoteFs};
+    use std::{env, fs::File, io::Write};
     enum MockFSError {
         None,
         WrongSize,

@@ -1,74 +1,75 @@
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
-use arrow::array::*;
-use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
+use arrow::{array::*, compute::kernels::cast_utils::string_to_timestamp_nanos};
 use async_trait::async_trait;
-use chrono::format::Fixed::Nanosecond3;
-use chrono::format::Item::{Fixed, Literal, Numeric, Space};
-use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
-use chrono::format::Pad::Zero;
-use chrono::format::Parsed;
-use chrono::{DateTime, ParseResult, TimeZone, Utc};
-use datafusion::cube_ext;
-use datafusion::physical_plan::ExecutionPlan;
-use datafusion::sql::parser::Statement as DFStatement;
+use chrono::{
+    format::{
+        Fixed::Nanosecond3,
+        Item::{Fixed, Literal, Numeric, Space},
+        Numeric::{Day, Hour, Minute, Month, Second, Year},
+        Pad::Zero,
+        Parsed,
+    },
+    DateTime, ParseResult, TimeZone, Utc,
+};
+use datafusion::{cube_ext, physical_plan::ExecutionPlan, sql::parser::Statement as DFStatement};
 use futures::future::join_all;
 use hex::FromHex;
 use itertools::Itertools;
 use log::trace;
-use rand::distributions::Uniform;
-use rand::{thread_rng, Rng};
+use rand::{distributions::Uniform, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use sqlparser::ast::*;
-use sqlparser::dialect::Dialect;
+use sqlparser::{ast::*, dialect::Dialect};
 use tempfile::TempDir;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
-use tokio::time::timeout;
+use tokio::{fs::File, io::AsyncWriteExt, time::timeout};
 use tracing::instrument;
 use tracing_futures::WithSubscriber;
 
 use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
-use crate::cluster::{Cluster, JobEvent, JobResultListener};
-use crate::config::injection::DIService;
-use crate::config::ConfigObj;
-use crate::import::limits::ConcurrencyLimits;
-use crate::import::{parse_space_separated_binstring, ImportService, Ingestion};
-use crate::metastore::job::JobType;
-use crate::metastore::multi_index::MultiIndex;
-use crate::metastore::source::SourceCredentials;
-use crate::metastore::{
-    is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
-    IndexType, MetaStoreTable, RowKey, Schema, TableId,
-};
-use crate::queryplanner::panic::PanicWorkerNode;
-use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
-use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec, QueryExecutor};
-use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
-use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
-use crate::remotefs::RemoteFs;
-use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
-use crate::store::ChunkDataStore;
-use crate::table::{data, Row, TableValue, TimestampValue};
-use crate::telemetry::incoming_traffic_agent_event;
-use crate::util::decimal::Decimal;
-use crate::util::strings::path_to_string;
-use crate::CubeError;
 use crate::{
     app_metrics,
-    metastore::{Column, ColumnType, MetaStore},
-    store::DataFrame,
+    cluster::{Cluster, JobEvent, JobResultListener},
+    config::{injection::DIService, ConfigObj},
+    import::{
+        limits::ConcurrencyLimits, parse_space_separated_binstring, ImportService, Ingestion,
+    },
+    metastore::{
+        is_valid_plain_binary_hll, job::JobType, multi_index::MultiIndex,
+        source::SourceCredentials, table::Table, Column, ColumnType, HllFlavour, IdRow,
+        ImportFormat, Index, IndexDef, IndexType, MetaStore, MetaStoreTable, RowKey, Schema,
+        TableId,
+    },
+    queryplanner::{
+        panic::PanicWorkerNode,
+        pretty_printers::{pp_phys_plan, pp_plan},
+        query_executor::{batch_to_dataframe, ClusterSendExec, QueryExecutor},
+        serialized_plan::{RowFilter, SerializedPlan},
+        PlanningMeta, QueryPlan, QueryPlanner,
+    },
+    remotefs::RemoteFs,
+    sql::{
+        cache::SqlResultCache,
+        parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand},
+    },
+    store::{ChunkDataStore, DataFrame},
+    table::{data, Row, TableValue, TimestampValue},
+    telemetry::incoming_traffic_agent_event,
+    util::{decimal::Decimal, strings::path_to_string},
+    CubeError,
 };
 use data::create_array_builder;
-use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
-use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
+use datafusion::{
+    cube_ext::catch_unwind::async_try_with_catch_unwind,
+    physical_plan::parquet::NoopParquetMetadataCache,
+};
 use std::mem::take;
 
 pub mod cache;
@@ -1638,37 +1639,34 @@ fn parse_decimal(cell: &Expr, scale: u8) -> Result<Decimal, CubeError> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
-    use std::io::Write;
-    use std::path::PathBuf;
-    use std::time::Duration;
-    use std::{env, fs};
+    use std::{env, fs, fs::File, io::Write, path::PathBuf, time::Duration};
 
     use async_compression::tokio::write::GzipEncoder;
     use futures_timer::Delay;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use rocksdb::{Options, DB};
     use tokio::io::{AsyncWriteExt, BufWriter};
     use uuid::Uuid;
 
-    use crate::cluster::MockCluster;
-    use crate::config::{Config, FileStoreProvider};
-    use crate::import::MockImportService;
-    use crate::metastore::metastore_fs::RocksMetaStoreFs;
-    use crate::metastore::RocksMetaStore;
-    use crate::queryplanner::query_executor::MockQueryExecutor;
-    use crate::queryplanner::MockQueryPlanner;
-    use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
-    use crate::store::ChunkStore;
+    use crate::{
+        cluster::MockCluster,
+        config::{Config, FileStoreProvider},
+        import::MockImportService,
+        metastore::{metastore_fs::RocksMetaStoreFs, RocksMetaStore},
+        queryplanner::{query_executor::MockQueryExecutor, MockQueryPlanner},
+        remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs},
+        store::ChunkStore,
+    };
 
     use super::*;
-    use crate::queryplanner::pretty_printers::pp_phys_plan;
-    use crate::remotefs::queue::QueueRemoteFs;
-    use crate::scheduler::SchedulerImpl;
-    use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
+    use crate::{
+        queryplanner::pretty_printers::pp_phys_plan,
+        remotefs::queue::QueueRemoteFs,
+        scheduler::SchedulerImpl,
+        table::data::{cmp_min_rows, cmp_row_key_heap},
+    };
     use regex::Regex;
 
     #[tokio::test]

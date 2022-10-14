@@ -14,12 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use crate::data::{alpha, estimate_bias, linear_counting_threshold};
-use crate::encoding::{NormalEncoding, SparseEncoding};
-use crate::error::Result;
-use crate::sparse::SparseRepresentation;
-use crate::state::State;
-use crate::ZetaError;
+use crate::{
+    data::{alpha, estimate_bias, linear_counting_threshold},
+    encoding::{NormalEncoding, SparseEncoding},
+    error::Result,
+    sparse::SparseRepresentation,
+    state::State,
+    ZetaError,
+};
 use std::cmp::max;
 
 /// Implementation of the normal HLL++ representation.

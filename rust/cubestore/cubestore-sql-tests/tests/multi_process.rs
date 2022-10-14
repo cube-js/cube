@@ -1,6 +1,5 @@
 //! Runs the SQL tests with 2 select worker processes.
-use cubestore::config::Config;
-use cubestore::util::respawn;
+use cubestore::{config::Config, util::respawn};
 use cubestore_sql_tests::run_sql_tests;
 use tokio::runtime::Builder;
 

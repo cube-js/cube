@@ -2,23 +2,23 @@ use super::{
     AggregateFunction, BaseRocksSecondaryIndex, Column, ColumnType, DataFrameValue, IndexId,
     RocksSecondaryIndex, RocksTable, TableId,
 };
-use crate::data_frame_from;
-use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
-use crate::queryplanner::udfs::aggregate_udf_by_kind;
-use crate::queryplanner::udfs::CubeAggregateUDFKind;
-use crate::rocks_table_impl;
-use crate::{base_rocks_secondary_index, CubeError};
+use crate::{
+    base_rocks_secondary_index, data_frame_from,
+    metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema},
+    queryplanner::udfs::{aggregate_udf_by_kind, CubeAggregateUDFKind},
+    rocks_table_impl, CubeError,
+};
 use arrow::datatypes::Schema as ArrowSchema;
 use byteorder::{BigEndian, WriteBytesExt};
-use chrono::DateTime;
-use chrono::Utc;
-use datafusion::physical_plan::expressions::{Column as FusionColumn, Max, Min, Sum};
-use datafusion::physical_plan::{udaf, AggregateExpr, PhysicalExpr};
+use chrono::{DateTime, Utc};
+use datafusion::physical_plan::{
+    expressions::{Column as FusionColumn, Max, Min, Sum},
+    udaf, AggregateExpr, PhysicalExpr,
+};
 use itertools::Itertools;
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::io::Write;
-use std::sync::Arc;
+use std::{io::Write, sync::Arc};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct AggregateColumnIndex {

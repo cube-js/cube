@@ -1,11 +1,8 @@
-use crate::metastore::MetaStoreEvent;
-use crate::CubeError;
+use crate::{metastore::MetaStoreEvent, CubeError};
 use async_trait::async_trait;
 use log::error;
 use std::sync::Arc;
-use tokio::sync::broadcast::Receiver;
-use tokio::sync::Mutex;
-use tokio::sync::Notify;
+use tokio::sync::{broadcast::Receiver, Mutex, Notify};
 
 #[async_trait]
 pub trait MetastoreListener: Send + Sync {

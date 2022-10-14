@@ -1,29 +1,34 @@
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::panic;
-use std::process::{Child, ExitStatus};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    fmt::Debug,
+    marker::PhantomData,
+    panic,
+    process::{Child, ExitStatus},
+    sync::Arc,
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use deadqueue::unlimited;
 use futures::future::join_all;
-use ipc_channel::ipc;
-use ipc_channel::ipc::{IpcReceiver, IpcSender};
+use ipc_channel::{
+    ipc,
+    ipc::{IpcReceiver, IpcSender},
+};
 use log::error;
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use tokio::runtime::Builder;
-use tokio::sync::oneshot::Sender;
-use tokio::sync::{oneshot, watch, Notify, RwLock};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tokio::{
+    runtime::Builder,
+    sync::{oneshot, oneshot::Sender, watch, Notify, RwLock},
+};
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
-use crate::config::{Config, WorkerServices};
-use crate::util::respawn::respawn;
-use crate::CubeError;
-use datafusion::cube_ext;
-use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
+use crate::{
+    config::{Config, WorkerServices},
+    util::respawn::respawn,
+    CubeError,
+};
+use datafusion::{cube_ext, cube_ext::catch_unwind::async_try_with_catch_unwind};
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -363,8 +368,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use std::time::Duration;
+    use std::{sync::Arc, time::Duration};
 
     use arrow::datatypes::{DataType, Field, Schema};
     use async_trait::async_trait;
@@ -373,11 +377,13 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use tokio::runtime::Builder;
 
-    use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
-    use crate::config::WorkerServices;
-    use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
-    use crate::util::respawn;
-    use crate::CubeError;
+    use crate::{
+        cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool},
+        config::WorkerServices,
+        queryplanner::serialized_plan::SerializedLogicalPlan,
+        util::respawn,
+        CubeError,
+    };
     use datafusion::cube_ext;
 
     #[ctor::ctor]

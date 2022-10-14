@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use datafusion::error::DataFusionError;
-use datafusion::logical_plan::LogicalPlan;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::{error::DataFusionError, logical_plan::LogicalPlan, physical_plan::ExecutionPlan};
 
 /// Recursively applies a transformation on each node and rewrites the plan. The plan is traversed
 /// bottom-up, top-down information can be propagated via context, see [PlanRewriter] for details.

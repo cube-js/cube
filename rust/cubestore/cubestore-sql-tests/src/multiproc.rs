@@ -8,10 +8,8 @@
 use async_trait::async_trait;
 use cubestore::util::respawn::respawn;
 use ipc_channel::ipc::{IpcBytesReceiver, IpcBytesSender};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use std::fmt::Debug;
-use std::time::Duration;
+use serde::{de::DeserializeOwned, Serialize};
+use std::{fmt::Debug, time::Duration};
 
 /// Runs the multi-process test as instructed by the passed specification. More concretely:
 ///     1. Starts a number of worker processes.

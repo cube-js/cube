@@ -2,53 +2,63 @@
 pub mod injection;
 pub mod processing_loop;
 
-use crate::cluster::transport::{
-    ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
+use crate::{
+    cluster::{
+        transport::{
+            ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
+        },
+        Cluster, ClusterImpl, ClusterMetaStoreClient,
+    },
+    config::{
+        injection::{DIService, Injector},
+        processing_loop::ProcessingLoop,
+    },
+    http::HttpServer,
+    import::{limits::ConcurrencyLimits, ImportService, ImportServiceImpl},
+    metastore::{
+        metastore_fs::{MetaStoreFs, RocksMetaStoreFs},
+        MetaStore, MetaStoreRpcClient, RocksMetaStore,
+    },
+    mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService},
+    queryplanner::{
+        query_executor::{QueryExecutor, QueryExecutorImpl},
+        QueryPlanner, QueryPlannerImpl,
+    },
+    remotefs::{
+        gcs::GCSRemoteFs, minio::MINIORemoteFs, queue::QueueRemoteFs, s3::S3RemoteFs,
+        LocalDirRemoteFs, RemoteFs,
+    },
+    scheduler::SchedulerImpl,
+    sql::{SqlService, SqlServiceImpl},
+    store::{
+        compaction::{CompactionService, CompactionServiceImpl},
+        ChunkDataStore, ChunkStore, WALDataStore, WALStore,
+    },
+    streaming::{StreamingService, StreamingServiceImpl},
+    table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl},
+    telemetry::{
+        start_agent_event_loop, start_track_event_loop, stop_agent_event_loop,
+        stop_track_event_loop,
+    },
+    CubeError,
 };
-use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
-use crate::config::injection::{DIService, Injector};
-use crate::config::processing_loop::ProcessingLoop;
-use crate::http::HttpServer;
-use crate::import::limits::ConcurrencyLimits;
-use crate::import::{ImportService, ImportServiceImpl};
-use crate::metastore::metastore_fs::{MetaStoreFs, RocksMetaStoreFs};
-use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
-use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
-use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
-use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
-use crate::remotefs::gcs::GCSRemoteFs;
-use crate::remotefs::minio::MINIORemoteFs;
-use crate::remotefs::queue::QueueRemoteFs;
-use crate::remotefs::s3::S3RemoteFs;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
-use crate::scheduler::SchedulerImpl;
-use crate::sql::{SqlService, SqlServiceImpl};
-use crate::store::compaction::{CompactionService, CompactionServiceImpl};
-use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
-use crate::streaming::{StreamingService, StreamingServiceImpl};
-use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
-use crate::telemetry::{
-    start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
+use datafusion::{
+    cube_ext,
+    physical_plan::parquet::{LruParquetMetadataCache, NoopParquetMetadataCache},
 };
-use crate::CubeError;
-use datafusion::cube_ext;
-use datafusion::physical_plan::parquet::{LruParquetMetadataCache, NoopParquetMetadataCache};
 use futures::future::join_all;
-use log::Level;
-use log::{debug, error};
+use log::{debug, error, Level};
 use mockall::automock;
 use rocksdb::{Options, DB};
 use simple_logger::SimpleLogger;
-use std::fmt::Display;
-use std::future::Future;
-use std::path::PathBuf;
-use std::pin::Pin;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::{env, fs};
-use tokio::sync::broadcast;
-use tokio::task::JoinHandle;
-use tokio::time::{timeout_at, Duration, Instant};
+use std::{
+    env, fmt::Display, fs, future::Future, path::PathBuf, pin::Pin, str::FromStr, sync::Arc,
+};
+use tokio::{
+    sync::broadcast,
+    task::JoinHandle,
+    time::{timeout_at, Duration, Instant},
+};
 
 #[derive(Clone)]
 pub struct CubeServices {

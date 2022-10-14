@@ -1,29 +1,30 @@
-use crate::config::injection::DIService;
-use crate::config::ConfigObj;
-use crate::metastore::source::SourceCredentials;
-use crate::metastore::table::Table;
-use crate::metastore::{Column, ColumnType, IdRow, MetaStore};
-use crate::sql::timestamp_from_string;
-use crate::store::ChunkDataStore;
-use crate::table::data::{append_row, create_array_builders};
-use crate::table::{Row, TableValue};
-use crate::util::decimal::Decimal;
-use crate::CubeError;
+use crate::{
+    config::{injection::DIService, ConfigObj},
+    metastore::{source::SourceCredentials, table::Table, Column, ColumnType, IdRow, MetaStore},
+    sql::timestamp_from_string,
+    store::ChunkDataStore,
+    table::{
+        data::{append_row, create_array_builders},
+        Row, TableValue,
+    },
+    util::decimal::Decimal,
+    CubeError,
+};
 use arrow::array::ArrayBuilder;
 use async_trait::async_trait;
 use datafusion::cube_ext::ordfloat::OrdF64;
-use futures::future::join_all;
-use futures::stream::StreamExt;
-use futures::Stream;
+use futures::{future::join_all, stream::StreamExt, Stream};
 use itertools::{EitherOrBoth, Itertools};
 use json::JsonValue;
 use log::debug;
 use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
-use std::io::{Cursor, Write};
-use std::pin::Pin;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::{
+    io::{Cursor, Write},
+    pin::Pin,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 #[cfg(debug_assertions)]
 use stream_debug::MockStreamingSource;
 use warp::hyper::body::Bytes;

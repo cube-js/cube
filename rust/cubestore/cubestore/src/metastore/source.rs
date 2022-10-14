@@ -1,7 +1,9 @@
 use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, TableId};
-use crate::base_rocks_secondary_index;
-use crate::metastore::{DataFrameValue, IdRow, MetaStoreEvent};
-use crate::rocks_table_impl;
+use crate::{
+    base_rocks_secondary_index,
+    metastore::{DataFrameValue, IdRow, MetaStoreEvent},
+    rocks_table_impl,
+};
 use byteorder::{BigEndian, WriteBytesExt};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer, Serialize};

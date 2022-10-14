@@ -17,6 +17,5 @@ mod error;
 mod instance;
 mod sketch;
 
-pub use error::HllError;
-pub use error::Result;
+pub use error::{HllError, Result};
 pub use sketch::HllSketch;

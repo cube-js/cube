@@ -1,19 +1,26 @@
-use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
-use crate::queryplanner::hll::Hll;
-use crate::CubeError;
-use arrow::array::{Array, BinaryArray, TimestampNanosecondArray, UInt64Builder};
-use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
+use crate::{
+    queryplanner::{
+        coalesce::{coalesce, SUPPORTED_COALESCE_TYPES},
+        hll::Hll,
+    },
+    CubeError,
+};
+use arrow::{
+    array::{Array, BinaryArray, TimestampNanosecondArray, UInt64Builder},
+    datatypes::{DataType, IntervalUnit, TimeUnit},
+};
 use chrono::{TimeZone, Utc};
-use datafusion::cube_ext::datetime::{date_addsub_array, date_addsub_scalar};
-use datafusion::error::DataFusionError;
-use datafusion::physical_plan::functions::Signature;
-use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::{type_coercion, Accumulator, ColumnarValue};
-use datafusion::scalar::ScalarValue;
+use datafusion::{
+    cube_ext::datetime::{date_addsub_array, date_addsub_scalar},
+    error::DataFusionError,
+    physical_plan::{
+        functions::Signature, type_coercion, udaf::AggregateUDF, udf::ScalarUDF, Accumulator,
+        ColumnarValue,
+    },
+    scalar::ScalarValue,
+};
 use serde_derive::{Deserialize, Serialize};
-use smallvec::smallvec;
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
 use std::sync::Arc;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]

@@ -1,8 +1,11 @@
-use crate::queryplanner::planning::WorkerExec;
-use crate::queryplanner::query_executor::ClusterSendExec;
-use datafusion::error::DataFusionError;
-use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
-use datafusion::physical_plan::ExecutionPlan;
+use crate::queryplanner::{planning::WorkerExec, query_executor::ClusterSendExec};
+use datafusion::{
+    error::DataFusionError,
+    physical_plan::{
+        hash_aggregate::{AggregateMode, HashAggregateExec},
+        ExecutionPlan,
+    },
+};
 use std::sync::Arc;
 
 /// Transforms from:

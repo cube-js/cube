@@ -1,10 +1,12 @@
-use sqlparser::ast::{
-    HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement, Value,
+use sqlparser::{
+    ast::{
+        HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement,
+        Value,
+    },
+    dialect::{keywords::Keyword, Dialect},
+    parser::{Parser, ParserError},
+    tokenizer::{Token, Tokenizer},
 };
-use sqlparser::dialect::keywords::Keyword;
-use sqlparser::dialect::Dialect;
-use sqlparser::parser::{Parser, ParserError};
-use sqlparser::tokenizer::{Token, Tokenizer};
 
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}

@@ -1,5 +1,4 @@
-use crate::table::data::concat_record_batches;
-use crate::CubeError;
+use crate::{table::data::concat_record_batches, CubeError};
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use futures::StreamExt;

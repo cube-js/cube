@@ -1,15 +1,14 @@
-use cubestore::app_metrics;
-use cubestore::config::{validate_config, Config, CubeServices};
-use cubestore::http::status::serve_status_probes;
-use cubestore::telemetry::{init_agent_sender, track_event};
-use cubestore::util::logger::init_cube_logger;
-use cubestore::util::metrics::init_metrics;
-use cubestore::util::{metrics, spawn_malloc_trim_loop};
+use cubestore::{
+    app_metrics,
+    config::{validate_config, Config, CubeServices},
+    http::status::serve_status_probes,
+    telemetry::{init_agent_sender, track_event},
+    util::{logger::init_cube_logger, metrics, metrics::init_metrics, spawn_malloc_trim_loop},
+};
 use datafusion::cube_ext;
 use log::debug;
 use serde_json::Value;
-use std::collections::HashMap;
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 use tokio::runtime::Builder;
 
 const PACKAGE_JSON: &'static str = std::include_str!("../../../package.json");

@@ -7,61 +7,71 @@ pub mod worker_pool;
 #[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 
-use crate::ack_error;
-use crate::cluster::message::NetworkMessage;
-use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
-use crate::config::injection::{DIService, Injector};
-use crate::config::{is_router, WorkerServices};
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
-use crate::import::ImportService;
-use crate::metastore::chunks::chunk_file_name;
-use crate::metastore::job::{Job, JobStatus, JobType};
-use crate::metastore::table::Table;
-use crate::metastore::{
-    deactivate_table_on_corrupt_data, Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey,
-    TableId,
+use crate::{
+    ack_error,
+    cluster::{
+        message::NetworkMessage,
+        transport::{ClusterTransport, MetaStoreTransport, WorkerConnection},
+    },
+    config::{
+        injection::{DIService, Injector},
+        is_router, WorkerServices,
+    },
+    import::ImportService,
+    metastore::{
+        chunks::chunk_file_name,
+        deactivate_table_on_corrupt_data,
+        job::{Job, JobStatus, JobType},
+        table::Table,
+        Chunk, IdRow, MetaStore, MetaStoreEvent, MetaStoreRpcClientTransport,
+        MetaStoreRpcMethodCall, MetaStoreRpcMethodResult, MetaStoreRpcServer, Partition, RowKey,
+        TableId,
+    },
+    queryplanner::{
+        query_executor::{QueryExecutor, SerializedRecordBatchStream},
+        serialized_plan::SerializedPlan,
+    },
+    remotefs::RemoteFs,
+    store::{compaction::CompactionService, ChunkDataStore},
+    util::aborting_join_handle::AbortingJoinHandle,
+    CubeError,
 };
-use crate::metastore::{
-    MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
-    MetaStoreRpcServer,
-};
-use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchStream};
-use crate::queryplanner::serialized_plan::SerializedPlan;
-use crate::remotefs::RemoteFs;
-use crate::store::compaction::CompactionService;
-use crate::store::ChunkDataStore;
-use crate::util::aborting_join_handle::AbortingJoinHandle;
-use crate::CubeError;
-use arrow::datatypes::SchemaRef;
-use arrow::error::ArrowError;
-use arrow::record_batch::RecordBatch;
+use arrow::{datatypes::SchemaRef, error::ArrowError, record_batch::RecordBatch};
 use async_trait::async_trait;
 use core::mem;
-use datafusion::cube_ext;
-use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
+use datafusion::{
+    cube_ext,
+    physical_plan::{RecordBatchStream, SendableRecordBatchStream},
+};
 use flatbuffers::bitflags::_core::pin::Pin;
-use futures::future::join_all;
-use futures::task::{Context, Poll};
-use futures::{Future, Stream};
+use futures::{
+    future::join_all,
+    task::{Context, Poll},
+    Future, Stream,
+};
 use futures_timer::Delay;
 use itertools::Itertools;
 use log::{debug, error, info, warn};
 use mockall::automock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
-use std::sync::Weak;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use std::time::SystemTime;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::sync::{oneshot, watch, Notify, RwLock};
-use tokio::task::JoinHandle;
-use tokio::time::timeout;
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
+    sync::{Arc, Mutex, Weak},
+    time::{Duration, SystemTime},
+};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    sync::{
+        broadcast::{Receiver, Sender},
+        oneshot, watch, Notify, RwLock,
+    },
+    task::JoinHandle,
+    time::timeout,
+};
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
 

@@ -1,6 +1,8 @@
 //! Helpers to match on returned rows in tests.
-use cubestore::table::{TableValue, TimestampValue};
-use cubestore::util::decimal::Decimal;
+use cubestore::{
+    table::{TableValue, TimestampValue},
+    util::decimal::Decimal,
+};
 
 pub const NULL: () = ();
 

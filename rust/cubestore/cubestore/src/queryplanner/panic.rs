@@ -1,14 +1,12 @@
 use crate::queryplanner::planning::WorkerExec;
 use arrow::datatypes::{Schema, SchemaRef};
 use async_trait::async_trait;
-use datafusion::error::DataFusionError;
-use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
-use datafusion::physical_plan::{
-    ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
+use datafusion::{
+    error::DataFusionError,
+    logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode},
+    physical_plan::{ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream},
 };
-use std::any::Any;
-use std::fmt::Formatter;
-use std::sync::Arc;
+use std::{any::Any, fmt::Formatter, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct PanicWorkerNode {}

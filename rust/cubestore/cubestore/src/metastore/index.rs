@@ -2,8 +2,10 @@ use super::{
     BaseRocksSecondaryIndex, Column, Index, IndexId, IndexType, RocksSecondaryIndex, RocksTable,
     TableId,
 };
-use crate::metastore::{IdRow, MetaStoreEvent};
-use crate::{rocks_table_impl, CubeError};
+use crate::{
+    metastore::{IdRow, MetaStoreEvent},
+    rocks_table_impl, CubeError,
+};
 use byteorder::{BigEndian, WriteBytesExt};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};

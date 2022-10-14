@@ -15,8 +15,7 @@
  * limitations under the License.
  */
 
-use crate::error::Result;
-use crate::ZetaError;
+use crate::{error::Result, ZetaError};
 
 /// Difference encoding can efficiently store sorted integers by storing only the difference
 /// between them, rather than their absolute values. Since the deltas between values should be small,

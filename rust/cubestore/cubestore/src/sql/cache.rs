@@ -1,11 +1,9 @@
-use crate::queryplanner::serialized_plan::SerializedPlan;
-use crate::sql::InlineTables;
-use crate::store::DataFrame;
-use crate::CubeError;
+use crate::{
+    queryplanner::serialized_plan::SerializedPlan, sql::InlineTables, store::DataFrame, CubeError,
+};
 use futures::Future;
 use log::trace;
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 use tokio::sync::{watch, RwLock};
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug)]
@@ -114,21 +112,22 @@ impl SqlResultCache {
 
 #[cfg(test)]
 mod tests {
-    use crate::queryplanner::serialized_plan::SerializedPlan;
-    use crate::queryplanner::PlanningMeta;
-    use crate::sql::cache::SqlResultCache;
-    use crate::sql::InlineTables;
-    use crate::store::DataFrame;
-    use crate::table::{Row, TableValue};
-    use crate::CubeError;
+    use crate::{
+        queryplanner::{serialized_plan::SerializedPlan, PlanningMeta},
+        sql::{cache::SqlResultCache, InlineTables},
+        store::DataFrame,
+        table::{Row, TableValue},
+        CubeError,
+    };
     use datafusion::logical_plan::{DFSchema, LogicalPlan};
     use flatbuffers::bitflags::_core::sync::atomic::AtomicI64;
     use futures::future::join_all;
     use futures_timer::Delay;
-    use std::collections::HashMap;
-    use std::sync::atomic::Ordering;
-    use std::sync::Arc;
-    use std::time::Duration;
+    use std::{
+        collections::HashMap,
+        sync::{atomic::Ordering, Arc},
+        time::Duration,
+    };
 
     #[tokio::test]
     async fn simple() -> Result<(), CubeError> {

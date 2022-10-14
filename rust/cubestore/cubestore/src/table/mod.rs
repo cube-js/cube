@@ -1,19 +1,23 @@
 use crate::util::decimal::Decimal;
 
-use arrow::array::{
-    Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
-    Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
-    Int64Decimal4Array, Int64Decimal5Array, StringArray, TimestampMicrosecondArray,
+use arrow::{
+    array::{
+        Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
+        Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
+        Int64Decimal4Array, Int64Decimal5Array, StringArray, TimestampMicrosecondArray,
+    },
+    datatypes::{DataType, TimeUnit},
 };
-use arrow::datatypes::{DataType, TimeUnit};
 
 use chrono::{SecondsFormat, TimeZone, Utc};
 use datafusion::cube_ext::ordfloat::OrdF64;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::fmt;
-use std::fmt::{Debug, Formatter};
+use std::{
+    cmp::Ordering,
+    fmt,
+    fmt::{Debug, Formatter},
+};
 
 pub mod data;
 pub(crate) mod parquet;
@@ -207,8 +211,10 @@ pub fn cmp_same_types(l: &TableValue, r: &TableValue) -> Ordering {
 
 #[cfg(test)]
 mod tests {
-    use crate::table::{TableValue, TimestampValue};
-    use crate::util::decimal::Decimal;
+    use crate::{
+        table::{TableValue, TimestampValue},
+        util::decimal::Decimal,
+    };
     use serde::{Deserialize, Serialize};
 
     #[test]

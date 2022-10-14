@@ -1,9 +1,12 @@
-use crate::metastore::partition::partition_file_name;
-use crate::metastore::{IdRow, MetaStore, MetaStoreTable, Partition};
-use crate::queryplanner::InfoSchemaTableDef;
-use crate::CubeError;
-use arrow::array::{ArrayRef, BooleanArray, StringArray, UInt64Array};
-use arrow::datatypes::{DataType, Field};
+use crate::{
+    metastore::{partition::partition_file_name, IdRow, MetaStore, MetaStoreTable, Partition},
+    queryplanner::InfoSchemaTableDef,
+    CubeError,
+};
+use arrow::{
+    array::{ArrayRef, BooleanArray, StringArray, UInt64Array},
+    datatypes::{DataType, Field},
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 

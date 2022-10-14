@@ -1,6 +1,5 @@
 use crate::CubeError;
-use std::ffi::OsString;
-use std::path::PathBuf;
+use std::{ffi::OsString, path::PathBuf};
 
 pub fn path_to_string(p: PathBuf) -> Result<String, CubeError> {
     os_to_string(p.into_os_string())

@@ -2,18 +2,18 @@ mod execute;
 mod plan;
 
 pub use execute::AggregateTopKExec;
-pub use plan::materialize_topk;
-pub use plan::plan_topk;
+pub use plan::{materialize_topk, plan_topk};
 
 use crate::queryplanner::planning::Snapshots;
 use arrow::compute::SortOptions;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
 use itertools::Itertools;
-use serde::Deserialize;
-use serde::Serialize;
-use std::any::Any;
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
+use serde::{Deserialize, Serialize};
+use std::{
+    any::Any,
+    fmt::{Display, Formatter},
+    sync::Arc,
+};
 
 /// Workers will split their local results into batches of at least this size.
 pub const MIN_TOPK_STREAM_ROWS: usize = 1024;

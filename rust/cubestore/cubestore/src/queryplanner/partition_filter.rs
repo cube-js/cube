@@ -1,8 +1,12 @@
-use crate::table::{cmp_same_types, TableValue};
-use crate::util::decimal::Decimal;
+use crate::{
+    table::{cmp_same_types, TableValue},
+    util::decimal::Decimal,
+};
 use arrow::datatypes::{DataType, Schema};
-use datafusion::logical_plan::{Column, Expr, Operator};
-use datafusion::scalar::ScalarValue;
+use datafusion::{
+    logical_plan::{Column, Expr, Operator},
+    scalar::ScalarValue,
+};
 use std::cmp::Ordering;
 
 #[derive(Debug)]
@@ -534,12 +538,13 @@ mod tests {
     use super::*;
     use crate::sql::parser::{CubeStoreParser, Statement as CubeStatement};
     use arrow::datatypes::Field;
-    use datafusion::catalog::TableReference;
-    use datafusion::datasource::TableProvider;
-    use datafusion::logical_plan::ToDFSchema;
-    use datafusion::physical_plan::udaf::AggregateUDF;
-    use datafusion::physical_plan::udf::ScalarUDF;
-    use datafusion::sql::planner::{ContextProvider, SqlToRel};
+    use datafusion::{
+        catalog::TableReference,
+        datasource::TableProvider,
+        logical_plan::ToDFSchema,
+        physical_plan::{udaf::AggregateUDF, udf::ScalarUDF},
+        sql::planner::{ContextProvider, SqlToRel},
+    };
     use smallvec::alloc::sync::Arc;
     use sqlparser::ast::{Query, Select, SelectItem, SetExpr, Statement as SQLStatement};
 

@@ -1,19 +1,21 @@
-use crate::config::injection::DIService;
-use crate::config::ConfigObj;
-use crate::metastore::{RocksMetaStore, WriteBatchContainer};
-use crate::remotefs::RemoteFs;
-use crate::CubeError;
+use crate::{
+    config::{injection::DIService, ConfigObj},
+    metastore::{RocksMetaStore, WriteBatchContainer},
+    remotefs::RemoteFs,
+    CubeError,
+};
 use async_trait::async_trait;
 use datafusion::cube_ext;
 use futures::future::join_all;
 use log::{error, info, trace};
 use regex::Regex;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::SystemTime;
-use tokio::fs;
-use tokio::fs::File;
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Arc,
+    time::SystemTime,
+};
+use tokio::{fs, fs::File};
 
 #[async_trait]
 pub trait MetaStoreFs: DIService + Send + Sync {

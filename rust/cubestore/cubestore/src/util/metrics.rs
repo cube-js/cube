@@ -15,9 +15,10 @@
 //! Note that misconfiguration (invalid port, address, etc) can cause metric updates to be silently
 //! ignored. This is by design to avoid interrupting normal operation.
 use crate::CubeError;
-use std::net::ToSocketAddrs;
-use std::net::UdpSocket;
-use std::sync::Once;
+use std::{
+    net::{ToSocketAddrs, UdpSocket},
+    sync::Once,
+};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Compatibility {

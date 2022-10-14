@@ -1,7 +1,6 @@
 use crate::CubeError;
 use futures::TryFutureExt;
-use std::future::Future;
-use std::time::Duration;
+use std::{future::Future, time::Duration};
 use tracing::Instrument;
 
 pub async fn acquire_lock<F: Future>(name: &str, lock: F) -> Result<F::Output, CubeError> {

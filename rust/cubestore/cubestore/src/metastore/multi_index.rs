@@ -6,17 +6,19 @@
 //! Multi-partitioned are compacted and repartitioned by applying the same operation to ordinary
 //! partitions they own.
 use super::RocksTable;
-use crate::data_frame_from;
-use crate::metastore::{
-    BaseRocksSecondaryIndex, Column, IdRow, IndexId, MetaStoreEvent, RocksSecondaryIndex, TableId,
+use crate::{
+    data_frame_from,
+    metastore::{
+        BaseRocksSecondaryIndex, Column, IdRow, IndexId, MetaStoreEvent, RocksSecondaryIndex,
+        TableId,
+    },
+    rocks_table_impl,
+    table::Row,
 };
-use crate::rocks_table_impl;
-use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::io::Cursor;
-use std::io::Write;
+use std::io::{Cursor, Write};
 
 data_frame_from! {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]

@@ -14,14 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use crate::difference_encoding::{DifferenceDecoder, DifferenceEncoder};
-use crate::encoding::SparseEncoding;
-use crate::normal::NormalRepresentation;
-use crate::state::State;
-use crate::Result;
-use crate::ZetaError;
-use std::cmp::min;
-use std::collections::BTreeSet;
+use crate::{
+    difference_encoding::{DifferenceDecoder, DifferenceEncoder},
+    encoding::SparseEncoding,
+    normal::NormalRepresentation,
+    state::State,
+    Result, ZetaError,
+};
+use std::{cmp::min, collections::BTreeSet};
 
 #[derive(Debug, Clone)]
 pub struct SparseRepresentation {

@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 use protobuf::ProtobufError;
-use std::fmt::{Display, Formatter};
-use std::num::TryFromIntError;
+use std::{
+    fmt::{Display, Formatter},
+    num::TryFromIntError,
+};
 
 pub type Result<T> = std::result::Result<T, ZetaError>;
 

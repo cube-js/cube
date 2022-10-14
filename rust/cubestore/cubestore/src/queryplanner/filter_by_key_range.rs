@@ -1,20 +1,19 @@
-use crate::queryplanner::serialized_plan::{RowFilter, RowRange};
-use crate::table::data::cmp_partition_key;
-use arrow::array::ArrayRef;
-use arrow::datatypes::SchemaRef;
-use arrow::error::ArrowError;
-use arrow::record_batch::RecordBatch;
+use crate::{
+    queryplanner::serialized_plan::{RowFilter, RowRange},
+    table::data::cmp_partition_key,
+};
+use arrow::{array::ArrayRef, datatypes::SchemaRef, error::ArrowError, record_batch::RecordBatch};
 use async_trait::async_trait;
-use datafusion::cube_ext::stream::StreamWithSchema;
-use datafusion::error::DataFusionError;
-use datafusion::physical_plan::{
-    Distribution, ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
+use datafusion::{
+    cube_ext::stream::StreamWithSchema,
+    error::DataFusionError,
+    physical_plan::{
+        Distribution, ExecutionPlan, OptimizerHints, Partitioning, SendableRecordBatchStream,
+    },
 };
 use futures::StreamExt;
 use itertools::Itertools;
-use std::any::Any;
-use std::cmp::Ordering;
-use std::sync::Arc;
+use std::{any::Any, cmp::Ordering, sync::Arc};
 
 #[derive(Debug)]
 pub struct FilterByKeyRangeExec {

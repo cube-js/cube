@@ -1,20 +1,26 @@
-use crate::config::processing_loop::ProcessingLoop;
-use crate::sql::{InlineTables, SqlQueryContext, SqlService};
-use crate::table::TableValue;
-use crate::util::time_span::warn_long;
-use crate::{metastore, CubeError};
+use crate::{
+    config::processing_loop::ProcessingLoop,
+    metastore,
+    sql::{InlineTables, SqlQueryContext, SqlService},
+    table::TableValue,
+    util::time_span::warn_long,
+    CubeError,
+};
 use async_trait::async_trait;
 use datafusion::cube_ext;
 use hex::ToHex;
 use log::{error, info, warn};
 use msql_srv::*;
-use std::convert::TryFrom;
-use std::io;
-use std::sync::Arc;
-use std::time::Duration;
-use std::time::SystemTime;
-use tokio::net::TcpListener;
-use tokio::sync::{watch, RwLock};
+use std::{
+    convert::TryFrom,
+    io,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
+use tokio::{
+    net::TcpListener,
+    sync::{watch, RwLock},
+};
 
 struct Backend {
     sql_service: Arc<dyn SqlService>,

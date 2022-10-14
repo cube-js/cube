@@ -1,13 +1,11 @@
-use crate::config::injection::Injector;
-use crate::config::{is_router, uses_remote_metastore, Config};
-use crate::metastore::MetaStore;
-use crate::sql::SqlService;
-use crate::CubeError;
-use std::convert::Infallible;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use warp::http::StatusCode;
-use warp::Filter;
+use crate::{
+    config::{injection::Injector, is_router, uses_remote_metastore, Config},
+    metastore::MetaStore,
+    sql::SqlService,
+    CubeError,
+};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc};
+use warp::{http::StatusCode, Filter};
 
 pub fn serve_status_probes(c: &Config) {
     let addr = match c.config_obj().status_bind_address() {

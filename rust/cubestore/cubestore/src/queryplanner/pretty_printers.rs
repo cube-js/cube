@@ -2,45 +2,43 @@
 
 use bigdecimal::ToPrimitive;
 
-use datafusion::cube_ext::alias::LogicalAlias;
-use datafusion::datasource::TableProvider;
-use datafusion::logical_plan::{LogicalPlan, PlanVisitor};
-use datafusion::physical_plan::filter::FilterExec;
-use datafusion::physical_plan::hash_aggregate::{
-    AggregateMode, AggregateStrategy, HashAggregateExec,
+use datafusion::{
+    cube_ext::alias::LogicalAlias,
+    datasource::TableProvider,
+    logical_plan::{LogicalPlan, PlanVisitor},
+    physical_plan::{
+        filter::FilterExec,
+        hash_aggregate::{AggregateMode, AggregateStrategy, HashAggregateExec},
+        hash_join::HashJoinExec,
+        limit::{GlobalLimitExec, LocalLimitExec},
+        merge_join::MergeJoinExec,
+        merge_sort::{LastRowByUniqueKeyExec, MergeReSortExec, MergeSortExec},
+        sort::SortExec,
+        ExecutionPlan,
+    },
 };
-use datafusion::physical_plan::hash_join::HashJoinExec;
-use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
-use datafusion::physical_plan::merge_join::MergeJoinExec;
-use datafusion::physical_plan::merge_sort::{
-    LastRowByUniqueKeyExec, MergeReSortExec, MergeSortExec,
-};
-use datafusion::physical_plan::sort::SortExec;
-use datafusion::physical_plan::ExecutionPlan;
 use itertools::{repeat_n, Itertools};
 
-use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
-use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
-use crate::queryplanner::planning::{ClusterSendNode, Snapshot, WorkerExec};
-use crate::queryplanner::query_executor::{
-    ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider,
+use crate::queryplanner::{
+    filter_by_key_range::FilterByKeyRangeExec,
+    panic::{PanicWorkerExec, PanicWorkerNode},
+    planning::{ClusterSendNode, Snapshot, WorkerExec},
+    query_executor::{ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider},
+    serialized_plan::{IndexSnapshot, RowRange},
+    topk::{AggregateTopKExec, ClusterAggregateTopK, SortColumn},
+    CubeTableLogical,
 };
-use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
-use crate::queryplanner::topk::ClusterAggregateTopK;
-use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
-use crate::queryplanner::CubeTableLogical;
-use datafusion::cube_ext::join::CrossJoinExec;
-use datafusion::cube_ext::joinagg::CrossJoinAggExec;
-use datafusion::cube_ext::rolling::RollingWindowAggExec;
-use datafusion::cube_ext::rolling::RollingWindowAggregate;
-use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::expressions::Column;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::parquet::ParquetExec;
-use datafusion::physical_plan::projection::ProjectionExec;
-use datafusion::physical_plan::skip::SkipExec;
-use datafusion::physical_plan::union::UnionExec;
+use datafusion::{
+    cube_ext::{
+        join::CrossJoinExec,
+        joinagg::CrossJoinAggExec,
+        rolling::{RollingWindowAggExec, RollingWindowAggregate},
+    },
+    physical_plan::{
+        empty::EmptyExec, expressions::Column, memory::MemoryExec, merge::MergeExec,
+        parquet::ParquetExec, projection::ProjectionExec, skip::SkipExec, union::UnionExec,
+    },
+};
 
 #[derive(Default, Clone, Copy)]
 pub struct PPOptions {

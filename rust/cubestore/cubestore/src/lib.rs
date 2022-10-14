@@ -16,8 +16,7 @@
 extern crate lazy_static;
 extern crate core;
 
-use crate::metastore::TableId;
-use crate::remotefs::queue::RemoteFsOpResult;
+use crate::{metastore::TableId, remotefs::queue::RemoteFsOpResult};
 use arrow::error::ArrowError;
 use cubehll::HllError;
 use cubezetasketch::ZetaError;
@@ -27,15 +26,17 @@ use log::SetLoggerError;
 use parquet::errors::ParquetError;
 use serde_derive::{Deserialize, Serialize};
 use sqlparser::parser::ParserError;
-use std::backtrace::Backtrace;
-use std::fmt;
-use std::fmt::Display;
-use std::fmt::{Debug, Formatter};
-use std::num::ParseIntError;
-use std::sync::PoisonError;
-use tokio::sync::broadcast;
-use tokio::sync::mpsc::error::SendError;
-use tokio::time::error::Elapsed;
+use std::{
+    backtrace::Backtrace,
+    fmt,
+    fmt::{Debug, Display, Formatter},
+    num::ParseIntError,
+    sync::PoisonError,
+};
+use tokio::{
+    sync::{broadcast, mpsc::error::SendError},
+    time::error::Elapsed,
+};
 
 pub mod app_metrics;
 pub mod cluster;
@@ -56,8 +57,7 @@ pub mod table;
 pub mod telemetry;
 pub mod util;
 
-pub use datafusion::cube_ext::spawn;
-pub use datafusion::cube_ext::spawn_blocking;
+pub use datafusion::cube_ext::{spawn, spawn_blocking};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CubeError {

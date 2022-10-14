@@ -1,8 +1,10 @@
 //! We keep all CubeStore metrics in one place for discoverability.
 //! The convention is to prefix all metrics with `cs.` (short for CubeStore).
 
-use crate::util::metrics;
-use crate::util::metrics::{Counter, Histogram};
+use crate::util::{
+    metrics,
+    metrics::{Counter, Histogram},
+};
 
 /// The number of process startups.
 pub static STARTUPS: Counter = metrics::counter("cs.startup");

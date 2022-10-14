@@ -16,8 +16,7 @@
  */
 
 use crate::error::Result;
-use protobuf::rt::ProtobufVarint;
-use protobuf::{wire_format, CodedInputStream, CodedOutputStream};
+use protobuf::{rt::ProtobufVarint, wire_format, CodedInputStream, CodedOutputStream};
 use std::convert::TryFrom;
 
 /// This is actually an enum from .proto file. This is the only place that would require `protoc`,

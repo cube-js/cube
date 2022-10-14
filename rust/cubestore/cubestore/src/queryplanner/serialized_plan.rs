@@ -1,35 +1,37 @@
-use crate::metastore::table::{Table, TablePath};
-use crate::metastore::{Chunk, IdRow, Index, Partition};
-use crate::queryplanner::panic::PanicWorkerNode;
-use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta, Snapshots};
-use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableProvider};
-use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
-use crate::queryplanner::udfs::aggregate_udf_by_kind;
-use crate::queryplanner::udfs::{
-    aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
-    CubeScalarUDFKind,
+use crate::{
+    metastore::{
+        table::{Table, TablePath},
+        Chunk, IdRow, Index, Partition,
+    },
+    queryplanner::{
+        panic::PanicWorkerNode,
+        planning::{ClusterSendNode, PlanningMeta, Snapshots},
+        query_executor::{CubeTable, InlineTableId, InlineTableProvider},
+        topk::{ClusterAggregateTopK, SortColumn},
+        udfs::{
+            aggregate_kind_by_name, aggregate_udf_by_kind, scalar_kind_by_name, scalar_udf_by_kind,
+            CubeAggregateUDFKind, CubeScalarUDFKind,
+        },
+    },
+    table::Row,
+    CubeError,
 };
-use crate::table::Row;
-use crate::CubeError;
-use arrow::datatypes::DataType;
-use arrow::record_batch::RecordBatch;
-use datafusion::cube_ext::alias::LogicalAlias;
-use datafusion::cube_ext::join::SkewedLeftCrossJoin;
-use datafusion::cube_ext::joinagg::CrossJoinAgg;
-use datafusion::cube_ext::rolling::RollingWindowAggregate;
-use datafusion::logical_plan::window_frames::WindowFrameBound;
-use datafusion::logical_plan::{
-    Column, DFSchemaRef, Expr, JoinConstraint, JoinType, LogicalPlan, Operator, Partitioning,
-    PlanVisitor,
+use arrow::{datatypes::DataType, record_batch::RecordBatch};
+use datafusion::{
+    cube_ext::{
+        alias::LogicalAlias, join::SkewedLeftCrossJoin, joinagg::CrossJoinAgg,
+        rolling::RollingWindowAggregate,
+    },
+    logical_plan::{
+        window_frames::WindowFrameBound, Column, DFSchemaRef, Expr, JoinConstraint, JoinType,
+        LogicalPlan, Operator, Partitioning, PlanVisitor,
+    },
+    physical_plan::{aggregates, functions, parquet::ParquetMetadataCache},
+    scalar::ScalarValue,
 };
-use datafusion::physical_plan::parquet::ParquetMetadataCache;
-use datafusion::physical_plan::{aggregates, functions};
-use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
 use sqlparser::ast::RollingOffset;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default, Eq, PartialEq)]
 pub struct RowRange {

@@ -1,16 +1,14 @@
 use crate::to_rows;
 use async_trait::async_trait;
-use cubestore::cluster::Cluster;
-use cubestore::config::{env_parse, Config, CubeServices};
-use cubestore::table::TableValue;
-use cubestore::util::strings::path_to_string;
-use cubestore::CubeError;
+use cubestore::{
+    cluster::Cluster,
+    config::{env_parse, Config, CubeServices},
+    table::TableValue,
+    util::strings::path_to_string,
+    CubeError,
+};
 use flate2::read::GzDecoder;
-use std::any::Any;
-use std::io::Cursor;
-use std::path::Path;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{any::Any, io::Cursor, path::Path, sync::Arc, time::Duration};
 use tar::Archive;
 use tokio::time::timeout;
 

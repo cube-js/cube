@@ -29,11 +29,12 @@
 ///
 /// Note that this aggregator is *not* designed to be thread safe.
 use crate::error::Result;
-use crate::normal::NormalRepresentation;
-use crate::sparse::SparseRepresentation;
-use crate::state::aggregator_state_proto::AGGREGATOR_TYPE_HYPERLOGLOG_PLUS_UNIQUE;
-use crate::state::State;
-use crate::ZetaError;
+use crate::{
+    normal::NormalRepresentation,
+    sparse::SparseRepresentation,
+    state::{aggregator_state_proto::AGGREGATOR_TYPE_HYPERLOGLOG_PLUS_UNIQUE, State},
+    ZetaError,
+};
 use protobuf::CodedInputStream;
 
 #[derive(Debug, Clone)]

@@ -15,8 +15,7 @@ pub use malloc_trim_loop::spawn_malloc_trim_loop;
 
 use crate::CubeError;
 use log::error;
-use std::future::Future;
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 

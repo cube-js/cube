@@ -1,24 +1,25 @@
-use crate::di_service;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
-use crate::util::lock::acquire_lock;
-use crate::CubeError;
+use crate::{
+    di_service,
+    remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs},
+    util::lock::acquire_lock,
+    CubeError,
+};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use datafusion::cube_ext;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
-use s3::creds::Credentials;
-use s3::{Bucket, Region};
-use std::env;
-use std::fmt;
-use std::fmt::Formatter;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use s3::{creds::Credentials, Bucket, Region};
+use std::{
+    env, fmt,
+    fmt::Formatter,
+    io::Write,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tempfile::NamedTempFile;
-use tokio::fs;
-use tokio::sync::Mutex;
+use tokio::{fs, sync::Mutex};
 
 pub struct S3RemoteFs {
     dir: PathBuf,

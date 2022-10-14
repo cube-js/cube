@@ -1,7 +1,9 @@
 use pin_project::{pin_project, pinned_drop};
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{self, Poll};
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{self, Poll},
+};
 use tokio::task::{JoinError, JoinHandle};
 
 #[pin_project(PinnedDrop)]

@@ -1,10 +1,10 @@
-use crate::cluster::message::NetworkMessage;
-use crate::config::injection::DIService;
-use crate::config::ConfigObj;
-use crate::CubeError;
+use crate::{
+    cluster::message::NetworkMessage,
+    config::{injection::DIService, ConfigObj},
+    CubeError,
+};
 use async_trait::async_trait;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use tokio::net::TcpStream;
 
 /// Client-side connection for exchanging messages between the server and the client.

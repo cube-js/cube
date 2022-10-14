@@ -15,57 +15,72 @@ pub mod info_schema;
 pub mod now;
 pub mod udfs;
 
-use crate::config::injection::DIService;
-use crate::config::ConfigObj;
-use crate::metastore::multi_index::MultiPartition;
-use crate::metastore::table::{Table, TablePath};
-use crate::metastore::{IdRow, MetaStore};
-use crate::queryplanner::info_schema::info_schema_schemata::SchemataInfoSchemaTableDef;
-use crate::queryplanner::info_schema::info_schema_tables::TablesInfoSchemaTableDef;
-use crate::queryplanner::info_schema::system_chunks::SystemChunksTableDef;
-use crate::queryplanner::info_schema::system_indexes::SystemIndexesTableDef;
-use crate::queryplanner::info_schema::system_jobs::SystemJobsTableDef;
-use crate::queryplanner::info_schema::system_partitions::SystemPartitionsTableDef;
-use crate::queryplanner::info_schema::system_tables::SystemTablesTableDef;
-use crate::queryplanner::now::MaterializeNow;
-use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
-use crate::queryplanner::query_executor::{
-    batch_to_dataframe, ClusterSendExec, InlineTableProvider,
+use crate::{
+    app_metrics,
+    config::{injection::DIService, ConfigObj},
+    metastore,
+    metastore::{
+        multi_index::MultiPartition,
+        table::{Table, TablePath},
+        IdRow, MetaStore,
+    },
+    queryplanner::{
+        info_schema::{
+            info_schema_schemata::SchemataInfoSchemaTableDef,
+            info_schema_tables::TablesInfoSchemaTableDef, system_chunks::SystemChunksTableDef,
+            system_indexes::SystemIndexesTableDef, system_jobs::SystemJobsTableDef,
+            system_partitions::SystemPartitionsTableDef, system_tables::SystemTablesTableDef,
+        },
+        now::MaterializeNow,
+        planning::{choose_index_ext, ClusterSendNode},
+        query_executor::{batch_to_dataframe, ClusterSendExec, InlineTableProvider},
+        serialized_plan::SerializedPlan,
+        topk::ClusterAggregateTopK,
+        udfs::{
+            aggregate_udf_by_kind, scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind,
+        },
+    },
+    sql::InlineTables,
+    store::DataFrame,
+    CubeError,
 };
-use crate::queryplanner::serialized_plan::SerializedPlan;
-use crate::queryplanner::topk::ClusterAggregateTopK;
-use crate::queryplanner::udfs::aggregate_udf_by_kind;
-use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
-use crate::sql::InlineTables;
-use crate::store::DataFrame;
-use crate::{app_metrics, metastore, CubeError};
-use arrow::array::ArrayRef;
-use arrow::datatypes::Field;
-use arrow::record_batch::RecordBatch;
-use arrow::{datatypes::Schema, datatypes::SchemaRef};
+use arrow::{
+    array::ArrayRef,
+    datatypes::{Field, Schema, SchemaRef},
+    record_batch::RecordBatch,
+};
 use async_trait::async_trait;
 use core::fmt;
-use datafusion::catalog::TableReference;
-use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
-use datafusion::error::DataFusionError;
-use datafusion::logical_plan::{Expr, LogicalPlan, PlanVisitor};
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, SendableRecordBatchStream};
-use datafusion::prelude::ExecutionConfig;
-use datafusion::sql::parser::Statement;
-use datafusion::sql::planner::{ContextProvider, SqlToRel};
-use datafusion::{cube_ext, datasource::TableProvider, prelude::ExecutionContext};
+use datafusion::{
+    catalog::TableReference,
+    cube_ext,
+    datasource::{
+        datasource::{Statistics, TableProviderFilterPushDown},
+        TableProvider,
+    },
+    error::DataFusionError,
+    logical_plan::{Expr, LogicalPlan, PlanVisitor},
+    physical_plan::{
+        collect, memory::MemoryExec, udaf::AggregateUDF, udf::ScalarUDF, ExecutionPlan,
+        Partitioning, SendableRecordBatchStream,
+    },
+    prelude::{ExecutionConfig, ExecutionContext},
+    sql::{
+        parser::Statement,
+        planner::{ContextProvider, SqlToRel},
+    },
+};
 use log::{debug, trace};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::alloc::fmt::Formatter;
-use std::any::Any;
-use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
-use std::sync::Arc;
-use std::time::SystemTime;
+use std::{
+    any::Any,
+    collections::{HashMap, HashSet},
+    hash::{Hash, Hasher},
+    sync::Arc,
+    time::SystemTime,
+};
 
 #[automock]
 #[async_trait]

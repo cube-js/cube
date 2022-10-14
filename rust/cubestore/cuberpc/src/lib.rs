@@ -2,9 +2,12 @@ use inflector::Inflector;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::{format_ident, quote, ToTokens};
-use syn::parse::{Parse, ParseStream};
-use syn::spanned::Spanned;
-use syn::{parse_macro_input, FnArg, Item, Pat, ReturnType, TraitItem};
+use syn::{
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+    spanned::Spanned,
+    FnArg, Item, Pat, ReturnType, TraitItem,
+};
 
 #[proc_macro_attribute]
 pub fn service(_attr: TokenStream, input: TokenStream) -> proc_macro::TokenStream {

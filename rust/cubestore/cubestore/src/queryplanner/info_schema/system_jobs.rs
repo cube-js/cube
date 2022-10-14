@@ -1,9 +1,12 @@
-use crate::metastore::job::Job;
-use crate::metastore::{IdRow, MetaStore};
-use crate::queryplanner::InfoSchemaTableDef;
-use crate::CubeError;
-use arrow::array::{ArrayRef, StringArray, TimestampNanosecondArray, UInt64Array};
-use arrow::datatypes::{DataType, Field, TimeUnit};
+use crate::{
+    metastore::{job::Job, IdRow, MetaStore},
+    queryplanner::InfoSchemaTableDef,
+    CubeError,
+};
+use arrow::{
+    array::{ArrayRef, StringArray, TimestampNanosecondArray, UInt64Array},
+    datatypes::{DataType, Field, TimeUnit},
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 

@@ -1,21 +1,27 @@
-use crate::di_service;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
-use crate::util::lock::acquire_lock;
-use crate::CubeError;
+use crate::{
+    di_service,
+    remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs},
+    util::lock::acquire_lock,
+    CubeError,
+};
 use async_trait::async_trait;
 use cloud_storage::Object;
 use datafusion::cube_ext;
 use futures::StreamExt;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Once};
-use std::time::SystemTime;
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, Once},
+    time::SystemTime,
+};
 use tempfile::{NamedTempFile, PathPersistError};
-use tokio::fs;
-use tokio::fs::File;
-use tokio::io::{AsyncWriteExt, BufWriter};
-use tokio::sync::Mutex;
+use tokio::{
+    fs,
+    fs::File,
+    io::{AsyncWriteExt, BufWriter},
+    sync::Mutex,
+};
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 static INIT_CREDENTIALS: Once = Once::new();

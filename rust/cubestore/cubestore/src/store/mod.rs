@@ -1,25 +1,27 @@
 pub mod compaction;
 
 use async_trait::async_trait;
-use datafusion::physical_plan::collect;
-use datafusion::physical_plan::expressions::Column as FusionColumn;
-use datafusion::physical_plan::hash_aggregate::{
-    AggregateMode, AggregateStrategy, HashAggregateExec,
+use datafusion::physical_plan::{
+    collect,
+    expressions::Column as FusionColumn,
+    hash_aggregate::{AggregateMode, AggregateStrategy, HashAggregateExec},
+    memory::MemoryExec,
+    ExecutionPlan, PhysicalExpr,
 };
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 use serde::{de, Deserialize, Serialize};
 extern crate bincode;
 
 use bincode::{deserialize_from, serialize_into};
 
-use crate::metastore::{
-    deactivate_table_on_corrupt_data, table::Table, Chunk, Column, ColumnType, IdRow, Index,
-    IndexType, MetaStore, Partition, WAL,
+use crate::{
+    metastore::{
+        deactivate_table_on_corrupt_data, table::Table, Chunk, Column, ColumnType, IdRow, Index,
+        IndexType, MetaStore, Partition, WAL,
+    },
+    remotefs::{ensure_temp_file_is_dropped, RemoteFs},
+    table::{Row, TableValue},
+    CubeError,
 };
-use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
-use crate::table::{Row, TableValue};
-use crate::CubeError;
 use arrow::datatypes::{Schema, SchemaRef};
 use std::{
     fs::File,
@@ -27,24 +29,26 @@ use std::{
     sync::Arc,
 };
 
-use crate::cluster::Cluster;
-use crate::config::injection::DIService;
-use crate::config::ConfigObj;
-use crate::metastore::chunks::chunk_file_name;
-use crate::table::data::cmp_partition_key;
-use crate::table::parquet::{arrow_schema, ParquetTableStore};
-use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
-use arrow::record_batch::RecordBatch;
-use datafusion::cube_ext;
-use datafusion::cube_ext::util::lexcmp_array_rows;
+use crate::{
+    cluster::Cluster,
+    config::{injection::DIService, ConfigObj},
+    metastore::chunks::chunk_file_name,
+    table::{
+        data::cmp_partition_key,
+        parquet::{arrow_schema, ParquetTableStore},
+    },
+};
+use arrow::{
+    array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array},
+    record_batch::RecordBatch,
+};
+use datafusion::{cube_ext, cube_ext::util::lexcmp_array_rows};
 use futures::future::join_all;
 use itertools::Itertools;
 use log::trace;
 use mockall::automock;
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
+use std::{cmp::Ordering, collections::HashMap};
+use tokio::{sync::RwLock, task::JoinHandle};
 
 pub const ROW_GROUP_SIZE: usize = 16384; // TODO config
 
@@ -571,18 +575,22 @@ impl ChunkStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assert_eq_columns;
-    use crate::cluster::MockCluster;
-    use crate::config::Config;
-    use crate::metastore::metastore_fs::RocksMetaStoreFs;
-    use crate::metastore::{IndexDef, IndexType, RocksMetaStore};
-    use crate::remotefs::LocalDirRemoteFs;
-    use crate::table::data::{concat_record_batches, rows_to_columns};
-    use crate::{metastore::ColumnType, table::TableValue};
+    use crate::{
+        assert_eq_columns,
+        cluster::MockCluster,
+        config::Config,
+        metastore::{
+            metastore_fs::RocksMetaStoreFs, ColumnType, IndexDef, IndexType, RocksMetaStore,
+        },
+        remotefs::LocalDirRemoteFs,
+        table::{
+            data::{concat_record_batches, rows_to_columns},
+            TableValue,
+        },
+    };
     use arrow::array::{Int64Array, StringArray};
     use rocksdb::{Options, DB};
-    use std::fs;
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     #[tokio::test]
     async fn create_wal_test() {

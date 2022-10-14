@@ -1,38 +1,37 @@
-use crate::queryplanner::topk::SortColumn;
-use crate::queryplanner::udfs::read_sketch;
-use arrow::array::ArrayRef;
-use arrow::compute::SortOptions;
-use arrow::datatypes::SchemaRef;
-use arrow::error::ArrowError;
-use arrow::record_batch::RecordBatch;
+use crate::queryplanner::{topk::SortColumn, udfs::read_sketch};
+use arrow::{
+    array::ArrayRef, compute::SortOptions, datatypes::SchemaRef, error::ArrowError,
+    record_batch::RecordBatch,
+};
 use async_trait::async_trait;
-use datafusion::cube_ext;
-use datafusion::error::DataFusionError;
+use datafusion::{cube_ext, error::DataFusionError};
 
-use datafusion::physical_plan::common::collect;
-use datafusion::physical_plan::filter::FilterExec;
-use datafusion::physical_plan::group_scalar::GroupByScalar;
-use datafusion::physical_plan::hash_aggregate::{
-    create_accumulators, create_group_by_values, write_group_result_row, AccumulatorSet,
-    AggregateMode,
+use datafusion::{
+    physical_plan::{
+        common::collect,
+        filter::FilterExec,
+        group_scalar::GroupByScalar,
+        hash_aggregate::{
+            create_accumulators, create_group_by_values, write_group_result_row, AccumulatorSet,
+            AggregateMode,
+        },
+        limit::GlobalLimitExec,
+        memory::MemoryExec,
+        AggregateExpr, ExecutionPlan, OptimizerHints, Partitioning, PhysicalExpr,
+        SendableRecordBatchStream,
+    },
+    scalar::ScalarValue,
 };
-use datafusion::physical_plan::limit::GlobalLimitExec;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::{
-    AggregateExpr, ExecutionPlan, OptimizerHints, Partitioning, PhysicalExpr,
-    SendableRecordBatchStream,
-};
-use datafusion::scalar::ScalarValue;
 use flatbuffers::bitflags::_core::cmp::Ordering;
 use futures::{Stream, StreamExt};
 use itertools::Itertools;
-use smallvec::smallvec;
-use smallvec::SmallVec;
-use std::any::Any;
-use std::collections::BTreeSet;
-use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
-use std::sync::Arc;
+use smallvec::{smallvec, SmallVec};
+use std::{
+    any::Any,
+    collections::{BTreeSet, HashSet},
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TopKAggregateFunction {
@@ -856,24 +855,26 @@ fn to_empty_sketch(s: &mut ScalarValue) {
 mod tests {
     use super::*;
     use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
-    use arrow::array::{Array, ArrayRef, Int64Array};
-    use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-    use arrow::error::ArrowError;
-    use arrow::record_batch::RecordBatch;
-    use datafusion::catalog::catalog::MemoryCatalogList;
-    use datafusion::error::DataFusionError;
-    use datafusion::execution::context::{ExecutionConfig, ExecutionContextState, ExecutionProps};
-    use datafusion::logical_plan::{Column, DFField, DFSchema, Expr};
-    use datafusion::physical_plan::aggregates::AggregateFunction;
-    use datafusion::physical_plan::empty::EmptyExec;
-    use datafusion::physical_plan::memory::MemoryExec;
-    use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
-    use datafusion::physical_plan::ExecutionPlan;
+    use arrow::{
+        array::{Array, ArrayRef, Int64Array},
+        datatypes::{DataType, Field, Schema, SchemaRef},
+        error::ArrowError,
+        record_batch::RecordBatch,
+    };
+    use datafusion::{
+        catalog::catalog::MemoryCatalogList,
+        error::DataFusionError,
+        execution::context::{ExecutionConfig, ExecutionContextState, ExecutionProps},
+        logical_plan::{Column, DFField, DFSchema, Expr},
+        physical_plan::{
+            aggregates::AggregateFunction, empty::EmptyExec, memory::MemoryExec,
+            planner::DefaultPhysicalPlanner, ExecutionPlan,
+        },
+    };
     use futures::StreamExt;
     use itertools::Itertools;
 
-    use std::iter::FromIterator;
-    use std::sync::Arc;
+    use std::{iter::FromIterator, sync::Arc};
 
     #[tokio::test]
     async fn topk_simple() {

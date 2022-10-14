@@ -18,34 +18,40 @@ use rocksdb::{
     WriteBatchIterator, DB,
 };
 use serde::{Deserialize, Deserializer, Serialize};
-use std::hash::{Hash, Hasher};
-use std::{collections::hash_map::DefaultHasher, env, io::Cursor, sync::Arc, time};
-use tokio::fs;
-use tokio::sync::{oneshot, Notify, RwLock};
+use std::{
+    collections::hash_map::DefaultHasher,
+    env,
+    hash::{Hash, Hasher},
+    io::Cursor,
+    sync::Arc,
+    time,
+};
+use tokio::{
+    fs,
+    sync::{oneshot, Notify, RwLock},
+};
 
-use crate::config::injection::DIService;
-use crate::config::{Config, ConfigObj};
-use crate::metastore::chunks::{ChunkIndexKey, ChunkRocksIndex};
-use crate::metastore::index::IndexIndexKey;
-use crate::metastore::job::{Job, JobIndexKey, JobRocksIndex, JobRocksTable, JobStatus, JobType};
-use crate::metastore::multi_index::{
-    MultiIndexIndexKey, MultiPartition, MultiPartitionIndexKey, MultiPartitionRocksIndex,
-    MultiPartitionRocksTable,
+use crate::{
+    config::{injection::DIService, Config, ConfigObj},
+    metastore::{
+        chunks::{ChunkIndexKey, ChunkRocksIndex},
+        index::IndexIndexKey,
+        job::{Job, JobIndexKey, JobRocksIndex, JobRocksTable, JobStatus, JobType},
+        multi_index::{
+            MultiIndexIndexKey, MultiPartition, MultiPartitionIndexKey, MultiPartitionRocksIndex,
+            MultiPartitionRocksTable,
+        },
+        partition::PartitionIndexKey,
+        source::{Source, SourceCredentials, SourceIndexKey, SourceRocksIndex, SourceRocksTable},
+        table::{AggregateColumnIndex, TableIndexKey, TablePath},
+        wal::{WALIndexKey, WALRocksIndex},
+    },
+    remotefs::LocalDirRemoteFs,
+    table::{Row, TableValue},
+    util::{aborting_join_handle::AbortingJoinHandle, time_span::warn_long, WorkerLoop},
+    CubeError,
 };
-use crate::metastore::partition::PartitionIndexKey;
-use crate::metastore::source::{
-    Source, SourceCredentials, SourceIndexKey, SourceRocksIndex, SourceRocksTable,
-};
-use crate::metastore::table::{AggregateColumnIndex, TableIndexKey, TablePath};
-use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
-use crate::remotefs::LocalDirRemoteFs;
-use crate::table::{Row, TableValue};
-use crate::util::aborting_join_handle::AbortingJoinHandle;
-use crate::util::time_span::warn_long;
-use crate::util::WorkerLoop;
-use crate::CubeError;
-use arrow::datatypes::TimeUnit::Microsecond;
-use arrow::datatypes::{DataType, Field};
+use arrow::datatypes::{DataType, Field, TimeUnit::Microsecond};
 use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
 use core::{fmt, mem};
@@ -58,26 +64,26 @@ use itertools::Itertools;
 use log::trace;
 use metastore_fs::{MetaStoreFs, RocksMetaStoreFs};
 use multi_index::{MultiIndex, MultiIndexRocksIndex, MultiIndexRocksTable};
-use parquet::basic::{ConvertedType, Repetition};
-use parquet::{basic::Type, schema::types};
+use parquet::{
+    basic::{ConvertedType, Repetition, Type},
+    schema::types,
+};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
-use rocksdb::backup::BackupEngineOptions;
-use rocksdb::checkpoint::Checkpoint;
+use rocksdb::{backup::BackupEngineOptions, checkpoint::Checkpoint};
 use schema::{SchemaRocksIndex, SchemaRocksTable};
 use smallvec::alloc::fmt::Formatter;
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Display};
-use std::mem::take;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
-use std::sync::Mutex;
-use std::time::{Duration, SystemTime};
-use table::Table;
-use table::{TableRocksIndex, TableRocksTable};
-use tokio::fs::File;
-use tokio::sync::broadcast::Sender;
+use std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
+    fmt::{Debug, Display},
+    mem::take,
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Mutex,
+    time::{Duration, SystemTime},
+};
+use table::{Table, TableRocksIndex, TableRocksTable};
+use tokio::{fs::File, sync::broadcast::Sender};
 use wal::WALRocksTable;
 
 #[macro_export]
@@ -5144,14 +5150,10 @@ fn swap_active_partitions_impl(
 
 #[cfg(test)]
 mod tests {
-    use super::table::AggregateColumn;
-    use super::*;
-    use crate::config::Config;
-    use crate::remotefs::LocalDirRemoteFs;
+    use super::{table::AggregateColumn, *};
+    use crate::{config::Config, remotefs::LocalDirRemoteFs};
     use futures_timer::Delay;
-    use std::thread::sleep;
-    use std::time::Duration;
-    use std::{env, fs};
+    use std::{env, fs, thread::sleep, time::Duration};
 
     #[test]
     fn macro_test() {

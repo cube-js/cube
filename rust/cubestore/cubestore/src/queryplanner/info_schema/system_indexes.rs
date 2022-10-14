@@ -1,8 +1,12 @@
-use crate::metastore::{IdRow, Index, MetaStore, MetaStoreTable};
-use crate::queryplanner::InfoSchemaTableDef;
-use crate::CubeError;
-use arrow::array::{ArrayRef, StringArray, UInt64Array};
-use arrow::datatypes::{DataType, Field};
+use crate::{
+    metastore::{IdRow, Index, MetaStore, MetaStoreTable},
+    queryplanner::InfoSchemaTableDef,
+    CubeError,
+};
+use arrow::{
+    array::{ArrayRef, StringArray, UInt64Array},
+    datatypes::{DataType, Field},
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 

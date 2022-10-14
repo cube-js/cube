@@ -1,61 +1,71 @@
-use crate::cluster::{pick_worker_by_ids, pick_worker_by_partitions, Cluster};
-use crate::config::injection::DIService;
-use crate::config::ConfigObj;
-use crate::metastore::multi_index::MultiPartition;
-use crate::metastore::table::Table;
-use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
-use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
-use crate::queryplanner::optimizations::CubeQueryPlanner;
-use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
-use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
-use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
-use crate::store::DataFrame;
-use crate::table::data::rows_to_columns;
-use crate::table::parquet::CubestoreParquetMetadataCache;
-use crate::table::{Row, TableValue, TimestampValue};
-use crate::{app_metrics, CubeError};
-use arrow::array::{
-    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array,
-    Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
-    Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, MutableArrayData, StringArray,
-    TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
+use crate::{
+    app_metrics,
+    cluster::{pick_worker_by_ids, pick_worker_by_partitions, Cluster},
+    config::{injection::DIService, ConfigObj},
+    metastore::{
+        multi_index::MultiPartition, table::Table, Column, ColumnType, IdRow, Index, Partition,
+    },
+    queryplanner::{
+        filter_by_key_range::FilterByKeyRangeExec,
+        optimizations::CubeQueryPlanner,
+        planning::{get_worker_plan, Snapshot, Snapshots},
+        pretty_printers::{pp_phys_plan, pp_plan},
+        serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan},
+    },
+    store::DataFrame,
+    table::{
+        data::rows_to_columns, parquet::CubestoreParquetMetadataCache, Row, TableValue,
+        TimestampValue,
+    },
+    CubeError,
 };
-use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
-use arrow::ipc::reader::StreamReader;
-use arrow::ipc::writer::MemStreamWriter;
-use arrow::record_batch::RecordBatch;
+use arrow::{
+    array::{
+        make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array,
+        Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
+        Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, MutableArrayData, StringArray,
+        TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
+    },
+    datatypes::{DataType, Schema, SchemaRef, TimeUnit},
+    ipc::{reader::StreamReader, writer::MemStreamWriter},
+    record_batch::RecordBatch,
+};
 use async_trait::async_trait;
 use core::fmt;
-use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
-use datafusion::datasource::TableProvider;
-use datafusion::error::DataFusionError;
-use datafusion::error::Result as DFResult;
-use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
-use datafusion::logical_plan;
-use datafusion::logical_plan::{Expr, LogicalPlan};
-use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::merge::MergeExec;
-use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
-use datafusion::physical_plan::parquet::{
-    NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache,
-};
-use datafusion::physical_plan::projection::ProjectionExec;
-use datafusion::physical_plan::{
-    collect, ExecutionPlan, OptimizerHints, Partitioning, PhysicalExpr, SendableRecordBatchStream,
+use datafusion::{
+    datasource::{
+        datasource::{Statistics, TableProviderFilterPushDown},
+        TableProvider,
+    },
+    error::{DataFusionError, Result as DFResult},
+    execution::context::{ExecutionConfig, ExecutionContext},
+    logical_plan,
+    logical_plan::{Expr, LogicalPlan},
+    physical_plan::{
+        collect,
+        empty::EmptyExec,
+        memory::MemoryExec,
+        merge::MergeExec,
+        merge_sort::{LastRowByUniqueKeyExec, MergeSortExec},
+        parquet::{NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache},
+        projection::ProjectionExec,
+        ExecutionPlan, OptimizerHints, Partitioning, PhysicalExpr, SendableRecordBatchStream,
+    },
 };
 use itertools::Itertools;
 use log::{debug, error, trace, warn};
 use mockall::automock;
 use serde_derive::{Deserialize, Serialize};
-use std::any::Any;
-use std::cmp::min;
-use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Formatter};
-use std::io::Cursor;
-use std::mem::take;
-use std::sync::Arc;
-use std::time::SystemTime;
+use std::{
+    any::Any,
+    cmp::min,
+    collections::{HashMap, HashSet},
+    fmt::{Debug, Formatter},
+    io::Cursor,
+    mem::take,
+    sync::Arc,
+    time::SystemTime,
+};
 use tracing::{instrument, Instrument};
 
 #[automock]

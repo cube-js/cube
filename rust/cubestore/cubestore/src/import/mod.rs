@@ -1,45 +1,47 @@
-use core::mem;
-use core::slice::memchr;
-use std::convert::TryFrom;
-use std::path::Path;
-use std::pin::Pin;
-use std::sync::Arc;
+use core::{mem, slice::memchr};
+use std::{convert::TryFrom, path::Path, pin::Pin, sync::Arc};
 
 use arrow::array::{ArrayBuilder, ArrayRef};
 use async_compression::tokio::bufread::GzipDecoder;
-use async_std::io::SeekFrom;
-use async_std::task::{Context, Poll};
+use async_std::{
+    io::SeekFrom,
+    task::{Context, Poll},
+};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
 use datafusion::cube_ext;
-use futures::future::join_all;
-use futures::{Stream, StreamExt};
+use futures::{future::join_all, Stream, StreamExt};
 use itertools::Itertools;
 use mockall::automock;
 use num::ToPrimitive;
 use pin_project_lite::pin_project;
 use tempfile::TempPath;
-use tokio::fs::File;
-use tokio::io::{AsyncBufRead, AsyncSeekExt, AsyncWriteExt, BufReader};
-use tokio::task::JoinHandle;
+use tokio::{
+    fs::File,
+    io::{AsyncBufRead, AsyncSeekExt, AsyncWriteExt, BufReader},
+    task::JoinHandle,
+};
 
 use cubehll::HllSketch;
 
-use crate::config::injection::DIService;
-use crate::config::ConfigObj;
-use crate::import::limits::ConcurrencyLimits;
-use crate::metastore::table::Table;
-use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
-use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
-use crate::remotefs::RemoteFs;
-use crate::sql::timestamp_from_string;
-use crate::store::ChunkDataStore;
-use crate::streaming::StreamingService;
-use crate::table::data::{append_row, create_array_builders};
-use crate::table::{Row, TableValue};
-use crate::util::decimal::Decimal;
-use crate::util::maybe_owned::MaybeOwnedStr;
-use crate::CubeError;
+use crate::{
+    config::{injection::DIService, ConfigObj},
+    import::limits::ConcurrencyLimits,
+    metastore::{
+        is_valid_plain_binary_hll, table::Table, Column, ColumnType, HllFlavour, IdRow,
+        ImportFormat, MetaStore,
+    },
+    remotefs::RemoteFs,
+    sql::timestamp_from_string,
+    store::ChunkDataStore,
+    streaming::StreamingService,
+    table::{
+        data::{append_row, create_array_builders},
+        Row, TableValue,
+    },
+    util::{decimal::Decimal, maybe_owned::MaybeOwnedStr},
+    CubeError,
+};
 use datafusion::cube_ext::ordfloat::OrdF64;
 
 pub mod limits;
@@ -768,9 +770,11 @@ impl Ingestion {
 mod tests {
     extern crate test;
 
-    use crate::import::parse_decimal;
-    use crate::metastore::{Column, ColumnType, ImportFormat};
-    use crate::table::{Row, TableValue};
+    use crate::{
+        import::parse_decimal,
+        metastore::{Column, ColumnType, ImportFormat},
+        table::{Row, TableValue},
+    };
     use indoc::indoc;
     use tokio::io::BufReader;
     use tokio_stream::StreamExt;

@@ -1,13 +1,13 @@
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
-use datafusion::error::DataFusionError;
-use datafusion::execution::context::ExecutionProps;
-use datafusion::logical_plan::{Expr, ExprRewriter, LogicalPlan};
-use datafusion::optimizer::optimizer::OptimizerRule;
-use datafusion::optimizer::utils::from_plan;
-use datafusion::scalar::ScalarValue;
+use datafusion::{
+    error::DataFusionError,
+    execution::context::ExecutionProps,
+    logical_plan::{Expr, ExprRewriter, LogicalPlan},
+    optimizer::{optimizer::OptimizerRule, utils::from_plan},
+    scalar::ScalarValue,
+};
 use itertools::Itertools;
-use std::convert::TryFrom;
-use std::time::SystemTime;
+use std::{convert::TryFrom, time::SystemTime};
 
 pub struct MaterializeNow;
 impl OptimizerRule for MaterializeNow {

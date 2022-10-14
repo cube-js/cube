@@ -16,47 +16,50 @@
 //!
 //!       At this point we also optimize the physical plan to ensure we do as much work as possible
 //!       on the workers, see [CubeQueryPlanner] for details.
-use std::collections::hash_map::RandomState;
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::{
+    collections::{hash_map::RandomState, HashMap, HashSet},
+    sync::Arc,
+};
 
 use arrow::datatypes::{Field, SchemaRef};
 use async_trait::async_trait;
-use datafusion::error::DataFusionError;
-use datafusion::execution::context::ExecutionContextState;
-use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, Operator, UserDefinedLogicalNode};
-use datafusion::physical_plan::aggregates::AggregateFunction as FusionAggregateFunction;
-use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::planner::ExtensionPlanner;
-use datafusion::physical_plan::{
-    ExecutionPlan, OptimizerHints, Partitioning, PhysicalPlanner, SendableRecordBatchStream,
+use datafusion::{
+    error::DataFusionError,
+    execution::context::ExecutionContextState,
+    logical_plan::{DFSchemaRef, Expr, LogicalPlan, Operator, UserDefinedLogicalNode},
+    physical_plan::{
+        aggregates::AggregateFunction as FusionAggregateFunction, empty::EmptyExec,
+        planner::ExtensionPlanner, ExecutionPlan, OptimizerHints, Partitioning, PhysicalPlanner,
+        SendableRecordBatchStream,
+    },
 };
-use flatbuffers::bitflags::_core::any::Any;
-use flatbuffers::bitflags::_core::fmt::Formatter;
+use flatbuffers::bitflags::_core::{any::Any, fmt::Formatter};
 use itertools::Itertools;
 
-use crate::cluster::Cluster;
-use crate::metastore::multi_index::MultiPartition;
-use crate::metastore::table::{Table, TablePath};
-use crate::metastore::{
-    AggregateFunction, Chunk, Column, IdRow, Index, IndexType, MetaStore, Partition, Schema,
+use crate::{
+    cluster::Cluster,
+    metastore::{
+        multi_index::MultiPartition,
+        table::{Table, TablePath},
+        AggregateFunction, Chunk, Column, IdRow, Index, IndexType, MetaStore, Partition, Schema,
+    },
+    queryplanner::{
+        optimizations::rewrite_plan::{rewrite_plan, PlanRewriter},
+        panic::{plan_panic_worker, PanicWorkerNode},
+        partition_filter::PartitionFilter,
+        query_executor::{ClusterSendExec, CubeTable, InlineTableProvider},
+        serialized_plan::{IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan},
+        topk::{materialize_topk, plan_topk, ClusterAggregateTopK},
+        CubeTableLogical,
+    },
+    CubeError,
 };
-use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
-use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
-use crate::queryplanner::partition_filter::PartitionFilter;
-use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, InlineTableProvider};
-use crate::queryplanner::serialized_plan::{
-    IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
+use datafusion::{
+    logical_plan, optimizer::utils::expr_to_columns,
+    physical_plan::parquet::NoopParquetMetadataCache,
 };
-use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
-use crate::queryplanner::CubeTableLogical;
-use crate::CubeError;
-use datafusion::logical_plan;
-use datafusion::optimizer::utils::expr_to_columns;
-use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Serializer};
-use serde_derive::Deserialize;
-use serde_derive::Serialize;
+use serde_derive::{Deserialize, Serialize};
 use std::iter::FromIterator;
 
 #[cfg(test)]
@@ -1206,31 +1209,40 @@ pub mod tests {
 
     use arrow::datatypes::Schema as ArrowSchema;
     use async_trait::async_trait;
-    use datafusion::datasource::TableProvider;
-    use datafusion::execution::context::ExecutionContext;
-    use datafusion::logical_plan::LogicalPlan;
-    use datafusion::physical_plan::udaf::AggregateUDF;
-    use datafusion::physical_plan::udf::ScalarUDF;
-    use datafusion::sql::parser::Statement as DFStatement;
-    use datafusion::sql::planner::{ContextProvider, SqlToRel};
+    use datafusion::{
+        datasource::TableProvider,
+        execution::context::ExecutionContext,
+        logical_plan::LogicalPlan,
+        physical_plan::{udaf::AggregateUDF, udf::ScalarUDF},
+        sql::{
+            parser::Statement as DFStatement,
+            planner::{ContextProvider, SqlToRel},
+        },
+    };
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
 
-    use crate::config::Config;
-    use crate::metastore::multi_index::MultiPartition;
-    use crate::metastore::table::{Table, TablePath};
-    use crate::metastore::{Chunk, Column, ColumnType, IdRow, Index, Partition, Schema};
-    use crate::queryplanner::planning::{choose_index, try_extract_cluster_send, PlanIndexStore};
-    use crate::queryplanner::pretty_printers::PPOptions;
-    use crate::queryplanner::query_executor::ClusterSendExec;
-    use crate::queryplanner::serialized_plan::RowRange;
-    use crate::queryplanner::{pretty_printers, CubeTableLogical};
-    use crate::sql::parser::{CubeStoreParser, Statement};
-    use crate::table::{Row, TableValue};
-    use crate::CubeError;
+    use crate::{
+        config::Config,
+        metastore::{
+            multi_index::MultiPartition,
+            table::{Table, TablePath},
+            Chunk, Column, ColumnType, IdRow, Index, Partition, Schema,
+        },
+        queryplanner::{
+            planning::{choose_index, try_extract_cluster_send, PlanIndexStore},
+            pretty_printers,
+            pretty_printers::PPOptions,
+            query_executor::ClusterSendExec,
+            serialized_plan::RowRange,
+            CubeTableLogical,
+        },
+        sql::parser::{CubeStoreParser, Statement},
+        table::{Row, TableValue},
+        CubeError,
+    };
     use datafusion::catalog::TableReference;
-    use std::collections::HashMap;
-    use std::iter::FromIterator;
+    use std::{collections::HashMap, iter::FromIterator};
 
     #[tokio::test]
     pub async fn test_choose_index() {

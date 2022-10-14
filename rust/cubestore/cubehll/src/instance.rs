@@ -11,18 +11,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use crate::bias_correction;
-use crate::error::HllError;
-use crate::error::Result;
-use crate::instance::HllInstance::{Dense, Sparse};
+use crate::{
+    bias_correction,
+    error::{HllError, Result},
+    instance::HllInstance::{Dense, Sparse},
+};
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
 use itertools::Itertools;
 use serde_derive::Deserialize;
-use std::cmp::{max, min};
-use std::collections::HashSet;
-use std::convert::TryInto;
-use std::io::{Cursor, Read};
-use std::mem::size_of;
+use std::{
+    cmp::{max, min},
+    collections::HashSet,
+    convert::TryInto,
+    io::{Cursor, Read},
+    mem::size_of,
+};
 
 #[derive(Debug, Clone)]
 pub enum HllInstance {
@@ -1330,11 +1333,9 @@ mod tests {
     }
 
     mod dense {
-        use crate::instance::tests::TestingHll;
-        use crate::instance::{number_of_buckets, DenseHll};
+        use crate::instance::{number_of_buckets, tests::TestingHll, DenseHll};
         use hex::FromHex;
-        use std::hash::Hasher;
-        use std::ops::Range;
+        use std::{hash::Hasher, ops::Range};
         use twox_hash::XxHash64;
 
         fn bit_lengths() -> Range<u8> {

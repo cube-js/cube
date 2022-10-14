@@ -1,8 +1,7 @@
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{SecondsFormat, Utc};
-use core::mem;
-use core::time::Duration;
+use core::{mem, time::Duration};
 use datafusion::cube_ext;
 use deflate::deflate_bytes_zlib;
 use futures::{Sink, StreamExt};
@@ -10,14 +9,17 @@ use futures_timer::Delay;
 use log::{Level, Log, Metadata, Record};
 use nanoid::nanoid;
 use serde_json::{Map, Number, Value};
-use std::collections::{HashMap, HashSet};
-use std::env;
-use std::pin::Pin;
-use std::sync::Arc;
-use tokio::net::TcpStream;
-use tokio::sync::{Mutex, Notify, RwLock};
-use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use std::{
+    collections::{HashMap, HashSet},
+    env,
+    pin::Pin,
+    sync::Arc,
+};
+use tokio::{
+    net::TcpStream,
+    sync::{Mutex, Notify, RwLock},
+};
+use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 lazy_static! {
     pub static ref SENDER: Arc<EventSender> = Arc::new(EventSender::new(Arc::new(

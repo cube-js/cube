@@ -1,29 +1,32 @@
-use crate::cluster::{pick_worker_by_ids, Cluster};
-use crate::config::ConfigObj;
-use crate::metastore::job::{Job, JobStatus, JobType};
-use crate::metastore::partition::partition_file_name;
-use crate::metastore::table::Table;
-use crate::metastore::{
-    deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, IdRow, MetaStore,
-    MetaStoreEvent, Partition, RowKey, TableId,
+use crate::{
+    cluster::{pick_worker_by_ids, Cluster},
+    config::ConfigObj,
+    metastore::{
+        deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data,
+        job::{Job, JobStatus, JobType},
+        partition::partition_file_name,
+        table::Table,
+        IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId,
+    },
+    remotefs::RemoteFs,
+    store::{ChunkStore, WALStore},
+    util::{time_span::warn_long_fut, WorkerLoop},
+    CubeError,
 };
-use crate::remotefs::RemoteFs;
-use crate::store::{ChunkStore, WALStore};
-use crate::util::time_span::warn_long_fut;
-use crate::util::WorkerLoop;
-use crate::CubeError;
 use chrono::Utc;
 use datafusion::cube_ext;
-use flatbuffers::bitflags::_core::cmp::Ordering;
-use flatbuffers::bitflags::_core::time::Duration;
+use flatbuffers::bitflags::_core::{cmp::Ordering, time::Duration};
 use futures_timer::Delay;
 use log::error;
-use std::collections::{BinaryHeap, HashSet};
-use std::sync::Arc;
-use tokio::sync::broadcast::Receiver;
-use tokio::sync::{broadcast, Mutex, Notify, RwLock};
-use tokio::task::JoinHandle;
-use tokio::time::Instant;
+use std::{
+    collections::{BinaryHeap, HashSet},
+    sync::Arc,
+};
+use tokio::{
+    sync::{broadcast, broadcast::Receiver, Mutex, Notify, RwLock},
+    task::JoinHandle,
+    time::Instant,
+};
 use tokio_util::sync::CancellationToken;
 
 pub struct SchedulerImpl {

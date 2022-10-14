@@ -1,14 +1,11 @@
-use crate::config::injection::DIService;
-use crate::metastore::Index;
-use crate::CubeError;
-use arrow::array::ArrayRef;
-use arrow::datatypes::Schema;
-use arrow::record_batch::RecordBatch;
+use crate::{config::injection::DIService, metastore::Index, CubeError};
+use arrow::{array::ArrayRef, datatypes::Schema, record_batch::RecordBatch};
 use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, ParquetMetadataCache};
-use parquet::arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader};
-use parquet::file::properties::{WriterProperties, WriterVersion};
-use std::fs::File;
-use std::sync::Arc;
+use parquet::{
+    arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader},
+    file::properties::{WriterProperties, WriterVersion},
+};
+use std::{fs::File, sync::Arc};
 
 pub trait CubestoreParquetMetadataCache: DIService + Send + Sync {
     fn cache(self: &Self) -> Arc<dyn ParquetMetadataCache>;
@@ -104,23 +101,32 @@ pub fn arrow_schema(i: &Index) -> Schema {
 mod tests {
     extern crate test;
 
-    use crate::assert_eq_columns;
-    use crate::metastore::{Column, ColumnType, Index};
-    use crate::store::{compaction, ROW_GROUP_SIZE};
-    use crate::table::data::{cmp_row_key_heap, concat_record_batches, rows_to_columns, to_stream};
-    use crate::table::parquet::{arrow_schema, ParquetTableStore};
-    use crate::table::{Row, TableValue};
-    use crate::util::decimal::Decimal;
-    use arrow::array::{
-        ArrayRef, BooleanArray, Float64Array, Int64Array, Int64Decimal4Array, StringArray,
-        TimestampMicrosecondArray,
+    use crate::{
+        assert_eq_columns,
+        metastore::{Column, ColumnType, Index},
+        store::{compaction, ROW_GROUP_SIZE},
+        table::{
+            data::{cmp_row_key_heap, concat_record_batches, rows_to_columns, to_stream},
+            parquet::{arrow_schema, ParquetTableStore},
+            Row, TableValue,
+        },
+        util::decimal::Decimal,
     };
-    use arrow::record_batch::RecordBatch;
+    use arrow::{
+        array::{
+            ArrayRef, BooleanArray, Float64Array, Int64Array, Int64Decimal4Array, StringArray,
+            TimestampMicrosecondArray,
+        },
+        record_batch::RecordBatch,
+    };
     use itertools::Itertools;
-    use parquet::data_type::DataType;
-    use parquet::file::reader::FileReader;
-    use parquet::file::reader::SerializedFileReader;
-    use parquet::file::statistics::{Statistics, TypedStatistics};
+    use parquet::{
+        data_type::DataType,
+        file::{
+            reader::{FileReader, SerializedFileReader},
+            statistics::{Statistics, TypedStatistics},
+        },
+    };
     use pretty_assertions::assert_eq;
     use std::sync::Arc;
     use tempfile::NamedTempFile;

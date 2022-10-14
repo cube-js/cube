@@ -4,12 +4,14 @@
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 
-use cubestore::config::Config;
-use cubestore::util::respawn;
-use cubestore_sql_tests::multiproc::{
-    multiproc_child_main, run_multiproc_test, MultiProcTest, SignalInit, WaitCompletion, WorkerProc,
+use cubestore::{config::Config, util::respawn};
+use cubestore_sql_tests::{
+    multiproc::{
+        multiproc_child_main, run_multiproc_test, MultiProcTest, SignalInit, WaitCompletion,
+        WorkerProc,
+    },
+    run_sql_tests, TestFn,
 };
-use cubestore_sql_tests::{run_sql_tests, TestFn};
 
 const METASTORE_PORT: u16 = 51336;
 const WORKER_PORTS: [u16; 2] = [51337, 51338];

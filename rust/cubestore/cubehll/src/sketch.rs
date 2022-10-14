@@ -12,8 +12,7 @@
  * limitations under the License.
  */
 
-use crate::error::Result;
-use crate::instance::HllInstance;
+use crate::{error::Result, instance::HllInstance};
 
 /// HyperLogLog sketch estimates a size of a set (i.e. the number of unique elements in it) without
 /// storing all the elements in the set.

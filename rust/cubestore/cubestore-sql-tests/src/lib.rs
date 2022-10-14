@@ -1,18 +1,19 @@
 #![feature(async_closure)]
 #![feature(test)]
 
-pub use crate::benches::cubestore_benches;
-pub use crate::tests::{to_rows, TestFn};
+pub use crate::{
+    benches::cubestore_benches,
+    tests::{to_rows, TestFn},
+};
 extern crate test;
 use async_trait::async_trait;
-use cubestore::sql::{QueryPlans, SqlQueryContext, SqlService};
-use cubestore::store::DataFrame;
-use cubestore::CubeError;
-use std::env;
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
-use test::TestFn::DynTestFn;
-use test::{ShouldPanic, TestDesc, TestDescAndFn, TestName, TestType};
+use cubestore::{
+    sql::{QueryPlans, SqlQueryContext, SqlService},
+    store::DataFrame,
+    CubeError,
+};
+use std::{env, panic::RefUnwindSafe, sync::Arc};
+use test::{ShouldPanic, TestDesc, TestDescAndFn, TestFn::DynTestFn, TestName, TestType};
 use tests::sql_tests;
 
 mod benches;

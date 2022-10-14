@@ -1,25 +1,32 @@
-use crate::queryplanner::planning::{ClusterSendNode, CubeExtensionPlanner};
-use crate::queryplanner::topk::execute::{AggregateTopKExec, TopKAggregateFunction};
-use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn, MIN_TOPK_STREAM_ROWS};
-use crate::queryplanner::udfs::{
-    aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
-    CubeScalarUDFKind,
+use crate::queryplanner::{
+    planning::{ClusterSendNode, CubeExtensionPlanner},
+    topk::{
+        execute::{AggregateTopKExec, TopKAggregateFunction},
+        ClusterAggregateTopK, SortColumn, MIN_TOPK_STREAM_ROWS,
+    },
+    udfs::{
+        aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
+        CubeScalarUDFKind,
+    },
 };
 use arrow::datatypes::{DataType, Schema};
-use datafusion::error::DataFusionError;
-use datafusion::execution::context::ExecutionContextState;
-use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan};
-use datafusion::physical_plan::aggregates::AggregateFunction;
-use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
-use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
-use datafusion::physical_plan::planner::{compute_aggregation_strategy, physical_name};
-use datafusion::physical_plan::sort::{SortExec, SortOptions};
-use datafusion::physical_plan::udf::create_physical_expr;
-use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, PhysicalPlanner};
+use datafusion::{
+    error::DataFusionError,
+    execution::context::ExecutionContextState,
+    logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan},
+    physical_plan::{
+        aggregates::AggregateFunction,
+        expressions::{Column, PhysicalSortExpr},
+        hash_aggregate::{AggregateMode, HashAggregateExec},
+        planner::{compute_aggregation_strategy, physical_name},
+        sort::{SortExec, SortOptions},
+        udf::create_physical_expr,
+        ExecutionPlan, PhysicalExpr, PhysicalPlanner,
+    },
+};
 
 use itertools::Itertools;
-use std::cmp::max;
-use std::sync::Arc;
+use std::{cmp::max, sync::Arc};
 
 /// Replaces `Limit(Sort(Aggregate(ClusterSend)))` with [ClusterAggregateTopK] when possible.
 pub fn materialize_topk(p: LogicalPlan) -> Result<LogicalPlan, DataFusionError> {

@@ -1,9 +1,12 @@
-use crate::metastore::chunks::chunk_file_name;
-use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreTable};
-use crate::queryplanner::InfoSchemaTableDef;
-use crate::CubeError;
-use arrow::array::{ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array};
-use arrow::datatypes::{DataType, Field, TimeUnit};
+use crate::{
+    metastore::{chunks::chunk_file_name, Chunk, IdRow, MetaStore, MetaStoreTable},
+    queryplanner::InfoSchemaTableDef,
+    CubeError,
+};
+use arrow::{
+    array::{ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array},
+    datatypes::{DataType, Field, TimeUnit},
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 

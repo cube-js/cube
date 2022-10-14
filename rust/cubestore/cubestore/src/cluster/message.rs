@@ -1,12 +1,15 @@
-use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
-use crate::queryplanner::query_executor::SerializedRecordBatchStream;
-use crate::queryplanner::serialized_plan::SerializedPlan;
-use crate::CubeError;
+use crate::{
+    metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult},
+    queryplanner::{query_executor::SerializedRecordBatchStream, serialized_plan::SerializedPlan},
+    CubeError,
+};
 use arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum NetworkMessage {

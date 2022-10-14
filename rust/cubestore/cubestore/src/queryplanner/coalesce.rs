@@ -1,9 +1,10 @@
-use arrow::array::ArrayRef;
-use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
-use datafusion::cube_match_array;
-use datafusion::error::DataFusionError;
-use datafusion::physical_plan::ColumnarValue;
-use datafusion::scalar::ScalarValue;
+use arrow::{
+    array::ArrayRef,
+    datatypes::{DataType, IntervalUnit, TimeUnit},
+};
+use datafusion::{
+    cube_match_array, error::DataFusionError, physical_plan::ColumnarValue, scalar::ScalarValue,
+};
 use std::sync::Arc;
 
 /// Currently supported types by the coalesce function.
