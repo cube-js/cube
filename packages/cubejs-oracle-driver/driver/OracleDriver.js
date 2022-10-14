@@ -117,9 +117,7 @@ class OracleDriver extends BaseDriver {
   }
 
   async testConnection() {
-    return (
-      await this.getConnectionFromPool()
-    ).execute('SELECT 1 FROM DUAL');
+    await this.query('SELECT 1 FROM DUAL', {});
   }
 
   async query(query, values) {
@@ -129,6 +127,14 @@ class OracleDriver extends BaseDriver {
       return res && res.rows;
     } catch (e) {
       throw (e);
+    } finally {
+      if (conn) {
+        try {
+          await conn.close();
+        } catch (e) {
+          throw (e);
+        }
+      }
     }
   }
 
