@@ -12,7 +12,7 @@ pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;
 mod filter_by_key_range;
 pub mod info_schema;
-mod now;
+pub mod now;
 pub mod udfs;
 
 use crate::config::injection::DIService;
