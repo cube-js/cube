@@ -21,7 +21,7 @@ use std::panic::RefUnwindSafe;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use tokio::io::{AsyncWriteExt, BufWriter};
 
 pub type TestFn = Box<
@@ -34,6 +34,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
     return vec![
         t("insert", insert),
         t("select_test", select_test),
+        t("refresh_selects", refresh_selects),
         t("negative_numbers", negative_numbers),
         t("negative_decimal", negative_decimal),
         t("custom_types", custom_types),
@@ -200,10 +201,12 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             planning_filter_index_selection,
         ),
         t("planning_aggregate_index", planning_aggregate_index),
-
         t("aggregate_index", aggregate_index),
         t("aggregate_index_hll", aggregate_index_hll),
-        t("aggregate_index_with_hll_bytes", aggregate_index_with_hll_bytes),
+        t(
+            "aggregate_index_with_hll_bytes",
+            aggregate_index_with_hll_bytes,
+        ),
         t("aggregate_index_errors", aggregate_index_errors),
         t("inline_tables", inline_tables),
         t("inline_tables_2x", inline_tables_2x),
@@ -258,6 +261,40 @@ async fn insert(service: Box<dyn SqlClient>) {
         (LastName, PersonID, FirstName, Address, City)
         VALUES
         ('LastName 1', 23, 'FirstName 1', 'Address 1', 'City 1'), ('LastName 2', 22, 'FirstName 2', 'Address 2', 'City 2');").await.unwrap();
+}
+
+async fn refresh_selects(service: Box<dyn SqlClient>) {
+    let t = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs_f64();
+
+    let result = service
+        .exec_query("SELECT FLOOR((UNIX_TIMESTAMP()) / 10)")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![TableValue::Float((t / 10.).floor().into())])]
+    );
+
+    let result = service
+        .exec_query("SELECT ((3600 * 24 - 28800) / 86400)")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(0)])]);
+
+    let result = service
+        .exec_query("SELECT ((3600 * (24 + 8) - 28800) / 86400)")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
+    let result = service
+        .exec_query("SELECT ((3600 * (48 + 8) - 28800) / 86400)")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
 }
 
 async fn select_test(service: Box<dyn SqlClient>) {
