@@ -12545,4 +12545,19 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_extract_string_field() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "test_extract_string_field",
+            execute_query(
+                "SELECT EXTRACT('YEAR' FROM CAST ('2020-12-25 22:48:48.000' AS timestamptz))"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
