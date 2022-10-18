@@ -45,6 +45,8 @@ use itertools::Itertools;
 use serde_json::json;
 use std::{collections::HashMap, ops::Index, sync::Arc};
 
+pub use super::rewriter::CubeRunner;
+
 macro_rules! add_data_node {
     ($converter:expr, $value_expr:expr, $field_variant:ident) => {
         $converter
@@ -461,6 +463,10 @@ impl LogicalPlanToLanguageConverter {
 
     pub fn take_rewriter(self) -> Rewriter {
         Rewriter::new(self.graph, self.cube_context)
+    }
+
+    pub fn take_runner(self) -> CubeRunner {
+        Rewriter::rewrite_runner(self.cube_context, self.graph)
     }
 }
 

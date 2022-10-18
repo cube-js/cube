@@ -20,12 +20,14 @@ use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner, StopR
 use itertools::Itertools;
 use std::{env, ffi::OsStr, fs, io::Write, sync::Arc, time::Duration};
 
+use super::rules::split::SplitRulesConfig;
+
 pub struct Rewriter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     cube_context: Arc<CubeContext>,
 }
 
-type CubeRunner = Runner<LogicalPlanLanguage, LogicalPlanAnalysis, IterInfo>;
+pub type CubeRunner = Runner<LogicalPlanLanguage, LogicalPlanAnalysis, IterInfo>;
 
 #[derive(Debug)]
 pub struct IterDebugInfo {
@@ -370,7 +372,10 @@ impl Rewriter {
             Box::new(FilterRules::new(cube_context.clone())),
             Box::new(DateRules::new(cube_context.clone())),
             Box::new(OrderRules::new(cube_context.clone())),
-            Box::new(SplitRules::new(cube_context.clone())),
+            Box::new(SplitRules::new(
+                cube_context.clone(),
+                SplitRulesConfig::default(),
+            )),
         ];
         let mut rewrites = Vec::new();
         for r in rules {

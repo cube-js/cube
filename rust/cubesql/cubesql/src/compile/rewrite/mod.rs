@@ -1,9 +1,9 @@
-mod analysis;
+pub mod analysis;
 pub mod converter;
 mod cost;
 pub mod language;
-mod rewriter;
-mod rules;
+pub mod rewriter;
+pub mod rules;
 
 use crate::{compile::rewrite::analysis::LogicalPlanAnalysis, CubeError};
 use datafusion::{
