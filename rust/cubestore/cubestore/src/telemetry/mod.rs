@@ -475,3 +475,47 @@ impl Log for ReportingLogger {
         self.logger.flush()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
+
+    #[test]
+    fn test_http_telemetry_transport_try_new() {
+        let transport_without_headers =
+            HttpTelemetryTransport::try_new("http://transport_without_headers".to_string(), None)
+                .unwrap();
+
+        assert_eq!(
+            transport_without_headers.endpoint_url,
+            "http://transport_without_headers"
+        );
+        assert_eq!(transport_without_headers.headers, None);
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_str("token").unwrap());
+        headers.insert(
+            HeaderName::from_static("content-length"),
+            HeaderValue::from_str("10000").unwrap(),
+        );
+
+        let transport_with_headers = HttpTelemetryTransport::try_new(
+            "http://transport_with_header".to_string(),
+            Some(headers.clone()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            transport_with_headers.endpoint_url,
+            "http://transport_with_header"
+        );
+
+        assert_eq!(
+            format!("{:?}", transport_with_headers.headers.unwrap()),
+            Value::String(
+                "{\"authorization\": \"token\", \"content-length\": \"10000\"}".to_string()
+            )
+        );
+    }
+}
