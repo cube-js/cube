@@ -9,6 +9,7 @@ use futures::{Sink, StreamExt};
 use futures_timer::Delay;
 use log::{Level, Log, Metadata, Record};
 use nanoid::nanoid;
+use reqwest::header::HeaderMap;
 use serde_json::{Map, Number, Value};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -21,7 +22,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 lazy_static! {
     pub static ref SENDER: Arc<EventSender> = Arc::new(EventSender::new(Arc::new(
-        HttpTelemetryTransport::try_new("https://track.cube.dev/track".to_string()).unwrap()
+        HttpTelemetryTransport::try_new("https://track.cube.dev/track".to_string(), None).unwrap()
     )));
 }
 
@@ -46,10 +47,11 @@ pub trait TelemetryTransport: Sync + Send {
 pub struct HttpTelemetryTransport {
     endpoint_url: String,
     client: reqwest::Client,
+    headers: Option<HeaderMap>,
 }
 
 impl HttpTelemetryTransport {
-    pub fn try_new(endpoint_url: String) -> Result<Self, CubeError> {
+    pub fn try_new(endpoint_url: String, headers: Option<HeaderMap>) -> Result<Self, CubeError> {
         let client = reqwest::ClientBuilder::new()
             .use_rustls_tls()
             .user_agent("cubestore")
@@ -58,6 +60,7 @@ impl HttpTelemetryTransport {
         Ok(Self {
             endpoint_url,
             client,
+            headers,
         })
     }
 }
@@ -74,9 +77,16 @@ impl TelemetryTransport for HttpTelemetryTransport {
 
             log::trace!("sending via http to {} :{:?}", self.endpoint_url, to_send);
 
+            let empty_header_map = HeaderMap::new();
             let res = self
                 .client
                 .post(&self.endpoint_url)
+                .headers(
+                    self.headers
+                        .as_ref()
+                        .unwrap_or(&empty_header_map)
+                        .to_owned(),
+                )
                 .json(&to_send)
                 .send()
                 .await?;
@@ -396,7 +406,7 @@ pub async fn init_agent_sender() {
                 "https" | "http" => {
                     log::trace!("using http transport for agent enpoint");
                     Some(Arc::new(EventSender::new(Arc::new(
-                        HttpTelemetryTransport::try_new(endpoint_url).unwrap(),
+                        HttpTelemetryTransport::try_new(endpoint_url, None).unwrap(),
                     ))))
                 }
                 "wss" => {
