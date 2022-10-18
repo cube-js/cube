@@ -312,14 +312,14 @@ pub struct InfoSchemaColumnsProvider {
 }
 
 impl InfoSchemaColumnsProvider {
-    pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(db_name: &str, cubes: &Vec<V1CubeMeta>) -> Self {
         let mut builder = InformationSchemaColumnsBuilder::new();
 
         for cube in cubes {
             let mut position = 1;
 
             for column in cube.get_columns() {
-                builder.add_column("db", "public", cube.name.clone(), &column, position);
+                builder.add_column(db_name, "public", cube.name.clone(), &column, position);
 
                 position += 1;
             }

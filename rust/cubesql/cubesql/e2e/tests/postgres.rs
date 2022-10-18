@@ -790,6 +790,16 @@ impl PostgresIntegrationTestSuite {
             panic!("Must be Row command, 0")
         }
 
+        let messages = new_client
+            .simple_query(&"SELECT table_catalog FROM information_schema.tables LIMIT 1")
+            .await?;
+        if let SimpleQueryMessage::Row(row) = &messages[0] {
+            // default one
+            assert_eq!(row.get(0), Some("meow"));
+        } else {
+            panic!("Must be Row command, 0")
+        }
+
         Ok(())
     }
 

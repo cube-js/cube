@@ -1,10 +1,9 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 7556
 expression: "execute_query(\"select current_database(), current_schema(), current_user;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +--------------------+------------------+----------------+
 | current_database() | current_schema() | current_user() |
 +--------------------+------------------+----------------+
-| db                 | public           | ovr            |
+| cubedb             | public           | ovr            |
 +--------------------+------------------+----------------+
