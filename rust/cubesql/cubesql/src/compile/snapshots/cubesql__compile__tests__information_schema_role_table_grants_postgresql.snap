@@ -5,7 +5,7 @@ expression: "execute_query(\"SELECT * FROM information_schema.role_table_grants\
 +---------+---------+---------------+--------------+---------------------------+----------------+--------------+----------------+
 | grantor | grantee | table_catalog | table_schema | table_name                | privilege_type | is_grantable | with_hierarchy |
 +---------+---------+---------------+--------------+---------------------------+----------------+--------------+----------------+
-| ovr     | ovr     | db            | public       | KibanaSampleDataEcommerce | SELECT         | YES          | YES            |
-| ovr     | ovr     | db            | public       | Logs                      | SELECT         | YES          | YES            |
-| ovr     | ovr     | db            | public       | NumberCube                | SELECT         | YES          | YES            |
+| ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | SELECT         | YES          | YES            |
+| ovr     | ovr     | cubedb        | public       | Logs                      | SELECT         | YES          | YES            |
+| ovr     | ovr     | cubedb        | public       | NumberCube                | SELECT         | YES          | YES            |
 +---------+---------+---------------+--------------+---------------------------+----------------+--------------+----------------+

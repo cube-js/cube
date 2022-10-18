@@ -80,11 +80,11 @@ pub struct PgCatalogTableProvider {
 }
 
 impl PgCatalogTableProvider {
-    pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(current_user: &str, cubes: &Vec<V1CubeMeta>) -> Self {
         let mut builder = PgCatalogTablesBuilder::new();
 
         for cube in cubes {
-            builder.add_table("public", cube.name.clone(), "db");
+            builder.add_table("public", cube.name.clone(), current_user);
         }
 
         Self {

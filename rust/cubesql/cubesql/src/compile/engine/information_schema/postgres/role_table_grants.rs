@@ -77,11 +77,11 @@ pub struct InfoSchemaRoleTableGrantsProvider {
 }
 
 impl InfoSchemaRoleTableGrantsProvider {
-    pub fn new(current_user: String, cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(db_name: &str, current_user: &str, cubes: &Vec<V1CubeMeta>) -> Self {
         let mut builder = InfoSchemaRoleTableGrantsBuilder::new(cubes.len());
 
         for cube in cubes {
-            builder.add_table(&current_user, "db", "public", cube.name.clone(), "SELECT");
+            builder.add_table(current_user, db_name, "public", cube.name.clone(), "SELECT");
         }
 
         Self {

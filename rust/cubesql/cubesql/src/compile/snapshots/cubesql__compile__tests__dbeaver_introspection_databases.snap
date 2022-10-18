@@ -1,10 +1,9 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 8325
-expression: "execute_query(\"SELECT db.oid,db.* FROM pg_catalog.pg_database db WHERE datname = 'db'\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+expression: "execute_query(\"SELECT db.oid,db.* FROM pg_catalog.pg_database db WHERE datname = 'cubedb'\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+-------+---------+--------+----------+------------+------------+---------------+--------------+--------------+---------------+--------------+------------+---------------+--------+
 | _oid  | oid   | datname | datdba | encoding | datcollate | datctype   | datistemplate | datallowconn | datconnlimit | datlastsysoid | datfrozenxid | datminmxid | dattablespace | datacl |
 +-------+-------+---------+--------+----------+------------+------------+---------------+--------------+--------------+---------------+--------------+------------+---------------+--------+
-| 13757 | 13757 | db      | 10     | 6        | en_US.utf8 | en_US.utf8 | false         | true         | -1           | 13756         | 727          | 1          | 1663          | NULL   |
+| 13757 | 13757 | cubedb  | 10     | 6        | en_US.utf8 | en_US.utf8 | false         | true         | -1           | 13756         | 727          | 1          | 1663          | NULL   |
 +-------+-------+---------+--------+----------+------------+------------+---------------+--------------+--------------+---------------+--------------+------------+---------------+--------+

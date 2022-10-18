@@ -5,7 +5,7 @@ expression: "execute_query(\"SELECT * FROM pg_catalog.pg_tables\".to_string(),\n
 +------------+---------------------------+------------+------------+------------+----------+-------------+-------------+
 | schemaname | tablename                 | tableowner | tablespace | hasindexes | hasrules | hastriggers | rowsecurity |
 +------------+---------------------------+------------+------------+------------+----------+-------------+-------------+
-| public     | KibanaSampleDataEcommerce | db         |            | true       | false    | false       | false       |
-| public     | Logs                      | db         |            | true       | false    | false       | false       |
-| public     | NumberCube                | db         |            | true       | false    | false       | false       |
+| public     | KibanaSampleDataEcommerce | ovr        |            | true       | false    | false       | false       |
+| public     | Logs                      | ovr        |            | true       | false    | false       | false       |
+| public     | NumberCube                | ovr        |            | true       | false    | false       | false       |
 +------------+---------------------------+------------+------------+------------+----------+-------------+-------------+
