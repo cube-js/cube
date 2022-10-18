@@ -77,19 +77,18 @@ impl TelemetryTransport for HttpTelemetryTransport {
 
             log::trace!("sending via http to {} :{:?}", self.endpoint_url, to_send);
 
-            let empty_header_map = HeaderMap::new();
+            let header_map = self
+                .headers
+                .as_ref()
+                .map_or_else(|| HeaderMap::new(), |m| m.to_owned());
             let res = self
                 .client
                 .post(&self.endpoint_url)
-                .headers(
-                    self.headers
-                        .as_ref()
-                        .unwrap_or(&empty_header_map)
-                        .to_owned(),
-                )
+                .headers(header_map)
                 .json(&to_send)
                 .send()
                 .await?;
+
             if res.status() != 200 {
                 if retry < max_retries - 1 {
                     continue;
