@@ -73,7 +73,7 @@ tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
 mysql_common = "0.26.0"
-flatbuffers = "0.7.0"
+flatbuffers = "2.0.0"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
 tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
