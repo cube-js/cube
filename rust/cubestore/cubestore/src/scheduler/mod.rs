@@ -665,19 +665,22 @@ impl SchedulerImpl {
         table_id: u64,
         locations: &[&String],
     ) -> Result<(), CubeError> {
-        for &l in locations {
-            let node = self.cluster.node_name_for_import(table_id, &l).await?;
-            let job = self
-                .meta_store
-                .add_job(Job::new(
-                    RowKey::Table(TableId::Tables, table_id),
-                    JobType::TableImportCSV(l.clone()),
-                    node.to_string(),
-                ))
-                .await?;
-            if job.is_some() {
-                // TODO queue failover
-                self.cluster.notify_job_runner(node).await?;
+        let table = self.meta_store.get_table_by_id(table_id).await?;
+        if !table.get_row().sealed() {
+            for &l in locations {
+                let node = self.cluster.node_name_for_import(table_id, &l).await?;
+                let job = self
+                    .meta_store
+                    .add_job(Job::new(
+                        RowKey::Table(TableId::Tables, table_id),
+                        JobType::TableImportCSV(l.clone()),
+                        node.to_string(),
+                    ))
+                    .await?;
+                if job.is_some() {
+                    // TODO queue failover
+                    self.cluster.notify_job_runner(node).await?;
+                }
             }
         }
         Ok(())

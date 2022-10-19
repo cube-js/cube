@@ -883,11 +883,14 @@ pub trait MetaStore: DIService + Send + Sync {
         indexes: Vec<IndexDef>,
         is_ready: bool,
         build_range_end: Option<DateTime<Utc>>,
+        seal_at: Option<DateTime<Utc>>,
+        select_statement: Option<String>,
         unique_key_column_names: Option<Vec<String>>,
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
     ) -> Result<IdRow<Table>, CubeError>;
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError>;
+    async fn seal_table(&self, id: u64) -> Result<IdRow<Table>, CubeError>;
     async fn update_location_download_size(
         &self,
         id: u64,
@@ -3049,6 +3052,8 @@ impl MetaStore for RocksMetaStore {
         indexes: Vec<IndexDef>,
         is_ready: bool,
         build_range_end: Option<DateTime<Utc>>,
+        seal_at: Option<DateTime<Utc>>,
+        select_statement: Option<String>,
         unique_key_column_names: Option<Vec<String>>,
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
@@ -3140,6 +3145,8 @@ impl MetaStore for RocksMetaStore {
                 import_format,
                 is_ready,
                 build_range_end,
+                seal_at,
+                select_statement,
                 unique_key_column_indices,
                 aggregate_column_indices,
                 seq_column_index,
@@ -3225,6 +3232,15 @@ impl MetaStore for RocksMetaStore {
             batch_pipe.invalidate_tables_cache();
             let rocks_table = TableRocksTable::new(db_ref.clone());
             Ok(rocks_table.update_with_fn(id, |r| r.update_is_ready(is_ready), batch_pipe)?)
+        })
+        .await
+    }
+
+    async fn seal_table(&self, id: u64) -> Result<IdRow<Table>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            batch_pipe.invalidate_tables_cache();
+            let rocks_table = TableRocksTable::new(db_ref.clone());
+            Ok(rocks_table.update_with_fn(id, |r| r.update_sealed(true), batch_pipe)?)
         })
         .await
     }
@@ -5389,6 +5405,8 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
+                None,
             )
             .await
             .unwrap();
@@ -5402,6 +5420,8 @@ mod tests {
                 None,
                 vec![],
                 true,
+                None,
+                None,
                 None,
                 None,
                 None,
@@ -5518,6 +5538,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5533,6 +5555,8 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
+                    None,
                     None,
                     None,
                     None,
@@ -5619,6 +5643,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5697,6 +5723,8 @@ mod tests {
                     true,
                     None,
                     None,
+                    None,
+                    None,
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
                         ("max".to_string(), "aggr_col1".to_string()),
@@ -5763,6 +5791,8 @@ mod tests {
                     vec![aggr_index_def.clone()],
                     true,
                     None,
+                    None,
+                    None,
                     Some(vec!["col2".to_string(), "col1".to_string()]),
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
@@ -5783,6 +5813,8 @@ mod tests {
                     vec![aggr_index_def.clone()],
                     true,
                     None,
+                    None,
+                    None,
                     Some(vec!["col1".to_string()]),
                     None,
                     None,
@@ -5799,6 +5831,8 @@ mod tests {
                     None,
                     vec![aggr_index_def.clone()],
                     true,
+                    None,
+                    None,
                     None,
                     Some(vec!["col1".to_string()]),
                     Some(vec![
@@ -6050,6 +6084,8 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -6168,6 +6204,8 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
+                    None,
                     None,
                     None,
                     None,

@@ -16,6 +16,7 @@ import { format as formatSql } from 'sqlstring';
 import axios, { AxiosResponse } from 'axios';
 import { Mutex } from 'async-mutex';
 import { KsqlQuery } from './KsqlQuery';
+import sqlstring from 'sqlstring';
 
 type KsqlDriverOptions = {
   url: string,
@@ -119,12 +120,18 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
+    //FIXME Temporal hack
+    if (query.toLowerCase().includes('now()')) {
+        let d = new Date();
+        return [{'?column?':d.toISOString()}] as any;
+    }
     if (query.toLowerCase().startsWith('select')) {
       throw new Error('Select queries for ksql allowed only from Cube Store. In order to query ksql create pre-aggregation first.');
     }
     const { data } = await this.apiQuery('/ksql', {
       ksql: `${formatSql(query, values)};`,
     });
+    
     return data[0];
   }
 
@@ -224,16 +231,18 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unable to detect a source table for ksql download query. In order to query ksql use "SELECT * FROM <TABLE>"');
     }
 
-    return this.getStreamingTableData(table);
+    const selectStatement = sqlstring.format(query, params);
+    return this.getStreamingTableData(table, selectStatement);
   }
 
-  private async getStreamingTableData(streamingTable: string) {
+  private async getStreamingTableData(streamingTable: string, selectStatement?: string) {
     return {
       types: await this.tableColumnTypes(streamingTable),
       streamingTable,
       streamingSource: {
         name: this.config.streamingSourceName || 'default',
         type: 'ksql',
+        selectStatement: selectStatement,
         credentials: {
           user: this.config.username,
           password: this.config.password,

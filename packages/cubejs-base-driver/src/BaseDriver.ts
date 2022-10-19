@@ -15,7 +15,7 @@ import { reduce } from 'ramda';
 import fs from 'fs';
 import { cancelCombinator } from './utils';
 import {
-  CreateTableIndex,
+  ExternalCreateTableOptions,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   DownloadTableCSVData,
@@ -316,10 +316,10 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   public async uploadTable(table: string, columns: TableStructure, tableData: DownloadTableData) {
-    return this.uploadTableWithIndexes(table, columns, tableData, [], null, [], [], []);
+    return this.uploadTableWithIndexes(table, columns, tableData, [], null, [], {});
   }
 
-  public async uploadTableWithIndexes(table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, _uniqueKeyColumns: string[] | null, _queryTracingObj: any, _aggregates: string[], _createTableIndexes: CreateTableIndex[]) {
+  public async uploadTableWithIndexes(table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, _uniqueKeyColumns: string[] | null, _queryTracingObj: any, _externalOptions: ExternalCreateTableOptions) {
     if (!isDownloadTableMemoryData(tableData)) {
       throw new Error(`${this.constructor} driver supports only rows upload`);
     }

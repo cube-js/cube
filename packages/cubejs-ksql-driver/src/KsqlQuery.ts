@@ -76,10 +76,10 @@ export class KsqlQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  public preAggregationInvalidateKeyQueries(cube: string, preAggregation: any) {
+  /* public preAggregationInvalidateKeyQueries(cube: string, preAggregation: any) {
     // always empty as streaming tables are constantly refreshed by Cube Store
     return [];
-  }
+  } */
 
   public preAggregationReadOnly(cube: string, preAggregation: any) {
     const [sql] = this.preAggregationSql(cube, preAggregation);
@@ -87,7 +87,7 @@ export class KsqlQuery extends BaseQuery {
   }
 
   public static extractTableFromSimpleSelectAsteriskQuery(sql: string) {
-    const match = sql.match(/^SELECT \* FROM ([\S]+)$/);
+    const match = sql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*/i);
     return match && match[1];
   }
 }
