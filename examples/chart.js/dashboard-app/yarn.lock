@@ -729,11 +729,6 @@
   dependencies:
     tslib "^2.4.0"
 
-"@trigensoftware/chart.js@^4.0.3-dev":
-  version "4.0.3-dev"
-  resolved "https://npm.pkg.github.com/download/@trigensoftware/chart.js/4.0.3-dev/239e351f8ca01c85b222266f7e746282b09f0340#239e351f8ca01c85b222266f7e746282b09f0340"
-  integrity sha512-/TAybihBfNvzE53cvfYU4Q41X4MY/zSMTUV48zY9GH/h7PYhwdHx26GnGro0H4q1sJadO8R8BNCiixuAFHuW9Q==
-
 "@trysound/sax@0.2.0":
   version "0.2.0"
   resolved "https://registry.yarnpkg.com/@trysound/sax/-/sax-0.2.0.tgz#cccaab758af56761eb7bf37af6f03f326dd798ad"
@@ -821,6 +816,11 @@ chalk@^4.1.0:
   dependencies:
     ansi-styles "^4.1.0"
     supports-color "^7.1.0"
+
+chart.js@^4.0.0-alpha.2:
+  version "4.0.0-alpha.2"
+  resolved "https://registry.yarnpkg.com/chart.js/-/chart.js-4.0.0-alpha.2.tgz#da8e2dd5669f91bd0a42a683a9a736b319b5a76a"
+  integrity sha512-zQWWelV2aRRR2pdMT8mYlqMA9v168ja469JQG1i1+laXaHB9MzlqAHf+JqiPyOsKnpTRsClcqH3KJcGKJFhqDg==
 
 chrome-trace-event@^1.0.2:
   version "1.0.3"

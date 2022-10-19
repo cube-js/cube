@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "@cubejs-client/core": "^0.30.29",
-    "@trigensoftware/chart.js": "^4.0.3-dev"
+    "chart.js": "^4.0.0-alpha.2"
   }
 }
