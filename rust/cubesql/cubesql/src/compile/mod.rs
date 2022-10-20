@@ -12560,4 +12560,38 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_select_is_null_is_not_null() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                (count IS NOT NULL) c,
+                (customer_gender IS NULL) g
+            FROM KibanaSampleDataEcommerce
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
 }
