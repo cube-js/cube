@@ -278,6 +278,8 @@ jobs:
         uses: docker/setup-buildx-action@v1
         with:
           version: v0.6.3
+      - name: Copy yarn.lock file
+        run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
         with:
@@ -348,6 +350,8 @@ jobs:
         uses: docker/setup-buildx-action@v1
         with:
           version: v0.6.3
+      - name: Copy yarn.lock file
+        run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
         with:
@@ -418,6 +422,8 @@ jobs:
         uses: docker/setup-buildx-action@v1
         with:
           version: v0.6.3
+      - name: Copy yarn.lock file
+        run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
         with:
