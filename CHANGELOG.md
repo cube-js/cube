@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.6](https://github.com/cube-js/cube.js/compare/v0.31.5...v0.31.6) (2022-10-20)
+
+
+### Bug Fixes
+
+* **docker:** Correct lock for deps with yarn.lock ([#5509](https://github.com/cube-js/cube.js/issues/5509)) ([97ca524](https://github.com/cube-js/cube.js/commit/97ca524556178a1210c796ee5bac42d476c7c3df))
+
+
+### Features
+
+* **snowflake-driver:** Upgrade snowflake-sdk ([#5508](https://github.com/cube-js/cube.js/issues/5508)) ([2863a93](https://github.com/cube-js/cube.js/commit/2863a93508c8ddf7a4a78a45386b79c2ae5f5ed6))
+
+
+
+
+
 ## [0.31.5](https://github.com/cube-js/cube.js/compare/v0.31.4...v0.31.5) (2022-10-20)
 
 
