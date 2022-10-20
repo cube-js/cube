@@ -25577,10 +25577,10 @@ snapdragon@^0.8.1:
     source-map-resolve "^0.5.0"
     use "^3.1.0"
 
-snowflake-sdk@^1.6.13:
-  version "1.6.13"
-  resolved "https://registry.yarnpkg.com/snowflake-sdk/-/snowflake-sdk-1.6.13.tgz#75e6521f83cecb24a2d2276575d753b14496fef2"
-  integrity sha512-X/eiT4v/yw6+aLdEJK85te4lvkB45lkTzad2CtJdofzxWqtfi1CB2hafTJTfXoDKKJTxLTyYVo+zIYhvhcEarA==
+snowflake-sdk@^1.6.14:
+  version "1.6.14"
+  resolved "https://registry.yarnpkg.com/snowflake-sdk/-/snowflake-sdk-1.6.14.tgz#7e1fd52df738c3cdb74277b7b2b35a40394c1941"
+  integrity sha512-sKg17Yz1/aydKxlA4unlprH+uw9ZsvRezdUmamLjNlvsXQsw+pok4PoMeCKtWs2OSVFnX0VO3eSacCPglQrAQA==
   dependencies:
     "@azure/storage-blob" "^12.5.0"
     "@techteamer/ocsp" "1.0.0"
