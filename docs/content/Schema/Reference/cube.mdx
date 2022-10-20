@@ -10,7 +10,7 @@ redirect_from:
   - /cube
 ---
 
-A `cube` represents a table of data in Cube.js. Cubes are typically declared in
+A `cube` represents a table of data in Cube. Cubes are typically declared in
 separate files with one cube per file. Within each cube are definitions of
 measures, dimensions, and joins between cubes. A cube should always be declared
 with a capital letter.
@@ -22,7 +22,7 @@ cube(`Users`, {
   joins: {
     Organizations: {
       relationship: `belongsTo`,
-      sql: `${Users}.organization_id = ${Organizations}.id`,
+      sql: `${Users.organizationId} = ${Organizations.id}`,
     },
   },
 
@@ -80,16 +80,16 @@ cube(`Users`, {
 
   joins: {
     Contacts: {
-      sql: `${CUBE}.contact_id = ${Contacts}.id`,
+      sql: `${CUBE}.contact_id = ${Contacts.id}`,
       relationship: `hasOne`
     }
-  }
+  },
 
   dimensions: {
     // primary key,
 
     name: {
-      sql: `COALESCE(${CUBE}.name, ${Contacts}.name)`,
+      sql: `COALESCE(${CUBE}.name, ${Contacts.name})`,
       type: `string`
     }
   }
@@ -103,7 +103,7 @@ cube(`Contacts`, {
 });
 ```
 
-Referencing a foreign cube in the `sql` parameter instructs Cube.js to build an
+Referencing a foreign cube in the `sql` parameter instructs Cube to build an
 implicit join to this cube. Using the schema above, we'll use a query as an
 example:
 
@@ -173,7 +173,7 @@ cube(`Companies`, {
 
 ### <--{"id" : "Parameters"}--> title
 
-Use `title` to change the display name of the cube. By default, Cube.js will
+Use `title` to change the display name of the cube. By default, Cube will
 humanize the cube's name, so for instance, `UsersOrder` would become
 `Users Orders`. If default humanizing doesn't work in your case, please use the
 title parameter. It is highly recommended to give human readable names to your
@@ -233,7 +233,7 @@ cube(`ExtendedOrderFacts`, {
 });
 ```
 
-You can also omit the cube name while defining it. This way Cube.js doesn't
+You can also omit the cube name while defining it. This way, Cube doesn't
 register this cube globally but instead it returns reference to it which you can
 use while combining cubes. It makes sense to use it for dynamic schema
 generation and reusing with `extends`. Previous example without defining
@@ -265,9 +265,9 @@ cube(`ExtendedOrderFacts`, {
 
 ### <--{"id" : "Parameters"}--> refreshKey
 
-Cube.js caching layer uses `refreshKey` queries to get the current version of
-content for a specific cube. If a query result changes, Cube.js will invalidate
-all queries that rely on that cube.
+Cube's caching layer uses `refreshKey` queries to get the current version of
+content for a specific cube. If a query result changes, Cube will invalidate all
+queries that rely on that cube.
 
 The default values for `refreshKey` are
 
@@ -286,9 +286,9 @@ it last ran. timestamp in that case.
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
 
-  // With this refreshKey Cube.js will only refresh the data if
+  // With this refreshKey Cube will only refresh the data if
   // the value of previous MAX(updated_at_timestamp) changed
-  // By default Cube.js will check this refreshKey every 10 seconds
+  // By default Cube will check this refreshKey every 10 seconds
   refreshKey: {
     sql: `SELECT MAX(updated_at_timestamp) FROM orders`,
   },
@@ -328,8 +328,8 @@ intervals in CRON expressions are not supported.
 
 <WarningBox>
 
-Cube.js supports two different formats of CRON expressions: standard and
-advanced with support for seconds.
+Cube supports two different formats of CRON expressions: standard and advanced
+with support for seconds.
 
 </WarningBox>
 
@@ -419,9 +419,9 @@ all member names including pre-aggregation table names.
 
 ### <--{"id" : "Parameters"}--> rewriteQueries
 
-Set this flag to true if you want Cube.js to rewrite your queries after final
-SQL has been generated. This may be helpful to apply filter pushdown
-optimizations or reduce unnecessary query nesting. For example:
+Set this flag to true if you want Cube to rewrite your queries after final SQL
+has been generated. This may be helpful to apply filter pushdown optimizations
+or reduce unnecessary query nesting. For example:
 
 ```javascript
 cube(`Tickets`, {
@@ -436,8 +436,10 @@ cube(`Tickets`, {
 ### <--{"id" : "Context Variables"}--> Filter Params
 
 `FILTER_PARAMS` allows you to use filter values during SQL generation. You can
-add it for any valid SQL expression as in the case of dimensions.
-This is useful if you want to hint your database optimizer to use a specific index or filter out partitions or shards in your cloud data warehouse so you won't be billed for scanning those.
+add it for any valid SQL expression as in the case of dimensions. This is useful
+if you want to hint your database optimizer to use a specific index or filter
+out partitions or shards in your cloud data warehouse so you won't be billed for
+scanning those.
 
 It has the following structure:
 
@@ -518,9 +520,9 @@ cube(`Events`, {
 
 ### <--{"id" : "Context Variables"}--> Security Context
 
-`SECURITY_CONTEXT` is a user security object that is passed by the Cube.js
-Client. Please read the [Security Context page][ref-sec-ctx] for more
-information on how to set `SECURITY_CONTEXT`.
+`SECURITY_CONTEXT` is a user security object that is passed by the Cube Client.
+Please read the [Security Context page][ref-sec-ctx] for more information on how
+to set `SECURITY_CONTEXT`.
 
 <InfoBox>
 
@@ -596,7 +598,7 @@ cube(`Orders`, {
 #### convertTz
 
 In case you need to convert your timestamp to user request timezone in cube or
-member SQL you can use `SQL_UTILS.convertTz()` method. Note that Cube.js will
+member SQL you can use `SQL_UTILS.convertTz()` method. Note that Cube will
 automatically convert timezones for `timeDimensions` fields in
 [queries](/query-format#query-properties).
 

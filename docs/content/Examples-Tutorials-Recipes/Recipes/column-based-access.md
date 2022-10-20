@@ -29,7 +29,7 @@ cube(`Products`, {
   joins: {
     Suppliers: {
       relationship: `belongsTo`,
-      sql: `${CUBE}.supplier_id = ${Suppliers}.id`,
+      sql: `${CUBE}.supplier_id = ${Suppliers.id}`,
     },
   },
 
@@ -47,6 +47,12 @@ cube(`Suppliers`, {
   sql: `SELECT * FROM public.suppliers`,
 
   dimensions: {
+    id: {
+      primaryKey: true,
+      sql: `id`,
+      type: `string`,
+    },
+
     email: {
       sql: `email`,
       type: `string`,
@@ -64,9 +70,9 @@ measures from the `Products` cube:
 module.exports = {
   queryRewrite: (query, { securityContext }) => {
     const cubeNames = [
-      ...Array.from(query.measures, (e) => e.split('.')[0]),
-      ...Array.from(query.dimensions, (e) => e.split('.')[0]),
-    ];
+      ...(query.dimensions || []),
+      ...(query.measures || []),
+    ].map((e) => e.split('.')[0]);
 
     if (cubeNames.includes('Products')) {
       if (!securityContext.email) {

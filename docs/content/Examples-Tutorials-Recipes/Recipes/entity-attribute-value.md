@@ -27,7 +27,7 @@ cube(`Users`, {
   joins: {
     Orders: {
       relationship: 'hasMany',
-      sql: `${Users}.id = ${Orders}.user_id`,
+      sql: `${CUBE}.id = ${Orders.userId}`,
     },
   },
 
@@ -50,6 +50,11 @@ cube(`Orders`, {
   sql: `SELECT * FROM public.orders`,
 
   dimensions: {
+    userId: {
+      sql: `user_id`,
+      type: `string`,
+    },
+
     status: {
       sql: `status`,
       type: `string`,
