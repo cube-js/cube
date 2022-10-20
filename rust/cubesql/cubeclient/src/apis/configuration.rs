@@ -24,6 +24,7 @@ pub struct ApiKey {
 }
 
 impl Configuration {
+    #[must_use]
     pub fn new(client: ClientWithMiddleware) -> Configuration {
         Configuration {
             client,

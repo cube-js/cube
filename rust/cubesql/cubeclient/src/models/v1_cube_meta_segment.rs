@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct V1CubeMetaSegment {
     #[serde(rename = "name")]
     pub name: String,
@@ -9,8 +9,9 @@ pub struct V1CubeMetaSegment {
 }
 
 impl V1CubeMetaSegment {
-    pub fn new(name: String, title: String, short_title: String) -> V1CubeMetaSegment {
-        V1CubeMetaSegment {
+    #[must_use]
+    pub fn new(name: String, title: String, short_title: String) -> Self {
+        Self {
             name,
             title,
             short_title,

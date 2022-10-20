@@ -43,7 +43,7 @@ pub async fn load_v1(
         }
 
         if let Some(ref local_var_token) = configuration.bearer_access_token {
-            local_var_req_builder = local_var_req_builder.bearer_auth(local_var_token.to_owned());
+            local_var_req_builder = local_var_req_builder.bearer_auth(local_var_token.clone());
         };
         local_var_req_builder = local_var_req_builder.json(&v1_load_request);
 
@@ -78,20 +78,20 @@ pub async fn load_v1(
                     span_counter += 1;
 
                     continue;
-                } else {
-                    error!(
-                        "[client] load - strange response, success which contains error: {:?}",
-                        res
-                    );
-
-                    let local_var_error = ResponseContent {
-                        status: local_var_status,
-                        content: local_var_content,
-                        entity: None,
-                    };
-
-                    return Err(Error::ResponseError(local_var_error));
                 }
+
+                error!(
+                    "[client] load - strange response, success which contains error: {:?}",
+                    res
+                );
+
+                let local_var_error = ResponseContent {
+                    status: local_var_status,
+                    content: local_var_content,
+                    entity: None,
+                };
+
+                return Err(Error::ResponseError(local_var_error));
             };
 
             return response_ok;
@@ -127,7 +127,7 @@ pub async fn meta_v1(
             local_var_req_builder.header(reqwest::header::USER_AGENT, local_var_user_agent.clone());
     }
     if let Some(ref local_var_token) = local_var_configuration.bearer_access_token {
-        local_var_req_builder = local_var_req_builder.bearer_auth(local_var_token.to_owned());
+        local_var_req_builder = local_var_req_builder.bearer_auth(local_var_token.clone());
     };
 
     let local_var_req = local_var_req_builder.build()?;
