@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.31.4",
+  "version": "0.31.5",
   "description": "Cube.js e2e tests",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -32,10 +32,8 @@
     "birdbox:local:postgresql:snapshot": "USE_LOCAL_CUBEJS_BINARY=true jest --verbose --updateSnapshot -i dist/test/cli-postgresql.test.js",
     "birdbox:local:postgresql-pre-aggregations": "USE_LOCAL_CUBEJS_BINARY=true jest --verbose -i dist/test/cli-postgresql-pre-aggregations.test.js",
     "birdbox:local:postgresql-pre-aggregations:snapshot": "USE_LOCAL_CUBEJS_BINARY=true jest --verbose --updateSnapshot -i dist/test/cli-postgresql-pre-aggregations.test.js",
-
     "cypress:install": "cypress install",
     "cypress:birdbox": "node dist/test/bin/cypress-birdbox.js",
-
     "driver:athena": "jest --verbose -i dist/test/driver-athena.test.js",
     "driver:athena:snap": "jest --verbose --updateSnapshot -i dist/test/driver-athena.test.js",
     "driver:bigquery": "jest --verbose -i dist/test/driver-bigquery.test.js",
@@ -48,9 +46,7 @@
     "driver:questdb:snap": "jest --verbose --updateSnapshot -i dist/test/driver-questdb.test.js",
     "driver:databricks": "jest --verbose -i dist/test/driver-databricks.test.js",
     "driver:databricks:snap": "jest --verbose --updateSnapshot -i dist/test/driver-databricks.test.js",
-  
     "rest:postgres": "yarn tsc && clear && jest --verbose -i dist/test/rest-postgres.test.js",
-  
     "smoke:athena": "jest --verbose -i dist/test/smoke-athena.test.js",
     "smoke:athena:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-athena.test.js",
     "smoke:bigquery": "jest --verbose -i dist/test/smoke-bigquery.test.js",
@@ -78,13 +74,13 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
-    "@cubejs-backend/cubestore-driver": "^0.31.4",
+    "@cubejs-backend/cubestore-driver": "^0.31.5",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/postgres-driver": "^0.31.4",
-    "@cubejs-backend/query-orchestrator": "^0.31.3",
-    "@cubejs-backend/schema-compiler": "^0.31.4",
+    "@cubejs-backend/postgres-driver": "^0.31.5",
+    "@cubejs-backend/query-orchestrator": "^0.31.5",
+    "@cubejs-backend/schema-compiler": "^0.31.5",
     "@cubejs-backend/shared": "^0.31.0",
-    "@cubejs-backend/testing-shared": "^0.31.4",
+    "@cubejs-backend/testing-shared": "^0.31.5",
     "@cubejs-client/ws-transport": "^0.31.0",
     "dedent": "^0.7.0",
     "fs-extra": "^8.1.0",

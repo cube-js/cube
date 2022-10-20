@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.5](https://github.com/cube-js/cube.js/compare/v0.31.4...v0.31.5) (2022-10-20)
+
+
+### Features
+
+* **cubestore:** CC-1133 - add headers to telemetry request ([#5473](https://github.com/cube-js/cube.js/issues/5473)) ([26fa817](https://github.com/cube-js/cube.js/commit/26fa8173961adfc756cee0a9bb626219f33c35b2))
+
+
+
+
+
 ## [0.31.4](https://github.com/cube-js/cube.js/compare/v0.31.3...v0.31.4) (2022-10-13)
 
 

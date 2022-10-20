@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.5](https://github.com/cube-js/cube.js/compare/v0.31.4...v0.31.5) (2022-10-20)
+
+
+### Bug Fixes
+
+* **cubesql:** Use real database name in Postgres meta layer ([031a90f](https://github.com/cube-js/cube.js/commit/031a90fac068ce35f18823a034f65b486153c726))
+
+
+### Features
+
+* **cubesql:** Allow `EXTRACT` field to be parsed as a string ([cad1e0b](https://github.com/cube-js/cube.js/commit/cad1e0b4452233866f87d3856823ef81ca117444))
+
+
+
+
+
 ## [0.31.2](https://github.com/cube-js/cube.js/compare/v0.31.1...v0.31.2) (2022-10-08)
 
 

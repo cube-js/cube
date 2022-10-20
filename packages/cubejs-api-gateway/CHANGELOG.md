@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.5](https://github.com/cube-js/cube.js/compare/v0.31.4...v0.31.5) (2022-10-20)
+
+
+### Features
+
+* pre-aggregations build jobs API endpoint ([#5251](https://github.com/cube-js/cube.js/issues/5251)) ([4aee3ef](https://github.com/cube-js/cube.js/commit/4aee3efba9c14b4698c81707d92af11c98978c81))
+
+
+
+
+
 ## [0.31.4](https://github.com/cube-js/cube.js/compare/v0.31.3...v0.31.4) (2022-10-13)
 
 
