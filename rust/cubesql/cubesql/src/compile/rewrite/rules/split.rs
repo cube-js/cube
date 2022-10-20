@@ -1246,7 +1246,7 @@ impl RewriteRules for SplitRules {
                 outer_aggregate_split_replacer(fun_expr("Floor", vec!["?expr"]), "?cube"),
                 fun_expr(
                     "Floor",
-                    vec![outer_projection_split_replacer("?expr", "?cube")],
+                    vec![outer_aggregate_split_replacer("?expr", "?cube")],
                 ),
             ),
             // Cast
