@@ -64,11 +64,7 @@
     "prettier": "^2.0.5",
     "rimraf": "^3.0.2",
     "rollup": "2.53.1",
-    "rollup-plugin-less": "^1.1.3",
-    "rollup-plugin-local-resolve": "^1.0.7",
     "rollup-plugin-peer-deps-external": "^2.2.4",
-    "rollup-plugin-postcss": "^4.0.0",
-    "rollup-plugin-uglify": "^6.0.4",
     "typescript": "~4.1.5"
   },
   "repository": {
