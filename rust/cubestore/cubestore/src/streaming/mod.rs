@@ -47,6 +47,7 @@ impl StreamingServiceImpl {
         meta_store: Arc<dyn MetaStore>,
         chunk_store: Arc<dyn ChunkDataStore>,
     ) -> Arc<Self> {
+        log::error!("!!! kSql streaming service created");
         Arc::new(Self {
             config_obj,
             meta_store,
@@ -85,12 +86,20 @@ impl StreamingServiceImpl {
                 user,
                 password,
                 url,
-            } => Ok(Arc::new(KSqlStreamingSource {
-                user: user.clone(),
-                password: password.clone(),
-                table: location_url.path().to_string().replace("/", ""),
-                endpoint_url: url.to_string(),
-            })),
+            } => {
+                log::error!(
+                    "!!! kSql creds: user: {:?}, password: {:?}, url: {:?}",
+                    user,
+                    password,
+                    url
+                );
+                Ok(Arc::new(KSqlStreamingSource {
+                    user: user.clone(),
+                    password: password.clone(),
+                    table: location_url.path().to_string().replace("/", ""),
+                    endpoint_url: url.to_string(),
+                }))
+            }
         }
     }
 }
@@ -121,6 +130,7 @@ impl StreamingService for StreamingServiceImpl {
             builders.into_iter().map(|mut b| b.finish()).collect_vec()
         };
 
+        log::error!("!!! kSql start import loop");
         // TODO support sealing streaming tables through ALTER TABLE
         while let Some(new_rows) = tokio::time::timeout(
             Duration::from_secs(self.config_obj.stale_stream_timeout()),
@@ -131,6 +141,7 @@ impl StreamingService for StreamingServiceImpl {
         {
             let rows = new_rows?;
             debug!("Received {} rows for {}", rows.len(), location);
+            log::error!("!! kSql Received {} rows for {}", rows.len(), location);
             let table_cols = table.get_row().get_columns().as_slice();
             let mut builders = create_array_builders(table_cols);
             for row in rows {
@@ -158,6 +169,7 @@ impl StreamingService for StreamingServiceImpl {
                 .activate_chunks(table.get_id(), new_chunk_ids?)
                 .await?;
         }
+        log::error!("!!! kSql start import loop");
         Ok(())
     }
 }
@@ -415,6 +427,10 @@ impl StreamingSource for KSqlStreamingSource {
         seq_column: Column,
         initial_seq_value: u64,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Vec<Row>, CubeError>> + Send>>, CubeError> {
+        log::error!(
+            "!!! kSql sending query {}",
+            format!("SELECT * FROM `{}` EMIT CHANGES;", self.table)
+        );
         let res = self
             .post_req(
                 "/query-stream",
@@ -423,6 +439,7 @@ impl StreamingSource for KSqlStreamingSource {
                 },
             )
             .await?;
+        log::error!("!!! kSql received query {:?}", res.status());
         let column_to_move = columns.clone();
         let seq_column_to_move = seq_column.clone();
         Ok(
