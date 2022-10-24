@@ -12560,4 +12560,75 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_sigma_cross_join_count() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                count_25 "__Row Count",
+                datetrunc_8 "Second of Completed At",
+                cast_timestamp_to_datetime_10 "Completed At",
+                v_11 "Target Const"
+            FROM (
+                SELECT
+                    q1.datetrunc_8 datetrunc_8,
+                    q1.cast_timestamp_to_datetime_10 cast_timestamp_to_datetime_10,
+                    q1.v_11 v_11,
+                    q2.count_25 count_25
+                FROM (
+                    SELECT
+                        date_trunc('second', "order_date"::timestamptz) datetrunc_8,
+                        "order_date"::timestamptz cast_timestamp_to_datetime_10,
+                        1 v_11
+                    FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                ) q1
+                CROSS JOIN (
+                    SELECT count(1) count_25
+                    FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                ) q2
+                ORDER BY q1.datetrunc_8 ASC
+                LIMIT 10001
+            ) q5
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scans = logical_plan
+            .find_cube_scans()
+            .iter()
+            .map(|cube| cube.request.clone())
+            .collect::<Vec<V1LoadRequestQuery>>();
+
+        assert!(cube_scans.contains(&V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string(),]),
+            segments: Some(vec![]),
+            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                granularity: Some("second".to_string()),
+                date_range: None
+            }]),
+            order: None, // TODO: ORDER BY probably should be pushed down and be equal to order_date ASC
+            limit: None, // TODO: LIMIT probably should be pushed down and be equal to 10001
+            offset: None,
+            filters: None,
+        }));
+
+        assert!(cube_scans.contains(&V1LoadRequestQuery {
+            measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+            dimensions: Some(vec![]),
+            segments: Some(vec![]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+        }));
+    }
 }
