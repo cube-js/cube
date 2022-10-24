@@ -12594,4 +12594,47 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_cast_split_aliasing() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            select
+                q1.datetrunc_8 datetrunc_8,
+                q1.cast_timestamp_to_datetime_10 cast_timestamp_to_datetime_10,
+                q1.v_11 v_11
+            from (
+                select
+                    date_trunc('second', "order_date"::timestamptz) datetrunc_8,
+                    "order_date"::timestamptz cast_timestamp_to_datetime_10,
+                    1 v_11
+                from "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            ) q1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("second".to_owned()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
 }
