@@ -201,6 +201,10 @@ trait Visitor<'ast, E: Error> {
             }
             Expr::TypedString { .. } => (),
             Expr::AtTimeZone { timestamp, .. } => self.visit_expr(timestamp)?,
+            Expr::Position { expr, r#in } => {
+                self.visit_expr(expr)?;
+                self.visit_expr(r#in)?;
+            }
         };
 
         Ok(())
