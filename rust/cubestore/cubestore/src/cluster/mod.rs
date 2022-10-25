@@ -740,6 +740,7 @@ impl JobRunner {
             }
         });
         debug!("Running job: {:?}", job);
+        log::error!("!! kSql Running job: {:?}", job);
         let handle = AbortingJoinHandle::new(self.route_job(job.get_row())?);
         // TODO cancel job if this worker isn't job owner anymore
         let res = if let Some(duration) = self.job_timeout(&job) {

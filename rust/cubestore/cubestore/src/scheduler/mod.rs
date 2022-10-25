@@ -314,6 +314,7 @@ impl SchedulerImpl {
     async fn reconcile_table_imports(&self) -> Result<(), CubeError> {
         // Using get_tables_with_path due to it's cached
         let tables = self.meta_store.get_tables_with_path(true).await?;
+        log::error!("reconcile table imports. Tables count {}", tables.len());
         for table in tables.iter() {
             if table.table.get_row().is_ready() {
                 if let Some(locations) = table.table.get_row().locations() {
@@ -326,6 +327,7 @@ impl SchedulerImpl {
                                     JobType::TableImportCSV(location.to_string()),
                                 )
                                 .await?;
+                            log::error!("!! kSql schedule import try schedule for {}", location);
                             if job.is_none() {
                                 log::error!("!! kSql schedule import job for location {}", location);
                                 self.schedule_table_import(table.table.get_id(), &[location])
@@ -435,6 +437,7 @@ impl SchedulerImpl {
         if let MetaStoreEvent::Insert(TableId::Tables, row_id) = event {
             let table = self.meta_store.get_table_by_id(row_id).await?;
             if let Some(locations) = table.get_row().locations() {
+                log::error!("!! kSql Event::Insert shedule import for locations {:?}", locations);
                 self.schedule_table_import(row_id, &locations).await?;
             }
         }
