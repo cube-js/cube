@@ -27,6 +27,13 @@ cube(`Orders`, {
     number: {
       sql: `number`,
       type: `sum`
+    },
+
+    completedCount: {
+      type: `count`,
+      filters: [{
+        sql: `${CUBE}.status = 'completed'`
+      }],
     }
   },
   
@@ -51,7 +58,5 @@ cube(`Orders`, {
       sql: `completed_at`,
       type: `time`
     }
-  },
-  
-  dataSource: `default`
+  }
 });
