@@ -639,6 +639,7 @@ impl ImportService for ImportServiceImpl {
     }
 
     async fn import_table_part(&self, table_id: u64, location: &str) -> Result<(), CubeError> {
+        log::error!("!! kSql import start for location {}", location);
         let table = self.meta_store.get_table_by_id(table_id).await?;
         let format = table
             .get_row()
@@ -663,8 +664,10 @@ impl ImportService for ImportServiceImpl {
             )));
         }
         if Table::is_stream_location(location) {
+            log::error!("!! kSql stream import start for location {}", location);
             self.streaming_service.stream_table(table, location).await?;
         } else {
+            log::error!("!! kSql not stream import start for location {}", location);
             self.do_import(&table, *format, location).await?;
             self.drop_temp_uploads(&location).await?;
         }

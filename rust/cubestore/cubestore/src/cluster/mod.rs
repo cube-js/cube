@@ -906,6 +906,7 @@ impl JobRunner {
                     let table_id = *table_id;
                     let import_service = self.import_service.clone();
                     let location = location.to_string();
+                    log::error!("!! kSql Job TableImportCSV procedding started for location {}", location);
                     Ok(cube_ext::spawn(async move {
                         import_service
                             .clone()

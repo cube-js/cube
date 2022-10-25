@@ -327,6 +327,7 @@ impl SchedulerImpl {
                                 )
                                 .await?;
                             if job.is_none() {
+                                log::error!("!! kSql schedule import job for location {}", location);
                                 self.schedule_table_import(table.table.get_id(), &[location])
                                     .await?;
                             }

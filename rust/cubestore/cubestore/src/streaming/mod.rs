@@ -141,7 +141,6 @@ impl StreamingService for StreamingServiceImpl {
         {
             let rows = new_rows?;
             debug!("Received {} rows for {}", rows.len(), location);
-            log::error!("!! kSql Received {} rows for {}", rows.len(), location);
             let table_cols = table.get_row().get_columns().as_slice();
             let mut builders = create_array_builders(table_cols);
             for row in rows {
@@ -169,7 +168,7 @@ impl StreamingService for StreamingServiceImpl {
                 .activate_chunks(table.get_id(), new_chunk_ids?)
                 .await?;
         }
-        log::error!("!!! kSql start import loop");
+        log::error!("!!! kSql end import loop");
         Ok(())
     }
 }
