@@ -2779,3 +2779,22 @@ pub fn create_regexp_substr_udf() -> ScalarUDF {
         &fun,
     )
 }
+
+pub fn create_position_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "POSITION is not implemented, it's a stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
+
+    ScalarUDF::new(
+        "position",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}

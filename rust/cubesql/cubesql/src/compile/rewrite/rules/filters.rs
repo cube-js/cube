@@ -529,7 +529,7 @@ impl RewriteRules for FilterRules {
                     "or",
                 ),
             ),
-            // Unwrap lower for case case insensitive operators
+            // Unwrap lower for case-insensitive operators
             transforming_rewrite(
                 "filter-replacer-lower-unwrap",
                 filter_replacer(
@@ -544,7 +544,25 @@ impl RewriteRules for FilterRules {
                 ),
                 self.unwrap_lower_or_upper("?op"),
             ),
-            // Unwrap lower for case case insensitive operators
+            rewrite(
+                "filter-replacer-lower-is-null-unwrap",
+                filter_replacer(
+                    is_null_expr(fun_expr("Lower", vec!["?expr"])),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(is_null_expr("?expr"), "?alias_to_cube", "?members"),
+            ),
+            rewrite(
+                "filter-replacer-lower-is-not-null-unwrap",
+                filter_replacer(
+                    is_not_null_expr(fun_expr("Lower", vec!["?expr"])),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(is_not_null_expr("?expr"), "?alias_to_cube", "?members"),
+            ),
+            // Unwrap upper for case-insensitive operators
             transforming_rewrite(
                 "filter-replacer-upper-unwrap",
                 filter_replacer(
@@ -558,6 +576,24 @@ impl RewriteRules for FilterRules {
                     "?members",
                 ),
                 self.unwrap_lower_or_upper("?op"),
+            ),
+            rewrite(
+                "filter-replacer-upper-is-null-unwrap",
+                filter_replacer(
+                    is_null_expr(fun_expr("Upper", vec!["?expr"])),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(is_null_expr("?expr"), "?alias_to_cube", "?members"),
+            ),
+            rewrite(
+                "filter-replacer-upper-is-not-null-unwrap",
+                filter_replacer(
+                    is_not_null_expr(fun_expr("Upper", vec!["?expr"])),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(is_not_null_expr("?expr"), "?alias_to_cube", "?members"),
             ),
             // Lower(?column) = 'literal'
             // TODO: Migrate to equalsLower operator, when it will be available in Cube?
@@ -877,6 +913,192 @@ impl RewriteRules for FilterRules {
                     "?output_op",
                     "?literal",
                     "?new_literal",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-sigma-str-contains",
+                filter_replacer(
+                    binary_expr(
+                        udf_expr(
+                            "position",
+                            vec![
+                                literal_expr("?literal"),
+                                fun_expr("Lower", vec![column_expr("?column")]),
+                            ],
+                        ),
+                        ">",
+                        literal_number(0),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_filter_prefix(
+                    "?column",
+                    "contains",
+                    "?literal",
+                    None,
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-sigma-str-not-contains",
+                filter_replacer(
+                    binary_expr(
+                        udf_expr(
+                            "position",
+                            vec![
+                                literal_expr("?literal"),
+                                fun_expr("Lower", vec![column_expr("?column")]),
+                            ],
+                        ),
+                        "<=",
+                        literal_number(0),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_filter_prefix(
+                    "?column",
+                    "notContains",
+                    "?literal",
+                    None,
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-sigma-str-starts-with",
+                filter_replacer(
+                    binary_expr(
+                        udf_expr(
+                            "position",
+                            vec![
+                                literal_expr("?literal"),
+                                fun_expr("Lower", vec![column_expr("?column")]),
+                            ],
+                        ),
+                        "=",
+                        literal_number(1),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_filter_prefix(
+                    "?column",
+                    "startsWith",
+                    "?literal",
+                    None,
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-sigma-str-not-starts-with",
+                filter_replacer(
+                    binary_expr(
+                        udf_expr(
+                            "position",
+                            vec![
+                                literal_expr("?literal"),
+                                fun_expr("Lower", vec![column_expr("?column")]),
+                            ],
+                        ),
+                        "!=",
+                        literal_number(1),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_filter_prefix(
+                    "?column",
+                    "notStartsWith",
+                    "?literal",
+                    None,
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-sigma-str-ends-with",
+                filter_replacer(
+                    binary_expr(
+                        udf_expr(
+                            "position",
+                            vec![
+                                fun_expr("Reverse", vec![literal_expr("?literal")]),
+                                fun_expr(
+                                    "Reverse",
+                                    vec![fun_expr("Lower", vec![column_expr("?column")])],
+                                ),
+                            ],
+                        ),
+                        "=",
+                        literal_number(1),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_filter_prefix(
+                    "?column",
+                    "endsWith",
+                    "?literal",
+                    None,
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-sigma-str-not-ends-with",
+                filter_replacer(
+                    binary_expr(
+                        udf_expr(
+                            "position",
+                            vec![
+                                fun_expr("Reverse", vec![literal_expr("?literal")]),
+                                fun_expr(
+                                    "Reverse",
+                                    vec![fun_expr("Lower", vec![column_expr("?column")])],
+                                ),
+                            ],
+                        ),
+                        "!=",
+                        literal_number(1),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_filter_prefix(
+                    "?column",
+                    "notEndsWith",
+                    "?literal",
+                    None,
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
                 ),
             ),
             transforming_rewrite(
