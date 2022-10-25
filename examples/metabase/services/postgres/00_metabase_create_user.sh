@@ -1,4 +1,5 @@
 #!/bin/bash
+
 set -e # exit if a command exits with a not-zero exit code
 
 POSTGRES="psql -U postgres"

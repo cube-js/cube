@@ -1,9 +1,9 @@
-version: '2.2'
+version: '3'
 services:
   cube:
     container_name: "cube"
     restart: "always"
-    image: cubejs/cube:v0.31.6
+    image: cubejs/cube
     ports:
       - 4000:4000  # Cube.js API and Developer Playground
       - 5432:5432  # Cube SQL API
@@ -30,6 +30,8 @@ services:
     image: metabase/metabase
     env_file:
       - ./config/metabase.env
+    depends_on:
+      - postgres
     ports:
       - 3000:3000
 
