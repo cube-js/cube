@@ -19,8 +19,6 @@ describe('CubeStoreHandler', () => {
   });
 
   it('acquire with release', async () => {
-    jest.setTimeout(60 * 1000);
-
     const handler = new CubeStoreHandlerOpen({
       stdout: (v) => {
         console.log(v.toString());
@@ -39,11 +37,9 @@ describe('CubeStoreHandler', () => {
     await pausePromise(5 * 1000);
 
     await handler.release(true);
-  });
+  }, 60 * 1000);
 
   it('auto restart', async () => {
-    jest.setTimeout(60 * 1000);
-
     let restartCount = 0;
 
     const handler = new CubeStoreHandlerOpen({
@@ -78,11 +74,9 @@ describe('CubeStoreHandler', () => {
     }
 
     await handler.release(true);
-  });
+  }, 60 * 1000);
 
   it('auto kill if parent dies', async () => {
-    jest.setTimeout(60 * 1000);
-
     {
       const startedProcess = fork('./dist/test/process-test-fork', {
         stdio: 'pipe'
@@ -133,5 +127,7 @@ describe('CubeStoreHandler', () => {
 
       await exitPromise;
     }
-  });
+
+    await pausePromise(2 * 1000);
+  }, 60 * 1000);
 });

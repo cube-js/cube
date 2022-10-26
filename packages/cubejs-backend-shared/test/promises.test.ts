@@ -485,7 +485,9 @@ describe('asyncDebounce', () => {
 
 describe('asyncMemoizeBackground', () => {
   beforeEach(() => {
-    jest.useFakeTimers('legacy');
+    jest.useFakeTimers({
+      legacyFakeTimers: true
+    });
   });
 
   afterEach(() => {

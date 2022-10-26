@@ -79,7 +79,7 @@ checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 [[package]]
 name = "arrow"
 version = "11.1.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=0bc721700352afe8267dba82388b81deffc24095#0bc721700352afe8267dba82388b81deffc24095"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=0a23deccf4e589768177fbaa7a3745c8b25f63c9#0a23deccf4e589768177fbaa7a3745c8b25f63c9"
 dependencies = [
  "bitflags",
  "chrono",
@@ -167,7 +167,7 @@ dependencies = [
  "async-trait",
  "axum-core",
  "bitflags",
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "futures-util",
  "http",
  "http-body",
@@ -194,7 +194,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bdc19781b16e32f8a7200368a336fa4509d4b72ef15dd4e41df5290855ee1e6"
 dependencies = [
  "async-trait",
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "futures-util",
  "http",
  "http-body",
@@ -388,9 +388,9 @@ checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
 
 [[package]]
 name = "bytes"
-version = "1.1.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
+checksum = "ec8a7b6a70fde80372154c65702f00a0f56f3e1c36abbc6c440484be248856db"
 
 [[package]]
 name = "cc"
@@ -632,7 +632,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=f544f7e64dae8af51b04434c45d64bd34171fea7#f544f7e64dae8af51b04434c45d64bd34171fea7"
 dependencies = [
  "arrow",
  "chrono",
@@ -685,7 +685,7 @@ dependencies = [
  "bincode",
  "bitflags",
  "byteorder",
- "bytes 0.5.6",
+ "bytes 1.2.1",
  "chrono",
  "chrono-tz",
  "comfy-table 4.1.1",
@@ -725,7 +725,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=f544f7e64dae8af51b04434c45d64bd34171fea7#f544f7e64dae8af51b04434c45d64bd34171fea7"
 dependencies = [
  "ahash",
  "arrow",
@@ -737,6 +737,7 @@ dependencies = [
  "datafusion-physical-expr",
  "futures",
  "hashbrown 0.12.0",
+ "itertools",
  "lazy_static",
  "log",
  "num_cpus",
@@ -757,7 +758,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=f544f7e64dae8af51b04434c45d64bd34171fea7#f544f7e64dae8af51b04434c45d64bd34171fea7"
 dependencies = [
  "arrow",
  "ordered-float 2.10.0",
@@ -768,7 +769,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=f544f7e64dae8af51b04434c45d64bd34171fea7#f544f7e64dae8af51b04434c45d64bd34171fea7"
 dependencies = [
  "async-trait",
  "chrono",
@@ -781,7 +782,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=f544f7e64dae8af51b04434c45d64bd34171fea7#f544f7e64dae8af51b04434c45d64bd34171fea7"
 dependencies = [
  "ahash",
  "arrow",
@@ -792,7 +793,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=c9761d716dee9546142d4ef3716466b4cb012f3e#c9761d716dee9546142d4ef3716466b4cb012f3e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=f544f7e64dae8af51b04434c45d64bd34171fea7#f544f7e64dae8af51b04434c45d64bd34171fea7"
 dependencies = [
  "ahash",
  "arrow",
@@ -1141,7 +1142,7 @@ version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37a82c6d637fc9515a4694bbf1cb2457b79d81ce52b3108bdeea58b07dd34a57"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "fnv",
  "futures-core",
  "futures-sink",
@@ -1227,7 +1228,7 @@ version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31f4c6746584866f0feabcc69893c5b51beef3831656a968ed7ae254cdc4fd03"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "fnv",
  "itoa 1.0.1",
 ]
@@ -1238,7 +1239,7 @@ version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ff4f84919677303da5f147645dbea6b1881f368d03ac84e1dc09031ebd7b2c6"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "http",
  "pin-project-lite",
 ]
@@ -1273,7 +1274,7 @@ version = "0.14.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b26ae0a80afebe130861d90abf98e3814a4f28a4c6ffeb5ab8ebb2be311e0ef2"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "futures-channel",
  "futures-core",
  "futures-util",
@@ -1762,7 +1763,7 @@ dependencies = [
  "bigdecimal 0.2.2",
  "bitflags",
  "byteorder",
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "chrono",
  "flate2",
  "lazy_static",
@@ -2071,7 +2072,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "11.1.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=0bc721700352afe8267dba82388b81deffc24095#0bc721700352afe8267dba82388b81deffc24095"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=0a23deccf4e589768177fbaa7a3745c8b25f63c9#0a23deccf4e589768177fbaa7a3745c8b25f63c9"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -2126,7 +2127,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "byteorder",
- "bytes 0.5.6",
+ "bytes 1.2.1",
  "chrono",
  "log",
  "thiserror",
@@ -2216,7 +2217,7 @@ version = "0.19.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8bbcd5f6deb39585a0d9f4ef34c4a41c25b7ad26d23c75d837d78c8e7adc85f"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "fallible-iterator",
  "futures",
  "log",
@@ -2232,7 +2233,7 @@ checksum = "878c6cbf956e03af9aa8204b407b9cbf47c072164800aa918c516cd4b056c50c"
 dependencies = [
  "base64 0.13.0",
  "byteorder",
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "fallible-iterator",
  "hmac",
  "md-5",
@@ -2248,7 +2249,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebd6e8b7189a73169290e89bd24c771071f1012d8fe6f738f5226531f0b03d89"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "fallible-iterator",
  "postgres-protocol",
 ]
@@ -2309,7 +2310,7 @@ version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71adf41db68aa0daaefc69bb30bcd68ded9b9abaad5d1fbb6304c4fb390e083e"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "prost-derive",
 ]
 
@@ -2332,7 +2333,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "prost",
 ]
 
@@ -2582,7 +2583,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46a1f7aa4f35e5e8b4160449f51afc758f0ce6454315a9fa7d0d113e958c41eb"
 dependencies = [
  "base64 0.13.0",
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "encoding_rs",
  "futures-core",
  "futures-util",
@@ -2653,7 +2654,7 @@ checksum = "34a3bb58e85333f1ab191bf979104b586ebd77475bc6681882825f4532dfe87c"
 dependencies = [
  "arrayvec 0.7.2",
  "byteorder",
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "num-traits",
  "postgres",
  "serde",
@@ -2919,7 +2920,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "sqlparser"
 version = "0.16.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=19f730c8274b39f55224824c98687dc55aa95c92#19f730c8274b39f55224824c98687dc55aa95c92"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=ef389d81a7b787b424a43177e2e9d7ad8be3e6c5#ef389d81a7b787b424a43177e2e9d7ad8be3e6c5"
 dependencies = [
  "log",
 ]
@@ -3185,7 +3186,7 @@ version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af73ac49756f3f7c01172e34a23e5d0216f6c32333757c2c61feb2bbff5a5ee"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "libc",
  "memchr",
  "mio 0.8.2",
@@ -3229,7 +3230,7 @@ checksum = "19c88a47a23c5d2dc9ecd28fb38fba5fc7e5ddc1fe64488ec145076b0c71c8ae"
 dependencies = [
  "async-trait",
  "byteorder",
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "fallible-iterator",
  "futures",
  "log",
@@ -3272,7 +3273,7 @@ version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e99e1983e5d376cd8eb4b66604d2e99e79f5bd988c3055891dcd8c9e2604cc0"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "futures-core",
  "futures-io",
  "futures-sink",
@@ -3287,7 +3288,7 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0edfdeb067411dba2044da6d1cb2df793dd35add7888d73c16e3381ded401764"
 dependencies = [
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "futures-core",
  "futures-sink",
  "pin-project-lite",
@@ -3305,7 +3306,7 @@ dependencies = [
  "async-trait",
  "axum",
  "base64 0.13.0",
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "futures-core",
  "futures-util",
  "h2",
@@ -3354,7 +3355,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d342c6d58709c0a6d48d48dabbb62d4ef955cf5f0f3bbfd845838e7ae88dbae"
 dependencies = [
  "bitflags",
- "bytes 1.1.0",
+ "bytes 1.2.1",
  "futures-core",
  "futures-util",
  "http",

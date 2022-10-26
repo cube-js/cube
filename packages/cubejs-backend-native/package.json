@@ -30,10 +30,10 @@
   ],
   "devDependencies": {
     "@cubejs-infra/node-pre-gyp-github": "^1.0.3",
-    "@types/jest": "^26",
+    "@types/jest": "^28.1.8",
     "@types/node": "^12",
     "cargo-cp-artifact": "^0.1",
-    "jest": "^26",
+    "jest": "^28.1.3",
     "mysql2": "^2.3.3",
     "typescript": "~4.1.5"
   },
