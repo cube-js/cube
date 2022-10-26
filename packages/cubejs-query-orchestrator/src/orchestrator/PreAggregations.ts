@@ -609,7 +609,7 @@ export class PreAggregationLoader {
   }
 
   protected async loadPreAggregationWithKeys(): Promise<LoadPreAggregationResult> {
-    const invalidationKeys = await this.getInvalidationKeyValues();
+    const invalidationKeys = await this.getPartitionInvalidationKeyValues();
     const contentVersion = this.contentVersion(invalidationKeys);
     const structureVersion = getStructureVersion(this.preAggregation);
 
@@ -761,6 +761,14 @@ export class PreAggregationLoader {
   protected getInvalidationKeyValues() {
     return Promise.all(
       (this.preAggregation.invalidateKeyQueries || []).map(
+        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+      )
+    );
+  }
+
+  protected getPartitionInvalidationKeyValues() {
+    return Promise.all(
+      (this.preAggregation.partitionInvalidateKeyQueries || []).map(
         (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
       )
     );
@@ -1504,7 +1512,7 @@ export class PreAggregationPartitionRangeLoader {
       previewSql: this.preAggregation.previewSql &&
         this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
       buildRangeEnd,
-      sealAt,
+      sealAt, //Used only for kSql pre aggregations
     };
   }
 

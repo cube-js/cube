@@ -76,10 +76,26 @@ export class KsqlQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
+  public partitionInvalidateKeyQueries(cube: string, preAggregation: any) {
+    return [];
+  }
+
   /* public preAggregationInvalidateKeyQueries(cube: string, preAggregation: any) {
     // always empty as streaming tables are constantly refreshed by Cube Store
     return [];
   } */
+
+  public preAggregationStartEndQueries(cube: string, preAggregation: any) {
+
+
+    //TODO error build range required
+    const res = this.evaluateSymbolSqlWithContext(() => [
+      
+      preAggregation.refreshRangeStart && [this.evaluateSql(cube, preAggregation.refreshRangeStart.sql, {}), [], {external:true}],
+      preAggregation.refreshRangeEnd && [this.evaluateSql(cube, preAggregation.refreshRangeEnd.sql, {}), [], {external:true}]
+    ], { preAggregationQuery: true });
+    return res;
+  }
 
   public preAggregationReadOnly(cube: string, preAggregation: any) {
     const [sql] = this.preAggregationSql(cube, preAggregation);

@@ -148,6 +148,7 @@ export class PreAggregations {
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
+    const partitionInvalidateKeyQueries = this.query.partitionInvalidateKeyQueries ? this.query.partitionInvalidateKeyQueries(cube, preAggregation) : invalidateKeyQueries;
 
     const matchedTimeDimension =
       preAggregation.partitionGranularity &&
@@ -177,6 +178,7 @@ export class PreAggregations {
       timestampFormat: queryForSqlEvaluation.timestampFormat(),
       tableName,
       invalidateKeyQueries,
+      partitionInvalidateKeyQueries,
       type: preAggregation.type,
       external: preAggregation.external,
       previewSql: this.query.preAggregationPreviewSql(tableName),

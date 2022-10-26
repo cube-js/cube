@@ -354,7 +354,6 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns: string[] | null, queryTracingObj?: any, sealAt?: string) {
-    console.log("seal seal seal ", sealAt);
     if (!uniqueKeyColumns) {
       throw new Error('Older version of orchestrator is being used with newer version of Cube Store driver. Please upgrade cube.js.');
     }
