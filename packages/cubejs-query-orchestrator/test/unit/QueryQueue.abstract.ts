@@ -30,7 +30,7 @@ export const QueryQueueTest = (name: string, options?: any) => {
     });
 
     afterAll(async () => {
-      await options.redisPool.cleanup();
+      await options?.redisPool.cleanup();
     });
 
     test('gutter', async () => {
