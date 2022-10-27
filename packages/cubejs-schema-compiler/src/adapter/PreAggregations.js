@@ -170,7 +170,6 @@ export class PreAggregations {
     }[preAggregation.type] || uniqueKeyColumnsDefault)();
 
     const aggregationsColumns = this.aggregationsColumns(cube, preAggregation);
-
     
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
@@ -191,7 +190,7 @@ export class PreAggregations {
       // in fact we can reference preAggregation.granularity however accessing timeDimensions is more strict and consistent
       granularity: references.timeDimensions[0]?.granularity,
       partitionGranularity: preAggregation.partitionGranularity,
-      updateWindowSeconds: preAggregation.refreshKey.updateWindow &&
+      updateWindowSeconds: preAggregation.refreshKey && preAggregation.refreshKey.updateWindow &&
         this.query.parseSecondDuration(preAggregation.refreshKey.updateWindow),
       preAggregationStartEndQueries:
         (preAggregation.partitionGranularity || references.timeDimensions[0]?.granularity) &&

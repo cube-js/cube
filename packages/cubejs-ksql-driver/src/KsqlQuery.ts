@@ -80,19 +80,19 @@ export class KsqlQuery extends BaseQuery {
     return [];
   }
 
-  /* public preAggregationInvalidateKeyQueries(cube: string, preAggregation: any) {
-    // always empty as streaming tables are constantly refreshed by Cube Store
-    return [];
-  } */
-
   public preAggregationStartEndQueries(cube: string, preAggregation: any) {
-
-
-    //TODO error build range required
+    if (preAggregation.partitionGranularity) {
+      if (!preAggregation.refreshRangeStart) {
+        throw new Error('Pre aggregation schema for kSql source with partition granularity must contains buildRangeStart parameter');
+      }
+      if (!preAggregation.refreshRangeEnd) {
+        throw new Error('Pre aggregation schema for kSql source with partition granularity must contains buildRangeEnd parameter');
+      }
+    }
     const res = this.evaluateSymbolSqlWithContext(() => [
       
-      preAggregation.refreshRangeStart && [this.evaluateSql(cube, preAggregation.refreshRangeStart.sql, {}), [], {external:true}],
-      preAggregation.refreshRangeEnd && [this.evaluateSql(cube, preAggregation.refreshRangeEnd.sql, {}), [], {external:true}]
+      preAggregation.refreshRangeStart && [this.evaluateSql(cube, preAggregation.refreshRangeStart.sql, {}), [], { external: true }],
+      preAggregation.refreshRangeEnd && [this.evaluateSql(cube, preAggregation.refreshRangeEnd.sql, {}), [], { external: true }]
     ], { preAggregationQuery: true });
     return res;
   }

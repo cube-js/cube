@@ -11,6 +11,7 @@ use crate::util::decimal::Decimal;
 use crate::CubeError;
 use arrow::array::ArrayBuilder;
 use async_trait::async_trait;
+use chrono::Utc;
 use datafusion::cube_ext::ordfloat::OrdF64;
 use futures::future::join_all;
 use futures::stream::StreamExt;
@@ -21,7 +22,6 @@ use log::debug;
 use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
-use chrono::Utc;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -55,7 +55,11 @@ impl StreamingServiceImpl {
         })
     }
 
-    async fn source_by(&self, table: &IdRow<Table>,location: &str) -> Result<Arc<dyn StreamingSource>, CubeError> {
+    async fn source_by(
+        &self,
+        table: &IdRow<Table>,
+        location: &str,
+    ) -> Result<Arc<dyn StreamingSource>, CubeError> {
         let location_url = Url::parse(location)?;
         if location_url.scheme() != "stream" {
             return Err(CubeError::internal(format!(
@@ -91,13 +95,12 @@ impl StreamingServiceImpl {
                 password: password.clone(),
                 table: location_url.path().to_string().replace("/", ""),
                 endpoint_url: url.to_string(),
-                select_statement: table.get_row().select_statement().clone()
+                select_statement: table.get_row().select_statement().clone(),
             })),
         }
     }
 
     async fn try_seal_table(&self, table: &IdRow<Table>) -> Result<bool, CubeError> {
-
         if let Some(seal_at) = table.get_row().seal_at() {
             if seal_at < &Utc::now() {
                 self.meta_store.seal_table(table.get_id()).await?;
@@ -109,7 +112,6 @@ impl StreamingServiceImpl {
             Ok(false)
         }
     }
-
 }
 
 #[async_trait]
@@ -145,24 +147,23 @@ impl StreamingService for StreamingServiceImpl {
         let mut sealed = false;
 
         while !sealed {
-
             let new_rows = match tokio::time::timeout(
                 Duration::from_secs(self.config_obj.stale_stream_timeout()),
                 stream.next(),
-                )
-                .await {
-                    Ok(Some(rows)) => rows,
-                    Ok(None) => {
-                        self.try_seal_table(&table).await?;
-                        break;
-                    },
-                    Err(e) => {
-                        self.try_seal_table(&table).await?;
+            )
+            .await
+            {
+                Ok(Some(rows)) => rows,
+                Ok(None) => {
+                    self.try_seal_table(&table).await?;
+                    break;
+                }
+                Err(e) => {
+                    self.try_seal_table(&table).await?;
 
-                        return Err(CubeError::user(format!("Stale stream timeout: {}", e)));
-                    }
-
-                };
+                    return Err(CubeError::user(format!("Stale stream timeout: {}", e)));
+                }
+            };
 
             let rows = new_rows?;
             debug!("Received {} rows for {}", rows.len(), location);
@@ -216,7 +217,7 @@ pub struct KSqlStreamingSource {
     password: Option<String>,
     table: String,
     endpoint_url: String,
-    select_statement: Option<String>
+    select_statement: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -242,10 +243,9 @@ pub struct KSqlQuerySchema {
 impl KSqlStreamingSource {
     fn query(&self) -> String {
         self.select_statement.as_ref().map_or(
-           format!("SELECT * FROM `{}` EMIT CHANGES;", self.table), 
-            |sql| format!("{} EMIT CHANGES;", sql)
-           )
-
+            format!("SELECT * FROM `{}` EMIT CHANGES;", self.table),
+            |sql| format!("{} EMIT CHANGES;", sql),
+        )
     }
     fn parse_lines(
         tail_bytes: &mut Bytes,
@@ -465,7 +465,7 @@ impl StreamingSource for KSqlStreamingSource {
             .post_req(
                 "/query-stream",
                 &KSqlQuery {
-                    sql: self.query(),//format!("SELECT * FROM `{}` EMIT CHANGES;", self.table),
+                    sql: self.query(), //format!("SELECT * FROM `{}` EMIT CHANGES;", self.table),
                 },
             )
             .await?;
@@ -520,9 +520,9 @@ impl StreamingSource for KSqlStreamingSource {
 #[cfg(debug_assertions)]
 mod stream_debug {
     use super::*;
+    use crate::table::TimestampValue;
     use async_std::task::{Context, Poll};
     use chrono::{DateTime, Utc};
-    use crate::table::TimestampValue;
 
     struct MockRowStream {
         last_id: i64,

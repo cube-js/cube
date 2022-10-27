@@ -246,11 +246,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 }),
             ),
             (
-                Field::new(
-                    "sealed",
-                    DataType::Boolean,
-                    false,
-                ),
+                Field::new("sealed", DataType::Boolean, false),
                 Box::new(|tables| {
                     Arc::new(BooleanArray::from(
                         tables
@@ -266,7 +262,13 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                     Arc::new(StringArray::from(
                         tables
                             .iter()
-                            .map(|row| row.table.get_row().select_statement().as_ref().map(|t| t.as_str()))
+                            .map(|row| {
+                                row.table
+                                    .get_row()
+                                    .select_statement()
+                                    .as_ref()
+                                    .map(|t| t.as_str())
+                            })
                             .collect::<Vec<_>>(),
                     ))
                 }),

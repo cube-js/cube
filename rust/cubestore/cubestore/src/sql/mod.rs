@@ -875,16 +875,15 @@ impl SqlService for SqlServiceImpl {
                             let utc = Utc.timestamp_nanos(ts.get_time_stamp());
                             Result::Ok(Some(utc))
                         }
-                        _ => Result::Err(CubeError::user(format!(
-                            "Bad seal_at {}",
-                            option.value
-                        ))),
+                        _ => Result::Err(CubeError::user(format!("Bad seal_at {}", option.value))),
                     })?;
                 let select_statement = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "select_statement")
                     .map_or(Result::Ok(None), |option| match &option.value {
-                        Value::SingleQuotedString(select_statement) => Result::Ok(Some(select_statement.clone())),
+                        Value::SingleQuotedString(select_statement) => {
+                            Result::Ok(Some(select_statement.clone()))
+                        }
                         _ => Result::Err(CubeError::user(format!(
                             "Bad select_statement {}",
                             option.value
@@ -992,7 +991,8 @@ impl SqlService for SqlServiceImpl {
                                 user,
                                 password,
                                 url: url.ok_or(CubeError::user(
-                                    "url is required as credential for select_statement source".to_string(),
+                                    "url is required as credential for select_statement source"
+                                        .to_string(),
                                 ))?,
                             })
                         }

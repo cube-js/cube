@@ -99,7 +99,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       withEntries.push(`seal_at = '${options.sealAt}'`);
     }
     if (options.selectStatement) {
-      withEntries.push(`select_statement = '${options.selectStatement.replaceAll(`'`, `\\'`)}'`);
+      withEntries.push(`select_statement = '${options.selectStatement.replaceAll('\'', '\\\'')}'`);
     }
     if (withEntries.length > 0) {
       sql = `${sql} WITH (${withEntries.join(', ')})`;
@@ -182,7 +182,6 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     if (createTableIndexes && createTableIndexes.length) {
       hasAggregatingIndexes = createTableIndexes.some((index) => index.type === 'aggregate');
     }
-
 
     const aggregations = hasAggregatingIndexes && aggregationsColumns && aggregationsColumns.length ? ` AGGREGATIONS (${aggregationsColumns.join(', ')})` : '';
 

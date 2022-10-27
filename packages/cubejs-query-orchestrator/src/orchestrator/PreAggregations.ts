@@ -1218,9 +1218,9 @@ export class PreAggregationLoader {
         this.preAggregation.uniqueKeyColumns,
         queryOptions,
         {
-           aggregationsColumns: this.preAggregation.aggregationsColumns,
-           createTableIndexes: this.prepareCreateTableIndexes(newVersionEntry),
-           sealAt: this.preAggregation.sealAt
+          aggregationsColumns: this.preAggregation.aggregationsColumns,
+          createTableIndexes: this.prepareCreateTableIndexes(newVersionEntry),
+          sealAt: this.preAggregation.sealAt
         }
       )
     ).catch((error: any) => {
@@ -1512,7 +1512,7 @@ export class PreAggregationPartitionRangeLoader {
       previewSql: this.preAggregation.previewSql &&
         this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
       buildRangeEnd,
-      sealAt, //Used only for kSql pre aggregations
+      sealAt, // Used only for kSql pre aggregations
     };
   }
 
