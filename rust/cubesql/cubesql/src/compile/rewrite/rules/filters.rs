@@ -339,6 +339,20 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             transforming_rewrite(
+                "filter-replacer-not-in-filter-to-negated-in-filter",
+                filter_replacer(
+                    not_expr(inlist_expr("?expr", "?list", "?negated")),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(
+                    inlist_expr("?expr", "?list", "?new_negated"),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                self.transform_negate_inlist("?negated", "?new_negated"),
+            ),
+            transforming_rewrite(
                 "filter-replacer-is-null",
                 filter_replacer(
                     is_null_expr(column_expr("?column")),
@@ -373,6 +387,20 @@ impl RewriteRules for FilterRules {
                     "?filter_values",
                     false,
                 ),
+            ),
+            transforming_rewrite(
+                "filter-replacer-binary-swap",
+                filter_replacer(
+                    binary_expr(literal_expr("?literal"), "?op", column_expr("?column")),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                filter_replacer(
+                    binary_expr(column_expr("?column"), "?new_op", literal_expr("?literal")),
+                    "?alias_to_cube",
+                    "?members",
+                ),
+                self.transform_filter_binary_swap("?literal", "?op", "?new_op"),
             ),
             rewrite(
                 "filter-replacer-equals-negation",
@@ -1968,6 +1996,56 @@ impl FilterRules {
         }
     }
 
+    fn transform_filter_binary_swap(
+        &self,
+        literal_var: &'static str,
+        op_var: &'static str,
+        new_op_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let literal_var = var!(literal_var);
+        let op_var = var!(op_var);
+        let new_op_var = var!(new_op_var);
+        move |egraph, subst| {
+            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                match literal {
+                    ScalarValue::Decimal128(_, _, _)
+                    | ScalarValue::Float32(_)
+                    | ScalarValue::Float64(_)
+                    | ScalarValue::Int8(_)
+                    | ScalarValue::Int16(_)
+                    | ScalarValue::Int32(_)
+                    | ScalarValue::Int64(_)
+                    | ScalarValue::UInt8(_)
+                    | ScalarValue::UInt16(_)
+                    | ScalarValue::UInt32(_)
+                    | ScalarValue::UInt64(_) => (),
+                    _ => continue,
+                };
+
+                for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                    let new_op = match op {
+                        Operator::Gt => Operator::Lt,
+                        Operator::GtEq => Operator::LtEq,
+                        Operator::Lt => Operator::Gt,
+                        Operator::LtEq => Operator::GtEq,
+                        Operator::Eq => Operator::Eq,
+                        Operator::NotEq => Operator::NotEq,
+                        _ => continue,
+                    };
+
+                    subst.insert(
+                        new_op_var,
+                        egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(new_op))),
+                    );
+
+                    return true;
+                }
+            }
+
+            false
+        }
+    }
+
     fn transform_filter_quicksight_case(
         &self,
         op_var: &'static str,
@@ -2416,6 +2494,29 @@ impl FilterRules {
 
                     return true;
                 }
+            }
+
+            false
+        }
+    }
+
+    fn transform_negate_inlist(
+        &self,
+        negated_var: &'static str,
+        new_negated_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let negated_var = var!(negated_var);
+        let new_negated_var = var!(new_negated_var);
+        move |egraph, subst| {
+            for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated).cloned() {
+                subst.insert(
+                    new_negated_var,
+                    egraph.add(LogicalPlanLanguage::InListExprNegated(InListExprNegated(
+                        !negated,
+                    ))),
+                );
+
+                return true;
             }
 
             false

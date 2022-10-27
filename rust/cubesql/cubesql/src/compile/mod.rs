@@ -13093,4 +13093,146 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_sigma_num_range() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT taxful_total_price
+            FROM KibanaSampleDataEcommerce
+            WHERE (
+                (
+                    (500 <= taxful_total_price) AND
+                    (10000 >= taxful_total_price)
+                ) OR
+                (taxful_total_price IS NULL)
+            )
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: None,
+                            operator: None,
+                            values: None,
+                            or: None,
+                            and: Some(vec![
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                                    ),
+                                    operator: Some("gte".to_string()),
+                                    values: Some(vec!["500".to_string()]),
+                                    or: None,
+                                    and: None,
+                                }),
+                                json!(V1LoadRequestQueryFilterItem {
+                                    member: Some(
+                                        "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                                    ),
+                                    operator: Some("lte".to_string()),
+                                    values: Some(vec!["10000".to_string()]),
+                                    or: None,
+                                    and: None,
+                                }),
+                            ]),
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                            ),
+                            operator: Some("notSet".to_string()),
+                            values: None,
+                            or: None,
+                            and: None,
+                        }),
+                    ]),
+                    and: None,
+                }]),
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_sigma_num_not_in() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT taxful_total_price
+            FROM KibanaSampleDataEcommerce
+            WHERE (
+                NOT (taxful_total_price IN (1, 1.1)) OR
+                (taxful_total_price IS NULL)
+            )
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                            ),
+                            operator: Some("notEquals".to_string()),
+                            values: Some(vec!["1".to_string(), "1.1".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some(
+                                "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                            ),
+                            operator: Some("notSet".to_string()),
+                            values: None,
+                            or: None,
+                            and: None,
+                        }),
+                    ]),
+                    and: None,
+                }]),
+            }
+        )
+    }
 }
