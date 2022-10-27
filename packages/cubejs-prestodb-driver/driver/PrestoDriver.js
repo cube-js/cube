@@ -71,7 +71,10 @@ class PrestoDriver extends BaseDriver {
   }
 
   query(query, values) {
-    const queryWithParams = SqlString.format(query, values);
+    const queryWithParams = SqlString.format(query, (values || []).map(value => (typeof s === 'string' ? {
+      toSqlString: () => SqlString.escape(value).replace(/\\\\([_%])/g, '\\$1')
+    } : value)));
+
     return this.queryPromised(queryWithParams);
   }
 
