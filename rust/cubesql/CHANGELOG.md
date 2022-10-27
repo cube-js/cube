@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.7](https://github.com/cube-js/cube.js/compare/v0.31.6...v0.31.7) (2022-10-27)
+
+
+### Features
+
+* **cubesql:** Support `is null`, `is not null` in SELECT ([d499c47](https://github.com/cube-js/cube.js/commit/d499c47c6cec4ac7b72d26418598bfbe515c6c62))
+* **cubesql:** Support Sigma Computing string filters ([d18b971](https://github.com/cube-js/cube.js/commit/d18b9712c4eae1ced2b8f94681e1676d854e99a5))
+
+
+
+
+
 ## [0.31.5](https://github.com/cube-js/cube.js/compare/v0.31.4...v0.31.5) (2022-10-20)
 
 

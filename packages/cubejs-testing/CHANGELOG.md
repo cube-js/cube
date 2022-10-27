@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.7](https://github.com/cube-js/cube.js/compare/v0.31.6...v0.31.7) (2022-10-27)
+
+
+### Bug Fixes
+
+* Remove empty hidden cubes from meta ([#5531](https://github.com/cube-js/cube.js/issues/5531)) ([f93e851](https://github.com/cube-js/cube.js/commit/f93e8515598fd90708606220dd5d96b4e2396fd6))
+
+
+
+
+
 ## [0.31.5](https://github.com/cube-js/cube.js/compare/v0.31.4...v0.31.5) (2022-10-20)
 
 
