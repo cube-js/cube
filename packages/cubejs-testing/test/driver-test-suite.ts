@@ -105,6 +105,14 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
         } else {
           test(testNameWithHash, cbFnError);
         }
+      } else if (t.type === 'testFn') {
+        if (t.skip) {
+          // eslint-disable-next-line no-loop-func
+          test.skip(testNameWithHash, () => t.testFn(client));
+        } else {
+          // eslint-disable-next-line no-loop-func
+          test(testNameWithHash, () => t.testFn(client));
+        }
       }
     }
   });

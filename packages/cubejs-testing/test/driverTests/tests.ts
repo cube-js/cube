@@ -1,6 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { expect } from '@jest/globals';
-import { driverTest, driverTestWithError } from './driverTest';
+import { driverTest, driverTestFn, driverTestWithError } from './driverTest';
 
 const commonSchemas = [
   'CAST.js',
@@ -9,6 +9,7 @@ const commonSchemas = [
   'Products.sql.js',
   'Customers.js',
   'ECommerce.js',
+  'HiddenECommerce.js',
   'Products.js',
 ];
 
@@ -1216,4 +1217,13 @@ export const hiddenMember = driverTestWithError({
   },
   schemas: commonSchemas,
   expectArray: [(e) => expect(e.toString()).toMatch(/hidden/)],
+});
+
+export const hiddenCube = driverTestFn({
+  name: 'hidden cube',
+  schemas: commonSchemas,
+  testFn: async (client) => {
+    const meta = await client.meta();
+    expect(meta.cubes.find(cube => cube.name === 'HiddenECommerce')).toBe(undefined);
+  }
 });

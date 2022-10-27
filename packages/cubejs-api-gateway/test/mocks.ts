@@ -106,14 +106,17 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
             {
               name: 'Foo.bar',
               sql: 'bar',
+              isVisible: true,
             },
           ],
           dimensions: [
             {
               name: 'Foo.id',
+              isVisible: true,
             },
             {
               name: 'Foo.time',
+              isVisible: true,
             },
           ],
         },
