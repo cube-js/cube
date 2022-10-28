@@ -1,9 +1,9 @@
-mod analysis;
+pub mod analysis;
 pub mod converter;
 mod cost;
 pub mod language;
-mod rewriter;
-mod rules;
+pub mod rewriter;
+pub mod rules;
 
 use crate::{compile::rewrite::analysis::LogicalPlanAnalysis, CubeError};
 use datafusion::{
@@ -510,6 +510,58 @@ where
     .unwrap()
 }
 
+/// `main_searcher` and `anchors` can not be used for rewrite. It should be using only for searching
+/// `anchors` and `rewrite_searcher` have 3 arguments:
+///     1: variable name
+///     2: pattern that can be recursively found any number of times before the target pattern
+///     3: target pattern
+/// target pattern of `rewrite_searcher` and chain can be used the same as in transforming_chain_rewrite
+pub fn transforming_anchors_rewrite<T>(
+    name: &str,
+    main_searcher: String,
+    anchors: Vec<(&str, String, String)>,
+    rewrite_searcher: (&str, String, String),
+    chain: Vec<(&str, String)>,
+    applier: String,
+    transform_fn: T,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+        + Sync
+        + Send
+        + 'static,
+{
+    Rewrite::new(
+        name.to_string(),
+        AnchorsSearcher {
+            main: main_searcher.parse().unwrap(),
+            anchors: anchors
+                .into_iter()
+                .map(|(var, pattern1, pattern2)| {
+                    (
+                        var.parse().unwrap(),
+                        pattern1.parse().unwrap(),
+                        pattern2.parse().unwrap(),
+                    )
+                })
+                .collect(),
+            rewrite_searcher: (
+                rewrite_searcher.0.parse().unwrap(),
+                rewrite_searcher.1.parse().unwrap(),
+                rewrite_searcher.2.parse().unwrap(),
+            ),
+            chain: chain
+                .into_iter()
+                .map(|(var, pattern)| (var.parse().unwrap(), pattern.parse().unwrap()))
+                .collect(),
+        },
+        TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
+            transform_fn(egraph, subst)
+        }),
+    )
+    .unwrap()
+}
+
 fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     let mut current = list_type.to_string();
     for i in list.into_iter().rev() {
@@ -938,6 +990,64 @@ pub fn original_expr_name(
     })
 }
 
+fn search_match_chained<'a>(
+    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    cur_match: SearchMatches<'a, LogicalPlanLanguage>,
+    chain: Iter<(Var, Pattern<LogicalPlanLanguage>)>,
+) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
+    let mut chain = chain.clone();
+    let mut matches_to_merge = Vec::new();
+    if let Some((var, pattern)) = chain.next() {
+        for subst in cur_match.substs.iter() {
+            if let Some(id) = subst.get(var.clone()) {
+                if let Some(next_match) = pattern.search_eclass(egraph, id.clone()) {
+                    let chain_matches = search_match_chained(
+                        egraph,
+                        SearchMatches {
+                            eclass: cur_match.eclass.clone(),
+                            substs: next_match
+                                .substs
+                                .iter()
+                                .map(|next_subst| {
+                                    let mut new_subst = subst.clone();
+                                    for pattern_var in pattern.vars().into_iter() {
+                                        if let Some(pattern_var_value) = next_subst.get(pattern_var)
+                                        {
+                                            new_subst
+                                                .insert(pattern_var, pattern_var_value.clone());
+                                        }
+                                    }
+                                    new_subst
+                                })
+                                .collect::<Vec<_>>(),
+                            // TODO merge
+                            ast: cur_match.ast.clone(),
+                        },
+                        chain.clone(),
+                    );
+                    matches_to_merge.extend(chain_matches);
+                }
+            }
+        }
+        if !matches_to_merge.is_empty() {
+            let mut substs = Vec::new();
+            for m in matches_to_merge {
+                substs.extend(m.substs.clone());
+            }
+            Some(SearchMatches {
+                eclass: cur_match.eclass.clone(),
+                substs,
+                // TODO merge
+                ast: cur_match.ast.clone(),
+            })
+        } else {
+            None
+        }
+    } else {
+        Some(cur_match)
+    }
+}
+
 pub struct ChainSearcher {
     main: Pattern<LogicalPlanLanguage>,
     chain: Vec<(Var, Pattern<LogicalPlanLanguage>)>,
@@ -986,58 +1096,150 @@ impl ChainSearcher {
         cur_match: SearchMatches<'a, LogicalPlanLanguage>,
         chain: Iter<(Var, Pattern<LogicalPlanLanguage>)>,
     ) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
-        let mut chain = chain.clone();
-        let mut matches_to_merge = Vec::new();
-        if let Some((var, pattern)) = chain.next() {
-            for subst in cur_match.substs.iter() {
-                if let Some(id) = subst.get(var.clone()) {
-                    if let Some(next_match) = pattern.search_eclass(egraph, id.clone()) {
-                        let chain_matches = self.search_match_chained(
+        search_match_chained(egraph, cur_match, chain)
+    }
+}
+
+pub struct AnchorsSearcher {
+    main: Pattern<LogicalPlanLanguage>,
+    anchors: Vec<(
+        Var,
+        Pattern<LogicalPlanLanguage>,
+        Pattern<LogicalPlanLanguage>,
+    )>,
+    rewrite_searcher: (
+        Var,
+        Pattern<LogicalPlanLanguage>,
+        Pattern<LogicalPlanLanguage>,
+    ),
+    chain: Vec<(Var, Pattern<LogicalPlanLanguage>)>,
+}
+
+impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for AnchorsSearcher {
+    fn search(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
+        let matches = self.main.search(egraph);
+        let mut result = Vec::new();
+        for m in matches {
+            result.extend(
+                m.substs
+                    .iter()
+                    .filter_map(|s| self.search_match(egraph, s.clone(), self.anchors.iter())),
+            );
+        }
+
+        result
+    }
+
+    fn search_eclass(
+        &self,
+        _egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        _eclass: Id,
+    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
+        panic!("RecursiveSearcher - can not use search_eclass. Use search instead");
+    }
+
+    fn vars(&self) -> Vec<Var> {
+        let mut vars = self.rewrite_searcher.2.vars();
+        for (_, p) in self.chain.iter() {
+            vars.extend(p.vars());
+        }
+        vars
+    }
+}
+
+impl AnchorsSearcher {
+    fn search_match_recursively<'a>(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        substs: Vec<Subst>,
+        intermediate_pattern: &'a Pattern<LogicalPlanLanguage>,
+        target_pattern: &'a Pattern<LogicalPlanLanguage>,
+    ) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
+        for subst in substs.iter() {
+            for var in intermediate_pattern.vars() {
+                if let Some(id) = subst.get(var) {
+                    let matches = target_pattern.search_eclass(egraph, id.clone());
+                    if matches.is_some() {
+                        return matches;
+                    }
+                    if let Some(matches) = intermediate_pattern.search_eclass(egraph, id.clone()) {
+                        let matches = self.search_match_recursively(
                             egraph,
-                            SearchMatches {
-                                eclass: cur_match.eclass.clone(),
-                                substs: next_match
-                                    .substs
-                                    .iter()
-                                    .map(|next_subst| {
-                                        let mut new_subst = subst.clone();
-                                        for pattern_var in pattern.vars().into_iter() {
-                                            if let Some(pattern_var_value) =
-                                                next_subst.get(pattern_var)
-                                            {
-                                                new_subst
-                                                    .insert(pattern_var, pattern_var_value.clone());
-                                            }
-                                        }
-                                        new_subst
-                                    })
-                                    .collect::<Vec<_>>(),
-                                // TODO merge
-                                ast: cur_match.ast.clone(),
-                            },
-                            chain.clone(),
+                            matches.substs,
+                            intermediate_pattern,
+                            target_pattern,
                         );
-                        matches_to_merge.extend(chain_matches);
+                        if matches.is_some() {
+                            return matches;
+                        }
                     }
                 }
             }
-            if !matches_to_merge.is_empty() {
-                let mut substs = Vec::new();
-                for m in matches_to_merge {
-                    substs.extend(m.substs.clone());
-                }
-                Some(SearchMatches {
-                    eclass: cur_match.eclass.clone(),
-                    substs,
-                    // TODO merge
-                    ast: cur_match.ast.clone(),
-                })
-            } else {
-                None
-            }
-        } else {
-            Some(cur_match)
         }
+
+        return None;
+    }
+
+    fn search_match(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        subst: Subst,
+        anchors: Iter<(
+            Var,
+            Pattern<LogicalPlanLanguage>,
+            Pattern<LogicalPlanLanguage>,
+        )>,
+    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
+        for anchor in anchors {
+            if let Some(id) = subst.get(anchor.0.clone()) {
+                if anchor.2.search_eclass(egraph, id.clone()).is_some() {
+                    continue;
+                } else if let Some(intermediate_node) = anchor.1.search_eclass(egraph, id.clone()) {
+                    if self
+                        .search_match_recursively(
+                            egraph,
+                            intermediate_node.substs,
+                            &anchor.1,
+                            &anchor.2,
+                        )
+                        .is_some()
+                    {
+                        continue;
+                    }
+                }
+
+                return None;
+            }
+        }
+
+        if let Some(id) = subst.get(self.rewrite_searcher.0.clone()) {
+            let found_pattern = self.rewrite_searcher.2.search_eclass(egraph, id.clone());
+            if let Some(found_pattern) = found_pattern {
+                let matches = search_match_chained(egraph, found_pattern, self.chain.iter());
+                if matches.is_some() {
+                    return matches;
+                }
+            }
+            if let Some(intermediate_node) =
+                self.rewrite_searcher.1.search_eclass(egraph, id.clone())
+            {
+                for subst in intermediate_node.substs.into_iter() {
+                    if let Some(matches) = self.search_match_recursively(
+                        egraph,
+                        vec![subst],
+                        &self.rewrite_searcher.1,
+                        &self.rewrite_searcher.2,
+                    ) {
+                        return search_match_chained(egraph, matches, self.chain.iter());
+                    }
+                }
+            }
+        }
+
+        return None;
     }
 }
 

@@ -11,13 +11,13 @@ use crate::{
             literal_number, literal_string, original_expr_name, outer_aggregate_split_replacer,
             outer_projection_split_replacer, projection, projection_expr,
             projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
-            rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
-            udf_expr, AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
-            BinaryExprOp, ColumnExprColumn, CubeScanAliasToCube,
-            GroupAggregateSplitReplacerAliasToCube, GroupExprSplitReplacerAliasToCube,
-            InnerAggregateSplitReplacerAliasToCube, LiteralExprValue, LogicalPlanLanguage,
-            OuterAggregateSplitReplacerAliasToCube, OuterProjectionSplitReplacerAliasToCube,
-            ProjectionAlias,
+            rules::members::MemberRules, transforming_anchors_rewrite, transforming_chain_rewrite,
+            transforming_rewrite, udf_expr, AggregateFunctionExprDistinct,
+            AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, ColumnExprColumn,
+            CubeScanAliasToCube, GroupAggregateSplitReplacerAliasToCube,
+            GroupExprSplitReplacerAliasToCube, InnerAggregateSplitReplacerAliasToCube,
+            LiteralExprValue, LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
+            OuterProjectionSplitReplacerAliasToCube, ProjectionAlias,
         },
     },
     transport::V1CubeMetaExt,
@@ -32,8 +32,21 @@ use datafusion::{
 use egg::{EGraph, Id, Rewrite, Subst};
 use std::{fmt::Display, ops::Index, sync::Arc};
 
+pub struct SplitRulesConfig {
+    pub use_anchors_rules: bool,
+}
+
+impl SplitRulesConfig {
+    pub fn default() -> Self {
+        Self {
+            use_anchors_rules: true,
+        }
+    }
+}
+
 pub struct SplitRules {
     cube_context: Arc<CubeContext>,
+    config: SplitRulesConfig,
 }
 
 impl RewriteRules for SplitRules {
@@ -1162,6 +1175,9 @@ impl RewriteRules for SplitRules {
                     "?alias",
                     "?outer_alias",
                     "?output_fun",
+                    "?distinct",
+                    false,
+                    "?output_distinct",
                 ),
             ),
             transforming_chain_rewrite(
@@ -1184,6 +1200,9 @@ impl RewriteRules for SplitRules {
                     "?alias",
                     "?outer_alias",
                     "?output_fun",
+                    "?distinct",
+                    false,
+                    "?output_distinct",
                 ),
             ),
             transforming_rewrite(
@@ -1560,14 +1579,101 @@ impl RewriteRules for SplitRules {
             true,
         ));
 
+        if self.config.use_anchors_rules {
+            let anchor_rules = vec![transforming_anchors_rewrite(
+                "split-push-down-count-distinct-year-and-month-outer-aggr-replacer",
+                aggregate(
+                    "?inner_aggregate",
+                    outer_aggregate_split_replacer("?aggr_group_expr", "?outer_aggregate_cube"),
+                    "?aggr_aggr_expr",
+                ),
+                vec![
+                    (
+                        "?aggr_group_expr",
+                        aggr_group_expr("?group_expr_first", "?group_expr_second"),
+                        fun_expr(
+                            "DatePart",
+                            vec![literal_string("MONTH"), column_expr("?month_column")],
+                        ),
+                    ),
+                    (
+                        "?aggr_group_expr",
+                        aggr_group_expr("?group_expr_third", "?group_expr_fourth"),
+                        cast_expr(
+                            cast_expr(
+                                binary_expr(
+                                    binary_expr(
+                                        binary_expr(
+                                            binary_expr(
+                                                fun_expr(
+                                                    "DatePart",
+                                                    vec![
+                                                        literal_string("YEAR"),
+                                                        column_expr("?year_column"),
+                                                    ],
+                                                ),
+                                                "*",
+                                                literal_number(100),
+                                            ),
+                                            "+",
+                                            literal_number(1),
+                                        ),
+                                        "*",
+                                        literal_number(100),
+                                    ),
+                                    "+",
+                                    literal_number(1),
+                                ),
+                                "?inner_type",
+                            ),
+                            "?outer_type",
+                        ),
+                    ),
+                ],
+                (
+                    "?aggr_aggr_expr",
+                    aggr_aggr_expr("?aggr_expr_first", "?aggr_expr_second"),
+                    outer_aggregate_split_replacer("?agg_fun", "?cube"),
+                ),
+                vec![
+                    ("?agg_fun", agg_fun_expr("?fun", vec!["?arg"], "?distinct")),
+                    ("?arg", column_expr("?column")),
+                ],
+                alias_expr(
+                    agg_fun_expr(
+                        "?output_fun",
+                        vec!["?alias".to_string()],
+                        "?output_distinct",
+                    ),
+                    "?outer_alias",
+                ),
+                self.transform_outer_aggr_fun(
+                    "?cube",
+                    "?agg_fun",
+                    "?fun",
+                    "?arg",
+                    Some("?column"),
+                    "?alias",
+                    "?outer_alias",
+                    "?output_fun",
+                    "?distinct",
+                    true,
+                    "?output_distinct",
+                ),
+            )];
+
+            rules.extend(anchor_rules.into_iter());
+        }
+
         rules
     }
 }
 
 impl SplitRules {
-    pub fn new(cube_context: Arc<CubeContext>) -> Self {
+    pub fn new(cube_context: Arc<CubeContext>, config: SplitRulesConfig) -> Self {
         Self {
             cube_context: cube_context,
+            config,
         }
     }
 
@@ -2302,6 +2408,9 @@ impl SplitRules {
         alias_expr_var: &'static str,
         outer_alias_expr_var: &'static str,
         output_fun_var: &'static str,
+        distinct_var: &'static str,
+        allow_count_distinct: bool,
+        output_distinct_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let original_expr_var = var!(original_expr_var);
@@ -2311,73 +2420,91 @@ impl SplitRules {
         let alias_expr_var = var!(alias_expr_var);
         let outer_alias_expr_var = var!(outer_alias_expr_var);
         let output_fun_var = var!(output_fun_var);
+        let distinct_var = var!(distinct_var);
+        let output_distinct_var = var!(output_distinct_var);
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
             for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
-                let output_fun = match fun {
-                    AggregateFunction::Count => AggregateFunction::Sum,
-                    AggregateFunction::Sum => AggregateFunction::Sum,
-                    AggregateFunction::Min => AggregateFunction::Min,
-                    AggregateFunction::Max => AggregateFunction::Max,
-                    _ => continue,
-                };
-
-                for alias_to_cube in var_iter!(
-                    egraph[subst[cube_var]],
-                    OuterAggregateSplitReplacerAliasToCube
-                )
-                .cloned()
+                for distinct in
+                    var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
                 {
-                    for column in column_var
-                        .map(|column_var| {
-                            var_iter!(egraph[subst[column_var]], ColumnExprColumn)
-                                .cloned()
-                                .collect()
-                        })
-                        .unwrap_or(vec![Column::from_name(
-                            MemberRules::default_count_measure_name(),
-                        )])
-                    {
-                        let (name, cube) = match (
-                            original_expr_name(egraph, subst[original_expr_var]),
-                            meta.find_cube_by_column(&alias_to_cube, &column),
-                        ) {
-                            (Some(name), Some((_, cube))) => (name, cube),
-                            _ => continue,
-                        };
+                    let output_fun = match fun {
+                        AggregateFunction::Count if *distinct && !allow_count_distinct => continue,
+                        AggregateFunction::Count => AggregateFunction::Sum,
+                        AggregateFunction::Sum => AggregateFunction::Sum,
+                        AggregateFunction::Min => AggregateFunction::Min,
+                        AggregateFunction::Max => AggregateFunction::Max,
+                        _ => continue,
+                    };
 
-                        let inner_and_outer_alias: Option<(String, String)> =
-                            if cube.lookup_measure(&column.name).is_some() {
-                                Some((name.to_string(), name.to_string()))
-                            } else if cube.lookup_dimension(&column.name).is_some() {
-                                original_expr_name(egraph, subst[arg_var])
-                                    .map(|inner| (inner, name.to_string()))
-                            } else {
-                                None
+                    for alias_to_cube in var_iter!(
+                        egraph[subst[cube_var]],
+                        OuterAggregateSplitReplacerAliasToCube
+                    )
+                    .cloned()
+                    {
+                        for column in column_var
+                            .map(|column_var| {
+                                var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                                    .cloned()
+                                    .collect()
+                            })
+                            .unwrap_or(vec![Column::from_name(
+                                MemberRules::default_count_measure_name(),
+                            )])
+                        {
+                            let (name, cube) = match (
+                                original_expr_name(egraph, subst[original_expr_var]),
+                                meta.find_cube_by_column(&alias_to_cube, &column),
+                            ) {
+                                (Some(name), Some((_, cube))) => (name, cube),
+                                _ => continue,
                             };
 
-                        if let Some((inner_alias, outer_alias)) = inner_and_outer_alias {
-                            let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                                ColumnExprColumn(Column::from_name(inner_alias.to_string())),
-                            ));
-                            subst.insert(
-                                alias_expr_var,
-                                egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
-                            );
-                            subst.insert(
-                                outer_alias_expr_var,
-                                egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
-                                    outer_alias.to_string(),
-                                ))),
-                            );
-                            subst.insert(
-                                output_fun_var,
-                                egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
-                                    AggregateFunctionExprFun(output_fun),
-                                )),
-                            );
+                            let inner_and_outer_alias: Option<(String, String)> =
+                                if cube.lookup_measure(&column.name).is_some() {
+                                    Some((name.to_string(), name.to_string()))
+                                } else if cube.lookup_dimension(&column.name).is_some() {
+                                    original_expr_name(egraph, subst[arg_var])
+                                        .map(|inner| (inner, name.to_string()))
+                                } else {
+                                    None
+                                };
 
-                            return true;
+                            if let Some((inner_alias, outer_alias)) = inner_and_outer_alias {
+                                let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                    ColumnExprColumn(Column::from_name(inner_alias.to_string())),
+                                ));
+                                subst.insert(
+                                    alias_expr_var,
+                                    egraph.add(LogicalPlanLanguage::ColumnExpr([alias])),
+                                );
+                                subst.insert(
+                                    outer_alias_expr_var,
+                                    egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                                        AliasExprAlias(outer_alias.to_string()),
+                                    )),
+                                );
+                                subst.insert(
+                                    output_fun_var,
+                                    egraph.add(LogicalPlanLanguage::AggregateFunctionExprFun(
+                                        AggregateFunctionExprFun(output_fun),
+                                    )),
+                                );
+
+                                if allow_count_distinct {
+                                    subst.insert(
+                                        output_distinct_var,
+                                        egraph.add(
+                                            LogicalPlanLanguage::AggregateFunctionExprDistinct(
+                                                AggregateFunctionExprDistinct(false),
+                                            ),
+                                        ),
+                                    );
+                                }
+
+                                return true;
+                            }
                         }
                     }
                 }

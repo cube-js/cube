@@ -1,4 +1,23 @@
-use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment};
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use cubeclient::models::{
+    V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadRequestQuery,
+    V1LoadResponse,
+};
+
+use crate::{
+    sql::{
+        session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
+        ServerManager, Session, SessionManager, SqlAuthService,
+    },
+    transport::{LoadRequestMeta, TransportService},
+    CubeError,
+};
+
+use super::MetaContext;
+
+pub mod rewrite_engine;
 
 pub fn get_test_meta() -> Vec<V1CubeMeta> {
     vec![
@@ -48,6 +67,12 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     _type: "number".to_string(),
                     agg_type: Some("avg".to_string()),
                 },
+                V1CubeMetaMeasure {
+                    name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                    title: None,
+                    _type: "number".to_string(),
+                    agg_type: Some("countDistinct".to_string()),
+                },
             ],
             segments: vec![
                 V1CubeMetaSegment {
@@ -95,4 +120,86 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
             segments: vec![],
         },
     ]
+}
+
+pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
+    Arc::new(MetaContext::new(get_test_meta()))
+}
+
+pub async fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
+    let server = Arc::new(ServerManager::new(
+        get_test_auth(),
+        get_test_transport(),
+        None,
+    ));
+
+    let db_name = match &protocol {
+        DatabaseProtocol::MySQL => "db",
+        DatabaseProtocol::PostgreSQL => "cubedb",
+    };
+    let session_manager = Arc::new(SessionManager::new(server.clone()));
+    let session = session_manager
+        .create_session(protocol, "127.0.0.1".to_string())
+        .await;
+
+    // Populate like shims
+    session.state.set_database(Some(db_name.to_string()));
+    session.state.set_user(Some("ovr".to_string()));
+
+    let auth_ctx = HttpAuthContext {
+        access_token: "access_token".to_string(),
+        base_path: "base_path".to_string(),
+    };
+
+    session.state.set_auth_context(Some(Arc::new(auth_ctx)));
+
+    session
+}
+
+pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
+    #[derive(Debug)]
+    struct TestSqlAuth {}
+
+    #[async_trait]
+    impl SqlAuthService for TestSqlAuth {
+        async fn authenticate(
+            &self,
+            _user: Option<String>,
+        ) -> Result<AuthenticateResponse, CubeError> {
+            Ok(AuthenticateResponse {
+                context: Arc::new(HttpAuthContext {
+                    access_token: "fake".to_string(),
+                    base_path: "fake".to_string(),
+                }),
+                password: None,
+            })
+        }
+    }
+
+    Arc::new(TestSqlAuth {})
+}
+
+pub fn get_test_transport() -> Arc<dyn TransportService> {
+    #[derive(Debug)]
+    struct TestConnectionTransport {}
+
+    #[async_trait]
+    impl TransportService for TestConnectionTransport {
+        // Load meta information about cubes
+        async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
+            panic!("It's a fake transport");
+        }
+
+        // Execute load query
+        async fn load(
+            &self,
+            _query: V1LoadRequestQuery,
+            _ctx: AuthContextRef,
+            _meta_fields: LoadRequestMeta,
+        ) -> Result<V1LoadResponse, CubeError> {
+            panic!("It's a fake transport");
+        }
+    }
+
+    Arc::new(TestConnectionTransport {})
 }
