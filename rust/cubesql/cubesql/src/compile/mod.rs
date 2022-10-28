@@ -13077,4 +13077,20 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_union_with_cast_count_to_decimal() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_union_with_cast_count_to_decimal",
+            execute_query(
+                "select count(1) from (select 1 a) x union all select cast(null as decimal) order by 1;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
