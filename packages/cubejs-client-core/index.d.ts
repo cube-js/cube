@@ -843,7 +843,7 @@ declare module '@cubejs-client/core' {
     timeElapsed(): string;
   }
 
-  interface UnsubscribeObj {
+  export interface UnsubscribeObj {
     /**
      * Allows to stop requests in-flight in long polling or web socket subscribe loops.
      * It doesn't cancel any submitted requests to the underlying databases.
