@@ -843,6 +843,14 @@ declare module '@cubejs-client/core' {
     timeElapsed(): string;
   }
 
+  interface UnsubscribeObj {
+    /**
+     * Allows to stop requests in-flight in long polling or web socket subscribe loops.
+     * It doesn't cancel any submitted requests to the underlying databases.
+     */
+    unsubscribe(): Promise<void>;
+  }
+
   export type SqlQueryTuple = [string, any[], any];
 
   export type SqlData = {
@@ -1045,7 +1053,7 @@ declare module '@cubejs-client/core' {
       query: QueryType,
       options?: LoadMethodOptions,
       callback?: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
-    ): void;
+    ): UnsubscribeObj;
 
     load<QueryType extends DeeplyReadonly<Query | Query[]>>(
       query: QueryType,
@@ -1082,26 +1090,26 @@ declare module '@cubejs-client/core' {
       query: QueryType,
       options: LoadMethodOptions | null,
       callback: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
-    ): void;
+    ): UnsubscribeObj;
 
     sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<SqlQuery>;
     /**
      * Get generated SQL string for the given `query`.
      * @param query - [Query object](query-format)
      */
-    sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
+    sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): UnsubscribeObj;
 
     meta(options?: LoadMethodOptions): Promise<Meta>;
     /**
      * Get meta description of cubes available for querying.
      */
-    meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
+    meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
 
     dryRun(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<DryRunResponse>;
     /**
      * Get query related meta without query execution
      */
-    dryRun(query: DeeplyReadonly<Query | Query[]>, options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
+    dryRun(query: DeeplyReadonly<Query | Query[]>, options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): UnsubscribeObj;
   }
 
   /**
