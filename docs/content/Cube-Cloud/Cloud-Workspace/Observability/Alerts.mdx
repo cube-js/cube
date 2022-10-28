@@ -1,9 +1,12 @@
 ---
 title: Alerts in Cube Cloud
 menuTitle: Alerts
-permalink: /cloud/dev-tools/alerts
-category: Developer Tools
-menuOrder: 3
+permalink: /cloud/workspace/alerts
+category: Cloud Workspace
+subCategory: Observability
+menuOrder: 11
+redirect_from:
+  - /cloud/dev-tools/alerts/
 ---
 
 Cube Cloud lets you set up alerts so you can be notified when there are issues
@@ -19,8 +22,8 @@ issue resolves, a resolution email is also sent.
 
 <InfoBox>
 
-This feature is not available on the free plan.
-See [pricing plans](https://cube.dev/pricing/) for details.
+This feature is not available on the free plan. See
+[pricing plans](https://cube.dev/pricing/) for details.
 
 </InfoBox>
 
@@ -30,8 +33,8 @@ Cube Cloud has three different types of alerts:
 
 - **API outages.** These are triggered if the deployment's API becomes
   unavailable by monitoring the [`/livez` endpoint][ref-rest-api-livez].
-- **Database timeouts.** These are triggered if either the APIs or
-  the database are taking longer than expected to respond.
+- **Database timeouts.** These are triggered if either the APIs or the database
+  are taking longer than expected to respond.
 - **Pre-aggregation build failures.** These are triggered if any pre-aggregation
   fails to build.
 
@@ -49,7 +52,7 @@ menu, then click **Alerts**:
 <div style="text-align: center">
   <img
     alt="Finding the Alerts menu in Cube Cloud"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Developer-Tools/alerts-1.png"
+    src="https://ucarecdn.com/519d1521-6df5-4412-893b-c29d1b01d1d3/"
     style="border: none"
     width="100%"
   />
@@ -61,7 +64,7 @@ configured for this deployment:
 <div style="text-align: center">
   <img
     alt="The Cube Cloud account's Alerts Page"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Developer-Tools/alerts-2.png"
+    src="https://ucarecdn.com/cb358aa9-3b66-4a58-a6f2-ac843b783d98/"
     style="border: none"
     width="100%"
   />
@@ -73,7 +76,7 @@ alert:
 <div style="text-align: center">
   <img
     alt="Creating a new Alert on Cube Cloud"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Developer-Tools/alerts-3.png"
+    src="https://ucarecdn.com/e0566c85-022f-4eaa-8019-c93667ebde71/"
     style="border: none"
     width="100%"
   />
@@ -88,7 +91,7 @@ configure alerts for specific deployments by clicking **Specific** instead of
 <div style="text-align: center">
   <img
     alt="Selecting deployments for an alert on Cube Cloud"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Developer-Tools/alerts-4.png"
+    src="https://ucarecdn.com/0d2afc83-2f0a-4fe9-85b2-d3c9c726bd2c/"
     style="border: none"
     width="100%"
   />
@@ -103,20 +106,19 @@ toggling the **Specific users** option and selecting them:
 <div style="text-align: center">
   <img
     alt="Setting receipients for an alert on Cube Cloud"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Developer-Tools/alerts-5.png"
+    src="https://ucarecdn.com/5591a428-2a90-4709-9ce1-f6c3d5ad46ef/"
     style="border: none"
     width="100%"
   />
 </div>
 
 Optionally, you can also add additional email addresses that should receive
-email notifications by entering the email address in the **Custom email**
-field:
+email notifications by entering the email address in the **Custom email** field:
 
 <div style="text-align: center">
   <img
     alt="Setting an custom email for an alert on Cube Cloud"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/Developer-Tools/alerts-6.png"
+    src="https://ucarecdn.com/a9748134-c9a3-462e-8c5e-5b42ff79c629/"
     style="border: none"
     width="100%"
   />
