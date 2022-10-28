@@ -610,6 +610,7 @@ export class PreAggregationLoader {
 
   protected async loadPreAggregationWithKeys(): Promise<LoadPreAggregationResult> {
     const invalidationKeys = await this.getPartitionInvalidationKeyValues();
+
     const contentVersion = this.contentVersion(invalidationKeys);
     const structureVersion = getStructureVersion(this.preAggregation);
 
@@ -767,11 +768,15 @@ export class PreAggregationLoader {
   }
 
   protected getPartitionInvalidationKeyValues() {
-    return Promise.all(
-      (this.preAggregation.partitionInvalidateKeyQueries || []).map(
-        (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
-      )
-    );
+    if (this.preAggregation.partitionInvalidateKeyQueries) {
+      return Promise.all(
+        (this.preAggregation.partitionInvalidateKeyQueries || []).map(
+          (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+        )
+      );
+    } else {
+      return this.getInvalidationKeyValues();
+    }
   }
 
   protected scheduleRefresh(invalidationKeys, newVersionEntry) {
