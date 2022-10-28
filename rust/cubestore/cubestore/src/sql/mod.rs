@@ -889,7 +889,6 @@ impl SqlService for SqlServiceImpl {
                             option.value
                         ))),
                     })?;
-                println!("sst1: {:?}", select_statement);
 
                 let res = self
                     .create_table(
