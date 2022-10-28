@@ -12600,6 +12600,37 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_bool_and_or() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "test_bool_and_or",
+            execute_query(
+                "
+                SELECT
+                    bool_and(ttt) and_ttt, bool_or(ttt) or_ttt,
+                    bool_and(ttf) and_ttf, bool_or(ttf) or_ttf,
+                    bool_and(fff) and_fff, bool_or(fff) or_fff,
+                    bool_and(ttn) and_ttn, bool_or(ttn) or_ttn,
+                    bool_and(tfn) and_tfn, bool_or(tfn) or_tfn,
+                    bool_and(ffn) and_ffn, bool_or(ffn) or_ffn,
+                    bool_and(nnn) and_nnn, bool_or(nnn) or_nnn
+                FROM (
+                    SELECT true ttt, true  ttf, false fff, true ttn, true  tfn, false ffn, null::bool nnn
+                    UNION ALL
+                    SELECT true ttt, true  ttf, false fff, true ttn, false tfn, false ffn, null       nnn
+                    UNION ALL
+                    SELECT true ttt, false ttf, false fff, null ttn, null  tfn, null  ffn, null       nnn
+                ) tbl
+                "
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_select_is_null_is_not_null() {
         init_logger();
 
