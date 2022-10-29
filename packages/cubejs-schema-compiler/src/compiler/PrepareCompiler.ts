@@ -15,6 +15,7 @@ import { ContextEvaluator } from './ContextEvaluator';
 import { JoinGraph } from './JoinGraph';
 import { CubeToMetaTransformer } from './CubeToMetaTransformer';
 import { CompilerCache } from './CompilerCache';
+import { YamlCompiler } from './YamlCompiler';
 
 export const prepareCompiler = (repo, options) => {
   const cubeDictionary = new CubeDictionary();
@@ -26,6 +27,7 @@ export const prepareCompiler = (repo, options) => {
   const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
+  const yamlCompiler = new YamlCompiler(cubeSymbols);
 
   const transpilers: TranspilerInterface[] = [
     new ValidationTranspiler(),
@@ -51,7 +53,8 @@ export const prepareCompiler = (repo, options) => {
       Reflection
     },
     compileContext: options.compileContext,
-    standalone: options.standalone
+    standalone: options.standalone,
+    yamlCompiler
   }, options));
 
   return {

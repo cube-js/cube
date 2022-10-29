@@ -7,6 +7,13 @@ export const prepareCompiler = (content, options) => originalPrepareCompiler({
   ])
 }, { adapter: 'postgres', ...options });
 
+export const prepareYamlCompiler = (content, options) => originalPrepareCompiler({
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    { fileName: 'main.yml', content }
+  ])
+}, { adapter: 'postgres', ...options });
+
 export const prepareCube = (cubeName, cube, options) => {
   const fileName = `${cubeName}.js`;
   const content = `cube(${JSON.stringify(cubeName)}, ${JSON.stringify(cube).replace(/"([^"]+)":/g, '$1:')});`;
