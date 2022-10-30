@@ -31,6 +31,7 @@ export class DataSchemaCompiler {
     this.errorReport = options.errorReport;
     this.standalone = options.standalone;
     this.yamlCompiler = options.yamlCompiler;
+    this.yamlCompiler.dataSchemaCompiler = this;
   }
 
   compileObjects(compileServices, objects, errorsReport) {

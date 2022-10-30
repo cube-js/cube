@@ -179,7 +179,7 @@ cubes:
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
 cubes:
   - name: active_users
-    sql: "SELECT 1 as user_id, '2022-01-01' as \\"timestamp\\" WHERE {FILTER_PARAMS.active_users.time.filter(\\"timestamp\\")}"
+    sql: "SELECT * FROM (SELECT 1 as user_id, '2022-01-01'::timestamptz as \\"timestamp\\") t WHERE {FILTER_PARAMS.active_users.time.filter(\\"timestamp\\")} AND {FILTER_PARAMS.active_users.time.filter(lambda a,b : f'timestamp >= {a}::timestamptz AND timestamp <= {b}::timestamptz')}"
     
     measures:
       - name: weekly_active
@@ -196,13 +196,6 @@ cubes:
       - name: time
         sql: "{CUBE}.timestamp"
         type: time
-        
-    preAggregations:
-      - name: main
-        measures:
-          - weekly_active
-        timeDimension: time
-        granularity: day
     `);
     await compiler.compile();
 

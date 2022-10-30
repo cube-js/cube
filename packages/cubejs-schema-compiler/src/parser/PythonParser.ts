@@ -12,7 +12,12 @@ import {
   String_templateContext,
   AtomContext,
   Atom_exprContext,
-  Expr_stmtContext, TrailerContext,
+  Expr_stmtContext,
+  TrailerContext,
+  VfpdefContext,
+  VarargslistContext,
+  LambdefContext,
+  Single_string_template_atomContext,
 } from './Python3Parser';
 import { UserError } from '../compiler/UserError';
 import { Python3ParserVisitor } from './Python3ParserVisitor';
@@ -123,7 +128,10 @@ export class PythonParser {
           } else {
             throw new UserError(`Unsupported Python multiple children node: ${node.constructor.name}: ${node.text}`);
           }
-        } else if (node instanceof Double_string_template_atomContext) {
+        } else if (
+          node instanceof Double_string_template_atomContext ||
+          node instanceof Single_string_template_atomContext
+        ) {
           if ((node.test() || node.star_expr()) && children.length === 1) {
             return children[0];
           }
@@ -176,6 +184,17 @@ export class PythonParser {
           } else {
             throw new UserError(`Unsupported Python Trailer children node: ${node.constructor.name}: ${node.text}`);
           }
+        } else if (node instanceof VfpdefContext) {
+          const name = node.NAME();
+          if (name) {
+            return t.identifier(name.text);
+          } else {
+            throw new UserError(`Unsupported Python vfpdef children node: ${node.constructor.name}: ${node.text}`);
+          }
+        } else if (node instanceof VarargslistContext) {
+          return { args: children };
+        } else if (node instanceof LambdefContext) {
+          return t.arrowFunctionExpression(children[0].args, children[1]);
         } else {
           return singleNodeReturn();
         }

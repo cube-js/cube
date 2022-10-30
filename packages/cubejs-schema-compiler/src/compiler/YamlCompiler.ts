@@ -7,6 +7,8 @@ import babelTraverse from '@babel/traverse';
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
 import { CubeSymbols } from './CubeSymbols';
+import { DataSchemaCompiler } from './DataSchemaCompiler';
+import { nonStringFields } from './CubeValidator';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -16,6 +18,8 @@ type EscapeStateStack = {
 };
 
 export class YamlCompiler {
+  public dataSchemaCompiler: DataSchemaCompiler | null = null;
+
   public constructor(private cubeSymbols: CubeSymbols) {
   }
 
@@ -23,13 +27,31 @@ export class YamlCompiler {
     const yamlObj = YAML.parse(file.content);
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
-        yamlObj.cubes.forEach(({ name, ...cube }) => cubes.push(Object.assign({}, this.transformYamlCubeObj({ name, ...cube }, errorsReport), { fileName: file.fileName })));
+        yamlObj.cubes.forEach(({ name, ...cube }) => {
+          const transpiledFile = this.transpileAndPrepareJsFile(file, 'cube', { name, ...cube }, errorsReport);
+          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+        });
       } else if (key === 'views') {
-        yamlObj.views.forEach(({ name, ...cube }) => cubes.push(Object.assign({}, this.transformYamlCubeObj({ name, ...cube }, errorsReport), { fileName: file.fileName, isView: true })));
+        yamlObj.views.forEach(({ name, ...cube }) => {
+          const transpiledFile = this.transpileAndPrepareJsFile(file, 'view', { name, ...cube }, errorsReport);
+          this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+        });
       } else {
         errorsReport.error(`Unexpected YAML key: ${key}. Only 'cubes' and 'views' are allowed here.`);
       }
     }
+  }
+
+  private transpileAndPrepareJsFile(file, methodFn, cubeObj, errorsReport) {
+    const yamlAst = this.transformYamlCubeObj(cubeObj, errorsReport);
+
+    const cubeOrViewCall = t.callExpression(t.identifier(methodFn), [t.stringLiteral(cubeObj.name), yamlAst]);
+
+    const content = babelGenerator(cubeOrViewCall, {}, '').code;
+    return {
+      fileName: file.fileName,
+      content
+    };
   }
 
   private transformYamlCubeObj(cubeObj, errorsReport) {
@@ -39,7 +61,7 @@ export class YamlCompiler {
     cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
     cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'segment', errorsReport);
     cubeObj.joins = this.yamlArrayToObj(cubeObj.joins || [], 'join', errorsReport);
-    return this.transpileYamlCubePropContextFields(cubeObj, [], cubeObj.name, errorsReport);
+    return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
 
   private camelizeObj(cubeObjPart: any): any {
@@ -62,7 +84,7 @@ export class YamlCompiler {
     return cubeObjPart;
   }
 
-  private transpileYamlCubePropContextFields(obj, propertyPath, cubeName, errorsReport) {
+  private transpileYaml(obj, propertyPath, cubeName, errorsReport) {
     if (transpiledFields.has(propertyPath[propertyPath.length - 1])) {
       for (const p of transpiledFieldsPatterns) {
         const fullPath = propertyPath.join('.');
@@ -73,20 +95,33 @@ export class YamlCompiler {
             return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
           } else if (Array.isArray(obj)) {
             const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
-              const ast = this.parsePythonAndTranspileToJs(code, cubeName, errorsReport);
+              const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
               return ast?.body[0]?.expression;
             }).filter(ast => !!ast)))]);
             return this.astIntoArrowFunction(resultAst, '', cubeName);
           }
         }
       }
+    } else if (typeof obj === 'string') {
+      let code = obj;
+      if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
+        code = `f"${this.escapeDoubleQuotes(obj)}"`;
+      }
+      const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
+      return ast?.body[0]?.expression;
+    } else if (typeof obj === 'boolean') {
+      return t.booleanLiteral(obj);
     }
     if (typeof obj === 'object') {
+      const properties: any[] = [];
       for (const propKey of Object.keys(obj)) {
-        obj[propKey] = this.transpileYamlCubePropContextFields(obj[propKey], propertyPath.concat(propKey), cubeName, errorsReport);
+        const ast = this.transpileYaml(obj[propKey], propertyPath.concat(propKey), cubeName, errorsReport);
+        properties.push(t.objectProperty(t.stringLiteral(propKey), ast));
       }
+      return t.objectExpression(properties);
+    } else {
+      throw new Error(`Unexpected input during yaml transpiling: ${JSON.stringify(obj)}`);
     }
-    return obj;
   }
 
   private escapeDoubleQuotes(str: string): string {
@@ -134,21 +169,18 @@ export class YamlCompiler {
   }
 
   private parsePythonIntoArrowFunction(codeString, cubeName, originalObj, errorsReport) {
-    const ast = this.parsePythonAndTranspileToJs(codeString, cubeName, errorsReport);
-    if (ast) {
-      return this.astIntoArrowFunction(ast, codeString, cubeName);
-    }
-    return originalObj;
+    const ast = this.parsePythonAndTranspileToJs(codeString, errorsReport);
+    return this.astIntoArrowFunction(ast, codeString, cubeName);
   }
 
-  private parsePythonAndTranspileToJs(codeString, cubeName, errorsReport) {
+  private parsePythonAndTranspileToJs(codeString, errorsReport) {
     try {
       const pythonParser = new PythonParser(codeString);
       return pythonParser.transpileToJs();
     } catch (e) {
       errorsReport.error(`Can't parse python expression. Most likely this type of syntax isn't supported yet: ${e.message || e}`);
     }
-    return null;
+    return t.nullLiteral();
   }
 
   private astIntoArrowFunction(ast, codeString, cubeName) {
@@ -173,10 +205,7 @@ export class YamlCompiler {
 
     babelTraverse(ast, traverseObj);
 
-    const content = babelGenerator(ast, {}, codeString).code;
-    // eslint-disable-next-line no-new-func
-    const evalArrowFunction = new Function(`return ${content}`);
-    return evalArrowFunction();
+    return ast.program.body[0]?.expression;
   }
 
   private yamlArrayToObj(yamlArray, memberType, errorsReport) {
