@@ -8,6 +8,21 @@ const cronParser = require('cron-parser');
  * and update CubePropContextTranspiler.transpiledFieldsPatterns
  **************************** */
 
+// Update this whenever schema is updated otherwise YAML will be broken
+export const nonStringFields = new Set([
+  'primaryKey',
+  'scheduledRefresh',
+  'unionWithSourceData',
+  'rewriteQueries',
+  'shown',
+  'subQuery',
+  'propagateFiltersToSubQuery',
+  'incremental',
+  'external',
+  'useOriginalSqlPreAggregations',
+  'readOnly'
+]);
+
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
 
 const identifier = Joi.string().regex(identifierRegex, 'identifier');

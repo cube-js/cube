@@ -30,6 +30,8 @@ export class DataSchemaCompiler {
     this.compilerCache = options.compilerCache;
     this.errorReport = options.errorReport;
     this.standalone = options.standalone;
+    this.yamlCompiler = options.yamlCompiler;
+    this.yamlCompiler.dataSchemaCompiler = this;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -76,6 +78,16 @@ export class DataSchemaCompiler {
   }
 
   transpileFile(file, errorsReport) {
+    if (R.endsWith('.yml', file.fileName)) {
+      return file;
+    } else if (R.endsWith('.js', file.fileName)) {
+      return this.transpileJsFile(file, errorsReport);
+    } else {
+      return file;
+    }
+  }
+
+  transpileJsFile(file, errorsReport) {
     try {
       const ast = parse(
         file.content,
@@ -157,6 +169,14 @@ export class DataSchemaCompiler {
     }
 
     compiledFiles[file.fileName] = true;
+    if (R.endsWith('.js', file.fileName)) {
+      this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+    } else if (R.endsWith('.yml', file.fileName)) {
+      this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+    }
+  }
+
+  compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
     const err = syntaxCheck(file.content, file.fileName);
     if (err) {
       errorsReport.error(err.toString());
@@ -208,13 +228,13 @@ export class DataSchemaCompiler {
               exports,
               contexts,
               toCompile,
-              compiledFiles
+              compiledFiles,
             );
             exports[foundFile.fileName] = exports[foundFile.fileName] || {};
             return exports[foundFile.fileName];
           }
         },
-        COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : R.clone(this.compileContext || {})
+        COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : R.clone(this.compileContext || {}),
       }, { filename: file.fileName, timeout: 15000 });
     } catch (e) {
       errorsReport.error(e);

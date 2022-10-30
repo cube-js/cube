@@ -20,7 +20,7 @@
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
-    "generate": "antlr4ts -visitor src/parser/GenericSql.g4",
+    "generate": "antlr4ts -visitor src/parser/GenericSql.g4 src/parser/Python3Lexer.g4 src/parser/Python3Parser.g4",
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
@@ -54,7 +54,8 @@
     "moment-timezone": "^0.5.33",
     "node-dijkstra": "^2.5.0",
     "ramda": "^0.27.0",
-    "syntax-error": "^1.3.0"
+    "syntax-error": "^1.3.0",
+    "yaml": "^1.10.2"
   },
   "devDependencies": {
     "@apla/clickhouse": "^1.5.5",
