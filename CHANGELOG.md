@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.8](https://github.com/cube-js/cube.js/compare/v0.31.7...v0.31.8) (2022-10-30)
+
+
+### Bug Fixes
+
+* **cubesql:** Count measure type changed from u64 to i64 ([#5535](https://github.com/cube-js/cube.js/issues/5535)) ([f568851](https://github.com/cube-js/cube.js/commit/f568851948cff16ddc53a974d46a77a8698dbdf1))
+
+
+### Features
+
+* YAML support ([#5539](https://github.com/cube-js/cube.js/issues/5539)) ([29c19db](https://github.com/cube-js/cube.js/commit/29c19db9315ef7ad40350150f74f9519d6ff4a98))
+* **cubesql:** Support `BOOL_AND`, `BOOL_OR` aggregate functions ([#5533](https://github.com/cube-js/cube.js/issues/5533)) ([a2e6e38](https://github.com/cube-js/cube.js/commit/a2e6e386557bfbf43b2a4907c1fa3aef07ea90f2))
+* **cubesql:** Support Sigma Computing number filters ([f2f2abd](https://github.com/cube-js/cube.js/commit/f2f2abdbdafdd4669e1bd223b5b2f50a24c42b86))
+* **cubesql:** Thoughspot - count distinct with year and month ([#5450](https://github.com/cube-js/cube.js/issues/5450)) ([d44baad](https://github.com/cube-js/cube.js/commit/d44baad34dab8dbf70aa7c9b011dfe17f93b1375))
+
+
+
+
+
 ## [0.31.7](https://github.com/cube-js/cube.js/compare/v0.31.6...v0.31.7) (2022-10-27)
 
 

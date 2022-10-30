@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.8](https://github.com/cube-js/cube.js/compare/v0.31.7...v0.31.8) (2022-10-30)
+
+
+### Features
+
+* YAML support ([#5539](https://github.com/cube-js/cube.js/issues/5539)) ([29c19db](https://github.com/cube-js/cube.js/commit/29c19db9315ef7ad40350150f74f9519d6ff4a98))
+
+
+
+
+
 ## [0.31.7](https://github.com/cube-js/cube.js/compare/v0.31.6...v0.31.7) (2022-10-27)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
