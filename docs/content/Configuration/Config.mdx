@@ -237,6 +237,13 @@ execution queues, pre-aggregation table caches. By default, the same instance is
 used for **all** tenants; override this property in situations where each tenant
 requires their own Query Orchestrator.
 
+<WarningBox>
+
+Please remember to override [`preAggregationsSchema`][self-pre-aggregations-schema] if you override `contextToOrchestratorId`.
+Otherwise, you end up with table name clashes for your pre-aggregations.
+
+</WarningBox>
+
 Called on each request.
 
 ```javascript
@@ -837,6 +844,7 @@ module.exports = {
 [ref-sec-ctx]: /security/context
 [self-opts-req-ctx]: #request-context
 [self-opts-checkauth]: #check-auth
+[self-pre-aggregations-schema]: #options-reference-pre-aggregations-schema
 [self-opts-ctx-to-appid]: #context-to-app-id
 [self-driver-factory]: #driver-factory
 [ref-schema-ref-datasource]: /schema/reference/cube#data-source
