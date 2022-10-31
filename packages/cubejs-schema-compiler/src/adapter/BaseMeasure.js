@@ -19,6 +19,10 @@ export class BaseMeasure {
     return [`${this.measureSql()} ${this.aliasName()}`];
   }
 
+  hasNoRemapping() {
+    return this.measureSql() === this.aliasName();
+  }
+
   cumulativeSelectColumns() {
     return [`${this.cumulativeMeasureSql()} ${this.aliasName()}`];
   }

@@ -47,6 +47,13 @@ cube(\`Orders\`, {
       type: \`count\`,
       //drillMembers: [id, createdAt]
     },
+    
+    runningTotal: {
+      type: \`count\`,
+      rollingWindow: {
+        trailing: \`unbounded\`
+      },
+    },
   },
 
   dimensions: {
@@ -362,6 +369,24 @@ view(\`OrdersView2\`, {
     }]
   }, [{
     orders__count: '1',
+  }]));
+
+  it('rolling window', async () => runQueryTest({
+    measures: ['OrdersView.runningTotal']
+  }, [{
+    orders_view__running_total: '2',
+  }]));
+
+  it('rolling window with dimension', async () => runQueryTest({
+    measures: ['OrdersView.runningTotal'],
+    dimensions: ['OrdersView.productName'],
+    order: [{ id: 'OrdersView.productName' }],
+  }, [{
+    orders_view__product_name: 'Potato',
+    orders_view__running_total: '1',
+  }, {
+    orders_view__product_name: 'Tomato',
+    orders_view__running_total: '1',
   }]));
 
   it('check includes are exposed in meta', async () => {

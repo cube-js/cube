@@ -850,6 +850,12 @@ class BaseQuery {
       () => this.dimensionColumns('q_0').concat(this.measures.map(m => m.selectColumns())).join(', '),
       renderedReferenceContext,
     );
+
+    const queryHasNoRemapping = this.evaluateSymbolSqlWithContext(
+      () => this.dimensionsForSelect().concat(this.measures).every(r => r.hasNoRemapping()),
+      renderedReferenceContext,
+    );
+
     const havingFilters = this.evaluateSymbolSqlWithContext(
       () => this.baseWhere(this.measureFilters),
       renderedReferenceContext,
@@ -860,7 +866,8 @@ class BaseQuery {
     if (
       toJoin.length === 1 &&
       this.measureFilters.length === 0 &&
-      this.measures.filter(m => m.expression).length === 0
+      this.measures.filter(m => m.expression).length === 0 &&
+      queryHasNoRemapping
     ) {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
