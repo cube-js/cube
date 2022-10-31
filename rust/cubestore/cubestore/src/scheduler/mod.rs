@@ -36,6 +36,7 @@ pub struct SchedulerImpl {
     cluster: Arc<dyn Cluster>,
     remote_fs: Arc<dyn RemoteFs>,
     event_receiver: Mutex<Receiver<MetaStoreEvent>>,
+    cachestore_event_receiver: Mutex<Receiver<MetaStoreEvent>>,
     cancel_token: CancellationToken,
     gc_loop: Arc<DataGCLoop>,
     config: Arc<dyn ConfigObj>,
@@ -50,6 +51,7 @@ impl SchedulerImpl {
         cluster: Arc<dyn Cluster>,
         remote_fs: Arc<dyn RemoteFs>,
         event_receiver: Receiver<MetaStoreEvent>,
+        cachestore_event_receiver: Receiver<MetaStoreEvent>,
         config: Arc<dyn ConfigObj>,
     ) -> SchedulerImpl {
         let cancel_token = CancellationToken::new();
@@ -64,6 +66,7 @@ impl SchedulerImpl {
             cluster,
             remote_fs,
             event_receiver: Mutex::new(event_receiver),
+            cachestore_event_receiver: Mutex::new(cachestore_event_receiver),
             cancel_token,
             gc_loop,
             config,
@@ -76,6 +79,8 @@ impl SchedulerImpl {
     ) -> Vec<JoinHandle<Result<(), CubeError>>> {
         let scheduler2 = scheduler.clone();
         let scheduler3 = scheduler.clone();
+        let scheduler4 = scheduler.clone();
+
         vec![
             cube_ext::spawn(async move {
                 let gc_loop = scheduler.gc_loop.clone();
@@ -83,14 +88,18 @@ impl SchedulerImpl {
                 Ok(())
             }),
             cube_ext::spawn(async move {
-                Self::run_scheduler(scheduler2).await;
+                scheduler2.run_meta_event_processor().await;
                 Ok(())
             }),
             cube_ext::spawn(async move {
-                scheduler3
+                scheduler3.run_cache_event_processor().await;
+                Ok(())
+            }),
+            cube_ext::spawn(async move {
+                scheduler4
                     .reconcile_loop
                     .process(
-                        scheduler3.clone(),
+                        scheduler4.clone(),
                         async move |_| Ok(Delay::new(Duration::from_secs(30)).await),
                         async move |s, _| s.reconcile().await,
                     )
@@ -100,11 +109,11 @@ impl SchedulerImpl {
         ]
     }
 
-    async fn run_scheduler(scheduler: Arc<SchedulerImpl>) {
+    async fn run_meta_event_processor(self: Arc<Self>) {
         loop {
-            let mut event_receiver = scheduler.event_receiver.lock().await;
+            let mut event_receiver = self.event_receiver.lock().await;
             let event = tokio::select! {
-                _ = scheduler.cancel_token.cancelled() => {
+                _ = self.cancel_token.cancelled() => {
                     return;
                 }
                 event = event_receiver.recv() => {
@@ -120,13 +129,39 @@ impl SchedulerImpl {
                     }
                 }
             };
-            let scheduler_to_move = scheduler.clone();
+
+            let scheduler_to_move = self.clone();
             cube_ext::spawn(async move {
                 let res = scheduler_to_move.process_event(event.clone()).await;
                 if let Err(e) = res {
                     error!("Error processing event {:?}: {}", event, e);
                 }
             });
+        }
+    }
+
+    async fn run_cache_event_processor(self: Arc<Self>) {
+        loop {
+            let mut event_receiver = self.cachestore_event_receiver.lock().await;
+            let _ = tokio::select! {
+                _ = self.cancel_token.cancelled() => {
+                    return;
+                }
+                event = event_receiver.recv() => {
+                    match event {
+                        Err(broadcast::error::RecvError::Lagged(messages)) => {
+                            error!("Scheduler is lagging on cache store event processing for {} messages", messages);
+                            continue;
+                        },
+                        Err(broadcast::error::RecvError::Closed) => {
+                            return;
+                        },
+                        Ok(event) => event,
+                    }
+                }
+            };
+
+            // Right now, it's used to free channel
         }
     }
 

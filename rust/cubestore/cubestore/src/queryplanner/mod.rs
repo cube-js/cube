@@ -25,7 +25,7 @@ use crate::metastore::{IdRow, MetaStore};
 use crate::queryplanner::flatten_union::FlattenUnion;
 use crate::queryplanner::info_schema::{
     SchemataInfoSchemaTableDef, SystemCacheTableDef, SystemChunksTableDef, SystemIndexesTableDef,
-    SystemJobsTableDef, SystemPartitionsTableDef, SystemReplayHandlesTableDef,
+    SystemJobsTableDef, SystemPartitionsTableDef, SystemQueueTableDef, SystemReplayHandlesTableDef,
     SystemSnapshotsTableDef, SystemTablesTableDef, TablesInfoSchemaTableDef,
 };
 use crate::queryplanner::now::MaterializeNow;
@@ -331,6 +331,11 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 self.cache_store.clone(),
                 InfoSchemaTable::SystemChunks,
             ))),
+            ("system", "queue") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                self.cache_store.clone(),
+                InfoSchemaTable::SystemQueue,
+            ))),
             ("system", "replay_handles") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
                 self.cache_store.clone(),
@@ -383,6 +388,7 @@ pub enum InfoSchemaTable {
     SystemIndexes,
     SystemPartitions,
     SystemChunks,
+    SystemQueue,
     SystemReplayHandles,
     SystemCache,
     SystemSnapshots,
@@ -448,6 +454,7 @@ impl InfoSchemaTable {
             InfoSchemaTable::SystemTables => Box::new(SystemTablesTableDef),
             InfoSchemaTable::SystemIndexes => Box::new(SystemIndexesTableDef),
             InfoSchemaTable::SystemChunks => Box::new(SystemChunksTableDef),
+            InfoSchemaTable::SystemQueue => Box::new(SystemQueueTableDef),
             InfoSchemaTable::SystemReplayHandles => Box::new(SystemReplayHandlesTableDef),
             InfoSchemaTable::SystemPartitions => Box::new(SystemPartitionsTableDef),
             InfoSchemaTable::SystemJobs => Box::new(SystemJobsTableDef),

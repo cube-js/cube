@@ -1175,8 +1175,11 @@ impl Config {
             })
             .await;
 
-        let (event_sender, _) = broadcast::channel(10000); // TODO config
-        let event_sender_to_move = event_sender.clone();
+        let (metastore_event_sender, _) = broadcast::channel(8192); // TODO config
+        let (cachestore_event_sender, _) = broadcast::channel(2048); // TODO config
+
+        let metastore_event_sender_to_move = metastore_event_sender.clone();
+        let cachestore_event_sender_to_move = cachestore_event_sender.clone();
 
         self.injector
             .register_typed::<dyn ClusterTransport, _, _, _>(async move |i| {
@@ -1233,7 +1236,7 @@ impl Config {
                                 .await
                                 .unwrap()
                         };
-                        meta_store.add_listener(event_sender).await;
+                        meta_store.add_listener(metastore_event_sender).await;
                         meta_store
                     },
                 )
@@ -1272,15 +1275,20 @@ impl Config {
                                 dump_dir,
                                 cachestore_fs,
                                 config,
+                                vec![cachestore_event_sender],
                             )
                             .await
                             .unwrap()
                         } else {
-                            LazyRocksCacheStore::load_from_remote(&path, cachestore_fs, config)
-                                .await
-                                .unwrap()
+                            LazyRocksCacheStore::load_from_remote(
+                                &path,
+                                cachestore_fs,
+                                config,
+                                vec![cachestore_event_sender],
+                            )
+                            .await
+                            .unwrap()
                         };
-
                         cache_store
                     },
                 )
@@ -1406,7 +1414,7 @@ impl Config {
             })
             .await;
 
-        let cluster_meta_store_sender = event_sender_to_move.clone();
+        let cluster_meta_store_sender = metastore_event_sender_to_move.clone();
 
         self.injector
             .register_typed_with_default::<dyn Cluster, _, _, _>(async move |i| {
@@ -1457,7 +1465,8 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
-                    event_sender_to_move.subscribe(),
+                    metastore_event_sender_to_move.subscribe(),
+                    cachestore_event_sender_to_move.subscribe(),
                     i.get_service_typed().await,
                 ))
             })

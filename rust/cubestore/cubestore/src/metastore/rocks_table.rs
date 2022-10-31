@@ -118,7 +118,7 @@ pub trait BaseRocksSecondaryIndex<T>: Debug {
 
     fn is_ttl(&self) -> bool;
 
-    fn get_expire<'a>(&self, _row: &'a T) -> &'a Option<DateTime<Utc>>;
+    fn get_expire(&self, _row: &T) -> Option<DateTime<Utc>>;
 
     fn version(&self) -> u32;
 
@@ -141,7 +141,7 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
         if RocksSecondaryIndex::is_ttl(self) {
             let expire = RocksSecondaryIndex::get_expire(self, row);
 
-            RocksSecondaryIndexValue::HashAndTTL(&hash, expire.clone())
+            RocksSecondaryIndexValue::HashAndTTL(&hash, expire)
                 .to_bytes(RocksSecondaryIndex::value_version(self))
         } else {
             RocksSecondaryIndexValue::Hash(&hash).to_bytes(RocksSecondaryIndex::value_version(self))
@@ -170,8 +170,8 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
         false
     }
 
-    fn get_expire<'a>(&self, _row: &'a T) -> &'a Option<DateTime<Utc>> {
-        &None
+    fn get_expire(&self, _row: &T) -> Option<DateTime<Utc>> {
+        None
     }
 }
 
@@ -199,7 +199,7 @@ where
         RocksSecondaryIndex::is_ttl(self)
     }
 
-    fn get_expire<'a>(&self, row: &'a T) -> &'a Option<DateTime<Utc>> {
+    fn get_expire(&self, row: &T) -> Option<DateTime<Utc>> {
         RocksSecondaryIndex::get_expire(self, row)
     }
 
@@ -636,14 +636,36 @@ pub trait RocksTable: Debug + Send + Sync {
 
     fn delete(&self, row_id: u64, batch_pipe: &mut BatchPipe) -> Result<IdRow<Self::T>, CubeError> {
         let row = self.get_row_or_not_found(row_id)?;
-        let deleted_row = self.delete_index_row(row.get_row(), row_id)?;
-        batch_pipe.add_event(MetaStoreEvent::Delete(Self::table_id(), row_id));
+        self.delete_impl(row, batch_pipe)
+    }
+
+    fn try_delete(
+        &self,
+        row_id: u64,
+        batch_pipe: &mut BatchPipe,
+    ) -> Result<Option<IdRow<Self::T>>, CubeError> {
+        if let Some(row) = self.get_row(row_id)? {
+            Ok(Some(self.delete_impl(row, batch_pipe)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn delete_impl(
+        &self,
+        row: IdRow<Self::T>,
+        batch_pipe: &mut BatchPipe,
+    ) -> Result<IdRow<Self::T>, CubeError> {
+        let deleted_row = self.delete_index_row(row.get_row(), row.get_id())?;
+        batch_pipe.add_event(MetaStoreEvent::Delete(Self::table_id(), row.get_id()));
         batch_pipe.add_event(self.delete_event(row.clone()));
         for row in deleted_row {
             batch_pipe.batch().delete(row.key);
         }
 
-        batch_pipe.batch().delete(self.delete_row(row_id)?.key);
+        batch_pipe
+            .batch()
+            .delete(self.delete_row(row.get_id())?.key);
 
         Ok(row)
     }
