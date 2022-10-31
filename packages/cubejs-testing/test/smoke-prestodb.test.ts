@@ -20,7 +20,7 @@ describe('prestodb', () => {
         CUBEJS_DB_HOST: db.getHost(),
         CUBEJS_DB_PORT: `${db.getMappedPort(8080)}`,
         CUBEJS_DB_PRESTO_CATALOG: 'memory',
-        CUBEJS_DB_USER: 'integration',
+        CUBEJS_DB_USER: 'test',
 
         ...DEFAULT_CONFIG,
       },
