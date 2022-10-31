@@ -52,14 +52,13 @@ describe('prestodb', () => {
     expect(response.rawData()).toMatchSnapshot('dimensions');
   });
 
-
   test('query dimensions with underscore filter', async () => {
     const response = await client.load({
       filters: [
         {
-          member: "Orders.status",
-          operator: "contains",
-          values: ["cancelled_"]
+          member: 'Orders.status',
+          operator: 'contains',
+          values: ['cancelled_']
         }
       ],
       dimensions: [
