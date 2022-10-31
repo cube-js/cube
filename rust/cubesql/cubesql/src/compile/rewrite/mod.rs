@@ -324,6 +324,11 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
         },
+        EventNotification {
+            name: String,
+            members: Vec<LogicalPlan>,
+            meta: Option<Vec<(String, String)>>,
+        },
     }
 }
 
@@ -498,58 +503,6 @@ where
         name.to_string(),
         ChainSearcher {
             main: main_searcher.parse().unwrap(),
-            chain: chain
-                .into_iter()
-                .map(|(var, pattern)| (var.parse().unwrap(), pattern.parse().unwrap()))
-                .collect(),
-        },
-        TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
-            transform_fn(egraph, subst)
-        }),
-    )
-    .unwrap()
-}
-
-/// `main_searcher` and `anchors` can not be used for rewrite. It should be using only for searching
-/// `anchors` and `rewrite_searcher` have 3 arguments:
-///     1: variable name
-///     2: pattern that can be recursively found any number of times before the target pattern
-///     3: target pattern
-/// target pattern of `rewrite_searcher` and chain can be used the same as in transforming_chain_rewrite
-pub fn transforming_anchors_rewrite<T>(
-    name: &str,
-    main_searcher: String,
-    anchors: Vec<(&str, String, String)>,
-    rewrite_searcher: (&str, String, String),
-    chain: Vec<(&str, String)>,
-    applier: String,
-    transform_fn: T,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
-where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
-        + Sync
-        + Send
-        + 'static,
-{
-    Rewrite::new(
-        name.to_string(),
-        AnchorsSearcher {
-            main: main_searcher.parse().unwrap(),
-            anchors: anchors
-                .into_iter()
-                .map(|(var, pattern1, pattern2)| {
-                    (
-                        var.parse().unwrap(),
-                        pattern1.parse().unwrap(),
-                        pattern2.parse().unwrap(),
-                    )
-                })
-                .collect(),
-            rewrite_searcher: (
-                rewrite_searcher.0.parse().unwrap(),
-                rewrite_searcher.1.parse().unwrap(),
-                rewrite_searcher.2.parse().unwrap(),
-            ),
             chain: chain
                 .into_iter()
                 .map(|(var, pattern)| (var.parse().unwrap(), pattern.parse().unwrap()))
@@ -871,6 +824,10 @@ fn group_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Dis
     )
 }
 
+fn event_notification(name: impl Display, members: impl Display, meta: impl Display) -> String {
+    format!("(EventNotification {} {} {})", name, members, meta)
+}
+
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {
     format!("(CubeScanMembers {} {})", left, right)
 }
@@ -1097,149 +1054,6 @@ impl ChainSearcher {
         chain: Iter<(Var, Pattern<LogicalPlanLanguage>)>,
     ) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
         search_match_chained(egraph, cur_match, chain)
-    }
-}
-
-pub struct AnchorsSearcher {
-    main: Pattern<LogicalPlanLanguage>,
-    anchors: Vec<(
-        Var,
-        Pattern<LogicalPlanLanguage>,
-        Pattern<LogicalPlanLanguage>,
-    )>,
-    rewrite_searcher: (
-        Var,
-        Pattern<LogicalPlanLanguage>,
-        Pattern<LogicalPlanLanguage>,
-    ),
-    chain: Vec<(Var, Pattern<LogicalPlanLanguage>)>,
-}
-
-impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for AnchorsSearcher {
-    fn search(
-        &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
-        let matches = self.main.search(egraph);
-        let mut result = Vec::new();
-        for m in matches {
-            result.extend(
-                m.substs
-                    .iter()
-                    .filter_map(|s| self.search_match(egraph, s.clone(), self.anchors.iter())),
-            );
-        }
-
-        result
-    }
-
-    fn search_eclass(
-        &self,
-        _egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        _eclass: Id,
-    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
-        panic!("RecursiveSearcher - can not use search_eclass. Use search instead");
-    }
-
-    fn vars(&self) -> Vec<Var> {
-        let mut vars = self.rewrite_searcher.2.vars();
-        for (_, p) in self.chain.iter() {
-            vars.extend(p.vars());
-        }
-        vars
-    }
-}
-
-impl AnchorsSearcher {
-    fn search_match_recursively<'a>(
-        &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        substs: Vec<Subst>,
-        intermediate_pattern: &'a Pattern<LogicalPlanLanguage>,
-        target_pattern: &'a Pattern<LogicalPlanLanguage>,
-    ) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
-        for subst in substs.iter() {
-            for var in intermediate_pattern.vars() {
-                if let Some(id) = subst.get(var) {
-                    let matches = target_pattern.search_eclass(egraph, id.clone());
-                    if matches.is_some() {
-                        return matches;
-                    }
-                    if let Some(matches) = intermediate_pattern.search_eclass(egraph, id.clone()) {
-                        let matches = self.search_match_recursively(
-                            egraph,
-                            matches.substs,
-                            intermediate_pattern,
-                            target_pattern,
-                        );
-                        if matches.is_some() {
-                            return matches;
-                        }
-                    }
-                }
-            }
-        }
-
-        return None;
-    }
-
-    fn search_match(
-        &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        subst: Subst,
-        anchors: Iter<(
-            Var,
-            Pattern<LogicalPlanLanguage>,
-            Pattern<LogicalPlanLanguage>,
-        )>,
-    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
-        for anchor in anchors {
-            if let Some(id) = subst.get(anchor.0.clone()) {
-                if anchor.2.search_eclass(egraph, id.clone()).is_some() {
-                    continue;
-                } else if let Some(intermediate_node) = anchor.1.search_eclass(egraph, id.clone()) {
-                    if self
-                        .search_match_recursively(
-                            egraph,
-                            intermediate_node.substs,
-                            &anchor.1,
-                            &anchor.2,
-                        )
-                        .is_some()
-                    {
-                        continue;
-                    }
-                }
-
-                return None;
-            }
-        }
-
-        if let Some(id) = subst.get(self.rewrite_searcher.0.clone()) {
-            let found_pattern = self.rewrite_searcher.2.search_eclass(egraph, id.clone());
-            if let Some(found_pattern) = found_pattern {
-                let matches = search_match_chained(egraph, found_pattern, self.chain.iter());
-                if matches.is_some() {
-                    return matches;
-                }
-            }
-            if let Some(intermediate_node) =
-                self.rewrite_searcher.1.search_eclass(egraph, id.clone())
-            {
-                for subst in intermediate_node.substs.into_iter() {
-                    if let Some(matches) = self.search_match_recursively(
-                        egraph,
-                        vec![subst],
-                        &self.rewrite_searcher.1,
-                        &self.rewrite_searcher.2,
-                    ) {
-                        return search_match_chained(egraph, matches, self.chain.iter());
-                    }
-                }
-            }
-        }
-
-        return None;
     }
 }
 
