@@ -148,7 +148,7 @@ export class QueryOrchestrator {
     dataSource = 'default',
     schema: string,
     table: string,
-    key: any[],
+    key: any,
     token: string,
   ): Promise<[boolean, string]> {
     return this.preAggregations.isPartitionExist(

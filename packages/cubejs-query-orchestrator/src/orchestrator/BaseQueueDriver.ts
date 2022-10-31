@@ -2,7 +2,7 @@ import { QueueDriverConnectionInterface, QueueDriverInterface } from '@cubejs-ba
 import { getCacheHash } from './utils';
 
 export abstract class BaseQueueDriver implements QueueDriverInterface {
-  public redisHash(queryKey) {
+  public redisHash(queryKey: string) {
     return getCacheHash(queryKey);
   }
 

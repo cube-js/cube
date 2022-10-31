@@ -1,8 +1,17 @@
-/* globals describe, test, expect, afterAll */
-import { QueryQueue } from '../../src/orchestrator/QueryQueue';
+import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
+import { pausePromise } from '@cubejs-backend/shared';
+import { QueryQueue } from '../../src';
 import { processUidRE } from '../../src/orchestrator/utils';
 
-export const QueryQueueTest = (name: string, options?: any) => {
+export type QueryQueueTestOptions = {
+  cacheAndQueueDriver?: string,
+  redisPool?: any,
+  cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
+  beforeAll?: () => Promise<void>,
+  afterAll?: () => Promise<void>,
+};
+
+export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}) => {
   describe(`QueryQueue${name}`, () => {
     let delayCount = 0;
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
@@ -30,9 +39,29 @@ export const QueryQueueTest = (name: string, options?: any) => {
       ...options
     });
 
+    if (options?.cacheAndQueueDriver === 'cubestore') {
+      // TODO: Find all problems with queue
+      afterEach(async () => {
+        await queue.shutdown();
+        await pausePromise(2500);
+      });
+    }
+
     afterAll(async () => {
-      await options.redisPool.cleanup();
+      await queue.shutdown();
+
+      if (options?.afterAll) {
+        await options?.afterAll();
+      }
+
+      await options?.redisPool.cleanup();
     });
+
+    if (options?.beforeAll) {
+      beforeAll(async () => {
+        await options.beforeAll();
+      });
+    }
 
     test('gutter', async () => {
       const query = ['select * from'];
@@ -40,7 +69,9 @@ export const QueryQueueTest = (name: string, options?: any) => {
       expect(result).toBe('select * from bar');
     });
 
-    test('instant double wait resolve', async () => {
+    const nonCubestoreTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
+
+    nonCubestoreTest('instant double wait resolve', async () => {
       const results = await Promise.all([
         queue.executeInQueue('delay', 'instant', { delay: 400, result: '2' }),
         queue.executeInQueue('delay', 'instant', { delay: 400, result: '2' })
@@ -62,6 +93,7 @@ export const QueryQueueTest = (name: string, options?: any) => {
       delayCount = 0;
       const query = ['select * from 2'];
       let errorString = '';
+
       for (let i = 0; i < 5; i++) {
         try {
           await queue.executeInQueue('delay', query, { delay: 3000, result: '1' });
@@ -89,17 +121,18 @@ export const QueryQueueTest = (name: string, options?: any) => {
 
     test('priority stage reporting', async () => {
       delayCount = 0;
-      const resultPromise = queue.executeInQueue('delay', '31', { delay: 200, result: '1' }, 20, { stageQueryKey: '12' });
+      const resultPromise1 = queue.executeInQueue('delay', '31', { delay: 200, result: '1' }, 20, { stageQueryKey: '12' });
       await delayFn(null, 50);
       const resultPromise2 = queue.executeInQueue('delay', '32', { delay: 200, result: '1' }, 10, { stageQueryKey: '12' });
       await delayFn(null, 50);
+
       expect((await queue.getQueryStage('12', 10)).stage).toBe('#1 in queue');
-      await resultPromise;
+      await resultPromise1;
       await resultPromise2;
       expect(await queue.getQueryStage('12')).toEqual(undefined);
     });
 
-    test('negative priority', async () => {
+    nonCubestoreTest('negative priority', async () => {
       delayCount = 0;
       const results = [];
 
@@ -116,7 +149,7 @@ export const QueryQueueTest = (name: string, options?: any) => {
       expect(results.map(r => parseInt(r[0], 10) - parseInt(results[0][0], 10))).toEqual([0, 1, 2]);
     });
 
-    test('orphaned', async () => {
+    nonCubestoreTest('orphaned', async () => {
       for (let i = 1; i <= 4; i++) {
         await queue.executeInQueue('delay', `11${i}`, { delay: 50, result: `${i}` }, 0);
       }
@@ -137,7 +170,7 @@ export const QueryQueueTest = (name: string, options?: any) => {
       await queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0);
     });
 
-    test('queue hash process persistent flag properly', () => {
+    nonCubestoreTest('queue hash process persistent flag properly', () => {
       const query = ['select * from table'];
       const key1 = queue.redisHash(query);
       // @ts-ignore
@@ -164,7 +197,7 @@ export const QueryQueueTest = (name: string, options?: any) => {
       expect(result).toBe('select * from bar');
     });
 
-    test('queue driver lock obtain race condition', async () => {
+    nonCubestoreTest('queue driver lock obtain race condition', async () => {
       const redisClient: any = await queue.queueDriver.createConnection();
       const redisClient2: any = await queue.queueDriver.createConnection();
       const priority = 10;
@@ -219,7 +252,7 @@ export const QueryQueueTest = (name: string, options?: any) => {
       await queue.queueDriver.release(redisClient2);
     });
 
-    test('activated but lock is not acquired', async () => {
+    nonCubestoreTest('activated but lock is not acquired', async () => {
       const redisClient = await queue.queueDriver.createConnection();
       const redisClient2 = await queue.queueDriver.createConnection();
       const priority = 10;
@@ -229,11 +262,11 @@ export const QueryQueueTest = (name: string, options?: any) => {
       await queue.reconcileQueue();
 
       await redisClient.addToQueue(
-        keyScore, 'activated1', time, 'handler', ['select'], priority, { stageQueryKey: 'race' }
+        keyScore, 'activated1', time, 'handler', <any>['select'], priority, { stageQueryKey: 'race', requestId: '1' }
       );
 
       await redisClient.addToQueue(
-        keyScore + 100, 'activated2', time + 100, 'handler2', ['select2'], priority, { stageQueryKey: 'race2' }
+        keyScore + 100, 'activated2', time + 100, 'handler2', <any>['select2'], priority, { stageQueryKey: 'race2', requestId: '1' }
       );
 
       const processingId1 = await redisClient.getNextProcessingId();

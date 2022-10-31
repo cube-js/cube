@@ -56,7 +56,7 @@ export const QueryCacheTest = (name: string, options?: QueryCacheTestOptions) =>
           doLock(1000)
         ];
 
-        await pausePromise(25);
+        await pausePromise(100);
 
         locks.push(doLock(1000));
         locks.push(doLock(1000));

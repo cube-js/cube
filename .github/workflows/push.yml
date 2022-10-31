@@ -300,7 +300,7 @@ jobs:
           CUBEJS_REDIS_SENTINEL: "redis+sentinel://localhost:5000,localhost:5001,localhost:5002/mymaster/0"
 
   integration-cubestore:
-    needs: [unit, lint, latest-tag-sha]
+    needs: [latest-tag-sha]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
@@ -316,7 +316,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -351,6 +351,17 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
+      - uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./rust/cubestore
+          key: ubuntu-20.04
+      - name: Build cubestore
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --manifest-path rust/cubestore/Cargo.toml -j 4
+      - name: Run Cube Store in background
+        run: RUNNER_TRACKING_ID="" && ./rust/cubestore/target/debug/cubestored &
       - name: Run Cubestore Integration
         timeout-minutes: 10
         run: |
@@ -367,7 +378,7 @@ jobs:
         node-version: [14.x]
         db: [
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
-            'mysql-aurora-serverless', 'cubestore', 'crate'
+            'mysql-aurora-serverless', 'crate'
         ]
       fail-fast: false
 
