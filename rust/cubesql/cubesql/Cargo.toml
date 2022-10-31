@@ -73,6 +73,3 @@ harness = false
 [[bench]]
 name = "benchmarks"
 harness = false
-
-[profile.bench]
-debug = true

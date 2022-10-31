@@ -5,3 +5,6 @@ members = [
     "cubeclient",
     "pg-srv"
 ]
+
+[profile.bench]
+debug = true
