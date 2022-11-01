@@ -106,7 +106,7 @@ impl MinMaxCondition {
                         Ordering::Less => {
                             return false;
                         }
-                        Ordering::Equal => {} //We on border of range, so we should compare next part
+                        Ordering::Equal => {} //We on the border of the range, so we should compare next part
                         Ordering::Greater => min_satisfied = true, //Min condition satisfied
                     }
                 } else {
@@ -119,7 +119,7 @@ impl MinMaxCondition {
                         Ordering::Less => {
                             return false;
                         }
-                        Ordering::Equal => {} //We on border of range, so we should compare next part
+                        Ordering::Equal => {} //We on the border of the range, so we should compare next part
                         Ordering::Greater => max_satisfied = true, //Max condition satisfied
                     }
                 } else {
@@ -127,8 +127,7 @@ impl MinMaxCondition {
                 }
             }
             if max_satisfied && min_satisfied {
-                //min and max value of current part is equal so we can check rest of rows as
-                //separate range
+                //min and max value of the current part is equal so we can check rest of rows as separate range
                 if min_row[i] == max_row[i] {
                     min_satisfied = false;
                     max_satisfied = false;
