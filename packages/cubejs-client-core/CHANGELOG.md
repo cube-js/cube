@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.9](https://github.com/cube-js/cube.js/compare/v0.31.8...v0.31.9) (2022-11-01)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** `startsWith` and `endsWith` to filterOperatorsForMember ([#5544](https://github.com/cube-js/cube.js/issues/5544)) ([583de4a](https://github.com/cube-js/cube.js/commit/583de4a58c841542f3138c5ce836dbfedd19d4de))
+
+
+
+
+
 ## [0.31.8](https://github.com/cube-js/cube.js/compare/v0.31.7...v0.31.8) (2022-10-30)
 
 **Note:** Version bump only for package @cubejs-client/core

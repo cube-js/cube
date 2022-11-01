@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.9](https://github.com/cube-js/cube.js/compare/v0.31.8...v0.31.9) (2022-11-01)
+
+
+### Bug Fixes
+
+* You requested hidden member in case of rolling window measure is being used in a view ([#5546](https://github.com/cube-js/cube.js/issues/5546)) ([c00ea43](https://github.com/cube-js/cube.js/commit/c00ea432021a02638361b278f8eb24801a7a867b))
+
+
+
+
+
 ## [0.31.8](https://github.com/cube-js/cube.js/compare/v0.31.7...v0.31.8) (2022-10-30)
 
 
