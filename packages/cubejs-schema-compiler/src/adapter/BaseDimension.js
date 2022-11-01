@@ -8,6 +8,10 @@ export class BaseDimension {
     return [`${this.dimensionSql()} ${this.aliasName()}`];
   }
 
+  hasNoRemapping() {
+    return this.dimensionSql() === this.aliasName();
+  }
+
   cumulativeSelectColumns() {
     return [`${this.aliasName()}`];
   }
