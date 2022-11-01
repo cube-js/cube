@@ -434,6 +434,7 @@ jobs:
           yarn run smoke:questdb
           yarn run smoke:multidb
           yarn run smoke:lambda
+          yarn run smoke:prestodb
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
