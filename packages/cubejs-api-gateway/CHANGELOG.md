@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.10](https://github.com/cube-js/cube.js/compare/v0.31.9...v0.31.10) (2022-11-01)
+
+
+### Bug Fixes
+
+* Revert back strict shown checks behavior for consistency reasons ([#5551](https://github.com/cube-js/cube.js/issues/5551)) ([c3ee4e6](https://github.com/cube-js/cube.js/commit/c3ee4e6911d07f7d5cb8977f563555157f7b5f2b)), closes [#5542](https://github.com/cube-js/cube.js/issues/5542)
+
+
+
+
+
 ## [0.31.8](https://github.com/cube-js/cube.js/compare/v0.31.7...v0.31.8) (2022-10-30)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.31.9",
+  "version": "0.31.10",
   "description": "Cube.js e2e tests",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
