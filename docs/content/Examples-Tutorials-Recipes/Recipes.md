@@ -18,6 +18,7 @@ These recipes will show you the best practices of using Cube.js.
 - [Enforcing role-based access](/recipes/role-based-access)
 - [Enforcing column-based access](/recipes/column-based-access)
 - [Enforcing mandatory filters](/recipes/enforcing-mandatory-filters)
+- [Controlling access to cubes and views](/recipes/controlling-access-to-cubes-and-views)
 
 ### <--{"id" : "Recipes"}--> Data sources
 
