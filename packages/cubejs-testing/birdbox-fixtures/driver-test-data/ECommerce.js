@@ -74,6 +74,7 @@ cube(`ECommerce`, {
       sql: 'row_id',
       type: 'number',
       primaryKey: true,
+      shown: true,
     },
     orderId: {
       sql: 'order_id',
