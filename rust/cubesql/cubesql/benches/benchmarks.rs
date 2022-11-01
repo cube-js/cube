@@ -1,20 +1,14 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use cubesql::compile::{
-    rewrite::rules::split::SplitRulesConfig,
-    test::rewrite_engine::{cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner},
+use cubesql::compile::test::rewrite_engine::{
+    cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner,
 };
 use std::sync::Arc;
 
 macro_rules! bench_func {
-    ($NAME:expr, $QUERY:expr, $USE_ANCHORS:expr, $CRITERION:expr) => {{
+    ($NAME:expr, $QUERY:expr, $CRITERION:expr) => {{
         let context = Arc::new(futures::executor::block_on(cube_context()));
         let plan = query_to_logical_plan($QUERY, &context);
-        let rules = rewrite_rules(
-            context.clone(),
-            SplitRulesConfig {
-                use_anchors_rules: $USE_ANCHORS,
-            },
-        );
+        let rules = rewrite_rules(context.clone());
 
         $CRITERION.bench_function($NAME, |b| {
             b.iter(|| {
@@ -77,12 +71,8 @@ fn get_split_query() -> String {
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 36, 37, 38".to_string()
 }
 
-pub fn split_query_no_anchors(c: &mut Criterion) {
-    bench_func!("split_query_no_anchors", get_split_query(), false, c);
-}
-
 pub fn split_query(c: &mut Criterion) {
-    bench_func!("split_query", get_split_query(), true, c);
+    bench_func!("split_query", get_split_query(), c);
 }
 
 pub fn split_query_count_distinct(c: &mut Criterion) {
@@ -132,7 +122,7 @@ pub fn split_query_count_distinct(c: &mut Criterion) {
         GROUP BY
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 36, 37, 38".to_string();
 
-    bench_func!("split_query_count_distinct", query, true, c);
+    bench_func!("split_query_count_distinct", query, c);
 }
 
 fn get_wrapped_query() -> String {
@@ -189,16 +179,12 @@ fn get_wrapped_query() -> String {
 }
 
 pub fn wrapped_query(c: &mut Criterion) {
-    bench_func!("wrapped_query", get_wrapped_query(), true, c);
-}
-
-pub fn wrapped_query_no_anchors(c: &mut Criterion) {
-    bench_func!("wrapped_query_no_anchors", get_wrapped_query(), false, c);
+    bench_func!("wrapped_query", get_wrapped_query(), c);
 }
 
 criterion_group! {
     name = benches;
     config = Criterion::default().measurement_time(std::time::Duration::from_secs(300));
-    targets = split_query, split_query_no_anchors, split_query_count_distinct, wrapped_query, wrapped_query_no_anchors
+    targets = split_query, split_query_count_distinct, wrapped_query
 }
 criterion_main!(benches);
