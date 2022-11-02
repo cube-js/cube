@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.11](https://github.com/cube-js/cube.js/compare/v0.31.10...v0.31.11) (2022-11-02)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/prestodb-driver:** Replace double escaping in contain filter ([#5529](https://github.com/cube-js/cube.js/issues/5529)) ([7870705](https://github.com/cube-js/cube.js/commit/7870705b04697faf8cb994c0794bc86437a9e3cf)), closes [#5528](https://github.com/cube-js/cube.js/issues/5528)
+
+
+
+
+
 ## [0.31.3](https://github.com/cube-js/cube.js/compare/v0.31.2...v0.31.3) (2022-10-08)
 
 
