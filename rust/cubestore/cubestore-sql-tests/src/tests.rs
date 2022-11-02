@@ -190,6 +190,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "unique_key_and_multi_measures_for_stream_table",
             unique_key_and_multi_measures_for_stream_table,
         ),
+        t(
+            "unique_key_and_multi_partitions",
+            unique_key_and_multi_partitions,
+        ),
         t("divide_by_zero", divide_by_zero),
         t(
             "filter_multiple_in_for_decimal",
@@ -5312,6 +5316,66 @@ async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClie
     assert_eq!(
         to_rows(&r),
         rows(&[("0", 1, "text_value"), ("1", 1, "text_value")])
+    );
+}
+
+async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA test").await.unwrap();
+    service.exec_query("CREATE TABLE test.unique_parts1 (a int, b int, c int, e int, val int) unique key (a, b, c, e) ").await.unwrap();
+    service.exec_query("CREATE TABLE test.unique_parts2 (a int, b int, c int, e int, val int) unique key (a, b, c, e) ").await.unwrap();
+    service
+        .exec_query(
+            "
+            INSERT INTO test.unique_parts1
+            (a, b, c, e, val, __seq)
+            VALUES
+            (1, 1, 1, 1, 10, 1),
+            (2, 2, 2, 2, 20, 2)
+            "
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "
+            INSERT INTO test.unique_parts1
+            (a, b, c, e, val, __seq)
+            VALUES
+            (11, 11, 11, 11, 110, 11),
+            (22, 22, 22, 22, 220, 21)
+            "
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "
+            INSERT INTO test.unique_parts2
+            (a, b, c, e, val, __seq)
+            VALUES
+            (3, 3, 3, 3, 30, 3),
+            (4, 4, 4, 4, 40, 4)
+            "
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT a, b FROM (
+                    SELECT * FROM test.unique_parts1
+                    UNION ALL 
+                    SELECT * FROM test.unique_parts2
+                ) `tt` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 100",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 1), (2, 2), (3, 3), (4, 4), (11, 11), (22, 22)])
     );
 }
 
