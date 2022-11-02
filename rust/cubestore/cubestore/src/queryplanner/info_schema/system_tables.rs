@@ -257,7 +257,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 }),
             ),
             (
-                Field::new("select_statement 22", DataType::Utf8, false),
+                Field::new("select_statement", DataType::Utf8, false),
                 Box::new(|tables| {
                     Arc::new(StringArray::from(
                         tables

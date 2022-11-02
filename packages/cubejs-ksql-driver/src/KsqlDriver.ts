@@ -233,10 +233,10 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return {
       types: await this.tableColumnTypes(streamingTable),
       streamingTable,
+      selectStatement,
       streamingSource: {
         name: this.config.streamingSourceName || 'default',
         type: 'ksql',
-        selectStatement,
         credentials: {
           user: this.config.username,
           password: this.config.password,

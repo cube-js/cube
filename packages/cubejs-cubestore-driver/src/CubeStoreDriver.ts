@@ -370,7 +370,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       uniqueKey: uniqueKeyColumns.join(','),
       indexes,
       files: [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`],
-      selectStatement: tableData.streamingSource.selectStatement,
+      selectStatement: tableData.selectStatement,
       sealAt
     };
     return this.createTableWithOptions(table, columns, options, queryTracingObj);

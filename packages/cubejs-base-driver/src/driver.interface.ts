@@ -69,10 +69,10 @@ export interface StreamTableData extends DownloadTableBase {
 
 export interface StreamingSourceTableData extends DownloadTableBase {
   streamingTable: string;
+  selectStatement?: string;
   streamingSource: {
     name: string;
     type: string;
-    selectStatement?: string;
     credentials: any;
   };
   /**
