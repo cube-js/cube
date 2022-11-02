@@ -111,15 +111,15 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 
 Get the data for a query.
 
-| Parameter | Description                                                            |
-| --------- | ---------------------------------------------------------------------- |
-| query     | URL encoded Cube.js [Query](/query-format)                             |
-| queryType | If multiple queries are passed in `query`, this must be set to `multi` |
+| Parameter   | Description                                                                                                           |
+| ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `query`     | Either a single URL encoded Cube [Query](/query-format), or an array of queries                                       |
+| `queryType` | If multiple queries are passed in `query` for [data blending][ref-recipes-data-blending], this must be set to `multi` |
 
 Response
 
 - `query` - The query passed via params. It can be an array of queries and in
-  such case it will be treated as a [Data Blending](/recipes/data-blending)
+  such case it will be treated as a [Data Blending][ref-recipes-data-blending]
   query.
 - `data` - Formatted dataset of query results.
 - `annotation` - Metadata for query. Contains descriptions for all query items.
@@ -433,3 +433,5 @@ Keep-Alive: timeout=5
 
 {"health":"DOWN"}
 ```
+
+[ref-recipes-data-blending]: /recipes/data-blending
