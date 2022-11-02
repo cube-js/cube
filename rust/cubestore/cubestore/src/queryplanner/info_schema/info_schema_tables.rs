@@ -62,6 +62,27 @@ impl InfoSchemaTableDef for TablesInfoSchemaTableDef {
                     ))
                 }),
             ),
+            (
+                Field::new(
+                    "seal_at",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Box::new(|tables| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        tables
+                            .iter()
+                            .map(|row| {
+                                row.table
+                                    .get_row()
+                                    .seal_at()
+                                    .as_ref()
+                                    .map(|t| t.timestamp_nanos())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
         ]
     }
 }

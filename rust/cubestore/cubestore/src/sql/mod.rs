@@ -218,6 +218,8 @@ impl SqlServiceImpl {
         locations: Option<Vec<String>>,
         import_format: Option<ImportFormat>,
         build_range_end: Option<DateTime<Utc>>,
+        seal_at: Option<DateTime<Utc>>,
+        select_statement: Option<String>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
         aggregates: Option<Vec<(Ident, Ident)>>,
@@ -301,6 +303,8 @@ impl SqlServiceImpl {
                     indexes_to_create,
                     true,
                     build_range_end,
+                    seal_at,
+                    select_statement,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                     aggregates.map(|keys| {
                         keys.iter()
@@ -357,6 +361,8 @@ impl SqlServiceImpl {
                 indexes_to_create,
                 false,
                 build_range_end,
+                seal_at,
+                select_statement,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 aggregates.map(|keys| {
                     keys.iter()
@@ -860,6 +866,30 @@ impl SqlService for SqlServiceImpl {
                         ))),
                     })?;
 
+                let seal_at = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "seal_at")
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(seal_at) => {
+                            let ts = timestamp_from_string(seal_at)?;
+                            let utc = Utc.timestamp_nanos(ts.get_time_stamp());
+                            Result::Ok(Some(utc))
+                        }
+                        _ => Result::Err(CubeError::user(format!("Bad seal_at {}", option.value))),
+                    })?;
+                let select_statement = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "select_statement")
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(select_statement) => {
+                            Result::Ok(Some(select_statement.clone()))
+                        }
+                        _ => Result::Err(CubeError::user(format!(
+                            "Bad select_statement {}",
+                            option.value
+                        ))),
+                    })?;
+
                 let res = self
                     .create_table(
                         schema_name.clone(),
@@ -869,6 +899,8 @@ impl SqlService for SqlServiceImpl {
                         locations,
                         Some(import_format),
                         build_range_end,
+                        seal_at,
+                        select_statement,
                         indexes,
                         unique_key,
                         aggregates,
@@ -958,7 +990,8 @@ impl SqlService for SqlServiceImpl {
                                 user,
                                 password,
                                 url: url.ok_or(CubeError::user(
-                                    "url is required as credential for ksql source".to_string(),
+                                    "url is required as credential for select_statement source"
+                                        .to_string(),
                                 ))?,
                             })
                         }
@@ -1801,6 +1834,95 @@ mod tests {
                 TableValue::String("true".to_string()),
                 TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("false".to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("".to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
+            ]));
+        }
+        let _ = DB::destroy(&Options::default(), path);
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    #[tokio::test]
+    async fn create_table_test_seal_at() {
+        let config = Config::test("create_table_test_seal_at");
+        let path = "/tmp/test_create_table_seal_at";
+        let _ = DB::destroy(&Options::default(), path);
+        let store_path = path.to_string() + &"_store".to_string();
+        let remote_store_path = path.to_string() + &"remote_store".to_string();
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        {
+            let remote_fs = LocalDirRemoteFs::new(
+                Some(PathBuf::from(remote_store_path.clone())),
+                PathBuf::from(store_path.clone()),
+            );
+            let meta_store = RocksMetaStore::new(
+                path,
+                RocksMetaStoreFs::new(remote_fs.clone()),
+                config.config_obj(),
+            );
+            let rows_per_chunk = 10;
+            let query_timeout = Duration::from_secs(30);
+            let chunk_store = ChunkStore::new(
+                meta_store.clone(),
+                remote_fs.clone(),
+                Arc::new(MockCluster::new()),
+                config.config_obj(),
+                rows_per_chunk,
+            );
+            let limits = Arc::new(ConcurrencyLimits::new(4));
+            let service = SqlServiceImpl::new(
+                meta_store.clone(),
+                chunk_store,
+                limits,
+                Arc::new(MockQueryPlanner::new()),
+                Arc::new(MockQueryExecutor::new()),
+                Arc::new(MockCluster::new()),
+                Arc::new(MockImportService::new()),
+                config.config_obj(),
+                remote_fs.clone(),
+                rows_per_chunk,
+                query_timeout,
+                query_timeout,
+                10_000, // max_cached_queries
+            );
+            let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+            assert_eq!(
+                i.get_rows()[0],
+                Row::new(vec![
+                    TableValue::Int(1),
+                    TableValue::String("Foo".to_string())
+                ])
+            );
+            let query = "CREATE TABLE Foo.Persons (
+                                PersonID int,
+                                LastName varchar(255),
+                                FirstName varchar(255),
+                                Address varchar(255),
+                                City varchar(255)
+                              ) WITH (seal_at='2022-10-05T01:00:00.000Z', select_statement='SELECT * FROM test WHERE created_at > \\'2022-05-01 00:00:00\\'');";
+            let i = service.exec_query(&query.to_string()).await.unwrap();
+            assert_eq!(i.get_rows()[0], Row::new(vec![
+                TableValue::Int(1),
+                TableValue::String("Persons".to_string()),
+                TableValue::String("1".to_string()),
+                TableValue::String("[{\"name\":\"PersonID\",\"column_type\":\"Int\",\"column_index\":0},{\"name\":\"LastName\",\"column_type\":\"String\",\"column_index\":1},{\"name\":\"FirstName\",\"column_type\":\"String\",\"column_index\":2},{\"name\":\"Address\",\"column_type\":\"String\",\"column_index\":3},{\"name\":\"City\",\"column_type\":\"String\",\"column_index\":4}]".to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("false".to_string()),
+                TableValue::String("true".to_string()),
+                TableValue::String(meta_store.get_table("Foo".to_string(), "Persons".to_string()).await.unwrap().get_row().created_at().as_ref().unwrap().to_string()),
+                TableValue::String("NULL".to_string()),
+                TableValue::String("2022-10-05 01:00:00 UTC".to_string()),
+                TableValue::String("false".to_string()),
+                TableValue::String("SELECT * FROM test WHERE created_at > '2022-05-01 00:00:00'".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),

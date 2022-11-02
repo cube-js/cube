@@ -7,6 +7,7 @@ import csvWriter from 'csv-write-stream';
 import {
   BaseDriver,
   DownloadTableCSVData,
+  ExternalCreateTableOptions,
   DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
   StreamTableData,
   DriverCapabilities,
@@ -39,6 +40,8 @@ type CreateTableOptions = {
   indexes?: string
   files?: string[]
   aggregations?: string
+  selectStatement?: string
+  sealAt?: string
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
@@ -91,6 +94,12 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
     if (options.buildRangeEnd) {
       withEntries.push(`build_range_end = '${options.buildRangeEnd}'`);
+    }
+    if (options.sealAt) {
+      withEntries.push(`seal_at = '${options.sealAt}'`);
+    }
+    if (options.selectStatement) {
+      withEntries.push(`select_statement = '${options.selectStatement.replaceAll('\'', '\\\'')}'`);
     }
     if (withEntries.length > 0) {
       sql = `${sql} WITH (${withEntries.join(', ')})`;
@@ -163,7 +172,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns: string[] | null, queryTracingObj?: any, aggregationsColumns?: string[], createTableIndexes?: CreateTableIndex[]) {
+  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns: string[] | null, queryTracingObj?: any, externalOptions?: ExternalCreateTableOptions) {
+    const createTableIndexes = externalOptions?.createTableIndexes;
+    const aggregationsColumns = externalOptions?.aggregationsColumns;
+
     const indexes = createTableIndexes && createTableIndexes.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
 
     let hasAggregatingIndexes = false;
@@ -178,7 +190,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     } else if (tableData.csvFile) {
       await this.importCsvFile(tableData, table, columns, indexes, aggregations, queryTracingObj);
     } else if (tableData.streamingSource) {
-      await this.importStreamingSource(columns, tableData, table, indexes, uniqueKeyColumns, queryTracingObj);
+      await this.importStreamingSource(columns, tableData, table, indexes, uniqueKeyColumns, queryTracingObj, externalOptions?.sealAt);
     } else if (tableData.rows) {
       await this.importRows(table, columns, indexes, aggregations, tableData, queryTracingObj);
     } else {
@@ -340,7 +352,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns: string[] | null, queryTracingObj?: any) {
+  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns: string[] | null, queryTracingObj?: any, sealAt?: string) {
     if (!uniqueKeyColumns) {
       throw new Error('Older version of orchestrator is being used with newer version of Cube Store driver. Please upgrade cube.js.');
     }
@@ -352,12 +364,14 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
         ),
       queryTracingObj
     );
-
+    
     const options: CreateTableOptions = {
       buildRangeEnd: queryTracingObj?.buildRangeEnd,
       uniqueKey: uniqueKeyColumns.join(','),
       indexes,
       files: [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`],
+      selectStatement: tableData.selectStatement,
+      sealAt
     };
     return this.createTableWithOptions(table, columns, options, queryTracingObj);
   }

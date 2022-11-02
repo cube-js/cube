@@ -177,7 +177,7 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
     await connection.uploadTableWithIndexes(
       preAggregation.tableName,
       columns,
-      { rows: [] }, preAggregation.indexesSql, preAggregation.uniqueKeyColumns, {}, preAggregation.aggregationsColumns, preAggregation.createTableIndexes
+      { rows: [] }, preAggregation.indexesSql, preAggregation.uniqueKeyColumns, {}, { aggregationsColumns: preAggregation.aggregationsColumns, createTableIndexes: preAggregation.createTableIndexes }
     );
 
     // eslint-disable-next-line camelcase

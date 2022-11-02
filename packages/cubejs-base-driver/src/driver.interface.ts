@@ -69,6 +69,7 @@ export interface StreamTableData extends DownloadTableBase {
 
 export interface StreamingSourceTableData extends DownloadTableBase {
   streamingTable: string;
+  selectStatement?: string;
   streamingSource: {
     name: string;
     type: string;
@@ -137,6 +138,12 @@ export type QueryOptions = {
   inlineTables?: InlineTables,
   [key: string]: any
 };
+
+export type ExternalCreateTableOptions = {
+  aggregationsColumns?: string[],
+  createTableIndexes?: CreateTableIndex[],
+  sealAt?: string
+};
 export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData | StreamTableDataWithTypes);
 
 // eslint-disable-next-line camelcase
@@ -145,7 +152,7 @@ export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<any>;
   uploadTableWithIndexes(
-    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], queryTracingObj: any, aggregationsColumns: string[], createTableIndexes: CreateTableIndex[]
+    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], queryTracingObj: any, externalOptions: ExternalCreateTableOptions
   ): Promise<void>;
   loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
   //

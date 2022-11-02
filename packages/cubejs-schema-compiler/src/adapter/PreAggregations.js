@@ -148,6 +148,7 @@ export class PreAggregations {
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
+    const partitionInvalidateKeyQueries = this.query.partitionInvalidateKeyQueries && this.query.partitionInvalidateKeyQueries(cube, preAggregation);
 
     const matchedTimeDimension =
       preAggregation.partitionGranularity &&
@@ -176,6 +177,7 @@ export class PreAggregations {
       timestampFormat: queryForSqlEvaluation.timestampFormat(),
       tableName,
       invalidateKeyQueries,
+      partitionInvalidateKeyQueries,
       type: preAggregation.type,
       external: preAggregation.external,
       previewSql: this.query.preAggregationPreviewSql(tableName),
@@ -188,6 +190,8 @@ export class PreAggregations {
       // in fact we can reference preAggregation.granularity however accessing timeDimensions is more strict and consistent
       granularity: references.timeDimensions[0]?.granularity,
       partitionGranularity: preAggregation.partitionGranularity,
+      updateWindowSeconds: preAggregation.refreshKey && preAggregation.refreshKey.updateWindow &&
+        this.query.parseSecondDuration(preAggregation.refreshKey.updateWindow),
       preAggregationStartEndQueries:
         (preAggregation.partitionGranularity || references.timeDimensions[0]?.granularity) &&
         this.refreshRangeQuery().preAggregationStartEndQueries(cube, preAggregation),

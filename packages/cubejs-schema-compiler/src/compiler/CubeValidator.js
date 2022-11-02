@@ -213,12 +213,14 @@ const OriginalSqlSchema = condition(
     (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
       timeDimensionReference: Joi.func().required(),
       allowNonStrictDateRangeMatch: Joi.bool(),
     }),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
       timeDimension: Joi.func().required(),
       allowNonStrictDateRangeMatch: Joi.bool(),

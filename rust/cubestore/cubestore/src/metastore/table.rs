@@ -122,6 +122,12 @@ pub struct Table {
     #[serde(default)]
     build_range_end: Option<DateTime<Utc>>,
     #[serde(default)]
+    seal_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    sealed: bool,
+    #[serde(default)]
+    select_statement: Option<String>,
+    #[serde(default)]
     unique_key_column_indices: Option<Vec<u64>>,
     #[serde(default)]
     aggregate_column_indices: Vec<AggregateColumnIndex>,
@@ -157,6 +163,8 @@ impl Table {
         import_format: Option<ImportFormat>,
         is_ready: bool,
         build_range_end: Option<DateTime<Utc>>,
+        seal_at: Option<DateTime<Utc>>,
+        select_statement: Option<String>,
         unique_key_column_indices: Option<Vec<u64>>,
         aggregate_column_indices: Vec<AggregateColumnIndex>,
         seq_column_index: Option<u64>,
@@ -173,6 +181,9 @@ impl Table {
             is_ready,
             created_at: Some(Utc::now()),
             build_range_end,
+            seal_at,
+            select_statement,
+            sealed: false,
             unique_key_column_indices,
             aggregate_column_indices,
             seq_column_index,
@@ -220,6 +231,12 @@ impl Table {
         table
     }
 
+    pub fn update_sealed(&self, sealed: bool) -> Self {
+        let mut table = self.clone();
+        table.sealed = sealed;
+        table
+    }
+
     pub fn update_location_download_size(
         &self,
         location: &str,
@@ -262,6 +279,18 @@ impl Table {
 
     pub fn build_range_end(&self) -> &Option<DateTime<Utc>> {
         &self.build_range_end
+    }
+
+    pub fn seal_at(&self) -> &Option<DateTime<Utc>> {
+        &self.seal_at
+    }
+
+    pub fn select_statement(&self) -> &Option<String> {
+        &self.select_statement
+    }
+
+    pub fn sealed(&self) -> bool {
+        self.sealed
     }
 
     pub fn unique_key_columns(&self) -> Option<Vec<&Column>> {

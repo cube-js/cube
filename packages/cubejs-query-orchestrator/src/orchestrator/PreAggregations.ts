@@ -184,6 +184,8 @@ export type PreAggregationDescription = {
   expandedPartition: boolean;
   unionWithSourceData: LambdaOptions;
   buildRangeEnd?: string;
+  updateWindowSeconds?: number;
+  sealAt?: string;
 };
 
 const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -607,7 +609,8 @@ export class PreAggregationLoader {
   }
 
   protected async loadPreAggregationWithKeys(): Promise<LoadPreAggregationResult> {
-    const invalidationKeys = await this.getInvalidationKeyValues();
+    const invalidationKeys = await this.getPartitionInvalidationKeyValues();
+
     const contentVersion = this.contentVersion(invalidationKeys);
     const structureVersion = getStructureVersion(this.preAggregation);
 
@@ -762,6 +765,18 @@ export class PreAggregationLoader {
         (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
       )
     );
+  }
+
+  protected getPartitionInvalidationKeyValues() {
+    if (this.preAggregation.partitionInvalidateKeyQueries) {
+      return Promise.all(
+        (this.preAggregation.partitionInvalidateKeyQueries || []).map(
+          (sqlQuery) => this.loadCache.keyQueryResult(sqlQuery, this.waitForRenew, this.priority(10))
+        )
+      );
+    } else {
+      return this.getInvalidationKeyValues();
+    }
   }
 
   protected scheduleRefresh(invalidationKeys, newVersionEntry) {
@@ -1207,8 +1222,11 @@ export class PreAggregationLoader {
         this.prepareIndexesSql(newVersionEntry, queryOptions),
         this.preAggregation.uniqueKeyColumns,
         queryOptions,
-        this.preAggregation.aggregationsColumns,
-        this.prepareCreateTableIndexes(newVersionEntry),
+        {
+          aggregationsColumns: this.preAggregation.aggregationsColumns,
+          createTableIndexes: this.prepareCreateTableIndexes(newVersionEntry),
+          sealAt: this.preAggregation.sealAt
+        }
       )
     ).catch((error: any) => {
       this.logger('Uploading external pre-aggregation error', { ...queryOptions, error: error?.stack || error?.message });
@@ -1482,7 +1500,9 @@ export class PreAggregationPartitionRangeLoader {
     if (this.preAggregation.unionWithSourceData && buildRangeEnd < range[1]) {
       loadRange[1] = buildRangeEnd;
     }
-
+    const sealAt = addSecondsToLocalTimestamp(
+      loadRange[1], this.preAggregation.timezone, this.preAggregation.updateWindowSeconds || 0
+    ).toISOString();
     return {
       ...this.preAggregation,
       tableName: partitionTableName,
@@ -1497,6 +1517,7 @@ export class PreAggregationPartitionRangeLoader {
       previewSql: this.preAggregation.previewSql &&
         this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
       buildRangeEnd,
+      sealAt, // Used only for kSql pre aggregations
     };
   }
 

@@ -224,6 +224,55 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                     ))
                 }),
             ),
+            (
+                Field::new(
+                    "seal_at",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Box::new(|tables| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        tables
+                            .iter()
+                            .map(|row| {
+                                row.table
+                                    .get_row()
+                                    .seal_at()
+                                    .as_ref()
+                                    .map(|t| t.timestamp_nanos())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("sealed", DataType::Boolean, false),
+                Box::new(|tables| {
+                    Arc::new(BooleanArray::from(
+                        tables
+                            .iter()
+                            .map(|row| row.table.get_row().sealed())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("select_statement", DataType::Utf8, false),
+                Box::new(|tables| {
+                    Arc::new(StringArray::from(
+                        tables
+                            .iter()
+                            .map(|row| {
+                                row.table
+                                    .get_row()
+                                    .select_statement()
+                                    .as_ref()
+                                    .map(|t| t.as_str())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
         ]
     }
 }

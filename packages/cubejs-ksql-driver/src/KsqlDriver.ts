@@ -12,7 +12,7 @@ import {
   BaseDriver, DriverCapabilities,
   DriverInterface,
 } from '@cubejs-backend/base-driver';
-import { format as formatSql } from 'sqlstring';
+import sqlstring, { format as formatSql } from 'sqlstring';
 import axios, { AxiosResponse } from 'axios';
 import { Mutex } from 'async-mutex';
 import { KsqlQuery } from './KsqlQuery';
@@ -125,6 +125,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     const { data } = await this.apiQuery('/ksql', {
       ksql: `${formatSql(query, values)};`,
     });
+    
     return data[0];
   }
 
@@ -224,13 +225,15 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unable to detect a source table for ksql download query. In order to query ksql use "SELECT * FROM <TABLE>"');
     }
 
-    return this.getStreamingTableData(table);
+    const selectStatement = sqlstring.format(query, params);
+    return this.getStreamingTableData(table, selectStatement);
   }
 
-  private async getStreamingTableData(streamingTable: string) {
+  private async getStreamingTableData(streamingTable: string, selectStatement?: string) {
     return {
       types: await this.tableColumnTypes(streamingTable),
       streamingTable,
+      selectStatement,
       streamingSource: {
         name: this.config.streamingSourceName || 'default',
         type: 'ksql',
