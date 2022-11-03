@@ -148,9 +148,9 @@ export class CubeStoreQuery extends BaseQuery {
         wrappedGranularity: timeDimension?.granularity || rollupGranularity,
         rollupGranularity: granularityOverride,
         topLevelMerge: false,
-        renderedReference: {
+        renderedReference: timeDimension ? {
           [timeDimension.dimension]: timeDimension.cumulativeSelectColumns()[0]
-        }
+        } : undefined
       }
     );
   }

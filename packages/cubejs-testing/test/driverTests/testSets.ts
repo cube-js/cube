@@ -51,7 +51,7 @@ import {
   filteringECommerceEndsWithDimensionsFirst,
   filteringECommerceEndsWithDimensionsSecond,
   filteringECommerceEndsWithDimensionsThird,
-  queryingEcommerceTotalQuantifyAvgDiscountTotal, hiddenMember, hiddenCube,
+  queryingEcommerceTotalQuantifyAvgDiscountTotal, hiddenMember, hiddenCube, preAggsCustomersRunningTotal,
 } from './tests';
 import { testSet } from './driverTest';
 
@@ -118,7 +118,7 @@ const withoutOrderingTestSet = testSet([
   filteringECommerceStartsWithDimensionsThird,
   filteringECommerceEndsWithDimensionsFirst,
   filteringECommerceEndsWithDimensionsSecond,
-  filteringECommerceEndsWithDimensionsThird
+  filteringECommerceEndsWithDimensionsThird,
 ]);
 
 export const mainTestSet = testSet([
@@ -127,6 +127,10 @@ export const mainTestSet = testSet([
   ...withoutOrderingTestSet,
   hiddenMember,
   hiddenCube,
+]);
+
+export const preAggsTestSet = testSet([
+  preAggsCustomersRunningTotal,
 ]);
 
 export const productionTestSet = testSet([
