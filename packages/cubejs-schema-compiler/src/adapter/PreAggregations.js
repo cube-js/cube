@@ -345,9 +345,8 @@ export class PreAggregations {
       dimensionsList.concat(segmentsList).reduce((map, d) => map.set(d, 1), new Map())
     );
 
-    filterDimensionsSingleValueEqual = new Set(
-      allValuesEq1(filterDimensionsSingleValueEqual) ? filterDimensionsSingleValueEqual?.keys() : null
-    );
+    filterDimensionsSingleValueEqual =
+      allValuesEq1(filterDimensionsSingleValueEqual) ? new Set(filterDimensionsSingleValueEqual?.keys()) : null;
 
     return {
       sortedDimensions,
@@ -475,13 +474,13 @@ export class PreAggregations {
      * @type {Set<string>}
      */
     const filterDimensionsSingleValueEqual =
-      transformedQuery.filterDimensionsSingleValueEqual instanceof Set
+      transformedQuery.filterDimensionsSingleValueEqual && (transformedQuery.filterDimensionsSingleValueEqual instanceof Set
         ? transformedQuery.filterDimensionsSingleValueEqual
         : new Set(
           Object.keys(
             transformedQuery.filterDimensionsSingleValueEqual || {},
           )
-        );
+        ));
 
     /**
      * Determine whether pre-aggregation can be used or not.
@@ -507,8 +506,11 @@ export class PreAggregations {
         transformedQuery.isAdditive ||
         R.equals(transformedQuery.timeDimensions, refTimeDimensions)
       ) && (
+        filterDimensionsSingleValueEqual &&
         references.dimensions.length === filterDimensionsSingleValueEqual.size &&
-        R.all(d => filterDimensionsSingleValueEqual.has(d), references.dimensions)
+        R.all(d => filterDimensionsSingleValueEqual.has(d), references.dimensions) ||
+        transformedQuery.allFiltersWithinSelectedDimensions &&
+        R.equals(references.sortedDimensions || references.dimensions, transformedQuery.sortedDimensions)
       ) && (
         R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.measures) ||
         R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures)
