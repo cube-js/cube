@@ -1183,6 +1183,16 @@ export const filteringECommerceEndsWithDimensionsThird = driverTest({
   schemas: commonSchemas
 });
 
+export const preAggsCustomersRunningTotal = driverTest({
+  name: 'pre-aggregations Customers: running total without time dimension',
+  query: {
+    measures: [
+      'Customers.runningTotal'
+    ]
+  },
+  schemas: commonSchemas
+});
+
 export const queryingEcommerceTotalQuantifyAvgDiscountTotal = driverTestWithError({
   name: 'querying ECommerce: total quantity, avg discount, total ' +
   'sales, total profit by product + order + total -- noisy ' +
