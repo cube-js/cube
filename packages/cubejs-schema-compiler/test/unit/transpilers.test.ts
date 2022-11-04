@@ -8,12 +8,15 @@ describe('Transpilers', () => {
           sql: 'select * from test',
           dimensions: {
             test1: {
+              sql: 'test_1',
               type: 'number'
             },
             'test1': {
+              sql: 'test_1',
               type: 'number'
             },
             test2: {
+              sql: 'test_2',
               type: 'number'
             },
           }
@@ -36,6 +39,7 @@ describe('Transpilers', () => {
           sql: \`select * from test \${USER_CONTEXT.test1.filter('test1')}\`,
           dimensions: {
             test1: {
+              sql: 'test_1',
               type: 'number'
             },
           }

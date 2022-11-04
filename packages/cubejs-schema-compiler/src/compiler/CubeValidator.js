@@ -499,10 +499,10 @@ const cubeSchema = Joi.object().keys({
     inherit(BaseDimensionWithoutSubQuery, {
       latitude: Joi.object().keys({
         sql: Joi.func().required()
-      }),
+      }).required(),
       longitude: Joi.object().keys({
         sql: Joi.func().required()
-      })
+      }).required()
     }),
     inherit(BaseDimension, {
       sql: Joi.func().required()
