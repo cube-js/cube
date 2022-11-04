@@ -35,10 +35,11 @@ concurrency.
 
 <InfoBox>
 
-To start building pre-aggregations, Cube.js requires write access to the
+To start building pre-aggregations, depending on your data source, Cube.js may require write access to the
 [pre-aggregations schema][ref-config-preagg-schema] in the source database.
-Cube.js first builds pre-aggregations as tables in the source database and then
+In this case Cube.js first builds pre-aggregations as tables in the source database and then
 exports them into the pre-aggregations storage.
+Please refer to the documentation for your specific driver to learn more about read-only support and pre-aggregation build strategies.
 
 </InfoBox>
 
