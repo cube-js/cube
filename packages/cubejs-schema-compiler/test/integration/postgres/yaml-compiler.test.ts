@@ -57,6 +57,49 @@ cubes:
     );
   });
 
+  it('with filter', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: ActiveUsers
+    sql: "SELECT 1 as user_id, '2022-01-01'::timestamptz as timestamp"
+    
+    measures:
+      - name: withFilter
+        sql: "{CUBE}.user_id"
+        type: countDistinct
+        filters:
+          - sql: "{CUBE}.user_id > 10"
+
+    dimensions:
+      - name: time
+        sql: "{CUBE}.timestamp"
+        type: time
+    `);
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['ActiveUsers.withFilter'],
+      timeDimensions: [{
+        dimension: 'ActiveUsers.time',
+        granularity: 'day',
+        dateRange: ['2022-01-01', '2022-01-03']
+      }],
+      timezone: 'UTC'
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    const res = await dbRunner.testQuery(query.buildSqlAndParams());
+    console.log(JSON.stringify(res));
+
+    expect(res).toEqual(
+      [{
+        active_users__time_day: '2022-01-01T00:00:00.000Z',
+        active_users__with_filter: '0',
+      }]
+    );
+  });
+
   it('member reference', async () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
 cubes:
