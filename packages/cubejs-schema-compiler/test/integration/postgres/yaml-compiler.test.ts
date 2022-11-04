@@ -57,6 +57,27 @@ cubes:
     );
   });
 
+  it('missed sql', async () => {
+    const { compiler } = prepareYamlCompiler(`
+cubes:
+  - name: ActiveUsers
+    sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
+    
+    measures:
+      - name: weeklyActive
+        sql: "{CUBE}.user_id"
+        type: countDistinct
+        rollingWindow:
+          trailing: 7 day
+          offset: start
+
+    dimensions:
+      - name: time
+        type: time
+    `);
+    expect(() => compiler.compile()).rejects.toThrow(/sql.*is required/);
+  });
+
   it('with filter', async () => {
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
 cubes:
