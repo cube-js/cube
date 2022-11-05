@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.12](https://github.com/cube-js/cube.js/compare/v0.31.11...v0.31.12) (2022-11-05)
+
+
+### Features
+
+* **cubesql:** Support Skyvia date granularities ([df69d93](https://github.com/cube-js/cube.js/commit/df69d93e3f0c016d4767e0509ca523b60bc74099))
+
+
+
+
+
 ## [0.31.10](https://github.com/cube-js/cube.js/compare/v0.31.9...v0.31.10) (2022-11-01)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.12](https://github.com/cube-js/cube.js/compare/v0.31.11...v0.31.12) (2022-11-05)
+
+
+### Bug Fixes
+
+* TypeError: Cannot read property 'dimension' of undefined for rolling window rollup without time dimension ([#5553](https://github.com/cube-js/cube.js/issues/5553)) ([03c3b6f](https://github.com/cube-js/cube.js/commit/03c3b6f4197ff8e6a77fc6bb7c08e4730cbfde66))
+
+
+
+
+
 ## [0.31.11](https://github.com/cube-js/cube.js/compare/v0.31.10...v0.31.11) (2022-11-02)
 
 

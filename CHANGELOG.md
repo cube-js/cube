@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.12](https://github.com/cube-js/cube.js/compare/v0.31.11...v0.31.12) (2022-11-05)
+
+
+### Bug Fixes
+
+* Cannot read property 'apply' of undefined on missed dimension sql ([#5559](https://github.com/cube-js/cube.js/issues/5559)) ([6f85096](https://github.com/cube-js/cube.js/commit/6f850967ba834bbdd87284fa957859d66d19344a))
+* YAML filter support ([fb6fade](https://github.com/cube-js/cube.js/commit/fb6fade4bfa5b0fb2e3b6895e378aef97ea26f95))
+* **cubestore:** Fix partition pruning ([#5548](https://github.com/cube-js/cube.js/issues/5548)) ([8bc4aee](https://github.com/cube-js/cube.js/commit/8bc4aeeff5502d2e17763bf503ebe396227b48ae))
+* No column found in case non equals filter query incorrectly matched against rollup with no dimensions ([#5552](https://github.com/cube-js/cube.js/issues/5552)) ([73b3203](https://github.com/cube-js/cube.js/commit/73b3203925bf9d8221001f730bb23272dd4e47e6))
+* TypeError: Cannot read property 'dimension' of undefined for rolling window rollup without time dimension ([#5553](https://github.com/cube-js/cube.js/issues/5553)) ([03c3b6f](https://github.com/cube-js/cube.js/commit/03c3b6f4197ff8e6a77fc6bb7c08e4730cbfde66))
+
+
+### Features
+
+* Trino driver ([e58c392](https://github.com/cube-js/cube.js/commit/e58c3924781b65f5631ee241b39a0bee1366273d))
+* **cubesql:** Support Skyvia date granularities ([df69d93](https://github.com/cube-js/cube.js/commit/df69d93e3f0c016d4767e0509ca523b60bc74099))
+
+
+
+
+
 ## [0.31.11](https://github.com/cube-js/cube.js/compare/v0.31.10...v0.31.11) (2022-11-02)
 
 

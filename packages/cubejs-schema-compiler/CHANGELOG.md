@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.12](https://github.com/cube-js/cube.js/compare/v0.31.11...v0.31.12) (2022-11-05)
+
+
+### Bug Fixes
+
+* Cannot read property 'apply' of undefined on missed dimension sql ([#5559](https://github.com/cube-js/cube.js/issues/5559)) ([6f85096](https://github.com/cube-js/cube.js/commit/6f850967ba834bbdd87284fa957859d66d19344a))
+* No column found in case non equals filter query incorrectly matched against rollup with no dimensions ([#5552](https://github.com/cube-js/cube.js/issues/5552)) ([73b3203](https://github.com/cube-js/cube.js/commit/73b3203925bf9d8221001f730bb23272dd4e47e6))
+* YAML filter support ([fb6fade](https://github.com/cube-js/cube.js/commit/fb6fade4bfa5b0fb2e3b6895e378aef97ea26f95))
+
+
+
+
+
 ## [0.31.11](https://github.com/cube-js/cube.js/compare/v0.31.10...v0.31.11) (2022-11-02)
 
 
