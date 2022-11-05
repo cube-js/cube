@@ -14,6 +14,7 @@ module.exports = {
   hive: '@cubejs-backend/hive-driver',
   snowflake: '@cubejs-backend/snowflake-driver',
   prestodb: '@cubejs-backend/prestodb-driver',
+  trino: '@cubejs-backend/trino-driver',
   oracle: '@cubejs-backend/oracle-driver',
   sqlite: '@cubejs-backend/sqlite-driver',
   awselasticsearch: '@cubejs-backend/elasticsearch-driver',

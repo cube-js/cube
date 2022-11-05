@@ -4,38 +4,65 @@
  * @fileoverview The `PrestoDriver` and related types declaration.
  */
 
-const {
+import {
+  DownloadQueryResultsOptions, DownloadQueryResultsResult,
+  DriverCapabilities, DriverInterface,
+  StreamOptions,
+  StreamTableData,
+  TableStructure,
+  BaseDriver
+} from '@cubejs-backend/base-driver';
+import {
   getEnv,
   assertDataSource,
-} = require('@cubejs-backend/shared');
-const presto = require('presto-client');
-const {
+} from '@cubejs-backend/shared';
+import { Transform, TransformCallback } from 'stream';
+import {
   map, zipObj, prop, concat
-} = require('ramda');
-const { BaseDriver } = require('@cubejs-backend/base-driver');
-const SqlString = require('sqlstring');
+} from 'ramda';
+import SqlString from 'sqlstring';
+
+const presto = require('presto-client');
+
+export type PrestoDriverConfiguration = {
+  host?: string;
+  port?: string;
+  catalog?: string;
+  schema?: string;
+  user?: string;
+  // eslint-disable-next-line camelcase
+  basic_auth?: { user: string, password: string };
+  ssl?: string;
+  dataSource?: string;
+};
 
 /**
  * Presto driver class.
  */
-class PrestoDriver extends BaseDriver {
+export class PrestoDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns default concurrency value.
    */
-  static getDefaultConcurrency() {
+  public static getDefaultConcurrency() {
     return 2;
   }
+
+  private config: PrestoDriverConfiguration;
+
+  private catalog: string | undefined;
+
+  private client: any;
 
   /**
    * Class constructor.
    */
-  constructor(config = {}) {
+  public constructor(config: PrestoDriverConfiguration = {}) {
     super();
 
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-      
+
     this.config = {
       host: getEnv('dbHost', { dataSource }),
       port: getEnv('dbPort', { dataSource }),
@@ -59,10 +86,10 @@ class PrestoDriver extends BaseDriver {
     this.client = new presto.Client(this.config);
   }
 
-  testConnection() {
+  public testConnection() {
     const query = SqlString.format('show catalogs like ?', [`%${this.catalog}%`]);
 
-    return this.queryPromised(query)
+    return (<Promise<any[]>> this.queryPromised(query, false))
       .then(catalogs => {
         if (catalogs.length === 0) {
           throw new Error(`Catalog not found '${this.catalog}'`);
@@ -70,40 +97,96 @@ class PrestoDriver extends BaseDriver {
       });
   }
 
-  query(query, values) {
-    const queryWithParams = SqlString.format(query, (values || []).map(value => (typeof s === 'string' ? {
-      toSqlString: () => SqlString.escape(value).replace(/\\\\([_%])/g, '\\$1')
-    } : value)));
-
-    return this.queryPromised(queryWithParams);
+  public query(query: string, values: unknown[]): Promise<any[]> {
+    return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), false);
   }
 
-  queryPromised(query) {
-    return new Promise((resolve, reject) => {
-      let fullData = [];
+  public prepareQueryWithParams(query: string, values: unknown[]) {
+    return SqlString.format(query, (values || []).map(value => (typeof value === 'string' ? {
+      toSqlString: () => SqlString.escape(value).replace(/\\\\([_%])/g, '\\$1'),
+    } : value)));
+  }
 
-      this.client.execute({
-        query,
-        schema: this.config.schema || 'default',
-        data: (error, data, columns) => {
-          const normalData = this.normalizeResultOverColumns(data, columns);
-          fullData = concat(normalData, fullData);
-        },
-        success: () => {
-          resolve(fullData);
-        },
-        error: error => {
-          reject(new Error(`${error.message}\n${error.error}`));
+  public queryPromised(query: string, streaming: boolean): Promise<any[] | StreamTableData> {
+    const toError = (error: any) => new Error(error.error ? `${error.message}\n${error.error}` : error.message);
+    if (streaming) {
+      const rowStream = new Transform({
+        writableObjectMode: true,
+        readableObjectMode: true,
+
+        transform(obj: any, encoding: string, callback: TransformCallback) {
+          callback(null, obj);
         }
       });
-    });
+
+      return new Promise((resolve, reject) => {
+        this.client.execute({
+          query,
+          schema: this.config.schema || 'default',
+          columns: (error: any, columns: TableStructure) => {
+            resolve({
+              rowStream,
+              types: columns
+            });
+          },
+          data: (error: any, data: any[], columns: TableStructure) => {
+            const normalData = this.normalizeResultOverColumns(data, columns);
+            for (const obj of normalData) {
+              rowStream.write(obj);
+            }
+          },
+          success: () => {
+            rowStream.end();
+          },
+          error: (error: any) => {
+            reject(toError(error));
+          }
+        });
+      });
+    } else {
+      return new Promise((resolve, reject) => {
+        let fullData: any[] = [];
+
+        this.client.execute({
+          query,
+          schema: this.config.schema || 'default',
+          data: (error: any, data: any[], columns: TableStructure) => {
+            const normalData = this.normalizeResultOverColumns(data, columns);
+            fullData = concat(normalData, fullData);
+          },
+          success: () => {
+            resolve(fullData);
+          },
+          error: (error: any) => {
+            reject(toError(error));
+          }
+        });
+      });
+    }
   }
 
-  normalizeResultOverColumns(data, columns) {
+  public downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    if (options.streamImport) {
+      return <Promise<DownloadQueryResultsResult>> this.stream(query, values, options);
+    }
+    return super.downloadQueryResults(query, values, options);
+  }
+
+  public normalizeResultOverColumns(data: any[], columns: TableStructure) {
     const columnNames = map(prop('name'), columns || []);
     const arrayToObject = zipObj(columnNames);
     return map(arrayToObject, data || []);
   }
-}
 
-module.exports = PrestoDriver;
+  public stream(query: string, values: unknown[], _options: StreamOptions): Promise<StreamTableData> {
+    const queryWithParams = this.prepareQueryWithParams(query, values);
+
+    return <Promise<StreamTableData>> this.queryPromised(queryWithParams, true);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      unloadWithoutTempTable: true
+    };
+  }
+}

@@ -83,6 +83,12 @@
       "path": "packages/cubejs-databricks-jdbc-driver"
     },
     {
+      "path": "packages/cubejs-prestodb-driver"
+    },
+    {
+      "path": "packages/cubejs-trino-driver"
+    },
+    {
       "path": "rust/cubestore"
     },
     {

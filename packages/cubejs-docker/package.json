@@ -28,6 +28,7 @@
     "@cubejs-backend/oracle-driver": "^0.31.11",
     "@cubejs-backend/postgres-driver": "^0.31.11",
     "@cubejs-backend/prestodb-driver": "^0.31.11",
+    "@cubejs-backend/trino-driver": "^0.31.11",
     "@cubejs-backend/questdb-driver": "^0.31.11",
     "@cubejs-backend/redshift-driver": "^0.31.11",
     "@cubejs-backend/server": "^0.31.11",
