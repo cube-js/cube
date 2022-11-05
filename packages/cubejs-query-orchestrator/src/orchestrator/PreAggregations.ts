@@ -939,7 +939,9 @@ export class PreAggregationLoader {
     withTempTable: boolean,
     dropSourceTempTable: boolean,
   ) {
-    await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
+    if (withTempTable) {
+      await client.createSchemaIfNotExists(this.preAggregation.preAggregationsSchema);
+    }
     const targetTableName = this.targetTableName(newVersionEntry);
     const queryOptions = await this.prepareWriteStrategy(
       client,
