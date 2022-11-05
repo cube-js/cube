@@ -22785,7 +22785,7 @@ preserve@^0.2.0:
   resolved "https://registry.yarnpkg.com/preserve/-/preserve-0.2.0.tgz#815ed1f6ebc65926f865b310c0713bcb3315ce4b"
   integrity sha1-gV7R9uvGWSb4ZbMQwHE7yzMVzks=
 
-presto-client@^0.12.1:
+presto-client@^0.12.2:
   version "0.12.2"
   resolved "https://registry.yarnpkg.com/presto-client/-/presto-client-0.12.2.tgz#9719064bed0bd98166ae4bf2ac2c08c0f6996544"
   integrity sha512-rmoBoxM5mSQZ06SxwEHzMM8nn8W0XQJ2YmmxU9xMOM4r7Hs9Nec72VsM+M1FIYdteU9UIi40550weGs1uiTBNA==
