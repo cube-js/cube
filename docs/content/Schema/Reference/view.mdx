@@ -8,8 +8,9 @@ subCategory: Reference
 ---
 
 Views sit on top of the data graph of cubes and create a facade of your whole
-data model with which data consumers can interact. They’re the place to define
-metrics, manage governance and data access, and control ambiguous join paths.
+data model with which data consumers can interact. They are useful for defining
+metrics, managing governance and data access, and controlling ambiguous join
+paths.
 
 <div style="text-align: center">
   <img
@@ -39,26 +40,26 @@ view(`ActiveUsers`, {
 ```
 
 You also can reference measures and dimensions one-by-one. This is helpful when
-there is a need to control the join path, apply filters and/or rename
-measures/dimensions. In the example below, we create a view `CompletedOrders`
-which filters only completed orders from the `Orders` cube and also brings in
-dimensions from the `Countries` and `Users` cubes through nested joins:
+there is a need to control the join path or to rename measures and dimensions
+from the underlying cubes. In the example below, we create a view
+`CompletedOrders` which brings in dimensions from the `Users` cube through
+nested joins:
 
 ```typescript
 view(`CompletedOrders`, {
   description: 'Count of completed orders',
 
-  // You can use filters to reduce views to the subset of the data
+  includes: [Orders.completedCount],
+
   measures: {
     count: {
-      sql: `${Orders.status}`,
-      type: `count`,
-      filters: [{ sql: `${Orders.status} = 'completed'` }],
+      sql: `${Orders.completedCount}`,
+      type: `number`,
     },
   },
 
-  // in the example below we are controlling join path
-  // and rename dimensions
+  // In the example below we are controlling the join path with a nested path
+  // to the underlying member.
   dimensions: {
     userCity: {
       sql: `${Orders.Users.city}`,
@@ -91,7 +92,7 @@ is. It is a very simple and yet useful tool that gives a hint to everyone and
 ensures that data is interpreted correctly by users.
 
 ```typescript
-view(`Active Users`, {
+view(`ActiveUsers`, {
   description: `14 days rolling count of active users`,
 });
 ```
