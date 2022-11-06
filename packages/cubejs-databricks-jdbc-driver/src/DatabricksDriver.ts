@@ -32,15 +32,23 @@ const { version } = require('../../package.json');
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
     readOnly?: boolean,
+
     // common bucket config
     bucketType?: string,
     exportBucket?: string,
     exportBucketMountDir?: string,
     pollInterval?: number,
+
+    /**
+     * The export bucket CSV file escape symbol.
+     */
+    exportBucketCsvEscapeSymbol?: string,
+
     // AWS bucket config
     awsKey?: string,
     awsSecret?: string,
     awsRegion?: string,
+    
     // Azure export bucket
     azureKey?: string,
   };
@@ -110,7 +118,14 @@ export class DatabricksDriver extends JDBCDriver {
    */
   public constructor(
     conf: Partial<DatabricksDriverConfiguration> & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
     } = {},
   ) {
@@ -159,6 +174,7 @@ export class DatabricksDriver extends JDBCDriver {
       azureKey:
         conf?.azureKey ||
         getEnv('dbExportBucketAzureKey', { dataSource }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
     };
     super(config);
     this.config = config;
@@ -309,6 +325,7 @@ export class DatabricksDriver extends JDBCDriver {
     );
 
     return {
+      exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
       csvFile,
       types,
       csvNoHeader: true,

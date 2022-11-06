@@ -61,6 +61,11 @@ export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   storeTimezone?: string,
   executionTimeout?: number,
   readOnly?: boolean,
+
+  /**
+   * The export bucket CSV file escape symbol.
+   */
+  exportBucketCsvEscapeSymbol?: string,
 };
 
 /**
@@ -116,6 +121,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.config = <Partial<Config>>{
       ...this.getInitialConfiguration(dataSource),
       executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
       ...config,
     };
     this.enabled = true;

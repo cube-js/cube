@@ -35,6 +35,11 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   exportBucket?: string
   pollTimeout?: number
   pollMaxInterval?: number
+
+  /**
+   * The export bucket CSV file escape symbol.
+   */
+  exportBucketCsvEscapeSymbol?: string
 }
 
 type AthenaDriverOptionsInitialized = Required<AthenaDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
@@ -64,7 +69,14 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    */
   public constructor(
     config: AthenaDriverOptions & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
     } = {},
   ) {
@@ -109,6 +121,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         config.pollMaxInterval ||
         getEnv('dbPollMaxInterval', { dataSource })
       ) * 1000,
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
     };
     if (this.config.exportBucket) {
       this.config.exportBucket = AthenaDriver.normalizeS3Path(this.config.exportBucket);
@@ -193,6 +206,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     });
     if (list.Contents === undefined) {
       return {
+        exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
         csvFile: [],
         types,
       };
@@ -208,6 +222,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     );
 
     return {
+      exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
       csvFile,
       types,
       csvNoHeader: true

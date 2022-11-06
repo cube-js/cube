@@ -34,6 +34,11 @@ interface BigQueryDriverOptions extends BigQueryOptions {
   location?: string,
   pollTimeout?: number,
   pollMaxInterval?: number,
+
+  /**
+   * The export bucket CSV file escape symbol.
+   */
+  exportBucketCsvEscapeSymbol?: string,
 }
 
 type BigQueryDriverOptionsInitialized =
@@ -63,7 +68,14 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
    */
   public constructor(
     config: BigQueryDriverOptions & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
     } = {}
   ) {
@@ -102,6 +114,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         config.pollMaxInterval ||
         getEnv('dbPollMaxInterval', { dataSource })
       ) * 1000,
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
     };
 
     getEnv('dbExportBucketType', {
@@ -251,12 +264,15 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     const urls = await Promise.all(files.map(async file => {
       const [url] = await file.getSignedUrl({
         action: 'read',
-        expires: new Date(new Date().getTime() + 60 * 60 * 1000)
+        expires: new Date(new Date().getTime() + 60 * 60 * 1000),
       });
       return url;
     }));
 
-    return { csvFile: urls };
+    return {
+      exportBucketCsvEscapeSymbol: this.options.exportBucketCsvEscapeSymbol,
+      csvFile: urls,
+    };
   }
 
   public async loadPreAggregationIntoTable(
