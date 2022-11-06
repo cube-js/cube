@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { DriverTests } from '@cubejs-backend/testing-shared';
 
 import { AthenaDriver } from '../src';
@@ -32,6 +33,12 @@ describe('AthenaDriver', () => {
 
   test('unload', async () => {
     await tests.testUnload();
+  });
+
+  test('unload CSV escape symbol', async () => {
+    await tests.testUnloadEscapeSymbolOp1(AthenaDriver);
+    await tests.testUnloadEscapeSymbolOp2(AthenaDriver);
+    await tests.testUnloadEscapeSymbolOp3(AthenaDriver);
   });
 
   test('unload empty', async () => {

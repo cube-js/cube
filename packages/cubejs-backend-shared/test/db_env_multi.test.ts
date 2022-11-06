@@ -669,6 +669,35 @@ describe('Multiple datasources', () => {
     );
   });
 
+  test('getEnv("dbExportBucketCsvEscapeSymbol")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '"';
+    process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '\'';
+    process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = 'wrong1';
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'default' })).toEqual('"');
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'postgres' })).toEqual('\'');
+    expect(() => getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '\'';
+    process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '"';
+    process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = 'wrong2';
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'default' })).toEqual('\'');
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'postgres' })).toEqual('"');
+    expect(() => getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL;
+    delete process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL;
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
   test('getEnv("dbExportBucketType")', () => {
     process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_TYPE = 'postgres1';

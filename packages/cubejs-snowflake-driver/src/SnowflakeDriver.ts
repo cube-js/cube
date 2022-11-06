@@ -142,6 +142,11 @@ interface SnowflakeDriverOptions {
   exportBucket?: SnowflakeDriverExportBucket,
   executionTimeout?: number,
   application: string,
+
+  /**
+   * The export bucket CSV file escape symbol.
+   */
+  exportBucketCsvEscapeSymbol?: string,
 }
 
 /**
@@ -168,7 +173,14 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    */
   public constructor(
     config: Partial<SnowflakeDriverOptions> & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
     } = {}
   ) {
@@ -199,6 +211,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       exportBucket: this.getExportBucket(dataSource),
       resultPrefetch: 1,
       executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
       application: 'CubeDev_Cube',
       ...config
     };
@@ -419,6 +432,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     if (result[0].rows_unloaded === '0') {
       return {
+        exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
         csvFile: [],
       };
     }
@@ -447,6 +461,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       );
 
       return {
+        exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
         csvFile,
       };
     }
@@ -472,7 +487,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         return url;
       }));
 
-      return { csvFile };
+      return {
+        exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
+        csvFile,
+      };
     }
 
     throw new Error('Unable to UNLOAD table, there are no files in GCS storage');

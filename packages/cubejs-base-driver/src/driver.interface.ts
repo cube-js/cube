@@ -47,16 +47,25 @@ export interface DownloadTableMemoryData extends DownloadTableBase {
 }
 
 export interface DownloadTableCSVData extends DownloadTableBase {
-  csvFile: string[];
   /**
-   * Some drivers know types of response
+   * An array of unloaded CSV data temporary URLs.
+   */
+  csvFile: string[];
+
+  /**
+   * Unloaded data fields types.
    */
   types?: TableStructure;
 
   /**
-   * Some drivers export csv files with no header row.
+   * Determine whether CSV file contains header or not.
    */
   csvNoHeader?: boolean;
+
+  /**
+   * The CSV file escape symbol.
+   */
+  exportBucketCsvEscapeSymbol?: string;
 }
 
 export interface StreamTableData extends DownloadTableBase {

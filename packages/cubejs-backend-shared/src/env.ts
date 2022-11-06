@@ -537,6 +537,17 @@ const variables: Record<string, (...args: any) => any> = {
   /** ****************************************************************
    * Export Bucket options                                           *
    ***************************************************************** */
+
+  /**
+   * Export bucket CSV escape symbol.
+   */
+  dbExportBucketCsvEscapeSymbol: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL', dataSource)]
+  ),
   
   /**
    * Export bucket storage type.

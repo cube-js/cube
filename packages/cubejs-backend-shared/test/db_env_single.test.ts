@@ -422,6 +422,23 @@ describe('Single datasources', () => {
     expect(getEnv('jdbcDriver', { dataSource: 'wrong' })).toBeUndefined();
   });
 
+  test('getEnv("dbExportBucketCsvEscapeSymbol")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '"';
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'default' })).toEqual('"');
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'postgres' })).toEqual('"');
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'wrong' })).toEqual('"');
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '\'';
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'default' })).toEqual('\'');
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'postgres' })).toEqual('\'');
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'wrong' })).toEqual('\'');
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL;
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
   test('getEnv("dbExportBucketType")', () => {
     process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE = 'default1';
     expect(getEnv('dbExportBucketType', { dataSource: 'default' })).toEqual('default1');

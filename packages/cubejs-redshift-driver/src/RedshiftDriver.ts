@@ -52,7 +52,14 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
    */
   public constructor(
     options: RedshiftDriverConfiguration & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
     } = {}
   ) {
@@ -200,6 +207,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
       if (unloadTotalRows === 0) {
         return {
+          exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
           csvFile: [],
         };
       }
@@ -227,6 +235,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         );
 
         return {
+          exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
           csvFile,
         };
       }

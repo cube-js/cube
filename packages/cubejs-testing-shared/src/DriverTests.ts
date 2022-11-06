@@ -83,6 +83,54 @@ export class DriverTests {
     expect(string.trim()).toEqual(expectedRows);
   }
 
+  public async testUnloadEscapeSymbolOp1(Driver: any) {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '"';
+    const driver = new Driver({}) as DriverInterface;
+    const query = `
+      SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
+      FROM (${DriverTests.QUERY}) AS orders
+      GROUP BY 1
+      ORDER BY 1
+    `;
+    const tableName = await this.createUnloadTable(query);
+    assert(driver.unload);
+    const data = await driver.unload(tableName, { maxFileSize: 64 });
+    expect(data.exportBucketCsvEscapeSymbol).toBe('"');
+    await driver.release();
+  }
+
+  public async testUnloadEscapeSymbolOp2(Driver: any) {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '\'';
+    const driver = new Driver({}) as DriverInterface;
+    const query = `
+      SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
+      FROM (${DriverTests.QUERY}) AS orders
+      GROUP BY 1
+      ORDER BY 1
+    `;
+    const tableName = await this.createUnloadTable(query);
+    assert(driver.unload);
+    const data = await driver.unload(tableName, { maxFileSize: 64 });
+    expect(data.exportBucketCsvEscapeSymbol).toBe('\'');
+    await driver.release();
+  }
+
+  public async testUnloadEscapeSymbolOp3(Driver: any) {
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL;
+    const driver = new Driver({}) as DriverInterface;
+    const query = `
+      SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
+      FROM (${DriverTests.QUERY}) AS orders
+      GROUP BY 1
+      ORDER BY 1
+    `;
+    const tableName = await this.createUnloadTable(query);
+    assert(driver.unload);
+    const data = await driver.unload(tableName, { maxFileSize: 64 });
+    expect(data.exportBucketCsvEscapeSymbol).toBeUndefined();
+    await driver.release();
+  }
+
   public async testUnloadEmpty() {
     const query = `
       SELECT 'new' AS orders__status, 100 AS orders__amount  
