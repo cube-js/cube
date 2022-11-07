@@ -7,10 +7,10 @@ export const prepareCompiler = (content, options) => originalPrepareCompiler({
   ])
 }, { adapter: 'postgres', ...options });
 
-export const prepareYamlCompiler = (content, options) => originalPrepareCompiler({
+export const prepareYamlCompiler = (content, { yamlExtension, ...options } = {}) => originalPrepareCompiler({
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([
-    { fileName: 'main.yml', content }
+    { fileName: yamlExtension ? 'main.yaml' : 'main.yml', content }
   ])
 }, { adapter: 'postgres', ...options });
 

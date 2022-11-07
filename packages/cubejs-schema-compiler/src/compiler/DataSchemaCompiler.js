@@ -78,7 +78,7 @@ export class DataSchemaCompiler {
   }
 
   transpileFile(file, errorsReport) {
-    if (R.endsWith('.yml', file.fileName)) {
+    if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       return file;
     } else if (R.endsWith('.js', file.fileName)) {
       return this.transpileJsFile(file, errorsReport);
@@ -171,7 +171,7 @@ export class DataSchemaCompiler {
     compiledFiles[file.fileName] = true;
     if (R.endsWith('.js', file.fileName)) {
       this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
-    } else if (R.endsWith('.yml', file.fileName)) {
+    } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     }
   }
