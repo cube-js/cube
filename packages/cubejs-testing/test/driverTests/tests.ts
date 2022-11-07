@@ -246,7 +246,61 @@ export const filteringCustomersEndsWithFilterThird = driverTest({
   schemas: commonSchemas,
 });
 
-export const filteringCustomersStartsWithAndDimensionsFirst = driverTest({
+export const filteringCustomersNotEndsWithFilterFirst = driverTest({
+  name: 'filtering Customers: notEndsWith filter + dimensions, first',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'notEndsWith',
+        values: ['0'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
+
+export const filteringCustomersNotEndsWithFilterSecond = driverTest({
+  name: 'filtering Customers: notEndsWith filter + dimensions, second',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'notEndsWith',
+        values: ['0', '5'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
+
+export const filteringCustomersNotEndsWithFilterThird = driverTest({
+  name: 'filtering Customers: notEndsWith filter + dimensions, third',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'notEndsWith',
+        values: ['9'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
+
+export const filteringCustomersStartsWithFirst = driverTest({
   name: 'filtering Customers: startsWith + dimensions, first',
   query: {
     dimensions: [
@@ -264,7 +318,7 @@ export const filteringCustomersStartsWithAndDimensionsFirst = driverTest({
   schemas: commonSchemas,
 });
 
-export const filteringCustomersStartsWithAndDimensionsSecond = driverTest({
+export const filteringCustomersStartsWithSecond = driverTest({
   name: 'filtering Customers: startsWith + dimensions, second',
   query: {
     dimensions: [
@@ -282,7 +336,7 @@ export const filteringCustomersStartsWithAndDimensionsSecond = driverTest({
   schemas: commonSchemas,
 });
 
-export const filteringCustomersStartsWithAndDimensionsThird = driverTest({
+export const filteringCustomersStartsWithThird = driverTest({
   name: 'filtering Customers: startsWith + dimensions, third',
   query: {
     dimensions: [
@@ -300,8 +354,8 @@ export const filteringCustomersStartsWithAndDimensionsThird = driverTest({
   schemas: commonSchemas,
 });
 
-export const filteringCustomersEndsWithFilterAndDimensionsFirst = driverTest({
-  name: 'filtering Customers: endsWith filter + dimensions, first',
+export const filteringCustomersNotStartsWithFirst = driverTest({
+  name: 'filtering Customers: notStartsWith + dimensions, first',
   query: {
     dimensions: [
       'Customers.customerId',
@@ -310,16 +364,16 @@ export const filteringCustomersEndsWithFilterAndDimensionsFirst = driverTest({
     filters: [
       {
         member: 'Customers.customerId',
-        operator: 'endsWith',
-        values: ['0'],
+        operator: 'notStartsWith',
+        values: ['A'],
       },
     ],
   },
   schemas: commonSchemas,
 });
 
-export const filteringCustomersEndsWithFilterAndDimensionsSecond = driverTest({
-  name: 'filtering Customers: endsWith filter + dimensions, second',
+export const filteringCustomersNotStartsWithSecond = driverTest({
+  name: 'filtering Customers: notStartsWith + dimensions, second',
   query: {
     dimensions: [
       'Customers.customerId',
@@ -328,16 +382,16 @@ export const filteringCustomersEndsWithFilterAndDimensionsSecond = driverTest({
     filters: [
       {
         member: 'Customers.customerId',
-        operator: 'endsWith',
-        values: ['0', '5'],
+        operator: 'notStartsWith',
+        values: ['A', 'B'],
       },
     ],
   },
   schemas: commonSchemas,
 });
 
-export const filteringCustomersEndsWithFilterAndDimensionsThird = driverTest({
-  name: 'filtering Customers: endsWith filter + dimensions, third',
+export const filteringCustomersNotStartsWithThird = driverTest({
+  name: 'filtering Customers: notStartsWith + dimensions, third',
   query: {
     dimensions: [
       'Customers.customerId',
@@ -346,8 +400,8 @@ export const filteringCustomersEndsWithFilterAndDimensionsThird = driverTest({
     filters: [
       {
         member: 'Customers.customerId',
-        operator: 'endsWith',
-        values: ['9'],
+        operator: 'notStartsWith',
+        values: ['Z'],
       },
     ],
   },
