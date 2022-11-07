@@ -176,12 +176,30 @@ export class BaseFilter extends BaseDimension {
   }
 
   /**
+   * Returns SQL statement for the `notStartsWith` filter.
+   * @param {string} column Column name.
+   * @returns string
+   */
+  notStartsWithWhere(column) {
+    return this.likeOr(column, true, 'starts');
+  }
+
+  /**
    * Returns SQL statement for the `endsWith` filter.
    * @param {string} column Column name.
    * @returns string
    */
   endsWithWhere(column) {
     return this.likeOr(column, false, 'ends');
+  }
+
+  /**
+   * Returns SQL statement for the `endsWith` filter.
+   * @param {string} column Column name.
+   * @returns string
+   */
+  notEndsWithWhere(column) {
+    return this.likeOr(column, true, 'ends');
   }
 
   /**
