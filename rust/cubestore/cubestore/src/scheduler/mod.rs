@@ -267,8 +267,9 @@ impl SchedulerImpl {
             // TODO config
             .get_partitions_with_chunks_created_seconds_ago(60)
             .await?;
-
         for p in partition_compaction_candidates_id {
+            self.schedule_compaction_in_memory_chunks_if_needed(&p)
+                .await?;
             self.schedule_compaction_if_needed(&p).await?;
         }
         Ok(())
@@ -408,8 +409,7 @@ impl SchedulerImpl {
                     if partition.get_row().is_active() {
                         if chunk.get_row().in_memory() {
                             self.schedule_compaction_in_memory_chunks_if_needed(&partition)
-                                .await
-                                .unwrap();
+                                .await?;
                         }
                         self.schedule_compaction_if_needed(&partition).await?;
                     } else {
@@ -625,7 +625,22 @@ impl SchedulerImpl {
             .filter(|c| c.get_row().in_memory() && c.get_row().active())
             .collect::<Vec<_>>();
 
-        if chunks.len() > compaction_in_memory_chunks_count_threshold {
+        let oldest_insert_at = chunks
+            .iter()
+            .filter_map(|c| c.get_row().oldest_insert_at().clone())
+            .min();
+
+        if chunks.len() > compaction_in_memory_chunks_count_threshold
+            || oldest_insert_at
+                .map(|min| {
+                    Utc::now().signed_duration_since(min).num_seconds()
+                        > self
+                            .config
+                            .compaction_in_memory_chunks_max_lifetime_threshold()
+                            as i64
+                })
+                .unwrap_or(false)
+        {
             let node = self.cluster.node_name_by_partition(partition);
             let job = self
                 .meta_store
