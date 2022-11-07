@@ -64,10 +64,10 @@ Now we can require and use `winston-loggly-bulk` library inside `cube.js`:
 
 ```javascript
 const winston = require('winston');
-const { loggly } = require('winston-loggly-bulk');
+const { Loggly } = require('winston-loggly-bulk');
 
 winston.add(
-  new loggly({
+  new Loggly({
     token: 'LOGGLY-TOKEN',
     subdomain: 'your-subdomain',
     tags: ['winston-nodejs'],
@@ -77,7 +77,7 @@ winston.add(
 
 module.exports = {
   logger: (msg, params) => {
-    console.log(`${msg}: ${json.stringify(params)}`);
+    console.log(`${msg}: ${JSON.stringify(params)}`);
     winston.log('info', msg, params);
   },
 };
