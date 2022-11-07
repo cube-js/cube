@@ -14,8 +14,8 @@ use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use log::info;
 use rocksdb::{
-    DBIterator, Direction, IteratorMode, MergeOperands, Options, ReadOptions, Snapshot, WriteBatch,
-    WriteBatchIterator, DB,
+    ColumnFamilyDescriptor, DBIterator, Direction, IteratorMode, MergeOperands, Options,
+    ReadOptions, Snapshot, WriteBatch, WriteBatchIterator, DB, DEFAULT_COLUMN_FAMILY_NAME,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use std::hash::{Hash, Hasher};
@@ -2087,7 +2087,7 @@ impl WriteBatchIterator for WriteBatchContainer {
     }
 }
 
-fn meta_store_merge(
+fn meta_store_default_cf_merge(
     _new_key: &[u8],
     existing_val: Option<&[u8]>,
     operands: &mut MergeOperands,
@@ -2101,6 +2101,51 @@ fn meta_store_merge(
     }
     result.write_u64::<BigEndian>(counter).unwrap();
     Some(result)
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub enum ColumnFamilyName {
+    Default,
+}
+
+impl TryFrom<&String> for ColumnFamilyName {
+    type Error = CubeError;
+
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            DEFAULT_COLUMN_FAMILY_NAME => Ok(Self::Default),
+            _ => Err(CubeError::internal(format!(
+                "Unable to convert string with value '{}' to ColumnFamilyName",
+                value
+            ))),
+        }
+    }
+}
+
+impl ToString for ColumnFamilyName {
+    fn to_string(&self) -> String {
+        match self {
+            ColumnFamilyName::Default => DEFAULT_COLUMN_FAMILY_NAME.to_string(),
+        }
+    }
+}
+
+impl ColumnFamilyName {
+    fn get_descriptor(&self) -> ColumnFamilyDescriptor {
+        match self {
+            ColumnFamilyName::Default => {
+                let mut opts = Options::default();
+                opts.create_if_missing(true);
+                opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+                opts.set_merge_operator_associative(
+                    "meta_store merge",
+                    meta_store_default_cf_merge,
+                );
+
+                ColumnFamilyDescriptor::new(ColumnFamilyName::Default.to_string(), opts)
+            }
+        }
+    }
 }
 
 impl RocksMetaStore {
@@ -2123,9 +2168,37 @@ impl RocksMetaStore {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
-        opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
+        opts.set_merge_operator_associative("meta_store merge", meta_store_default_cf_merge);
 
-        let db = DB::open(&opts, path).unwrap();
+        // This code used for downgrading version or dropping column family, because
+        // RocksDB doesnt allow to open DB without defining all columns families
+        let mut cfs_to_remove = Vec::new();
+
+        let cfs: Vec<ColumnFamilyDescriptor> = DB::list_cf(&opts, &path)
+            .unwrap()
+            .into_iter()
+            .map(|cf_name| {
+                if let Ok(cf) = ColumnFamilyName::try_from(&cf_name) {
+                    cf.get_descriptor()
+                } else {
+                    let mut opts = Options::default();
+                    opts.create_if_missing(true);
+                    opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+
+                    cfs_to_remove.push(cf_name.clone());
+
+                    // We are going to open CF with default options, to drop it after open
+                    ColumnFamilyDescriptor::new(cf_name, opts)
+                }
+            })
+            .collect();
+
+        let mut db = DB::open_cf_descriptors(&opts, path, cfs).unwrap();
+
+        for cf_to_remove in &cfs_to_remove {
+            db.drop_cf(cf_to_remove).unwrap();
+        }
+
         let db_arc = Arc::new(db);
 
         let (rw_loop_tx, rw_loop_rx) = std::sync::mpsc::sync_channel::<
