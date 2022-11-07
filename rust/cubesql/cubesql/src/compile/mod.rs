@@ -13321,4 +13321,39 @@ ORDER BY \"COUNT(count)\" DESC"
             )
         }
     }
+
+    #[tokio::test]
+    async fn test_sigma_literal_relation() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT l1.*
+            FROM (
+                SELECT
+                    "customer_gender",
+                    1 as error
+                FROM "KibanaSampleDataEcommerce"
+            ) as l1
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
 }

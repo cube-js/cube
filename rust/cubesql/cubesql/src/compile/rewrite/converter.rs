@@ -11,13 +11,13 @@ use crate::{
             ColumnExprColumn, CubeScanAliases, CubeScanLimit, CubeScanOffset, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
-            JoinRightOn, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberValue,
-            LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc, OrderMember,
-            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun,
-            ScalarUDFExprFun, ScalarVariableExprDataType, ScalarVariableExprVariable,
-            SegmentMemberMember, SortExprAsc, SortExprNullsFirst, TableScanFetch,
-            TableScanProjection, TableScanSourceTableName, TableScanTableName, TableUDFExprFun,
-            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            JoinRightOn, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
+            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
+            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
+            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
+            TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
+            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
             TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
@@ -1189,9 +1189,14 @@ impl LanguageToLogicalPlanConverter {
                                     let value =
                                         match_data_node!(node_by_id, params[0], LiteralMemberValue);
                                     let expr = self.to_expr(params[1])?;
+                                    let relation = match_data_node!(
+                                        node_by_id,
+                                        params[2],
+                                        LiteralMemberRelation
+                                    );
                                     fields.push((
                                         DFField::new(
-                                            expr_relation(&expr),
+                                            relation.as_deref(),
                                             &expr_name(&expr)?,
                                             value.get_datatype(),
                                             true,

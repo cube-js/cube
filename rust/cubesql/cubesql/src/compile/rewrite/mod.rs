@@ -237,6 +237,7 @@ crate::plan_to_language! {
         LiteralMember {
             value: ScalarValue,
             expr: Arc<Expr>,
+            relation: Option<String>,
         },
         Order {
             member: String,
@@ -892,8 +893,8 @@ fn change_user_expr(cube: impl Display, expr: impl Display) -> String {
     format!("(ChangeUser {} {})", cube, expr)
 }
 
-fn literal_member(value: impl Display, expr: impl Display) -> String {
-    format!("(LiteralMember {} {})", value, expr)
+fn literal_member(value: impl Display, expr: impl Display, relation: impl Display) -> String {
+    format!("(LiteralMember {} {} {})", value, expr, relation)
 }
 
 fn time_dimension_expr(
