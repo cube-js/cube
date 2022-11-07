@@ -21,6 +21,7 @@ import fetch from 'node-fetch';
 import { CubeStoreQuery } from './CubeStoreQuery';
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
+import { escape } from 'sqlstring';
 
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
@@ -99,7 +100,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       withEntries.push(`seal_at = '${options.sealAt}'`);
     }
     if (options.selectStatement) {
-      withEntries.push(`select_statement = '${options.selectStatement.split('\'').join('\\\'')}'`);
+      withEntries.push(`select_statement = ${escape(options.selectStatement)}`);
     }
     if (withEntries.length > 0) {
       sql = `${sql} WITH (${withEntries.join(', ')})`;
