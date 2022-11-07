@@ -15,13 +15,12 @@ import {
   QueryOptions,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
-import { format as formatSql } from 'sqlstring';
+import { format as formatSql, escape } from 'sqlstring';
 import fetch from 'node-fetch';
 
 import { CubeStoreQuery } from './CubeStoreQuery';
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
-import { escape } from 'sqlstring';
 
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
