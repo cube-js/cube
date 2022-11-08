@@ -9873,6 +9873,26 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_union_ctes() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "union_ctes",
+            execute_query(
+                "
+                WITH w AS (SELECT 1 l)
+                SELECT w.l
+                FROM w
+                UNION ALL (SELECT w.l FROM w)
+                ;"
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "cast_decimal_default_precision",
