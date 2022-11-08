@@ -1,5 +1,6 @@
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
+import { camelize } from 'inflection';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
@@ -117,6 +118,11 @@ export class CubeSymbols {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }
 
+    this.camelCaseTypes(cube.measures);
+    this.camelCaseTypes(cube.dimensions);
+    this.camelCaseTypes(cube.segments);
+    this.camelCaseTypes(cube.preAggregations);
+
     if (cube.preAggregations) {
       this.transformPreAggregations(cube.preAggregations);
     }
@@ -128,6 +134,18 @@ export class CubeSymbols {
       cube.segments || {},
       cube.preAggregations || {}
     );
+  }
+
+  camelCaseTypes(obj) {
+    if (!obj) {
+      return;
+    }
+    // eslint-disable-next-line no-restricted-syntax
+    for (const member of Object.values(obj)) {
+      if (member.type && member.type.indexOf('_') !== -1) {
+        member.type = camelize(member.type, true);
+      }
+    }
   }
 
   transformPreAggregations(preAggregations) {

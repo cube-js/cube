@@ -14,7 +14,7 @@ cubes:
     measures:
       - name: weeklyActive
         sql: "{CUBE}.user_id"
-        type: countDistinct
+        type: count_distinct
         rollingWindow:
           trailing: 7 day
           offset: start
@@ -23,7 +23,7 @@ cubes:
       - name: time
         sql: "{CUBE}.timestamp"
         type: time
-    `);
+    `, { yamlExtension: true });
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
@@ -66,7 +66,7 @@ cubes:
     measures:
       - name: weeklyActive
         sql: "{CUBE}.user_id"
-        type: countDistinct
+        type: count_distinct
         rollingWindow:
           trailing: 7 day
           offset: start
@@ -87,7 +87,7 @@ cubes:
     measures:
       - name: withFilter
         sql: "{CUBE}.user_id"
-        type: countDistinct
+        type: count_distinct
         filters:
           - sql: "{CUBE}.user_id > 10"
 
@@ -130,7 +130,7 @@ cubes:
     measures:
       - name: weeklyActive
         sql: "{user_id}"
-        type: countDistinct
+        type: count_distinct
         rollingWindow:
           trailing: 7 day
           offset: start
