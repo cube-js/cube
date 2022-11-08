@@ -22,7 +22,8 @@ expression: "execute_query(\"\n                SELECT\n                    attre
 | 18016    | __user             | NULL    |
 | 18016    | agentCount         | NULL    |
 | 18016    | agentCountApprox   | NULL    |
-| 18023    | __cubeJoinField    | NULL    |
-| 18023    | __user             | NULL    |
-| 18023    | someNumber         | NULL    |
+| 18016    | read               | NULL    |
+| 18024    | __cubeJoinField    | NULL    |
+| 18024    | __user             | NULL    |
+| 18024    | someNumber         | NULL    |
 +----------+--------------------+---------+

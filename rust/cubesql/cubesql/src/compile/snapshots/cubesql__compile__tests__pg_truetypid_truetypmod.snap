@@ -20,9 +20,10 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | 18000    | __cubeJoinField    | text      | 25    | -1     | NULL   |
 | 18016    | agentCount         | int8      | 20    | -1     | 64     |
 | 18016    | agentCountApprox   | int8      | 20    | -1     | 64     |
+| 18016    | read               | bool      | 16    | -1     | NULL   |
 | 18016    | __user             | text      | 25    | -1     | NULL   |
 | 18016    | __cubeJoinField    | text      | 25    | -1     | NULL   |
-| 18023    | someNumber         | numeric   | 1700  | -1     | NULL   |
-| 18023    | __user             | text      | 25    | -1     | NULL   |
-| 18023    | __cubeJoinField    | text      | 25    | -1     | NULL   |
+| 18024    | someNumber         | numeric   | 1700  | -1     | NULL   |
+| 18024    | __user             | text      | 25    | -1     | NULL   |
+| 18024    | __cubeJoinField    | text      | 25    | -1     | NULL   |
 +----------+--------------------+-----------+-------+--------+--------+

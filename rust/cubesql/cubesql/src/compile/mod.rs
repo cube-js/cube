@@ -10966,6 +10966,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                    "Logs.read".to_string(),
                 ]),
                 segments: Some(vec![]),
                 time_dimensions: None,
@@ -13373,6 +13374,314 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_three_cubes() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT *
+            FROM KibanaSampleDataEcommerce 
+            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            LEFT JOIN NumberCube ON (NumberCube.__cubeJoinField = Logs.__cubeJoinField)
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                    "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                    "Logs.agentCount".to_string(),
+                    "Logs.agentCountApprox".to_string(),
+                    "NumberCube.someNumber".to_string(),
+                ]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                    "Logs.read".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_three_cubes_split() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT count(KibanaSampleDataEcommerce.count), Logs.read, NumberCube.someNumber, extract(MONTH FROM KibanaSampleDataEcommerce.order_date)
+            FROM KibanaSampleDataEcommerce 
+            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            LEFT JOIN NumberCube ON (NumberCube.__cubeJoinField = Logs.__cubeJoinField)
+            WHERE Logs.read
+            GROUP BY 2,3,4
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "NumberCube.someNumber".to_string(),
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                ]),
+                dimensions: Some(vec!["Logs.read".to_string(),]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("month".to_owned()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("Logs.read".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["true".to_string()]),
+                    or: None,
+                    and: None
+                }])
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_two_subqueries_with_filter_order_limit() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT count(KibanaSampleDataEcommerce.count), Logs.read
+            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender limit 10) KibanaSampleDataEcommerce
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            WHERE Logs.read
+            GROUP BY 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec!["Logs.read".to_string(),]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["true".to_string()]),
+                        or: None,
+                        and: None
+                    }
+                ])
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_three_subqueries_with_filter_order_limit_and_split() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT count(Ecommerce.count), Logs.read, extract(MONTH FROM Ecommerce.order_date)
+            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender limit 10) Ecommerce
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
+            LEFT JOIN (SELECT someNumber, __cubeJoinField from NumberCube) NumberC ON (Logs.__cubeJoinField = NumberC.__cubeJoinField)
+            WHERE Logs.read
+            GROUP BY 2, 3
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec!["Logs.read".to_string(),]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("month".to_owned()),
+                    date_range: None
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["true".to_string()]),
+                        or: None,
+                        and: None
+                    }
+                ])
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_subquery_and_table_with_filter_order_limit() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT count(KibanaSampleDataEcommerce.count), Logs.read
+            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender limit 10) KibanaSampleDataEcommerce
+            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            WHERE Logs.read
+            GROUP BY 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec!["Logs.read".to_string(),]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["true".to_string()]),
+                        or: None,
+                        and: None
+                    }
+                ])
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_twoo_subqueries_and_table_with_filter_order_limit_and_split() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT count(Ecommerce.count), Logs.read, extract(MONTH FROM Ecommerce.order_date)
+            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender limit 10) Ecommerce
+            LEFT JOIN Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
+            LEFT JOIN (SELECT someNumber, __cubeJoinField from NumberCube) NumberC ON (Logs.__cubeJoinField = NumberC.__cubeJoinField)
+            WHERE Logs.read
+            GROUP BY 2, 3
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec!["Logs.read".to_string(),]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("month".to_owned()),
+                    date_range: None
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["true".to_string()]),
+                        or: None,
+                        and: None
+                    }
+                ])
             }
         )
     }
