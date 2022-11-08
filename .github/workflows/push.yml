@@ -428,13 +428,7 @@ jobs:
           mkdir -p rust/cubestore/downloaded/latest/bin
           cp rust/cubestore/target/debug/cubestored rust/cubestore/downloaded/latest/bin/cubestored
           cd packages/cubejs-testing/
-          yarn run smoke:postgres
-          yarn run smoke:crate
-          yarn run smoke:materialize
-          yarn run smoke:questdb
-          yarn run smoke:multidb
-          yarn run smoke:lambda
-          yarn run smoke:prestodb
+          yarn run smoke
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment

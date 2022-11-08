@@ -48,6 +48,7 @@ class MSSqlDriver extends BaseDriver {
       assertDataSource('default');
 
     this.config = {
+      readOnly: true,
       server: getEnv('dbHost', { dataSource }),
       database: getEnv('dbName', { dataSource }),
       port: getEnv('dbPort', { dataSource }),
@@ -73,7 +74,8 @@ class MSSqlDriver extends BaseDriver {
       },
       ...config
     };
-    this.connectionPool = new sql.ConnectionPool(this.config);
+    const { readOnly, ...poolConfig } = this.config;
+    this.connectionPool = new sql.ConnectionPool(poolConfig);
     this.initialConnectPromise = this.connectionPool.connect();
   }
 
