@@ -44,5 +44,6 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
     'CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET',
     'CUBEJS_DB_EXPORT_BUCKET_AWS_REGION',
   ],
-  prestodb: []
+  prestodb: [],
+  mssql: [],
 };
