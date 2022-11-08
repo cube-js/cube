@@ -5,7 +5,7 @@ use crate::{
             converter::{is_expr_node, node_to_expr},
             AliasExprAlias, ChangeUserCube, ColumnExprColumn, DimensionName, LiteralExprValue,
             LogicalPlanLanguage, MeasureName, SegmentName, TableScanSourceTableName,
-            TimeDimensionName,
+            TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
     },
     var_iter, CubeError,
@@ -146,6 +146,21 @@ impl LogicalPlanAnalysis {
                     let expr = original_expr(params[1])?;
                     let cube = var_iter!(egraph[params[0]], ChangeUserCube).next().unwrap();
                     map.push((format!("{}.__user", cube), expr));
+                    Some(map)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::VirtualField(params) => {
+                if let Some(_) = column_name(params[2]) {
+                    let field_name = var_iter!(egraph[params[0]], VirtualFieldName)
+                        .next()
+                        .unwrap();
+                    let cube = var_iter!(egraph[params[1]], VirtualFieldCube)
+                        .next()
+                        .unwrap();
+                    let expr = original_expr(params[2])?;
+                    map.push((format!("{}.{}", cube, field_name.to_string()), expr));
                     Some(map)
                 } else {
                     None

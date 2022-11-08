@@ -10,6 +10,8 @@ pub struct V1CubeMeta {
     pub dimensions: Vec<crate::models::V1CubeMetaDimension>,
     #[serde(rename = "segments")]
     pub segments: Vec<crate::models::V1CubeMetaSegment>,
+    #[serde(rename = "joins")]
+    pub joins: Option<Vec<crate::models::V1CubeMetaJoin>>,
 }
 
 impl V1CubeMeta {
@@ -18,6 +20,7 @@ impl V1CubeMeta {
         measures: Vec<crate::models::V1CubeMetaMeasure>,
         dimensions: Vec<crate::models::V1CubeMetaDimension>,
         segments: Vec<crate::models::V1CubeMetaSegment>,
+        joins: Option<Vec<crate::models::V1CubeMetaJoin>>,
     ) -> V1CubeMeta {
         V1CubeMeta {
             name,
@@ -25,6 +28,7 @@ impl V1CubeMeta {
             measures,
             dimensions,
             segments,
+            joins,
         }
     }
 }

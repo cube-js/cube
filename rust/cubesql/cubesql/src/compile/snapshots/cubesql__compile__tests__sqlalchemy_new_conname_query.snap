@@ -17,4 +17,5 @@ expression: "execute_query(r#\"SELECT\n                a.attname,\n             
 | is_male            | boolean                             | NULL    | true       | 18000     | NULL    |           | NULL             |
 | is_female          | boolean                             | NULL    | true       | 18000     | NULL    |           | NULL             |
 | __user             | text                                | NULL    | false      | 18000     | NULL    |           | NULL             |
+| __cubeJoinField    | text                                | NULL    | false      | 18000     | NULL    |           | NULL             |
 +--------------------+-------------------------------------+---------+------------+-----------+---------+-----------+------------------+

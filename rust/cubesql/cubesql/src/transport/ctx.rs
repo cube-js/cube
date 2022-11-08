@@ -132,6 +132,16 @@ impl MetaContext {
     pub fn find_cube_table_with_name(&self, name: String) -> Option<CubeMetaTable> {
         self.tables.iter().find(|table| table.name == name).cloned()
     }
+
+    pub fn cube_has_join(&self, cube_name: &str, join_name: String) -> bool {
+        if let Some(cube) = self.find_cube_with_name(cube_name) {
+            if let Some(joins) = cube.joins {
+                return joins.iter().any(|j| j.name == join_name);
+            }
+        }
+
+        return false;
+    }
 }
 
 #[cfg(test)]
@@ -147,6 +157,7 @@ mod tests {
                 dimensions: vec![],
                 measures: vec![],
                 segments: vec![],
+                joins: None,
             },
             V1CubeMeta {
                 name: "test2".to_string(),
@@ -154,6 +165,7 @@ mod tests {
                 dimensions: vec![],
                 measures: vec![],
                 segments: vec![],
+                joins: None,
             },
         ];
 
@@ -165,7 +177,7 @@ mod tests {
         }
 
         match test_context.find_cube_table_with_name("test2".to_string()) {
-            Some(table) => assert_eq!(18004, table.oid),
+            Some(table) => assert_eq!(18005, table.oid),
             _ => panic!("wrong name!"),
         }
     }

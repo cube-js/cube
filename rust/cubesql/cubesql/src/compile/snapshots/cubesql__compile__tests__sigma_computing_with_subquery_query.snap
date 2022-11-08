@@ -17,4 +17,5 @@ expression: "execute_query(\"\n                with\n                    nsp as 
 | is_male            | bool      | NULL        |
 | is_female          | bool      | NULL        |
 | __user             | text      | NULL        |
+| __cubeJoinField    | text      | NULL        |
 +--------------------+-----------+-------------+

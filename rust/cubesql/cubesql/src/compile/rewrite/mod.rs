@@ -212,7 +212,7 @@ crate::plan_to_language! {
             order: Vec<LogicalPlan>,
             limit: Option<usize>,
             offset: Option<usize>,
-            aliases: Option<Vec<String>>,
+            aliases: Option<Vec<(String, String)>>,
             split: bool,
             can_pushdown_join: bool,
         },
@@ -232,6 +232,11 @@ crate::plan_to_language! {
             expr: Arc<Expr>,
         },
         ChangeUser {
+            cube: String,
+            expr: Arc<Expr>,
+        },
+        VirtualField {
+            name: String,
             cube: String,
             expr: Arc<Expr>,
         },
@@ -277,11 +282,15 @@ crate::plan_to_language! {
         MemberReplacer {
             members: Vec<LogicalPlan>,
             alias_to_cube: Vec<((String, String), String)>,
+            aliases: Vec<(String, String)>,
         },
         MemberPushdownReplacer {
             members: Vec<LogicalPlan>,
             old_members: Arc<LogicalPlan>,
             alias_to_cube: Vec<((String, String), String)>,
+        },
+        MergedMembersReplacer {
+            members: Vec<LogicalPlan>,
         },
         ListConcatPushdownReplacer {
             members: Arc<LogicalPlan>,
@@ -772,8 +781,12 @@ fn cross_join(left: impl Display, right: impl Display) -> String {
     format!("(CrossJoin {} {})", left, right)
 }
 
-fn member_replacer(members: impl Display, aliases: impl Display) -> String {
-    format!("(MemberReplacer {} {})", members, aliases)
+fn member_replacer(
+    members: impl Display,
+    cube_aliases: impl Display,
+    aliases: impl Display,
+) -> String {
+    format!("(MemberReplacer {} {} {})", members, cube_aliases, aliases)
 }
 
 fn member_pushdown_replacer(
@@ -785,6 +798,10 @@ fn member_pushdown_replacer(
         "(MemberPushdownReplacer {} {} {})",
         members, old_members, alias_to_cube
     )
+}
+
+fn merged_members_replacer(members: impl Display) -> String {
+    format!("(MergedMembersReplacer {})", members)
 }
 
 fn list_concat_pushdown_replacer(members: impl Display) -> String {
@@ -927,6 +944,10 @@ fn change_user_expr(cube: impl Display, expr: impl Display) -> String {
 
 fn literal_member(value: impl Display, expr: impl Display, relation: impl Display) -> String {
     format!("(LiteralMember {} {} {})", value, expr, relation)
+}
+
+fn virtual_field_expr(name: impl Display, cube: impl Display, expr: impl Display) -> String {
+    format!("(VirtualField {} {} {})", name, cube, expr)
 }
 
 fn time_dimension_expr(

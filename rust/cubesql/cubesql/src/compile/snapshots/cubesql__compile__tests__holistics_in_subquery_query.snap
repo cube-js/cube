@@ -17,9 +17,12 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.KibanaSampleDataEcommerce | is_male            | boolean                     |
 | public.KibanaSampleDataEcommerce | is_female          | boolean                     |
 | public.KibanaSampleDataEcommerce | __user             | text                        |
+| public.KibanaSampleDataEcommerce | __cubeJoinField    | text                        |
 | public.Logs                      | agentCount         | bigint                      |
 | public.Logs                      | agentCountApprox   | bigint                      |
 | public.Logs                      | __user             | text                        |
+| public.Logs                      | __cubeJoinField    | text                        |
 | public.NumberCube                | someNumber         | numeric                     |
 | public.NumberCube                | __user             | text                        |
+| public.NumberCube                | __cubeJoinField    | text                        |
 +----------------------------------+--------------------+-----------------------------+

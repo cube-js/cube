@@ -8,7 +8,7 @@ use crate::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
             BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
-            ColumnExprColumn, CubeScanAliases, CubeScanLimit, CubeScanOffset, DimensionName,
+            ColumnExprColumn, CubeScanLimit, CubeScanOffset, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
             JoinRightOn, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
@@ -1204,6 +1204,19 @@ impl LanguageToLogicalPlanConverter {
                                         MemberField::Literal(value),
                                     ));
                                 }
+                                LogicalPlanLanguage::VirtualField(params) => {
+                                    let expr = self.to_expr(params[2])?;
+                                    fields.push((
+                                        DFField::new(
+                                            expr_relation(&expr),
+                                            // TODO empty schema
+                                            &expr_name(&expr)?,
+                                            DataType::Utf8,
+                                            true,
+                                        ),
+                                        MemberField::Literal(ScalarValue::Utf8(None)),
+                                    ));
+                                }
                                 LogicalPlanLanguage::MemberError(params) => {
                                     let error =
                                         match_data_node!(node_by_id, params[0], MemberErrorError);
@@ -1434,32 +1447,10 @@ impl LanguageToLogicalPlanConverter {
                             query.offset = offset;
                         }
 
-                        let aliases =
-                            match_data_node!(node_by_id, cube_scan_params[6], CubeScanAliases);
-
                         fields = fields
                             .into_iter()
                             .unique_by(|(f, _)| f.qualified_name())
                             .collect();
-
-                        if let Some(aliases) = aliases {
-                            let mut new_fields = Vec::with_capacity(aliases.len());
-
-                            // Aliases serve solely column ordering purpose as fields generally not ordered
-                            for alias in aliases.iter() {
-                                let field_for_alias = fields
-                                    .iter()
-                                    .find(|(f, _)| f.name() == alias)
-                                    .ok_or(CubeError::internal(format!(
-                                        "Unable to find field for alias {}",
-                                        alias
-                                    )))?;
-
-                                new_fields.push(field_for_alias.clone());
-                            }
-
-                            fields = new_fields;
-                        }
 
                         let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
 

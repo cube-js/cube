@@ -2684,6 +2684,7 @@ impl SplitRules {
                         if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
                             if cube.lookup_dimension(&column.name).is_some()
                                 || column.name == "__user"
+                                || column.name == "__cubeJoinField"
                             {
                                 return true;
                             }
@@ -2791,6 +2792,7 @@ impl SplitRules {
                         if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
                             if cube.lookup_dimension(&column.name).is_some()
                                 || column.name == "__user"
+                                || column.name == "__cubeJoinField"
                             {
                                 return true;
                             }

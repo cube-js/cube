@@ -86,6 +86,7 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     short_title: "Female".to_string(),
                 },
             ],
+            joins: None,
         },
         V1CubeMeta {
             name: "Logs".to_string(),
@@ -106,6 +107,7 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                 },
             ],
             segments: vec![],
+            joins: None,
         },
         V1CubeMeta {
             name: "NumberCube".to_string(),
@@ -118,6 +120,7 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                 agg_type: Some("number".to_string()),
             }],
             segments: vec![],
+            joins: None,
         },
     ]
 }
