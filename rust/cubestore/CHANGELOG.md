@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
+
+
+### Bug Fixes
+
+* **cubestore:** Merge for streaming union ([#5554](https://github.com/cube-js/cube.js/issues/5554)) ([310649a](https://github.com/cube-js/cube.js/commit/310649af9a280484481dc09063178c07f3f36131))
+
+
+
+
+
 ## [0.31.12](https://github.com/cube-js/cube.js/compare/v0.31.11...v0.31.12) (2022-11-05)
 
 

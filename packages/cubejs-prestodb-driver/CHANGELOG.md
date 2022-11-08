@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
+
+
+### Bug Fixes
+
+* Make Trino driver CommonJS compatible ([#5581](https://github.com/cube-js/cube.js/issues/5581)) ([ca8fd4e](https://github.com/cube-js/cube.js/commit/ca8fd4e42f4d8f87667507920f02cbb1a7072763))
+
+
+
+
+
 ## [0.31.12](https://github.com/cube-js/cube.js/compare/v0.31.11...v0.31.12) (2022-11-05)
 
 

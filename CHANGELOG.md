@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
+
+
+### Bug Fixes
+
+* Make Trino driver CommonJS compatible ([#5581](https://github.com/cube-js/cube.js/issues/5581)) ([ca8fd4e](https://github.com/cube-js/cube.js/commit/ca8fd4e42f4d8f87667507920f02cbb1a7072763))
+* **cubestore:** Merge for streaming union ([#5554](https://github.com/cube-js/cube.js/issues/5554)) ([310649a](https://github.com/cube-js/cube.js/commit/310649af9a280484481dc09063178c07f3f36131))
+
+
+### Features
+
+* export bucket CVS files escape symbol support ([#5570](https://github.com/cube-js/cube.js/issues/5570)) ([09ceffb](https://github.com/cube-js/cube.js/commit/09ceffbefc75417555f8ff90f6277bd9c419d751))
+* notStartsWith/notEndsWith filters support ([#5579](https://github.com/cube-js/cube.js/issues/5579)) ([8765833](https://github.com/cube-js/cube.js/commit/87658333df0194db07c3ce0ae6f94a292f8bd592))
+* YAML snake case and `.yaml` extension support ([#5578](https://github.com/cube-js/cube.js/issues/5578)) ([c8af286](https://github.com/cube-js/cube.js/commit/c8af2864af2dcc532abdc3629cf58893d874c190))
+
+
+
+
+
 ## [0.31.12](https://github.com/cube-js/cube.js/compare/v0.31.11...v0.31.12) (2022-11-05)
 
 

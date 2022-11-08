@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
+
+
+### Features
+
+* export bucket CVS files escape symbol support ([#5570](https://github.com/cube-js/cube.js/issues/5570)) ([09ceffb](https://github.com/cube-js/cube.js/commit/09ceffbefc75417555f8ff90f6277bd9c419d751))
+
+
+
+
+
 ## [0.31.12](https://github.com/cube-js/cube.js/compare/v0.31.11...v0.31.12) (2022-11-05)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver
