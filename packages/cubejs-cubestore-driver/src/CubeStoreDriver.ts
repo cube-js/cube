@@ -15,7 +15,7 @@ import {
   QueryOptions,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
-import { format as formatSql } from 'sqlstring';
+import { format as formatSql, escape } from 'sqlstring';
 import fetch from 'node-fetch';
 
 import { CubeStoreQuery } from './CubeStoreQuery';
@@ -99,7 +99,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       withEntries.push(`seal_at = '${options.sealAt}'`);
     }
     if (options.selectStatement) {
-      withEntries.push(`select_statement = '${options.selectStatement.replaceAll('\'', '\\\'')}'`);
+      withEntries.push(`select_statement = ${escape(options.selectStatement)}`);
     }
     if (withEntries.length > 0) {
       sql = `${sql} WITH (${withEntries.join(', ')})`;
