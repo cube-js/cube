@@ -2755,7 +2755,7 @@ mod tests {
                         .await
                         .unwrap();
                 }
-                Delay::new(Duration::from_millis(1000)).await;
+                Delay::new(Duration::from_millis(2000)).await;
                 let active_partitions = services
                     .meta_store
                     .get_active_partitions_by_index_id(1)
@@ -2764,13 +2764,6 @@ mod tests {
                 assert_eq!(active_partitions.len(), 1);
                 let partition = active_partitions.first().unwrap();
                 assert_eq!(partition.get_row().main_table_row_count(), 6);
-                let chunks = services
-                    .meta_store
-                    .get_chunks_by_partition(partition.get_id(), false)
-                    .await
-                    .unwrap();
-                assert_eq!(chunks.len(), 1);
-                assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 6);
             })
             .await
     }
