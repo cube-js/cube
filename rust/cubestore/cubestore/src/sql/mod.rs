@@ -2755,7 +2755,7 @@ mod tests {
                         .await
                         .unwrap();
                 }
-                Delay::new(Duration::from_millis(1000)).await;
+                Delay::new(Duration::from_millis(2000)).await;
                 let active_partitions = services
                     .meta_store
                     .get_active_partitions_by_index_id(1)
