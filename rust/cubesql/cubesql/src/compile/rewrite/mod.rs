@@ -307,6 +307,7 @@ crate::plan_to_language! {
             filters: Vec<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
             members: Vec<LogicalPlan>,
+            aliases: Vec<(String, String)>,
         },
         FilterCastUnwrapReplacer {
             filters: Vec<LogicalPlan>,
@@ -831,10 +832,11 @@ fn filter_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
     cube_members: impl Display,
+    aliases: impl Display,
 ) -> String {
     format!(
-        "(FilterReplacer {} {} {})",
-        members, alias_to_cube, cube_members
+        "(FilterReplacer {} {} {} {})",
+        members, alias_to_cube, cube_members, aliases
     )
 }
 

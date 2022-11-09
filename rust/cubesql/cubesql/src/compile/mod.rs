@@ -3357,8 +3357,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("month".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-12-16 00:00:00".to_string(),
-                        "2022-06-13 00:00:00".to_string()
+                        "2021-12-16T00:00:00.000Z".to_string(),
+                        "2022-06-12T23:59:59.999Z".to_string()
                     ])),
                 }]),
                 order: None,
@@ -13529,11 +13529,11 @@ ORDER BY \"COUNT(count)\" DESC"
 
         let logical_plan = convert_select_to_query_plan(
             r#"
-            SELECT count(Ecommerce.count), Logs.read, extract(MONTH FROM Ecommerce.order_date)
+            SELECT count(Ecommerce.count), Logs.r, extract(MONTH FROM Ecommerce.order_date)
             FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender limit 10) Ecommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
+            LEFT JOIN (SELECT read r, __cubeJoinField FROM Logs) Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
             LEFT JOIN (SELECT someNumber, __cubeJoinField from NumberCube) NumberC ON (Logs.__cubeJoinField = NumberC.__cubeJoinField)
-            WHERE Logs.read
+            WHERE Logs.r
             GROUP BY 2, 3
             "#
             .to_string(),
