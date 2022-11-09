@@ -11252,7 +11252,7 @@ ORDER BY \"COUNT(count)\" DESC"
             execute_query(
                 "SELECT\n          n.nspname || '.' || c.relname AS \"table_name\",\n          a.attname AS \"column_name\",\n          format_type(a.atttypid, a.atttypmod) AS \"data_type\"\n        FROM pg_namespace n,\n             pg_class c,\n             pg_attribute a\n        WHERE n.oid = c.relnamespace\n          AND c.oid = a.attrelid\n          AND a.attnum > 0\n          AND NOT a.attisdropped\n          AND c.relname IN (SELECT table_name\nFROM information_schema.tables\nWHERE (table_type = 'BASE TABLE' OR table_type = 'VIEW')\n  AND table_schema NOT IN ('pg_catalog', 'information_schema')\n  AND has_schema_privilege(table_schema, 'USAGE'::text)\n)\n
                 /* Added to avoid random output order and validate snapshot */
-                order by table_name;"
+                order by table_name, column_name;"
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
@@ -12413,30 +12413,20 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             r#"
             select
-                "_"."t1.agentCountApprox" as "agentCountApprox",
                 "_"."a0" as "a0"
             from (
                 select
-                    sum(cast("rows"."t0.taxful_total_price" as decimal)) as "a0",
-                    "rows"."t1.agentCountApprox" as "t1.agentCountApprox"
+                    sum(cast("rows"."t0.taxful_total_price" as decimal)) as "a0"
                 from (
                     select
-                        "$Outer"."t1.agentCountApprox",
                         "$Inner"."t0.taxful_total_price"
                     from (
-                        select
-                            "_"."agentCount" as "t1.agentCount",
-                            "_"."agentCountApprox" as "t1.agentCountApprox"
-                        from "public"."Logs" "_"
-                    ) "$Outer"
-                    left outer join (
                         select
                             "_"."taxful_total_price" as "t0.taxful_total_price",
                             "_"."count" as "t0.count"
                         from "public"."KibanaSampleDataEcommerce" "_"
-                    ) "$Inner" on ("$Outer"."t1.agentCount" = "$Inner"."t0.count")
+                    ) "$Inner"
                 ) "rows"
-                group by "t1.agentCountApprox"
             ) "_"
             where not "_"."a0" is null
             limit 1000001
@@ -12447,15 +12437,10 @@ ORDER BY \"COUNT(count)\" DESC"
         .await
         .as_logical_plan();
 
-        let cube_scans = logical_plan
-            .find_cube_scans()
-            .iter()
-            .map(|cube| cube.request.clone())
-            .collect::<Vec<V1LoadRequestQuery>>();
-
         assert_eq!(
-            cube_scans.contains(&V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                 ]),
@@ -12465,8 +12450,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
-            }),
-            true
+            }
         );
     }
 
@@ -13631,7 +13615,7 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
-    async fn test_join_twoo_subqueries_and_table_with_filter_order_limit_and_split() {
+    async fn test_join_two_subqueries_and_table_with_filter_order_limit_and_split() {
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -13683,6 +13667,165 @@ ORDER BY \"COUNT(count)\" DESC"
                     }
                 ])
             }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_two_subqueries_filter_push_down() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT count(Ecommerce.count), Logs.r, Ecommerce.date
+            FROM (SELECT __cubeJoinField, count, order_date date FROM KibanaSampleDataEcommerce where customer_gender = 'female' limit 10) Ecommerce
+            LEFT JOIN (select __cubeJoinField, read r from Logs) Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
+            WHERE (Logs.r IS NOT NULL) AND (Ecommerce.date BETWEEN timestamp with time zone '2022-06-13T12:30:00.000Z' AND timestamp with time zone '2022-06-29T12:30:00.000Z')
+            GROUP BY 2, 3
+            ORDER BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
+                dimensions: Some(vec![
+                    "Logs.read".to_string(),
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2022-06-13T12:30:00.000Z".to_string(),
+                        "2022-06-29T12:30:00.000Z".to_string()
+                    ]))
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(10),
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["female".to_string()]),
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("Logs.read".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None
+                    }
+                ])
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_cubes_on_wrong_field_error() {
+        init_logger();
+
+        let query = convert_sql_to_cube_query(
+            &r#"
+            SELECT *
+            FROM KibanaSampleDataEcommerce 
+            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.has_subscription = Logs.read) 
+            "#
+            .to_string(),
+            get_test_tenant_ctx(),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
+        )
+        .await;
+
+        assert_eq!(
+            query.unwrap_err().message(),
+            "Error during rewrite: Use __cubeJoinField to join Cubes. Please check logs for additional information.".to_string()
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_cubes_filter_from_wrong_side_error() {
+        init_logger();
+
+        let query = convert_sql_to_cube_query(
+            &r#"
+            SELECT count(KibanaSampleDataEcommerce.count), Logs.read
+            FROM (SELECT * FROM KibanaSampleDataEcommerce) KibanaSampleDataEcommerce
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs where read order by read limit 10) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            GROUP BY 2
+            "#
+            .to_string(),
+            get_test_tenant_ctx(),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
+        )
+        .await;
+
+        assert_eq!(
+            query.unwrap_err().message(),
+            "Error during rewrite: Can not join Cubes. This is most likely due to one of the following reasons:\n\
+            • one of the cubes contains a group by\n\
+            • one of the cubes contains a measure\n\
+            • the cube on the right contains a filter, sorting or limits\n\
+            . Please check logs for additional information.".to_string()
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_cubes_with_aggr_error() {
+        init_logger();
+
+        let query = convert_sql_to_cube_query(
+            &r#"
+            SELECT *
+            FROM (SELECT count(count), __cubeJoinField FROM KibanaSampleDataEcommerce group by 2) KibanaSampleDataEcommerce
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            "#
+            .to_string(),
+            get_test_tenant_ctx(),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
+        )
+        .await;
+
+        assert_eq!(
+            query.unwrap_err().message(),
+            "Error during rewrite: Can not join Cubes. This is most likely due to one of the following reasons:\n\
+            • one of the cubes contains a group by\n\
+            • one of the cubes contains a measure\n\
+            • the cube on the right contains a filter, sorting or limits\n\
+            . Please check logs for additional information.".to_string()
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_cubes_with_postprocessing_error() {
+        init_logger();
+
+        let query = convert_sql_to_cube_query(
+            &r#"
+            SELECT *
+            FROM (SELECT count(count), __cubeJoinField, extract(MONTH from order_date) FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            "#
+            .to_string(),
+            get_test_tenant_ctx(),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
+        )
+        .await;
+
+        assert_eq!(
+            query.unwrap_err().message(),
+            "Error during rewrite: Can not join Cubes. Looks like one of the subqueries includes post-processing operations. Please check logs for additional information.".to_string()
         )
     }
 }
