@@ -9,7 +9,7 @@ use crate::metastore::{
     Partition, PartitionData,
 };
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
-use crate::store::{ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
+use crate::store::{ChunkDataStore, ChunkStore, ROW_GROUP_SIZE, min_max_values_from_data};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
 use crate::table::parquet::{arrow_schema, ParquetTableStore};
 use crate::table::redistribute::redistribute;
@@ -197,9 +197,10 @@ impl CompactionServiceImpl {
                 })
                 .min();
 
+            let (min, max) = min_max_values_from_data(batch.columns(), key_size);
             let chunk = self
                 .meta_store
-                .create_chunk(partition.get_id(), batch.num_rows(), true)
+                .create_chunk(partition.get_id(), batch.num_rows(), min, max, true)
                 .await?;
 
             self.meta_store
@@ -412,9 +413,11 @@ impl CompactionService for CompactionServiceImpl {
                 if chunks.len() < 2 {
                     return Ok(());
                 }
+                
+                //We don't track min/max chunk values for multi-parititons
                 Some(
                     self.meta_store
-                        .create_chunk(partition_id, chunks_row_count as usize, false)
+                        .create_chunk(partition_id, chunks_row_count as usize, None, None, false)
                         .await?,
                 )
             }
@@ -629,15 +632,22 @@ impl CompactionService for CompactionServiceImpl {
                     .enumerate()
                     .map(|(i, item)| -> Result<_, CubeError> {
                         match item {
-                            EitherOrBoth::Both((c, min), (_, next_min)) => {
+                            EitherOrBoth::Both((c, min, max), (_, next_min, _)) => {
                                 if i == 0 && partition_min.is_none() {
-                                    Ok((*c as u64, (None, Some(Row::new(next_min.clone())))))
+                                    Ok((*c as u64,
+                                        (None, Some(Row::new(next_min.clone()))),
+                                        (Some(Row::new(min.clone())), Some(Row::new(max.clone())))
+                                         ))
                                 } else if i < num_filtered - 1 {
                                     Ok((
                                         *c as u64,
                                         (
                                             Some(Row::new(min.clone())),
                                             Some(Row::new(next_min.clone())),
+                                        ),
+                                        (
+                                            Some(Row::new(min.clone())),
+                                            Some(Row::new(max.clone())),
                                         ),
                                     ))
                                 } else {
@@ -647,13 +657,17 @@ impl CompactionService for CompactionServiceImpl {
                                     )))
                                 }
                             }
-                            EitherOrBoth::Left((c, min)) => {
+                            EitherOrBoth::Left((c, min, max)) => {
                                 if i == 0 && num_filtered == 1 {
-                                    Ok((*c as u64, (partition_min.clone(), partition_max.clone())))
+                                    Ok((*c as u64, 
+                                        (partition_min.clone(), partition_max.clone()),
+                                        (Some(Row::new(min.clone())), Some(Row::new(max.clone())))
+                                       ))
                                 } else if i == num_filtered - 1 {
                                     Ok((
                                         *c as u64,
                                         (Some(Row::new(min.clone())), partition_max.clone()),
+                                        (Some(Row::new(min.clone())), Some(Row::new(max.clone()))),
                                     ))
                                 } else {
                                     Err(CubeError::internal(format!(
@@ -1059,26 +1073,30 @@ pub(crate) async fn write_to_files(
     num_rows: usize,
     store: ParquetTableStore,
     files: Vec<String>,
-) -> Result<Vec<(usize, Vec<TableValue>)>, CubeError> {
+) -> Result<Vec<(usize, Vec<TableValue>, Vec<TableValue>)>, CubeError> {
     let rows_per_file = div_ceil(num_rows as usize, files.len());
     let key_size = store.key_size() as usize;
     let partition_split_key_size = store.partition_split_key_size() as usize;
 
     let mut last_row = Vec::new();
     // (num_rows, first_row) for all processed writers.
-    let stats = Arc::new(Mutex::new(vec![(0, Vec::new())]));
+    let stats = Arc::new(Mutex::new(vec![(0, Vec::new(), Vec::new())]));
     let stats_ref = stats.clone();
 
     let pick_writer = |b: &RecordBatch| -> WriteBatchTo {
         let stats_ref = stats_ref.clone();
         let mut stats = stats_ref.lock().unwrap();
 
-        let (num_rows, first_row) = stats.last_mut().unwrap();
+        let (num_rows, first_row, max_row) = stats.last_mut().unwrap();
         if first_row.is_empty() {
             *first_row = TableValue::from_columns(&b.columns()[0..key_size], 0);
         }
         if *num_rows + b.num_rows() < rows_per_file {
             *num_rows += b.num_rows();
+            if b.num_rows() > 0 {
+                *max_row = TableValue::from_columns(&b.columns()[0..key_size], b.num_rows() - 1);
+            }
+
             return WriteBatchTo::Current;
         }
 
@@ -1097,13 +1115,14 @@ pub(crate) async fn write_to_files(
         {
             i += 1;
         }
+        *max_row = last_row.clone();
         if i == b.num_rows() {
             *num_rows += b.num_rows();
             return WriteBatchTo::Current;
         }
 
         *num_rows += i;
-        stats.push((0, Vec::new()));
+        stats.push((0, Vec::new(), Vec::new()));
         last_row.clear();
         return WriteBatchTo::Next {
             rows_for_current: i,
@@ -1372,17 +1391,17 @@ mod tests {
         metastore.get_default_index(1).await.unwrap();
         let partition = metastore.get_partition(1).await.unwrap();
         metastore
-            .create_chunk(partition.get_id(), 10, false)
+            .create_chunk(partition.get_id(), 10, None, None, false)
             .await
             .unwrap();
         metastore.chunk_uploaded(1).await.unwrap();
         metastore
-            .create_chunk(partition.get_id(), 16, false)
+            .create_chunk(partition.get_id(), 16, None, None, false)
             .await
             .unwrap();
         metastore.chunk_uploaded(2).await.unwrap();
         metastore
-            .create_chunk(partition.get_id(), 20, false)
+            .create_chunk(partition.get_id(), 20, None, None, false)
             .await
             .unwrap();
         metastore.chunk_uploaded(3).await.unwrap();
@@ -1506,7 +1525,7 @@ mod tests {
             .unwrap()
             .get_id();
         metastore
-            .create_chunk(next_partition_id, 2, false)
+            .create_chunk(next_partition_id, 2, None, None, false)
             .await
             .unwrap();
         metastore.chunk_uploaded(4).await.unwrap();
@@ -1603,21 +1622,26 @@ mod tests {
         let partition = metastore.get_partition(1).await.unwrap();
 
         let rows = (0..5)
-            .map(|i| Row::new(vec![TableValue::String(format!("Foo {}", 4 - i))]))
+            .map(|i| Row::new(vec![TableValue::String(format!("Foo {}", i))]))
+            .collect::<Vec<_>>();
+        let rows2 = (3..7)
+            .map(|i| Row::new(vec![TableValue::String(format!("Foo {}", i))]))
             .collect::<Vec<_>>();
         let data = rows_to_columns(&cols, &rows);
+        let data2 = rows_to_columns(&cols, &rows2);
         let index = metastore
             .get_index(partition.get_row().get_index_id())
             .await
             .unwrap();
         let schema = Arc::new(arrow_schema(index.get_row()));
         let batch = RecordBatch::try_new(schema.clone(), data).unwrap();
+        let batch2 = RecordBatch::try_new(schema.clone(), data2).unwrap();
         let chunk_first = metastore
-            .create_chunk(partition.get_id(), 5, true)
+            .create_chunk(partition.get_id(), 5, None, None, true)
             .await
             .unwrap();
         let chunk_second = metastore
-            .create_chunk(partition.get_id(), 5, true)
+            .create_chunk(partition.get_id(), 4, None, None, true)
             .await
             .unwrap();
 
@@ -1635,7 +1659,7 @@ mod tests {
             .await
             .unwrap();
         chunk_store
-            .add_memory_chunk(chunk_second.get_id(), batch.clone())
+            .add_memory_chunk(chunk_second.get_id(), batch2.clone())
             .await
             .unwrap();
 
@@ -1662,6 +1686,10 @@ mod tests {
             .map(|c| c.get_row().get_row_count())
             .sum::<u64>();
 
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].get_row().min(), &Some(Row::new(vec![TableValue::String("Foo 0".to_string())])));
+        assert_eq!(chunks[0].get_row().max(), &Some(Row::new(vec![TableValue::String("Foo 6".to_string())])));
+
         let mut data = Vec::new();
         for chunk in chunks.iter() {
             for b in chunk_store.get_chunk_columns(chunk.clone()).await.unwrap() {
@@ -1670,26 +1698,24 @@ mod tests {
         }
 
         let batch = data[0].clone();
+        assert_eq!(9, chunks_row_count);
 
-        let rows = (0..10)
+        let rows = (0..9)
             .map(|i| Row::new(TableValue::from_columns(&batch.columns().clone(), i)))
             .collect::<Vec<_>>();
 
         let expected = vec![
             Row::new(vec![TableValue::String("Foo 0".to_string())]),
-            Row::new(vec![TableValue::String("Foo 0".to_string())]),
             Row::new(vec![TableValue::String("Foo 1".to_string())]),
-            Row::new(vec![TableValue::String("Foo 1".to_string())]),
-            Row::new(vec![TableValue::String("Foo 2".to_string())]),
             Row::new(vec![TableValue::String("Foo 2".to_string())]),
             Row::new(vec![TableValue::String("Foo 3".to_string())]),
             Row::new(vec![TableValue::String("Foo 3".to_string())]),
             Row::new(vec![TableValue::String("Foo 4".to_string())]),
             Row::new(vec![TableValue::String("Foo 4".to_string())]),
+            Row::new(vec![TableValue::String("Foo 5".to_string())]),
+            Row::new(vec![TableValue::String("Foo 6".to_string())]),
         ];
 
-        assert_eq!(1, chunks.len());
-        assert_eq!(10, chunks_row_count);
         assert_eq!(expected, rows);
 
         RocksMetaStore::cleanup_test_metastore("compact_in_memory_chunks");
@@ -1925,6 +1951,8 @@ impl MultiSplit {
                 mc.get_row().min_row().cloned(),
                 mc.get_row().max_row().cloned(),
                 0,
+                None,
+                None
             );
             children.push(self.meta.create_partition(c).await?)
         }

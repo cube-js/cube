@@ -115,6 +115,46 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                 }),
             ),
             (
+                Field::new("min_row", DataType::Utf8, true),
+                Box::new(|partitions| {
+                    let min_array = partitions
+                        .iter()
+                        .map(|row| {
+                            row.get_row()
+                                .get_min()
+                                .as_ref()
+                                .map(|x| format!("{:?}", x))
+                        })
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        min_array
+                            .iter()
+                            .map(|v| v.as_ref().map(|v| v.as_str()))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("max_row", DataType::Utf8, true),
+                Box::new(|partitions| {
+                    let max_array = partitions
+                        .iter()
+                        .map(|row| {
+                            row.get_row()
+                                .get_max()
+                                .as_ref()
+                                .map(|x| format!("{:?}", x))
+                        })
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        max_array
+                            .iter()
+                            .map(|v| v.as_ref().map(|v| v.as_str()))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
                 Field::new("active", DataType::Boolean, true),
                 Box::new(|partitions| {
                     Arc::new(BooleanArray::from(

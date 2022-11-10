@@ -6420,6 +6420,64 @@ async fn cache_prefix_keys(service: Box<dyn SqlClient>) {
             Row::new(vec![TableValue::String("locks:key3".to_string())]),
         ]
     );
+async fn limit_pushdown(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    service
+        .exec_query("CREATE TABLE Foo.pushdown1 (id int, n int) INDEX main (id)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE Foo.pushdown2 (id int, n int) INDEX main (id)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO Foo.pushdown1
+            (id, n)
+            VALUES
+            (11, 10),
+            (11, 15),
+            (11, 18),
+            (12, 20),
+            (12, 25),
+            (13, 30)",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO Foo.pushdown2
+            (id, n)
+            VALUES
+            (21, 10),
+            (21, 15),
+            (21, 18),
+            (22, 20),
+            (22, 25),
+            (23, 30)",
+        )
+        .await
+        .unwrap();
+    let res = service
+        .exec_query("SELECT id, SUM(n) FROM (
+                SELECT * FROM Foo.pushdown1 
+                UNION ALL 
+                SELECT * FROM Foo.pushdown2
+                ) as `tb` GROUP BY 1 ORDER BY 1 LIMIT 3")
+        .await
+        .unwrap();
+    println!("{:?}", res);
+    /* let p = service
+        .plan_query("SELECT id, SUM(n) FROM (
+                SELECT * FROM Foo.pushdown1 
+                UNION ALL 
+                SELECT * FROM Foo.pushdown2
+                ) as `tb` GROUP BY 1 ORDER BY 1 LIMIT 3")
+        .await
+        .unwrap();
+    println!("{}", pp_phys_plan(p.router.as_ref()));
+    println!("{}", pp_phys_plan(p.worker.as_ref())); */
 }
 
 async fn queue_full_workflow(service: Box<dyn SqlClient>) {

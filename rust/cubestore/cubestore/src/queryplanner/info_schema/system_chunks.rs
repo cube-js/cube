@@ -175,6 +175,46 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                     ))
                 }),
             ),
+            (
+                Field::new("min_row", DataType::Utf8, true),
+                Box::new(|chunks| {
+                    let min_array = chunks
+                        .iter()
+                        .map(|row| {
+                            row.get_row()
+                                .min()
+                                .as_ref()
+                                .map(|x| format!("{:?}", x))
+                        })
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        min_array
+                            .iter()
+                            .map(|v| v.as_ref().map(|v| v.as_str()))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("max_row", DataType::Utf8, true),
+                Box::new(|chunks| {
+                    let max_array = chunks
+                        .iter()
+                        .map(|row| {
+                            row.get_row()
+                                .max()
+                                .as_ref()
+                                .map(|x| format!("{:?}", x))
+                        })
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        max_array
+                            .iter()
+                            .map(|v| v.as_ref().map(|v| v.as_str()))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
         ]
     }
 }
