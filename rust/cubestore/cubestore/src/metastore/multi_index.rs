@@ -138,8 +138,8 @@ impl MultiPartition {
         max_row: Option<Row>,
     ) -> MultiPartition {
         MultiPartition {
-            multi_index_id: parent.row.multi_index_id,
-            parent_multi_partition_id: Some(parent.id),
+            multi_index_id: parent.get_row().multi_index_id,
+            parent_multi_partition_id: Some(parent.get_id()),
             min_row,
             max_row,
             total_row_count: 0,
