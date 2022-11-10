@@ -13,10 +13,11 @@ import {
   VizState,
 } from '@cubejs-client/react';
 import { Col, Row, Space } from 'antd';
+import { PlaySquareOutlined } from '@ant-design/icons';
 import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
-import { Card } from '../../../atoms';
+import { Button, Card } from '../../../atoms';
 import { FatalError } from '../../../components/Error/FatalError';
 import ChartContainer from '../../../ChartContainer';
 import { SectionHeader, SectionRow } from '../../../components';
@@ -203,15 +204,20 @@ export function PlaygroundQueryBuilder({
 
   const isGraphQLSupported = useServerCoreVersionGte('0.29.0');
 
-  const { isChartRendererReady, queryStatus, queryError, queryRequestId } =
-    useChartRendererState(queryId);
+  const {
+    isChartRendererReady,
+    queryStatus,
+    queryError,
+    queryRequestId,
+    resultSetExists,
+  } = useChartRendererState(queryId);
   const {
     setQueryStatus,
     setQueryLoading,
     setChartRendererReady,
     setQueryError,
   } = useChartRendererStateMethods();
-  
+
   const { refreshToken } = useSecurityContext();
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -315,7 +321,7 @@ export function PlaygroundQueryBuilder({
         availableFilterMembers,
       }) => {
         let parsedDateRange;
-        
+
         if (dryRunResponse) {
           const { timeDimensions = [] } = dryRunResponse.pivotQuery || {};
           parsedDateRange = timeDimensions[0]?.dateRange;
@@ -323,6 +329,11 @@ export function PlaygroundQueryBuilder({
           // @ts-ignore
           parsedDateRange = query.timeDimensions[0].dateRange;
         }
+        
+        const queriesEqual = areQueriesEqual(
+          validateQuery(query),
+          validateQuery(queryRef.current)
+        );
 
         return (
           <Wrapper data-testid={`query-builder-${queryId}`}>
@@ -455,7 +466,9 @@ export function PlaygroundQueryBuilder({
                   <Space style={{ marginLeft: 'auto' }}>
                     {Extra ? (
                       <Extra
-                        queryRequestId={queryRequestId || queryError?.response?.requestId}
+                        queryRequestId={
+                          queryRequestId || queryError?.response?.requestId
+                        }
                         queryStatus={queryStatus}
                         error={queryError}
                       />
@@ -467,6 +480,23 @@ export function PlaygroundQueryBuilder({
                         query={query}
                         {...(queryStatus as QueryStatus)}
                       />
+                    ) : null}
+
+                    {resultSetExists && queriesEqual ? (
+                      <Button
+                        icon={<PlaySquareOutlined />}
+                        onClick={async () => {
+                          await refreshToken();
+
+                          handleRunButtonClick({
+                            query: validateQuery(query),
+                            pivotConfig,
+                            chartType: chartType || 'line',
+                          });
+                        }}
+                      >
+                        Rerun query
+                      </Button>
                     ) : null}
                   </Space>
                 </SectionRow>
@@ -529,16 +559,18 @@ export function PlaygroundQueryBuilder({
                     isFetchingMeta={isFetchingMeta}
                     render={({ framework }) => {
                       if (richMetaError) {
-                        return <FatalError error={richMetaError} stack={metaErrorStack} />;
+                        return (
+                          <FatalError
+                            error={richMetaError}
+                            stack={metaErrorStack}
+                          />
+                        );
                       }
 
                       return (
                         <ChartRenderer
                           queryId={queryId}
-                          areQueriesEqual={areQueriesEqual(
-                            validateQuery(query),
-                            validateQuery(queryRef.current)
-                          )}
+                          areQueriesEqual={queriesEqual}
                           isFetchingMeta={isFetchingMeta}
                           queryError={queryError}
                           framework={framework}

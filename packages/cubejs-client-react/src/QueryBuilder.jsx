@@ -239,7 +239,7 @@ export default class QueryBuilder extends React.Component {
     const toFilter = (member) => ({
       member: member.member?.name || member.dimension?.name,
       operator: member.operator,
-      values: member.values,
+      ...(['set', 'notSet'].includes(member.operator) ? {} : { values: member.values }),
     });
 
     const updateMethods = (memberType, toQuery = getName) => ({
@@ -355,7 +355,9 @@ export default class QueryBuilder extends React.Component {
     if (this.orderMembersOrderKeys.length) {
       // Preserve order until the members change or manually re-ordered
       // This is needed so that when an order member becomes active, it doesn't jump to the top of the list
-      orderMembers = (this.orderMembersOrderKeys || []).map((id) => orderMembers.find((member) => member.id === id));
+      orderMembers = (this.orderMembersOrderKeys || [])
+        .map((id) => orderMembers.find((member) => member.id === id))
+        .filter(Boolean);
     }
 
     return {
