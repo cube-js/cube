@@ -15,7 +15,7 @@ impl Partition {
         index_id: u64,
         multi_partition_id: Option<u64>,
         min_value: Option<Row>,
-        max_value: Option<Row>,
+        max_value: Option<Row>
     ) -> Partition {
         Partition {
             index_id,
@@ -33,6 +33,8 @@ impl Partition {
                     .to_lowercase(),
             ),
             file_size: None,
+            min: None,
+            max: None
         }
     }
 
@@ -53,6 +55,8 @@ impl Partition {
                     .to_lowercase(),
             ),
             file_size: None,
+            min: None,
+            max: None
         }
     }
     pub fn get_min_val(&self) -> &Option<Row> {
@@ -61,6 +65,14 @@ impl Partition {
 
     pub fn get_max_val(&self) -> &Option<Row> {
         &self.max_value
+    }
+
+    pub fn get_min(&self) -> &Option<Row> {
+        &self.min
+    }
+
+    pub fn get_max(&self) -> &Option<Row> {
+        &self.max
     }
 
     pub fn get_full_name(&self, partition_id: u64) -> Option<String> {
@@ -97,11 +109,15 @@ impl Partition {
         min_value: Option<Row>,
         max_value: Option<Row>,
         main_table_row_count: u64,
+        min: Option<Row>,
+        max: Option<Row>,
     ) -> Partition {
         let mut p = self.clone();
         p.min_value = min_value;
         p.max_value = max_value;
         p.main_table_row_count = main_table_row_count;
+        p.min = min;
+        p.max = max;
         p
     }
 

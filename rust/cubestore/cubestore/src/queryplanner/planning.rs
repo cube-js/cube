@@ -33,7 +33,7 @@ use datafusion::physical_plan::{
 };
 use flatbuffers::bitflags::_core::any::Any;
 use flatbuffers::bitflags::_core::fmt::Formatter;
-use itertools::Itertools;
+use itertools::{Itertools, EitherOrBoth};
 
 use crate::cluster::Cluster;
 use crate::metastore::multi_index::MultiPartition;
@@ -51,6 +51,7 @@ use crate::queryplanner::serialized_plan::{
 use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
 use crate::queryplanner::CubeTableLogical;
 use crate::CubeError;
+use crate::table::{Row, cmp_same_types};
 use datafusion::logical_plan;
 use datafusion::optimizer::utils::expr_to_columns;
 use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
@@ -58,6 +59,7 @@ use serde::{Deserialize as SerdeDeser, Deserializer, Serialize as SerdeSer, Seri
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::iter::FromIterator;
+use std::cmp::Ordering;
 
 #[cfg(test)]
 pub async fn choose_index(
@@ -138,20 +140,24 @@ pub async fn choose_index_ext(
             indices.iter().map(|i| i.index.get_id()).collect_vec(),
         )
         .await?;
+
     assert_eq!(partitions.len(), indices.len());
     for ((i, c), ps) in indices
         .iter_mut()
         .zip(collector.constraints.iter())
         .zip(partitions)
     {
-        i.partitions = pick_partitions(i, c, ps)?
+        i.partitions = pick_partitions(i, c, ps)?;
     }
-
+    
+    let pushdown_limit = can_pushdown_limit(&indices);
     // We have enough information to finalize the logical plan.
     let mut r = ChooseIndex {
         chosen_indices: &indices,
         next_index: 0,
         enable_topk,
+        pushdown_limit,
+        limit: None
     };
     let plan = rewrite_plan(p, &(), &mut r)?;
     assert_eq!(r.next_index, indices.len());
@@ -175,6 +181,88 @@ pub async fn choose_index_ext(
         },
     ))
 }
+
+fn can_pushdown_limit(indices: &Vec<IndexSnapshot>) -> bool {
+    if indices.is_empty() {
+        return false;
+    }
+    if indices[0].sort_on().is_none() || indices[0].sort_on().unwrap().is_empty() {
+        return false;
+    }
+
+    let sort_on = indices[0].sort_on().unwrap();
+    let sort_on_len = sort_on.len();
+
+    let mut partitions = Vec::new();
+    for ind in indices.iter() {
+        if ind.sort_on().map_or_else(|| true , |v| v != sort_on) {
+            return false;
+        }
+
+        partitions.extend(ind.partitions.iter().filter_map(|p| {
+            if p.partition().get_row().is_active() {
+                Some(
+                    p.partition()
+                    )
+            } else {
+                None
+            }
+        }));
+    }
+
+    if partitions.is_empty() {
+        return false;
+    }
+
+    !is_partitions_intersects(partitions, sort_on_len)
+}
+
+
+fn is_partitions_intersects(mut partitions: Vec<&IdRow<Partition>>, sort_on_len: usize) -> bool {
+        for p in partitions.iter() {
+            println!("!!!partit!!! {:?}, {:?}", p.get_row().get_min_val(), p.get_row().get_max_val());
+        }
+        partitions.sort_by(|a, b| {
+            cmp_row(a.get_row().get_min_val(), b.get_row().get_min_val(), sort_on_len)
+        });
+
+        for item in partitions.iter().zip_longest(partitions.iter().skip(1)) {
+
+            match item {
+
+                EitherOrBoth::Both(left_part, right_part) => {
+                    match cmp_row(left_part.get_row().get_max_val(), right_part.get_row().get_min_val(), sort_on_len) {
+                        Ordering::Greater => return true,
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
+    false
+}
+
+fn cmp_row(l:&Option<Row>, r:&Option<Row>, len:usize) -> Ordering {
+
+    match (l, r) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(l), Some(r)) => l.values()
+            .iter()
+            .take(len)
+            .zip(r.values().iter().take(len))
+            .find_map(|(a, b)| {
+                match cmp_same_types(a, b) {
+                    Ordering::Less => Some(Ordering::Less),
+                    Ordering::Greater => Some(Ordering::Greater),
+                    Ordering::Equal => None
+                }
+            }
+            ).unwrap_or(Ordering::Equal)
+    }
+}
+
 
 fn all_have_same_partitioned_index(cs: &[IndexCandidate]) -> bool {
     if cs.is_empty() {
@@ -443,6 +531,8 @@ struct ChooseIndex<'a> {
     next_index: usize,
     chosen_indices: &'a [IndexSnapshot],
     enable_topk: bool,
+    pushdown_limit: bool,
+    limit: Option<usize>
 }
 
 impl PlanRewriter for ChooseIndex<'_> {
@@ -501,9 +591,12 @@ impl ChooseIndex<'_> {
 
                     let index_schema = source.schema();
                     assert_eq!(table_schema, index_schema);
-
+                    let input = match self.limit {
+                        Some(n) => LogicalPlan::Limit { n, input: Arc::new(p) },
+                        None => p
+                    };
                     return Ok(ClusterSendNode::new(
-                        Arc::new(p),
+                        Arc::new(input),
                         vec![vec![Snapshot::Index(snapshot)]],
                     )
                     .into_plan());
@@ -517,6 +610,12 @@ impl ChooseIndex<'_> {
                 } else {
                     panic!("Unexpected table source")
                 }
+            },
+            LogicalPlan::Limit { n, .. } => {
+                if self.pushdown_limit {
+                    self.limit = Some(n.to_owned());
+                }
+                return Ok(p)
             }
             _ => return Ok(p),
         }
@@ -1575,7 +1674,7 @@ pub mod tests {
         for p in 0..indices.partitions.len() {
             indices
                 .chunks
-                .push(Chunk::new(p as u64, 123, false).set_uploaded(true));
+                .push(Chunk::new(p as u64, 123, None, None, false).set_uploaded(true));
         }
 
         // Plan again.
