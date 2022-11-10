@@ -1227,7 +1227,7 @@ mod tests {
     use datafusion::physical_plan::collect;
     use rocksdb::{Options, DB};
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[tokio::test]
     async fn compaction() {
@@ -1579,7 +1579,7 @@ mod tests {
             PathBuf::from(chunk_store_path.clone()),
         );
         let metastore = RocksMetaStore::new(
-            path,
+            Path::new(path),
             RocksMetaStoreFs::new(remote_fs.clone()),
             config.config_obj(),
         );

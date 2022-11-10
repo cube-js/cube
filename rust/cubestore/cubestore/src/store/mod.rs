@@ -582,7 +582,7 @@ mod tests {
     use arrow::array::{Int64Array, StringArray};
     use rocksdb::{Options, DB};
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[tokio::test]
     async fn create_wal_test() {
@@ -601,7 +601,7 @@ mod tests {
             );
             let store = WALStore::new(
                 RocksMetaStore::new(
-                    path,
+                    Path::new(path),
                     RocksMetaStoreFs::new(remote_fs.clone()),
                     config.config_obj(),
                 ),
@@ -691,7 +691,7 @@ mod tests {
                 PathBuf::from(chunk_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                path,
+                Path::new(path),
                 RocksMetaStoreFs::new(remote_fs.clone()),
                 config.config_obj(),
             );
@@ -788,7 +788,7 @@ mod tests {
                 PathBuf::from(chunk_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                path,
+                Path::new(path),
                 RocksMetaStoreFs::new(remote_fs.clone()),
                 config.config_obj(),
             );

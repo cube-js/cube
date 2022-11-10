@@ -41,7 +41,7 @@ use rocksdb::{Options, DB};
 use simple_logger::SimpleLogger;
 use std::fmt::Display;
 use std::future::Future;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -1102,9 +1102,14 @@ impl Config {
                         let config = i.get_service_typed::<dyn ConfigObj>().await;
                         let metastore_fs = i.get_service_typed::<dyn MetaStoreFs>().await;
                         let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            RocksMetaStore::load_from_dump(&path, dump_dir, metastore_fs, config)
-                                .await
-                                .unwrap()
+                            RocksMetaStore::load_from_dump(
+                                &Path::new(&path),
+                                dump_dir,
+                                metastore_fs,
+                                config,
+                            )
+                            .await
+                            .unwrap()
                         } else {
                             metastore_fs.load_from_remote(&path, config).await.unwrap()
                         };

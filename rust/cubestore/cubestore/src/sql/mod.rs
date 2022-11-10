@@ -1720,7 +1720,7 @@ mod tests {
                 PathBuf::from(store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                path,
+                Path::new(path),
                 RocksMetaStoreFs::new(remote_fs.clone()),
                 config.config_obj(),
             );
@@ -1778,7 +1778,7 @@ mod tests {
                 PathBuf::from(store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                path,
+                Path::new(path),
                 RocksMetaStoreFs::new(remote_fs.clone()),
                 config.config_obj(),
             );
@@ -1864,7 +1864,7 @@ mod tests {
                 PathBuf::from(store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                path,
+                Path::new(path),
                 RocksMetaStoreFs::new(remote_fs.clone()),
                 config.config_obj(),
             );
