@@ -78,17 +78,28 @@ const FilterGroup = ({
                 updateMethods.update(m, { ...m, operator })
               }
             >
-              {m.operators.map((operator) => (
-                <Select.Option
-                  key={operator.name}
-                  value={operator.name}
-                  disabled={operatorsByMemberName[m.member]?.includes(
-                    operator.name
-                  )}
-                >
-                  {operator.title}
-                </Select.Option>
-              ))}
+              {m.operators.map((operator) => {
+                const isOperatorDisabled = operatorsByMemberName[
+                  m.member
+                ]?.includes(operator.name);
+
+                return (
+                  <Select.Option
+                    key={operator.name}
+                    value={operator.name}
+                    title={
+                      isOperatorDisabled
+                        ? `There is already a filter applied with this operator for ${
+                            m.dimension?.title || m.name
+                          }`
+                        : operator.name
+                    }
+                    disabled={isOperatorDisabled}
+                  >
+                    {operator.title}
+                  </Select.Option>
+                );
+              })}
             </Select>
 
             {!['set', 'notSet'].includes(m.operator) ? (
