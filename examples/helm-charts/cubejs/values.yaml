@@ -44,7 +44,7 @@ config:
 
   ## The port for a Cube.js deployment to listen to Postgres SQL connections on
   ##
-  pgSqlPort: 5432
+  pgSqlPort:
 
   ## The username to access the SQL api
   ##
