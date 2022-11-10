@@ -15,7 +15,7 @@ import {
 
 import QueryRenderer from './QueryRenderer.jsx';
 import CubeContext from './CubeContext';
-import { generateRandomString, removeEmpty } from './utils';
+import { removeEmpty } from './utils';
 
 const granularities = [
   { name: undefined, title: 'w/o grouping' },
