@@ -73,8 +73,10 @@ export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
               token={currentToken!}
               dashboardSource={props.dashboardSource}
               securityContextToken={securityContextToken}
-              onTabChange={props.onTabChange}
               extra={props.extra}
+              schemaVersion={props.schemaVersion}
+              onSchemaChange={props.onSchemaChange}
+              onTabChange={props.onTabChange}
               onVizStateChanged={props.onVizStateChanged}
               onSecurityContextModalOpen={() => setIsModalOpen(true)}
             />
@@ -105,7 +107,6 @@ function QueryTabsRenderer({
   token,
   securityContextToken,
   dashboardSource,
-  schemaVersion,
   onSecurityContextModalOpen,
   ...props
 }: QueryTabsRendererProps) {
@@ -158,8 +159,9 @@ function QueryTabsRenderer({
             chartType,
           }}
           dashboardSource={dashboardSource}
-          schemaVersion={schemaVersion}
+          schemaVersion={props.schemaVersion}
           extra={props.extra}
+          onSchemaChange={props.onSchemaChange}
           onVizStateChanged={(vizState) => {
             saveTab({
               query: vizState.query || {},
