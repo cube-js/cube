@@ -152,13 +152,14 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
   lastEvent = new Date();
 
   const flush = async (toFlush?: any[], retries?: number) => {
+    const agentFrameSize: number = getEnv('agentFrameSize');
     if (!transport) {
       transport = /^http/.test(endpointUrl) ?
         new HttpTransport(endpointUrl) :
         new WebSocketTransport(endpointUrl, logger, clearTransport);
     }
 
-    if (!toFlush) toFlush = trackEvents.splice(0, getEnv('agentFrameSize'));
+    if (!toFlush) toFlush = trackEvents.splice(0, agentFrameSize);
     if (!toFlush.length) return false;
     if (retries == null) retries = 3;
 
@@ -167,6 +168,10 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
       const result = await transport.send(toFlush.map(r => ({ ...r, sentAt })));
       if (!result && retries > 0) return flush(toFlush, retries - 1);
   
+      if (trackEvents.length > agentFrameSize) {
+        await flush();
+      }
+
       return true;
     } catch (e) {
       if (retries > 0) return flush(toFlush, retries - 1);
