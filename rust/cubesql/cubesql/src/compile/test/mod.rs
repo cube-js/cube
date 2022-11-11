@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use cubeclient::models::{
-    V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment, V1LoadRequestQuery,
-    V1LoadResponse,
+    V1CubeMeta, V1CubeMetaDimension, V1CubeMetaJoin, V1CubeMetaMeasure, V1CubeMetaSegment,
+    V1LoadRequestQuery, V1LoadResponse,
 };
 
 use crate::{
@@ -86,11 +86,18 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     short_title: "Female".to_string(),
                 },
             ],
+            joins: Some(vec![V1CubeMetaJoin {
+                name: "Logs".to_string(),
+                relationship: "belongsTo".to_string(),
+            }]),
         },
         V1CubeMeta {
             name: "Logs".to_string(),
             title: None,
-            dimensions: vec![],
+            dimensions: vec![V1CubeMetaDimension {
+                name: "Logs.read".to_string(),
+                _type: "boolean".to_string(),
+            }],
             measures: vec![
                 V1CubeMetaMeasure {
                     name: "Logs.agentCount".to_string(),
@@ -106,6 +113,10 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                 },
             ],
             segments: vec![],
+            joins: Some(vec![V1CubeMetaJoin {
+                name: "NumberCube".to_string(),
+                relationship: "belongsTo".to_string(),
+            }]),
         },
         V1CubeMeta {
             name: "NumberCube".to_string(),
@@ -118,6 +129,7 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                 agg_type: Some("number".to_string()),
             }],
             segments: vec![],
+            joins: None,
         },
     ]
 }

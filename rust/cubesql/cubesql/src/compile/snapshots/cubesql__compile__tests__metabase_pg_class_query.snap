@@ -17,4 +17,5 @@ expression: "execute_query(\"\n                SELECT *\n                    FRO
 | public  | KibanaSampleDataEcommerce | is_male            | 16       | true       | -1        | 1      | -1        | 10     | NULL        | NULL  | NULL        | 0           | b       |
 | public  | KibanaSampleDataEcommerce | is_female          | 16       | true       | -1        | 1      | -1        | 11     | NULL        | NULL  | NULL        | 0           | b       |
 | public  | KibanaSampleDataEcommerce | __user             | 25       | false      | -1        | -1     | -1        | 12     | NULL        | NULL  | NULL        | 0           | b       |
+| public  | KibanaSampleDataEcommerce | __cubeJoinField    | 25       | false      | -1        | -1     | -1        | 13     | NULL        | NULL  | NULL        | 0           | b       |
 +---------+---------------------------+--------------------+----------+------------+-----------+--------+-----------+--------+-------------+-------+-------------+-------------+---------+

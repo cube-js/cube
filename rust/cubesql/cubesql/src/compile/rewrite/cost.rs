@@ -73,6 +73,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::Measure(_) => 1,
             LogicalPlanLanguage::Dimension(_) => 1,
             LogicalPlanLanguage::ChangeUser(_) => 1,
+            LogicalPlanLanguage::VirtualField(_) => 1,
             LogicalPlanLanguage::LiteralMember(_) => 1,
             LogicalPlanLanguage::TimeDimensionGranularity(TimeDimensionGranularity(Some(_))) => 1,
             LogicalPlanLanguage::MemberError(_) => 1,
@@ -90,6 +91,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::GroupAggregateSplitReplacer(_) => 1,
             LogicalPlanLanguage::MemberPushdownReplacer(_) => 1,
             LogicalPlanLanguage::EventNotification(_) => 1,
+            LogicalPlanLanguage::MergedMembersReplacer(_) => 1,
             _ => 0,
         };
 
@@ -103,6 +105,8 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
         let structure_points = match enode {
             // TODO needed to get rid of FilterOpFilters on upper level
             LogicalPlanLanguage::FilterOpFilters(_) => 1,
+            LogicalPlanLanguage::Join(_) => 1,
+            LogicalPlanLanguage::CrossJoin(_) => 1,
             _ => 0,
         };
         enode.children().iter().fold(

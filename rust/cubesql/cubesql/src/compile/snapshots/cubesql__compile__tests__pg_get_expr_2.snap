@@ -5,6 +5,7 @@ expression: "execute_query(\"\n                SELECT\n                    attre
 +----------+--------------------+---------+
 | attrelid | attname            | default |
 +----------+--------------------+---------+
+| 18000    | __cubeJoinField    | NULL    |
 | 18000    | __user             | NULL    |
 | 18000    | avgPrice           | NULL    |
 | 18000    | count              | NULL    |
@@ -17,9 +18,12 @@ expression: "execute_query(\"\n                SELECT\n                    attre
 | 18000    | minPrice           | NULL    |
 | 18000    | order_date         | NULL    |
 | 18000    | taxful_total_price | NULL    |
-| 18015    | __user             | NULL    |
-| 18015    | agentCount         | NULL    |
-| 18015    | agentCountApprox   | NULL    |
-| 18021    | __user             | NULL    |
-| 18021    | someNumber         | NULL    |
+| 18016    | __cubeJoinField    | NULL    |
+| 18016    | __user             | NULL    |
+| 18016    | agentCount         | NULL    |
+| 18016    | agentCountApprox   | NULL    |
+| 18016    | read               | NULL    |
+| 18024    | __cubeJoinField    | NULL    |
+| 18024    | __user             | NULL    |
+| 18024    | someNumber         | NULL    |
 +----------+--------------------+---------+

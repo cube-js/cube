@@ -112,7 +112,7 @@ impl TransportService for HttpTransport {
             };
         }
 
-        let response = cube_api::meta_v1(&self.get_client_config_for_ctx(ctx)).await?;
+        let response = cube_api::meta_v1(&self.get_client_config_for_ctx(ctx), true).await?;
 
         let mut store = self.cache.write().await;
         if let Some(cache_bucket) = &*store {

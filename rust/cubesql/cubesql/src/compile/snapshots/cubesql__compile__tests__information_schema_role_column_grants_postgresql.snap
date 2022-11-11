@@ -17,9 +17,13 @@ expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | is_male            | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | is_female          | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | __user             | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | __cubeJoinField    | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | Logs                      | agentCount         | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | Logs                      | agentCountApprox   | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | Logs                      | read               | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | Logs                      | __user             | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | Logs                      | __cubeJoinField    | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | NumberCube                | someNumber         | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | NumberCube                | __user             | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | NumberCube                | __cubeJoinField    | SELECT         | YES          |
 +---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+

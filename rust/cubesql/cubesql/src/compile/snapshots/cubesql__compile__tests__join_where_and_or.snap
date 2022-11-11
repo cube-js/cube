@@ -17,9 +17,13 @@ expression: "execute_query(\"\n                SELECT\n                    att.a
 | is_male            | 10     | 18000 |
 | is_female          | 11     | 18000 |
 | __user             | 12     | 18000 |
-| agentCount         | 1      | 18015 |
-| agentCountApprox   | 2      | 18015 |
-| __user             | 3      | 18015 |
-| someNumber         | 1      | 18021 |
-| __user             | 2      | 18021 |
+| __cubeJoinField    | 13     | 18000 |
+| agentCount         | 1      | 18016 |
+| agentCountApprox   | 2      | 18016 |
+| read               | 3      | 18016 |
+| __user             | 4      | 18016 |
+| __cubeJoinField    | 5      | 18016 |
+| someNumber         | 1      | 18024 |
+| __user             | 2      | 18024 |
+| __cubeJoinField    | 3      | 18024 |
 +--------------------+--------+-------+

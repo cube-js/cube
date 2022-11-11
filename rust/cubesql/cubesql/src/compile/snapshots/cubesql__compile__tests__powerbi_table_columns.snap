@@ -17,4 +17,5 @@ expression: "execute_query(\"select COLUMN_NAME, ORDINAL_POSITION, IS_NULLABLE, 
 | is_male            | 10               | NO          | boolean                     |
 | is_female          | 11               | NO          | boolean                     |
 | __user             | 12               | YES         | text                        |
+| __cubeJoinField    | 13               | YES         | text                        |
 +--------------------+------------------+-------------+-----------------------------+

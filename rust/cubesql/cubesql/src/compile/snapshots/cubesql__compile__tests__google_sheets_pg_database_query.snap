@@ -17,4 +17,5 @@ expression: "execute_query(\"\n                SELECT\n                    cl.re
 | KibanaSampleDataEcommerce | is_male            | 10       | false    | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
 | KibanaSampleDataEcommerce | is_female          | 11       | false    | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
 | KibanaSampleDataEcommerce | __user             | 12       | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | __cubeJoinField    | 13       | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
 +---------------------------+--------------------+----------+----------+-------+-----------------+-----------+--------+-----------+-------+----------------+

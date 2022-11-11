@@ -17,4 +17,5 @@ expression: "execute_query(\"show columns from KibanaSampleDataEcommerce;\".to_s
 | is_male            | tinyint(1)   | NO   |     | NULL    |       |
 | is_female          | tinyint(1)   | NO   |     | NULL    |       |
 | __user             | varchar(255) | YES  |     | NULL    |       |
+| __cubeJoinField    | varchar(255) | YES  |     | NULL    |       |
 +--------------------+--------------+------+-----+---------+-------+

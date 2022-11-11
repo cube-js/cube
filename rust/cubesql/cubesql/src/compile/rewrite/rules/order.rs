@@ -34,6 +34,7 @@ impl RewriteRules for OrderRules {
                         "?offset",
                         "?cube_aliases",
                         "?split",
+                        "?can_pushdown_join",
                     ),
                 ),
                 cube_scan(
@@ -45,6 +46,7 @@ impl RewriteRules for OrderRules {
                     "?offset",
                     "?cube_aliases",
                     "?split",
+                    "?can_pushdown_join",
                 ),
                 self.push_down_sort("?expr", "?members", "?aliases"),
             ),
