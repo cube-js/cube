@@ -12413,20 +12413,32 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             r#"
             select
+                "_"."t1.agentCountApprox" as "agentCountApprox",
                 "_"."a0" as "a0"
             from (
                 select
-                    sum(cast("rows"."t0.taxful_total_price" as decimal)) as "a0"
+                    sum(cast("rows"."t0.taxful_total_price" as decimal)) as "a0",
+                    "rows"."t1.agentCountApprox" as "t1.agentCountApprox"
                 from (
                     select
+                        "$Outer"."t1.agentCountApprox",
                         "$Inner"."t0.taxful_total_price"
                     from (
                         select
+                            "_"."agentCount" as "t1.agentCount",
+                            "_"."agentCountApprox" as "t1.agentCountApprox",
+                            "_"."__cubeJoinField" as "t1.__cubeJoinField"
+                        from "public"."Logs" "_"
+                    ) "$Outer"
+                    left outer join (
+                        select
                             "_"."taxful_total_price" as "t0.taxful_total_price",
-                            "_"."count" as "t0.count"
+                            "_"."count" as "t0.count",
+                            "_"."__cubeJoinField" as "t0.__cubeJoinField"
                         from "public"."KibanaSampleDataEcommerce" "_"
-                    ) "$Inner"
+                    ) "$Inner" on ("$Outer"."t1.__cubeJoinField" = "$Inner"."t0.__cubeJoinField")
                 ) "rows"
+                group by "t1.agentCountApprox"
             ) "_"
             where not "_"."a0" is null
             limit 1000001
@@ -12440,7 +12452,7 @@ ORDER BY \"COUNT(count)\" DESC"
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
-                measures: Some(vec![]),
+                measures: Some(vec!["Logs.agentCountApprox".to_string(),]),
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                 ]),
@@ -12450,7 +12462,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
-            }
+            },
         );
     }
 

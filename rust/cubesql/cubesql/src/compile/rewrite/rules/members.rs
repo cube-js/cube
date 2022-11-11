@@ -784,7 +784,7 @@ impl RewriteRules for MemberRules {
                         "?right_can_pushdown_join",
                     ),
                 ),
-                self.join_to_cross_join("?left_on", "?right_on"),
+                self.join_to_cross_join("?left_on", "?right_on", "?left_aliases", "?right_aliases"),
             ),
         ];
 
@@ -1360,6 +1360,35 @@ impl MemberRules {
             )
     }
 
+    fn update_cube_aliases_relation(
+        cube_aliases: Vec<(String, String)>,
+        old_relations: &Vec<String>,
+        new_relation: &Option<String>,
+    ) -> Vec<(String, String)> {
+        if let Some(new_relation) = new_relation {
+            cube_aliases
+                .into_iter()
+                .map(|(old_alias, member)| {
+                    let old_relation = old_alias.split(".").next().unwrap().to_string();
+                    if old_relations.contains(&old_relation) {
+                        (
+                            format!(
+                                "{}{}",
+                                new_relation,
+                                old_alias.strip_prefix(&old_relation).unwrap()
+                            ),
+                            member,
+                        )
+                    } else {
+                        (old_alias, member)
+                    }
+                })
+                .collect::<Vec<_>>()
+        } else {
+            cube_aliases
+        }
+    }
+
     fn push_down_aggregate_to_empty_scan(
         &self,
         alias_to_cube_var: &'static str,
@@ -1447,9 +1476,15 @@ impl MemberRules {
                             member_replacer_alias_to_cube,
                         );
 
+                        let old_relations = alias_to_cube.iter().map(|(a, _)| a.clone()).collect();
+
                         let member_replacer_aliases =
                             egraph.add(LogicalPlanLanguage::MemberReplacerAliases(
-                                MemberReplacerAliases(cube_aliases.unwrap_or(vec![])),
+                                MemberReplacerAliases(Self::update_cube_aliases_relation(
+                                    cube_aliases.unwrap_or(vec![]),
+                                    &old_relations,
+                                    &projection_alias,
+                                )),
                             ));
                         subst.insert(member_replacer_aliases_var, member_replacer_aliases);
 
@@ -1763,7 +1798,10 @@ impl MemberRules {
                                     return true;
                                 }
 
-                                if column.name.eq_ignore_ascii_case(&"__user") {
+                                let member_name =
+                                    member_name.split(".").last().unwrap().to_string();
+
+                                if member_name.eq_ignore_ascii_case(&"__user") {
                                     let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
                                         ColumnExprColumn(Column {
                                             relation: Some(cube_alias),
@@ -1784,7 +1822,7 @@ impl MemberRules {
                                     return true;
                                 }
 
-                                if column.name.eq_ignore_ascii_case(&"__cubeJoinField") {
+                                if member_name.eq_ignore_ascii_case(&"__cubeJoinField") {
                                     let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
                                         ColumnExprColumn(Column {
                                             relation: Some(cube_alias),
@@ -2619,19 +2657,54 @@ impl MemberRules {
         &self,
         left_on_var: &'static str,
         right_on_var: &'static str,
+        left_aliases_var: &'static str,
+        right_aliases_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let left_on_var = var!(left_on_var);
         let right_on_var = var!(right_on_var);
+        let left_aliases_var = var!(left_aliases_var);
+        let right_aliases_var = var!(right_aliases_var);
         move |egraph, subst| {
-            for left_join_on in var_iter!(egraph[subst[left_on_var]], JoinLeftOn) {
-                match (left_join_on.len(), left_join_on.first()) {
-                    (1, Some(col)) if col.name == "__cubeJoinField" => (),
-                    _ => continue,
-                }
-                for right_join_on in var_iter!(egraph[subst[right_on_var]], JoinRightOn) {
-                    match (right_join_on.len(), right_join_on.first()) {
-                        (1, Some(col)) if col.name == "__cubeJoinField" => return true,
-                        _ => continue,
+            for left_aliases in var_iter!(egraph[subst[left_aliases_var]], CubeScanAliases).cloned()
+            {
+                let left_aliases = left_aliases.unwrap_or(vec![]);
+                for right_aliases in
+                    var_iter!(egraph[subst[right_aliases_var]], CubeScanAliases).cloned()
+                {
+                    let right_aliases = right_aliases.unwrap_or(vec![]);
+                    for left_join_on in var_iter!(egraph[subst[left_on_var]], JoinLeftOn) {
+                        for join_on in left_join_on.iter() {
+                            let mut column_name = join_on.name.clone();
+                            if let Some(name) = find_column_by_alias(
+                                &column_name,
+                                &left_aliases,
+                                &join_on.relation.clone().unwrap_or_default(),
+                            ) {
+                                column_name = name.split(".").last().unwrap().to_string();
+                            }
+
+                            if column_name == "__cubeJoinField" {
+                                for right_join_on in
+                                    var_iter!(egraph[subst[right_on_var]], JoinRightOn)
+                                {
+                                    for join_on in right_join_on.iter() {
+                                        let mut column_name = join_on.name.clone();
+                                        if let Some(name) = find_column_by_alias(
+                                            &column_name,
+                                            &right_aliases,
+                                            &join_on.relation.clone().unwrap_or_default(),
+                                        ) {
+                                            column_name =
+                                                name.split(".").last().unwrap().to_string();
+                                        }
+
+                                        if column_name == "__cubeJoinField" {
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2800,14 +2873,23 @@ fn get_member_name(
     aliases: &Vec<(String, String)>,
     cube_alias: &String,
 ) -> String {
+    find_column_by_alias(column_name, aliases, cube_alias)
+        .unwrap_or(format!("{}.{}", cube_name, column_name))
+}
+
+fn find_column_by_alias(
+    column_name: &String,
+    aliases: &Vec<(String, String)>,
+    cube_alias: &String,
+) -> Option<String> {
     if let Some((_, name)) = aliases
         .iter()
         .find(|(a, _)| a == &format!("{}.{}", cube_alias, column_name))
     {
-        return name.to_string();
+        return Some(name.to_string());
     }
 
-    format!("{}.{}", cube_name, column_name)
+    None
 }
 
 #[cfg(test)]

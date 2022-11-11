@@ -4,6 +4,7 @@ use crate::{
             df::scan::{CubeScanNode, CubeScanOptions, MemberField},
             provider::CubeContext,
         },
+        is_olap_query,
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
@@ -912,30 +913,43 @@ impl LanguageToLogicalPlanConverter {
                 let right = self.to_logical_plan(params[1]);
 
                 if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
-                    match (left_on.first(), right_on.first()) {
-                        (Some(left_col), Some(right_col))
-                            if left_col.name == "__cubeJoinField"
-                                && right_col.name == "__cubeJoinField" =>
-                        {
-                            return Err(CubeError::internal(
-                                "Can not join Cubes. This is most likely due to one of the following reasons:\n\
-                                • one of the cubes contains a group by\n\
-                                • one of the cubes contains a measure\n\
-                                • the cube on the right contains a filter, sorting or limits\n".to_string(),
-                            ));
+                    if left_on.iter().any(|c| c.name == "__cubeJoinField")
+                        || right_on.iter().any(|c| c.name == "__cubeJoinField")
+                    {
+                        return Err(CubeError::internal(
+                            "Can not join Cubes. This is most likely due to one of the following reasons:\n\
+                            • one of the cubes contains a group by\n\
+                            • one of the cubes contains a measure\n\
+                            • the cube on the right contains a filter, sorting or limits\n".to_string(),
+                        ));
+                    } else {
+                        return Err(CubeError::internal(
+                            "Use __cubeJoinField to join Cubes".to_string(),
+                        ));
+                    }
+                } else {
+                    let mut is_olap = left_on.iter().any(|c| c.name == "__cubeJoinField")
+                        || right_on.iter().any(|c| c.name == "__cubeJoinField");
+                    if !is_olap {
+                        if let Ok(left_plan) = &left {
+                            match is_olap_query(left_plan) {
+                                Ok(res) if res => is_olap = true,
+                                _ => (),
+                            }
                         }
-                        _ => {
-                            return Err(CubeError::internal(
-                                "Use __cubeJoinField to join Cubes".to_string(),
-                            ));
+                        if let Ok(right_plan) = &right {
+                            match is_olap_query(right_plan) {
+                                Ok(res) if res => is_olap = true,
+                                _ => (),
+                            }
                         }
                     }
-                } else if left_on.iter().any(|c| c.name == "__cubeJoinField")
-                    || right_on.iter().any(|c| c.name == "__cubeJoinField")
-                {
-                    return Err(CubeError::internal(
-                        "Can not join Cubes. Looks like one of the subqueries includes post-processing operations".to_string(),
-                    ));
+
+                    if is_olap {
+                        return Err(CubeError::internal(
+                            "Can not join Cubes. Looks like one of the subqueries includes post-processing operations".to_string(),
+                        ));
+                    }
                 }
 
                 let left = Arc::new(left?);
