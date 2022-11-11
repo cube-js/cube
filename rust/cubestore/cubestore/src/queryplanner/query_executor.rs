@@ -120,6 +120,7 @@ impl QueryExecutor for QueryExecutorImpl {
             pp_phys_plan(split_plan.as_ref())
         );
 
+
         let execution_time = SystemTime::now();
 
         let results = collect(split_plan.clone()).instrument(collect_span).await;
@@ -163,7 +164,6 @@ impl QueryExecutor for QueryExecutorImpl {
         let (physical_plan, logical_plan) = self
             .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
             .await?;
-
         let worker_plan;
         let max_batch_rows;
         if let Some((p, s)) = get_worker_plan(&physical_plan) {

@@ -75,6 +75,14 @@ impl Partition {
         &self.max
     }
 
+    pub fn get_min_or_lower_bound(&self) -> Option<&Row> {
+        self.get_min().as_ref().or(self.get_min_val().as_ref())
+    }
+
+    pub fn get_max_or_upper_bound(&self) -> Option<&Row> {
+        self.get_max().as_ref().or(self.get_max_val().as_ref())
+    }
+
     pub fn get_full_name(&self, partition_id: u64) -> Option<String> {
         match self.has_main_table_file() {
             false => None,
