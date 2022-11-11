@@ -6,7 +6,6 @@ import crypto from 'crypto';
 import WebSocket from 'ws';
 import zlib from 'zlib';
 import { promisify } from 'util';
-import { number } from '@hapi/joi';
 
 const deflate = promisify(zlib.deflate);
 interface AgentTransport {
