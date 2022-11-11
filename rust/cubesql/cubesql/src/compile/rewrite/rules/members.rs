@@ -1703,7 +1703,7 @@ impl MemberRules {
             for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                 for alias_to_cube in var_iter!(egraph[subst[cube_var]], MemberReplacerAliasToCube) {
                     for aliases in var_iter!(egraph[subst[aliases_var]], MemberReplacerAliases) {
-                        if let Some(((_, cube_alias), cube)) =
+                        for ((_, cube_alias), cube) in
                             meta_context.find_cube_by_column_for_replacer(&alias_to_cube, &column)
                         {
                             let column_names = if let Some(alias_var) = &alias_var {
@@ -1883,7 +1883,7 @@ impl MemberRules {
             for column in var_iter!(egraph[subst[dimension_var]], ColumnExprColumn).cloned() {
                 for alias_to_cube in var_iter!(egraph[subst[cube_var]], MemberReplacerAliasToCube) {
                     for aliases in var_iter!(egraph[subst[aliases_var]], MemberReplacerAliases) {
-                        if let Some(((_, cube_alias), cube)) =
+                        for ((_, cube_alias), cube) in
                             meta_context.find_cube_by_column_for_replacer(&alias_to_cube, &column)
                         {
                             let time_dimension_name =
@@ -2161,7 +2161,7 @@ impl MemberRules {
                 for alias_to_cube in
                     var_iter!(egraph[subst[alias_to_cube_var]], MemberReplacerAliasToCube)
                 {
-                    if let Some(((_, cube_alias), cube)) =
+                    for ((_, cube_alias), cube) in
                         meta_context.find_cube_by_column_for_replacer(&alias_to_cube, &column)
                     {
                         for distinct in distinct_var

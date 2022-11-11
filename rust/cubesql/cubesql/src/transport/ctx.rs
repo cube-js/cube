@@ -93,22 +93,33 @@ impl MetaContext {
         &self,
         alias_to_cube: &Vec<((String, String), String)>,
         column: &Column,
-    ) -> Option<((String, String), V1CubeMeta)> {
-        (if let Some(rel) = column.relation.as_ref() {
-            alias_to_cube.iter().find(|((a, _), _)| a == rel)
+    ) -> Vec<((String, String), V1CubeMeta)> {
+        if let Some(rel) = column.relation.as_ref() {
+            alias_to_cube
+                .iter()
+                .filter_map(|((old, new), c)| {
+                    if old == rel {
+                        self.find_cube_with_name(c)
+                            .map(|cube| ((old.to_string(), new.to_string()), cube))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
         } else {
-            alias_to_cube.iter().find(|(_, c)| {
-                if let Some(cube) = self.find_cube_with_name(c) {
-                    cube.contains_member(&cube.member_name(&column.name))
-                } else {
-                    false
-                }
-            })
-        })
-        .and_then(|((old, new), c)| {
-            self.find_cube_with_name(c)
-                .map(|cube| ((old.to_string(), new.to_string()), cube))
-        })
+            alias_to_cube
+                .iter()
+                .filter_map(|((old, new), c)| {
+                    if let Some(cube) = self.find_cube_with_name(c) {
+                        if cube.contains_member(&cube.member_name(&column.name)) {
+                            return Some(((old.to_string(), new.to_string()), cube));
+                        }
+                    }
+
+                    None
+                })
+                .collect()
+        }
     }
 
     pub fn find_measure_with_name(&self, name: String) -> Option<V1CubeMetaMeasure> {
