@@ -151,6 +151,7 @@ pub async fn choose_index_ext(
     }
     
     let pushdown_limit = can_pushdown_limit(&indices);
+
     // We have enough information to finalize the logical plan.
     let mut r = ChooseIndex {
         chosen_indices: &indices,
@@ -161,6 +162,14 @@ pub async fn choose_index_ext(
     };
     let plan = rewrite_plan(p, &(), &mut r)?;
     assert_eq!(r.next_index, indices.len());
+
+    let plan = if pushdown_limit {
+
+        let mut r = PushDownLimit{};
+        rewrite_plan(&plan, &None, &mut r)?
+    } else {
+        plan
+    };
 
     let mut multi_parts = Vec::new();
     for i in &indices {
@@ -191,63 +200,91 @@ fn can_pushdown_limit(indices: &Vec<IndexSnapshot>) -> bool {
     }
 
     let sort_on = indices[0].sort_on().unwrap();
-    let sort_on_len = sort_on.len();
-
-    let mut partitions = Vec::new();
-    for ind in indices.iter() {
-        if ind.sort_on().map_or_else(|| true , |v| v != sort_on) {
-            return false;
-        }
-
-        partitions.extend(ind.partitions.iter().filter_map(|p| {
-            if p.partition().get_row().is_active() {
-                Some(
-                    p.partition()
-                    )
-            } else {
-                None
-            }
-        }));
-    }
-
-    if partitions.is_empty() {
+    
+    if indices.iter().any(|i| i.sort_on().map_or(true, |s| s != sort_on)) {
         return false;
     }
 
-    !is_partitions_intersects(partitions, sort_on_len)
-}
+    let sort_on_len = sort_on.len();
+    
+    let mut inds_min_max = indices.iter().map(|i| index_min_max(i)).collect::<Vec<_>>();
 
+    inds_min_max.sort_by(|a, b| cmp_row(a.0, b.0, sort_on_len, true));
 
-fn is_partitions_intersects(mut partitions: Vec<&IdRow<Partition>>, sort_on_len: usize) -> bool {
-        for p in partitions.iter() {
-            println!("!!!partit!!! {:?}, {:?}", p.get_row().get_min_val(), p.get_row().get_max_val());
-        }
-        partitions.sort_by(|a, b| {
-            cmp_row(a.get_row().get_min_val(), b.get_row().get_min_val(), sort_on_len)
-        });
+    for item in inds_min_max.iter().zip_longest(inds_min_max.iter().skip(1)) {
 
-        for item in partitions.iter().zip_longest(partitions.iter().skip(1)) {
+        match item {
 
-            match item {
-
-                EitherOrBoth::Both(left_part, right_part) => {
-                    match cmp_row(left_part.get_row().get_max_val(), right_part.get_row().get_min_val(), sort_on_len) {
-                        Ordering::Greater => return true,
-                        _ => {}
-                    }
+            EitherOrBoth::Both(left_part, right_part) => {
+                match cmp_row(left_part.1, right_part.0, sort_on_len, true) {
+                    Ordering::Greater => return false,
+                    _ => {}
                 }
-                _ => {}
             }
+            _ => {}
         }
-    false
+    }
+    true
+
 }
 
-fn cmp_row(l:&Option<Row>, r:&Option<Row>, len:usize) -> Ordering {
+
+
+fn index_min_max(ind: &IndexSnapshot) -> (Option<&Row>, Option<&Row>) {
+    let sort_on_len = ind.sort_on().unwrap().len();
+
+    let mut partitions = ind.partitions.iter().filter(|p| p.partition().get_row().is_active()).collect::<Vec<_>>();
+
+    if partitions.is_empty() {
+        return (None, None);
+    }
+
+    partitions.sort_by(|a, b| {
+        let a_row = a.partition().get_row();
+        let b_row = b.partition().get_row();
+        let a_val = a_row.get_min_or_lower_bound();
+        let b_val = b_row.get_max_or_upper_bound();
+        cmp_row(a_val, b_val, sort_on_len, true)
+    });
+
+    let min_candidates = partitions.first().unwrap()
+        .chunks
+        .iter()
+        .map(|c| c.get_row().min().as_ref());
+    let part_min = partitions.first().unwrap().partition().get_row().get_min_or_lower_bound();
+
+    let min = if part_min.is_some() {
+        min_candidates.chain(std::iter::once(part_min)).min_by(|a, b| cmp_row(*a, *b, sort_on_len, true))
+    } else {
+        min_candidates.min_by(|a, b| cmp_row(*a, *b, sort_on_len, true))
+    };
+
+    let max_candidates = partitions.last().unwrap()
+        .chunks
+        .iter()
+        .map(|c| c.get_row().max().as_ref());
+
+    let part_max = partitions.first().unwrap().partition().get_row().get_max_or_upper_bound();
+
+    let max = if part_max.is_some() {
+        max_candidates.chain(std::iter::once(part_max)).max_by(|a, b| cmp_row(*a, *b, sort_on_len, false))
+    } else {
+        max_candidates.max_by(|a, b| cmp_row(*a, *b, sort_on_len, false))
+    };
+
+    if min.is_none() || max.is_none() {
+        return (None, None);
+    }
+
+    (min.unwrap(), max.unwrap())
+}
+
+fn cmp_row(l:Option<&Row>, r:Option<&Row>, len:usize, none_first: bool) -> Ordering {
 
     match (l, r) {
         (None, None) => Ordering::Equal,
-        (None, Some(_)) => Ordering::Less,
-        (Some(_), None) => Ordering::Greater,
+        (None, Some(_)) => if none_first { Ordering::Less } else { Ordering::Greater },
+        (Some(_), None) => if !none_first { Ordering::Greater } else { Ordering::Less },
         (Some(l), Some(r)) => l.values()
             .iter()
             .take(len)
@@ -552,6 +589,7 @@ impl PlanRewriter for ChooseIndex<'_> {
     }
 }
 
+
 fn try_extract_cluster_send(p: &LogicalPlan) -> Option<&ClusterSendNode> {
     if let LogicalPlan::Extension { node } = p {
         return node.as_any().downcast_ref::<ClusterSendNode>();
@@ -618,6 +656,50 @@ impl ChooseIndex<'_> {
                 return Ok(p)
             }
             _ => return Ok(p),
+        }
+    }
+}
+
+struct PushDownLimit {
+}
+
+impl PlanRewriter for PushDownLimit {
+    type Context = Option<usize>;
+
+    fn enter_node(
+        &mut self,
+        n: &LogicalPlan,
+        _: &Self::Context,
+    ) -> Option<Self::Context> {
+        match n {
+            LogicalPlan::Limit { n, .. } => Some(Some(*n)),
+            _ => None
+        } 
+    }
+    fn rewrite(
+        &mut self,
+        n: LogicalPlan,
+        limit: &Self::Context,
+    ) -> Result<LogicalPlan, DataFusionError> {
+        match &n {
+            LogicalPlan::Extension { node } => {
+                if let Some(limit) = limit {
+                    if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
+                        let res = ClusterSendNode::new(
+                            Arc::new(
+                                LogicalPlan::Limit { n: *limit, input: cs.input.clone() }
+                                ),
+                            cs.snapshots.clone()
+                            ).into_plan();
+                        Ok(res)
+                    } else {
+                        Ok(n)
+                    }
+                } else {
+                    Ok(n)
+                }
+            }
+            _ => Ok(n)
         }
     }
 }

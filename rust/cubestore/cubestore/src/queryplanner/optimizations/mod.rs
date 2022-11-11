@@ -10,6 +10,7 @@ use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalPlanner};
 use rewrite_plan::rewrite_physical_plan;
 use std::sync::Arc;
+use crate::queryplanner::pretty_printers::pp_phys_plan;
 
 mod distributed_partial_aggregate;
 mod prefer_inplace_aggregates;
