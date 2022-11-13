@@ -9,17 +9,17 @@ redirect_from:
   - /deployment/guide
 ---
 
-This section contains a general overview of deploying Cube.js cluster in
+This section contains a general overview of deploying a Cube cluster in
 production. You can find platform-specific guides for:
 
 - [Cube Cloud][ref-deploy-cubecloud]
 - [Docker][ref-deploy-docker]
 - [Kubernetes][ref-deploy-k8s]
 
-If you are moving Cube.js to production, check out the [Production
+If you are moving Cube to production, check out the [Production
 Checklist][ref-deploy-prod-list].
 
-As shown in the diagram below, a typical production Cube.js cluster consists of
+As shown in the diagram below, a typical production Cube cluster consists of
 one or multiple API instances, a Refresh Worker, Redis and a Cube Store cluster.
 
 <div style="text-align: center">
@@ -47,7 +47,7 @@ also need access to the data schema files.
 
 Cube Store cluster can be configured via environment variables.
 
-Below you can find an example Docker Compose configuration for a Cube.js
+Below you can find an example Docker Compose configuration for a Cube
 cluster:
 
 ```yaml
@@ -157,13 +157,13 @@ A Refresh Worker updates pre-aggregations and the in-memory cache in the
 background. They also keep the refresh keys up-to-date for all defined schemas
 and pre-aggregations.
 
-[Cube.js Docker image][dh-cubejs] can be used for creating Refresh Workers; to
+[Cube Docker image][dh-cubejs] can be used for creating Refresh Workers; to
 make the service act as a Refresh Worker, `CUBEJS_REFRESH_WORKER=true` should be
 set in the environment variables.
 
 ## Cube Store
 
-Cube Store is the purpose-built pre-aggregations storage for Cube.js.
+Cube Store is the purpose-built pre-aggregations storage for Cube.
 
 Cube Store uses a distributed query engine architecture. In every Cube Store
 cluster:
@@ -179,9 +179,9 @@ cluster:
 More information on Cube Store architecture can be found in [this presentation](https://docs.google.com/presentation/d/1oQ-koloag0UcL-bUHOpBXK4txpqiGl41rxhgDVrw7gw/).
 
 By default, Cube Store listens on the port `3030` for queries coming from
-Cube.js. The port could be changed by setting `CUBESTORE_HTTP_PORT` environment
+Cube. The port could be changed by setting `CUBESTORE_HTTP_PORT` environment
 variable. In a case of using custom port, please make sure to change
-`CUBEJS_CUBESTORE_PORT` environment variable for Cube.js API Instances and
+`CUBEJS_CUBESTORE_PORT` environment variable for Cube API Instances and
 Refresh Worker.
 
 ### <--{"id" : "Cube Store"}--> Scaling
@@ -197,7 +197,7 @@ Cube Store has two "kinds" of nodes:
 
 - The **router** node handles incoming client connections, manages database
   metadata and serves simple queries
-- Multiple **worker** nodes which execute SQL queries received from Cube.js
+- Multiple **worker** nodes which execute SQL queries received from Cube
 
 Both the router and worker use the [Cube Store Docker image][dh-cubestore]. The
 following environment variables should be used to manage the roles:
@@ -298,10 +298,10 @@ Redis][replace-redis] for in-memory cache and queue management in late
 
 </WarningBox>
 
-Cube.js uses Redis, an in-memory data structure store, for query caching and
+Cube uses Redis, an in-memory data structure store, for query caching and
 queue.
 
-Set the `CUBEJS_REDIS_URL` environment variable to allow Cube.js API Instances
+Set the `CUBEJS_REDIS_URL` environment variable to allow Cube API Instances
 and Refresh Worker to connect to Redis. If your Redis instance also has a
 password, please set it via the `CUBEJS_REDIS_PASSWORD` environment variable.
 Set the `CUBEJS_REDIS_TLS` environment variable to true if you want to enable
@@ -310,18 +310,18 @@ connections.
 
 ### <--{"id" : "Redis"}--> Redis Sentinel
 
-Cube.js supports Redis Sentinel via `CUBEJS_REDIS_USE_IOREDIS=true` environment
+Cube supports Redis Sentinel via `CUBEJS_REDIS_USE_IOREDIS=true` environment
 variable. Then set `CUBEJS_REDIS_URL` to the
-`redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube.js
+`redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube
 to connect to the Redis Sentinel.
 
-Cube.js server instances used by same tenant environments should have same Redis
+Cube server instances used by same tenant environments should have same Redis
 instances. Otherwise they will have different query queues which can lead to
 incorrect pre-aggregation states and intermittent data access errors.
 
 ### <--{"id" : "Redis"}--> Redis Pool
 
-If `CUBEJS_REDIS_URL` is provided Cube.js, will create a Redis connection pool
+If `CUBEJS_REDIS_URL` is provided Cube, will create a Redis connection pool
 with a minimum of 2 and maximum of 1000 concurrent connections, by default. The
 `CUBEJS_REDIS_POOL_MIN` and `CUBEJS_REDIS_POOL_MAX` environment variables can be
 used to tweak pool size limits. To disable connection pooling, and instead
@@ -331,13 +331,13 @@ If your maximum concurrent connections limit is too low, you may see
 `TimeoutError: ResourceRequest timed out` errors. As a rule of a thumb, you need
 to have `Queue Size * Number of tenants` concurrent connections to ensure the
 best performance possible. If you use clustered deployments, please make sure
-you have enough connections for all Cube.js server instances. A lower number of
+you have enough connections for all Cube server instances. A lower number of
 connections still can work, however Redis becomes a performance bottleneck in
 this case.
 
 ### <--{"id" : "Redis"}--> Running without Redis
 
-If you want to run Cube.js in production without Redis, you can use
+If you want to run Cube in production without Redis, you can use
 `CUBEJS_CACHE_AND_QUEUE_DRIVER` environment variable to `memory`.
 
 <WarningBox>
@@ -353,8 +353,6 @@ manage the query queue.
 [ref-deploy-cubecloud]: /deployment/platforms/cube-cloud
 [ref-deploy-docker]: /deployment/platforms/docker
 [ref-deploy-k8s]: /deployment/platforms/kubernetes
-[ref-deploy-sls-aws]: /deployment/platforms/serverless/aws
-[ref-deploy-sls-gcp]: /deployment/platforms/serverless/google-cloud
 [ref-config-env]: /reference/environment-variables
 [ref-config-js]: /config
 [replace-redis]: https://cube.dev/blog/replacing-redis-with-cube-store
