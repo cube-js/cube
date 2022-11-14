@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.14](https://github.com/cube-js/cube.js/compare/v0.31.13...v0.31.14) (2022-11-14)
+
+
+### Features
+
+* **@cubejs-backend/mssql-driver:** Make MSSQL `readOnly` by default ([#5584](https://github.com/cube-js/cube.js/issues/5584)) ([ddf0369](https://github.com/cube-js/cube.js/commit/ddf036992aebc61fdd99d2a67753c63528bba9db))
+
+
+
+
+
 ## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
 
 **Note:** Version bump only for package @cubejs-backend/mssql-driver
