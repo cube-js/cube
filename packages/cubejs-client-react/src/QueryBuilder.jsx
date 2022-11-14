@@ -134,6 +134,7 @@ export default class QueryBuilder extends React.Component {
 
   async componentDidUpdate(prevProps) {
     const { schemaVersion, onSchemaChange } = this.props;
+    const { meta } = this.state;
 
     if (this.prevContext?.cubejsApi !== this.context?.cubejsApi) {
       this.prevContext = this.context;
@@ -142,7 +143,8 @@ export default class QueryBuilder extends React.Component {
 
     if (prevProps.schemaVersion !== schemaVersion) {
       try {
-        if (typeof onSchemaChange === 'function') {
+        const newMeta = await this.cubejsApi().meta();
+        if (!equals(newMeta, meta) && typeof onSchemaChange === 'function') {
           onSchemaChange({
             schemaVersion,
             refresh: async () => {
