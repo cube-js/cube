@@ -219,6 +219,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("inline_tables", inline_tables),
         t("inline_tables_2x", inline_tables_2x),
         t("build_range_end", build_range_end),
+        t("cache_incr", cache_incr),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -6163,6 +6164,24 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
                 TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
             ]),
         ]
+    );
+}
+
+async fn cache_incr(service: Box<dyn SqlClient>) {
+    let query = r#"CACHE INCR "prefix:key""#;
+
+    let r = service.exec_query(query.clone()).await.unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+    );
+
+    let r = service.exec_query(query).await.unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![Row::new(vec![TableValue::String("2".to_string()),]),]
     );
 }
 

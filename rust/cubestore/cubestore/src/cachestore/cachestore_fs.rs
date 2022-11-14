@@ -15,20 +15,20 @@ use std::sync::Arc;
 use tokio::fs;
 
 #[derive(Clone)]
-pub struct RocksMetaStoreFs {
+pub struct RocksCacheStoreFs {
     store_fs: BaseRocksStoreFs,
 }
 
-impl RocksMetaStoreFs {
+impl RocksCacheStoreFs {
     pub fn new(remote_fs: Arc<dyn RemoteFs>) -> Arc<Self> {
         Arc::new(Self {
-            store_fs: BaseRocksStoreFs::new(remote_fs, "metastore".to_string()),
+            store_fs: BaseRocksStoreFs::new(remote_fs, "cachestore".to_string()),
         })
     }
 }
 
 #[async_trait]
-impl MetaStoreFs for RocksMetaStoreFs {
+impl MetaStoreFs for RocksCacheStoreFs {
     async fn load_from_remote(
         self: Arc<Self>,
         path: &str,
@@ -68,13 +68,13 @@ impl MetaStoreFs for RocksMetaStoreFs {
                 }
             } else {
                 trace!(
-                    "Can't find metastore-current in {:?}",
+                    "Can't find cachestore-current in {:?}",
                     self.store_fs.remote_fs_ref()
                 );
             }
-            info!("Creating metastore from scratch in {}", path);
+            info!("Creating cachestore from scratch in {}", path);
         } else {
-            info!("Using existing metastore in {}", path);
+            info!("Using existing cachestore in {}", path);
         }
 
         return self
@@ -99,6 +99,7 @@ impl MetaStoreFs for RocksMetaStoreFs {
             .upload_file(&file_name, &log_name)
             .await
     }
+
     async fn upload_checkpoint(
         &self,
         remote_path: String,
@@ -116,4 +117,4 @@ impl MetaStoreFs for RocksMetaStoreFs {
     }
 }
 
-crate::di_service!(RocksMetaStoreFs, [MetaStoreFs]);
+crate::di_service!(RocksCacheStoreFs, [MetaStoreFs]);

@@ -1,9 +1,8 @@
 use super::{
-    AggregateFunction, BaseRocksSecondaryIndex, Column, ColumnType, DataFrameValue, IndexId,
-    RocksSecondaryIndex, RocksTable, TableId,
+    AggregateFunction, Column, ColumnType, DataFrameValue, IndexId, RocksSecondaryIndex, TableId,
 };
 use crate::data_frame_from;
-use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
+use crate::metastore::{IdRow, ImportFormat, Schema};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::CubeAggregateUDFKind;
 use crate::rocks_table_impl;
@@ -15,7 +14,7 @@ use chrono::Utc;
 use datafusion::physical_plan::expressions::{Column as FusionColumn, Max, Min, Sum};
 use datafusion::physical_plan::{udaf, AggregateExpr, PhysicalExpr};
 use itertools::Itertools;
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
 use std::sync::Arc;

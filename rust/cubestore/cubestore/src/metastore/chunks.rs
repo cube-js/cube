@@ -1,12 +1,12 @@
-use super::{BaseRocksSecondaryIndex, Chunk, IndexId, RocksSecondaryIndex, RocksTable, TableId};
-use crate::metastore::{IdRow, MetaStoreEvent};
+use super::{Chunk, IndexId, RocksSecondaryIndex, TableId};
+
 use crate::rocks_table_impl;
 use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer};
 use std::io::Cursor;
 
