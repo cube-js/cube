@@ -51,6 +51,7 @@ impl RewriteRules for SplitRules {
                         "?offset",
                         "?aliases",
                         "CubeScanSplit:false",
+                        "?can_pushdown_join",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -70,6 +71,7 @@ impl RewriteRules for SplitRules {
                             "?offset",
                             "?aliases",
                             "CubeScanSplit:true",
+                            "?can_pushdown_join",
                         ),
                         inner_aggregate_split_replacer("?group_expr", "?inner_aggregate_cube"),
                         inner_aggregate_split_replacer("?aggr_expr", "?inner_aggregate_cube"),
@@ -96,6 +98,7 @@ impl RewriteRules for SplitRules {
                         "?offset",
                         "?aliases",
                         "CubeScanSplit:false",
+                        "?can_pushdown_join",
                     ),
                     "?alias",
                 ),
@@ -112,6 +115,7 @@ impl RewriteRules for SplitRules {
                             "?offset",
                             "?aliases",
                             "CubeScanSplit:true",
+                            "?can_pushdown_join",
                         ),
                         "?projection_alias",
                     ),
@@ -138,6 +142,7 @@ impl RewriteRules for SplitRules {
                         "?offset",
                         "?aliases",
                         "CubeScanSplit:false",
+                        "?can_pushdown_join",
                     ),
                     "?alias",
                 ),
@@ -155,6 +160,7 @@ impl RewriteRules for SplitRules {
                                 "?offset",
                                 "?aliases",
                                 "CubeScanSplit:true",
+                                "?can_pushdown_join",
                             ),
                             "?inner_projection_alias",
                         ),
@@ -185,6 +191,7 @@ impl RewriteRules for SplitRules {
                         "?offset",
                         "?aliases",
                         "CubeScanSplit:false",
+                        "?can_pushdown_join",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -200,6 +207,7 @@ impl RewriteRules for SplitRules {
                             "?offset",
                             "?aliases",
                             "CubeScanSplit:true",
+                            "?can_pushdown_join",
                         ),
                         inner_aggregate_split_replacer("?group_expr", "?inner_aggregate_cube"),
                         inner_aggregate_split_replacer("?aggr_expr", "?inner_aggregate_cube"),
@@ -2676,6 +2684,7 @@ impl SplitRules {
                         if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
                             if cube.lookup_dimension(&column.name).is_some()
                                 || column.name == "__user"
+                                || column.name == "__cubeJoinField"
                             {
                                 return true;
                             }
@@ -2783,6 +2792,7 @@ impl SplitRules {
                         if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
                             if cube.lookup_dimension(&column.name).is_some()
                                 || column.name == "__user"
+                                || column.name == "__cubeJoinField"
                             {
                                 return true;
                             }

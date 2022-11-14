@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing-shared",
-  "version": "0.31.13",
+  "version": "0.31.14",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",

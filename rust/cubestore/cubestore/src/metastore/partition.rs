@@ -39,10 +39,10 @@ impl Partition {
 
     pub fn new_child(parent: &IdRow<Partition>, multi_partition_id: Option<u64>) -> Partition {
         Partition {
-            index_id: parent.row.index_id,
+            index_id: parent.get_row().index_id,
             min_value: None,
             max_value: None,
-            parent_partition_id: Some(parent.id),
+            parent_partition_id: Some(parent.get_id()),
             multi_partition_id,
             active: false,
             warmed_up: false,

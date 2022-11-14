@@ -4,11 +4,12 @@ use crate::{
             df::scan::{CubeScanNode, CubeScanOptions, MemberField},
             provider::CubeContext,
         },
+        is_olap_query,
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
             BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
-            ColumnExprColumn, CubeScanAliases, CubeScanLimit, CubeScanOffset, DimensionName,
+            ColumnExprColumn, CubeScanLimit, CubeScanOffset, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
             JoinRightOn, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
@@ -906,10 +907,54 @@ impl LanguageToLogicalPlanConverter {
                 LogicalPlan::Sort(Sort { expr, input })
             }
             LogicalPlanLanguage::Join(params) => {
-                let left = Arc::new(self.to_logical_plan(params[0])?);
-                let right = Arc::new(self.to_logical_plan(params[1])?);
                 let left_on = match_data_node!(node_by_id, params[2], JoinLeftOn);
                 let right_on = match_data_node!(node_by_id, params[3], JoinRightOn);
+                let left = self.to_logical_plan(params[0]);
+                let right = self.to_logical_plan(params[1]);
+
+                if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
+                    if left_on.iter().any(|c| c.name == "__cubeJoinField")
+                        || right_on.iter().any(|c| c.name == "__cubeJoinField")
+                    {
+                        return Err(CubeError::internal(
+                            "Can not join Cubes. This is most likely due to one of the following reasons:\n\
+                            • one of the cubes contains a group by\n\
+                            • one of the cubes contains a measure\n\
+                            • the cube on the right contains a filter, sorting or limits\n".to_string(),
+                        ));
+                    } else {
+                        return Err(CubeError::internal(
+                            "Use __cubeJoinField to join Cubes".to_string(),
+                        ));
+                    }
+                } else {
+                    let mut is_olap = left_on.iter().any(|c| c.name == "__cubeJoinField")
+                        || right_on.iter().any(|c| c.name == "__cubeJoinField");
+                    if !is_olap {
+                        if let Ok(left_plan) = &left {
+                            match is_olap_query(left_plan) {
+                                Ok(res) if res => is_olap = true,
+                                _ => (),
+                            }
+                        }
+                        if let Ok(right_plan) = &right {
+                            match is_olap_query(right_plan) {
+                                Ok(res) if res => is_olap = true,
+                                _ => (),
+                            }
+                        }
+                    }
+
+                    if is_olap {
+                        return Err(CubeError::internal(
+                            "Can not join Cubes. Looks like one of the subqueries includes post-processing operations".to_string(),
+                        ));
+                    }
+                }
+
+                let left = Arc::new(left?);
+                let right = Arc::new(right?);
+
                 let join_type = match_data_node!(node_by_id, params[4], JoinJoinType);
                 let join_constraint = match_data_node!(node_by_id, params[5], JoinJoinConstraint);
                 let schema = Arc::new(build_join_schema(
@@ -930,6 +975,15 @@ impl LanguageToLogicalPlanConverter {
                 })
             }
             LogicalPlanLanguage::CrossJoin(params) => {
+                if self.is_cube_scan_node(params[0]) && self.is_cube_scan_node(params[1]) {
+                    return Err(CubeError::internal(
+                        "Can not join Cubes. This is most likely due to one of the following reasons:\n\
+                        • one of the cubes contains a group by\n\
+                        • one of the cubes contains a measure\n\
+                        • the cube on the right contains a filter, sorting or limits\n".to_string(),
+                    ));
+                }
+
                 let left = Arc::new(self.to_logical_plan(params[0])?);
                 let right = Arc::new(self.to_logical_plan(params[1])?);
                 let schema = Arc::new(left.schema().join(right.schema())?);
@@ -1204,6 +1258,19 @@ impl LanguageToLogicalPlanConverter {
                                         MemberField::Literal(value),
                                     ));
                                 }
+                                LogicalPlanLanguage::VirtualField(params) => {
+                                    let expr = self.to_expr(params[2])?;
+                                    fields.push((
+                                        DFField::new(
+                                            expr_relation(&expr),
+                                            // TODO empty schema
+                                            &expr_name(&expr)?,
+                                            DataType::Utf8,
+                                            true,
+                                        ),
+                                        MemberField::Literal(ScalarValue::Utf8(None)),
+                                    ));
+                                }
                                 LogicalPlanLanguage::MemberError(params) => {
                                     let error =
                                         match_data_node!(node_by_id, params[0], MemberErrorError);
@@ -1434,32 +1501,10 @@ impl LanguageToLogicalPlanConverter {
                             query.offset = offset;
                         }
 
-                        let aliases =
-                            match_data_node!(node_by_id, cube_scan_params[6], CubeScanAliases);
-
                         fields = fields
                             .into_iter()
                             .unique_by(|(f, _)| f.qualified_name())
                             .collect();
-
-                        if let Some(aliases) = aliases {
-                            let mut new_fields = Vec::with_capacity(aliases.len());
-
-                            // Aliases serve solely column ordering purpose as fields generally not ordered
-                            for alias in aliases.iter() {
-                                let field_for_alias = fields
-                                    .iter()
-                                    .find(|(f, _)| f.name() == alias)
-                                    .ok_or(CubeError::internal(format!(
-                                        "Unable to find field for alias {}",
-                                        alias
-                                    )))?;
-
-                                new_fields.push(field_for_alias.clone());
-                            }
-
-                            fields = new_fields;
-                        }
 
                         let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
 
@@ -1506,6 +1551,19 @@ impl LanguageToLogicalPlanConverter {
             }
             x => panic!("Unexpected logical plan node: {:?}", x),
         })
+    }
+
+    fn is_cube_scan_node(&self, node_id: Id) -> bool {
+        let node_by_id = &self.best_expr;
+        match node_by_id.index(node_id) {
+            LogicalPlanLanguage::Extension(params) => match node_by_id.index(params[0]) {
+                LogicalPlanLanguage::CubeScan(_) => return true,
+                _ => (),
+            },
+            _ => (),
+        }
+
+        return false;
     }
 }
 

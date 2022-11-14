@@ -206,6 +206,13 @@ impl V1CubeMetaExt for V1CubeMeta {
             can_be_null: true,
         });
 
+        columns.push(CubeColumn {
+            name: "__cubeJoinField".to_string(),
+            description: Some("Virtual column for joining cubes".to_string()),
+            column_type: ColumnType::String,
+            can_be_null: true,
+        });
+
         columns
     }
 

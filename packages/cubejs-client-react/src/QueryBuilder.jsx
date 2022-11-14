@@ -31,7 +31,7 @@ const granularities = [
 
 export default class QueryBuilder extends React.Component {
   static contextType = CubeContext;
-  
+
   static defaultProps = {
     cubejsApi: null,
     stateChangeHeuristics: null,
@@ -42,7 +42,7 @@ export default class QueryBuilder extends React.Component {
     defaultQuery: {},
     initialVizState: null,
     onVizStateChanged: null,
-    
+
     // deprecated
     query: null,
     setQuery: null,
@@ -134,7 +134,6 @@ export default class QueryBuilder extends React.Component {
 
   async componentDidUpdate(prevProps) {
     const { schemaVersion, onSchemaChange } = this.props;
-    const { meta } = this.state;
 
     if (this.prevContext?.cubejsApi !== this.context?.cubejsApi) {
       this.prevContext = this.context;
@@ -143,8 +142,7 @@ export default class QueryBuilder extends React.Component {
 
     if (prevProps.schemaVersion !== schemaVersion) {
       try {
-        const newMeta = await this.cubejsApi().meta();
-        if (!equals(newMeta, meta) && typeof onSchemaChange === 'function') {
+        if (typeof onSchemaChange === 'function') {
           onSchemaChange({
             schemaVersion,
             refresh: async () => {
@@ -223,7 +221,7 @@ export default class QueryBuilder extends React.Component {
 
   prepareRenderProps(queryRendererProps) {
     const getName = (member) => member.name;
-    
+
     const toTimeDimension = (member) => {
       const rangeSelection = member.compareDateRange
         ? { compareDateRange: member.compareDateRange }
@@ -235,7 +233,7 @@ export default class QueryBuilder extends React.Component {
         ...rangeSelection,
       });
     };
-    
+
     const toFilter = (member) => ({
       member: member.member?.name || member.dimension?.name,
       operator: member.operator,

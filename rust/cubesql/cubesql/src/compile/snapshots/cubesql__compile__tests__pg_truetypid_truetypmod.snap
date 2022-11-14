@@ -17,9 +17,13 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | 18000    | is_male            | bool      | 16    | -1     | NULL   |
 | 18000    | is_female          | bool      | 16    | -1     | NULL   |
 | 18000    | __user             | text      | 25    | -1     | NULL   |
-| 18015    | agentCount         | int8      | 20    | -1     | 64     |
-| 18015    | agentCountApprox   | int8      | 20    | -1     | 64     |
-| 18015    | __user             | text      | 25    | -1     | NULL   |
-| 18021    | someNumber         | numeric   | 1700  | -1     | NULL   |
-| 18021    | __user             | text      | 25    | -1     | NULL   |
+| 18000    | __cubeJoinField    | text      | 25    | -1     | NULL   |
+| 18016    | agentCount         | int8      | 20    | -1     | 64     |
+| 18016    | agentCountApprox   | int8      | 20    | -1     | 64     |
+| 18016    | read               | bool      | 16    | -1     | NULL   |
+| 18016    | __user             | text      | 25    | -1     | NULL   |
+| 18016    | __cubeJoinField    | text      | 25    | -1     | NULL   |
+| 18024    | someNumber         | numeric   | 1700  | -1     | NULL   |
+| 18024    | __user             | text      | 25    | -1     | NULL   |
+| 18024    | __cubeJoinField    | text      | 25    | -1     | NULL   |
 +----------+--------------------+-----------+-------+--------+--------+

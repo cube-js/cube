@@ -17,6 +17,7 @@ expression: "execute_query(\"show create table `db`.`KibanaSampleDataEcommerce`;
 |                           |   `has_subscription` tinyint(1) NOT NULL,  |
 |                           |   `is_male` tinyint(1),                    |
 |                           |   `is_female` tinyint(1),                  |
-|                           |   `__user` varchar(255) NOT NULL           |
+|                           |   `__user` varchar(255) NOT NULL,          |
+|                           |   `__cubeJoinField` varchar(255) NOT NULL  |
 |                           | ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4    |
 +---------------------------+--------------------------------------------+

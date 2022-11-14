@@ -110,12 +110,16 @@ pub async fn load_v1(
 
 pub async fn meta_v1(
     configuration: &configuration::Configuration,
+    extended: bool,
 ) -> Result<crate::models::V1MetaResponse, Error<MetaV1Error>> {
     let local_var_configuration = configuration;
 
     let local_var_client = &local_var_configuration.client;
 
-    let local_var_uri_str = format!("{}/v1/meta", local_var_configuration.base_path);
+    let local_var_uri_str = format!(
+        "{}/v1/meta?extended={}",
+        local_var_configuration.base_path, extended
+    );
     let mut local_var_req_builder =
         local_var_client.request(reqwest::Method::GET, local_var_uri_str.as_str());
 

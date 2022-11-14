@@ -7,6 +7,14 @@ paths:
   "/v1/meta":
     get:
       summary: "Load Metadata"
+      # TODO: Doesn't work in rust code-gen
+      # parameters:
+      #   - in: query
+      #     name: extended
+      #     required: true
+      #     schema:
+      #       type: boolean
+      #     description: You will receive extended response if this parameter is true
       description: ""
       operationId: "metaV1"
       responses:
@@ -65,6 +73,16 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    V1CubeMetaJoin:
+      type: "object"
+      required:
+        - name
+        - relationship
+      properties:
+        name:
+          type: "string"
+        relationship:
+          type: "string"
     V1CubeMetaSegment:
       type: "object"
       required:
@@ -126,6 +144,10 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1CubeMetaSegment"
+        joins:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/V1CubeMetaJoin"
     V1MetaResponse:
       type: "object"
       properties:

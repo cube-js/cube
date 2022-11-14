@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.14](https://github.com/cube-js/cube.js/compare/v0.31.13...v0.31.14) (2022-11-14)
+
+
+### Features
+
+* **cubesql:** Join Cubes ([#5585](https://github.com/cube-js/cube.js/issues/5585)) ([c687e42](https://github.com/cube-js/cube.js/commit/c687e42f9280f611152f7c154fdf136e6d9ce402))
+
+
+
+
+
 ## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
 
 

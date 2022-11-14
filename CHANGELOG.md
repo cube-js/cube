@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.14](https://github.com/cube-js/cube.js/compare/v0.31.13...v0.31.14) (2022-11-14)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow referencing CTEs in UNION ([7f5bc83](https://github.com/cube-js/cube.js/commit/7f5bc8316d6119ffe1703bc1bb41e54586f9d19b))
+* **cubesql:** Keep CubeScan literal values relation ([6d3856a](https://github.com/cube-js/cube.js/commit/6d3856acdfeea8d93866a1f36513016a5a04b2e8))
+* **playground:** schemaVersion updates ([5c4880f](https://github.com/cube-js/cube.js/commit/5c4880f1fa30189798c0b0ea42df67c7fd0aea75))
+
+
+### Features
+
+* **@cubejs-backend/mssql-driver:** Make MSSQL `readOnly` by default ([#5584](https://github.com/cube-js/cube.js/issues/5584)) ([ddf0369](https://github.com/cube-js/cube.js/commit/ddf036992aebc61fdd99d2a67753c63528bba9db))
+* **cubesql:** Join Cubes ([#5585](https://github.com/cube-js/cube.js/issues/5585)) ([c687e42](https://github.com/cube-js/cube.js/commit/c687e42f9280f611152f7c154fdf136e6d9ce402))
+* **playground:** ability to rerun queries ([#5597](https://github.com/cube-js/cube.js/issues/5597)) ([6ef8ce9](https://github.com/cube-js/cube.js/commit/6ef8ce91740086dc0b10ea11d7133f8be1e2ef0a))
+
+
+
+
+
 ## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
 
 
