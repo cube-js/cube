@@ -79,16 +79,16 @@ const DatabricksToGenericType: Record<string, string> = {
 
 async function resolveJDBCDriver(): Promise<string> {
   return fileExistsOr(
-    path.join(process.cwd(), 'SparkJDBC42.jar'),
+    path.join(process.cwd(), 'DatabricksJDBC42.jar'),
     async () => fileExistsOr(
-      path.join(__dirname, '..', 'download', 'SparkJDBC42.jar'),
+      path.join(__dirname, '..', 'download', 'DatabricksJDBC42.jar'),
       async () => {
         const pathOrNull = await downloadJDBCDriver();
         if (pathOrNull) {
           return pathOrNull;
         }
         throw new Error(
-          'Please download and place SparkJDBC42.jar inside your ' +
+          'Please download and place DatabricksJDBC42.jar inside your ' +
           'project directory'
         );
       }
@@ -136,7 +136,7 @@ export class DatabricksDriver extends JDBCDriver {
     const config: DatabricksDriverConfiguration = {
       ...conf,
       dbType: 'databricks',
-      drivername: 'com.simba.spark.jdbc.Driver',
+      drivername: 'com.databricks.client.jdbc.Driver',
       customClassPath: undefined,
       properties: {
         // PWD-parameter passed to the connection string has higher priority,
