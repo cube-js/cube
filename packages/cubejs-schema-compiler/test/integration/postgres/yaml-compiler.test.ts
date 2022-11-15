@@ -304,7 +304,7 @@ cubes:
     joins:
       - name: customers
         sql: "{orders}.customer_id = {customers}.id"
-        relationship: belongsTo
+        relationship: belongs_to
     
     measures:
       - name: count
