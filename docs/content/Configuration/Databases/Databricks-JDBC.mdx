@@ -20,7 +20,7 @@ CUBEJS_DB_TYPE=databricks-jdbc
 # CUBEJS_DB_NAME is optional
 CUBEJS_DB_NAME=default
 # You can find this inside the cluster's configuration
-CUBEJS_DB_DATABRICKS_URL=jdbc:spark://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/XXXXX/XXXXX;AuthMech=3;UID=token
+CUBEJS_DB_DATABRICKS_URL=jdbc:databricks://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/XXXXX/XXXXX;AuthMech=3;UID=token
 # You can specify the personal access token separately from `CUBEJS_DB_DATABRICKS_URL` by doing this:
 CUBEJS_DB_DATABRICKS_TOKEN=XXXXX
 ```
