@@ -14,7 +14,7 @@ permalink: /config/databases/snowflake
 
 ### <--{"id" : "Setup"}--> Manual
 
-Add the following to a `.env` file in your Cube.js project:
+Add the following to a `.env` file in your Cube project:
 
 ```bash
 CUBEJS_DB_TYPE=snowflake
@@ -27,21 +27,21 @@ CUBEJS_DB_PASS=**********
 
 ## Environment Variables
 
-| Environment Variable                            | Description                                                                                                                                         | Possible Values                                                        | Required |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | :------: |
-| `CUBEJS_DB_SNOWFLAKE_ACCOUNT`                   | The Snowflake account identifier to use when connecting to the database                                                                             | [A valid Snowflake account ID][snowflake-docs-account-id]              |    ✅    |
-| `CUBEJS_DB_SNOWFLAKE_REGION`                    | The Snowflake region to use when connecting to the database                                                                                         | [A valid Snowflake region][snowflake-docs-regions]                     |    ❌    |
-| `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`                 | The Snowflake warehouse to use when connecting to the database                                                                                      | [A valid Snowflake warehouse][snowflake-docs-warehouse] in the account |    ✅    |
-| `CUBEJS_DB_SNOWFLAKE_ROLE`                      | The Snowflake role to use when connecting to the database                                                                                           | [A valid Snowflake role][snowflake-docs-roles] in the account          |    ❌    |
-| `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE` | If `true`, [keep the Snowflake connection alive indefinitely][snowflake-docs-connection-options]                                                    | `true`, `false`                                                        |    ❌    |
-| `CUBEJS_DB_NAME`                                | The name of the database to connect to                                                                                                              | A valid database name                                                  |    ✅    |
-| `CUBEJS_DB_USER`                                | The username used to connect to the database                                                                                                        | A valid database username                                              |    ✅    |
-| `CUBEJS_DB_PASS`                                | The password used to connect to the database                                                                                                        | A valid database password                                              |    ✅    |
-| `CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR`             | The type of authenticator to use with Snowflake. Use `SNOWFLAKE` with username/password, or `SNOWFLAKE_JWT` with key pairs. Defaults to `SNOWFLAKE` | `SNOWFLAKE`, `SNOWFLAKE_JWT`                                           |    ❌    |
-| `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`          | The path to the private RSA key folder                                                                                                              | A valid path to the private RSA key                                    |    ❌    |
-| `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`          | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key                     |    ❌    |
-| `CUBEJS_CONCURRENCY`                            | The number of concurrent connections each queue has to the database. Default is `5`                                                                 | A valid number                                                         |    ❌    |
-| `CUBEJS_DB_MAX_POOL`                            | The maximum number of concurrent database connections to pool. Default is `20`                                                                      | A valid number                                                         |    ❌    |
+| Environment Variable                            | Description                                                                                                                                         | Possible Values                                                        | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_DB_SNOWFLAKE_ACCOUNT`                   | The Snowflake account identifier to use when connecting to the database                                                                             | [A valid Snowflake account ID][snowflake-docs-account-id]              |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_SNOWFLAKE_REGION`                    | The Snowflake region to use when connecting to the database                                                                                         | [A valid Snowflake region][snowflake-docs-regions]                     |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`                 | The Snowflake warehouse to use when connecting to the database                                                                                      | [A valid Snowflake warehouse][snowflake-docs-warehouse] in the account |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_SNOWFLAKE_ROLE`                      | The Snowflake role to use when connecting to the database                                                                                           | [A valid Snowflake role][snowflake-docs-roles] in the account          |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE` | If `true`, [keep the Snowflake connection alive indefinitely][snowflake-docs-connection-options]                                                    | `true`, `false`                                                        |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_NAME`                                | The name of the database to connect to                                                                                                              | A valid database name                                                  |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_USER`                                | The username used to connect to the database                                                                                                        | A valid database username                                              |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PASS`                                | The password used to connect to the database                                                                                                        | A valid database password                                              |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR`             | The type of authenticator to use with Snowflake. Use `SNOWFLAKE` with username/password, or `SNOWFLAKE_JWT` with key pairs. Defaults to `SNOWFLAKE` | `SNOWFLAKE`, `SNOWFLAKE_JWT`                                           |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH`          | The path to the private RSA key folder                                                                                                              | A valid path to the private RSA key                                    |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`          | The password for the private RSA key. Only required for encrypted keys                                                                              | A valid password for the encrypted private RSA key                     |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY`                            | The number of concurrent connections each queue has to the database. Default is `5`                                                                 | A valid number                                                         |    ❌    |                                    ❌                                    |
+| `CUBEJS_DB_MAX_POOL`                            | The maximum number of concurrent database connections to pool. Default is `20`                                                                      | A valid number                                                         |    ❌    |                                    ✅                                    |
 
 ## Pre-Aggregation Feature Support
 
@@ -105,11 +105,11 @@ role to your BigQuery credentials (`CUBEJS_DB_EXPORT_GCS_CREDENTIALS`).
 
 </InfoBox>
 
-Before configuring Cube.js, an [integration must be created and configured in
+Before configuring Cube, an [integration must be created and configured in
 Snowflake][snowflake-docs-gcs-integration]. Take note of the integration name
-(`gcs_int` from the example link) as you'll need it to configure Cube.js.
+(`gcs_int` from the example link) as you'll need it to configure Cube.
 
-Once the Snowflake integration is set up, configure Cube.js using the following:
+Once the Snowflake integration is set up, configure Cube using the following:
 
 ```dotenv
 CUBEJS_DB_EXPORT_BUCKET=snowflake-export-bucket
@@ -120,7 +120,7 @@ CUBEJS_DB_EXPORT_INTEGRATION=gcs_int
 
 ## SSL
 
-Cube.js does not require any additional configuration to enable SSL as Snowflake
+Cube does not require any additional configuration to enable SSL as Snowflake
 connections are made over HTTPS.
 
 [aws-s3]: https://aws.amazon.com/s3/

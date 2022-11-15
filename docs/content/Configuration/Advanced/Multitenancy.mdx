@@ -1,8 +1,11 @@
 ---
 title: Multitenancy
-permalink: /multitenancy-setup
+permalink: /config/multitenancy
 category: Configuration
-menuOrder: 4
+subCategory: Advanced
+menuOrder: 2
+redirect_from:
+  - /multitenancy-setup
 ---
 
 Cube supports multitenancy out of the box, both on database and data schema
@@ -33,8 +36,8 @@ combinations of these configuration options.
 
 ### <--{"id" : "Multitenancy"}--> Multitenancy vs Multiple Data Sources
 
-In cases where your Cube schema is spread across multiple different databases
-you may consider using the [`dataSource` cube property][ref-cube-datasource]
+In cases where your Cube schema is spread across multiple different data
+sources, consider using the [`dataSource` cube property][ref-cube-datasource]
 instead of multitenancy. Multitenancy is designed for cases where you need to
 serve different datasets for multiple users, or tenants which aren't related to
 each other.
@@ -118,6 +121,9 @@ module.exports = {
   },
 };
 ```
+
+More information can be found on the [Multiple Data Sources
+page][ref-config-multi-data-src].
 
 ### <--{"id" : "Multitenancy"}--> queryRewrite vs Multitenant Compile Context
 
@@ -360,6 +366,7 @@ number of Redis connections **per-tenant**.
 [ref-config-preagg-schema]: /config#pre-aggregations-schema
 [ref-config-ctx-to-appid]: /config#context-to-app-id
 [ref-config-ctx-to-orch-id]: /config#context-to-orchestrator-id
+[ref-config-multi-data-src]: /config/multiple-data-sources
 [ref-config-query-rewrite]: /config#query-rewrite
 [ref-config-refresh-ctx]: /config#scheduled-refresh-contexts
 [ref-config-refresh-tz]: /config#scheduled-refresh-time-zones

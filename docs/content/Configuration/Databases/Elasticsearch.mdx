@@ -26,7 +26,7 @@ If you're not using [Elastic Cloud][elastic-cloud], you **must** specify
 ### <--{"id" : "Setup"}--> Manual
 
 For a self-hosted Elasticsearch instance, add the following to a `.env` file in
-your Cube.js project:
+your Cube project:
 
 ```bash
 CUBEJS_DB_TYPE=elasticsearch
@@ -35,7 +35,7 @@ CUBEJS_DB_ELASTIC_QUERY_FORMAT=json
 ```
 
 For an Elasticsearch instanced hosted by [Elastic.co][elastic-co], add the
-following to a `.env` file in your Cube.js project:
+following to a `.env` file in your Cube project:
 
 ```bash
 CUBEJS_DB_TYPE=elasticsearch
@@ -46,19 +46,19 @@ CUBEJS_DB_ELASTIC_APIKEY_KEY=ui2lp2axTNmsyakw9tvNnw
 
 ## Environment Variables
 
-| Environment Variable             | Description                                                                                                                                                                              | Possible Values                        | Required |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | :------: |
-| `CUBEJS_DB_URL`                  | The URL for a database                                                                                                                                                                   | A valid database URL for Elasticsearch |    ✅    |
-| `CUBEJS_DB_ELASTIC_QUERY_FORMAT` | By default, queries return data in JDBC format, but you can also return data in standard Elasticsearch JDBC, JSON, CSV, YAML or raw formats (only JSON and JDBC are currently supported) | `json`, `jdbc`                         |    ❌    |
-| `CUBEJS_DB_ELASTIC_OPENDISTRO`   | If `true`, then use the Open Distro for Elasticsearch                                                                                                                                    | `true`, `false`                        |    ❌    |
-| `CUBEJS_DB_ELASTIC_APIKEY_ID`    | [ID of the API key from elastic.co][elastic-docs-api-keys]                                                                                                                               | A valid Elastic.co API key ID          |    ❌    |
-| `CUBEJS_DB_ELASTIC_APIKEY_KEY`   | [Value of the API key from elastic.co][elastic-docs-api-keys]                                                                                                                            | A valid Elastic.co API key value       |    ❌    |
-| `CUBEJS_CONCURRENCY`             | The number of concurrent connections each queue has to the database. Default is `2`                                                                                                      | A valid number                         |    ❌    |
-| `CUBEJS_DB_MAX_POOL`             | The maximum number of concurrent database connections to pool. Default is `8`                                                                                                            | A valid number                         |    ❌    |
+| Environment Variable             | Description                                                                                                                                                                              | Possible Values                        | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_DB_URL`                  | The URL for a database                                                                                                                                                                   | A valid database URL for Elasticsearch |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_ELASTIC_QUERY_FORMAT` | By default, queries return data in JDBC format, but you can also return data in standard Elasticsearch JDBC, JSON, CSV, YAML or raw formats (only JSON and JDBC are currently supported) | `json`, `jdbc`                         |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_ELASTIC_OPENDISTRO`   | If `true`, then use the Open Distro for Elasticsearch                                                                                                                                    | `true`, `false`                        |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_ELASTIC_APIKEY_ID`    | [ID of the API key from elastic.co][elastic-docs-api-keys]                                                                                                                               | A valid Elastic.co API key ID          |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_ELASTIC_APIKEY_KEY`   | [Value of the API key from elastic.co][elastic-docs-api-keys]                                                                                                                            | A valid Elastic.co API key value       |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY`             | The number of concurrent connections each queue has to the database. Default is `2`                                                                                                      | A valid number                         |    ❌    |                                    ❌                                    |
+| `CUBEJS_DB_MAX_POOL`             | The maximum number of concurrent database connections to pool. Default is `8`                                                                                                            | A valid number                         |    ❌    |                                    ✅                                    |
 
 ## SSL
 
-Cube.js does not require any additional configuration to enable SSL as
+Cube does not require any additional configuration to enable SSL as
 Elasticsearch connections are made over HTTPS.
 
 [elastic-co]: https://elastic.co/
@@ -66,3 +66,5 @@ Elasticsearch connections are made over HTTPS.
 [elasticsearch]: https://www.elastic.co/elasticsearch/
 [elastic-docs-api-keys]:
   https://www.elastic.co/guide/en/kibana/master/api-keys.html#create-api-key
+[ref-config-multiple-ds-decorating-env]:
+  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables

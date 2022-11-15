@@ -14,7 +14,7 @@ permalink: /config/databases/postgres
 
 ### <--{"id" : "Setup"}--> Manual
 
-Add the following to a `.env` file in your Cube.js project:
+Add the following to a `.env` file in your Cube project:
 
 ```bash
 CUBEJS_DB_TYPE=postgres
@@ -26,16 +26,16 @@ CUBEJS_DB_PASS=**********
 
 ## Environment Variables
 
-| Environment Variable | Description                                                                         | Possible Values           | Required |
-| -------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
-| `CUBEJS_DB_HOST`     | The host URL for a database                                                         | A valid database host URL |    ✅    |
-| `CUBEJS_DB_PORT`     | The port for the database connection                                                | A valid port number       |    ❌    |
-| `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name     |    ✅    |
-| `CUBEJS_DB_USER`     | The username used to connect to the database                                        | A valid database username |    ✅    |
-| `CUBEJS_DB_PASS`     | The password used to connect to the database                                        | A valid database password |    ✅    |
-| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js             | `true`, `false`           |    ❌    |
-| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the database. Default is `2` | A valid number            |    ❌    |
-| `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |
+| Environment Variable | Description                                                                         | Possible Values           | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| -------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_DB_HOST`     | The host URL for a database                                                         | A valid database host URL |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PORT`     | The port for the database connection                                                | A valid port number       |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name     |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_USER`     | The username used to connect to the database                                        | A valid database username |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PASS`     | The password used to connect to the database                                        | A valid database password |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the database. Default is `2` | A valid number            |    ❌    |                                    ❌                                    |
+| `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |                                    ✅                                    |
 
 ## Pre-Aggregation Feature Support
 
@@ -72,7 +72,7 @@ Postgres does not support export buckets.
 
 ## SSL
 
-To enable SSL-encrypted connections between Cube.js and Postgres, set the
+To enable SSL-encrypted connections between Cube and Postgres, set the
 `CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
@@ -99,8 +99,8 @@ Unless you're using a Private or Shield Heroku Postgres database, Heroku
 Postgres does not currently support verifiable certificates. [Here is the
 description of the issue from Heroku][heroku-postgres-issue].
 
-As a workaround, you can set `rejectUnauthorized` option to `false` in the
-Cube.js Postgres driver:
+As a workaround, you can set `rejectUnauthorized` option to `false` in the Cube
+Postgres driver:
 
 ```js
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
@@ -124,6 +124,8 @@ module.exports = {
 [postgres]: https://www.postgresql.org/
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-config-multiple-ds-decorating-env]:
+  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
 [ref-schema-ref-types-formats-countdistinctapprox]:
   /schema/reference/types-and-formats#count-distinct-approx
