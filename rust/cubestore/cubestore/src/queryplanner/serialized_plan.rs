@@ -199,6 +199,8 @@ pub enum SerializedLogicalPlan {
     ClusterSend {
         input: Arc<SerializedLogicalPlan>,
         snapshots: Vec<Snapshots>,
+        #[serde(default)]
+        limit: Option<usize>,
     },
     ClusterAggregateTopK {
         limit: usize,
@@ -383,9 +385,14 @@ impl SerializedLogicalPlan {
                     schema: schema.clone(),
                 }),
             },
-            SerializedLogicalPlan::ClusterSend { input, snapshots } => ClusterSendNode {
+            SerializedLogicalPlan::ClusterSend {
+                input,
+                snapshots,
+                limit,
+            } => ClusterSendNode {
                 input: Arc::new(input.logical_plan(worker_context)?),
                 snapshots: snapshots.clone(),
+                limit: limit.clone(),
             }
             .into_plan(),
             SerializedLogicalPlan::ClusterAggregateTopK {
@@ -725,12 +732,17 @@ impl SerializedLogicalPlan {
                     }
                 }
             }
-            SerializedLogicalPlan::ClusterSend { input, snapshots } => {
+            SerializedLogicalPlan::ClusterSend {
+                input,
+                snapshots,
+                limit,
+            } => {
                 let input =
                     input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
                 SerializedLogicalPlan::ClusterSend {
                     input: Arc::new(input),
                     snapshots: snapshots.clone(),
+                    limit: limit.clone(),
                 }
             }
             SerializedLogicalPlan::ClusterAggregateTopK {
@@ -1265,6 +1277,7 @@ impl SerializedPlan {
                     SerializedLogicalPlan::ClusterSend {
                         input: Arc::new(Self::serialized_logical_plan(&cs.input)),
                         snapshots: cs.snapshots.clone(),
+                        limit: cs.limit.clone(),
                     }
                 } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
                     SerializedLogicalPlan::ClusterAggregateTopK {

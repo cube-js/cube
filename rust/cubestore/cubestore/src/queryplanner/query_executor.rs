@@ -120,7 +120,6 @@ impl QueryExecutor for QueryExecutorImpl {
             pp_phys_plan(split_plan.as_ref())
         );
 
-
         let execution_time = SystemTime::now();
 
         let results = collect(split_plan.clone()).instrument(collect_span).await;

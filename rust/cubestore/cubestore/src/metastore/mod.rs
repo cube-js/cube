@@ -879,7 +879,7 @@ pub trait MetaStore: DIService + Send + Sync {
         row_count: usize,
         min: Option<Row>,
         max: Option<Row>,
-        in_memory: bool
+        in_memory: bool,
     ) -> Result<IdRow<Chunk>, CubeError>;
     async fn get_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
     async fn get_chunks_by_partition(

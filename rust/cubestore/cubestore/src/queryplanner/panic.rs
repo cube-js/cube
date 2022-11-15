@@ -111,5 +111,6 @@ pub fn plan_panic_worker() -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         input: Arc::new(PanicWorkerExec::new()),
         schema: Arc::new(Schema::empty()),
         max_batch_rows: 1,
+        limit: None,
     }))
 }

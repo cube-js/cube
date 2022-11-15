@@ -119,12 +119,7 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                 Box::new(|partitions| {
                     let min_array = partitions
                         .iter()
-                        .map(|row| {
-                            row.get_row()
-                                .get_min()
-                                .as_ref()
-                                .map(|x| format!("{:?}", x))
-                        })
+                        .map(|row| row.get_row().get_min().as_ref().map(|x| format!("{:?}", x)))
                         .collect::<Vec<_>>();
                     Arc::new(StringArray::from(
                         min_array
@@ -139,12 +134,7 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                 Box::new(|partitions| {
                     let max_array = partitions
                         .iter()
-                        .map(|row| {
-                            row.get_row()
-                                .get_max()
-                                .as_ref()
-                                .map(|x| format!("{:?}", x))
-                        })
+                        .map(|row| row.get_row().get_max().as_ref().map(|x| format!("{:?}", x)))
                         .collect::<Vec<_>>();
                     Arc::new(StringArray::from(
                         max_array

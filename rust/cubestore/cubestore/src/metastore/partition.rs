@@ -15,7 +15,7 @@ impl Partition {
         index_id: u64,
         multi_partition_id: Option<u64>,
         min_value: Option<Row>,
-        max_value: Option<Row>
+        max_value: Option<Row>,
     ) -> Partition {
         Partition {
             index_id,
@@ -34,7 +34,7 @@ impl Partition {
             ),
             file_size: None,
             min: None,
-            max: None
+            max: None,
         }
     }
 
@@ -56,7 +56,7 @@ impl Partition {
             ),
             file_size: None,
             min: None,
-            max: None
+            max: None,
         }
     }
     pub fn get_min_val(&self) -> &Option<Row> {

@@ -1,9 +1,9 @@
 use super::{Chunk, IndexId, RocksSecondaryIndex, TableId};
 
 use crate::rocks_table_impl;
+use crate::table::Row;
 use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
-use crate::table::Row;
 use chrono::{DateTime, Utc};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -12,7 +12,13 @@ use serde::{Deserialize, Deserializer};
 use std::io::Cursor;
 
 impl Chunk {
-    pub fn new(partition_id: u64, row_count: usize, min: Option<Row>, max: Option<Row>, in_memory: bool) -> Chunk {
+    pub fn new(
+        partition_id: u64,
+        row_count: usize,
+        min: Option<Row>,
+        max: Option<Row>,
+        in_memory: bool,
+    ) -> Chunk {
         Chunk {
             partition_id,
             row_count: row_count as u64,
@@ -31,7 +37,7 @@ impl Chunk {
             file_size: None,
             replay_handle_id: None,
             min,
-            max
+            max,
         }
     }
 
