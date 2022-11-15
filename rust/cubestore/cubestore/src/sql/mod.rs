@@ -4277,9 +4277,9 @@ mod tests {
                     .unwrap();
                 let res = service
                     .exec_query("EXPLAIN ANALYZE SELECT id, SUM(n) FROM (
-                            SELECT * FROM foo.pushdown1 
+                            SELECT * FROM foo.pushdown1
                             union all
-                            SELECT * FROM foo.pushdown2 
+                            SELECT * FROM foo.pushdown2
                             ) as `tb` GROUP BY 1 ORDER BY 1 LIMIT 3")
                     .await
                     .unwrap();
@@ -4293,9 +4293,9 @@ mod tests {
 
                 let res = service
                     .exec_query("SELECT id, SUM(n) FROM (
-                            SELECT * FROM foo.pushdown1 
+                            SELECT * FROM foo.pushdown1
                             union all
-                            SELECT * FROM foo.pushdown2 
+                            SELECT * FROM foo.pushdown2
                             ) as `tb` GROUP BY 1 ORDER BY 1 LIMIT 3")
                     .await
                     .unwrap();
@@ -4307,95 +4307,6 @@ mod tests {
                         Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
                     ]
                     );
-
-            })
-            .await;
-    }
-    #[tokio::test]
-    async fn limit_pushdown_without_group() {
-        assert!(true);
-        Config::test("limit_pushdown")
-            .update_config(|mut c| {
-                c.partition_split_threshold = 2;
-                c.compaction_chunks_count_threshold = 0;
-                c.compaction_chunks_max_lifetime_threshold = 0;
-                c
-            })
-            .start_test(async move |services| {
-                let service = services.sql_service;
-                service.exec_query("CREATE SCHEMA foo").await.unwrap();
-
-                service
-                    .exec_query("CREATE TABLE foo.pushdown1 (id int, n int) index aaa (id)")
-                    .await
-                    .unwrap();
-                service
-                    .exec_query("CREATE TABLE foo.pushdown2 (id int, n int) index aaa (id)")
-                    .await
-                    .unwrap();
-                service
-                    .exec_query(
-                        "INSERT INTO foo.pushdown1
-                        (id, n)
-                        VALUES
-                        (11, 40),
-                        (11, 10),
-                        (11, 15),
-                        (11, 18),
-                        (12, 20),
-                        (21, 25)
-                        ",
-                        )
-                    .await
-                    .unwrap();
-                service
-                    .exec_query(
-                        "INSERT INTO foo.pushdown2
-                        (id, n)
-                        VALUES
-                        (21, 10),
-                        (21, 15),
-                        (21, 15),
-                        (22, 20),
-                        (22, 25),
-                        (23, 30)",
-                        )
-                    .await
-                    .unwrap();
-                let res = service
-                    .exec_query("EXPLAIN ANALYZE SELECT id, n FROM (
-                            SELECT * FROM foo.pushdown1 
-                            union all
-                            SELECT * FROM foo.pushdown2 
-                            ) as `tb` WHERE id = 11 ORDER BY 2 LIMIT 3")
-                    .await
-                    .unwrap();
-                match &res.get_rows()[1].values()[2] {
-                    TableValue::String(s) => {
-                        println!("!!! plan: {}", s);
-                        assert!(s.starts_with("GlobalLimit, n: 3"))
-                    },
-                    _ => assert!(false)
-
-                };
-
-                let res = service
-                    .exec_query("SELECT id, n FROM (
-                            SELECT * FROM foo.pushdown1 
-                            union all
-                            SELECT * FROM foo.pushdown2 
-                            ) as `tb` WHERE id = 11 ORDER BY 2 LIMIT 3")
-                    .await
-                    .unwrap();
-                println!("!! rows: {:?}", res.get_rows());
-                /* assert_eq!(
-                    res.get_rows(),
-                    &vec![
-                        Row::new(vec![TableValue::Int(11), TableValue::Int(43)]),
-                        Row::new(vec![TableValue::Int(12), TableValue::Int(45)]),
-                        Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
-                    ]
-                    ); */
 
             })
             .await;

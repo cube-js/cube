@@ -1200,7 +1200,13 @@ fn min_max_values_from_data(data: &[ArrayRef], key_size: usize) -> (Option<Row>,
     if data.is_empty() || data[0].is_empty() || key_size == 0 {
         (None, None)
     } else {
-        (Some(Row::new(TableValue::from_columns(&data[0..key_size], 0))), Some(Row::new(TableValue::from_columns(&data[0..key_size], data[0].len() - 1)))) 
+        (
+            Some(Row::new(TableValue::from_columns(&data[0..key_size], 0))),
+            Some(Row::new(TableValue::from_columns(
+                &data[0..key_size],
+                data[0].len() - 1,
+            ))),
+        )
     }
 }
 

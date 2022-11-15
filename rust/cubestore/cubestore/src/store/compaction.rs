@@ -9,7 +9,7 @@ use crate::metastore::{
     Partition, PartitionData,
 };
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
-use crate::store::{ChunkDataStore, ChunkStore, ROW_GROUP_SIZE, min_max_values_from_data};
+use crate::store::{min_max_values_from_data, ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
 use crate::table::parquet::{arrow_schema, ParquetTableStore};
 use crate::table::redistribute::redistribute;
@@ -413,7 +413,7 @@ impl CompactionService for CompactionServiceImpl {
                 if chunks.len() < 2 {
                     return Ok(());
                 }
-                
+
                 //We don't track min/max chunk values for multi-parititons
                 Some(
                     self.meta_store
@@ -634,10 +634,11 @@ impl CompactionService for CompactionServiceImpl {
                         match item {
                             EitherOrBoth::Both((c, min, max), (_, next_min, _)) => {
                                 if i == 0 && partition_min.is_none() {
-                                    Ok((*c as u64,
+                                    Ok((
+                                        *c as u64,
                                         (None, Some(Row::new(next_min.clone()))),
-                                        (Some(Row::new(min.clone())), Some(Row::new(max.clone())))
-                                         ))
+                                        (Some(Row::new(min.clone())), Some(Row::new(max.clone()))),
+                                    ))
                                 } else if i < num_filtered - 1 {
                                     Ok((
                                         *c as u64,
@@ -645,10 +646,7 @@ impl CompactionService for CompactionServiceImpl {
                                             Some(Row::new(min.clone())),
                                             Some(Row::new(next_min.clone())),
                                         ),
-                                        (
-                                            Some(Row::new(min.clone())),
-                                            Some(Row::new(max.clone())),
-                                        ),
+                                        (Some(Row::new(min.clone())), Some(Row::new(max.clone()))),
                                     ))
                                 } else {
                                     Err(CubeError::internal(format!(
@@ -659,10 +657,11 @@ impl CompactionService for CompactionServiceImpl {
                             }
                             EitherOrBoth::Left((c, min, max)) => {
                                 if i == 0 && num_filtered == 1 {
-                                    Ok((*c as u64, 
+                                    Ok((
+                                        *c as u64,
                                         (partition_min.clone(), partition_max.clone()),
-                                        (Some(Row::new(min.clone())), Some(Row::new(max.clone())))
-                                       ))
+                                        (Some(Row::new(min.clone())), Some(Row::new(max.clone()))),
+                                    ))
                                 } else if i == num_filtered - 1 {
                                     Ok((
                                         *c as u64,
@@ -1687,8 +1686,14 @@ mod tests {
             .sum::<u64>();
 
         assert_eq!(chunks.len(), 1);
-        assert_eq!(chunks[0].get_row().min(), &Some(Row::new(vec![TableValue::String("Foo 0".to_string())])));
-        assert_eq!(chunks[0].get_row().max(), &Some(Row::new(vec![TableValue::String("Foo 6".to_string())])));
+        assert_eq!(
+            chunks[0].get_row().min(),
+            &Some(Row::new(vec![TableValue::String("Foo 0".to_string())]))
+        );
+        assert_eq!(
+            chunks[0].get_row().max(),
+            &Some(Row::new(vec![TableValue::String("Foo 6".to_string())]))
+        );
 
         let mut data = Vec::new();
         for chunk in chunks.iter() {
@@ -1952,7 +1957,7 @@ impl MultiSplit {
                 mc.get_row().max_row().cloned(),
                 0,
                 None,
-                None
+                None,
             );
             children.push(self.meta.create_partition(c).await?)
         }
