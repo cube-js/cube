@@ -1,4 +1,4 @@
-import YAML from 'yaml';
+import YAML from 'js-yaml';
 import { camelize } from 'inflection';
 import * as t from '@babel/types';
 import { parse } from '@babel/parser';
@@ -24,7 +24,7 @@ export class YamlCompiler {
   }
 
   public compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
-    const yamlObj = YAML.parse(file.content);
+    const yamlObj = YAML.load(file.content);
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
         yamlObj.cubes.forEach(({ name, ...cube }) => {
