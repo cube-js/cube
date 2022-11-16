@@ -36,10 +36,10 @@ export function loadable(
   }>,
   timeout?: number
 ) {
-  const Component = loadable(async () => {
+  const Component = lazy(async () => {
     try {
       return await factory();
-    } catch (error: any) {
+    } catch (error) {
       handleChunkLoadError(error);
     }
 
@@ -58,7 +58,7 @@ export function loadable(
     toggle?.();
     try {
       await factory();
-    } catch (error: any) {
+    } catch (error) {
       handleChunkLoadError(error);
     }
     toggle?.();
