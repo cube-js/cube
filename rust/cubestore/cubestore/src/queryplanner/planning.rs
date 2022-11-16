@@ -158,10 +158,17 @@ pub async fn choose_index_ext(
         next_index: 0,
         enable_topk,
         can_pushdown_limit,
+        need_sort_pushdown: false
     };
 
     let plan = rewrite_plan(p, &ChooseIndexContext::default(), &mut r)?;
     assert_eq!(r.next_index, indices.len());
+    let plan = if r.need_sort_pushdown {
+        let mut sort_pushdown = SortPushDown{};
+        rewrite_plan(&plan, &None, &mut sort_pushdown)?
+    } else {
+        plan
+    };
 
     /* let plan = if pushdown_limit {
         let mut r = PushDownLimit{index_sort_on: indices[0].sort_on().unwrap()};
@@ -480,7 +487,6 @@ impl PlanRewriter for CollectConstraints {
                     } else {
                         c.sort_on.clone()
                     };
-
                     self.constraints.push(IndexConstraints {
                         sort_on,
                         table: table.table.clone(),
@@ -500,20 +506,13 @@ impl PlanRewriter for CollectConstraints {
         n: &LogicalPlan,
         current_context: &Self::Context,
     ) -> Option<Self::Context> {
-        fn column_name(expr: &Expr) -> Option<String> {
-            match expr {
-                Expr::Alias(e, _) => column_name(e),
-                Expr::Column(col) => Some(col.name.clone()), // TODO use alias
-                _ => None,
-            }
-        }
         match n {
             LogicalPlan::Aggregate {
                 group_expr,
                 aggr_expr,
                 ..
             } => {
-                let sort_on = group_expr.iter().map(column_name).collect::<Vec<_>>();
+                let sort_on = group_expr.iter().map(extract_column_name).collect::<Vec<_>>();
                 let sort_on = if !sort_on.is_empty() && sort_on.iter().all(|c| c.is_some()) {
                     Some(SortColumns {
                         sort_on: sort_on.into_iter().map(|c| c.unwrap()).collect(),
@@ -528,8 +527,9 @@ impl PlanRewriter for CollectConstraints {
                     order_col_names: current_context.order_col_names.clone(),
                 })
             }
-            LogicalPlan::Sort { expr, .. } => {
-                Some(current_context.update_order_col_names(sort_to_columns(expr)))
+            LogicalPlan::Sort { expr, input, .. } => {
+                let sort_expr = sort_expr_with_original_names(expr, input);
+                Some(current_context.update_order_col_names(sort_to_column_names(&sort_expr)))
             }
             LogicalPlan::Filter { predicate, .. } => {
                 let mut sort_on = Vec::new();
@@ -601,8 +601,70 @@ impl PlanRewriter for CollectConstraints {
         })
     }
 }
+fn extract_column_name(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Alias(e, _) => extract_column_name(e),
+        Expr::Column(col) => Some(col.name.clone()), // TODO use alias
+        _ => None,
+    }
+}
 
-fn sort_to_columns(sort_exprs: &Vec<Expr>) -> Option<Vec<String>> {
+///Try to get original column namse from if underlined projection or aggregates contains columns aliases
+fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
+    fn get_name(exprs: &Vec<Expr>, may_be_alias: &String) -> String {
+        let expr = exprs.iter().find(|&expr| {
+            match expr {
+                Expr::Alias(_, name) => name == may_be_alias,
+                _ => false
+            }
+        });
+        if let Some(expr) = expr {
+            if let Some(original_name) = extract_column_name(expr) {
+                return original_name;
+            }
+        }
+        may_be_alias.clone()
+    }
+    match input {
+        LogicalPlan::Projection { expr, .. } => get_name(expr, may_be_alias),
+        LogicalPlan::Filter { input, .. } => get_original_name(may_be_alias, input),
+        LogicalPlan::Aggregate { group_expr, .. } => get_name(group_expr, may_be_alias),
+        _ => may_be_alias.clone()
+    }
+}
+
+fn sort_expr_with_original_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> Vec<Expr> {
+    let mut res = Vec::new();
+    for sexpr in sort_exprs.iter() {
+        match sexpr {
+            Expr::Sort { expr, asc, nulls_first  } => {
+                match expr.as_ref() {
+                    Expr::Column(c) => {
+                        let mut res_col = c.clone();
+                        res_col.name = get_original_name(&res_col.name, input);
+                        res.push(
+                            Expr::Sort {
+                                expr: Box::new(Expr::Column(res_col)),
+                                asc: asc.clone(),
+                                nulls_first: nulls_first.clone()
+                            }
+                            );
+                    }
+                    _ => {
+                        res.push(
+                                sexpr.clone()
+                            );
+                    }
+                }
+            }
+            _ => {
+            }
+        }
+    }
+    res
+}
+
+fn sort_to_column_names(sort_exprs: &Vec<Expr>) -> Option<Vec<String>> {
     let mut res = Vec::new();
     for sexpr in sort_exprs.iter() {
         match sexpr {
@@ -669,6 +731,7 @@ struct ChooseIndex<'a> {
     chosen_indices: &'a [IndexSnapshot],
     enable_topk: bool,
     can_pushdown_limit: bool,
+    need_sort_pushdown: bool,
 }
 
 #[derive(Default)]
@@ -676,6 +739,7 @@ struct ChooseIndexContext {
     limit: Option<usize>,
     sort: Vec<Expr>,
     single_value_filtered_cols: HashSet<String>,
+    resort_disabled: bool,
 }
 
 impl ChooseIndexContext {
@@ -684,6 +748,7 @@ impl ChooseIndexContext {
             limit,
             sort: self.sort.clone(),
             single_value_filtered_cols: self.single_value_filtered_cols.clone(),
+            resort_disabled: self.resort_disabled.clone()
         }
     }
     fn update_sort(&self, sort: Vec<Expr>) -> Self {
@@ -691,6 +756,7 @@ impl ChooseIndexContext {
             limit: self.limit.clone(),
             sort,
             single_value_filtered_cols: self.single_value_filtered_cols.clone(),
+            resort_disabled: self.resort_disabled.clone()
         }
     }
     fn update_single_value_filtered_cols(&self, cols: HashSet<String>) -> Self {
@@ -698,6 +764,15 @@ impl ChooseIndexContext {
             limit: self.limit.clone(),
             sort: self.sort.clone(),
             single_value_filtered_cols: cols,
+            resort_disabled: self.resort_disabled.clone()
+        }
+    }
+    fn update_resort_disabled(&self, resort_disabled: bool) -> Self {
+        Self {
+            limit: self.limit.clone(),
+            sort: self.sort.clone(),
+            single_value_filtered_cols: self.single_value_filtered_cols.clone(),
+            resort_disabled
         }
     }
 }
@@ -708,6 +783,13 @@ impl PlanRewriter for ChooseIndex<'_> {
     fn enter_node(&mut self, n: &LogicalPlan, context: &Self::Context) -> Option<Self::Context> {
         match n {
             LogicalPlan::Limit { n, .. } => Some(context.update_limit(Some(*n))),
+            LogicalPlan::Skip {n, ..} => {
+                if let Some(limit) = context.limit {
+                    Some(context.update_limit(Some(limit + *n)))
+                } else {
+                    None
+                }
+            }
             LogicalPlan::Filter { predicate, .. } => {
                 let mut single_filtered = Vec::new();
                 if single_value_filter_columns(predicate, &mut single_filtered) {
@@ -722,8 +804,11 @@ impl PlanRewriter for ChooseIndex<'_> {
                 } else {
                     None
                 }
-            }
-            LogicalPlan::Sort { expr, .. } => Some(context.update_sort(expr.clone())),
+            },
+            LogicalPlan::Join { .. } |
+            LogicalPlan::CrossJoin { .. } |
+            LogicalPlan::Aggregate { .. } => Some(context.update_resort_disabled(true)),
+            LogicalPlan::Sort { expr, input,.. } => Some(context.update_sort(sort_expr_with_original_names(expr, input))),
             _ => None,
         }
     }
@@ -785,7 +870,9 @@ impl ChooseIndex<'_> {
 
                     let index_schema = source.schema();
                     assert_eq!(table_schema, index_schema);
-                    let limit = self.get_limit_for_pushdown(snapshot.sort_on(), ctx);
+                    let (limit, resort_input) = self.get_limit_for_pushdown(snapshot.sort_on(), ctx);
+                    
+                    self.need_sort_pushdown = self.need_sort_pushdown || resort_input; 
 
                     return Ok(ClusterSendNode::new(
                         Arc::new(p),
@@ -813,16 +900,23 @@ impl ChooseIndex<'_> {
         &self,
         index_sort_on: Option<&Vec<String>>,
         ctx: &ChooseIndexContext,
-    ) -> Option<usize> {
-        if !self.can_pushdown_limit || index_sort_on.is_none() || index_sort_on.unwrap().is_empty()
-        {
-            return None;
+    ) -> (Option<usize>, bool) {
+        if ctx.limit.is_none() {
+            return (None, false);
         }
 
-        if let Some((limit, sort_columns)) = ctx.limit.zip(sort_to_columns(&ctx.sort)) {
+        //If there are not aggregates and join we can pushown limit with sort even if indexes is
+        //intersecting (i.e. if can_pushown_limit = false)
+        if ctx.resort_disabled && (!self.can_pushdown_limit || index_sort_on.is_none() || index_sort_on.unwrap().is_empty())
+        {
+            return (None, false);
+        }
+
+        let limit = ctx.limit.unwrap();
+
+        let limit_without_resort = if let Some((sort_columns, index_sort_on)) = sort_to_column_names(&ctx.sort).zip(index_sort_on) {
             //We exclude from order by and index sort_on strictly restricted columns (aka `a = 10`)
             let works_ind_sort_cols = index_sort_on
-                .unwrap()
                 .iter()
                 .filter(|c| !ctx.single_value_filtered_cols.contains(*c));
             let works_sort_cols = sort_columns
@@ -847,9 +941,53 @@ impl ChooseIndex<'_> {
             }
         } else {
             None
+        };
+
+        if limit_without_resort.is_some() {
+            (limit_without_resort, false)
+        } else if !ctx.resort_disabled { //If there are not aggregations then we can resort cluster sort input
+            (Some(limit), true)
+        } else {
+            (None, false)
+        }
+
+
+    }
+}
+
+struct SortPushDown {
+}
+
+impl PlanRewriter for SortPushDown {
+    type Context = Option<Vec<Expr>>;
+
+    fn enter_node(&mut self, n: &LogicalPlan, _context: &Self::Context) -> Option<Self::Context> {
+        match n {
+            LogicalPlan::Sort { expr, ..} => Some(Some(expr.clone())),
+            _ => None,
+        }
+    }
+
+    fn rewrite(
+        &mut self,
+        n: LogicalPlan,
+        ctx: &Self::Context,
+        ) -> Result<LogicalPlan, DataFusionError> {
+        match n {
+            LogicalPlan::Extension { ref node } =>  {
+                if let Some((node, sort_expr)) = node.as_any().downcast_ref::<ClusterSendNode>().zip(ctx.as_ref()) {
+                    let input = LogicalPlan::Sort { expr: sort_expr.clone(), input: node.input.clone() };
+                    Ok(ClusterSendNode::new(Arc::new(input), node.snapshots.clone(), node.limit.clone()).into_plan())
+
+                } else {
+                    Ok(n)
+                }
+            },
+            _ => Ok(n)
         }
     }
 }
+
 
 struct IndexCandidate {
     /// May contain for unmatched index.
@@ -1339,6 +1477,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
             }
             snapshots = send.snapshots.clone();
             let limit = send.limit.clone();
+
             *input = send.input.clone();
             return Ok(ClusterSendNode::new(Arc::new(p), snapshots, limit).into_plan());
         }
@@ -1371,6 +1510,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                     None
                 };
                 *i = send.input.as_ref().clone();
+
             }
             snapshots = vec![union_snapshots];
             return Ok(ClusterSendNode::new(Arc::new(p), snapshots, limit).into_plan());
