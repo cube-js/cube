@@ -8,7 +8,8 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-import hana, { Connection, ConnectionConfig, FieldInfo, QueryOptions } from '@sap/hana-client';
+// import hana, { Connection, ConnectionConfig, FieldInfo, QueryOptions } from '@sap/hana-client';
+
 import genericPool from 'generic-pool';
 import { promisify } from 'util';
 import {
@@ -21,35 +22,25 @@ import {
   DownloadTableData,
   IndexesSQL,
   DownloadTableMemoryData,
+  StreamTableDataWithTypes,
 } from '@cubejs-backend/base-driver';
 
+import { ConnectionOptions, Connection } from 'types-hana-client'
+
+const hdb = require('@sap/hana-client')
+
 const GenericTypeToSapHana: Record<GenericDataBaseType, string> = {
-  string: 'varchar(255) CHARACTER SET utf8mb4',
-  text: 'varchar(255) CHARACTER SET utf8mb4',
+  string: 'varchar(255)',
+  text: 'varchar(255)',
   decimal: 'decimal(38,10)',
 };
 
 /**
  * HANA Native types -> SQL type
  */
-const SapHanaNativeToSapHanaType = {
-  [hana.Types.DECIMAL]: 'decimal',
-  [hana.Types.NEWDECIMAL]: 'decimal',
-  [hana.Types.TINY]: 'tinyint',
-  [hana.Types.SHORT]: 'smallint',
-  [hana.Types.LONG]: 'int',
-  [hana.Types.INT24]: 'mediumint',
-  [hana.Types.LONGLONG]: 'bigint',
-  [hana.Types.NEWDATE]: 'datetime',
-  [hana.Types.TIMESTAMP2]: 'timestamp',
-  [hana.Types.DATETIME2]: 'datetime',
-  [hana.Types.TIME2]: 'time',
-  [hana.Types.TINY_BLOB]: 'tinytext',
-  [hana.Types.MEDIUM_BLOB]: 'mediumtext',
-  [hana.Types.LONG_BLOB]: 'longtext',
-  [hana.Types.BLOB]: 'text',
-  [hana.Types.VAR_STRING]: 'varchar',
-  [hana.Types.STRING]: 'varchar',
+const SapHanaNativeToSapHanaType: Record<GenericDataBaseType, string> = {
+  string: 'text',
+  double: 'decimal'
 };
 
 const SapHanaToGenericType: Record<string, GenericDataBaseType> = {
@@ -65,7 +56,7 @@ const SapHanaToGenericType: Record<string, GenericDataBaseType> = {
   'tinyint unsigned': 'int',
 };
 
-export interface SapHanaDriverConfiguration extends ConnectionConfig {
+export interface SapHanaDriverConfiguration extends ConnectionOptions{
   readOnly?: boolean,
   loadPreAggregationWithoutMetaLock?: boolean,
   storeTimezone?: string,
@@ -73,7 +64,7 @@ export interface SapHanaDriverConfiguration extends ConnectionConfig {
 }
 
 interface SapHanaConnection extends Connection {
-  execute: (options: string | QueryOptions, values?: any) => Promise<any>
+  execute: (options: string, values?: any) => Promise<any>
 }
 
 /**
@@ -89,7 +80,9 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
 
   protected readonly config: SapHanaDriverConfiguration;
 
-  protected readonly pool: genericPool.Pool<SapHanaConnection>;
+  protected pool: genericPool.Pool<SapHanaConnection>;
+
+  protected hdb: any;
 
   /**
    * Class constructor.
@@ -106,31 +99,32 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
 
+    this.hdb = hdb;
+
     const { pool, ...restConfig } = config;
     this.config = {
       host: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
+      databaseName: getEnv('dbName', { dataSource }),
       port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      socketPath: getEnv('dbSocketPath', { dataSource }),
-      timezone: 'Z',
-      ssl: this.getSslOptions(dataSource),
-      dateStrings: true,
+      uid: getEnv('dbUser', { dataSource }),
+      pwd: getEnv('dbPass', { dataSource }),
+      // ssl: this.getSslOptions(dataSource),
+      // dateStrings: true,
       readOnly: true,
       ...restConfig,
     };
     this.pool = genericPool.createPool({
       create: async () => {
-        const conn: any = hana.createConnection(this.config);
+        const conn: any = hdb.createConnection(this.config);
         const connect = promisify(conn.connect.bind(conn));
 
         if (conn.on) {
+          // there is no `on` method on HANA connection
           conn.on('error', () => {
             conn.destroy();
           });
         }
-        conn.execute = promisify(conn.query.bind(conn));
+        conn.execute = promisify(conn.exec.bind(conn));
 
         await connect();
 
@@ -138,7 +132,7 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
       },
       validate: async (connection) => {
         try {
-          await connection.execute('SELECT 1');
+          await connection.execute('SELECT 1 FROM DUMMY');
         } catch (e) {
           this.databasePoolError(e);
           return false;
@@ -198,12 +192,16 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
     return promise;
   }
 
+  async getConnectionFromPool() {
+    return await (<any> this.pool)._factory.create();
+  }
+
   public async testConnection() {
     // eslint-disable-next-line no-underscore-dangle
-    const conn: SapHanaConnection = await (<any> this.pool)._factory.create();
+    const conn: SapHanaConnection = await this.getConnectionFromPool();
 
     try {
-      return await conn.execute('SELECT 1');
+      return await conn.execute('SELECT 1 FROM DUMMY');
     } finally {
       // eslint-disable-next-line no-underscore-dangle
       await (<any> this.pool)._factory.destroy(conn);
@@ -211,11 +209,14 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query(query: string, values: unknown[]) {
-    return this.withConnection(async (conn) => {
-      await this.setTimeZone(conn);
-
-      return conn.execute(query, values);
-    });
+    const conn = await this.getConnectionFromPool();
+    return new Promise(
+      (resolve, reject) => conn.exec(
+        query,
+        values || [],
+        (err, result) => (err ? reject(err) : resolve(result))
+      )
+    );
   }
 
   protected setTimeZone(conn: SapHanaConnection) {
@@ -228,11 +229,19 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
   }
 
   public informationSchemaQuery() {
-    return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    // return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    return `
+      SELECT columns.COLUMN_NAME as ${this.quoteIdentifier('COLUMN_NAME')},
+             columns.TABLE_NAME as ${this.quoteIdentifier('TABLE_NAME')},
+             columns.SCHEMA_NAME as ${this.quoteIdentifier('SCHEMA_NAME')},
+             columns.DATA_TYPE_NAME as ${this.quoteIdentifier('DATA_TYPE_NAME')}
+      FROM SYS.TABLE_COLUMNS columns
+      WHERE columns.table_schema IN '${this.config.databaseName}'
+   `;
   }
 
   public quoteIdentifier(identifier: string) {
-    return `\`${identifier}\``;
+    return `\"${identifier}\"`;
   }
 
   public fromGenericType(columnType: GenericDataBaseType) {
@@ -250,16 +259,20 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
   }
 
-  public async stream(query: string, values: unknown[], { highWaterMark }: StreamOptions) {
+  public async stream(
+    query: string,
+    values: unknown[],
+    { highWaterMark }: StreamOptions
+  ): Promise<StreamTableDataWithTypes> {
     // eslint-disable-next-line no-underscore-dangle
     const conn: SapHanaConnection = await (<any> this.pool)._factory.create();
 
     try {
-      await this.setTimeZone(conn);
+      // await this.setTimeZone(conn);
 
       const [rowStream, fields] = await (
-        new Promise<[any, hana.FieldInfo[]]>((resolve, reject) => {
-          const stream = conn.query(query, values).stream({ highWaterMark });
+        new Promise<[any, FieldInfo[]]>((resolve, reject) => {
+          const stream = conn.exec(query, values).stream({ highWaterMark });
 
           stream.on('fields', (f) => {
             resolve([stream, f]);
@@ -286,7 +299,7 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  protected mapFieldsToGenericTypes(fields: hana.FieldInfo[]) {
+  protected mapFieldsToGenericTypes(fields: FieldInfo[]) {
     return fields.map((field) => {
       // @ts-ignore
       let dbType = hana.Types[field.type];
@@ -312,12 +325,12 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
       await this.setTimeZone(conn);
 
       return new Promise((resolve, reject) => {
-        conn.query(query, values, (err, rows, fields) => {
+        conn.exec(query, values, (err, result) => {
           if (err) {
             reject(err);
           } else {
             resolve({
-              rows,
+              result,
               types: this.mapFieldsToGenericTypes(<FieldInfo[]>fields),
             });
           }
