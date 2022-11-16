@@ -378,4 +378,59 @@ views:
       }]
     );
   });
+
+  it('extends', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: BaseUsers
+    sql: "SELECT 1"
+    
+    dimensions:
+      - name: time
+        sql: "{CUBE}.timestamp"
+        type: time
+        
+  - name: ActiveUsers
+    sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
+    extends: BaseUsers
+    measures:
+      - name: weeklyActive
+        sql: "{CUBE}.user_id"
+        type: count_distinct
+        rollingWindow:
+          trailing: 7 day
+          offset: start
+    `, { yamlExtension: true });
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['ActiveUsers.weeklyActive'],
+      timeDimensions: [{
+        dimension: 'ActiveUsers.time',
+        granularity: 'day',
+        dateRange: ['2022-01-01', '2022-01-03']
+      }],
+      timezone: 'UTC'
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    const res = await dbRunner.testQuery(query.buildSqlAndParams());
+    console.log(JSON.stringify(res));
+
+    expect(res).toEqual(
+      [{
+        active_users__time_day: '2022-01-01T00:00:00.000Z',
+        active_users__weekly_active: '0',
+      },
+      {
+        active_users__time_day: '2022-01-02T00:00:00.000Z',
+        active_users__weekly_active: '1',
+      },
+      {
+        active_users__time_day: '2022-01-03T00:00:00.000Z',
+        active_users__weekly_active: '1',
+      }]
+    );
+  });
 });
