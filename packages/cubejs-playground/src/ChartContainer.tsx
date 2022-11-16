@@ -22,14 +22,15 @@ import { playgroundAction } from './events';
 import { codeSandboxDefinition, copyToClipboard } from './utils';
 import DashboardSource from './DashboardSource';
 import { GraphQLIcon } from './shared/icons/GraphQLIcon';
+import { loadable } from './loadable';
 
-const GraphiQLSandbox = lazy(
+const GraphiQLSandbox = loadable(
   () => import('./components/GraphQL/GraphiQLSandbox')
 );
 
-const SqlQueryTab = lazy(() => import('./components/SqlQueryTab'));
+const SqlQueryTab = loadable(() => import('./components/SqlQueryTab'));
 
-const CachePane = lazy(() => import('./components/CachePane'));
+const CachePane = loadable(() => import('./components/CachePane'));
 
 const frameworkToTemplate = {
   react: 'create-react-app',
