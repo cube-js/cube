@@ -26,7 +26,7 @@
     "@babel/runtime": "^7.1.2",
     "@cubejs-client/core": "^0.31.13",
     "core-js": "^3.6.5",
-    "ramda": "^0.27.0"
+    "ramda": "^0.27.2"
   },
   "devDependencies": {
     "@types/ramda": "^0.27.40",
