@@ -16,15 +16,11 @@ import {
   BaseDriver,
   GenericDataBaseType,
   DriverInterface,
-  TableStructure,
-  DownloadTableData,
-  IndexesSQL,
-  DownloadTableMemoryData,
 } from '@cubejs-backend/base-driver';
 
-import { ConnectionOptions, Connection } from 'types-hana-client'
+import { ConnectionOptions, Connection } from 'types-hana-client';
 
-const hdb = require('@sap/hana-client')
+const hdb = require('@sap/hana-client');
 
 const GenericTypeToSapHana: Record<GenericDataBaseType, string> = {
   string: 'varchar(255)',
@@ -100,19 +96,17 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
 
     const { pool, ...restConfig } = config;
     this.config = {
-      host: getEnv('dbHost', { dataSource }),
-      databaseName: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
+      serverNode: getEnv('dbHost', { dataSource }),
       uid: getEnv('dbUser', { dataSource }),
       pwd: getEnv('dbPass', { dataSource }),
-      // ssl: this.getSslOptions(dataSource),
-      // dateStrings: true,
+      encrypt: true,
+      sslValidateCertificate: false,
       readOnly: true,
       ...restConfig,
     };
     this.pool = genericPool.createPool({
       create: async () => {
-        const conn: any = hdb.createConnection(this.config);
+        const conn: any = hdb.createConnection();
         const connect = promisify(conn.connect.bind(conn));
 
         if (conn.on) {
@@ -123,7 +117,7 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
         }
         conn.execute = promisify(conn.exec.bind(conn));
 
-        await connect();
+        await connect(this.config);
 
         return conn;
       },
@@ -156,41 +150,8 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
     return !!this.config.readOnly;
   }
 
-  protected withConnection(fn: (conn: SapHanaConnection) => Promise<any>) {
-    const self = this;
-    const connectionPromise = this.pool.acquire();
-
-    let cancelled = false;
-    const cancelObj: any = {};
-
-    const promise: any = connectionPromise.then(async conn => {
-      const [{ connectionId }] = await conn.execute('select connection_id() as connectionId');
-      cancelObj.cancel = async () => {
-        cancelled = true;
-        await self.withConnection(async processConnection => {
-          await processConnection.execute(`KILL ${connectionId}`);
-        });
-      };
-      return fn(conn)
-        .then(res => this.pool.release(conn).then(() => {
-          if (cancelled) {
-            throw new Error('Query cancelled');
-          }
-          return res;
-        }))
-        .catch((err) => this.pool.release(conn).then(() => {
-          if (cancelled) {
-            throw new Error('Query cancelled');
-          }
-          throw err;
-        }));
-    });
-    promise.cancel = () => cancelObj.cancel();
-    return promise;
-  }
-
-  async getConnectionFromPool() {
-    return await (<any> this.pool)._factory.create();
+  protected async getConnectionFromPool() {
+    return (<any> this.pool)._factory.create();
   }
 
   public async testConnection() {
@@ -207,13 +168,8 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
 
   public async query(query: string, values: unknown[]) {
     const conn = await this.getConnectionFromPool();
-    return new Promise(
-      (resolve, reject) => conn.exec(
-        query,
-        values || [],
-        (err, result) => (err ? reject(err) : resolve(result))
-      )
-    );
+    const res = await conn.execute(query, values || {});
+    return res && res.rows;
   }
 
   public async release() {
@@ -222,7 +178,6 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
   }
 
   public informationSchemaQuery() {
-    // return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
     return `
       SELECT columns.COLUMN_NAME as ${this.quoteIdentifier('COLUMN_NAME')},
              columns.TABLE_NAME as ${this.quoteIdentifier('TABLE_NAME')},
@@ -234,11 +189,7 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
   }
 
   public quoteIdentifier(identifier: string) {
-    return `\"${identifier}\"`;
-  }
-
-  public fromGenericType(columnType: GenericDataBaseType) {
-    return GenericTypeToSapHana[columnType] || super.fromGenericType(columnType);
+    return `"${identifier}"`;
   }
 
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: any, params: any, tx: any) {
@@ -250,66 +201,6 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
     }
 
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
-  }
-
-  public toColumnValue(value: any, genericType: GenericDataBaseType) {
-    if (genericType === 'timestamp' && typeof value === 'string') {
-      return value && value.replace('Z', '');
-    }
-    if (genericType === 'boolean' && typeof value === 'string') {
-      if (value.toLowerCase() === 'true') {
-        return true;
-      }
-      if (value.toLowerCase() === 'false') {
-        return false;
-      }
-    }
-    return super.toColumnValue(value, genericType);
-  }
-
-  protected isDownloadTableDataRow(tableData: DownloadTableData): tableData is DownloadTableMemoryData {
-    return (<DownloadTableMemoryData> tableData).rows !== undefined;
-  }
-
-  public async uploadTableWithIndexes(
-    table: string,
-    columns: TableStructure,
-    tableData: DownloadTableData,
-    indexesSql: IndexesSQL
-  ) {
-    if (!this.isDownloadTableDataRow(tableData)) {
-      throw new Error(`${this.constructor} driver supports only rows upload`);
-    }
-
-    await this.createTable(table, columns);
-
-    try {
-      const batchSize = 1000; // TODO make dynamic?
-      for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
-        const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
-        const indexArray = Array.from({ length: currentBatchSize }, (v, i) => i);
-        const valueParamPlaceholders =
-          indexArray.map(i => `(${columns.map((c, paramIndex) => this.param(paramIndex + i * columns.length)).join(', ')})`).join(', ');
-        const params = indexArray.map(i => columns
-          .map(c => this.toColumnValue(tableData.rows[i + j * batchSize][c.name], c.type)))
-          .reduce((a, b) => a.concat(b), []);
-
-        await this.query(
-          `INSERT INTO ${table}
-        (${columns.map(c => this.quoteIdentifier(c.name)).join(', ')})
-        VALUES ${valueParamPlaceholders}`,
-          params
-        );
-      }
-
-      for (let i = 0; i < indexesSql.length; i++) {
-        const [query, p] = indexesSql[i].sql;
-        await this.query(query, p);
-      }
-    } catch (e) {
-      await this.dropTable(table);
-      throw e;
-    }
   }
 
   public toGenericType(columnType: string) {
