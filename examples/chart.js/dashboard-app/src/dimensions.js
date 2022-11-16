@@ -1,5 +1,6 @@
 import {
   Chart,
+  Colors,
   BubbleController,
   CategoryScale,
   LinearScale,
@@ -8,6 +9,7 @@ import {
 } from 'chart.js'
 
 Chart.register(
+  Colors,
   BubbleController,
   PointElement,
   CategoryScale,

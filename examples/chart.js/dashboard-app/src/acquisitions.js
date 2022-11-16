@@ -1,5 +1,6 @@
 import {
   Chart,
+  Colors,
   BarController,
   CategoryScale,
   LinearScale,
@@ -8,6 +9,7 @@ import {
 } from 'chart.js'
 
 Chart.register(
+  Colors,
   BarController,
   BarElement,
   CategoryScale,
@@ -26,9 +28,9 @@ import { getAquisitionsByYear } from './api'
       type: 'bar',
       options: {
         plugins: {
-          legend: {
-            display: false
-          }
+          // legend: {
+          //   display: false
+          // }
         },
       },
       data: {

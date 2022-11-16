@@ -10,7 +10,8 @@
     "parcel": "^2.6.2"
   },
   "dependencies": {
+    "@cube-dev/example-wrapper": "^1.1.10",
     "@cubejs-client/core": "^0.30.29",
-    "chart.js": "^4.0.0-alpha.3"
+    "chart.js": "^4.0.0"
   }
 }
