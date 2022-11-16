@@ -16,13 +16,10 @@ import {
   BaseDriver,
   GenericDataBaseType,
   DriverInterface,
-  StreamOptions,
-  DownloadQueryResultsOptions,
   TableStructure,
   DownloadTableData,
   IndexesSQL,
   DownloadTableMemoryData,
-  StreamTableDataWithTypes,
 } from '@cubejs-backend/base-driver';
 
 import { ConnectionOptions, Connection } from 'types-hana-client'
@@ -219,10 +216,6 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
     );
   }
 
-  protected setTimeZone(conn: SapHanaConnection) {
-    return conn.execute(`SET time_zone = '${this.config.storeTimezone || '+00:00'}'`, []);
-  }
-
   public async release() {
     await this.pool.drain();
     await this.pool.clear();
@@ -257,86 +250,6 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
     }
 
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
-  }
-
-  public async stream(
-    query: string,
-    values: unknown[],
-    { highWaterMark }: StreamOptions
-  ): Promise<StreamTableDataWithTypes> {
-    // eslint-disable-next-line no-underscore-dangle
-    const conn: SapHanaConnection = await (<any> this.pool)._factory.create();
-
-    try {
-      // await this.setTimeZone(conn);
-
-      const [rowStream, fields] = await (
-        new Promise<[any, FieldInfo[]]>((resolve, reject) => {
-          const stream = conn.exec(query, values).stream({ highWaterMark });
-
-          stream.on('fields', (f) => {
-            resolve([stream, f]);
-          });
-          stream.on('error', (e) => {
-            reject(e);
-          });
-        })
-      );
-
-      return {
-        rowStream,
-        types: this.mapFieldsToGenericTypes(fields),
-        release: async () => {
-          // eslint-disable-next-line no-underscore-dangle
-          await (<any> this.pool)._factory.destroy(conn);
-        }
-      };
-    } catch (e) {
-      // eslint-disable-next-line no-underscore-dangle
-      await (<any> this.pool)._factory.destroy(conn);
-
-      throw e;
-    }
-  }
-
-  protected mapFieldsToGenericTypes(fields: FieldInfo[]) {
-    return fields.map((field) => {
-      // @ts-ignore
-      let dbType = hana.Types[field.type];
-
-      if (field.type in SapHanaNativeToSapHanaType) {
-        // @ts-ignore
-        dbType = SapHanaNativeToSapHanaType[field.type];
-      }
-
-      return {
-        name: field.name,
-        type: this.toGenericType(dbType)
-      };
-    });
-  }
-
-  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions) {
-    if ((options || {}).streamImport) {
-      return this.stream(query, values, options);
-    }
-
-    return this.withConnection(async (conn) => {
-      await this.setTimeZone(conn);
-
-      return new Promise((resolve, reject) => {
-        conn.exec(query, values, (err, result) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve({
-              result,
-              types: this.mapFieldsToGenericTypes(<FieldInfo[]>fields),
-            });
-          }
-        });
-      });
-    });
   }
 
   public toColumnValue(value: any, genericType: GenericDataBaseType) {
