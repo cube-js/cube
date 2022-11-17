@@ -118,6 +118,7 @@ export class CubeSymbols {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }
 
+    this.camelCaseTypes(cube.joins);
     this.camelCaseTypes(cube.measures);
     this.camelCaseTypes(cube.dimensions);
     this.camelCaseTypes(cube.segments);
@@ -144,6 +145,9 @@ export class CubeSymbols {
     for (const member of Object.values(obj)) {
       if (member.type && member.type.indexOf('_') !== -1) {
         member.type = camelize(member.type, true);
+      }
+      if (member.relationship && member.relationship.indexOf('_') !== -1) {
+        member.relationship = camelize(member.relationship, true);
       }
     }
   }

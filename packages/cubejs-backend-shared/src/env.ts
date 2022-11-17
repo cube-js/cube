@@ -1172,7 +1172,7 @@ const variables: Record<string, (...args: any) => any> = {
         );
       }
     } else {
-      return undefined;
+      return true;
     }
   },
 

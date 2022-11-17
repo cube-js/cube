@@ -1980,8 +1980,8 @@ describe('Multiple datasources', () => {
     delete process.env.CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE;
     delete process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE;
     delete process.env.CUBEJS_DS_WRONG_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE;
-    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'postgres' })).toEqual(true);
     expect(() => getEnv('snowflakeSessionKeepAlive', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );

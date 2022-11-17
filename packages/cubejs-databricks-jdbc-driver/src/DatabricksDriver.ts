@@ -79,16 +79,16 @@ const DatabricksToGenericType: Record<string, string> = {
 
 async function resolveJDBCDriver(): Promise<string> {
   return fileExistsOr(
-    path.join(process.cwd(), 'SparkJDBC42.jar'),
+    path.join(process.cwd(), 'DatabricksJDBC42.jar'),
     async () => fileExistsOr(
-      path.join(__dirname, '..', 'download', 'SparkJDBC42.jar'),
+      path.join(__dirname, '..', 'download', 'DatabricksJDBC42.jar'),
       async () => {
         const pathOrNull = await downloadJDBCDriver();
         if (pathOrNull) {
           return pathOrNull;
         }
         throw new Error(
-          'Please download and place SparkJDBC42.jar inside your ' +
+          'Please download and place DatabricksJDBC42.jar inside your ' +
           'project directory'
         );
       }
@@ -100,6 +100,8 @@ async function resolveJDBCDriver(): Promise<string> {
  * Databricks driver class.
  */
 export class DatabricksDriver extends JDBCDriver {
+  private showSparkProtocolWarn: boolean;
+
   protected readonly config: DatabricksDriverConfiguration;
 
   public static dialectClass() {
@@ -133,10 +135,17 @@ export class DatabricksDriver extends JDBCDriver {
       conf.dataSource ||
       assertDataSource('default');
 
+    let showSparkProtocolWarn = false;
+    let url: string = getEnv('databrickUrl', { dataSource });
+    if (url.indexOf('jdbc:spark://') !== -1) {
+      showSparkProtocolWarn = true;
+      url = url.replace('jdbc:spark://', 'jdbc:databricks://');
+    }
+
     const config: DatabricksDriverConfiguration = {
       ...conf,
       dbType: 'databricks',
-      drivername: 'com.simba.spark.jdbc.Driver',
+      drivername: 'com.databricks.client.jdbc.Driver',
       customClassPath: undefined,
       properties: {
         // PWD-parameter passed to the connection string has higher priority,
@@ -145,7 +154,7 @@ export class DatabricksDriver extends JDBCDriver {
         UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
       },
       database: getEnv('dbName', { required: false, dataSource }),
-      url: getEnv('databrickUrl', { dataSource }),
+      url,
       // common export bucket config
       bucketType:
         conf?.bucketType ||
@@ -178,6 +187,7 @@ export class DatabricksDriver extends JDBCDriver {
     };
     super(config);
     this.config = config;
+    this.showSparkProtocolWarn = showSparkProtocolWarn;
   }
 
   public readOnly() {
@@ -186,10 +196,10 @@ export class DatabricksDriver extends JDBCDriver {
 
   public setLogger(logger: any) {
     super.setLogger(logger);
-    this.showUrlTokenDeprecation();
+    this.showDeprecations();
   }
 
-  public showUrlTokenDeprecation() {
+  public showDeprecations() {
     if (this.config.url) {
       const result = this.config.url
         .split(';')
@@ -198,9 +208,19 @@ export class DatabricksDriver extends JDBCDriver {
 
       if (result) {
         this.logger('PWD Parameter Deprecation in connection string', {
-          warning: 'PWD parameter is deprecated and will be ignored in future releases. Please migrate to the CUBEJS_DB_DATABRICKS_TOKEN environment variable.'
+          warning:
+            'PWD parameter is deprecated and will be ignored in future releases. ' +
+            'Please migrate to the CUBEJS_DB_DATABRICKS_TOKEN environment variable.'
         });
       }
+    }
+    if (this.showSparkProtocolWarn) {
+      this.logger('jdbc:spark protocol deprecation', {
+        warning:
+          'The `jdbc:spark` protocol is deprecated and will be ignored in future releases. ' +
+          'Please migrate your CUBEJS_DB_DATABRICKS_URL environment variable to the ' +
+          '`jdbc:databricks` protocol.'
+      });
     }
   }
 

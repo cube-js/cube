@@ -1236,9 +1236,9 @@ describe('Single datasources', () => {
     );
 
     delete process.env.CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE;
-    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'postgres' })).toBeUndefined();
-    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'wrong' })).toBeUndefined();
+    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'postgres' })).toEqual(true);
+    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'wrong' })).toEqual(true);
   });
 
   test('getEnv("snowflakeAuthenticator")', () => {

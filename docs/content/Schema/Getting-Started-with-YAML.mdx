@@ -1,0 +1,209 @@
+---
+title: Getting Started with YAML
+permalink: /schema/getting-started/yaml
+category: Reference
+menuOrder: 2
+---
+
+<WarningBox heading={`🐣  Preview`}>
+
+YAML modelling is currently in Preview, and the syntax may change in a future
+version.
+
+</WarningBox>
+
+## Ensure deployment is using latest Cube
+
+First, ensure you're using Cube version `0.31.0` or higher. Then create a new
+`.yml` file in the `schema/` folder.
+
+## Syntax
+
+The syntax for YAML modelling is very similar to the existing JavaScript syntax,
+with a few key differences:
+
+1. All schema properties can be written in either camel-case or snake-case i.e.
+   `countDistinctApprox` can be written as `count_distinct_approx`,
+   `preAggregations` can be written as `pre_aggregations` etc. We recommend
+   using snake-case in YAML models.
+
+2. References to cubes, views and context variables should be wrapped in `{}` i.e.
+   `{FILTER_PARAMS.Orders.created_at.filter('created_at')}`.
+
+3. String values only need to have quotes around them if they contain special values:
+   `"{CUBE}.user_id = {Users.id}"`
+
+### <--{"id" : "Syntax"}--> Defining cubes
+
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM public.orders
+```
+
+Multi-line SQL queries also work:
+
+```yaml
+cubes:
+  - name: Orders
+    sql:
+      SELECT * FROM public.orders WHERE
+      {FILTER_PARAMS.Orders.created_at.filter('created_at')}
+```
+
+### <--{"id" : "Syntax"}--> Defining measures
+
+The `measures` property is an array of [measure
+definitions][ref-schema-ref-measures]. The measure definition **must** also
+define a `name` property.
+
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM public.orders
+    measures:
+      - name: count
+        type: count
+      - name: completed_count
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+      - name: distinct_user_count
+        type: count_distinct
+        sql: user_id
+      - name: total_revenue
+        sql: number
+        type: sum
+```
+
+### <--{"id" : "Syntax"}--> Defining dimensions
+
+The `dimensions` property is an array of [dimension
+definitions][ref-schema-ref-dimensions]. The dimension definition **must** also
+define a `name` property.
+
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM public.orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+      - name: created_at
+        sql: created_at
+        type: time
+      - name: completed_at
+        sql: completed_at
+        type: time
+```
+
+### <--{"id" : "Syntax"}--> Defining joins
+
+The `joins` property is an array of [join definitions][ref-schema-ref-joins].
+The join definition **must** also define a `name` property. When referencing
+either `CUBE` or another foreign cube, ensure they are wrapped in `{}` and that
+the entire statement is wrapped in `""`:
+
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM public.orders
+    joins:
+      - name: Users
+        sql: "{CUBE}.user_id = {Users.id}"
+        relationship: belongs_to
+```
+
+### <--{"id" : "Syntax"}--> Defining pre-aggregations
+
+The `pre_aggregations` property is an array of [pre-aggregation
+definitions][ref-schema-ref-preaggs]. The pre-aggregation definition **must**
+also define a `name` property.
+
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM public.orders
+    pre_aggregations:
+      - name: orders_by_status
+        measures:
+          - CUBE.count
+        dimensions:
+          - CUBE.status
+        time_dimension: CUBE.created_at
+        granularity: week
+        partition_granularity: month
+        indexes:
+          status_index:
+            columns:
+              - status
+```
+
+## Using context variables
+
+### <--{"id" : "Using context variables"}--> COMPILE_CONTEXT
+
+Instead of destructuring properties from
+[`COMPILE_CONTEXT`][ref-schema-ref-cube-compile-ctx], use dot-notation to
+specify the property directly:
+
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM public.orders
+    shown: COMPILE_CONTEXT.securityContext.property
+```
+
+If referencing the security context, ensure that you use camel-case (i.e.
+`securityContext`).
+
+### <--{"id" : "Using context variables"}--> FILTER_PARAMS
+
+[`FILTER_PARAMS`][ref-schema-ref-cube-filter-params] can also be used within the
+`sql` property of a cube/view definition:
+
+```yaml
+cubes:
+  - name: Orders
+    sql:
+      SELECT * FROM public.orders WHERE
+      {FILTER_PARAMS.Orders.created_at.filter('created_at')}
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+## Dynamic Data Modelling
+
+A significant number of Cube users leverage dynamic data models for multitenant
+scenarios; while it is possible to use `COMPILE_CONTEXT` already, complete
+support for dynamic data model generation is not yet available for YAML models.
+
+We're planning to add support for authoring models in Python to allow dynamic
+generation of models the very same way you can generate them in JavaScript
+today. If you’re interested in this feature, we'd love to hear your thoughts,
+please post an issue on GitHub.
+
+[ref-schema-ref-cube-compile-ctx]:
+  /schema/reference/cube#context-variables-compile-context
+[ref-schema-ref-cube-filter-params]:
+  /schema/reference/cube#context-variables-filter-params
+[ref-schema-ref-dimensions]: /schema/reference/dimensions
+[ref-schema-ref-joins]: /schema/reference/joins
+[ref-schema-ref-measures]: /schema/reference/measures
+[ref-schema-ref-measure-types]:
+  /schema/reference/types-and-formats#measures-types
+[ref-schema-ref-preaggs]: schema/reference/pre-aggregations

@@ -30,15 +30,7 @@ export class DruidQuery extends BaseQuery {
   }
 
   public convertTz(field: string) {
-    // TODO respect day light saving
-    const [hour, minute] = moment().tz(this.timezone).format('Z').split(':');
-    const minutes = parseInt(hour, 10) * 60 + parseInt(minute, 10);
-
-    if (minutes > 0) {
-      return `TIMESTAMPADD(MINUTE, ${minutes}, ${field})`;
-    }
-
-    return field;
+    return `CAST(TIME_FORMAT(${field}, 'yyyy-MM-dd HH:mm:ss', '${this.timezone}') AS TIMESTAMP)`;
   }
 
   public subtractInterval(date: string, interval: string) {

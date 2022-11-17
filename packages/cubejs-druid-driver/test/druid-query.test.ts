@@ -72,6 +72,6 @@ describe('DruidQuery', () => {
       },
     );
     const queryAndParams = query.buildSqlAndParams();
-    expect(queryAndParams[0]).toContain('TIMESTAMPADD(MINUTE,');
+    expect(queryAndParams[0]).toContain('CAST(TIME_FORMAT("visitors".created_at, \'yyyy-MM-dd HH:mm:ss\', \'Europe/Kiev\') AS TIMESTAMP)');
   }));
 });
