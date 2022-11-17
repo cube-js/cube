@@ -7,8 +7,7 @@ menuOrder: 2
 
 <WarningBox heading={`🐣  Preview`}>
 
-YAML modelling is currently in Preview, and the syntax may change in a future
-version.
+YAML modeling is currently in Public Preview.
 
 </WarningBox>
 
@@ -19,7 +18,7 @@ First, ensure you're using Cube version `0.31.0` or higher. Then create a new
 
 ## Syntax
 
-The syntax for YAML modelling is very similar to the existing JavaScript syntax,
+The syntax for YAML modeling is very similar to the existing JavaScript syntax,
 with a few key differences:
 
 1. All schema properties can be written in either camel-case or snake-case i.e.
@@ -46,7 +45,7 @@ Multi-line SQL queries also work:
 ```yaml
 cubes:
   - name: Orders
-    sql:
+    sql: >
       SELECT * FROM public.orders WHERE
       {FILTER_PARAMS.Orders.created_at.filter('created_at')}
 ```
@@ -148,9 +147,8 @@ cubes:
 
 ### <--{"id" : "Using context variables"}--> COMPILE_CONTEXT
 
-Instead of destructuring properties from
-[`COMPILE_CONTEXT`][ref-schema-ref-cube-compile-ctx], use dot-notation to
-specify the property directly:
+Use dot-notation to specify the property from [`COMPILE_CONTEXT`
+][ref-schema-ref-cube-compile-ctx]:
 
 ```yaml
 cubes:
@@ -170,7 +168,7 @@ If referencing the security context, ensure that you use camel-case (i.e.
 ```yaml
 cubes:
   - name: Orders
-    sql:
+    sql: >
       SELECT * FROM public.orders WHERE
       {FILTER_PARAMS.Orders.created_at.filter('created_at')}
     measures:
