@@ -28,8 +28,8 @@ describe('SapHanaDriver', () => {
     await hanaDriver.query('INSERT INTO  test.var_types (second_date, small_decimal) values(\'2022-11-17 10:20:30\', \'123.45\')', []);
     expect(JSON.parse(JSON.stringify((await hanaDriver.downloadQueryResults('select * from test.var_types', [], { highWaterMark: 1000 })).types)))
       .toStrictEqual([
-        { name: 'second_date', type: 'timestamp' },
-        { name: 'small_decimal', type: 'decimal' },
+        { name: 'SECOND_DATE', type: 'timestamp' },
+        { name: 'SMALL_DECIMAL', type: 'decimal' },
       ]);
   });
 

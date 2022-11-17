@@ -20,12 +20,14 @@ import { ConnectionOptions, Connection, FieldInfo } from 'types-hana-client';
 
 const hdb = require('@sap/hana-client');
 
-const GenericTypeToHanaType: Record<string, string> = {
-  string: 'nvarchar(max)',
-  binary: 'varbinary',
-};
+const TypeCode = require('@sap/hana-client/extension/TypeCode');
 
-// alphanum, shorttext not available on HANA Cloud
+// convert HANA build-in types with type:type object
+const HanaBuildInTypes: Record<string, string> = {};
+Object.entries(TypeCode).forEach(([key, _]) => {
+  HanaBuildInTypes[key] = key;
+});
+
 const SapHanaToGenericType: Record<string, GenericDataBaseType> = {
   smalldecimal: 'decimal',
   seconddate: 'timestamp',
@@ -214,7 +216,12 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
 
   protected mapFieldsToGenericTypes(fields: FieldInfo[]) {
     return fields.map((f) => {
-      const hanaType = this.getHanaTypeForField(f.nativeTypeName);
+      let hanaType = HanaBuildInTypes[f.nativeTypeName].toLowerCase();
+
+      if (f.nativeTypeName.toLowerCase() in SapHanaToGenericType) {
+        hanaType = SapHanaToGenericType[f.nativeTypeName.toLowerCase()];
+      }
+
       if (!hanaType) {
         throw new Error(
           `Unable to detect type for field "${f.columnName}" with dataTypeID: ${f.nativeTypeName}`
@@ -226,14 +233,6 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
         type: this.toGenericType(hanaType)
       });
     });
-  }
-
-  protected getHanaTypeForField(dataTypeID: string): string | null {
-    if (dataTypeID in GenericTypeToHanaType) {
-      return GenericTypeToHanaType[dataTypeID].toLowerCase();
-    }
-
-    return null;
   }
 
   public toGenericType(columnType: string) {
