@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.31.14",
+  "version": "0.31.15",
   "description": "Cube.js e2e tests",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -79,14 +79,14 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
-    "@cubejs-backend/cubestore-driver": "^0.31.14",
+    "@cubejs-backend/cubestore-driver": "^0.31.15",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/postgres-driver": "^0.31.14",
-    "@cubejs-backend/query-orchestrator": "^0.31.13",
-    "@cubejs-backend/schema-compiler": "^0.31.13",
-    "@cubejs-backend/shared": "^0.31.13",
-    "@cubejs-backend/testing-shared": "^0.31.14",
-    "@cubejs-client/ws-transport": "^0.31.13",
+    "@cubejs-backend/postgres-driver": "^0.31.15",
+    "@cubejs-backend/query-orchestrator": "^0.31.15",
+    "@cubejs-backend/schema-compiler": "^0.31.15",
+    "@cubejs-backend/shared": "^0.31.15",
+    "@cubejs-backend/testing-shared": "^0.31.15",
+    "@cubejs-client/ws-transport": "^0.31.15",
     "dedent": "^0.7.0",
     "fs-extra": "^8.1.0",
     "http-proxy": "^1.18.1",
@@ -98,7 +98,7 @@
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
     "@cubejs-backend/linter": "^0.31.0",
-    "@cubejs-client/core": "^0.31.13",
+    "@cubejs-client/core": "^0.31.15",
     "@jest/globals": "^26.6.2",
     "@types/dedent": "^0.7.0",
     "@types/http-proxy": "^1.17.5",

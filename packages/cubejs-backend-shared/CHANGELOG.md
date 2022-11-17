@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** Make `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE=true` by default ([be12c40](https://github.com/cube-js/cube.js/commit/be12c40ca7acda11409774f5aa407741fdfde871))
+
+
+
+
+
 ## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
 
 

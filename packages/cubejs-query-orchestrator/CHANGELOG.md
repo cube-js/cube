@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
+
+
+### Bug Fixes
+
+* packages/cubejs-query-orchestrator/package.json to reduce vulnerabilities ([#5409](https://github.com/cube-js/cube.js/issues/5409)) ([5e9fe68](https://github.com/cube-js/cube.js/commit/5e9fe68b40164ca12e9cecb0aefda31c06b57f28))
+
+
+
+
+
 ## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

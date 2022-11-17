@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
+
+
+### Bug Fixes
+
+* `extends` YAML support ([982885e](https://github.com/cube-js/cube.js/commit/982885e8e41b351e27919551688f50f7e5af3a5a))
+
+
+### Features
+
+* Replace YAML parser to provide more meaningful parse errors ([9984066](https://github.com/cube-js/cube.js/commit/99840665ee31aa8f14cf9c83b19d4a4cbc3a978a))
+* Support snake case in YAML relationship field ([f20fe6b](https://github.com/cube-js/cube.js/commit/f20fe6baa43142589a5a85be5af1daefb56acd8b))
+
+
+
+
+
 ## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
 
 

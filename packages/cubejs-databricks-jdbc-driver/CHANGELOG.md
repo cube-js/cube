@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
+
+
+### Bug Fixes
+
+* packages/cubejs-databricks-jdbc-driver/package.json to reduce vulnerabilities ([#5429](https://github.com/cube-js/cube.js/issues/5429)) ([a45c9a8](https://github.com/cube-js/cube.js/commit/a45c9a828b38d13da9a4194fdfc23e11674aa7cd))
+
+
+### Features
+
+* **databricks-jdbc:** jdbc (jar) driver update ([#5610](https://github.com/cube-js/cube.js/issues/5610)) ([aacd8cd](https://github.com/cube-js/cube.js/commit/aacd8cd356429e4da21749b92eb457c03a1a3f76))
+* **databricks-jdbc:** jdbc (jar) driver update ([#5612](https://github.com/cube-js/cube.js/issues/5612)) ([372ed71](https://github.com/cube-js/cube.js/commit/372ed71c6edd61d862d62cb0522fbc47c0f997b2))
+
+
+### Reverts
+
+* Revert "feat(databricks-jdbc): jdbc (jar) driver update (#5610)" (#5611) ([23ed416](https://github.com/cube-js/cube.js/commit/23ed416d9540afc4fe027f7e3c6917af387f06f7)), closes [#5610](https://github.com/cube-js/cube.js/issues/5610) [#5611](https://github.com/cube-js/cube.js/issues/5611)
+
+
+
+
+
 ## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
 
 

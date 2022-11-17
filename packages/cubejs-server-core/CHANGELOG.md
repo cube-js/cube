@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
+
+
+### Bug Fixes
+
+* **server-core:** Force flush events if their count is greater than the agent frame size ([#5602](https://github.com/cube-js/cube.js/issues/5602)) ([17d1d98](https://github.com/cube-js/cube.js/commit/17d1d989bd03459adae1e6c6714843fc82d99163))
+
+
+
+
+
 ## [0.31.14](https://github.com/cube-js/cube.js/compare/v0.31.13...v0.31.14) (2022-11-14)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

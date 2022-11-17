@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
+
+
+### Bug Fixes
+
+* **@cubejs-backend/snowflake-driver:** Make `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE=true` by default ([be12c40](https://github.com/cube-js/cube.js/commit/be12c40ca7acda11409774f5aa407741fdfde871))
+* `extends` YAML support ([982885e](https://github.com/cube-js/cube.js/commit/982885e8e41b351e27919551688f50f7e5af3a5a))
+* **client-react:** check meta changes ([4c44551](https://github.com/cube-js/cube.js/commit/4c44551b880bd4ff34d443241c1c0c28cae0d5f8))
+* **druid-driver:** Respect day light saving ([#5613](https://github.com/cube-js/cube.js/issues/5613)) ([388c992](https://github.com/cube-js/cube.js/commit/388c992ca7a2d3730249fafb2a53b3accff21451))
+* packages/cubejs-client-core/package.json to reduce vulnerabilities ([#5415](https://github.com/cube-js/cube.js/issues/5415)) ([fb2de68](https://github.com/cube-js/cube.js/commit/fb2de682670bd28b2879d0460fac990d9b653dce))
+* packages/cubejs-client-react/package.json to reduce vulnerabilities ([#5390](https://github.com/cube-js/cube.js/issues/5390)) ([0ab9c30](https://github.com/cube-js/cube.js/commit/0ab9c30692c70d3776a8429197915090fef61d4f))
+* packages/cubejs-databricks-jdbc-driver/package.json to reduce vulnerabilities ([#5413](https://github.com/cube-js/cube.js/issues/5413)) ([6a891f0](https://github.com/cube-js/cube.js/commit/6a891f0bc34dcaa8c955cd0ac20121d4d074e228))
+* packages/cubejs-databricks-jdbc-driver/package.json to reduce vulnerabilities ([#5429](https://github.com/cube-js/cube.js/issues/5429)) ([a45c9a8](https://github.com/cube-js/cube.js/commit/a45c9a828b38d13da9a4194fdfc23e11674aa7cd))
+* packages/cubejs-query-orchestrator/package.json to reduce vulnerabilities ([#5409](https://github.com/cube-js/cube.js/issues/5409)) ([5e9fe68](https://github.com/cube-js/cube.js/commit/5e9fe68b40164ca12e9cecb0aefda31c06b57f28))
+* packages/cubejs-templates/package.json to reduce vulnerabilities ([#5403](https://github.com/cube-js/cube.js/issues/5403)) ([c9706cb](https://github.com/cube-js/cube.js/commit/c9706cbfcd6480dbd58ca18ab064ded185f710d3))
+* **server-core:** Force flush events if their count is greater than the agent frame size ([#5602](https://github.com/cube-js/cube.js/issues/5602)) ([17d1d98](https://github.com/cube-js/cube.js/commit/17d1d989bd03459adae1e6c6714843fc82d99163))
+
+
+### Features
+
+* **databricks-jdbc:** jdbc (jar) driver update ([#5610](https://github.com/cube-js/cube.js/issues/5610)) ([aacd8cd](https://github.com/cube-js/cube.js/commit/aacd8cd356429e4da21749b92eb457c03a1a3f76))
+* **databricks-jdbc:** jdbc (jar) driver update ([#5612](https://github.com/cube-js/cube.js/issues/5612)) ([372ed71](https://github.com/cube-js/cube.js/commit/372ed71c6edd61d862d62cb0522fbc47c0f997b2))
+* **docs:** add new component to display code snippets side-by-side ([146328c](https://github.com/cube-js/cube.js/commit/146328c7e7eab41c7cfe4e67d26af58eeca9c09c))
+* Replace YAML parser to provide more meaningful parse errors ([9984066](https://github.com/cube-js/cube.js/commit/99840665ee31aa8f14cf9c83b19d4a4cbc3a978a))
+* Support snake case in YAML relationship field ([f20fe6b](https://github.com/cube-js/cube.js/commit/f20fe6baa43142589a5a85be5af1daefb56acd8b))
+
+
+### Reverts
+
+* Revert "feat(databricks-jdbc): jdbc (jar) driver update (#5610)" (#5611) ([23ed416](https://github.com/cube-js/cube.js/commit/23ed416d9540afc4fe027f7e3c6917af387f06f7)), closes [#5610](https://github.com/cube-js/cube.js/issues/5610) [#5611](https://github.com/cube-js/cube.js/issues/5611)
+
+
+
+
+
 ## [0.31.14](https://github.com/cube-js/cube.js/compare/v0.31.13...v0.31.14) (2022-11-14)
 
 
