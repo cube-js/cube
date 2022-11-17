@@ -2,7 +2,7 @@ import { createDriver } from './hana.db.runner';
 import { SapHanaDriver } from '../src';
 
 describe('SapHanaDriver', () => {
-  let hanaDriver: SapHanaDriver
+  let hanaDriver: SapHanaDriver;
 
   jest.setTimeout(60000);
 
@@ -14,13 +14,23 @@ describe('SapHanaDriver', () => {
   });
 
   afterAll(async () => {
-    await hanaDriver.query('DROP SCHEMA test', []);
+    await hanaDriver.query('DROP SCHEMA test cascade;', []);
     await hanaDriver.release();
   });
 
   test('test hana connection', async () => {
     const result = await hanaDriver.testConnection();
-    expect(result).toStrictEqual([{ "1": 1 }]);
+    expect(result).toStrictEqual([{ 1: 1 }]);
+  });
+
+  test('hana types to generic types', async () => {
+    await hanaDriver.query('CREATE TABLE test.var_types (second_date seconddate, small_decimal smalldecimal)', []);
+    await hanaDriver.query('INSERT INTO  test.var_types (second_date, small_decimal) values(\'2022-11-17 10:20:30\', \'123.45\')', []);
+    expect(JSON.parse(JSON.stringify((await hanaDriver.downloadQueryResults('select * from test.var_types', [], { highWaterMark: 1000 })).types)))
+      .toStrictEqual([
+        { name: 'second_date', type: 'timestamp' },
+        { name: 'small_decimal', type: 'decimal' },
+      ]);
   });
 
   test('release', async () => {

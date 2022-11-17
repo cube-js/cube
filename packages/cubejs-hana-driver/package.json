@@ -21,7 +21,7 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "integration": "npm run integration:hana",
+    "integration": "TEST_DB_SERVER=4b3b5138-3c21-404d-89f0-8f942db8db09.hana.prod-us20.hanacloud.ondemand.com:443 TEST_DB_USER=SCHEMA_MANAGER TEST_DB_PASSWORD=P@ssword1 npm run integration:hana",
     "integration:hana": "jest --verbose dist/test",
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"

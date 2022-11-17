@@ -60,4 +60,18 @@ declare module 'types-hana-client' {
     }
 
     function createConnection(options?: ConnectionOptions): Connection;
+
+    export interface FieldInfo {
+      columnName: string,
+      originalColumnName: string,
+      tableName: string,
+      ownerName: string,
+      type: number,
+      typeName: string,
+      nativeType: number,
+      nativeTypeName: string,
+      precision: number,
+      scale: number,
+      nullable: number
+    }
 }

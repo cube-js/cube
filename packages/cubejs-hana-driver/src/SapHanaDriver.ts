@@ -8,45 +8,27 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-// import hana, { Connection, ConnectionConfig, FieldInfo, QueryOptions } from '@sap/hana-client';
-
 import genericPool from 'generic-pool';
 import { promisify } from 'util';
 import {
   BaseDriver,
   GenericDataBaseType,
   DriverInterface,
+  DownloadQueryResultsOptions,
 } from '@cubejs-backend/base-driver';
-
-import { ConnectionOptions, Connection } from 'types-hana-client';
+import { ConnectionOptions, Connection, FieldInfo } from 'types-hana-client';
 
 const hdb = require('@sap/hana-client');
 
-const GenericTypeToSapHana: Record<GenericDataBaseType, string> = {
-  string: 'varchar(255)',
-  text: 'varchar(255)',
-  decimal: 'decimal(38,10)',
+const GenericTypeToHanaType: Record<string, string> = {
+  string: 'nvarchar(max)',
+  binary: 'varbinary',
 };
 
-/**
- * HANA Native types -> SQL type
- */
-const SapHanaNativeToSapHanaType: Record<GenericDataBaseType, string> = {
-  string: 'text',
-  double: 'decimal'
-};
-
+// alphanum, shorttext not available on HANA Cloud
 const SapHanaToGenericType: Record<string, GenericDataBaseType> = {
-  mediumtext: 'text',
-  longtext: 'text',
-  mediumint: 'int',
-  smallint: 'int',
-  bigint: 'int',
-  tinyint: 'int',
-  'mediumint unsigned': 'int',
-  'smallint unsigned': 'int',
-  'bigint unsigned': 'int',
-  'tinyint unsigned': 'int',
+  smalldecimal: 'decimal',
+  seconddate: 'timestamp',
 };
 
 export interface SapHanaDriverConfiguration extends ConnectionOptions{
@@ -169,7 +151,13 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
   public async query(query: string, values: unknown[]) {
     const conn = await this.getConnectionFromPool();
     const res = await conn.execute(query, values || {});
-    return res && res.rows;
+    return res;
+  }
+
+  public async queryResultSet(query: string, values: unknown[]) {
+    const conn = await this.getConnectionFromPool();
+
+    return conn.prepare(query).execQuery(values);
   }
 
   public async release() {
@@ -201,6 +189,51 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
     }
 
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
+  }
+
+  public async downloadQueryResults(
+    query: string,
+    values: unknown[],
+    options: DownloadQueryResultsOptions
+  ) {
+    if (options.streamImport) {
+      throw new Error('No support on the HANA stream yet');
+    }
+
+    const resultSet = await this.queryResultSet(query, values);
+    const rows = [];
+    while (resultSet.next()) {
+      rows.push(resultSet.getValues());
+    }
+
+    return {
+      rows,
+      types: this.mapFieldsToGenericTypes(resultSet.getColumnInfo())
+    };
+  }
+
+  protected mapFieldsToGenericTypes(fields: FieldInfo[]) {
+    return fields.map((f) => {
+      const hanaType = this.getHanaTypeForField(f.nativeTypeName);
+      if (!hanaType) {
+        throw new Error(
+          `Unable to detect type for field "${f.columnName}" with dataTypeID: ${f.nativeTypeName}`
+        );
+      }
+
+      return ({
+        name: f.columnName,
+        type: this.toGenericType(hanaType)
+      });
+    });
+  }
+
+  protected getHanaTypeForField(dataTypeID: string): string | null {
+    if (dataTypeID in GenericTypeToHanaType) {
+      return GenericTypeToHanaType[dataTypeID].toLowerCase();
+    }
+
+    return null;
   }
 
   public toGenericType(columnType: string) {
