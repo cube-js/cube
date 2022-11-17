@@ -1313,8 +1313,22 @@ impl ClusterImpl {
         let mut res = None;
         #[cfg(not(target_os = "windows"))]
         {
-            if let Some(pool) = self.select_process_pool.read().await.clone() {
-                let chunk_id_to_record_batches = chunk_id_to_record_batches
+            if let Some(pool) = self
+                .select_process_pool
+                .read()
+                .instrument(tracing::span!(
+                    tracing::Level::TRACE,
+                    "awaiting process_pool lock"
+                ))
+                .await
+                .clone()
+            {
+                let span = tracing::span!(
+                    tracing::Level::TRACE,
+                    "Serialize chunks into SerializedRecordBatchStream"
+                );
+                let chunk_id_to_record_batches = span.in_scope(|| {
+                    chunk_id_to_record_batches
                     .iter()
                     .map(
                         |(id, b)| -> Result<(u64, Vec<SerializedRecordBatchStream>), CubeError> {
@@ -1327,7 +1341,8 @@ impl ClusterImpl {
                             ))
                         },
                     )
-                    .collect::<Result<HashMap<_, _>, _>>()?;
+                    .collect::<Result<HashMap<_, _>, _>>()
+                })?;
                 res = Some(
                     pool.process(WorkerMessage::Select(
                         plan_node.clone(),
