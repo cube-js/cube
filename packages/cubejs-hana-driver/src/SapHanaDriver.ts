@@ -179,7 +179,7 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
   }
 
   public quoteIdentifier(identifier: string) {
-    return `"${identifier}"`;
+    return `${identifier}`; // don't quote
   }
 
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: any, params: any, tx: any) {

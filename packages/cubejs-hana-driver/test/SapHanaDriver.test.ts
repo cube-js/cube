@@ -1,7 +1,11 @@
 import { createDriver } from './hana.db.runner';
 import { SapHanaDriver } from '../src';
 
-describe('SapHanaDriver', () => {
+const maybe = process.env.TEST_DB_SERVER && process.env.TEST_DB_USER && process.env.TEST_DB_PASSWORD
+  ? describe 
+  : describe.skip;
+
+maybe('SapHanaDriver', () => {
   let hanaDriver: SapHanaDriver;
 
   jest.setTimeout(60000);
@@ -31,6 +35,23 @@ describe('SapHanaDriver', () => {
         { name: 'SECOND_DATE', type: 'timestamp' },
         { name: 'SMALL_DECIMAL', type: 'decimal' },
       ]);
+  });
+
+  test('hana boolean field', async () => {
+    // hana boolean doesn't accept 'true', 'false' and null
+    await hanaDriver.uploadTable('test.boolean', [{ name: 'b_value', type: 'boolean' }], {
+      rows: [
+        { b_value: true },
+        { b_value: true },
+        { b_value: false },
+      ]
+    });
+
+    // HANA always use upper case in result set
+    expect(JSON.parse(JSON.stringify(await hanaDriver.query('select * from test.boolean where b_value = ?', [true]))))
+      .toStrictEqual([{ B_VALUE: true }, { B_VALUE: true }]);
+    expect(JSON.parse(JSON.stringify(await hanaDriver.query('select * from test.boolean where b_value = ?', [false]))))
+      .toStrictEqual([{ B_VALUE: false }]);
   });
 
   test('release', async () => {
