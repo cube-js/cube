@@ -176,9 +176,8 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
 
   const flushAllByChunks = async () => {
     const agentFrameSize: number = getEnv('agentFrameSize');
-    const maxSockets: number = getEnv('agentMaxSockets');
     const toFlushArray = [];
-    while (trackEvents.length > 0 && toFlushArray.length < maxSockets) {
+    while (trackEvents.length > 0) {
       toFlushArray.push(trackEvents.splice(0, agentFrameSize));
     }
     await Promise.all(toFlushArray.map(toFlush => flush(toFlush)));
