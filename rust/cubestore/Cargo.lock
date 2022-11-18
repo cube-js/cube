@@ -1224,7 +1224,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=fix-streaming-merge#9890ffe377eeeb5836b8ca76a5b75c093c11c4bb"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=fix-streaming-merge#3dea8e752e4b0665548572401a19c5f9246728ad"
 dependencies = [
  "ahash 0.7.4",
  "arrow",

@@ -4,7 +4,6 @@ use crate::queryplanner::optimizations::distributed_partial_aggregate::{
 };
 use crate::queryplanner::optimizations::prefer_inplace_aggregates::try_switch_to_inplace_aggregates;
 use crate::queryplanner::planning::CubeExtensionPlanner;
-use crate::queryplanner::pretty_printers::pp_phys_plan;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::{ExecutionContextState, QueryPlanner};

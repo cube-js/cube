@@ -1761,7 +1761,6 @@ mod tests {
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
     use regex::Regex;
-    use std::thread::sleep;
 
     #[tokio::test]
     async fn create_schema_test() {
