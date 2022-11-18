@@ -143,6 +143,33 @@ cubes:
               - status
 ```
 
+### <--{"id" : "Syntax"}--> Extending cubes
+
+Cubes can also [be extended][ref-schema-advanced-extends] with the `extends` property:
+
+```yaml
+cubes:
+  - name: BaseOrders
+    sql: SELECT * FROM public.orders
+  - name: ExtendedOrders
+    extends: BaseOrders
+    pre_aggregations:
+      - name: orders_by_status
+        measures:
+          - CUBE.count
+        dimensions:
+          - CUBE.status
+        time_dimension: CUBE.created_at
+        granularity: week
+        partition_granularity: month
+        indexes:
+          status_index:
+            columns:
+              - status
+```
+
+[ref-schema-advanced-extends]: /schema/advanced/extending-cubes
+
 ## Using context variables
 
 ### <--{"id" : "Using context variables"}--> COMPILE_CONTEXT
