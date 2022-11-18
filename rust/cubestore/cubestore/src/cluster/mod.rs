@@ -1288,9 +1288,22 @@ impl ClusterImpl {
             .await;
 
         let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
-        let in_memory_chunks_futures = in_memory_chunks_to_load
-            .iter()
-            .map(|c| chunk_store.get_chunk_columns(c.clone()))
+        let in_memory_chunks_with_meta = self
+            .meta_store
+            .get_partition_and_index_for_chunks(in_memory_chunks_to_load.clone())
+            .instrument(tracing::span!(tracing::Level::TRACE, "get chunks meta"))
+            .await?;
+        let in_memory_chunks_futures = in_memory_chunks_with_meta
+            .into_iter()
+            .map(|(c, p, i)| {
+                chunk_store
+                    .get_chunk_columns_with_preloaded_meta(c.clone(), p, i)
+                    .instrument(tracing::span!(
+                        tracing::Level::TRACE,
+                        "get in memory chunk columns",
+                        row_count = c.get_row().get_row_count()
+                    ))
+            })
             .collect::<Vec<_>>();
 
         let chunk_id_to_record_batches = in_memory_chunks_to_load
