@@ -158,24 +158,10 @@ pub async fn choose_index_ext(
         next_index: 0,
         enable_topk,
         can_pushdown_limit,
-        need_sort_pushdown: false,
     };
 
     let plan = rewrite_plan(p, &ChooseIndexContext::default(), &mut r)?;
     assert_eq!(r.next_index, indices.len());
-    let plan = if r.need_sort_pushdown {
-        let mut sort_pushdown = SortPushDown {};
-        rewrite_plan(&plan, &None, &mut sort_pushdown)?
-    } else {
-        plan
-    };
-
-    /* let plan = if pushdown_limit {
-        let mut r = PushDownLimit{index_sort_on: indices[0].sort_on().unwrap()};
-        rewrite_plan(&plan, &PushDownLimitContext::default(), &mut r)?
-    } else {
-        plan
-    }; */
 
     let mut multi_parts = Vec::new();
     for i in &indices {
@@ -431,11 +417,11 @@ impl ConstraintsContext {
             order_col_names: self.order_col_names.clone(),
         }
     }
-    pub fn update_order_col_names(&self, order_col_names: Option<Vec<String>>) -> Self {
+    pub fn update_order_col_names(&self, order_col_names: Vec<String>) -> Self {
         Self {
             sort_on: self.sort_on.clone(),
             aggregates: self.aggregates.clone(),
-            order_col_names,
+            order_col_names: Some(order_col_names),
         }
     }
 }
@@ -531,8 +517,13 @@ impl PlanRewriter for CollectConstraints {
                 })
             }
             LogicalPlan::Sort { expr, input, .. } => {
-                let sort_expr = sort_expr_with_original_names(expr, input);
-                Some(current_context.update_order_col_names(sort_to_column_names(&sort_expr)))
+                let (names, _) = sort_to_column_names(expr, input);
+
+                if !names.is_empty() {
+                    Some(current_context.update_order_col_names(names))
+                } else {
+                    None
+                }
             }
             LogicalPlan::Filter { predicate, .. } => {
                 let mut sort_on = Vec::new();
@@ -634,57 +625,37 @@ fn get_original_name(may_be_alias: &String, input: &LogicalPlan) -> String {
     }
 }
 
-fn sort_expr_with_original_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> Vec<Expr> {
+fn sort_to_column_names(sort_exprs: &Vec<Expr>, input: &LogicalPlan) -> (Vec<String>, bool) {
     let mut res = Vec::new();
-    for sexpr in sort_exprs.iter() {
-        match sexpr {
-            Expr::Sort {
-                expr,
-                asc,
-                nulls_first,
-            } => match expr.as_ref() {
-                Expr::Column(c) => {
-                    let mut res_col = c.clone();
-                    res_col.name = get_original_name(&res_col.name, input);
-                    res.push(Expr::Sort {
-                        expr: Box::new(Expr::Column(res_col)),
-                        asc: asc.clone(),
-                        nulls_first: nulls_first.clone(),
-                    });
-                }
-                _ => {
-                    res.push(sexpr.clone());
-                }
-            },
-            _ => {}
-        }
-    }
-    res
-}
-
-fn sort_to_column_names(sort_exprs: &Vec<Expr>) -> Option<Vec<String>> {
-    let mut res = Vec::new();
+    let mut has_desc = false;
+    let mut has_asc = false;
     for sexpr in sort_exprs.iter() {
         match sexpr {
             Expr::Sort { expr, asc, .. } => {
-                if !asc {
-                    return None;
+                if *asc {
+                    has_asc = true;
+                } else {
+                    has_desc = true;
                 }
                 match expr.as_ref() {
                     Expr::Column(c) => {
-                        res.push(c.name.clone());
+                        res.push(get_original_name(&c.name, input));
                     }
                     _ => {
-                        return None;
+                        return (Vec::new(), true);
                     }
                 }
             }
             _ => {
-                return None;
+                return (Vec::new(), true);
             }
         }
     }
-    Some(res)
+    if has_asc && has_desc {
+        (Vec::new(), true)
+    } else {
+        (res, has_asc)
+    }
 }
 
 fn single_value_filter_columns<'a>(
@@ -729,15 +700,14 @@ struct ChooseIndex<'a> {
     chosen_indices: &'a [IndexSnapshot],
     enable_topk: bool,
     can_pushdown_limit: bool,
-    need_sort_pushdown: bool,
 }
 
 #[derive(Default)]
 struct ChooseIndexContext {
     limit: Option<usize>,
-    sort: Vec<Expr>,
+    sort: Option<Vec<String>>,
+    sort_is_asc: bool,
     single_value_filtered_cols: HashSet<String>,
-    resort_disabled: bool,
 }
 
 impl ChooseIndexContext {
@@ -746,15 +716,15 @@ impl ChooseIndexContext {
             limit,
             sort: self.sort.clone(),
             single_value_filtered_cols: self.single_value_filtered_cols.clone(),
-            resort_disabled: self.resort_disabled.clone(),
+            sort_is_asc: self.sort_is_asc.clone(),
         }
     }
-    fn update_sort(&self, sort: Vec<Expr>) -> Self {
+    fn update_sort(&self, names: Vec<String>, sort_is_asc: bool) -> Self {
         Self {
             limit: self.limit.clone(),
-            sort,
+            sort: Some(names),
             single_value_filtered_cols: self.single_value_filtered_cols.clone(),
-            resort_disabled: self.resort_disabled.clone(),
+            sort_is_asc,
         }
     }
     fn update_single_value_filtered_cols(&self, cols: HashSet<String>) -> Self {
@@ -762,15 +732,7 @@ impl ChooseIndexContext {
             limit: self.limit.clone(),
             sort: self.sort.clone(),
             single_value_filtered_cols: cols,
-            resort_disabled: self.resort_disabled.clone(),
-        }
-    }
-    fn update_resort_disabled(&self, resort_disabled: bool) -> Self {
-        Self {
-            limit: self.limit.clone(),
-            sort: self.sort.clone(),
-            single_value_filtered_cols: self.single_value_filtered_cols.clone(),
-            resort_disabled,
+            sort_is_asc: self.sort_is_asc.clone(),
         }
     }
 }
@@ -803,11 +765,13 @@ impl PlanRewriter for ChooseIndex<'_> {
                     None
                 }
             }
-            LogicalPlan::Join { .. }
-            | LogicalPlan::CrossJoin { .. }
-            | LogicalPlan::Aggregate { .. } => Some(context.update_resort_disabled(true)),
             LogicalPlan::Sort { expr, input, .. } => {
-                Some(context.update_sort(sort_expr_with_original_names(expr, input)))
+                let (names, sort_is_asc) = sort_to_column_names(expr, input);
+                if !names.is_empty() {
+                    Some(context.update_sort(names, sort_is_asc))
+                } else {
+                    None
+                }
             }
             _ => None,
         }
@@ -870,15 +834,17 @@ impl ChooseIndex<'_> {
 
                     let index_schema = source.schema();
                     assert_eq!(table_schema, index_schema);
-                    let (limit, resort_input) =
-                        self.get_limit_for_pushdown(snapshot.sort_on(), ctx);
-
-                    self.need_sort_pushdown = self.need_sort_pushdown || resort_input;
+                    let limit = self.get_limit_for_pushdown(snapshot.sort_on(), ctx);
+                    let limit_and_reverse = if let Some(limit) = limit {
+                        Some((limit, !ctx.sort_is_asc))
+                    } else {
+                        None
+                    };
 
                     return Ok(ClusterSendNode::new(
                         Arc::new(p),
                         vec![vec![Snapshot::Index(snapshot)]],
-                        limit,
+                        limit_and_reverse,
                     )
                     .into_plan());
                 } else if let Some(table) = source.as_any().downcast_ref::<InlineTableProvider>() {
@@ -901,104 +867,44 @@ impl ChooseIndex<'_> {
         &self,
         index_sort_on: Option<&Vec<String>>,
         ctx: &ChooseIndexContext,
-    ) -> (Option<usize>, bool) {
-        if ctx.limit.is_none() {
-            return (None, false);
-        }
-
-        //If there are not aggregates and join we can pushown limit with sort even if indexes is
-        //intersecting (i.e. if can_pushown_limit = false)
-        if ctx.resort_disabled
-            && (!self.can_pushdown_limit
-                || index_sort_on.is_none()
-                || index_sort_on.unwrap().is_empty())
+    ) -> Option<usize> {
+        if ctx.limit.is_none()
+            || !self.can_pushdown_limit
+            || index_sort_on.is_none()
+            || index_sort_on.unwrap().is_empty()
+            || ctx.sort.is_none()
+            || ctx.sort.as_ref().unwrap().is_empty()
         {
-            return (None, false);
+            return None;
         }
 
         let limit = ctx.limit.unwrap();
+        let sort_columns = ctx.sort.as_ref().unwrap();
+        let index_sort_on = index_sort_on.unwrap();
 
-        let limit_without_resort = if let Some((sort_columns, index_sort_on)) =
-            sort_to_column_names(&ctx.sort).zip(index_sort_on)
-        {
-            //We exclude from order by and index sort_on strictly restricted columns (aka `a = 10`)
-            let works_ind_sort_cols = index_sort_on
-                .iter()
-                .filter(|c| !ctx.single_value_filtered_cols.contains(*c));
-            let works_sort_cols = sort_columns
-                .iter()
-                .filter(|c| !ctx.single_value_filtered_cols.contains(*c));
+        //We exclude from order by and index sort_on strictly restricted columns (aka `a = 10`)
+        let works_ind_sort_cols = index_sort_on
+            .iter()
+            .filter(|c| !ctx.single_value_filtered_cols.contains(*c));
+        let works_sort_cols = sort_columns
+            .iter()
+            .filter(|c| !ctx.single_value_filtered_cols.contains(*c));
 
-            //We can push down limit only if resulting order by is the prefix of index sort on
-            let can_pushdown = works_sort_cols
-                .zip_longest(works_ind_sort_cols)
-                .all(|item| {
-                    match item {
-                        EitherOrBoth::Both(sort, index) => sort == index,
-                        EitherOrBoth::Left(_) => false, //order by has more columns then index sort on
-                        EitherOrBoth::Right(_) => true,
-                    }
-                });
+        //We can push down limit only if resulting order by is the prefix of index sort on
+        let can_pushdown = works_sort_cols
+            .zip_longest(works_ind_sort_cols)
+            .all(|item| {
+                match item {
+                    EitherOrBoth::Both(sort, index) => sort == index,
+                    EitherOrBoth::Left(_) => false, //order by has more columns then index sort on
+                    EitherOrBoth::Right(_) => true,
+                }
+            });
 
-            if can_pushdown {
-                Some(limit)
-            } else {
-                None
-            }
+        if can_pushdown {
+            Some(limit)
         } else {
             None
-        };
-
-        if limit_without_resort.is_some() {
-            (limit_without_resort, false)
-        } else if !ctx.resort_disabled {
-            //If there are not aggregations then we can resort cluster sort input
-            (Some(limit), true)
-        } else {
-            (None, false)
-        }
-    }
-}
-
-struct SortPushDown {}
-
-impl PlanRewriter for SortPushDown {
-    type Context = Option<Vec<Expr>>;
-
-    fn enter_node(&mut self, n: &LogicalPlan, _context: &Self::Context) -> Option<Self::Context> {
-        match n {
-            LogicalPlan::Sort { expr, .. } => Some(Some(expr.clone())),
-            _ => None,
-        }
-    }
-
-    fn rewrite(
-        &mut self,
-        n: LogicalPlan,
-        ctx: &Self::Context,
-    ) -> Result<LogicalPlan, DataFusionError> {
-        match n {
-            LogicalPlan::Extension { ref node } => {
-                if let Some((node, sort_expr)) = node
-                    .as_any()
-                    .downcast_ref::<ClusterSendNode>()
-                    .zip(ctx.as_ref())
-                {
-                    let input = LogicalPlan::Sort {
-                        expr: sort_expr.clone(),
-                        input: node.input.clone(),
-                    };
-                    Ok(ClusterSendNode::new(
-                        Arc::new(input),
-                        node.snapshots.clone(),
-                        node.limit.clone(),
-                    )
-                    .into_plan())
-                } else {
-                    Ok(n)
-                }
-            }
-            _ => Ok(n),
         }
     }
 }
@@ -1405,15 +1311,19 @@ pub type Snapshots = Vec<Snapshot>;
 pub struct ClusterSendNode {
     pub input: Arc<LogicalPlan>,
     pub snapshots: Vec<Snapshots>,
-    pub limit: Option<usize>,
+    pub limit_and_reverse: Option<(usize, bool)>,
 }
 
 impl ClusterSendNode {
-    pub fn new(input: Arc<LogicalPlan>, snapshots: Vec<Snapshots>, limit: Option<usize>) -> Self {
+    pub fn new(
+        input: Arc<LogicalPlan>,
+        snapshots: Vec<Snapshots>,
+        limit_and_reverse: Option<(usize, bool)>,
+    ) -> Self {
         ClusterSendNode {
             input,
             snapshots,
-            limit,
+            limit_and_reverse,
         }
     }
 
@@ -1460,7 +1370,7 @@ impl UserDefinedLogicalNode for ClusterSendNode {
         Arc::new(ClusterSendNode {
             input: Arc::new(inputs[0].clone()),
             snapshots: self.snapshots.clone(),
-            limit: self.limit.clone(),
+            limit_and_reverse: self.limit_and_reverse.clone(),
         })
     }
 }
@@ -1490,7 +1400,7 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 return Ok(p);
             }
             snapshots = send.snapshots.clone();
-            let limit = send.limit.clone();
+            let limit = send.limit_and_reverse.clone();
 
             *input = send.input.clone();
             return Ok(ClusterSendNode::new(Arc::new(p), snapshots, limit).into_plan());
@@ -1501,8 +1411,8 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                 return Ok(p);
             }
             let mut union_snapshots = Vec::new();
-            let mut limit = None;
-            for (k, i) in inputs.into_iter().enumerate() {
+            let mut limits = Vec::new();
+            for i in inputs.into_iter() {
                 let send;
                 if let Some(s) = try_extract_cluster_send(i) {
                     send = s;
@@ -1512,19 +1422,16 @@ fn pull_up_cluster_send(mut p: LogicalPlan) -> Result<LogicalPlan, DataFusionErr
                     ));
                 }
                 union_snapshots.extend(send.snapshots.concat());
-                limit = if k == 0 {
-                    send.limit
-                } else if let Some((l, send_l)) = limit.zip(send.limit) {
-                    if l == send_l {
-                        Some(l)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
+                limits.push(send.limit_and_reverse);
                 *i = send.input.as_ref().clone();
             }
+            let limit = if limits.is_empty() || limits.iter().any(|l| l.is_none()) {
+                None
+            } else if limits.iter().any(|l| l.unwrap() != limits[0].unwrap()) {
+                None
+            } else {
+                limits[0]
+            };
             snapshots = vec![union_snapshots];
             return Ok(ClusterSendNode::new(Arc::new(p), snapshots, limit).into_plan());
         }
@@ -1584,7 +1491,7 @@ impl ExtensionPlanner for CubeExtensionPlanner {
                 input.schema(),
                 false,
                 usize::MAX,
-                cs.limit.clone(),
+                cs.limit_and_reverse.clone(),
             )?))
         } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
             assert_eq!(inputs.len(), 1);
@@ -1607,7 +1514,7 @@ impl CubeExtensionPlanner {
         schema: SchemaRef,
         use_streaming: bool,
         max_batch_rows: usize,
-        limit: Option<usize>,
+        limit_and_reverse: Option<(usize, bool)>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         if snapshots.is_empty() {
             return Ok(Arc::new(EmptyExec::new(false, schema)));
@@ -1627,7 +1534,7 @@ impl CubeExtensionPlanner {
                 input,
                 schema,
                 max_batch_rows,
-                limit,
+                limit_and_reverse,
             }))
         }
     }
@@ -1642,7 +1549,7 @@ pub struct WorkerExec {
     //       This is a hacky workaround for wrong schema of joins after projection pushdown.
     pub schema: SchemaRef,
     pub max_batch_rows: usize,
-    pub limit: Option<usize>,
+    pub limit_and_reverse: Option<(usize, bool)>,
 }
 
 #[async_trait]
@@ -1672,7 +1579,7 @@ impl ExecutionPlan for WorkerExec {
             input: children.into_iter().next().unwrap(),
             schema: self.schema.clone(),
             max_batch_rows: self.max_batch_rows,
-            limit: self.limit.clone(),
+            limit_and_reverse: self.limit_and_reverse.clone(),
         }))
     }
 

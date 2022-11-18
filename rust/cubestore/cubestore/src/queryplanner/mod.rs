@@ -7,6 +7,7 @@ pub use planning::PlanningMeta;
 pub mod pretty_printers;
 pub mod query_executor;
 pub mod serialized_plan;
+mod tail_limit;
 mod topk;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;

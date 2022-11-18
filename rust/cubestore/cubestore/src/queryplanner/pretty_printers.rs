@@ -26,6 +26,7 @@ use crate::queryplanner::query_executor::{
     ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider,
 };
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
+use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
 use crate::queryplanner::CubeTableLogical;
@@ -343,6 +344,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += &format!("LocalLimit, n: {}", l.limit());
         } else if let Some(l) = a.downcast_ref::<GlobalLimitExec>() {
             *out += &format!("GlobalLimit, n: {}", l.limit());
+        } else if let Some(l) = a.downcast_ref::<TailLimitExec>() {
+            *out += &format!("TailLimit, n: {}", l.limit);
         } else if let Some(f) = a.downcast_ref::<FilterExec>() {
             *out += "Filter";
             if o.show_filters {

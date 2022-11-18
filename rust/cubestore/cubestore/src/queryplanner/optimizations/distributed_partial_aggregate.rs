@@ -1,5 +1,6 @@
 use crate::queryplanner::planning::WorkerExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
+use crate::queryplanner::tail_limit::TailLimitExec;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
 use datafusion::physical_plan::limit::GlobalLimitExec;
@@ -41,7 +42,7 @@ pub fn push_aggregate_to_workers(
             input: agg.with_new_children(vec![w.input.clone()])?,
             schema: agg.schema().clone(),
             max_batch_rows: w.max_batch_rows,
-            limit: w.limit.clone(),
+            limit_and_reverse: w.limit_and_reverse.clone(),
         }))
     } else {
         Ok(p)
@@ -54,9 +55,14 @@ pub fn add_limit_to_workers(
     p: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
     if let Some(w) = p.as_any().downcast_ref::<WorkerExec>() {
-        if let Some(limit) = w.limit {
-            let limit = Arc::new(GlobalLimitExec::new(w.input.clone(), limit));
-            w.with_new_children(vec![limit])
+        if let Some((limit, reverse)) = w.limit_and_reverse {
+            if reverse {
+                let limit = Arc::new(TailLimitExec::new(w.input.clone(), limit));
+                w.with_new_children(vec![limit])
+            } else {
+                let limit = Arc::new(GlobalLimitExec::new(w.input.clone(), limit));
+                w.with_new_children(vec![limit])
+            }
         } else {
             Ok(p)
         }
