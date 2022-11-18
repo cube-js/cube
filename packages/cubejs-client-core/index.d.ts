@@ -816,7 +816,7 @@ declare module '@cubejs-client/core' {
     never;
 
   type QueryArrayRecordType<T extends DeeplyReadonly<Query[]>> =
-    T extends readonly [infer First, ...infer Rest]
+    T extends readonly [infer First extends DeeplyReadonly<Query>, ...infer Rest]
       ? SingleQueryRecordType<First> | QueryArrayRecordType<Rest & DeeplyReadonly<Query[]>>
       : never;
 
