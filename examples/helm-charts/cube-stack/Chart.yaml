@@ -2,7 +2,7 @@ apiVersion: v2
 name: cube-stack
 description: Cube Stack is an Umbrella Chart that contains everything needed to run Cube in production.
 type: application
-version: 0.1.0
+version: 1.0.0
 appVersion: "0.28.26"
 keywords:
 - cubejs
@@ -15,11 +15,11 @@ sources:
   - https://github.com/cube-js/cube.js
 dependencies:
 - name: cubejs
-  version: "0.1.*"
+  version: "0.*"
   repository: file://../cubejs
   condition: global.cubejs.enabled
 - name: cubestore
-  version: "0.1.*"
+  version: "0.*"
   repository: file://../cubestore
   condition: global.cubestore.enabled
 - name: redis
