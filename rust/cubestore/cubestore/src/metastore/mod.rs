@@ -755,7 +755,7 @@ pub trait MetaStore: DIService + Send + Sync {
     fn partition_table(&self) -> PartitionMetaStoreTable;
     async fn create_partition(&self, partition: Partition) -> Result<IdRow<Partition>, CubeError>;
     async fn get_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
-    async fn get_partition_and_index_for_chunks(
+    async fn get_partition_and_index_for_chunks_out_of_queue(
         &self,
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<Vec<(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)>, CubeError>;
@@ -2114,13 +2114,13 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    async fn get_partition_and_index_for_chunks(
+    async fn get_partition_and_index_for_chunks_out_of_queue(
         &self,
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<Vec<(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)>, CubeError> {
-        self.read_operation(move |db_ref| {
-            let partition_db = PartitionRocksTable::new(db_ref.clone());
-            let index_db = IndexRocksTable::new(db_ref.clone());
+        self.read_operation_out_of_queue(move |db| {
+            let partition_db = PartitionRocksTable::new(db.clone());
+            let index_db = IndexRocksTable::new(db.clone());
             let mut res = Vec::with_capacity(chunks.len());
             for chunk in chunks.into_iter() {
                 let chunk_id = chunk.get_id();

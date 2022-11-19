@@ -1261,7 +1261,7 @@ impl SqlService for SqlServiceImpl {
                         let chunk_ids_to_batches = worker_plan
                             .in_memory_chunks_to_load()
                             .into_iter()
-                            .map(|c| (c.get_id(), Vec::new()))
+                            .map(|(c, _, _)| (c.get_id(), Vec::new()))
                             .collect();
                         return Ok(QueryPlans {
                             router: self

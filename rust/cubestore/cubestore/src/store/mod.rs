@@ -368,6 +368,10 @@ impl ChunkDataStore for ChunkStore {
                 partition
             )));
         }
+        let index = self
+            .meta_store
+            .get_index(partition.get_row().get_index_id())
+            .await?;
         let chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
@@ -381,15 +385,15 @@ impl ChunkDataStore for ChunkStore {
         let mut new_chunks = Vec::new();
         let mut old_chunks = Vec::new();
 
-        let chunks_with_meta = self
-            .meta_store
-            .get_partition_and_index_for_chunks(chunks)
-            .await?;
-        for (chunk, p, i) in chunks_with_meta.into_iter() {
+        for chunk in chunks.iter() {
             let chunk_id = chunk.get_id();
             old_chunks.push(chunk_id);
             let batches = self
-                .get_chunk_columns_with_preloaded_meta(chunk, p, i)
+                .get_chunk_columns_with_preloaded_meta(
+                    chunk.clone(),
+                    partition.clone(),
+                    index.clone(),
+                )
                 .await?;
             let mut columns = Vec::new();
             for i in 0..batches[0].num_columns() {

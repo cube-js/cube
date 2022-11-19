@@ -1139,7 +1139,7 @@ impl SerializedPlan {
         files
     }
 
-    pub fn in_memory_chunks_to_load(&self) -> Vec<IdRow<Chunk>> {
+    pub fn in_memory_chunks_to_load(&self) -> Vec<(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)> {
         self.list_in_memory_chunks_to_load(|id| {
             self.partition_ids_to_execute
                 .binary_search_by_key(&id, |(id, _)| *id)
@@ -1150,7 +1150,7 @@ impl SerializedPlan {
     fn list_in_memory_chunks_to_load(
         &self,
         include_partition: impl Fn(u64) -> bool,
-    ) -> Vec<IdRow<Chunk>> {
+    ) -> Vec<(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)> {
         let indexes = self.index_snapshots();
 
         let mut chunk_ids = Vec::new();
@@ -1163,7 +1163,11 @@ impl SerializedPlan {
 
                 for chunk in partition.chunks() {
                     if chunk.get_row().in_memory() {
-                        chunk_ids.push(chunk.clone());
+                        chunk_ids.push((
+                            chunk.clone(),
+                            partition.partition.clone(),
+                            index.index.clone(),
+                        ));
                     }
                 }
             }
