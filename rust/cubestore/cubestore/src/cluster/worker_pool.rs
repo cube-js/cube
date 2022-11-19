@@ -332,7 +332,6 @@ where
         tokio_builder.worker_threads(var.parse().unwrap());
     }
     let runtime = tokio_builder.build().unwrap();
-    println!("vvvvvvv");
     worker_setup(&runtime);
     runtime.block_on(async move {
         let config = Config::default();
