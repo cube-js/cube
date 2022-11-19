@@ -158,10 +158,10 @@ impl CompactionServiceImpl {
         let mut old_chunk_ids = Vec::new();
         let mut new_chunk_ids = Vec::new();
 
-        let chunks_with_meta = self
-            .meta_store
-            .get_partition_and_index_for_chunks(chunks.clone())
-            .await?;
+        let chunks_with_meta = chunks
+            .iter()
+            .map(|c| (c.clone(), partition.clone(), index.clone()))
+            .collect::<Vec<_>>();
 
         for group in compact_groups.iter() {
             let group_chunks = &chunks[group.0..group.1];
@@ -283,10 +283,11 @@ impl CompactionServiceImpl {
             })
             .min();
 
-        let chunks_with_meta = self
-            .meta_store
-            .get_partition_and_index_for_chunks(chunks.clone())
-            .await?;
+        let chunks_with_meta = chunks
+            .iter()
+            .map(|c| (c.clone(), partition.clone(), index.clone()))
+            .collect::<Vec<_>>();
+
         let in_memory_columns = prepare_in_memory_columns(
             &self.chunk_store,
             num_columns,
@@ -449,14 +450,14 @@ impl CompactionService for CompactionServiceImpl {
 
         let mut data = Vec::new();
         let num_columns = index.get_row().columns().len();
-        let chunks_with_meta = self
-            .meta_store
-            .get_partition_and_index_for_chunks(chunks.clone())
-            .await?;
-        for (chunk, p, i) in chunks_with_meta.into_iter() {
+        for chunk in chunks.iter() {
             for b in self
                 .chunk_store
-                .get_chunk_columns_with_preloaded_meta(chunk.clone(), p, i)
+                .get_chunk_columns_with_preloaded_meta(
+                    chunk.clone(),
+                    partition.clone(),
+                    index.clone(),
+                )
                 .await?
             {
                 assert_eq!(
@@ -1409,7 +1410,7 @@ mod tests {
         let cols_to_move = cols.clone();
         chunk_store
             .expect_get_chunk_columns_with_preloaded_meta()
-            .returning(move |c, i, p| {
+            .returning(move |c, _i, _p| {
                 let limit = match c.get_id() {
                     1 => 10,
                     2 => 16,
