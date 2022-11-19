@@ -6462,13 +6462,12 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
 
     //============================
 
-    //indexes `ind2` intersects for tables
     let res = assert_limit_pushdown(&service, "SELECT b, SUM(n) FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
                 ) as `tb` GROUP BY 1 ORDER BY 1 LIMIT 3", 
-                Some("ind2"), false, false
+                Some("ind2"), true, false
         )
         .await.unwrap();
     assert_eq!(

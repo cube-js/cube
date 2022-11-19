@@ -150,14 +150,12 @@ pub async fn choose_index_ext(
         i.partitions = pick_partitions(i, c, ps)?;
     }
 
-    let can_pushdown_limit = can_pushdown_limit(&indices);
-
     // We have enough information to finalize the logical plan.
     let mut r = ChooseIndex {
         chosen_indices: &indices,
         next_index: 0,
         enable_topk,
-        can_pushdown_limit,
+        can_pushdown_limit: true,
     };
 
     let plan = rewrite_plan(p, &ChooseIndexContext::default(), &mut r)?;
@@ -183,6 +181,9 @@ pub async fn choose_index_ext(
     ))
 }
 
+#[allow(dead_code)]
+///Checks that indexex is not intersects.
+///TODO unused yet but may be required for limit pushdown when order by consist aggregate functions
 fn can_pushdown_limit(indices: &Vec<IndexSnapshot>) -> bool {
     if indices.is_empty() {
         return false;
@@ -220,6 +221,7 @@ fn can_pushdown_limit(indices: &Vec<IndexSnapshot>) -> bool {
     true
 }
 
+#[allow(dead_code)]
 fn index_min_max(ind: &IndexSnapshot) -> (Option<&Row>, Option<&Row>) {
     let sort_on_len = ind.sort_on().unwrap().len();
 
