@@ -121,6 +121,7 @@ impl TailLimitStream {
     }
 }
 
+#[tracing::instrument(level = "trace", skip(batches, schema))]
 fn batches_tail(
     mut batches: Vec<RecordBatch>,
     limit: usize,
