@@ -826,6 +826,7 @@ impl ExecutionPlan for CubeTableExec {
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn execute(
         &self,
         partition: usize,
