@@ -64,6 +64,7 @@ impl ExecutionPlan for TailLimitExec {
         self.input.output_hints()
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn execute(
         &self,
         partition: usize,
