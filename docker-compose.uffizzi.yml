@@ -1,0 +1,50 @@
+version: "3"
+
+# uffizzi integration
+x-uffizzi:
+  ingress:
+    service: nginx
+    port: 8081
+
+services:
+  cube:
+    image: "${CUBEJS_IMAGE}"
+    environment:
+      - CUBEJS_DEV_MODE=true
+      - CUBEJS_DB_TYPE=postgres
+      - CUBEJS_DB_HOST=localhost
+      - CUBEJS_DB_NAME=ecom
+      - CUBEJS_DB_USER=postgres
+      - CUBEJS_DB_PASS=postgres
+      - BASE_URL=UFFIZZI_URL
+    deploy:
+      resources:
+        limits:
+          memory: 2000M
+    volumes:
+     - cube_volume:/cube/conf
+     - ./dashboard-app-uffizzi:/cube/conf/dashboard-app
+     - ./entrypoint:/cube/conf/entrypoint
+    entrypoint: ["/bin/sh" ,"-c", "cubejs server && mkdir -p dashboard-app && touch ./dashboard-app/.env.development && chmod +x ./entrypoint/entrypoint.sh ./dashboard-app/.env.development && ./entrypoint/entrypoint.sh"]
+
+  postgres:
+   image: postgres
+   environment:
+     - POSTGRES_USER=postgres
+     - POSTGRES_PASSWORD=postgres
+     - POSTGRES_DB=ecom
+     - PGDATA=/tmp
+   volumes:
+      - postgres_data:/var/lib/postgresql/data/
+      - ./sql/:/docker-entrypoint-initdb.d/
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+    - ./nginx:/etc/nginx
+
+# Volumes to persist data
+volumes:
+  postgres_data:
+  cube_volume:
+

@@ -7,11 +7,11 @@ services:
     ports:
       - 4000:4000  # Cube.js API and Developer Playground
       - 5432:5432  # Cube SQL API
-    env_file: 
+    env_file:
       - ./config/cube.env
     volumes:
       - .:/cube/conf
-  
+
   postgres:
     container_name: "postgres"
     restart: "always"
