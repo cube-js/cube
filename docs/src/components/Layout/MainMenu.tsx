@@ -40,6 +40,7 @@ const menuOrder = [
   'Deployment',
   'Developer Tools',
   'Examples & Tutorials',
+  'Release Notes',
 ];
 
 const nameRules: Record<string, string> = {
