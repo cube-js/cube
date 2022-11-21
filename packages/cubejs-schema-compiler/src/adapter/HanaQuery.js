@@ -41,8 +41,7 @@ export class HanaQuery extends BaseQuery {
   }
 
   convertTz(field) {
-    // return `CONVERT_TZ(${field}, @@session.time_zone, '${moment().tz(this.timezone).format('Z')}')`;
-    return `UTCTOLOCAL(TO_TIMESTAMP(${field}), '${moment().tz(this.timezone).format('Z')}')`;
+    return `UTCTOLOCAL(TO_TIMESTAMP(${field}), 'UTC')`;
   }
 
   timeStampCast(value) {
@@ -66,7 +65,7 @@ export class HanaQuery extends BaseQuery {
   }
 
   timeGroupedColumn(granularity, dimension) {
-    return `CAST(${GRANULARITY_TO_INTERVAL[granularity](dimension)} AS DATETIME)`;
+    return `TO_TIMESTAMP(${GRANULARITY_TO_INTERVAL[granularity](dimension)})`;
   }
 
   escapeColumnName(name) {
