@@ -169,17 +169,17 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
 
   public informationSchemaQuery() {
     return `
-      SELECT columns.COLUMN_NAME as ${this.quoteIdentifier('COLUMN_NAME')},
-             columns.TABLE_NAME as ${this.quoteIdentifier('TABLE_NAME')},
-             columns.SCHEMA_NAME as ${this.quoteIdentifier('SCHEMA_NAME')},
-             columns.DATA_TYPE_NAME as ${this.quoteIdentifier('DATA_TYPE_NAME')}
+      SELECT columns.COLUMN_NAME as ${this.quoteIdentifier('column_name')},
+             columns.TABLE_NAME as ${this.quoteIdentifier('table_name')},
+             columns.SCHEMA_NAME as ${this.quoteIdentifier('table_schema')},
+             columns.DATA_TYPE_NAME as ${this.quoteIdentifier('data_type')}
       FROM SYS.TABLE_COLUMNS columns
-      WHERE columns.table_schema IN '${this.config.databaseName}'
+      WHERE columns.SCHEMA_NAME = '${this.config.uid}'
    `;
   }
 
   public quoteIdentifier(identifier: string) {
-    return `${identifier}`; // don't quote
+    return `"${identifier}"`; 
   }
 
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: any, params: any, tx: any) {
