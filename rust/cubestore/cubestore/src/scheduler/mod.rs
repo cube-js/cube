@@ -2,6 +2,10 @@ use crate::cluster::{pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
+use crate::metastore::replay_handle::{
+    subtract_from_left_seq_pointer_by_location, subtract_from_right_seq_pointer_by_location,
+    union_seq_pointer_by_location, SeqPointerForLocation,
+};
 use crate::metastore::table::Table;
 use crate::metastore::{
     deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, IdRow, MetaStore,
@@ -17,6 +21,7 @@ use datafusion::cube_ext;
 use flatbuffers::bitflags::_core::cmp::Ordering;
 use flatbuffers::bitflags::_core::time::Duration;
 use futures_timer::Delay;
+use itertools::Itertools;
 use log::error;
 use std::collections::{BinaryHeap, HashSet};
 use std::sync::Arc;
@@ -216,6 +221,16 @@ impl SchedulerImpl {
             error!("Error deleting middle man partitions: {}", e);
         }
 
+        if let Err(e) = warn_long_fut(
+            "Merge replay handles",
+            Duration::from_millis(5000),
+            self.merge_replay_handles(),
+        )
+        .await
+        {
+            error!("Error deleting middle man partitions: {}", e);
+        }
+
         Ok(())
     }
 
@@ -258,6 +273,89 @@ impl SchedulerImpl {
                 })
                 .await?;
         }
+        Ok(())
+    }
+
+    /// This method is responsible for merging `ReplayHandle` to keep their numbers low.
+    /// Important merge algorithm points:
+    /// - Only `ReplayHandle` without chunks can be merged. Those either persisted or already merged by compaction.
+    /// In case of compaction merge we actually doesn't care about orphaned `ReplayHandle` because
+    /// `SeqPointer` union yields the same result.
+    /// - For failed `ReplayHandle` we always try to find if subsequent `ReplayHandle` already covered
+    /// due to replay so we can safely remove it.
+    /// Otherwise we just subtract it from resulting `SeqPointer` so freshly created `ReplayHandle`
+    /// can't remove failed one.
+    async fn merge_replay_handles(&self) -> Result<(), CubeError> {
+        let (failed, mut without_failed) = self
+            .meta_store
+            .all_replay_handles_to_merge()
+            .await?
+            .into_iter()
+            .partition::<Vec<_>, _>(|h| h.get_row().has_failed_to_persist_chunks());
+
+        without_failed.sort_by_key(|h| h.get_row().table_id());
+
+        let table_to_failed = failed
+            .into_iter()
+            .map(|h| (h.get_row().table_id(), h))
+            .into_group_map();
+
+        let mut to_merge = Vec::new();
+
+        for (table_id, handles) in &without_failed
+            .into_iter()
+            .group_by(|h| h.get_row().table_id())
+        {
+            let mut seq_pointer_by_location = None;
+            let mut ids = Vec::new();
+            let handles = handles.collect::<Vec<_>>();
+            for handle in handles.iter() {
+                union_seq_pointer_by_location(
+                    &mut seq_pointer_by_location,
+                    handle.get_row().seq_pointers_by_location(),
+                )?;
+                ids.push(handle.get_id());
+            }
+            let empty_vec = Vec::new();
+            let failed = table_to_failed.get(&table_id).unwrap_or(&empty_vec);
+
+            for failed_handle in failed.iter() {
+                let mut failed_seq_pointers =
+                    failed_handle.get_row().seq_pointers_by_location().clone();
+                let replay_after_failed = handles
+                    .iter()
+                    .filter(|h| h.get_id() > failed_handle.get_id());
+                for replay in replay_after_failed {
+                    subtract_from_left_seq_pointer_by_location(
+                        &mut failed_seq_pointers,
+                        replay.get_row().seq_pointers_by_location(),
+                    )?;
+                }
+                let empty_seq_pointers = failed_seq_pointers
+                    .map(|p| {
+                        p.iter()
+                            .all(|p| p.as_ref().map(|p| p.is_empty()).unwrap_or(true))
+                    })
+                    .unwrap_or(true);
+                if empty_seq_pointers {
+                    ids.push(failed_handle.get_id());
+                } else {
+                    subtract_from_right_seq_pointer_by_location(
+                        &mut seq_pointer_by_location,
+                        failed_handle.get_row().seq_pointers_by_location(),
+                    )?;
+                }
+            }
+
+            to_merge.push((ids, seq_pointer_by_location));
+        }
+
+        for (ids, seq_pointer_by_location) in to_merge.into_iter() {
+            self.meta_store
+                .merge_replay_handles(ids, seq_pointer_by_location)
+                .await?;
+        }
+
         Ok(())
     }
 
@@ -506,6 +604,11 @@ impl SchedulerImpl {
                     match new_job.get_row().status() {
                         JobStatus::Error(e) if e.contains("Stale stream timeout") => {
                             log::info!("Removing stale stream job: {:?}", new_job);
+                            self.meta_store.delete_job(new_job.get_id()).await?;
+                            self.reconcile_table_imports().await?;
+                        }
+                        JobStatus::Error(e) if e.contains("Stream requires replay") => {
+                            log::info!("Removing stream job that requires replay: {:?}", new_job);
                             self.meta_store.delete_job(new_job.get_id()).await?;
                             self.reconcile_table_imports().await?;
                         }

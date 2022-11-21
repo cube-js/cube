@@ -53,7 +53,8 @@ type KsqlDescribeResponse = {
     name: string;
     fields: KsqlField[];
     type: 'STREAM' | 'TABLE';
-    windowType: 'SESSION' | 'HOPPING' | 'TUMBLING'
+    windowType: 'SESSION' | 'HOPPING' | 'TUMBLING',
+    partitions: number;
   }
 };
 
@@ -188,8 +189,8 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return table.replace('.', '-');
   }
 
-  public async tableColumnTypes(table: string) {
-    const describe = await this.query<KsqlDescribeResponse>(`DESCRIBE ${this.quoteIdentifier(this.tableDashName(table))}`);
+  public async tableColumnTypes(table: string, describe?: KsqlDescribeResponse) {
+    describe = describe || await this.describeTable(table);
 
     let { fields } = describe.sourceDescription;
     if (describe.sourceDescription.windowType) {
@@ -230,8 +231,10 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   }
 
   private async getStreamingTableData(streamingTable: string, selectStatement?: string) {
+    const describe = await this.describeTable(streamingTable);
     return {
-      types: await this.tableColumnTypes(streamingTable),
+      types: await this.tableColumnTypes(streamingTable, describe),
+      partitions: describe.sourceDescription?.partitions,
       streamingTable,
       selectStatement,
       streamingSource: {
@@ -244,6 +247,10 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
         }
       }
     };
+  }
+
+  private describeTable(streamingTable: string): Promise<KsqlDescribeResponse> {
+    return this.query<KsqlDescribeResponse>(`DESCRIBE ${this.quoteIdentifier(this.tableDashName(streamingTable))}`);
   }
 
   public dropTable(tableName: string, options: any): Promise<any> {

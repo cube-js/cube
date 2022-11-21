@@ -79,6 +79,7 @@ export interface StreamTableData extends DownloadTableBase {
 export interface StreamingSourceTableData extends DownloadTableBase {
   streamingTable: string;
   selectStatement?: string;
+  partitions?: number;
   streamingSource: {
     name: string;
     type: string;

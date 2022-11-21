@@ -364,12 +364,21 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
         ),
       queryTracingObj
     );
+
+    let locations = [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`];
+
+    if (tableData.partitions) {
+      locations = [];
+      for (let i = 0; i < tableData.partitions; i++) {
+        locations.push(`stream://${tableData.streamingSource.name}/${tableData.streamingTable}/${i}`);
+      }
+    }
     
     const options: CreateTableOptions = {
       buildRangeEnd: queryTracingObj?.buildRangeEnd,
       uniqueKey: uniqueKeyColumns.join(','),
       indexes,
-      files: [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`],
+      files: locations,
       selectStatement: tableData.selectStatement,
       sealAt
     };

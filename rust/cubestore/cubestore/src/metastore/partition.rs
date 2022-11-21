@@ -10,6 +10,7 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use rocksdb::DB;
 use serde::{Deserialize, Deserializer};
+use std::fmt::Debug;
 
 impl Partition {
     pub fn new(

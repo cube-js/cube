@@ -339,6 +339,25 @@ impl Table {
             .map(|v| *v)
             .unwrap_or(config_partition_split_threshold)
     }
+
+    pub fn location_index(&self, location: &str) -> Result<usize, CubeError> {
+        let locations = self.locations().ok_or_else(|| {
+            CubeError::internal(format!(
+                "Locations are not defined but expected for: {:?}",
+                self
+            ))
+        })?;
+        let (pos, _) = locations
+            .iter()
+            .find_position(|l| l.as_str() == location)
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Location '{}' is not found in table: {:?}",
+                    location, self
+                ))
+            })?;
+        Ok(pos)
+    }
 }
 
 impl Column {
