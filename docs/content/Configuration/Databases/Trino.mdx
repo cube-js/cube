@@ -1,15 +1,15 @@
 ---
-title: Presto
-permalink: /config/databases/presto
+title: Trino
+permalink: /config/databases/trino
 redirect_from:
-  - /config/databases/prestodb
+  - /config/databases/trino
 ---
 
 ## Prerequisites
 
-- The hostname for the [Presto][presto] database server
-- The username/password for the [Presto][presto] database server
-- The name of the database to use within the [Presto][presto] database server
+- The hostname for the [Trino][trino] database server
+- The username/password for the [Trino][trino] database server
+- The name of the database to use within the [Trino][trino] database server
 
 ## Setup
 
@@ -18,12 +18,12 @@ redirect_from:
 Add the following to a `.env` file in your Cube project:
 
 ```bash
-CUBEJS_DB_TYPE=prestodb
-CUBEJS_DB_HOST=my.presto.host
-CUBEJS_DB_USER=presto_user
+CUBEJS_DB_TYPE=trino
+CUBEJS_DB_HOST=my.trino.host
+CUBEJS_DB_USER=trino_user
 CUBEJS_DB_PASS=**********
-CUBEJS_DB_PRESTO_CATALOG=my_presto_catalog
-CUBEJS_DB_SCHEMA=my_presto_schema
+CUBEJS_DB_PRESTO_CATALOG=my_trino_catalog
+CUBEJS_DB_SCHEMA=my_trino_schema
 ```
 
 ## Environment Variables
@@ -46,20 +46,20 @@ CUBEJS_DB_SCHEMA=my_presto_schema
 
 Measures of type
 [`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can be
-used in pre-aggregations when using Presto as a source database. To learn more
-about Presto support for approximate aggregate functions, [click
-here][presto-docs-approx-agg-fns].
+used in pre-aggregations when using Trino as a source database. To learn more
+about Trino support for approximate aggregate functions, [click
+here][trino-docs-approx-agg-fns].
 
 ## SSL
 
-To enable SSL-encrypted connections between Cube and Presto, set the
+To enable SSL-encrypted connections between Cube and Trino, set the
 `CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
-[presto]: https://prestodb.io/
-[presto-docs-approx-agg-fns]:
-  https://prestodb.io/docs/current/functions/aggregate.html
+[trino]: https://trino.io/
+[trino-docs-approx-agg-fns]:
+  https://trino.io/docs/current/functions/aggregate.html#approximate-aggregate-functions
 [ref-config-multiple-ds-decorating-env]:
   /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
