@@ -195,6 +195,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
     sql: Joi.func().required()
   },
   readOnly: Joi.boolean().strict(),
+  streamOffset: Joi.any().valid('earliest', 'latest'),
 };
 
 const BasePreAggregation = {

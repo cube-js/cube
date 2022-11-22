@@ -2,7 +2,7 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::replay_handle::{ReplayHandle, SeqPointer, SeqPointerForLocation};
 use crate::metastore::source::SourceCredentials;
-use crate::metastore::table::Table;
+use crate::metastore::table::{StreamOffset, Table};
 use crate::metastore::{Column, ColumnType, IdRow, MetaStore};
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
@@ -115,6 +115,7 @@ impl StreamingServiceImpl {
                 select_statement: table.get_row().select_statement().clone(),
                 partition,
                 ksql_client: self.ksql_client.clone(),
+                offset: table.get_row().stream_offset().clone(),
             })),
         }
     }
@@ -340,6 +341,7 @@ pub struct KSqlStreamingSource {
     table: String,
     endpoint_url: String,
     select_statement: Option<String>,
+    offset: Option<StreamOffset>,
     partition: Option<usize>,
     ksql_client: Arc<dyn KsqlClient>,
 }
@@ -697,7 +699,14 @@ impl StreamingSource for KSqlStreamingSource {
                 &KSqlQuery {
                     sql: self.query(initial_seq_value)?, //format!("SELECT * FROM `{}` EMIT CHANGES;", self.table),
                     properties: KSqlStreamsProperties {
-                        offset: "earliest".to_string(),
+                        offset: self
+                            .offset
+                            .as_ref()
+                            .map(|o| match o {
+                                StreamOffset::Earliest => "earliest".to_string(),
+                                StreamOffset::Latest => "latest".to_string(),
+                            })
+                            .unwrap_or("latest".to_string()),
                     },
                 },
             )
@@ -940,6 +949,11 @@ mod tests {
                 })
                 .unwrap(),
             );
+
+            if &query.properties.offset == "latest" {
+                return Ok(KsqlResponse::JsonNl { values });
+            }
+
             for i in offset..50000 {
                 for j in 0..2 {
                     if let Some(p) = &partition {
@@ -988,7 +1002,7 @@ mod tests {
             let listener = services.cluster.job_result_listener();
 
             let _ = service
-                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\'') unique key (`ANONYMOUSID`, `MESSAGEID`) location 'stream://ksql/EVENTS_BY_TYPE/0', 'stream://ksql/EVENTS_BY_TYPE/1'")
+                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\'', stream_offset = 'earliest') unique key (`ANONYMOUSID`, `MESSAGEID`) location 'stream://ksql/EVENTS_BY_TYPE/0', 'stream://ksql/EVENTS_BY_TYPE/1'")
                 .await
                 .unwrap();
 
@@ -1033,9 +1047,9 @@ mod tests {
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000 - 16384)])]);
 
-            scheduler.reconcile_table_imports().await.unwrap();
-
             let listener = services.cluster.job_result_listener();
+
+            scheduler.reconcile_table_imports().await.unwrap();
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://ksql/EVENTS_BY_TYPE/0".to_string())),

@@ -80,6 +80,7 @@ export interface StreamingSourceTableData extends DownloadTableBase {
   streamingTable: string;
   selectStatement?: string;
   partitions?: number;
+  streamOffset?: string;
   streamingSource: {
     name: string;
     type: string;
@@ -118,11 +119,15 @@ export type StreamOptions = {
   highWaterMark: number;
 };
 
+export type StreamingSourceOptions = {
+  streamOffset?: boolean;
+};
+
 export interface DownloadQueryResultsBase {
   types: TableStructure
 }
 
-export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities;
+export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities & StreamingSourceOptions;
 
 export type IndexesSQL = {
   sql: [string, unknown[]];

@@ -43,6 +43,7 @@ use crate::import::{parse_space_separated_binstring, ImportService, Ingestion};
 use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
+use crate::metastore::table::StreamOffset;
 use crate::metastore::{
     is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
     IndexType, MetaStoreTable, RowKey, Schema, TableId,
@@ -220,6 +221,7 @@ impl SqlServiceImpl {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        stream_offset: Option<String>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
         aggregates: Option<Vec<(Ident, Ident)>>,
@@ -291,6 +293,20 @@ impl SqlServiceImpl {
             }
         }
 
+        let stream_offset = if let Some(s) = &stream_offset {
+            Some(match s.as_str() {
+                "earliest" => StreamOffset::Earliest,
+                "latest" => StreamOffset::Latest,
+                x => {
+                    return Err(CubeError::user(format!(
+                        "Unexpected stream offset: {}. Only earliest and latest are allowed.",
+                        x
+                    )))
+                }
+            })
+        } else {
+            None
+        };
         if !external {
             return self
                 .db
@@ -305,6 +321,7 @@ impl SqlServiceImpl {
                     build_range_end,
                     seal_at,
                     select_statement,
+                    stream_offset,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                     aggregates.map(|keys| {
                         keys.iter()
@@ -363,6 +380,7 @@ impl SqlServiceImpl {
                 build_range_end,
                 seal_at,
                 select_statement,
+                stream_offset,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 aggregates.map(|keys| {
                     keys.iter()
@@ -900,6 +918,18 @@ impl SqlService for SqlServiceImpl {
                             option.value
                         ))),
                     })?;
+                let stream_offset = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "stream_offset")
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(select_statement) => {
+                            Result::Ok(Some(select_statement.clone()))
+                        }
+                        _ => Result::Err(CubeError::user(format!(
+                            "Bad stream_offset {}. Expected string.",
+                            option.value
+                        ))),
+                    })?;
 
                 let res = self
                     .create_table(
@@ -912,6 +942,7 @@ impl SqlService for SqlServiceImpl {
                         build_range_end,
                         seal_at,
                         select_statement,
+                        stream_offset,
                         indexes,
                         unique_key,
                         aggregates,

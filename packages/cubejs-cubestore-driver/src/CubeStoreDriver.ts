@@ -34,6 +34,7 @@ type Column = {
 };
 
 type CreateTableOptions = {
+  streamOffset?: string;
   inputFormat?: string
   buildRangeEnd?: string
   uniqueKey?: string
@@ -100,6 +101,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
     if (options.selectStatement) {
       withEntries.push(`select_statement = ${escape(options.selectStatement)}`);
+    }
+    if (options.streamOffset) {
+      withEntries.push(`stream_offset = '${options.streamOffset}'`);
     }
     if (withEntries.length > 0) {
       sql = `${sql} WITH (${withEntries.join(', ')})`;
@@ -380,6 +384,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       indexes,
       files: locations,
       selectStatement: tableData.selectStatement,
+      streamOffset: tableData.streamOffset,
       sealAt
     };
     return this.createTableWithOptions(table, columns, options, queryTracingObj);

@@ -104,6 +104,20 @@ impl core::fmt::Display for AggregateColumn {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+pub enum StreamOffset {
+    Earliest = 1,
+    Latest = 2,
+}
+
+impl DataFrameValue<String> for Option<StreamOffset> {
+    fn value(v: &Self) -> String {
+        v.as_ref()
+            .map(|s| format!("{:?}", s))
+            .unwrap_or("NULL".to_string())
+    }
+}
+
 data_frame_from! {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct Table {
@@ -127,6 +141,8 @@ pub struct Table {
     sealed: bool,
     #[serde(default)]
     select_statement: Option<String>,
+    #[serde(default)]
+    stream_offset: Option<StreamOffset>,
     #[serde(default)]
     unique_key_column_indices: Option<Vec<u64>>,
     #[serde(default)]
@@ -165,6 +181,7 @@ impl Table {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        stream_offset: Option<StreamOffset>,
         unique_key_column_indices: Option<Vec<u64>>,
         aggregate_column_indices: Vec<AggregateColumnIndex>,
         seq_column_index: Option<u64>,
@@ -183,6 +200,7 @@ impl Table {
             build_range_end,
             seal_at,
             select_statement,
+            stream_offset,
             sealed: false,
             unique_key_column_indices,
             aggregate_column_indices,
@@ -357,6 +375,10 @@ impl Table {
                 ))
             })?;
         Ok(pos)
+    }
+
+    pub fn stream_offset(&self) -> &Option<StreamOffset> {
+        &self.stream_offset
     }
 }
 
