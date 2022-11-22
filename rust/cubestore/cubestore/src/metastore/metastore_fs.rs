@@ -74,7 +74,7 @@ impl MetaStoreFs for RocksMetaStoreFs {
 
                     return self
                         .check_meta_store(
-                            RocksMetaStore::new(path, self.clone(), config),
+                            RocksMetaStore::new(Path::new(path), self.clone(), config),
                             Some(snapshot),
                         )
                         .await;
@@ -88,7 +88,10 @@ impl MetaStoreFs for RocksMetaStoreFs {
         }
 
         return self
-            .check_meta_store(RocksMetaStore::new(path, self.clone(), config), None)
+            .check_meta_store(
+                RocksMetaStore::new(Path::new(path), self.clone(), config),
+                None,
+            )
             .await;
     }
 
@@ -255,7 +258,7 @@ impl RocksMetaStoreFs {
             let path_to_log = self.remote_fs.local_file(log_file).await?;
             let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
             if let Ok(batch) = batch {
-                let db = meta_store.db.clone();
+                let db = meta_store.store.db.clone();
                 db.write(batch.write_batch())?;
             } else if let Err(e) = batch {
                 error!(
@@ -275,7 +278,8 @@ impl RocksMetaStoreFs {
         if let Some(snapshot) = snapshot {
             self.load_metastore_logs(snapshot, &meta_store).await?;
         }
-        RocksMetaStore::check_all_indexes(&meta_store).await?;
+
+        meta_store.check_all_indexes().await?;
 
         Ok(meta_store)
     }
