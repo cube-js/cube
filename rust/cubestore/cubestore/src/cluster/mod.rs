@@ -229,18 +229,22 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
                     let time = SystemTime::now();
                     debug!("Running select in worker started");
                     let plan_node_to_send = plan_node.clone();
-                    let result = chunk_id_to_record_batches
-                        .into_iter()
-                        .map(|(id, batches)| -> Result<_, CubeError> {
-                            Ok((
-                                id,
-                                batches
-                                    .into_iter()
-                                    .map(|b| b.read())
-                                    .collect::<Result<Vec<_>, _>>()?,
-                            ))
-                        })
-                        .collect::<Result<HashMap<_, _>, _>>()?;
+                    let result = tracing::trace_span!("Deserialize in_memory chunks").in_scope(
+                        move || {
+                            chunk_id_to_record_batches
+                                .into_iter()
+                                .map(|(id, batches)| -> Result<_, CubeError> {
+                                    Ok((
+                                        id,
+                                        batches
+                                            .into_iter()
+                                            .map(|b| b.read())
+                                            .collect::<Result<Vec<_>, _>>()?,
+                                    ))
+                                })
+                                .collect::<Result<HashMap<_, _>, _>>()
+                        },
+                    )?;
                     let res = services
                         .query_executor
                         .clone()
