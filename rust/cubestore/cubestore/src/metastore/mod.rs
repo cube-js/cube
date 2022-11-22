@@ -3299,7 +3299,6 @@ impl MetaStore for RocksMetaStore {
         multi_partition_id: u64,
     ) -> Result<(IdRow<MultiIndex>, IdRow<MultiPartition>, Vec<PartitionData>), CubeError> {
         let (mi, mp, pds) = self
-            .store
             .read_operation(move |db| {
                 let mindex = MultiIndexRocksTable::new(db.clone());
                 let mpartition = MultiPartitionRocksTable::new(db.clone());
