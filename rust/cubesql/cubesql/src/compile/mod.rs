@@ -13890,6 +13890,54 @@ ORDER BY \"COUNT(count)\" DESC"
         )
     }
 
+    #[tokio::test]
+    async fn test_push_down_projection_literal() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT cg2 cg3, l2 l3
+            FROM (
+                SELECT cg1 cg2, l1 l2
+                FROM (
+                    SELECT cg cg1, l l1
+                    FROM (
+                        SELECT customer_gender cg, lit l
+                        FROM (
+                            SELECT customer_gender, 1 lit
+                            FROM KibanaSampleDataEcommerce
+                        ) k
+                    ) k1
+                ) k2
+            ) k3
+            ORDER BY cg3 ASC;
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
     // TODO: unignore once filter push down to projection is implemented
     #[tokio::test]
     #[ignore]
