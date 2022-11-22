@@ -410,7 +410,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
-    async fn reconcile_table_imports(&self) -> Result<(), CubeError> {
+    pub async fn reconcile_table_imports(&self) -> Result<(), CubeError> {
         // Using get_tables_with_path due to it's cached
         let tables = self.meta_store.get_tables_with_path(true).await?;
         for table in tables.iter() {
@@ -711,7 +711,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
-    async fn schedule_compaction_in_memory_chunks_if_needed(
+    pub async fn schedule_compaction_in_memory_chunks_if_needed(
         &self,
         partition: &IdRow<Partition>,
     ) -> Result<(), CubeError> {

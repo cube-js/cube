@@ -25,7 +25,7 @@ use crate::scheduler::SchedulerImpl;
 use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
-use crate::streaming::{StreamingService, StreamingServiceImpl};
+use crate::streaming::{KsqlClient, KsqlClientImpl, StreamingService, StreamingServiceImpl};
 use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
@@ -1212,8 +1212,13 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
+            .await;
+
+        self.injector
+            .register_typed::<dyn KsqlClient, _, _, _>(async move |_| KsqlClientImpl::new())
             .await;
 
         self.injector
