@@ -3015,7 +3015,10 @@ impl FilterRules {
                 if let Some(member_name_to_expr) =
                     &egraph.index(subst[members_var]).data.member_name_to_expr
                 {
-                    if member_name_to_expr.iter().all(|(m, _)| m != &member) {
+                    if member_name_to_expr
+                        .iter()
+                        .all(|(m, _)| m.as_ref() != Some(&member))
+                    {
                         let date_range = var_iter!(
                             egraph[subst[time_dimension_date_range_var]],
                             TimeDimensionDateRangeReplacerDateRange
@@ -3078,7 +3081,10 @@ impl FilterRules {
                 if let Some(member_name_to_expr) =
                     &egraph.index(subst[members_var]).data.member_name_to_expr
                 {
-                    if member_name_to_expr.iter().any(|(m, _)| m == member) {
+                    if member_name_to_expr
+                        .iter()
+                        .any(|(m, _)| m.as_ref() == Some(member))
+                    {
                         return true;
                     }
                 }
