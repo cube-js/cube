@@ -90,7 +90,7 @@ function getStructureVersion(preAggregation) {
     versionArray.push(preAggregation.streamOffset);
   }
 
-  return version(versionArray);
+  return version(versionArray.length === 1 ? versionArray[0] : versionArray);
 }
 
 type VersionEntry = {
@@ -1173,7 +1173,7 @@ export class PreAggregationLoader {
         tableData.rowStream = stream;
       }
     } else {
-      tableData = await saveCancelFn(client.downloadTable(table, { streamOffset: this.preAggregation, ...externalDriverCapabilities }));
+      tableData = await saveCancelFn(client.downloadTable(table, { streamOffset: this.preAggregation.streamOffset, ...externalDriverCapabilities }));
     }
 
     if (!tableData.types) {
