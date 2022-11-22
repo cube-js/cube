@@ -974,7 +974,7 @@ mod tests {
     async fn streaming_replay() {
         Config::test("streaming_replay").update_config(|mut c| {
             c.stream_replay_check_interval_secs = 1;
-            c.compaction_in_memory_chunks_max_lifetime_threshold = 2;
+            c.compaction_in_memory_chunks_max_lifetime_threshold = 3;
             c.partition_split_threshold = 1000000;
             c.max_partition_split_threshold = 1000000;
             c.compaction_chunks_count_threshold = 100;
@@ -1022,7 +1022,7 @@ mod tests {
             // 4th chunk should be somewhere in the middle
             let chunk = meta_store.get_chunk(4).await.unwrap();
             chunk_store.free_memory_chunk(4).await.unwrap();
-            Delay::new(Duration::from_millis(2000)).await;
+            Delay::new(Duration::from_millis(4000)).await;
             scheduler.schedule_compaction_in_memory_chunks_if_needed(&meta_store.get_partition(chunk.get_row().get_partition_id()).await.unwrap()).await.unwrap();
 
             let wait = listener.wait_for_job_results(vec![
