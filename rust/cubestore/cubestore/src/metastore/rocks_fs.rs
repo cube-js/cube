@@ -45,6 +45,10 @@ impl BaseRocksStoreFs {
         Arc::new(Self { remote_fs, name })
     }
 
+    pub fn get_name(&self) -> &'static str {
+        &self.name
+    }
+
     pub async fn make_local_metastore_dir(&self) -> Result<String, CubeError> {
         let meta_store_path = self.remote_fs.local_file(&self.name).await?;
         fs::create_dir_all(meta_store_path.to_string()).await?;
