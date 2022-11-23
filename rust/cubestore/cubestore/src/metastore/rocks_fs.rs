@@ -5,9 +5,9 @@ use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::cube_ext;
 use futures::future::join_all;
-use log::{error, info};
+use log::{error, info, trace};
 use regex::Regex;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -37,30 +37,22 @@ pub trait MetaStoreFs: Send + Sync {
 #[derive(Clone)]
 pub struct BaseRocksStoreFs {
     remote_fs: Arc<dyn RemoteFs>,
-    name: String,
+    name: &'static str,
 }
 
 impl BaseRocksStoreFs {
-    pub fn new(remote_fs: Arc<dyn RemoteFs>, name: String) -> Self {
-        Self { remote_fs, name }
+    pub fn new(remote_fs: Arc<dyn RemoteFs>, name: &'static str) -> Arc<Self> {
+        Arc::new(Self { remote_fs, name })
     }
 
     pub async fn make_local_metastore_dir(&self) -> Result<String, CubeError> {
-        let meta_store_path = self.remote_fs_ref().local_file(&self.name).await?;
+        let meta_store_path = self.remote_fs.local_file(&self.name).await?;
         fs::create_dir_all(meta_store_path.to_string()).await?;
         Ok(meta_store_path)
     }
 
     pub fn remote_fs(&self) -> Arc<dyn RemoteFs> {
         self.remote_fs.clone()
-    }
-
-    pub fn remote_fs_ref(&self) -> &Arc<dyn RemoteFs> {
-        &self.remote_fs
-    }
-
-    pub fn name(&self) -> &String {
-        &self.name
     }
 
     pub async fn upload_snapsots_files(
@@ -256,3 +248,83 @@ impl BaseRocksStoreFs {
         Ok(res)
     }
 }
+
+#[async_trait]
+impl MetaStoreFs for BaseRocksStoreFs {
+    async fn load_from_remote(
+        self: Arc<Self>,
+        path: &str,
+        config: Arc<dyn ConfigObj>,
+        rocks_details: Arc<dyn RocksStoreDetails>,
+    ) -> Result<Arc<RocksStore>, CubeError> {
+        if !fs::metadata(path).await.is_ok() {
+            if self.is_remote_metadata_exists().await? {
+                let last_metastore_snapshot = self.load_current_snapshot_id().await?;
+
+                if let Some(snapshot) = last_metastore_snapshot {
+                    let to_load = self.files_to_load(snapshot.clone()).await?;
+                    let meta_store_path = self.make_local_metastore_dir().await?;
+                    for (file, _) in to_load.iter() {
+                        // TODO check file size
+                        self.remote_fs.download_file(file, None).await?;
+                        let local = self.remote_fs.local_file(file).await?;
+                        let path = Path::new(&local);
+                        fs::copy(
+                            path,
+                            PathBuf::from(&meta_store_path)
+                                .join(path.file_name().unwrap().to_str().unwrap()),
+                        )
+                        .await?;
+                    }
+
+                    return self
+                        .check_rocks_store(
+                            RocksStore::new(Path::new(path), self.clone(), config, rocks_details),
+                            Some(snapshot),
+                        )
+                        .await;
+                }
+            } else {
+                trace!("Can't find {}-current in {:?}", self.name, self.remote_fs);
+            }
+            info!("Creating {} from scratch in {}", self.name, path);
+        } else {
+            info!("Using existing {} in {}", self.name, path);
+        }
+
+        return self
+            .check_rocks_store(
+                RocksStore::new(Path::new(path), self.clone(), config, rocks_details),
+                None,
+            )
+            .await;
+    }
+
+    async fn upload_log(
+        &self,
+        log_name: &str,
+        serializer: &WriteBatchContainer,
+    ) -> Result<u64, CubeError> {
+        let file_name = self.remote_fs.local_file(log_name).await?;
+        serializer.write_to_file(&file_name).await?;
+        // TODO persist file size
+        self.remote_fs.upload_file(&file_name, &log_name).await
+    }
+
+    async fn upload_checkpoint(
+        &self,
+        remote_path: String,
+        checkpoint_path: PathBuf,
+    ) -> Result<(), CubeError> {
+        self.upload_snapsots_files(&remote_path, &checkpoint_path)
+            .await?;
+
+        self.delete_old_snapshots().await?;
+
+        self.write_metastore_current(&remote_path).await?;
+
+        Ok(())
+    }
+}
+
+crate::di_service!(BaseRocksStoreFs, [MetaStoreFs]);

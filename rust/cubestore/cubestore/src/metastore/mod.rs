@@ -2,7 +2,6 @@ pub mod chunks;
 pub mod index;
 pub mod job;
 pub mod listener;
-pub mod metastore_fs;
 pub mod multi_index;
 pub mod partition;
 pub mod replay_handle;
@@ -79,7 +78,6 @@ use std::path::Path;
 use std::str::FromStr;
 
 use crate::cachestore::CacheItem;
-use crate::metastore::metastore_fs::RocksMetaStoreFs;
 use crate::remotefs::LocalDirRemoteFs;
 use std::time::Duration;
 use table::Table;
@@ -1185,7 +1183,7 @@ impl RocksMetaStore {
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
         let store = RocksStore::new(
             store_path.clone().join(details.get_name()).as_path(),
-            RocksMetaStoreFs::new(remote_fs.clone()),
+            BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
             config.config_obj(),
             details,
         );
@@ -4001,7 +3999,6 @@ mod tests {
     use super::table::AggregateColumn;
     use super::*;
     use crate::config::Config;
-    use crate::metastore::metastore_fs::RocksMetaStoreFs;
     use crate::remotefs::LocalDirRemoteFs;
     use futures_timer::Delay;
     use rocksdb::IteratorMode;
@@ -4029,7 +4026,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
 
@@ -4216,7 +4213,7 @@ mod tests {
 
         let meta_store = RocksMetaStore::new(
             store_path.join("metastore").as_path(),
-            RocksMetaStoreFs::new(remote_fs),
+            BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
             config.config_obj(),
         );
 
@@ -4294,7 +4291,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
 
@@ -4342,7 +4339,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
 
@@ -4449,7 +4446,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
 
@@ -4536,7 +4533,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
 
@@ -4913,7 +4910,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
             meta_store
@@ -5050,7 +5047,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
             meta_store

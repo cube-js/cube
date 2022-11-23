@@ -1,11 +1,12 @@
 use crate::cachestore::cache_item::{CacheItemIndexKey, CacheItemRocksIndex, CacheItemRocksTable};
-use crate::cachestore::{CacheItem, RocksCacheStoreFs};
+use crate::cachestore::CacheItem;
 use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
 use std::env;
 
 use crate::metastore::{
-    DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksStore, RocksStoreDetails, RocksTable,
+    BaseRocksStoreFs, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksStore,
+    RocksStoreDetails, RocksTable,
 };
 use crate::remotefs::LocalDirRemoteFs;
 use crate::util::WorkerLoop;
@@ -141,7 +142,7 @@ impl RocksCacheStore {
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
         let store = RocksStore::new(
             store_path.clone().join(details.get_name()).as_path(),
-            RocksCacheStoreFs::new(remote_fs.clone()),
+            BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
             config.config_obj(),
             details,
         );

@@ -2,7 +2,7 @@
 pub mod injection;
 pub mod processing_loop;
 
-use crate::cachestore::{CacheStore, ClusterCacheStoreClient, RocksCacheStore, RocksCacheStoreFs};
+use crate::cachestore::{CacheStore, ClusterCacheStoreClient, RocksCacheStore};
 use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
@@ -12,8 +12,7 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
-use crate::metastore::metastore_fs::RocksMetaStoreFs;
-use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
+use crate::metastore::{BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore};
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
@@ -1122,7 +1121,8 @@ impl Config {
                 .register("metastore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
                     let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> = RocksMetaStoreFs::new(original_remote_fs);
+                    let arc: Arc<dyn DIService> =
+                        BaseRocksStoreFs::new(original_remote_fs, "metastore");
 
                     arc
                 })
@@ -1165,7 +1165,8 @@ impl Config {
                 .register("cachestore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
                     let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> = RocksCacheStoreFs::new(original_remote_fs);
+                    let arc: Arc<dyn DIService> =
+                        BaseRocksStoreFs::new(original_remote_fs, "cachestore");
 
                     arc
                 })

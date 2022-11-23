@@ -1748,15 +1748,14 @@ mod tests {
     use crate::cluster::MockCluster;
     use crate::config::{Config, FileStoreProvider};
     use crate::import::MockImportService;
-    use crate::metastore::metastore_fs::RocksMetaStoreFs;
-    use crate::metastore::RocksMetaStore;
+    use crate::metastore::{BaseRocksStoreFs, RocksMetaStore};
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
     use crate::store::ChunkStore;
 
     use super::*;
-    use crate::cachestore::{RocksCacheStore, RocksCacheStoreFs};
+    use crate::cachestore::RocksCacheStore;
     use crate::queryplanner::pretty_printers::pp_phys_plan;
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
@@ -1782,12 +1781,12 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                RocksCacheStoreFs::new(remote_fs.clone()),
+                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
                 config.config_obj(),
             );
             let rows_per_chunk = 10;
@@ -1852,12 +1851,12 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                RocksCacheStoreFs::new(remote_fs.clone()),
+                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
                 config.config_obj(),
             );
             let rows_per_chunk = 10;
@@ -1951,12 +1950,12 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                RocksCacheStoreFs::new(remote_fs.clone()),
+                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
                 config.config_obj(),
             );
             let rows_per_chunk = 10;
