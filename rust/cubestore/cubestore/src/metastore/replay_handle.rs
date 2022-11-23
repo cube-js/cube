@@ -55,18 +55,16 @@ impl SeqPointer {
     /// result |------|
     /// ```
     pub fn subtract_from_right(&mut self, other: &Self) {
-        if let Some(other_start_seq) = other.start_seq {
-            if let Some(end_seq) = self.end_seq {
-                self.end_seq = Some(end_seq.min(other_start_seq));
-            }
+        if let Some((other_start_seq, end_seq)) =
+            other.start_seq.as_ref().zip(self.end_seq.as_ref())
+        {
+            self.end_seq = Some((*end_seq).min(*other_start_seq));
         }
 
-        if let Some(end_seq) = self.end_seq {
-            if let Some(start_seq) = self.start_seq {
-                if end_seq <= start_seq {
-                    self.start_seq = None;
-                    self.end_seq = None;
-                }
+        if let Some((start_seq, end_seq)) = self.start_seq.as_ref().zip(self.end_seq.as_ref()) {
+            if end_seq <= start_seq {
+                self.start_seq = None;
+                self.end_seq = None;
             }
         }
     }
@@ -85,23 +83,6 @@ impl SeqPointer {
                 if other_start <= start && end <= other_end {
                     self.start_seq = None;
                     self.end_seq = None;
-                }
-            }
-        }
-    }
-
-    /// Choose min interval by end border.
-    /// Used to choose least persisted index.
-    /// ```md
-    /// self   |----------------|
-    /// other         |------|
-    /// result        |------|
-    /// ```
-    pub fn min_by_end_border(&mut self, other: &Self) {
-        if let Some(other_end_seq) = other.end_seq {
-            if let Some(end_seq) = self.end_seq {
-                if other_end_seq < end_seq {
-                    *self = other.clone();
                 }
             }
         }
