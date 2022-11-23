@@ -54,6 +54,9 @@ pub enum Statement {
         credentials: Vec<SqlOption>,
         or_update: bool,
     },
+    CacheIncr {
+        path: Ident,
+    },
     System(SystemCommand),
     Dump(Box<Query>),
 }
@@ -85,6 +88,10 @@ impl<'a> CubeStoreParser<'a> {
                 _ if w.value.eq_ignore_ascii_case("sys") => {
                     self.parser.next_token();
                     self.parse_system()
+                }
+                Keyword::CACHE => {
+                    self.parser.next_token();
+                    self.parse_cache()
                 }
                 Keyword::CREATE => {
                     self.parser.next_token();
@@ -120,6 +127,27 @@ impl<'a> CubeStoreParser<'a> {
             self.parse_create_source()
         } else {
             Ok(Statement::Statement(self.parser.parse_create()?))
+        }
+    }
+
+    fn parse_cache(&mut self) -> Result<Statement, ParserError> {
+        let command = match self.parser.next_token() {
+            Token::Word(w) => w.value.to_ascii_lowercase(),
+            _ => {
+                return Err(ParserError::ParserError(
+                    "Unknown cache command, available: INCR".to_string(),
+                ))
+            }
+        };
+
+        match command.as_str() {
+            "incr" => Ok(Statement::CacheIncr {
+                path: self.parser.parse_identifier()?,
+            }),
+            command => Err(ParserError::ParserError(format!(
+                "Unknown cache command: {}",
+                command
+            ))),
         }
     }
 

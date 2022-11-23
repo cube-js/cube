@@ -1,14 +1,12 @@
-use super::{
-    BaseRocksSecondaryIndex, IndexId, Partition, RocksSecondaryIndex, RocksTable, TableId,
-};
-use crate::metastore::{IdRow, MetaStoreEvent};
+use super::{IndexId, Partition, RocksSecondaryIndex, TableId};
+use crate::metastore::IdRow;
 use crate::rocks_table_impl;
 use crate::table::Row;
 use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer};
 use std::fmt::Debug;
 

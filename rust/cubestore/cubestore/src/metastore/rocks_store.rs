@@ -1,8 +1,6 @@
-use crate::config::{Config, ConfigObj};
-use crate::metastore::metastore_fs::{MetaStoreFs, RocksMetaStoreFs};
+use crate::config::ConfigObj;
 use crate::metastore::table::TablePath;
-use crate::metastore::MetaStoreEvent;
-use crate::remotefs::LocalDirRemoteFs;
+use crate::metastore::{MetaStoreEvent, MetaStoreFs};
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::time_span::warn_long;
 
@@ -71,7 +69,8 @@ enum_from_primitive! {
         Sources = 0x0800,
         MultiIndexes = 0x0900,
         MultiPartitions = 0x0A00,
-        ReplayHandles = 0x0B00
+        ReplayHandles = 0x0B00,
+        CacheItems = 0x0C00
     }
 }
 
@@ -401,9 +400,8 @@ impl RocksStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
         details: Arc<dyn RocksStoreDetails>,
-    ) -> Arc<RocksStore> {
-        let meta_store =
-            RocksStore::with_listener_impl(path, listeners, metastore_fs, config, details);
+    ) -> Arc<Self> {
+        let meta_store = Self::with_listener_impl(path, listeners, metastore_fs, config, details);
         Arc::new(meta_store)
     }
 
@@ -413,7 +411,7 @@ impl RocksStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
         details: Arc<dyn RocksStoreDetails>,
-    ) -> RocksStore {
+    ) -> Self {
         let db = details.open_db(path).unwrap();
         let db_arc = Arc::new(db);
 
@@ -459,7 +457,7 @@ impl RocksStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
         details: Arc<dyn RocksStoreDetails>,
-    ) -> Arc<RocksStore> {
+    ) -> Arc<Self> {
         Self::with_listener(path, vec![], metastore_fs, config, details)
     }
 
@@ -469,7 +467,7 @@ impl RocksStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
         details: Arc<dyn RocksStoreDetails>,
-    ) -> Result<Arc<RocksStore>, CubeError> {
+    ) -> Result<Arc<Self>, CubeError> {
         if !fs::metadata(path).await.is_ok() {
             let mut backup =
                 rocksdb::backup::BackupEngine::open(&BackupEngineOptions::default(), dump_path)?;
@@ -534,7 +532,7 @@ impl RocksStore {
 
         cube_ext::spawn_blocking(move || {
             let res = rw_loop_sender.send(Box::new(move || {
-                let db_span = warn_long("metastore write operation", Duration::from_millis(100));
+                let db_span = warn_long("store write operation", Duration::from_millis(100));
 
                 let mut batch = BatchPipe::new(db_to_send.as_ref());
                 let snapshot = db_to_send.snapshot();
@@ -592,13 +590,18 @@ impl RocksStore {
 
     pub async fn run_upload(&self) -> Result<(), CubeError> {
         let time = SystemTime::now();
-        trace!("Persisting meta store snapshot");
+        trace!("Persisting {} snapshot", self.details.get_name());
+
         let last_check_seq = self.last_check_seq().await;
         let last_db_seq = self.db.latest_sequence_number();
         if last_check_seq == last_db_seq {
-            trace!("Persisting meta store snapshot: nothing to update");
+            trace!(
+                "Persisting {} snapshot: nothing to update",
+                self.details.get_name()
+            );
             return Ok(());
         }
+
         let last_upload_seq = self.last_upload_seq().await;
         let (serializer, min, max) = {
             let updates = self.db.get_updates_since(last_upload_seq)?;
@@ -635,7 +638,7 @@ impl RocksStore {
             + time::Duration::from_secs(self.config.meta_store_snapshot_interval())
             < SystemTime::now()
         {
-            info!("Uploading meta store check point");
+            info!("Uploading {} check point", self.details.get_name());
             self.upload_check_point().await?;
         }
 
@@ -643,7 +646,8 @@ impl RocksStore {
         *check_seq = last_db_seq;
 
         info!(
-            "Persisting meta store snapshot: done ({:?})",
+            "Persisting {} snapshot: done ({:?})",
+            self.details.get_name(),
             time.elapsed()?
         );
 
@@ -776,30 +780,7 @@ impl RocksStore {
         .await?
     }
 
-    pub fn prepare_test_metastore(
-        test_name: &str,
-        details: Arc<dyn RocksStoreDetails>,
-    ) -> (Arc<LocalDirRemoteFs>, Arc<RocksStore>) {
-        let config = Config::test(test_name);
-        let store_path = env::current_dir()
-            .unwrap()
-            .join(format!("test-{}-local", test_name));
-        let remote_store_path = env::current_dir()
-            .unwrap()
-            .join(format!("test-{}-remote", test_name));
-        let _ = std::fs::remove_dir_all(store_path.clone());
-        let _ = std::fs::remove_dir_all(remote_store_path.clone());
-        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
-        let meta_store = RocksStore::new(
-            store_path.clone().join(details.get_name()).as_path(),
-            RocksMetaStoreFs::new(remote_fs.clone()),
-            config.config_obj(),
-            details,
-        );
-        (remote_fs, meta_store)
-    }
-
-    pub fn cleanup_test_metastore(test_name: &str) {
+    pub fn cleanup_test_store(test_name: &str) {
         let store_path = env::current_dir()
             .unwrap()
             .join(format!("test-{}-local", test_name));

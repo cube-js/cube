@@ -29,10 +29,10 @@ macro_rules! rocks_table_impl {
             }
         }
 
-        impl<'a> RocksTable for $rocks_table<'a> {
+        impl<'a> crate::metastore::RocksTable for $rocks_table<'a> {
             type T = $table;
 
-            fn db(&self) -> &DB {
+            fn db(&self) -> &rocksdb::DB {
                 self.db.db
             }
 
@@ -65,20 +65,20 @@ macro_rules! rocks_table_impl {
                 <$table>::deserialize(deserializer)
             }
 
-            fn indexes() -> Vec<Box<dyn BaseRocksSecondaryIndex<$table>>> {
+            fn indexes() -> Vec<Box<dyn crate::metastore::BaseRocksSecondaryIndex<$table>>> {
                 $indexes
             }
 
             fn update_event(
                 &self,
-                old_row: IdRow<Self::T>,
-                new_row: IdRow<Self::T>,
-            ) -> MetaStoreEvent {
-                paste::expr! { MetaStoreEvent::[<Update $table>](old_row, new_row) }
+                old_row: crate::metastore::IdRow<Self::T>,
+                new_row: crate::metastore::IdRow<Self::T>,
+            ) -> crate::metastore::MetaStoreEvent {
+                paste::expr! { crate::metastore::MetaStoreEvent::[<Update $table>](old_row, new_row) }
             }
 
-            fn delete_event(&self, row: IdRow<Self::T>) -> MetaStoreEvent {
-                paste::expr! { MetaStoreEvent::[<Delete $table>](row) }
+            fn delete_event(&self, row: crate::metastore::IdRow<Self::T>) -> crate::metastore::MetaStoreEvent {
+                paste::expr! { crate::metastore::MetaStoreEvent::[<Delete $table>](row) }
             }
         }
 
@@ -428,6 +428,18 @@ pub trait RocksTable: Debug + Send + Sync {
             "One value expected in {:?} for {:?} but nothing found",
             self, row_key
         )))?)
+    }
+
+    fn get_single_opt_row_by_index<K: Debug>(
+        &self,
+        row_key: &K,
+        secondary_index: &impl RocksSecondaryIndex<Self::T, K>,
+    ) -> Result<Option<IdRow<Self::T>>, CubeError>
+    where
+        K: Hash,
+    {
+        let rows = self.get_rows_by_index(row_key, secondary_index)?;
+        Ok(rows.into_iter().nth(0))
     }
 
     fn update_with_fn(

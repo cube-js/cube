@@ -1,12 +1,12 @@
-use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, TableId};
+use super::{IndexId, RocksSecondaryIndex, TableId};
 use crate::metastore::table::Table;
-use crate::metastore::{IdRow, MetaStoreEvent};
+use crate::metastore::IdRow;
 use crate::rocks_table_impl;
 use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::Debug;
 

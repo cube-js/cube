@@ -35,6 +35,7 @@ use tracing_futures::WithSubscriber;
 use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
+use crate::cachestore::CacheStore;
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -153,6 +154,7 @@ impl SqlQueryContext {
 
 pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,
+    cachestore: Arc<dyn CacheStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     limits: Arc<ConcurrencyLimits>,
@@ -172,6 +174,7 @@ crate::di_service!(SqlServiceImpl, [SqlService]);
 impl SqlServiceImpl {
     pub fn new(
         db: Arc<dyn MetaStore>,
+        cachestore: Arc<dyn CacheStore>,
         chunk_store: Arc<dyn ChunkDataStore>,
         limits: Arc<ConcurrencyLimits>,
         query_planner: Arc<dyn QueryPlanner>,
@@ -187,6 +190,7 @@ impl SqlServiceImpl {
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             db,
+            cachestore,
             chunk_store,
             limits,
             query_planner,
@@ -1194,6 +1198,18 @@ impl SqlService for SqlServiceImpl {
             },
 
             CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
+
+            CubeStoreStatement::CacheIncr { path } => {
+                let row = self.cachestore.cache_incr(path.value).await?;
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                    vec![Row::new(vec![TableValue::String(
+                        row.get_row().get_value().clone(),
+                    )])],
+                )))
+            }
+
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }
@@ -1732,14 +1748,14 @@ mod tests {
     use crate::cluster::MockCluster;
     use crate::config::{Config, FileStoreProvider};
     use crate::import::MockImportService;
-    use crate::metastore::metastore_fs::RocksMetaStoreFs;
-    use crate::metastore::RocksMetaStore;
+    use crate::metastore::{BaseRocksStoreFs, RocksMetaStore};
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
     use crate::store::ChunkStore;
 
     use super::*;
+    use crate::cachestore::RocksCacheStore;
     use crate::queryplanner::pretty_printers::pp_phys_plan;
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
@@ -1750,9 +1766,11 @@ mod tests {
     async fn create_schema_test() {
         let config = Config::test("create_schema_test");
         let path = "/tmp/test_create_schema";
-        let _ = DB::destroy(&Options::default(), path);
+
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
+
+        let _ = fs::remove_dir_all(path.clone());
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -1762,8 +1780,13 @@ mod tests {
                 PathBuf::from(store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                Path::new(path),
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                &Path::new(path).join("metastore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
+                config.config_obj(),
+            );
+            let cache_store = RocksCacheStore::new(
+                &Path::new(path).join("cachestore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
                 config.config_obj(),
             );
             let rows_per_chunk = 10;
@@ -1778,6 +1801,7 @@ mod tests {
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store,
+                cache_store,
                 store,
                 limits,
                 Arc::new(MockQueryPlanner::new()),
@@ -1800,7 +1824,10 @@ mod tests {
                 ])
             );
         }
-        let _ = DB::destroy(&Options::default(), path);
+
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("metastore"));
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("cachestore"));
+
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
@@ -1809,19 +1836,27 @@ mod tests {
     async fn create_table_test() {
         let config = Config::test("create_table_test");
         let path = "/tmp/test_create_table";
-        let _ = DB::destroy(&Options::default(), path);
+
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
+
+        let _ = fs::remove_dir_all(path.clone());
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
         {
             let remote_fs = LocalDirRemoteFs::new(
                 Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                Path::new(path),
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                &Path::new(path).join("metastore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
+                config.config_obj(),
+            );
+            let cache_store = RocksCacheStore::new(
+                &Path::new(path).join("cachestore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
                 config.config_obj(),
             );
             let rows_per_chunk = 10;
@@ -1836,6 +1871,7 @@ mod tests {
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store.clone(),
+                cache_store,
                 chunk_store,
                 limits,
                 Arc::new(MockQueryPlanner::new()),
@@ -1887,7 +1923,10 @@ mod tests {
                 TableValue::String("NULL".to_string()),
             ]));
         }
-        let _ = DB::destroy(&Options::default(), path);
+
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("metastore"));
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("cachestore"));
+
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
@@ -1896,19 +1935,27 @@ mod tests {
     async fn create_table_test_seal_at() {
         let config = Config::test("create_table_test_seal_at");
         let path = "/tmp/test_create_table_seal_at";
-        let _ = DB::destroy(&Options::default(), path);
+
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
+
+        let _ = fs::remove_dir_all(path.clone());
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
         {
             let remote_fs = LocalDirRemoteFs::new(
                 Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                Path::new(path),
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                &Path::new(path).join("metastore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
+                config.config_obj(),
+            );
+            let cache_store = RocksCacheStore::new(
+                &Path::new(path).join("cachestore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
                 config.config_obj(),
             );
             let rows_per_chunk = 10;
@@ -1923,6 +1970,7 @@ mod tests {
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store.clone(),
+                cache_store,
                 chunk_store,
                 limits,
                 Arc::new(MockQueryPlanner::new()),
@@ -1974,7 +2022,10 @@ mod tests {
                 TableValue::String("NULL".to_string()),
             ]));
         }
-        let _ = DB::destroy(&Options::default(), path);
+
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("metastore"));
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("cachestore"));
+
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }

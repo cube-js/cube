@@ -2,10 +2,10 @@ pub mod chunks;
 pub mod index;
 pub mod job;
 pub mod listener;
-pub mod metastore_fs;
 pub mod multi_index;
 pub mod partition;
 pub mod replay_handle;
+mod rocks_fs;
 mod rocks_store;
 mod rocks_table;
 pub mod schema;
@@ -13,6 +13,7 @@ pub mod source;
 pub mod table;
 pub mod wal;
 
+pub use rocks_fs::*;
 pub use rocks_store::*;
 pub use rocks_table::*;
 
@@ -21,10 +22,10 @@ use log::info;
 use rocksdb::{MergeOperands, Options, DB};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-use std::{io::Cursor, sync::Arc};
+use std::{env, io::Cursor, sync::Arc};
 
 use crate::config::injection::DIService;
-use crate::config::ConfigObj;
+use crate::config::{Config, ConfigObj};
 use crate::metastore::chunks::{ChunkIndexKey, ChunkRocksIndex};
 use crate::metastore::index::IndexIndexKey;
 use crate::metastore::job::{Job, JobIndexKey, JobRocksIndex, JobRocksTable, JobStatus, JobType};
@@ -59,7 +60,6 @@ use futures_timer::Delay;
 use index::{IndexRocksIndex, IndexRocksTable};
 use itertools::Itertools;
 use log::trace;
-use metastore_fs::MetaStoreFs;
 use multi_index::{MultiIndex, MultiIndexRocksIndex, MultiIndexRocksTable};
 use parquet::basic::{ConvertedType, Repetition};
 use parquet::{basic::Type, schema::types};
@@ -77,6 +77,7 @@ use std::mem::take;
 use std::path::Path;
 use std::str::FromStr;
 
+use crate::cachestore::CacheItem;
 use crate::remotefs::LocalDirRemoteFs;
 use std::time::Duration;
 use table::Table;
@@ -104,8 +105,8 @@ macro_rules! data_frame_from {
             $( $( #[$field_attr] )* $variant : $tt ),+
         }
 
-        impl From<Vec<IdRow<$name>>> for crate::store::DataFrame {
-            fn from(rows: Vec<IdRow<$name>>) -> Self {
+        impl From<Vec<crate::metastore::IdRow<$name>>> for crate::store::DataFrame {
+            fn from(rows: Vec<crate::metastore::IdRow<$name>>) -> Self {
                 crate::store::DataFrame::new(
                     vec![
                         crate::metastore::Column::new("id".to_string(), crate::metastore::ColumnType::Int, 0),
@@ -128,21 +129,21 @@ macro_rules! data_frame_from {
 #[macro_export]
 macro_rules! base_rocks_secondary_index {
     ($table: ty, $index: ty) => {
-        impl BaseRocksSecondaryIndex<$table> for $index {
+        impl crate::metastore::BaseRocksSecondaryIndex<$table> for $index {
             fn index_key_by(&self, row: &$table) -> Vec<u8> {
                 self.key_to_bytes(&self.typed_key_by(row))
             }
 
             fn get_id(&self) -> u32 {
-                RocksSecondaryIndex::get_id(self)
+                crate::metastore::RocksSecondaryIndex::get_id(self)
             }
 
             fn version(&self) -> u32 {
-                RocksSecondaryIndex::version(self)
+                crate::metastore::RocksSecondaryIndex::version(self)
             }
 
             fn is_unique(&self) -> bool {
-                RocksSecondaryIndex::is_unique(self)
+                crate::metastore::RocksSecondaryIndex::is_unique(self)
             }
         }
     };
@@ -1029,6 +1030,10 @@ pub enum MetaStoreEvent {
 
     UpdateMultiPartition(IdRow<MultiPartition>, IdRow<MultiPartition>),
     DeleteMultiPartition(IdRow<MultiPartition>),
+
+    // TODO: Split to CacheStoreEvent
+    UpdateCacheItem(IdRow<CacheItem>, IdRow<CacheItem>),
+    DeleteCacheItem(IdRow<CacheItem>),
 }
 
 fn meta_store_merge(
@@ -1047,7 +1052,7 @@ fn meta_store_merge(
     Some(result)
 }
 
-pub struct RocksMetaStoreDetails {}
+struct RocksMetaStoreDetails {}
 
 impl RocksStoreDetails for RocksMetaStoreDetails {
     fn open_db(&self, path: &Path) -> Result<DB, CubeError> {
@@ -1056,10 +1061,11 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
         opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
 
-        Ok(DB::open(&opts, path).unwrap())
+        DB::open(&opts, path)
+            .map_err(|err| CubeError::internal(format!("DB::open error for metastore: {}", err)))
     }
 
-    fn migrate<'a>(&self, table_ref: DbTableRef<'a>) -> Result<(), CubeError> {
+    fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError> {
         SchemaRocksTable::new(table_ref.clone()).check_indexes()?;
         TableRocksTable::new(table_ref.clone()).check_indexes()?;
         IndexRocksTable::new(table_ref.clone()).check_indexes()?;
@@ -1075,7 +1081,7 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
     }
 
     fn get_name(&self) -> &'static str {
-        "metastore"
+        &"metastore"
     }
 }
 
@@ -1089,15 +1095,19 @@ impl RocksMetaStore {
         path: &Path,
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
-    ) -> Arc<RocksMetaStore> {
-        Arc::new(RocksMetaStore {
-            store: RocksStore::with_listener(
-                path,
-                vec![],
-                metastore_fs,
-                config,
-                Arc::new(RocksMetaStoreDetails {}),
-            ),
+    ) -> Arc<Self> {
+        Self::new_from_store(RocksStore::with_listener(
+            path,
+            vec![],
+            metastore_fs,
+            config,
+            Arc::new(RocksMetaStoreDetails {}),
+        ))
+    }
+
+    fn new_from_store(store: Arc<RocksStore>) -> Arc<Self> {
+        Arc::new(Self {
+            store,
             upload_loop: Arc::new(WorkerLoop::new("Metastore upload")),
         })
     }
@@ -1107,7 +1117,7 @@ impl RocksMetaStore {
         dump_path: &Path,
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
-    ) -> Result<Arc<RocksMetaStore>, CubeError> {
+    ) -> Result<Arc<Self>, CubeError> {
         let store = RocksStore::load_from_dump(
             path,
             dump_path,
@@ -1117,10 +1127,19 @@ impl RocksMetaStore {
         )
         .await?;
 
-        Ok(Arc::new(RocksMetaStore {
-            store,
-            upload_loop: Arc::new(WorkerLoop::new("Metastore upload")),
-        }))
+        Ok(Self::new_from_store(store))
+    }
+
+    pub async fn load_from_remote(
+        path: &str,
+        metastore_fs: Arc<dyn MetaStoreFs>,
+        config: Arc<dyn ConfigObj>,
+    ) -> Result<Arc<Self>, CubeError> {
+        let store = metastore_fs
+            .load_from_remote(&path, config, Arc::new(RocksMetaStoreDetails {}))
+            .await?;
+
+        Ok(Self::new_from_store(store))
     }
 
     pub async fn wait_upload_loop(meta_store: Arc<Self>) {
@@ -1149,19 +1168,31 @@ impl RocksMetaStore {
     }
 
     pub fn prepare_test_metastore(test_name: &str) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
-        let (local_dir, store) =
-            RocksStore::prepare_test_metastore(test_name, Arc::new(RocksMetaStoreDetails {}));
-        (
-            local_dir,
-            Arc::new(RocksMetaStore {
-                store,
-                upload_loop: Arc::new(WorkerLoop::new("Metastore upload")),
-            }),
-        )
+        let config = Config::test(test_name);
+        let store_path = env::current_dir()
+            .unwrap()
+            .join(format!("test-{}-local", test_name));
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join(format!("test-{}-remote", test_name));
+
+        let _ = std::fs::remove_dir_all(store_path.clone());
+        let _ = std::fs::remove_dir_all(remote_store_path.clone());
+
+        let details = Arc::new(RocksMetaStoreDetails {});
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        let store = RocksStore::new(
+            store_path.clone().join(details.get_name()).as_path(),
+            BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
+            config.config_obj(),
+            details,
+        );
+
+        (remote_fs, Self::new_from_store(store))
     }
 
     pub fn cleanup_test_metastore(test_name: &str) {
-        RocksStore::cleanup_test_metastore(test_name)
+        RocksStore::cleanup_test_store(test_name)
     }
 
     pub async fn run_upload(&self) -> Result<(), CubeError> {
@@ -3370,7 +3401,7 @@ impl MetaStore for RocksMetaStore {
                             .table_id()
                 {
                     return Err(CubeError::internal(format!(
-                        "All replay handles should reference one table but two found: {:?} and {:?}", 
+                        "All replay handles should reference one table but two found: {:?} and {:?}",
                         replay_handles[0].get_row(), replay_handle
                     )))
                 }
@@ -3968,7 +3999,6 @@ mod tests {
     use super::table::AggregateColumn;
     use super::*;
     use crate::config::Config;
-    use crate::metastore::metastore_fs::RocksMetaStoreFs;
     use crate::remotefs::LocalDirRemoteFs;
     use futures_timer::Delay;
     use rocksdb::IteratorMode;
@@ -3996,7 +4026,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
 
@@ -4183,7 +4213,7 @@ mod tests {
 
         let meta_store = RocksMetaStore::new(
             store_path.join("metastore").as_path(),
-            RocksMetaStoreFs::new(remote_fs),
+            BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
             config.config_obj(),
         );
 
@@ -4261,7 +4291,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
 
@@ -4309,7 +4339,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
 
@@ -4416,7 +4446,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
 
@@ -4503,7 +4533,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.clone().join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
 
@@ -4880,7 +4910,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
             meta_store
@@ -5017,7 +5047,7 @@ mod tests {
         {
             let meta_store = RocksMetaStore::new(
                 store_path.join("metastore").as_path(),
-                RocksMetaStoreFs::new(remote_fs),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
             );
             meta_store

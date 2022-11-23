@@ -2,6 +2,7 @@
 pub mod injection;
 pub mod processing_loop;
 
+use crate::cachestore::{CacheStore, ClusterCacheStoreClient, RocksCacheStore};
 use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
@@ -11,8 +12,7 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
-use crate::metastore::metastore_fs::{MetaStoreFs, RocksMetaStoreFs};
-use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
+use crate::metastore::{BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore};
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
@@ -56,6 +56,7 @@ pub struct CubeServices {
     pub sql_service: Arc<dyn SqlService>,
     pub scheduler: Arc<SchedulerImpl>,
     pub rocks_meta_store: Option<Arc<RocksMetaStore>>,
+    pub rocks_cache_store: Option<Arc<RocksCacheStore>>,
     pub meta_store: Arc<dyn MetaStore>,
     pub cluster: Arc<ClusterImpl>,
 }
@@ -104,6 +105,13 @@ impl CubeServices {
                 RocksMetaStore::wait_upload_loop(rocks_meta_store).await;
                 Ok(())
             }));
+
+            let rocks_cache_store = self.rocks_cache_store.clone().unwrap();
+            futures.push(cube_ext::spawn(async move {
+                RocksCacheStore::wait_upload_loop(rocks_cache_store).await;
+                Ok(())
+            }));
+
             let cluster = self.cluster.clone();
             let (started_tx, started_rx) = tokio::sync::oneshot::channel();
             futures.push(cube_ext::spawn(async move {
@@ -158,9 +166,15 @@ impl CubeServices {
 
         let remote_fs = self.injector.get_service_typed::<QueueRemoteFs>().await;
         remote_fs.stop_processing_loops()?;
+
         if let Some(rocks_meta) = &self.rocks_meta_store {
             rocks_meta.stop_processing_loops().await;
         }
+
+        if let Some(rocks_cache) = &self.rocks_cache_store {
+            rocks_cache.stop_processing_loops().await;
+        }
+
         if self.injector.has_service_typed::<MySqlServer>().await {
             self.injector
                 .get_service_typed::<MySqlServer>()
@@ -947,7 +961,9 @@ impl Config {
 
             services.stop_processing_loops().await.unwrap();
         }
+
         let _ = DB::destroy(&Options::default(), self.meta_store_path());
+        let _ = DB::destroy(&Options::default(), self.cache_store_path());
         let _ = fs::remove_dir_all(store_path.clone());
         if clean_remote {
             let remote_files = remote_fs.list("").await.unwrap();
@@ -981,6 +997,10 @@ impl Config {
 
     pub fn meta_store_path(&self) -> PathBuf {
         self.local_dir().join("metastore")
+    }
+
+    pub fn cache_store_path(&self) -> PathBuf {
+        self.local_dir().join("cachestore")
     }
 
     async fn configure_remote_fs(&self) {
@@ -1098,20 +1118,21 @@ impl Config {
                 .await;
         } else {
             self.injector
-                .register_typed_with_default::<dyn MetaStoreFs, RocksMetaStoreFs, _, _>(
-                    async move |i| {
-                        // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                        let original_remote_fs = i.get_service("original_remote_fs").await;
-                        RocksMetaStoreFs::new(original_remote_fs)
-                    },
-                )
+                .register("metastore_fs", async move |i| {
+                    // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                    let original_remote_fs = i.get_service("original_remote_fs").await;
+                    let arc: Arc<dyn DIService> =
+                        BaseRocksStoreFs::new(original_remote_fs, "metastore");
+
+                    arc
+                })
                 .await;
             let path = self.meta_store_path().to_str().unwrap().to_string();
             self.injector
                 .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
                     async move |i| {
                         let config = i.get_service_typed::<dyn ConfigObj>().await;
-                        let metastore_fs = i.get_service_typed::<dyn MetaStoreFs>().await;
+                        let metastore_fs = i.get_service("metastore_fs").await;
                         let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
                             RocksMetaStore::load_from_dump(
                                 &Path::new(&path),
@@ -1122,7 +1143,9 @@ impl Config {
                             .await
                             .unwrap()
                         } else {
-                            metastore_fs.load_from_remote(&path, config).await.unwrap()
+                            RocksMetaStore::load_from_remote(&path, metastore_fs, config)
+                                .await
+                                .unwrap()
                         };
                         meta_store.add_listener(event_sender).await;
                         meta_store
@@ -1130,6 +1153,50 @@ impl Config {
                 )
                 .await;
         };
+
+        if uses_remote_metastore(&self.injector).await {
+            self.injector
+                .register_typed::<dyn CacheStore, _, _, _>(async move |_| {
+                    Arc::new(ClusterCacheStoreClient {})
+                })
+                .await;
+        } else {
+            self.injector
+                .register("cachestore_fs", async move |i| {
+                    // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                    let original_remote_fs = i.get_service("original_remote_fs").await;
+                    let arc: Arc<dyn DIService> =
+                        BaseRocksStoreFs::new(original_remote_fs, "cachestore");
+
+                    arc
+                })
+                .await;
+            let path = self.cache_store_path().to_str().unwrap().to_string();
+            self.injector
+                .register_typed_with_default::<dyn CacheStore, RocksCacheStore, _, _>(
+                    async move |i| {
+                        let config = i.get_service_typed::<dyn ConfigObj>().await;
+                        let cachestore_fs = i.get_service("cachestore_fs").await;
+                        let cache_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                            RocksCacheStore::load_from_dump(
+                                &Path::new(&path),
+                                dump_dir,
+                                cachestore_fs,
+                                config,
+                            )
+                            .await
+                            .unwrap()
+                        } else {
+                            RocksCacheStore::load_from_remote(&path, cachestore_fs, config)
+                                .await
+                                .unwrap()
+                        };
+
+                        cache_store
+                    },
+                )
+                .await;
+        }
 
         self.injector
             .register_typed::<dyn WALDataStore, _, _, _>(async move |i| {
@@ -1268,6 +1335,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
@@ -1333,6 +1401,11 @@ impl Config {
             sql_service: self.injector.get_service_typed().await,
             scheduler: self.injector.get_service_typed().await,
             rocks_meta_store: if self.injector.has_service_typed::<RocksMetaStore>().await {
+                Some(self.injector.get_service_typed().await)
+            } else {
+                None
+            },
+            rocks_cache_store: if self.injector.has_service_typed::<RocksCacheStore>().await {
                 Some(self.injector.get_service_typed().await)
             } else {
                 None
