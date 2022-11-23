@@ -5,6 +5,7 @@ pub mod listener;
 pub mod metastore_fs;
 pub mod multi_index;
 pub mod partition;
+pub mod replay_handle;
 mod rocks_store;
 mod rocks_table;
 pub mod schema;
@@ -32,10 +33,13 @@ use crate::metastore::multi_index::{
     MultiPartitionRocksTable,
 };
 use crate::metastore::partition::PartitionIndexKey;
+use crate::metastore::replay_handle::{
+    ReplayHandle, ReplayHandleIndexKey, ReplayHandleRocksIndex, ReplayHandleRocksTable, SeqPointer,
+};
 use crate::metastore::source::{
     Source, SourceCredentials, SourceIndexKey, SourceRocksIndex, SourceRocksTable,
 };
-use crate::metastore::table::{AggregateColumnIndex, TableIndexKey, TablePath};
+use crate::metastore::table::{AggregateColumnIndex, StreamOffset, TableIndexKey, TablePath};
 use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 
 use crate::table::{Row, TableValue};
@@ -196,7 +200,21 @@ impl DataFrameValue<String> for Option<DateTime<Utc>> {
     }
 }
 
+impl DataFrameValue<String> for DateTime<Utc> {
+    fn value(v: &Self) -> String {
+        v.to_string()
+    }
+}
+
 impl DataFrameValue<String> for Option<ImportFormat> {
+    fn value(v: &Self) -> String {
+        v.as_ref()
+            .map(|v| format!("{:?}", v))
+            .unwrap_or("NULL".to_string())
+    }
+}
+
+impl DataFrameValue<String> for Option<Vec<Option<SeqPointer>>> {
     fn value(v: &Self) -> String {
         v.as_ref()
             .map(|v| format!("{:?}", v))
@@ -211,6 +229,14 @@ impl DataFrameValue<String> for IndexType {
 }
 
 impl DataFrameValue<String> for Option<u64> {
+    fn value(v: &Self) -> String {
+        v.as_ref()
+            .map(|v| format!("{:?}", v))
+            .unwrap_or("NULL".to_string())
+    }
+}
+
+impl DataFrameValue<String> for Option<i64> {
     fn value(v: &Self) -> String {
         v.as_ref()
             .map(|v| format!("{:?}", v))
@@ -621,7 +647,9 @@ pub struct Chunk {
     #[serde(default)]
     suffix: Option<String>,
     #[serde(default)]
-    file_size: Option<u64>
+    file_size: Option<u64>,
+    #[serde(default)]
+    replay_handle_id: Option<u64>
 }
 }
 
@@ -686,6 +714,7 @@ pub trait MetaStore: DIService + Send + Sync {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        stream_offset: Option<StreamOffset>,
         unique_key_column_names: Option<Vec<String>>,
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
@@ -865,22 +894,23 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         deactivate_ids: Vec<u64>,
         uploaded_ids_and_sizes: Vec<(u64, Option<u64>)>,
+        new_replay_handle_id: Option<u64>,
     ) -> Result<(), CubeError>;
     async fn swap_chunks_without_check(
         &self,
         deactivate_ids: Vec<u64>,
         uploaded_ids_and_sizes: Vec<(u64, Option<u64>)>,
+        new_replay_handle_id: Option<u64>,
     ) -> Result<(), CubeError>;
-    async fn activate_wal(
+    async fn deactivate_chunks_without_check(
         &self,
-        wal_id_to_delete: u64,
-        uploaded_ids: Vec<(u64, Option<u64>)>,
-        index_count: u64,
+        deactivate_ids: Vec<u64>,
     ) -> Result<(), CubeError>;
     async fn activate_chunks(
         &self,
         table_id: u64,
         uploaded_chunk_ids: Vec<(u64, Option<u64>)>,
+        replay_handle_id: Option<u64>,
     ) -> Result<(), CubeError>;
     async fn delete_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
     async fn all_inactive_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError>;
@@ -922,6 +952,41 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn get_source_by_name(&self, name: String) -> Result<IdRow<Source>, CubeError>;
     async fn delete_source(&self, id: u64) -> Result<IdRow<Source>, CubeError>;
 
+    async fn create_replay_handle(
+        &self,
+        table_id: u64,
+        location_index: usize,
+        seq_pointer: SeqPointer,
+    ) -> Result<IdRow<ReplayHandle>, CubeError>;
+    async fn create_replay_handle_from_seq_pointers(
+        &self,
+        table_id: u64,
+        seq_pointer: Option<Vec<Option<SeqPointer>>>,
+    ) -> Result<IdRow<ReplayHandle>, CubeError>;
+    async fn get_replay_handles_by_table(
+        &self,
+        table_id: u64,
+    ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError>;
+    async fn get_replay_handles_by_ids(
+        &self,
+        ids: Vec<u64>,
+    ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError>;
+    async fn all_replay_handles(&self) -> Result<Vec<IdRow<ReplayHandle>>, CubeError>;
+    /// Returns `(handle, has_active_chunks)` tuple for all replay handles.
+    async fn all_replay_handles_to_merge(
+        &self,
+    ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError>;
+    async fn update_replay_handle_failed(
+        &self,
+        id: u64,
+        failed: bool,
+    ) -> Result<IdRow<ReplayHandle>, CubeError>;
+    async fn replace_replay_handles(
+        &self,
+        old_ids: Vec<u64>,
+        new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
+    ) -> Result<IdRow<ReplayHandle>, CubeError>;
+
     async fn get_tables_with_indexes(
         &self,
         table_name: Vec<(String, String)>,
@@ -947,6 +1012,7 @@ pub enum MetaStoreEvent {
     UpdateTable(IdRow<Table>, IdRow<Table>),
     UpdateWAL(IdRow<WAL>, IdRow<WAL>),
     UpdateSource(IdRow<Source>, IdRow<Source>),
+    UpdateReplayHandle(IdRow<ReplayHandle>, IdRow<ReplayHandle>),
 
     DeleteChunk(IdRow<Chunk>),
     DeleteIndex(IdRow<Index>),
@@ -956,6 +1022,7 @@ pub enum MetaStoreEvent {
     DeleteTable(IdRow<Table>),
     DeleteWAL(IdRow<WAL>),
     DeleteSource(IdRow<Source>),
+    DeleteReplayHandle(IdRow<ReplayHandle>),
 
     UpdateMultiIndex(IdRow<MultiIndex>, IdRow<MultiIndex>),
     DeleteMultiIndex(IdRow<MultiIndex>),
@@ -1440,6 +1507,7 @@ impl RocksMetaStore {
         db_ref: DbTableRef,
         batch_pipe: &mut BatchPipe,
         uploaded_chunk_ids: &[(u64, Option<u64>)],
+        replay_handle_id: Option<u64>,
     ) -> Result<(u64, HashMap</*partition_id*/ u64, /*rows*/ u64>), CubeError> {
         let table = ChunkRocksTable::new(db_ref.clone());
         let mut activated_row_count = 0;
@@ -1455,7 +1523,7 @@ impl RocksMetaStore {
                     if let Some(file_size) = file_size {
                         chunk = chunk.set_file_size(*file_size)?;
                     }
-                    Ok(chunk)
+                    Ok(chunk.set_replay_handle_id(replay_handle_id.clone()))
                 },
                 batch_pipe,
             )?;
@@ -1649,6 +1717,7 @@ impl MetaStore for RocksMetaStore {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        stream_offset: Option<StreamOffset>,
         unique_key_column_names: Option<Vec<String>>,
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
@@ -1742,6 +1811,7 @@ impl MetaStore for RocksMetaStore {
                 build_range_end,
                 seal_at,
                 select_statement,
+                stream_offset,
                 unique_key_column_indices,
                 aggregate_column_indices,
                 seq_column_index,
@@ -2068,6 +2138,7 @@ impl MetaStore for RocksMetaStore {
                 db,
                 pipe,
                 false,
+                None,
             )?;
             Ok(true)
         })
@@ -2790,43 +2861,11 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    async fn activate_wal(
-        &self,
-        wal_id_to_delete: u64,
-        uploaded_ids: Vec<(u64, Option<u64>)>,
-        index_count: u64,
-    ) -> Result<(), CubeError> {
-        trace!(
-            "Swapping chunks: deleting WAL ({}), activating chunks ({})",
-            wal_id_to_delete,
-            uploaded_ids.iter().map(|(id, _)| id).join(", ")
-        );
-        self.write_operation(move |db_ref, batch_pipe| {
-            let wal_table = WALRocksTable::new(db_ref.clone());
-
-            let deactivated_row_count = wal_table.get_row_or_not_found(wal_id_to_delete)?.get_row().get_row_count();
-            wal_table.delete(wal_id_to_delete, batch_pipe)?;
-
-            let (activated_row_count, _) = Self::activate_chunks_impl(db_ref, batch_pipe, &uploaded_ids)?;
-
-            if activated_row_count != deactivated_row_count * index_count {
-                return Err(CubeError::internal(format!(
-                    "Deactivated WAL row count ({}) doesn't match activated row count ({}) during swap of ({}) to ({}) chunks",
-                    deactivated_row_count,
-                    activated_row_count,
-                    wal_id_to_delete,
-                    uploaded_ids.iter().map(|(id, _)| id).join(", ")
-                )))
-            }
-            Ok(())
-        })
-        .await
-    }
-
     async fn activate_chunks(
         &self,
         table_id: u64,
         uploaded_chunk_ids: Vec<(u64, Option<u64>)>,
+        replay_handle_id: Option<u64>,
     ) -> Result<(), CubeError> {
         trace!(
             "Activating chunks ({})",
@@ -2838,8 +2877,12 @@ impl MetaStore for RocksMetaStore {
                 |t| t.update_has_data(true),
                 pipe,
             )?;
-            let (_, partition_rows) =
-                Self::activate_chunks_impl(db.clone(), pipe, &uploaded_chunk_ids)?;
+            let (_, partition_rows) = Self::activate_chunks_impl(
+                db.clone(),
+                pipe,
+                &uploaded_chunk_ids,
+                replay_handle_id,
+            )?;
             let partition = PartitionRocksTable::new(db.clone());
             let mut mpartition_rows = HashMap::new();
             for (p, rows) in partition_rows {
@@ -2861,6 +2904,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         deactivate_ids: Vec<u64>,
         uploaded_ids_and_sizes: Vec<(u64, Option<u64>)>,
+        new_replay_handle_id: Option<u64>,
     ) -> Result<(), CubeError> {
         if uploaded_ids_and_sizes.is_empty() {
             return Err(CubeError::internal(format!(
@@ -2875,6 +2919,7 @@ impl MetaStore for RocksMetaStore {
                 db_ref,
                 batch_pipe,
                 true,
+                new_replay_handle_id,
             )
         })
         .await
@@ -2884,6 +2929,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         deactivate_ids: Vec<u64>,
         uploaded_ids_and_sizes: Vec<(u64, Option<u64>)>,
+        new_replay_handle_id: Option<u64>,
     ) -> Result<(), CubeError> {
         if uploaded_ids_and_sizes.is_empty() {
             return Err(CubeError::internal(format!(
@@ -2898,6 +2944,24 @@ impl MetaStore for RocksMetaStore {
                 db_ref,
                 batch_pipe,
                 false,
+                new_replay_handle_id,
+            )
+        })
+        .await
+    }
+
+    async fn deactivate_chunks_without_check(
+        &self,
+        deactivate_ids: Vec<u64>,
+    ) -> Result<(), CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            RocksMetaStore::swap_chunks_impl(
+                deactivate_ids,
+                Vec::new(),
+                db_ref,
+                batch_pipe,
+                false,
+                None,
             )
         })
         .await
@@ -3201,6 +3265,151 @@ impl MetaStore for RocksMetaStore {
     async fn delete_source(&self, id: u64) -> Result<IdRow<Source>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             Ok(SourceRocksTable::new(db_ref.clone()).delete(id, batch_pipe)?)
+        })
+        .await
+    }
+
+    async fn create_replay_handle(
+        &self,
+        table_id: u64,
+        location_index: usize,
+        seq_pointer: SeqPointer,
+    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let tables_table = TableRocksTable::new(db_ref.clone());
+            let table = tables_table.get_row_or_not_found(table_id)?;
+            let handle = ReplayHandle::new(&table, location_index, seq_pointer)?;
+            Ok(ReplayHandleRocksTable::new(db_ref.clone()).insert(handle, batch_pipe)?)
+        })
+        .await
+    }
+
+    async fn create_replay_handle_from_seq_pointers(
+        &self,
+        table_id: u64,
+        seq_pointers: Option<Vec<Option<SeqPointer>>>,
+    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let handle = ReplayHandle::new_from_seq_pointers(table_id, seq_pointers);
+            Ok(ReplayHandleRocksTable::new(db_ref.clone()).insert(handle, batch_pipe)?)
+        })
+        .await
+    }
+
+    async fn get_replay_handles_by_table(
+        &self,
+        table_id: u64,
+    ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            Ok(ReplayHandleRocksTable::new(db_ref).get_rows_by_index(
+                &ReplayHandleIndexKey::ByTableId(table_id),
+                &ReplayHandleRocksIndex::ByTableId,
+            )?)
+        })
+        .await
+    }
+
+    async fn get_replay_handles_by_ids(
+        &self,
+        ids: Vec<u64>,
+    ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let table = ReplayHandleRocksTable::new(db_ref);
+            let rows = ids
+                .iter()
+                .map(|id| table.get_row_or_not_found(*id))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(rows)
+        })
+        .await
+    }
+
+    async fn update_replay_handle_failed(
+        &self,
+        id: u64,
+        failed: bool,
+    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            Ok(ReplayHandleRocksTable::new(db_ref.clone()).update_with_fn(
+                id,
+                |h| h.set_failed_to_persist_chunks(failed),
+                batch_pipe,
+            )?)
+        })
+        .await
+    }
+
+    async fn replace_replay_handles(
+        &self,
+        old_ids: Vec<u64>,
+        new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
+    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let table = ReplayHandleRocksTable::new(db_ref.clone());
+            let chunks_table = ChunkRocksTable::new(db_ref);
+            let mut replay_handles: Vec<IdRow<ReplayHandle>> = Vec::new();
+            for id in old_ids.into_iter() {
+                let replay_handle = table.get_row_or_not_found(id)?;
+
+                let chunks = chunks_table.get_rows_by_index(
+                    &ChunkIndexKey::ByReplayHandleId(Some(replay_handle.get_id())),
+                    &ChunkRocksIndex::ReplayHandleId,
+                )?;
+
+                if !chunks.is_empty() {
+                    return Err(CubeError::internal(format!(
+                        "Can't merge replay handle with chunks: {:?}",
+                        replay_handle
+                    )))
+                }
+
+                if !replay_handles.is_empty()
+                    && replay_handles[0].get_row().table_id()
+                        != replay_handle
+                            .get_row()
+                            .table_id()
+                {
+                    return Err(CubeError::internal(format!(
+                        "All replay handles should reference one table but two found: {:?} and {:?}", 
+                        replay_handles[0].get_row(), replay_handle
+                    )))
+                }
+                replay_handles.push(replay_handle);
+            }
+            let new_replay_handle = ReplayHandle::new_from_seq_pointers(replay_handles[0].get_row().table_id(), new_seq_pointer);
+            let new_handle = table.insert(new_replay_handle, batch_pipe)?;
+            for handle in replay_handles.iter() {
+                table.delete(handle.get_id(), batch_pipe)?;
+            }
+
+            Ok(new_handle)
+        })
+        .await
+    }
+
+    async fn all_replay_handles(&self) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
+        self.read_operation(move |db_ref| ReplayHandleRocksTable::new(db_ref).all_rows())
+            .await
+    }
+
+    async fn all_replay_handles_to_merge(
+        &self,
+    ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError> {
+        self.read_operation(move |db_ref| {
+            let all_replay_handles = ReplayHandleRocksTable::new(db_ref.clone()).all_rows()?;
+            let chunks_table = ChunkRocksTable::new(db_ref);
+            let mut result = Vec::new();
+            for replay_handle in all_replay_handles.into_iter() {
+                let chunks = chunks_table.get_rows_by_index(
+                    &ChunkIndexKey::ByReplayHandleId(Some(replay_handle.get_id())),
+                    &ChunkRocksIndex::ReplayHandleId,
+                )?;
+                result.push((
+                    replay_handle,
+                    chunks.iter().filter(|c| c.get_row().active()).count() == 0,
+                ));
+            }
+            Ok(result)
         })
         .await
     }
@@ -4005,6 +4214,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -4018,6 +4228,7 @@ mod tests {
                 None,
                 vec![],
                 true,
+                None,
                 None,
                 None,
                 None,
@@ -4139,6 +4350,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -4154,6 +4366,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -4244,6 +4457,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -4324,6 +4538,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
                         ("max".to_string(), "aggr_col1".to_string()),
@@ -4392,6 +4607,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Some(vec!["col2".to_string(), "col1".to_string()]),
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
@@ -4414,6 +4630,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Some(vec!["col1".to_string()]),
                     None,
                     None,
@@ -4430,6 +4647,7 @@ mod tests {
                     None,
                     vec![aggr_index_def.clone()],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -4685,6 +4903,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -4720,7 +4939,11 @@ mod tests {
             assert_eq!(dest_chunk2.get_row().active(), false);
 
             meta_store
-                .swap_chunks(source_ids.clone(), vec![(dest_chunk.get_id(), Some(26))])
+                .swap_chunks(
+                    source_ids.clone(),
+                    vec![(dest_chunk.get_id(), Some(26))],
+                    None,
+                )
                 .await
                 .unwrap();
 
@@ -4733,7 +4956,11 @@ mod tests {
             assert_eq!(ch.get_row().active(), true);
 
             meta_store
-                .swap_chunks(source_ids.clone(), vec![(dest_chunk2.get_id(), Some(26))])
+                .swap_chunks(
+                    source_ids.clone(),
+                    vec![(dest_chunk2.get_id(), Some(26))],
+                    None,
+                )
                 .await
                 .expect_err("Source chunk 1 is not active when swapping of (1, 2) to (3) chunks");
 
@@ -4754,7 +4981,11 @@ mod tests {
             meta_store.chunk_uploaded(ch.get_id()).await.unwrap();
 
             meta_store
-                .swap_chunks(source_ids.clone(), vec![(dest_chunk.get_id(), Some(26))])
+                .swap_chunks(
+                    source_ids.clone(),
+                    vec![(dest_chunk.get_id(), Some(26))],
+                    None,
+                )
                 .await
                 .expect_err(
                     "Destination chunk 3 is already active when swapping of (5, 6) to (3) chunks",
@@ -4803,6 +5034,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -5006,6 +5238,7 @@ impl RocksMetaStore {
         db_ref: DbTableRef,
         batch_pipe: &mut BatchPipe,
         check_rows: bool,
+        new_replay_handle_id: Option<u64>,
     ) -> Result<(), CubeError> {
         trace!(
             "Swapping chunks: deactivating ({}), activating ({})",
@@ -5053,6 +5286,7 @@ impl RocksMetaStore {
                     if let Some(file_size) = file_size {
                         updated = updated.set_file_size(*file_size)?;
                     }
+                    updated = updated.set_replay_handle_id(new_replay_handle_id);
                     Ok(updated)
                 },
                 batch_pipe,

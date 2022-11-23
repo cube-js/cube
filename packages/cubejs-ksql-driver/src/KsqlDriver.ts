@@ -53,7 +53,8 @@ type KsqlDescribeResponse = {
     name: string;
     fields: KsqlField[];
     type: 'STREAM' | 'TABLE';
-    windowType: 'SESSION' | 'HOPPING' | 'TUMBLING'
+    windowType: 'SESSION' | 'HOPPING' | 'TUMBLING',
+    partitions: number;
   }
 };
 
@@ -118,12 +119,17 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
+  public async query<R = unknown>(query: string, values?: unknown[], options: { streamOffset?: string } = {}): Promise<R> {
     if (query.toLowerCase().startsWith('select')) {
       throw new Error('Select queries for ksql allowed only from Cube Store. In order to query ksql create pre-aggregation first.');
     }
     const { data } = await this.apiQuery('/ksql', {
       ksql: `${formatSql(query, values)};`,
+      ...(options.streamOffset ? {
+        streamsProperties: {
+          'ksql.streams.auto.offset.reset': options.streamOffset
+        }
+      } : {})
     });
     
     return data[0];
@@ -188,8 +194,8 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return table.replace('.', '-');
   }
 
-  public async tableColumnTypes(table: string) {
-    const describe = await this.query<KsqlDescribeResponse>(`DESCRIBE ${this.quoteIdentifier(this.tableDashName(table))}`);
+  public async tableColumnTypes(table: string, describe?: KsqlDescribeResponse) {
+    describe = describe || await this.describeTable(table);
 
     let { fields } = describe.sourceDescription;
     if (describe.sourceDescription.windowType) {
@@ -210,12 +216,12 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
-    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params);
+    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params, { streamOffset: options?.streamOffset });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async downloadTable(table: string, options: any): Promise<any> {
-    return this.getStreamingTableData(this.tableDashName(table));
+    return this.getStreamingTableData(this.tableDashName(table), { streamOffset: options?.streamOffset });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -226,13 +232,17 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     }
 
     const selectStatement = sqlstring.format(query, params);
-    return this.getStreamingTableData(table, selectStatement);
+    return this.getStreamingTableData(table, { selectStatement, streamOffset: options?.streamOffset });
   }
 
-  private async getStreamingTableData(streamingTable: string, selectStatement?: string) {
+  private async getStreamingTableData(streamingTable: string, options: { selectStatement?: string, streamOffset?: string } = {}) {
+    const { selectStatement, streamOffset } = options;
+    const describe = await this.describeTable(streamingTable);
     return {
-      types: await this.tableColumnTypes(streamingTable),
+      types: await this.tableColumnTypes(streamingTable, describe),
+      partitions: describe.sourceDescription?.partitions,
       streamingTable,
+      streamOffset,
       selectStatement,
       streamingSource: {
         name: this.config.streamingSourceName || 'default',
@@ -244,6 +254,10 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
         }
       }
     };
+  }
+
+  private describeTable(streamingTable: string): Promise<KsqlDescribeResponse> {
+    return this.query<KsqlDescribeResponse>(`DESCRIBE ${this.quoteIdentifier(this.tableDashName(streamingTable))}`);
   }
 
   public dropTable(tableName: string, options: any): Promise<any> {

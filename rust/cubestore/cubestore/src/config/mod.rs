@@ -25,7 +25,7 @@ use crate::scheduler::SchedulerImpl;
 use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
-use crate::streaming::{StreamingService, StreamingServiceImpl};
+use crate::streaming::{KsqlClient, KsqlClientImpl, StreamingService, StreamingServiceImpl};
 use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
@@ -366,6 +366,8 @@ pub trait ConfigObj: DIService {
 
     fn metadata_cache_time_to_idle_secs(&self) -> u64;
 
+    fn stream_replay_check_interval_secs(&self) -> u64;
+
     fn dump_dir(&self) -> &Option<PathBuf>;
 }
 
@@ -416,6 +418,7 @@ pub struct ConfigObjImpl {
     pub max_cached_queries: usize,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
+    pub stream_replay_check_interval_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -584,6 +587,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn metadata_cache_time_to_idle_secs(&self) -> u64 {
         self.metadata_cache_time_to_idle_secs
+    }
+    fn stream_replay_check_interval_secs(&self) -> u64 {
+        self.stream_replay_check_interval_secs
     }
 
     fn dump_dir(&self) -> &Option<PathBuf> {
@@ -763,6 +769,10 @@ impl Config {
                     "CUBESTORE_METADATA_CACHE_TIME_TO_IDLE_SECS",
                     0,
                 ),
+                stream_replay_check_interval_secs: env_parse(
+                    "CUBESTORE_STREAM_REPLAY_CHECK_INTERVAL",
+                    0,
+                ),
             }),
         }
     }
@@ -824,6 +834,7 @@ impl Config {
                 meta_store_log_upload_interval: 30,
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
+                stream_replay_check_interval_secs: 60,
             }),
         }
     }
@@ -1201,8 +1212,13 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
+            .await;
+
+        self.injector
+            .register_typed::<dyn KsqlClient, _, _, _>(async move |_| KsqlClientImpl::new())
             .await;
 
         self.injector

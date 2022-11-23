@@ -43,6 +43,7 @@ use crate::import::{parse_space_separated_binstring, ImportService, Ingestion};
 use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
+use crate::metastore::table::StreamOffset;
 use crate::metastore::{
     is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
     IndexType, MetaStoreTable, RowKey, Schema, TableId,
@@ -220,6 +221,7 @@ impl SqlServiceImpl {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        stream_offset: Option<String>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
         aggregates: Option<Vec<(Ident, Ident)>>,
@@ -291,6 +293,20 @@ impl SqlServiceImpl {
             }
         }
 
+        let stream_offset = if let Some(s) = &stream_offset {
+            Some(match s.as_str() {
+                "earliest" => StreamOffset::Earliest,
+                "latest" => StreamOffset::Latest,
+                x => {
+                    return Err(CubeError::user(format!(
+                        "Unexpected stream offset: {}. Only earliest and latest are allowed.",
+                        x
+                    )))
+                }
+            })
+        } else {
+            None
+        };
         if !external {
             return self
                 .db
@@ -305,6 +321,7 @@ impl SqlServiceImpl {
                     build_range_end,
                     seal_at,
                     select_statement,
+                    stream_offset,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                     aggregates.map(|keys| {
                         keys.iter()
@@ -363,6 +380,7 @@ impl SqlServiceImpl {
                 build_range_end,
                 seal_at,
                 select_statement,
+                stream_offset,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 aggregates.map(|keys| {
                     keys.iter()
@@ -430,6 +448,17 @@ impl SqlServiceImpl {
                 )
             })
             .collect();
+        for stream_location in table
+            .get_row()
+            .locations()
+            .unwrap()
+            .iter()
+            .filter(|&l| Table::is_stream_location(l))
+        {
+            self.import_service
+                .validate_table_location(table.get_id(), stream_location)
+                .await?;
+        }
         let imports = listener.wait_for_job_results(wait_for).await?;
         for r in imports {
             if let JobEvent::Error(_, _, e) = r {
@@ -889,6 +918,18 @@ impl SqlService for SqlServiceImpl {
                             option.value
                         ))),
                     })?;
+                let stream_offset = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "stream_offset")
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(select_statement) => {
+                            Result::Ok(Some(select_statement.clone()))
+                        }
+                        _ => Result::Err(CubeError::user(format!(
+                            "Bad stream_offset {}. Expected string.",
+                            option.value
+                        ))),
+                    })?;
 
                 let res = self
                     .create_table(
@@ -901,6 +942,7 @@ impl SqlService for SqlServiceImpl {
                         build_range_end,
                         seal_at,
                         select_statement,
+                        stream_offset,
                         indexes,
                         unique_key,
                         aggregates,
@@ -1838,6 +1880,7 @@ mod tests {
                 TableValue::String("false".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -1923,6 +1966,7 @@ mod tests {
                 TableValue::String("2022-10-05 01:00:00 UTC".to_string()),
                 TableValue::String("false".to_string()),
                 TableValue::String("SELECT * FROM test WHERE created_at > '2022-05-01 00:00:00'".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -3330,6 +3374,49 @@ mod tests {
                 let worker_plan = pp_phys_plan(p.worker.as_ref());
                 assert!(worker_plan.find("aggr_index").is_some());
             })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn validate_ksql_location() {
+        Config::test("validate_ksql_location").update_config(|mut c| {
+            c.partition_split_threshold = 2;
+            c
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = 'foo', password = 'bar', url = 'http://foo.com')")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_1 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\'') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_3 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_fail_1 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\'') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .expect_err("Validation should fail");
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_fail_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM (SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\')') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .expect_err("Validation should fail");
+        })
             .await;
     }
 }

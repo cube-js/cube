@@ -82,11 +82,15 @@ export function getLastUpdatedAtTimestamp(timestamps: (number | undefined)[]): n
 }
 
 function getStructureVersion(preAggregation) {
-  return version(
-    preAggregation.indexesSql && preAggregation.indexesSql.length ?
-      [preAggregation.loadSql, preAggregation.indexesSql] :
-      preAggregation.loadSql
-  );
+  const versionArray = [preAggregation.loadSql];
+  if (preAggregation.indexesSql && preAggregation.indexesSql.length) {
+    versionArray.push(preAggregation.indexesSql);
+  }
+  if (preAggregation.streamOffset) {
+    versionArray.push(preAggregation.streamOffset);
+  }
+
+  return version(versionArray.length === 1 ? versionArray[0] : versionArray);
 }
 
 type VersionEntry = {
@@ -748,11 +752,15 @@ export class PreAggregationLoader {
   }
 
   protected contentVersion(invalidationKeys) {
-    return version(
-      this.preAggregation.indexesSql && this.preAggregation.indexesSql.length ?
-        [this.preAggregation.loadSql, this.preAggregation.indexesSql, invalidationKeys] :
-        [this.preAggregation.loadSql, invalidationKeys]
-    );
+    const versionArray = [this.preAggregation.loadSql];
+    if (this.preAggregation.indexesSql && this.preAggregation.indexesSql.length) {
+      versionArray.push(this.preAggregation.indexesSql);
+    }
+    if (this.preAggregation.streamOffset) {
+      versionArray.push(this.preAggregation.streamOffset);
+    }
+    versionArray.push(invalidationKeys);
+    return version(versionArray);
   }
 
   protected priority(defaultValue) {
@@ -895,7 +903,7 @@ export class PreAggregationLoader {
         targetTableName,
         query,
         params,
-        queryOptions
+        { streamOffset: this.preAggregation.streamOffset, ...queryOptions }
       ));
 
       await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
@@ -1030,7 +1038,7 @@ export class PreAggregationLoader {
         targetTableName,
         query,
         params,
-        queryOptions
+        { streamOffset: this.preAggregation.streamOffset, ...queryOptions }
       ));
 
       return queryOptions;
@@ -1069,6 +1077,7 @@ export class PreAggregationLoader {
     const tableData = await saveCancelFn(client.downloadQueryResults(
       sql,
       params, {
+        streamOffset: this.preAggregation.streamOffset,
         ...queryOptions,
         ...capabilities,
         ...this.getStreamingOptions(),
@@ -1164,7 +1173,7 @@ export class PreAggregationLoader {
         tableData.rowStream = stream;
       }
     } else {
-      tableData = await saveCancelFn(client.downloadTable(table, externalDriverCapabilities));
+      tableData = await saveCancelFn(client.downloadTable(table, { streamOffset: this.preAggregation.streamOffset, ...externalDriverCapabilities }));
     }
 
     if (!tableData.types) {

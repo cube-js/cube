@@ -79,6 +79,8 @@ export interface StreamTableData extends DownloadTableBase {
 export interface StreamingSourceTableData extends DownloadTableBase {
   streamingTable: string;
   selectStatement?: string;
+  partitions?: number;
+  streamOffset?: string;
   streamingSource: {
     name: string;
     type: string;
@@ -117,11 +119,15 @@ export type StreamOptions = {
   highWaterMark: number;
 };
 
+export type StreamingSourceOptions = {
+  streamOffset?: boolean;
+};
+
 export interface DownloadQueryResultsBase {
   types: TableStructure
 }
 
-export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities;
+export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities & StreamingSourceOptions;
 
 export type IndexesSQL = {
   sql: [string, unknown[]];
@@ -175,7 +181,7 @@ export interface DriverInterface {
   // Download data from Query (for readOnly)
   downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsResult>;
   // Download table
-  downloadTable: (table: string, options: ExternalDriverCompatibilities) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
+  downloadTable: (table: string, options: ExternalDriverCompatibilities & StreamingSourceOptions) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
   // Some drivers can implement streaming from SQL
   stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
   // Some drivers can implement UNLOAD data to external storage

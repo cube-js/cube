@@ -218,6 +218,11 @@ pub trait ChunkDataStore: DIService + Send + Sync {
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn repartition_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError>;
+    async fn has_in_memory_chunk(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+    ) -> Result<bool, CubeError>;
     async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
     async fn add_persistent_chunk(
@@ -404,7 +409,8 @@ impl ChunkDataStore for ChunkStore {
             .collect();
 
         self.meta_store
-            .swap_chunks(old_chunks, new_chunk_ids?)
+            // TODO replay_handle_id shouldn't be None but method isn't used
+            .swap_chunks(old_chunks, new_chunk_ids?, None)
             .await?;
 
         Ok(())
@@ -432,7 +438,8 @@ impl ChunkDataStore for ChunkStore {
         let chunk_id = chunk.get_id();
         let oldest_insert_at = chunk.get_row().oldest_insert_at().clone();
         old_chunks.push(chunk_id);
-        let batches = self.get_chunk_columns(chunk).await?;
+        let replay_handle_id = chunk.get_row().replay_handle_id();
+        let batches = self.get_chunk_columns(chunk.clone()).await?;
         if batches.is_empty() {
             self.meta_store.deactivate_chunk(chunk_id).await?;
             return Ok(());
@@ -473,7 +480,7 @@ impl ChunkDataStore for ChunkStore {
             .await?;
 
         self.meta_store
-            .swap_chunks(old_chunks, new_chunk_ids)
+            .swap_chunks(old_chunks, new_chunk_ids, replay_handle_id.clone())
             .await?;
 
         Ok(())
@@ -508,6 +515,27 @@ impl ChunkDataStore for ChunkStore {
                 Ok(parquet.read_columns(&local_file)?)
             })
             .await??)
+        }
+    }
+
+    async fn has_in_memory_chunk(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+    ) -> Result<bool, CubeError> {
+        if chunk.get_row().in_memory() {
+            let node_name = self.cluster.node_name_by_partition(&partition);
+            let server_name = self.cluster.server_name();
+            if node_name != server_name {
+                return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
+            }
+            let memory_chunks = self.memory_chunks.read().await;
+            Ok(memory_chunks.contains_key(&chunk.get_id()))
+        } else {
+            return Err(CubeError::internal(format!(
+                "Chunk {:?} is not in memory",
+                chunk
+            )));
         }
     }
 
@@ -647,6 +675,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -738,6 +767,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -758,7 +788,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             meta_store
-                .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)])
+                .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)], None)
                 .await
                 .unwrap();
             let chunk = meta_store.get_chunk(1).await.unwrap();
@@ -837,6 +867,7 @@ mod tests {
                     None,
                     vec![ind],
                     true,
+                    None,
                     None,
                     None,
                     None,
