@@ -74,20 +74,15 @@ impl SeqPointer {
     /// Subtract interval from left.
     /// Similar to `subtract_from_right` but opposite direction.
     /// ```md
-    /// self   |----------------|
+    /// self          |--|
     /// other         |------|
-    /// result               |--|
+    /// result None
     /// ```
-    pub fn subtract_from_left(&mut self, other: &Self) {
-        if let Some(other_end_seq) = other.end_seq {
-            if let Some(start_seq) = self.start_seq {
-                self.start_seq = Some(start_seq.max(other_end_seq));
-            }
-        }
-
-        if let Some(end_seq) = self.end_seq {
-            if let Some(start_seq) = self.start_seq {
-                if end_seq <= start_seq {
+    pub fn subtract_if_covers(&mut self, other: &Self) {
+        if let Some((other_start, other_end)) = other.start_seq.as_ref().zip(other.end_seq.as_ref())
+        {
+            if let Some((start, end)) = self.start_seq.as_ref().zip(self.end_seq.as_ref()) {
+                if other_start <= start && end <= other_end {
                     self.start_seq = None;
                     self.end_seq = None;
                 }
@@ -261,7 +256,13 @@ pub fn union_seq_pointer_by_location(
     merge_seq_pointer_by_location(
         seq_pointer_by_location,
         other_seq_pointer_by_location,
-        |a, b| a.union(b),
+        |a, b| {
+            if let Some((a, b)) = a.as_mut().zip(b.as_ref()) {
+                a.union(b);
+            } else if let Some(b) = b.as_ref() {
+                *a = Some(b.clone());
+            }
+        },
     )
 }
 
@@ -272,25 +273,33 @@ pub fn subtract_from_right_seq_pointer_by_location(
     merge_seq_pointer_by_location(
         seq_pointer_by_location,
         other_seq_pointer_by_location,
-        |a, b| a.subtract_from_right(b),
+        |a, b| {
+            if let Some((a, b)) = a.as_mut().zip(b.as_ref()) {
+                a.subtract_from_right(b);
+            }
+        },
     )
 }
 
-pub fn subtract_from_left_seq_pointer_by_location(
+pub fn subtract_if_covers_seq_pointer_by_location(
     seq_pointer_by_location: &mut Option<Vec<Option<SeqPointer>>>,
     other_seq_pointer_by_location: &Option<Vec<Option<SeqPointer>>>,
 ) -> Result<(), CubeError> {
     merge_seq_pointer_by_location(
         seq_pointer_by_location,
         other_seq_pointer_by_location,
-        |a, b| a.subtract_from_left(b),
+        |a, b| {
+            if let Some((a, b)) = a.as_mut().zip(b.as_ref()) {
+                a.subtract_if_covers(b);
+            }
+        },
     )
 }
 
 pub fn merge_seq_pointer_by_location(
     seq_pointer_by_location: &mut Option<Vec<Option<SeqPointer>>>,
     other_seq_pointer_by_location: &Option<Vec<Option<SeqPointer>>>,
-    merge_operation: fn(&mut SeqPointer, &SeqPointer),
+    merge_operation: fn(&mut Option<SeqPointer>, &Option<SeqPointer>),
 ) -> Result<(), CubeError> {
     if let Some(seq_pointers) = other_seq_pointer_by_location {
         match seq_pointer_by_location {
@@ -304,17 +313,17 @@ pub fn merge_seq_pointer_by_location(
                 for (to_update, from) in
                     seq_pointers_by_location.iter_mut().zip(seq_pointers.iter())
                 {
-                    if let Some(from) = from {
-                        if let Some(to_update) = to_update {
-                            merge_operation(to_update, from);
-                        } else {
-                            *to_update = Some(from.clone());
-                        }
-                    }
+                    merge_operation(to_update, from);
                 }
             }
             None => {
-                *seq_pointer_by_location = Some(seq_pointers.clone());
+                let mut new_seq_pointers = vec![None; seq_pointers.len()];
+
+                for (to_update, from) in new_seq_pointers.iter_mut().zip(seq_pointers.iter()) {
+                    merge_operation(to_update, from);
+                }
+
+                *seq_pointer_by_location = Some(new_seq_pointers);
             }
         }
     }

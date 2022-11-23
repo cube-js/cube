@@ -3,7 +3,7 @@ use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::replay_handle::{
-    subtract_from_left_seq_pointer_by_location, subtract_from_right_seq_pointer_by_location,
+    subtract_from_right_seq_pointer_by_location, subtract_if_covers_seq_pointer_by_location,
     union_seq_pointer_by_location, SeqPointerForLocation,
 };
 use crate::metastore::table::Table;
@@ -285,31 +285,34 @@ impl SchedulerImpl {
     /// due to replay so we can safely remove it.
     /// Otherwise we just subtract it from resulting `SeqPointer` so freshly created `ReplayHandle`
     /// can't remove failed one.
-    async fn merge_replay_handles(&self) -> Result<(), CubeError> {
+    pub async fn merge_replay_handles(&self) -> Result<(), CubeError> {
         let (failed, mut without_failed) = self
             .meta_store
             .all_replay_handles_to_merge()
             .await?
             .into_iter()
-            .partition::<Vec<_>, _>(|h| h.get_row().has_failed_to_persist_chunks());
+            .partition::<Vec<_>, _>(|(h, _)| h.get_row().has_failed_to_persist_chunks());
 
-        without_failed.sort_by_key(|h| h.get_row().table_id());
+        without_failed.sort_by_key(|(h, _)| h.get_row().table_id());
 
         let table_to_failed = failed
             .into_iter()
-            .map(|h| (h.get_row().table_id(), h))
+            .map(|(h, _)| (h.get_row().table_id(), h))
             .into_group_map();
 
         let mut to_merge = Vec::new();
 
         for (table_id, handles) in &without_failed
             .into_iter()
-            .group_by(|h| h.get_row().table_id())
+            .group_by(|(h, _)| h.get_row().table_id())
         {
             let mut seq_pointer_by_location = None;
             let mut ids = Vec::new();
             let handles = handles.collect::<Vec<_>>();
-            for handle in handles.iter() {
+            for (handle, _) in handles
+                .iter()
+                .filter(|(_, has_active_chunks)| *has_active_chunks)
+            {
                 union_seq_pointer_by_location(
                     &mut seq_pointer_by_location,
                     handle.get_row().seq_pointers_by_location(),
@@ -322,15 +325,24 @@ impl SchedulerImpl {
             for failed_handle in failed.iter() {
                 let mut failed_seq_pointers =
                     failed_handle.get_row().seq_pointers_by_location().clone();
+                let mut replay_after_failed_union = None;
                 let replay_after_failed = handles
                     .iter()
-                    .filter(|h| h.get_id() > failed_handle.get_id());
-                for replay in replay_after_failed {
-                    subtract_from_left_seq_pointer_by_location(
-                        &mut failed_seq_pointers,
+                    .filter(|(h, _)| {
+                        h.get_id() > failed_handle.get_id()
+                            && !h.get_row().has_failed_to_persist_chunks()
+                    })
+                    .collect::<Vec<_>>();
+                for (replay, _) in replay_after_failed.iter() {
+                    union_seq_pointer_by_location(
+                        &mut replay_after_failed_union,
                         replay.get_row().seq_pointers_by_location(),
                     )?;
                 }
+                subtract_if_covers_seq_pointer_by_location(
+                    &mut failed_seq_pointers,
+                    &replay_after_failed_union,
+                )?;
                 let empty_seq_pointers = failed_seq_pointers
                     .map(|p| {
                         p.iter()
@@ -352,7 +364,7 @@ impl SchedulerImpl {
 
         for (ids, seq_pointer_by_location) in to_merge.into_iter() {
             self.meta_store
-                .merge_replay_handles(ids, seq_pointer_by_location)
+                .replace_replay_handles(ids, seq_pointer_by_location)
                 .await?;
         }
 

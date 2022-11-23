@@ -1074,6 +1074,26 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+
+            println!("replay handles pre merge: {:#?}", service
+                .exec_query("SELECT * FROM system.replay_handles")
+                .await
+                .unwrap()
+            );
+
+            scheduler.merge_replay_handles().await.unwrap();
+
+            let result = service
+                .exec_query("SELECT * FROM system.replay_handles WHERE has_failed_to_persist_chunks = true")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows().len(), 0);
+
+            println!("replay handles after merge: {:#?}", service
+                .exec_query("SELECT * FROM system.replay_handles")
+                .await
+                .unwrap()
+            );
         })
             .await;
     }

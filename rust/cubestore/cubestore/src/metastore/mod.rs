@@ -972,13 +972,16 @@ pub trait MetaStore: DIService + Send + Sync {
         ids: Vec<u64>,
     ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError>;
     async fn all_replay_handles(&self) -> Result<Vec<IdRow<ReplayHandle>>, CubeError>;
-    async fn all_replay_handles_to_merge(&self) -> Result<Vec<IdRow<ReplayHandle>>, CubeError>;
+    /// Returns `(handle, has_active_chunks)` tuple for all replay handles.
+    async fn all_replay_handles_to_merge(
+        &self,
+    ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError>;
     async fn update_replay_handle_failed(
         &self,
         id: u64,
         failed: bool,
     ) -> Result<IdRow<ReplayHandle>, CubeError>;
-    async fn merge_replay_handles(
+    async fn replace_replay_handles(
         &self,
         old_ids: Vec<u64>,
         new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
@@ -3336,7 +3339,7 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    async fn merge_replay_handles(
+    async fn replace_replay_handles(
         &self,
         old_ids: Vec<u64>,
         new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
@@ -3389,7 +3392,9 @@ impl MetaStore for RocksMetaStore {
             .await
     }
 
-    async fn all_replay_handles_to_merge(&self) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
+    async fn all_replay_handles_to_merge(
+        &self,
+    ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError> {
         self.read_operation(move |db_ref| {
             let all_replay_handles = ReplayHandleRocksTable::new(db_ref.clone()).all_rows()?;
             let chunks_table = ChunkRocksTable::new(db_ref);
@@ -3399,9 +3404,10 @@ impl MetaStore for RocksMetaStore {
                     &ChunkIndexKey::ByReplayHandleId(Some(replay_handle.get_id())),
                     &ChunkRocksIndex::ReplayHandleId,
                 )?;
-                if chunks.iter().filter(|c| c.get_row().active()).count() == 0 {
-                    result.push(replay_handle);
-                }
+                result.push((
+                    replay_handle,
+                    chunks.iter().filter(|c| c.get_row().active()).count() == 0,
+                ));
             }
             Ok(result)
         })
