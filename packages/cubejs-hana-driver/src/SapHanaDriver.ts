@@ -15,12 +15,14 @@ import {
   GenericDataBaseType,
   DriverInterface,
   DownloadQueryResultsOptions,
+  StreamOptions,
 } from '@cubejs-backend/base-driver';
 import { ConnectionOptions, Connection, FieldInfo } from 'types-hana-client';
 
 const hdb = require('@sap/hana-client');
 
 const TypeCode = require('@sap/hana-client/extension/TypeCode');
+const Stream = require('@sap/hana-client/extension/Stream');
 
 // convert HANA build-in types with type:type object
 const HanaBuildInTypes: Record<string, string> = {};
@@ -179,7 +181,7 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
   }
 
   public quoteIdentifier(identifier: string) {
-    return `"${identifier}"`; 
+    return `"${identifier}"`;
   }
 
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: any, params: any, tx: any) {
@@ -193,13 +195,38 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
     return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, tx);
   }
 
+  public async stream(query: string, values: unknown[], _: StreamOptions) {
+    // eslint-disable-next-line no-underscore-dangle
+    const conn: SapHanaConnection = await (<any> this.pool)._factory.create();
+
+    try {
+      const resultSet = await this.queryResultSet(query, values);
+      const columnInfo = resultSet.getColumnInfo();
+
+      const rowStream = Stream.createObjectStream(resultSet);
+      return {
+        rowStream,
+        types: this.mapFieldsToGenericTypes(columnInfo),
+        release: async () => {
+          // eslint-disable-next-line no-underscore-dangle
+          await (<any> this.pool)._factory.destroy(conn);
+        }
+      };
+    } catch (e) {
+      // eslint-disable-next-line no-underscore-dangle
+      await (<any> this.pool)._factory.destroy(conn);
+      throw e;
+    }
+  }
+
   public async downloadQueryResults(
     query: string,
     values: unknown[],
     options: DownloadQueryResultsOptions
   ) {
     if (options.streamImport) {
-      throw new Error('No support on the HANA stream yet');
+      // throw new Error('No support on the HANA stream yet');
+      return this.stream(query, values, options);
     }
 
     const resultSet = await this.queryResultSet(query, values);

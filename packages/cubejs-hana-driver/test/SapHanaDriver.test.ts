@@ -2,7 +2,7 @@ import { createDriver } from './hana.db.runner';
 import { SapHanaDriver } from '../src';
 
 const maybe = process.env.TEST_DB_SERVER && process.env.TEST_DB_USER && process.env.TEST_DB_PASSWORD
-  ? describe 
+  ? describe
   : describe.skip;
 
 maybe('SapHanaDriver', () => {
