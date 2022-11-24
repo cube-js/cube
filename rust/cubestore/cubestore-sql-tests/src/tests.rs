@@ -6514,7 +6514,7 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) {
                 union all
                 SELECT * FROM foo.pushdown2 
                 ) as `tb` GROUP BY 1 LIMIT 3",
-         None, true, false).await.unwrap();
+         None, false, false).await.unwrap();
 
     assert_eq!(
         res,
