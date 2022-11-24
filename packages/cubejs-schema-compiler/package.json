@@ -1,11 +1,11 @@
 {
-  "name": "@cubejs-backend/schema-compiler",
+  "name": "cubejs-schema-compiler",
   "description": "Cube.js schema compiler",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.13",
+  "version": "0.32.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/zhjuncai/cube.js.git",
     "directory": "packages/cubejs-schema-compiler"
   },
   "engines": {
