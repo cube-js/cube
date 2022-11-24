@@ -33,6 +33,10 @@ Object.entries(TypeCode).forEach(([key, _]) => {
 const SapHanaToGenericType: Record<string, GenericDataBaseType> = {
   smalldecimal: 'decimal',
   seconddate: 'timestamp',
+  daydate: 'date',
+  smallint: 'int',
+  bigint: 'int',
+  tinyint: 'int',
 };
 
 export interface SapHanaDriverConfiguration extends ConnectionOptions{

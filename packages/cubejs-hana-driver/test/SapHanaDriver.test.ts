@@ -1,6 +1,8 @@
 import { createDriver } from './hana.db.runner';
 import { SapHanaDriver } from '../src';
 
+const streamToArray = require('stream-to-array');
+
 const maybe = process.env.TEST_DB_SERVER && process.env.TEST_DB_USER && process.env.TEST_DB_PASSWORD
   ? describe
   : describe.skip;
@@ -47,11 +49,58 @@ maybe('SapHanaDriver', () => {
       ]
     });
 
-    // HANA always use upper case in result set
-    expect(JSON.parse(JSON.stringify(await hanaDriver.query('select * from test.boolean where b_value = ?', [true]))))
-      .toStrictEqual([{ B_VALUE: true }, { B_VALUE: true }]);
-    expect(JSON.parse(JSON.stringify(await hanaDriver.query('select * from test.boolean where b_value = ?', [false]))))
-      .toStrictEqual([{ B_VALUE: false }]);
+    // HANA always use upper case in result set if not double quotes
+    let trueResult = await hanaDriver.query('select * from test.boolean where "b_value" = ?', [true]);
+    expect(JSON.parse(JSON.stringify(trueResult))).toStrictEqual([{ b_value: true }, { b_value: true }]);
+    
+    let falseResult = await hanaDriver.query('select * from test.boolean where "b_value" = ?', [false]);
+    expect(JSON.parse(JSON.stringify(falseResult))).toStrictEqual([{ b_value: false }]);
+  });
+
+  test('hana object stream', async () => {
+    await hanaDriver.uploadTable(
+      'test.streaming_test',
+      [
+        { name: 'id', type: 'bigint' },
+        { name: 'created', type: 'date' },
+        { name: 'price', type: 'decimal' }
+      ],
+      {
+        rows: [
+          { id: 1, created: '2022-01-01', price: '100' },
+          { id: 2, created: '2022-01-02', price: '200' },
+          { id: 3, created: '2022-01-03', price: '300' }
+        ]
+      }
+    );
+
+    const tableData = await hanaDriver.stream('select * from test.streaming_test', [], {
+      highWaterMark: 1000,
+    });
+
+    try {
+      expect(await tableData.types).toEqual([
+        {
+          name: 'id',
+          type: 'int'
+        },
+        {
+          name: 'created',
+          type: 'date'
+        },
+        {
+          name: 'price',
+          type: 'decimal'
+        },
+      ]);
+      expect(await streamToArray(tableData.rowStream)).toEqual([
+        { id: 1, created: '2022-01-01', price: '100' },
+        { id: 2, created: '2022-01-02', price: '200' },
+        { id: 3, created: '2022-01-03', price: '300' }
+      ]);
+    } finally {
+      await tableData.release();
+    }
   });
 
   test('release', async () => {
