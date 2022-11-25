@@ -431,7 +431,7 @@ cube('Orders', {
 cube('Orders', {
   dimensions: {
     amount: {
-      sql: `abount`,
+      sql: `amount`,
       type: `number`,
       format: `currency`,
     },
