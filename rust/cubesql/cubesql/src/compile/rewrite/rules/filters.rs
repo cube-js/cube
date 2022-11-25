@@ -180,10 +180,11 @@ impl RewriteRules for FilterRules {
                     ),
                 ),
             ),
-            rewrite(
+            transforming_rewrite(
                 "limit-push-down-projection",
                 limit("?skip", "?fetch", projection("?expr", "?input", "?alias")),
                 projection("?expr", limit("?skip", "?fetch", "?input"), "?alias"),
+                self.push_down_limit_projection("?input"),
             ),
             // Limit to top node
             rewrite(
@@ -1887,6 +1888,22 @@ impl FilterRules {
                 }
             }
             false
+        }
+    }
+
+    fn push_down_limit_projection(
+        &self,
+        input_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let input_var = var!(input_var);
+        move |egraph, subst| {
+            for node in egraph[subst[input_var]].nodes.iter() {
+                match node {
+                    LogicalPlanLanguage::Limit(_) => return false,
+                    _ => (),
+                }
+            }
+            true
         }
     }
 
