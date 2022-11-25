@@ -570,7 +570,7 @@ describe('ScaffoldingTemplate', () => {
 
       console.log('>>>', template.generateFilesByTableNames([
         'public.accounts',
-      ]))
+      ]));
       
       expect(
         template.generateFilesByTableNames([
