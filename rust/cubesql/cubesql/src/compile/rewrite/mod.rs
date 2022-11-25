@@ -708,7 +708,7 @@ fn case_expr_var_arg(
     format!("(CaseExpr {} {} {})", expr, when_then, else_expr)
 }
 
-fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> String {
+fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: Option<String>) -> String {
     case_expr_var_arg(
         "CaseExprExpr",
         list_expr(
@@ -719,7 +719,13 @@ fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> Str
                 .flatten()
                 .collect(),
         ),
-        list_expr("CaseExprElseExpr", vec![else_expr]),
+        list_expr(
+            "CaseExprElseExpr",
+            match else_expr {
+                Some(else_expr) => vec![else_expr],
+                None => vec![],
+            },
+        ),
     )
 }
 
