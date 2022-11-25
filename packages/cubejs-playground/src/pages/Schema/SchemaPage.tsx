@@ -46,9 +46,9 @@ type SchemaPageProps = RouterProps;
 
 export default class SchemaPage extends Component<SchemaPageProps, any> {
   static contextType = AppContext;
-  
+
   context!: React.ContextType<typeof AppContext>;
-  
+
   constructor(props) {
     super(props);
 
@@ -108,10 +108,14 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
     });
   }
 
-  async generateSchema(format: SchemaFormat = SchemaFormat.JavaScript) {    
+  async generateSchema(format: SchemaFormat = SchemaFormat.JavaScript) {
     const { checkedKeys, tablesSchema } = this.state;
     const { history } = this.props;
-    playgroundAction('Generate Schema');
+    const options = {
+      schemaFormat: format,
+    };
+
+    playgroundAction('Generate Schema', options);
     const res = await playgroundFetch('/playground/generate-schema', {
       method: 'POST',
       headers: {
@@ -125,8 +129,9 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
         tablesSchema,
       }),
     });
+
     if (res.status === 200) {
-      playgroundAction('Generate Schema Success');
+      playgroundAction('Generate Schema Success', options);
       await this.loadFiles();
       this.setState({ checkedKeys: [], activeTab: 'files' });
       Modal.success({
@@ -140,7 +145,10 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
         },
       });
     } else {
-      playgroundAction('Generate Schema Fail', { error: await res.text() });
+      playgroundAction('Generate Schema Fail', {
+        error: await res.text(),
+        ...options,
+      });
     }
   }
 
@@ -185,12 +193,14 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
       activeTab,
       isDocker,
     } = this.state;
-    
+
     const { playgroundContext } = this.context;
-    
-    const [, minor] = playgroundContext.coreServerVersion ? playgroundContext.coreServerVersion.split('.') : [];
+
+    const [, minor] = playgroundContext.coreServerVersion
+      ? playgroundContext.coreServerVersion.split('.')
+      : [];
     const isYamlFormatSupported = minor || Number(minor) >= 31;
-    
+
     const renderTreeNodes = (data) =>
       data.map((item) => {
         if (item.treeData) {
@@ -254,9 +264,13 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
                     <Menu.Item onClick={() => this.generateSchema()}>
                       JavaScript
                     </Menu.Item>
-                    
+
                     <Menu.Item
-                      title={!isYamlFormatSupported ? 'yaml schema format is supported by Cube 0.31.0 and later' : ''}
+                      title={
+                        !isYamlFormatSupported
+                          ? 'yaml schema format is supported by Cube 0.31.0 and later'
+                          : ''
+                      }
                       disabled={!isYamlFormatSupported}
                       onClick={() => this.generateSchema(SchemaFormat.Yaml)}
                     >
