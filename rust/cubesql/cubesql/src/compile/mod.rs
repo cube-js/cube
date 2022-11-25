@@ -13840,4 +13840,53 @@ ORDER BY \"COUNT(count)\" DESC"
             "Error during rewrite: Can not join Cubes. Looks like one of the subqueries includes post-processing operations. Please check logs for additional information.".to_string()
         )
     }
+
+    #[tokio::test]
+    async fn test_limit_push_down_recursion() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            select cast_timestamp_to_datetime_6 "Order Date"
+            from (
+                select "order_date"::timestamptz cast_timestamp_to_datetime_6
+                from (
+                    select *
+                    from "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                    limit 10001
+                ) q1
+                limit 10001
+            ) q3
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.minPrice".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                    "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                ]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10001),
+                offset: None,
+                filters: None,
+            }
+        )
+    }
 }
