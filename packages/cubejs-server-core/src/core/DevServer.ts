@@ -151,9 +151,8 @@ export class DevServer {
       });
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 
-      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver,
-        new YamlSchemaFormatter(tablesSchema, driver)
-      );
+      const formatter = req.body.format === 'yaml' ? new YamlSchemaFormatter(tablesSchema, driver) : undefined;
+      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver, formatter);
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables, { dataSource });
 
       const schemaPath = options.schemaPath || 'schema';
