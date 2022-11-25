@@ -34,7 +34,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
     }
 
     fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError> {
-        CacheItemRocksTable::new(table_ref.clone()).check_indexes()?;
+        CacheItemRocksTable::new(table_ref.clone()).migrate()?;
 
         Ok(())
     }

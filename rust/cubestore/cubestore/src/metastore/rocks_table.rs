@@ -1,7 +1,7 @@
 use crate::metastore::rocks_store::TableId;
 use crate::metastore::{
     get_fixed_prefix, BatchPipe, IdRow, IndexId, KeyVal, MemorySequence, MetaStoreEvent, RowKey,
-    SecondaryIndexInfo,
+    SecondaryIndexInfo, TableInfo,
 };
 use crate::CubeError;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -110,6 +110,8 @@ pub trait BaseRocksSecondaryIndex<T>: Debug {
     fn is_unique(&self) -> bool;
 
     fn version(&self) -> u32;
+
+    fn value_version(&self) -> u32;
 }
 
 pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
@@ -131,6 +133,10 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
     fn is_unique(&self) -> bool;
 
     fn version(&self) -> u32;
+
+    fn value_version(&self) -> u32 {
+        1
+    }
 }
 
 impl<T, I> BaseRocksSecondaryIndex<T> for I
@@ -151,6 +157,10 @@ where
 
     fn version(&self) -> u32 {
         RocksSecondaryIndex::version(self)
+    }
+
+    fn value_version(&self) -> u32 {
+        RocksSecondaryIndex::value_version(self)
     }
 }
 
@@ -277,7 +287,57 @@ pub trait RocksTable: Debug + Send + Sync {
         Ok(IdRow::new(row_id, row))
     }
 
-    fn check_indexes(&self) -> Result<(), CubeError> {
+    fn migrate(&self) -> Result<(), CubeError> {
+        self.migration_check_table()?;
+        self.migration_check_indexes()?;
+
+        Ok(())
+    }
+
+    fn migration_check_table(&self) -> Result<(), CubeError> {
+        let snapshot = self.snapshot();
+
+        let table_info = snapshot.get(
+            &RowKey::TableInfo {
+                table_id: self.table_id(),
+            }
+            .to_bytes(),
+        )?;
+
+        if let Some(table_info) = table_info {
+            let table_info = self.deserialize_table_info(table_info.as_slice())?;
+
+            if table_info.version != self.version()
+                || table_info.value_version != self.value_version()
+            {
+                self.migrate_table(table_info)?
+            }
+        } else {
+            self.db().put(
+                &RowKey::TableInfo {
+                    table_id: self.table_id(),
+                }
+                .to_bytes(),
+                self.serialize_table_info(TableInfo {
+                    version: self.version(),
+                    value_version: self.value_version(),
+                })?
+                .as_slice(),
+            )?;
+        };
+
+        Ok(())
+    }
+
+    fn migrate_table(&self, table_info: TableInfo) -> Result<(), CubeError> {
+        Err(CubeError::internal(format!(
+            "Unable to migrate table from {} to {}. There is no support for auto migrations. Please implement migration.",
+            table_info.version,
+            self.value_version()
+        )))
+    }
+
+    fn migration_check_indexes(&self) -> Result<(), CubeError> {
         let snapshot = self.snapshot();
         for index in Self::indexes().into_iter() {
             let index_info = snapshot.get(
@@ -288,7 +348,18 @@ pub trait RocksTable: Debug + Send + Sync {
             )?;
             if let Some(index_info) = index_info {
                 let index_info = self.deserialize_index_info(index_info.as_slice())?;
-                if index_info.version != index.version() {
+                if index_info.version != index.version()
+                    || index_info.value_version != index.value_version()
+                {
+                    log::trace!(
+                        "Migrating index {:?} from [{}, {}] to [{}, {}]",
+                        index,
+                        index_info.version,
+                        index_info.value_version,
+                        index.version(),
+                        index.value_version(),
+                    );
+
                     self.rebuild_index(&index)?;
                 }
             } else {
@@ -296,6 +367,27 @@ pub trait RocksTable: Debug + Send + Sync {
             }
         }
         Ok(())
+    }
+
+    fn version(&self) -> u32 {
+        1
+    }
+
+    fn value_version(&self) -> u32 {
+        1
+    }
+
+    fn deserialize_table_info(&self, buffer: &[u8]) -> Result<TableInfo, CubeError> {
+        let r = flexbuffers::Reader::get_root(&buffer).unwrap();
+        let row = TableInfo::deserialize(r)?;
+        Ok(row)
+    }
+
+    fn serialize_table_info(&self, index_info: TableInfo) -> Result<Vec<u8>, CubeError> {
+        let mut ser = flexbuffers::FlexbufferSerializer::new();
+        index_info.serialize(&mut ser).unwrap();
+        let serialized_row = ser.take_buffer();
+        Ok(serialized_row)
     }
 
     fn deserialize_index_info(&self, buffer: &[u8]) -> Result<SecondaryIndexInfo, CubeError> {
@@ -343,6 +435,7 @@ pub trait RocksTable: Debug + Send + Sync {
             .to_bytes(),
             self.serialize_index_info(SecondaryIndexInfo {
                 version: index.version(),
+                value_version: index.value_version(),
             })?
             .as_slice(),
         );
