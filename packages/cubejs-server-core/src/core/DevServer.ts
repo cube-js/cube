@@ -1,6 +1,6 @@
 /* eslint-disable global-require,no-restricted-syntax */
 import dotenv from '@cubejs-backend/dotenv';
-import { CubePreAggregationConverter, CubeSchemaConverter } from '@cubejs-backend/schema-compiler';
+import { CubePreAggregationConverter, CubeSchemaConverter, ScaffoldingTemplate, YamlSchemaFormatter } from '@cubejs-backend/schema-compiler';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
@@ -151,8 +151,9 @@ export class DevServer {
       });
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 
-      const ScaffoldingTemplate = require('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
-      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver);
+      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver,
+        new YamlSchemaFormatter(tablesSchema, driver)
+      );
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables, { dataSource });
 
       const schemaPath = options.schemaPath || 'schema';
@@ -436,7 +437,7 @@ export class DevServer {
         const type = keyByDataSource('CUBEJS_DB_TYPE', dataSource);
 
         let driver: BaseDriver | null = null;
-        
+
         try {
           if (!variables || !variables[type]) {
             throw new Error(`${type} is required`);
