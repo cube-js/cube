@@ -881,7 +881,7 @@ impl RewriteRules for FilterRules {
                                         is_not_null_expr(column_expr("?column")),
                                         column_expr("?column"),
                                     )],
-                                    literal_string(""),
+                                    Some(literal_string("")),
                                 ),
                                 literal_expr("?value"),
                             ],
@@ -1048,7 +1048,7 @@ impl RewriteRules for FilterRules {
                                     ],
                                 ),
                             )],
-                            literal_number(0),
+                            Some(literal_number(0)),
                         ),
                         "?op",
                         literal_number(0),
@@ -2220,7 +2220,13 @@ impl FilterRules {
                     | ScalarValue::UInt8(_)
                     | ScalarValue::UInt16(_)
                     | ScalarValue::UInt32(_)
-                    | ScalarValue::UInt64(_) => (),
+                    | ScalarValue::UInt64(_)
+                    | ScalarValue::Date32(_)
+                    | ScalarValue::Date64(_)
+                    | ScalarValue::TimestampSecond(_, _)
+                    | ScalarValue::TimestampMillisecond(_, _)
+                    | ScalarValue::TimestampMicrosecond(_, _)
+                    | ScalarValue::TimestampNanosecond(_, _) => (),
                     _ => continue,
                 };
 

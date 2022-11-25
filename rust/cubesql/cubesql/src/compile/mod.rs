@@ -13889,4 +13889,172 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    // TODO: unignore once filter push down to projection is implemented
+    #[tokio::test]
+    #[ignore]
+    async fn test_sigma_date_range() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            select count_23 "__Row Count"
+            from (
+                select count(1) count_23
+                from (
+                    select *
+                    from (
+                        select "order_date"::timestamptz cast_timestamp_to_datetime_11
+                        from "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                    ) q1
+                    where (
+                        (
+                            ('2022-11-01T00:00:00+00:00'::timestamptz <= cast_timestamp_to_datetime_11) and 
+                            ('2022-11-15T23:59:59.999+00:00'::timestamptz >= cast_timestamp_to_datetime_11)
+                        ) or
+                        (cast_timestamp_to_datetime_11 is null)
+                    )
+                ) q2
+                limit 1001
+            ) q4
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2022-11-01T00:00:00.000Z".to_string(),
+                        "2022-11-15T23:59:59.999Z".to_string(),
+                    ]))
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None
+                },])
+            }
+        )
+    }
+
+    // TODO: unignore once filter push down to projection is implemented
+    #[tokio::test]
+    #[ignore]
+    async fn test_sigma_date_top_n() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            select cast_timestamp_to_datetime_10 "Order Date"
+            from (
+                select cast_timestamp_to_datetime_10, isnotnull_11, Rank() over ( order by if_12 desc) "Rank_13" from (
+                    select
+                        cast_timestamp_to_datetime_10,
+                        (cast_timestamp_to_datetime_10 is not null) isnotnull_11,
+                        case
+                            when (cast_timestamp_to_datetime_10 is not null) then cast_timestamp_to_datetime_10
+                        end if_12
+                    from (
+                        select "order_date"::timestamptz cast_timestamp_to_datetime_10
+                        from "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                    ) q1
+                    where (cast_timestamp_to_datetime_10 is not null)
+                ) q2
+            ) q3
+            where
+                case
+                    when isnotnull_11 then ("Rank_13" <= 3)
+                end
+            limit 10001
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None
+                },])
+            }
+        )
+    }
+
+    // TODO: unignore once filter push down to projection is implemented
+    #[tokio::test]
+    #[ignore]
+    async fn test_sigma_date_in_list() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            select cast_timestamp_to_datetime_10 "Order Date"
+            from (
+                select "order_date"::timestamptz cast_timestamp_to_datetime_10
+                from "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            ) q1
+            where cast_timestamp_to_datetime_10 in (
+                '2019-01-17T15:25:48+00:00'::timestamptz,
+                '2019-09-09T00:00:00+00:00'::timestamptz
+            )
+            limit 10001
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(10001),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec![
+                        "2019-01-17T15:25:48.000Z".to_string(),
+                        "2019-09-09T00:00:00.000Z".to_string(),
+                    ]),
+                    or: None,
+                    and: None
+                },])
+            }
+        )
+    }
 }
