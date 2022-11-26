@@ -7,7 +7,7 @@ import {
   DirectiveNode,
   FieldNode,
   VariableNode,
-  ValueNode,
+  ValueNode, GraphQLSchema,
 } from 'graphql';
 
 import {
@@ -173,6 +173,24 @@ function unCapitalize(name: string) {
   return `${name[0].toLowerCase()}${name.slice(1)}`;
 }
 
+function normalizeCubeCapital(cube: any) {
+  const { config } = cube;
+  if (config.name[0] === config.name[0].toUpperCase()) {
+    return cube;
+  }
+  const measures = config.measures.map((m: {name: string}) => ({ ...m, name: capitalize(m.name) }));
+  const dimensions = config.dimensions.map((d: {name: string}) => ({ ...d, name: capitalize(d.name) }));
+  // TODO [PR] segments and others fields
+  // const segments = cube.segments.map((s: {name: string}) => ({...s, name: capitalize(s.name)}));
+  return {
+    config: {
+      name: capitalize(config.name),
+      measures,
+      dimensions,
+    }
+  };
+}
+
 function applyDirectives(
   directives: readonly DirectiveNode[] | undefined,
   values: Record<string, any>
@@ -333,7 +351,7 @@ function parseDates(result: any) {
   });
 }
 
-export function makeSchema(metaConfig: any) {
+export function makeSchema(_metaConfig: any): GraphQLSchema {
   const types: any[] = [
     DateTimeScalar,
     FloatFilter,
@@ -347,7 +365,9 @@ export function makeSchema(metaConfig: any) {
     return cube.config.measures.length || cube.config.dimensions.length;
   }
 
-  metaConfig.forEach(cube => {
+  const normalizedMetaConfig = _metaConfig.map((cube: any) => (normalizeCubeCapital(cube)));
+
+  normalizedMetaConfig.forEach(cube => {
     if (hasMembers(cube)) {
       types.push(objectType({
         name: `${cube.config.name}Members`,
@@ -420,7 +440,7 @@ export function makeSchema(metaConfig: any) {
     definition(t) {
       t.field('AND', { type: list(nonNull('RootWhereInput')) });
       t.field('OR', { type: list(nonNull('RootWhereInput')) });
-      metaConfig.forEach(cube => {
+      normalizedMetaConfig.forEach(cube => {
         if (hasMembers(cube)) {
           t.field(unCapitalize(cube.config.name), {
             type: `${cube.config.name}WhereInput`
@@ -433,7 +453,7 @@ export function makeSchema(metaConfig: any) {
   types.push(inputObjectType({
     name: 'RootOrderByInput',
     definition(t) {
-      metaConfig.forEach(cube => {
+      normalizedMetaConfig.forEach(cube => {
         if (hasMembers(cube)) {
           t.field(unCapitalize(cube.config.name), {
             type: `${cube.config.name}OrderByInput`
@@ -446,7 +466,7 @@ export function makeSchema(metaConfig: any) {
   types.push(objectType({
     name: 'Result',
     definition(t) {
-      metaConfig.forEach(cube => {
+      normalizedMetaConfig.forEach(cube => {
         if (hasMembers(cube)) {
           t.nonNull.field(unCapitalize(cube.config.name), {
             type: `${cube.config.name}Members`,
@@ -527,7 +547,7 @@ export function makeSchema(metaConfig: any) {
 
             getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
               const memberName = memberNode.name.value;
-              const memberType = getMemberType(metaConfig, cubeName, memberName);
+              const memberType = getMemberType(normalizedMetaConfig, cubeName, memberName);
               const key = `${cubeName}.${memberName}`;
 
               if (memberType === MemberType.MEASURES) {
