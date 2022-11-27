@@ -27,15 +27,20 @@ const metaConfig = [
   },
 ];
 
+function expectValidSchema(schema) {
+  expect(schema).toBeDefined();
+  expect(schema.getTypeMap()).toHaveProperty('FooMembers');
+  const fooFields = (schema.getType('FooMembers') as GraphQLObjectType).getFields();
+  expect(fooFields).toHaveProperty('bar');
+  expect(fooFields).toHaveProperty('id');
+  expect(fooFields).toHaveProperty('time');
+
+}
+
 describe('Graphql Schema', () => {
   test('should make valid schema', () => {
     const schema = makeSchema(metaConfig);
-    expect(schema).toBeDefined();
-    expect(schema.getTypeMap()).toHaveProperty('FooMembers');
-    const fooFields = (schema.getType('FooMembers') as GraphQLObjectType).getFields();
-    expect(fooFields).toHaveProperty('bar');
-    expect(fooFields).toHaveProperty('id');
-    expect(fooFields).toHaveProperty('time');
+    expectValidSchema(schema);
   });
 
   test('should make valid schema when name is not capitalized', async () => {
@@ -43,11 +48,6 @@ describe('Graphql Schema', () => {
       JSON.stringify(metaConfig)
         .replace(/Foo/g, 'foo')
     ));
-    expect(schema).toBeDefined();
-    expect(schema.getTypeMap()).toHaveProperty('FooMembers');
-    const fooFields = (schema.getType('FooMembers') as GraphQLObjectType).getFields();
-    expect(fooFields).toHaveProperty('bar');
-    expect(fooFields).toHaveProperty('id');
-    expect(fooFields).toHaveProperty('time');
+    expectValidSchema(schema);
   });
 });
