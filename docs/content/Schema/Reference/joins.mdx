@@ -34,11 +34,13 @@ The semantics of `INNER JOIN` can be achieved with additional filtering. For
 example, a simple check of whether the column value `IS NOT NULL` by using [set
 filter][ref-restapi-query-filter-op-set] satisfies this requirement.
 
-There's also no way to define `FULL OUTER JOIN` and `RIGHT OUTER JOIN` for the sake of join modeling simplicity.
-To get `RIGHT OUTER JOIN` semantics just define join [from other side of relationship][ref-schema-fundamentals-join-dir].
-The `FULL OUTER JOIN` can be built inside cube [sql][ref-schema-cube-sql] parameter.
-Quite frequently, `FULL OUTER JOIN` is used to solve [Data Blending][ref-schema-data-blenging] or similar problems.
-In that case, it's best practice to have a separate cube for such an operation.
+There's also no way to define `FULL OUTER JOIN` and `RIGHT OUTER JOIN` for the
+sake of join modeling simplicity. To get `RIGHT OUTER JOIN` semantics just
+define join [from other side of relationship][ref-schema-fundamentals-join-dir].
+The `FULL OUTER JOIN` can be built inside cube [sql][ref-schema-cube-sql]
+parameter. Quite frequently, `FULL OUTER JOIN` is used to solve [Data
+Blending][ref-schema-data-blenging] or similar problems. In that case, it's best
+practice to have a separate cube for such an operation.
 
 ## Naming
 
@@ -51,7 +53,7 @@ cube('Orders', {
   joins: {
     Products: {
       relationship: `belongsTo`,
-      sql: `${CUBE.id} = Products.orderId`,
+      sql: `${CUBE.id} = ${Products.orderId}`,
     },
   },
 });
@@ -63,7 +65,7 @@ cube('Orders', {
 
 `relationship` enables you to describe the join relationship between joined
 cubes. It’s important to properly define the type of relationship in order for
-Cube.js to accurately calculate measures. The relationship does not need to be
+Cube to accurately calculate measures. The relationship does not need to be
 defined on both cubes, but the definition can affect the [join
 direction][ref-schema-fundamentals-join-dir].
 
@@ -92,7 +94,7 @@ cube('Users', {
   joins: {
     Profile: {
       relationship: `hasOne`,
-      sql: `${Users}.id = ${Profile}.user_id`,
+      sql: `${CUBE}.id = ${Profile.userId}`,
     },
   },
 });
@@ -111,7 +113,7 @@ cube('Authors', {
   joins: {
     Books: {
       relationship: `hasMany`,
-      sql: `${Authors}.id = ${Books}.author_id`,
+      sql: `${CUBE}.id = ${Books.authorId}`,
     },
   },
 });
@@ -131,7 +133,7 @@ cube('Orders', {
   joins: {
     Customers: {
       relationship: `belongsTo`,
-      sql: `${Orders}.customer_id = ${Customers}.id`,
+      sql: `${CUBE}.customer_id = ${Customers.id}`,
     },
   },
 });
@@ -150,7 +152,7 @@ cube('Orders', {
       relationship: `belongsTo`,
       // The `customer_id` field on `Orders` corresponds to the
       // `id` field on `Customers`
-      sql: `${Orders}.customer_id = ${Customers}.id`,
+      sql: `${CUBE}.customer_id = ${Customers.id}`,
     },
   },
 });
@@ -159,12 +161,12 @@ cube('Orders', {
 ## Setting a Primary Key
 
 In order for a join to work, it is necessary to define a `primaryKey` as
-specified below. It is a requirement when a join is defined so that Cube.js can
+specified below. It is a requirement when a join is defined so that Cube can
 handle row multiplication issues.
 
 Let's imagine you want to calculate `Order Amount` by `Order Item Product Name`.
 In this case, `Order` rows will be multiplied by the `Order Item` join due to
-the `hasMany` relationship. In order to produce correct results, Cube.js will
+the `hasMany` relationship. In order to produce correct results, Cube will
 select distinct primary keys from `Order` first and then will join these primary
 keys with `Order` to get the correct `Order Amount` sum result. Please note that
 `primaryKey` should be defined in the `dimensions` section.
@@ -246,13 +248,13 @@ cube('Users', {
 
 <WarningBox>
 
-Join graph is directed and `A-B` join is different from `B-A`.
-[Learn more about it here][ref-schema-fundamentals-join-dir].
+Join graph is directed and `A-B` join is different from `B-A`. [Learn more about
+it here][ref-schema-fundamentals-join-dir].
 
 </WarningBox>
 
-Cube.js automatically takes care of transitive joins. For example if you have
-the following schema:
+Cube automatically takes care of transitive joins. For example if you have the
+following schema:
 
 ```javascript
 cube(`A`, {
@@ -302,7 +304,7 @@ and the following query:
 }
 ```
 
-Joins `A-B` and `B-C` will be resolved automatically. Cube.js uses [Dijkstra
+Joins `A-B` and `B-C` will be resolved automatically. Cube uses [Dijkstra
 algorithm][wiki-djikstra-alg] to find join path between cubes given requested
 members.
 
@@ -310,7 +312,6 @@ members.
 [ref-schema-cube-naming]: /schema/reference/cube#naming
 [ref-schema-fundamentals-join-dir]:
   /schema/fundamentals/joins#directions-of-joins
-[ref-schema-cube-sql]:
-  /schema/reference/cube#parameters-sql
+[ref-schema-cube-sql]: /schema/reference/cube#parameters-sql
 [ref-schema-data-blenging]: /schema/advanced/data-blending#data-blending
 [wiki-djikstra-alg]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm

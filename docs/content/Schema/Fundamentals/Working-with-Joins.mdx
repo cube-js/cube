@@ -61,7 +61,7 @@ cube('Customers', {
   joins: {
     Orders: {
       relationship: `hasMany`,
-      sql: `${Customers}.id = ${Orders.customerId}`,
+      sql: `${CUBE}.id = ${Orders.customerId}`,
     },
   },
 });
@@ -115,7 +115,7 @@ cube('Orders', {
   joins: {
     Customers: {
       relationship: `belongsTo`,
-      sql: `${Orders.customerId} = ${Customers}.id`,
+      sql: `${CUBE}.customer_id = ${Customers.id}`,
     },
   },
 });
@@ -208,13 +208,21 @@ cube(`Posts`, {
   joins: {
     PostTopics: {
       relationship: `belongsTo`,
-      sql: `${PostTopics}.post_id = ${Posts}.id`,
+      sql: `${CUBE}.id = ${PostTopics.postId}`,
     },
   },
 });
 
 cube(`Topics`, {
   sql: `SELECT * FROM topics`,
+
+  dimensions: {
+    postId: {
+      sql: `id`,
+      primaryKey: true,
+      type: `string`,
+    },
+  },
 });
 
 cube(`PostTopics`, {
@@ -223,7 +231,14 @@ cube(`PostTopics`, {
   joins: {
     Topic: {
       relationship: `hasMany`,
-      sql: `${PostTopics}.topic_id = ${Topics}.id`,
+      sql: `${CUBE}.topic_id = ${Topics.id}`,
+    },
+  },
+
+  dimensions: {
+    postId: {
+      sql: `post_id`,
+      type: `string`,
     },
   },
 });
@@ -345,8 +360,8 @@ cube(`Emails`, {
   joins: {
     Campaigns: {
       relationship: `belongsTo`,
-      sql: `${Emails}.campaign_id = ${Campaigns}.campaign_id
-      AND ${Emails}.customer_name = ${Campaigns}.customer_name`,
+      sql: `${CUBE}.campaign_id = ${Campaigns.id}
+      AND ${CUBE}.customer_name = ${Campaigns.customerName}`,
     },
   },
 
@@ -379,8 +394,21 @@ cube(`Campaigns`, {
   joins: {
     Transactions: {
       relationship: `hasMany`,
-      sql: `${Transactions}.customer_name = ${Campaigns}.customer_name
-      AND ${Transactions}.campaign_id = ${Campaigns}.campaign_id`,
+      sql: `${CUBE}.customer_name = ${Transactions.customerName}
+      AND ${CUBE}.campaign_id = ${Transactions.campaignId}`,
+    },
+  },
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primaryKey: true,
+    },
+
+    customerName: {
+      sql: `customer_name`,
+      type: `string`,
     },
   },
 });
@@ -450,7 +478,7 @@ cube('Orders', {
   joins: {
     Customers: {
       relationship: `belongsTo`,
-      sql: `${Orders}.customer_id = ${Customers}.id`,
+      sql: `${CUBE}.customer_id = ${Customers.id}`,
     },
   },
 
@@ -472,6 +500,11 @@ cube('Orders', {
       type: `number`,
       primaryKey: true,
       shown: true,
+    },
+
+    customerId: {
+      sql: `customer_id`,
+      type: `number`,
     },
   },
 });
@@ -504,7 +537,7 @@ cube('Customers', {
   joins: {
     Orders: {
       relationship: `hasMany`,
-      sql: `${Customers}.id = ${Orders}.customer_id`,
+      sql: `${CUBE}.id = ${Orders.customerId}`,
     },
   },
 
@@ -613,11 +646,11 @@ cube(`OrganizationUsers`, {
 
   joins: {
     Users: {
-      sql: `${CUBE}.user_id = ${Users}.id`,
+      sql: `${CUBE}.user_id = ${Users.id}`,
       relationship: `hasMany`,
     },
     Organizations: {
-      sql: `${CUBE}.organization_id = ${Organizations}.id`,
+      sql: `${CUBE}.organization_id = ${Organizations.id}`,
       relationship: `hasMany`,
     },
   },
@@ -674,7 +707,7 @@ cube(`Users`, {
 
   joins: {
     OrganizationUsers: {
-      sql: `${OrganizationUsers}.user_id = ${Users}.id`,
+      sql: `${OrganizationUsers.userId} = ${Users.id}`,
       relationship: `hasMany`,
     },
   },
@@ -690,7 +723,7 @@ cube(`OrganizationUsers`, {
 
   joins: {
     Organizations: {
-      sql: `${OrganizationUsers}.organization_id = ${Organizations}.id`,
+      sql: `${OrganizationUsers.organizationId} = ${Organizations.id}`,
       relationship: `hasMany`,
     },
   },

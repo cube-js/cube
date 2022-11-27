@@ -314,7 +314,7 @@ crate::plan_to_language! {
         },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
-            column_name_to_member: Vec<(String, String)>,
+            column_name_to_member: Vec<(String, Option<String>)>,
         },
         InnerAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
@@ -391,17 +391,29 @@ impl ExprRewriter for WithColumnRelation {
     }
 }
 
-fn column_name_to_member_vec(member_name_to_expr: Vec<(String, Expr)>) -> Vec<(String, String)> {
+fn column_name_to_member_vec(
+    member_name_to_expr: Vec<(Option<String>, Expr)>,
+) -> Vec<(String, Option<String>)> {
     let mut relation = WithColumnRelation(None);
     member_name_to_expr
         .into_iter()
         .map(|(member, expr)| {
             vec![
-                (expr_column_name(expr.clone(), &None), member.to_string()),
+                (expr_column_name(expr.clone(), &None), member.clone()),
                 (expr_column_name_with_relation(expr, &mut relation), member),
             ]
         })
         .flatten()
+        .collect::<Vec<_>>()
+}
+
+fn column_name_to_member_to_aliases(
+    column_name_to_member: Vec<(String, Option<String>)>,
+) -> Vec<(String, String)> {
+    column_name_to_member
+        .into_iter()
+        .filter(|(_, member)| member.is_some())
+        .map(|(column_name, member)| (column_name, member.unwrap()))
         .collect::<Vec<_>>()
 }
 
@@ -416,6 +428,7 @@ fn member_name_by_alias(
             .into_iter()
             .find(|(cn, _)| cn == alias)
             .map(|(_, member)| member)
+            .flatten()
     } else {
         None
     }
@@ -708,7 +721,7 @@ fn case_expr_var_arg(
     format!("(CaseExpr {} {} {})", expr, when_then, else_expr)
 }
 
-fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> String {
+fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: Option<String>) -> String {
     case_expr_var_arg(
         "CaseExprExpr",
         list_expr(
@@ -719,7 +732,13 @@ fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> Str
                 .flatten()
                 .collect(),
         ),
-        list_expr("CaseExprElseExpr", vec![else_expr]),
+        list_expr(
+            "CaseExprElseExpr",
+            match else_expr {
+                Some(else_expr) => vec![else_expr],
+                None => vec![],
+            },
+        ),
     )
 }
 

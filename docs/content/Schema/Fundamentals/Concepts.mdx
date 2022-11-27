@@ -6,7 +6,7 @@ subCategory: Fundamentals
 menuOrder: 2
 ---
 
-Cube.js borrows a lot of terminology from data science and [OLAP
+Cube borrows a lot of terminology from data science and [OLAP
 theory][wiki-olap], and this document is intended for both newcomers and regular
 users to refresh their understanding.
 
@@ -35,8 +35,8 @@ We'll use a sample e-commerce database with two tables, `orders` and
 
 ## Cubes
 
-A cube represents a dataset in Cube.js, and is conceptually similar to a [view
-in SQL][wiki-view-sql]. Cubes are typically declared in separate files with one
+A cube represents a dataset in Cube, and is conceptually similar to a [view in
+SQL][wiki-view-sql]. Cubes are typically declared in separate files with one
 cube per file. Within each cube are definitions of [dimensions][self-dimensions]
 and [measures][self-measures]. Typically, a cube points to a single table in
 your database using the [`sql` property][ref-schema-ref-sql]:
@@ -79,7 +79,7 @@ cube('Orders', {
     id: {
       sql: `id`,
       type: `number`,
-      // Here we explicitly let Cube.js know this field is the primary key
+      // Here we explicitly let Cube know this field is the primary key
       // This is required for de-duplicating results when using joins
       primaryKey: true
     },
@@ -103,10 +103,15 @@ cube('LineItems', {
     id: {
       sql: `id`,
       type: `number`,
-      // Again, we explicitly let Cube.js know this field is the primary key
+      // Again, we explicitly let Cube know this field is the primary key
       // This is required for de-duplicating results when using joins
       primaryKey: true
     },
+
+    orderId: {
+      sql: `order_id`,
+      type: `number`,
+    }
   },
 });
 ```
@@ -207,13 +212,13 @@ Measures can be of different types, and you can find them all
 ## Joins
 
 Joins define the relationships between cubes, which then allows accessing and
-comparing properties from two or more cubes at the same time. In Cube.js, all
-joins are `LEFT JOIN`s.
+comparing properties from two or more cubes at the same time. In Cube, all joins
+are `LEFT JOIN`s.
 
 <InfoBox>
 
-An `INNER JOIN` can be replicated with Cube.js; when making a Cube.js query, add
-a filter for `IS NOT NULL` on the required column.
+An `INNER JOIN` can be replicated with Cube; when making a Cube query, add a
+filter for `IS NOT NULL` on the required column.
 
 </InfoBox>
 
@@ -230,7 +235,7 @@ cube('Orders', {
       relationship: `belongsTo`,
       // Here we use the `CUBE` global to refer to the current cube,
       // so the following is equivalent to `Orders.id = LineItems.order_id`
-      sql: `${CUBE}.id = ${LineItems}.order_id`,
+      sql: `${CUBE}.id = ${LineItems.orderId}`,
     },
   },
 });
@@ -247,9 +252,9 @@ documentation][ref-schema-ref-joins-types].
 
 ## Segments
 
-Segments are filters that are predefined in the schema instead of [a Cube.js
-query][ref-backend-query-filters]. They allow simplifying Cube.js queries and
-make it easy to re-use common filters across a variety of queries.
+Segments are filters that are predefined in the schema instead of [a Cube
+query][ref-backend-query-filters]. They allow simplifying Cube queries and make
+it easy to re-use common filters across a variety of queries.
 
 To add a segment which limits results to completed orders, we can do the
 following:
@@ -295,8 +300,7 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-caching-use-preaggs-partition-time]:
   /caching/using-pre-aggregations#time-partitioning
 [ref-schema-dimension-types]: /schema/reference/types-and-formats#types
-[ref-schema-measure-types]:
-  /schema/reference/types-and-formats#measures-types
+[ref-schema-measure-types]: /schema/reference/types-and-formats#measures-types
 [ref-schema-ref-joins-types]: /schema/reference/joins#relationship
 [ref-schema-ref-sql]: /schema/reference/cube#sql
 [ref-tutorial-incremental-preagg]: /incremental-pre-aggregations

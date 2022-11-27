@@ -180,10 +180,11 @@ impl RewriteRules for FilterRules {
                     ),
                 ),
             ),
-            rewrite(
+            transforming_rewrite(
                 "limit-push-down-projection",
                 limit("?skip", "?fetch", projection("?expr", "?input", "?alias")),
                 projection("?expr", limit("?skip", "?fetch", "?input"), "?alias"),
+                self.push_down_limit_projection("?input"),
             ),
             // Limit to top node
             rewrite(
@@ -880,7 +881,7 @@ impl RewriteRules for FilterRules {
                                         is_not_null_expr(column_expr("?column")),
                                         column_expr("?column"),
                                     )],
-                                    literal_string(""),
+                                    Some(literal_string("")),
                                 ),
                                 literal_expr("?value"),
                             ],
@@ -1047,7 +1048,7 @@ impl RewriteRules for FilterRules {
                                     ],
                                 ),
                             )],
-                            literal_number(0),
+                            Some(literal_number(0)),
                         ),
                         "?op",
                         literal_number(0),
@@ -1890,6 +1891,22 @@ impl FilterRules {
         }
     }
 
+    fn push_down_limit_projection(
+        &self,
+        input_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let input_var = var!(input_var);
+        move |egraph, subst| {
+            for node in egraph[subst[input_var]].nodes.iter() {
+                match node {
+                    LogicalPlanLanguage::Limit(_) => return false,
+                    _ => (),
+                }
+            }
+            true
+        }
+    }
+
     fn unwrap_lower_or_upper(
         &self,
         op_var: &'static str,
@@ -2203,7 +2220,13 @@ impl FilterRules {
                     | ScalarValue::UInt8(_)
                     | ScalarValue::UInt16(_)
                     | ScalarValue::UInt32(_)
-                    | ScalarValue::UInt64(_) => (),
+                    | ScalarValue::UInt64(_)
+                    | ScalarValue::Date32(_)
+                    | ScalarValue::Date64(_)
+                    | ScalarValue::TimestampSecond(_, _)
+                    | ScalarValue::TimestampMillisecond(_, _)
+                    | ScalarValue::TimestampMicrosecond(_, _)
+                    | ScalarValue::TimestampNanosecond(_, _) => (),
                     _ => continue,
                 };
 
@@ -2992,7 +3015,10 @@ impl FilterRules {
                 if let Some(member_name_to_expr) =
                     &egraph.index(subst[members_var]).data.member_name_to_expr
                 {
-                    if member_name_to_expr.iter().all(|(m, _)| m != &member) {
+                    if member_name_to_expr
+                        .iter()
+                        .all(|(m, _)| m.as_ref() != Some(&member))
+                    {
                         let date_range = var_iter!(
                             egraph[subst[time_dimension_date_range_var]],
                             TimeDimensionDateRangeReplacerDateRange
@@ -3055,7 +3081,10 @@ impl FilterRules {
                 if let Some(member_name_to_expr) =
                     &egraph.index(subst[members_var]).data.member_name_to_expr
                 {
-                    if member_name_to_expr.iter().any(|(m, _)| m == member) {
+                    if member_name_to_expr
+                        .iter()
+                        .any(|(m, _)| m.as_ref() == Some(member))
+                    {
                         return true;
                     }
                 }

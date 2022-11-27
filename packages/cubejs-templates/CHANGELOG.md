@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
+
+
+### Bug Fixes
+
+* packages/cubejs-templates/package.json to reduce vulnerabilities ([#5403](https://github.com/cube-js/cube.js/issues/5403)) ([c9706cb](https://github.com/cube-js/cube.js/commit/c9706cbfcd6480dbd58ca18ab064ded185f710d3))
+
+
+
+
+
 ## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
 
 **Note:** Version bump only for package @cubejs-backend/templates

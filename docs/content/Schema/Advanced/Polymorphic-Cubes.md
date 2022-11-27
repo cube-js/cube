@@ -90,11 +90,11 @@ cube(`Lessons`, {
   joins: {
     Students: {
       relationship: `belongsTo`,
-      sql: `${CUBE}.student_id = ${Students}.id`,
+      sql: `${CUBE}.student_id = ${Students.id}`,
     },
     Teachers: {
       relationship: `belongsTo`,
-      sql: `${CUBE}.teacher_id = ${Teachers}.id`,
+      sql: `${CUBE}.teacher_id = ${Teachers.id}`,
     },
   },
 });

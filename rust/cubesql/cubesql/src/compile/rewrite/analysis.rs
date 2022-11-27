@@ -3,9 +3,9 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr},
-            AliasExprAlias, ChangeUserCube, ColumnExprColumn, DimensionName, LiteralExprValue,
-            LogicalPlanLanguage, MeasureName, SegmentName, TableScanSourceTableName,
-            TimeDimensionName, VirtualFieldCube, VirtualFieldName,
+            expr_column_name, AliasExprAlias, ChangeUserCube, ColumnExprColumn, DimensionName,
+            LiteralExprValue, LiteralMemberRelation, LogicalPlanLanguage, MeasureName, SegmentName,
+            TableScanSourceTableName, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
     },
     var_iter, CubeError,
@@ -28,7 +28,7 @@ use std::{fmt::Debug, ops::Index, sync::Arc};
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
     pub original_expr: Option<Expr>,
-    pub member_name_to_expr: Option<Vec<(String, Expr)>>,
+    pub member_name_to_expr: Option<Vec<(Option<String>, Expr)>>,
     pub column: Option<Column>,
     pub expr_to_alias: Option<Vec<(Expr, String)>>,
     pub referenced_expr: Option<Vec<Expr>>,
@@ -104,17 +104,35 @@ impl LogicalPlanAnalysis {
     fn make_member_name_to_expr(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Vec<(String, Expr)>> {
+    ) -> Option<Vec<(Option<String>, Expr)>> {
         let column_name = |id| egraph.index(id).data.column.clone();
         let id_to_column_name_to_expr = |id| egraph.index(id).data.member_name_to_expr.clone();
         let original_expr = |id| egraph.index(id).data.original_expr.clone();
+        let literal_member_relation = |id| {
+            egraph
+                .index(id)
+                .iter()
+                .find(|plan| {
+                    if let LogicalPlanLanguage::LiteralMemberRelation(_) = plan {
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .map(|plan| match plan {
+                    LogicalPlanLanguage::LiteralMemberRelation(LiteralMemberRelation(relation)) => {
+                        relation
+                    }
+                    _ => panic!("Unexpected non-literal member relation"),
+                })
+        };
         let mut map = Vec::new();
         match enode {
             LogicalPlanLanguage::Measure(params) => {
                 if let Some(_) = column_name(params[1]) {
                     let expr = original_expr(params[1])?;
                     let measure_name = var_iter!(egraph[params[0]], MeasureName).next().unwrap();
-                    map.push((measure_name.to_string(), expr.clone()));
+                    map.push((Some(measure_name.to_string()), expr.clone()));
                     Some(map)
                 } else {
                     None
@@ -125,7 +143,7 @@ impl LogicalPlanAnalysis {
                     let expr = original_expr(params[1])?;
                     let dimension_name =
                         var_iter!(egraph[params[0]], DimensionName).next().unwrap();
-                    map.push((dimension_name.to_string(), expr));
+                    map.push((Some(dimension_name.to_string()), expr));
                     Some(map)
                 } else {
                     None
@@ -135,7 +153,7 @@ impl LogicalPlanAnalysis {
                 if let Some(_) = column_name(params[1]) {
                     let expr = original_expr(params[1])?;
                     let segment_name = var_iter!(egraph[params[0]], SegmentName).next().unwrap();
-                    map.push((segment_name.to_string(), expr));
+                    map.push((Some(segment_name.to_string()), expr));
                     Some(map)
                 } else {
                     None
@@ -145,7 +163,7 @@ impl LogicalPlanAnalysis {
                 if let Some(_) = column_name(params[1]) {
                     let expr = original_expr(params[1])?;
                     let cube = var_iter!(egraph[params[0]], ChangeUserCube).next().unwrap();
-                    map.push((format!("{}.__user", cube), expr));
+                    map.push((Some(format!("{}.__user", cube)), expr));
                     Some(map)
                 } else {
                     None
@@ -160,7 +178,7 @@ impl LogicalPlanAnalysis {
                         .next()
                         .unwrap();
                     let expr = original_expr(params[2])?;
-                    map.push((format!("{}.{}", cube, field_name.to_string()), expr));
+                    map.push((Some(format!("{}.{}", cube, field_name.to_string())), expr));
                     Some(map)
                 } else {
                     None
@@ -172,7 +190,21 @@ impl LogicalPlanAnalysis {
                     let time_dimension_name = var_iter!(egraph[params[0]], TimeDimensionName)
                         .next()
                         .unwrap();
-                    map.push((time_dimension_name.to_string(), expr));
+                    map.push((Some(time_dimension_name.to_string()), expr));
+                    Some(map)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::LiteralMember(params) => {
+                if let Some(relation) = literal_member_relation(params[2]) {
+                    let expr = original_expr(params[1])?;
+                    let name = expr_column_name(expr, &None);
+                    let column_expr = Expr::Column(Column {
+                        relation: relation.clone(),
+                        name,
+                    });
+                    map.push((None, column_expr));
                     Some(map)
                 } else {
                     None

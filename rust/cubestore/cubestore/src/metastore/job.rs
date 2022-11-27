@@ -1,10 +1,10 @@
-use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, TableId};
+use super::{IndexId, RocksSecondaryIndex, TableId};
 use crate::base_rocks_secondary_index;
-use crate::metastore::{IdRow, MetaStoreEvent, RowKey};
+use crate::metastore::RowKey;
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::{Cursor, Write};
 

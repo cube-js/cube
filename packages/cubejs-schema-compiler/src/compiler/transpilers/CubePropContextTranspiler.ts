@@ -60,7 +60,7 @@ export class CubePropContextTranspiler implements TranspilerInterface {
     CubePropContextTranspiler.replaceValueWithArrowFunction(resolveSymbol, path.get('value'));
   }
 
-  public static replaceValueWithArrowFunction(resolveSymbol: (name: string) => void, value: NodePath<any>) {
+  public static replaceValueWithArrowFunction(resolveSymbol: (name: string) => any, value: NodePath<any>) {
     const knownIds = CubePropContextTranspiler.collectKnownIdentifiers(
       resolveSymbol,
       value,

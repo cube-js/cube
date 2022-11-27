@@ -9,9 +9,9 @@ menuOrder: 6
 ## Use case
 
 We want to run queries against
-[pre-aggregations](https://cube.dev/docs/caching#pre-aggregations) only to ensure our
-application's superior performance. Usually, accelerating a query is as simple as
-including its measures and dimensions to the pre-aggregation
+[pre-aggregations](https://cube.dev/docs/caching#pre-aggregations) only to
+ensure our application's superior performance. Usually, accelerating a query is
+as simple as including its measures and dimensions to the pre-aggregation
 [definition](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-measures).
 
 [Non-additive](https://cube.dev/docs/caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries-non-additivity)
@@ -22,12 +22,12 @@ to accelerate a query. However, there are a few ways to work around that.
 
 ## Data schema
 
-Let's explore the `Users` cube that contains various measures describing users' age:
+Let's explore the `Users` cube that contains various measures describing users'
+age:
 
 - count of unique age values (`distinctAges`)
 - average age (`avgAge`)
 - 90th [percentile](https://cube.dev/docs/recipes/percentiles) of age (`p90Age`)
-
 
 ```javascript
     distinctAges: {
@@ -46,7 +46,8 @@ Let's explore the `Users` cube that contains various measures describing users' 
     },
 ```
 
-All of these measures are non-additive. Practically speaking, it means that the pre-aggregation below would only accelerate a query that fully matches its
+All of these measures are non-additive. Practically speaking, it means that the
+pre-aggregation below would only accelerate a query that fully matches its
 definition:
 
 ```javascript
@@ -77,7 +78,9 @@ This query will match the pre-aggregation above and, thus, will be accelerated:
 }
 ```
 
-Meanwhile, the query below won't match the same pre-aggregation because it contains non-additive measures and omits the `gender` dimension. It won't be accelerated:
+Meanwhile, the query below won't match the same pre-aggregation because it
+contains non-additive measures and omits the `gender` dimension. It won't be
+accelerated:
 
 ```javascript
 {
@@ -91,16 +94,19 @@ Meanwhile, the query below won't match the same pre-aggregation because it conta
 
 Let's explore some possible workarounds.
 
-### <--{"id" : "Data schema"}-->  Replacing with approximate additive measures
+### <--{"id" : "Data schema"}--> Replacing with approximate additive measures
 
-Often, non-additive `countDistinct` measures can be changed to have the [`countDistinctApprox` type](https://cube.dev/docs/schema/reference/types-and-formats#measures-types-count-distinct-approx)
+Often, non-additive `countDistinct` measures can be changed to have the
+[`countDistinctApprox` type](https://cube.dev/docs/schema/reference/types-and-formats#measures-types-count-distinct-approx)
 which will make them additive and orders of magnitude more performant. This
-`countDistinctApprox` measures can be used in pre-aggregations. However, there are two
-drawbacks:
+`countDistinctApprox` measures can be used in pre-aggregations. However, there
+are two drawbacks:
 
-- This type is approximate, so the measures might yield slightly different results compared to their `countDistinct` counterparts. Please consult with your database's
-documentation to learn more.
-- The `countDistinctApprox` is not supported with all databases. Currently, Cube supports it for Athena, BigQuery, and Snowflake.
+- This type is approximate, so the measures might yield slightly different
+  results compared to their `countDistinct` counterparts. Please consult with
+  your database's documentation to learn more.
+- The `countDistinctApprox` is not supported with all databases. Currently, Cube
+  supports it for Athena, BigQuery, and Snowflake.
 
 For example, the `distinctAges` measure can be rewritten as follows:
 
@@ -111,12 +117,12 @@ For example, the `distinctAges` measure can be rewritten as follows:
     },
 ```
 
-### <--{"id" : "Data schema"}-->  Decomposing into a formula with additive measures
+### <--{"id" : "Data schema"}--> Decomposing into a formula with additive measures
 
 Non-additive `avg` measures can be rewritten as
 [calculated measures](https://cube.dev/docs/schema/reference/measures#calculated-measures)
-that reference additive measures only. Then, this additive measures can be used in
-pre-aggregations.
+that reference additive measures only. Then, this additive measures can be used
+in pre-aggregations.
 
 For example, the `avgAge` measure can be rewritten as follows:
 
@@ -136,12 +142,13 @@ For example, the `avgAge` measure can be rewritten as follows:
     },
 ```
 
-### <--{"id" : "Data schema"}-->  Providing multiple pre-aggregations
+### <--{"id" : "Data schema"}--> Providing multiple pre-aggregations
 
-If the two workarounds described above don't apply to your use case, feel free to create
-additional pre-aggregations with definitions that fully match your queries with
-non-additive measures. You will get a performance boost at the expense of a slightly
-increased overall pre-aggregation build time and space consumed.
+If the two workarounds described above don't apply to your use case, feel free
+to create additional pre-aggregations with definitions that fully match your
+queries with non-additive measures. You will get a performance boost at the
+expense of a slightly increased overall pre-aggregation build time and space
+consumed.
 
 ## Source code
 
