@@ -1,6 +1,6 @@
 /* eslint-disable global-require,no-restricted-syntax */
 import dotenv from '@cubejs-backend/dotenv';
-import { CubePreAggregationConverter, CubeSchemaConverter, ScaffoldingTemplate, YamlSchemaFormatter } from '@cubejs-backend/schema-compiler';
+import { CubePreAggregationConverter, CubeSchemaConverter, ScaffoldingTemplate, SchemaFormat, YamlSchemaFormatter } from '@cubejs-backend/schema-compiler';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
@@ -151,8 +151,11 @@ export class DevServer {
       });
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 
-      const formatter = req.body.format === 'yaml' ? new YamlSchemaFormatter(tablesSchema, driver) : undefined;
-      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver, formatter);
+      if (!Object.values(SchemaFormat).includes(req.body.format)) {
+        throw new Error(`Unknown schema format. Must be one of ${Object.values(SchemaFormat)}`);
+      }
+      
+      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver, req.body.format);
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables, { dataSource });
 
       const schemaPath = options.schemaPath || 'schema';

@@ -18,7 +18,7 @@ import { AppContext, AppContextConsumer } from '../../components/AppContext';
 import ButtonDropdown from '../../QueryBuilder/ButtonDropdown';
 
 enum SchemaFormat {
-  JavaScript = 'javascript',
+  JavaScript = 'js',
   Yaml = 'yaml',
 }
 
@@ -273,7 +273,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
                       disabled={!isYamlFormatSupported}
                       onClick={() => this.generateSchema(SchemaFormat.Yaml)}
                     >
-                      yaml
+                      Yaml
                     </Menu.Item>
                   </Menu>
                 }
