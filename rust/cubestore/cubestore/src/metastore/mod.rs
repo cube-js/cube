@@ -939,6 +939,7 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn start_processing_job(
         &self,
         server_name: String,
+        long_term: bool,
     ) -> Result<Option<IdRow<Job>>, CubeError>;
     async fn update_status(&self, job_id: u64, status: JobStatus) -> Result<IdRow<Job>, CubeError>;
     async fn update_heart_beat(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
@@ -3197,6 +3198,7 @@ impl MetaStore for RocksMetaStore {
     async fn start_processing_job(
         &self,
         server_name: String,
+        long_term: bool,
     ) -> Result<Option<IdRow<Job>>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let table = JobRocksTable::new(db_ref);
@@ -3206,6 +3208,7 @@ impl MetaStore for RocksMetaStore {
                     &JobRocksIndex::ByShard,
                 )?
                 .into_iter()
+                .filter(|j| j.get_row().is_long_term() == long_term)
                 .nth(0);
             if let Some(job) = next_job {
                 if let JobStatus::ProcessingBy(node) = job.get_row().status() {
