@@ -743,14 +743,6 @@ const variables: Record<string, (...args: any) => any> = {
     keyByDataSource('CUBEJS_DB_DATABRICKS_CATALOG', dataSource)
   ],
 
-  databricksStorageCredentialName: ({
-    dataSource
-  }: {
-    dataSource: string,
-  }) => process.env[
-    keyByDataSource('CUBEJS_DB_DATABRICKS_STORAGE_CREDENTIAL_NAME', dataSource)
-  ],
-
   /** ****************************************************************
    * Athena Driver                                                   *
    ***************************************************************** */
