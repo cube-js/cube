@@ -192,7 +192,10 @@ export class DatabricksDriver extends JDBCDriver {
       assertDataSource('default');
 
     let showSparkProtocolWarn = false;
-    let url: string = conf?.url || getEnv('databrickUrl', { dataSource });
+    let url: string =
+      conf?.url ||
+      getEnv('databrickUrl', { dataSource }) ||
+      getEnv('jdbcUrl', { dataSource });
     if (url.indexOf('jdbc:spark://') !== -1) {
       showSparkProtocolWarn = true;
       url = url.replace('jdbc:spark://', 'jdbc:databricks://');
@@ -245,15 +248,26 @@ export class DatabricksDriver extends JDBCDriver {
       azureKey:
         conf?.azureKey ||
         getEnv('dbExportBucketAzureKey', { dataSource }),
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      exportBucketCsvEscapeSymbol:
+        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
     };
     super(config);
     this.config = config;
     this.showSparkProtocolWarn = showSparkProtocolWarn;
   }
 
+  /**
+   * @override
+   */
   public readOnly() {
     return !!this.config.readOnly;
+  }
+
+  /**
+   * @override
+   */
+  public capabilities(): DriverCapabilities {
+    return { unloadWithoutTempTable: true };
   }
 
   /**
@@ -267,17 +281,31 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * @override
    */
-  public async loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: unknown[], _options: any) {
-    const [schema] = preAggregationTableName.split('.');
-    return super.loadPreAggregationIntoTable(
-      preAggregationTableName,
-      loadSql.replace(
-        new RegExp(`(?<=\\s)${schema}\\.(?=[^\\s]+)`, 'g'),
-        `${this.config.catalog}.${schema}.`
-      ),
-      params,
-      _options,
-    );
+  public async loadPreAggregationIntoTable(
+    preAggregationTableName: string,
+    loadSql: string,
+    params: unknown[],
+    _options: any,
+  ) {
+    if (this.config.catalog) {
+      const [schema] = preAggregationTableName.split('.');
+      return super.loadPreAggregationIntoTable(
+        preAggregationTableName,
+        loadSql.replace(
+          new RegExp(`(?<=\\s)${schema}\\.(?=[^\\s]+)`, 'g'),
+          `${this.config.catalog}.${schema}.`
+        ),
+        params,
+        _options,
+      );
+    } else {
+      return super.loadPreAggregationIntoTable(
+        preAggregationTableName,
+        loadSql,
+        params,
+        _options,
+      );
+    }
   }
 
   /**
@@ -470,10 +498,16 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns query columns types.
    */
-  public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: any; type: string; }[]> {
+  public async queryColumnTypes(
+    sql: string,
+    params?: unknown[]
+  ): Promise<{ name: any; type: string; }[]> {
     const result = [];
     // eslint-disable-next-line camelcase
-    const response = await this.query<{col_name: string; data_type: string}>(`DESCRIBE QUERY ${sql}`, params);
+    const response = await this.query<{col_name: string; data_type: string}>(
+      `DESCRIBE QUERY ${sql}`,
+      params || []
+    );
 
     for (const column of response) {
       // Databricks describe additional info by default after empty line.
@@ -534,15 +568,6 @@ export class DatabricksDriver extends JDBCDriver {
         this.config.bucketType
       }`);
     }
-
-    // if (this.config.catalog) {
-    //   if (!this.config.databricksStorageCredentialName) {
-    //     throw new Error(
-    //       'You should set CUBEJS_DB_DATABRICKS_STORAGE_CREDENTIAL_NAME ' +
-    //       'if you are using unity catalog'
-    //     );
-    //   }
-    // }
 
     const tableFullName = `${
       this.config.catalog ? `${this.config.catalog}.` : ''
@@ -757,9 +782,5 @@ export class DatabricksDriver extends JDBCDriver {
       `,
       [],
     );
-  }
-
-  public capabilities(): DriverCapabilities {
-    return { unloadWithoutTempTable: true };
   }
 }
