@@ -648,7 +648,7 @@ export async function getBirdbox(
           Mode.LOCAL,
           Mode.DOCKER,
         ],
-        default: Mode.DOCKER,
+        default: Mode.LOCAL,
       },
       log: {
         describe: 'Determines Birdbox logging.',
@@ -689,9 +689,6 @@ export async function getBirdbox(
 
   // birdbox instantiation
   let birdbox;
-  
-  console.log('>>>', { mode });
-  
   try {
     switch (mode) {
       case Mode.CLI:
