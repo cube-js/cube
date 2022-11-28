@@ -1,5 +1,4 @@
-import { ScaffoldingTemplate } from '../../src/scaffolding/ScaffoldingTemplate';
-import { YamlSchemaFormatter } from '../../src/scaffolding/formatters/YamlSchemaFormatter';
+import { ScaffoldingTemplate, SchemaFormat } from '../../src/scaffolding/ScaffoldingTemplate';
 
 const driver = {
   quoteIdentifier: (name) => `"${name}"`,
@@ -451,7 +450,7 @@ describe('ScaffoldingTemplate', () => {
       const template = new ScaffoldingTemplate(
         dbSchema,
         driver,
-        new YamlSchemaFormatter(dbSchema, driver)
+        SchemaFormat.Yaml
       );
 
       expect(
@@ -556,7 +555,7 @@ describe('ScaffoldingTemplate', () => {
           },
         },
         mySqlDriver,
-        new YamlSchemaFormatter(dbSchema, mySqlDriver)
+        SchemaFormat.Yaml
       );
       
       expect(

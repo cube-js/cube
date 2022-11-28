@@ -1,6 +1,6 @@
 import { MemberReference } from './descriptors/MemberReference';
 import { ValueWithComments } from './descriptors/ValueWithComments';
-import { JavaScriptSchemaFormatter } from './formatters/JavaScriptSchemaFormatter';
+import { JavaScriptSchemaFormatter, YamlSchemaFormatter } from './formatters';
 import {
   CubeDescriptor,
   CubeDescriptorMember,
@@ -26,17 +26,23 @@ export type SchemaDescriptor =
   | ValueWithComments
   | object;
 
+export enum SchemaFormat {
+  JavaScript = 'js',
+  Yaml = 'yaml',
+}
+
 export class ScaffoldingTemplate {
   private formatStrategy: BaseSchemaFormatter;
 
   public constructor(
     dbSchema: DatabaseSchema,
     private readonly driver,
-    formatStrategy?: BaseSchemaFormatter
+    format?: SchemaFormat
   ) {
     this.formatStrategy =
-      formatStrategy ||
-      new JavaScriptSchemaFormatter(dbSchema, this.driver);
+      format === SchemaFormat.Yaml
+        ? new YamlSchemaFormatter(dbSchema, this.driver)
+        : new JavaScriptSchemaFormatter(dbSchema, this.driver);
   }
 
   public generateFilesByTableNames(
@@ -48,7 +54,7 @@ export class ScaffoldingTemplate {
       schemaContext
     );
   }
-  
+
   public generateFilesByCubeDescriptors(
     cubeDescriptors: CubeDescriptor[],
     schemaContext: SchemaContext = {}
