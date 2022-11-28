@@ -111,9 +111,8 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
   async generateSchema(format: SchemaFormat = SchemaFormat.JavaScript) {
     const { checkedKeys, tablesSchema } = this.state;
     const { history } = this.props;
-    const options = {
-      schemaFormat: format,
-    };
+    
+    const options = { format };
 
     playgroundAction('Generate Schema', options);
     const res = await playgroundFetch('/playground/generate-schema', {
