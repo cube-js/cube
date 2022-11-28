@@ -454,15 +454,6 @@ describe('ScaffoldingTemplate', () => {
         new YamlSchemaFormatter(dbSchema, driver)
       );
 
-      console.log(
-        '>>>',
-        template.generateFilesByTableNames([
-          'public.orders',
-          ['public', 'customers'],
-          'public.accounts',
-        ])
-      );
-
       expect(
         template.generateFilesByTableNames([
           'public.orders',
@@ -557,7 +548,7 @@ describe('ScaffoldingTemplate', () => {
       ]);
     });
 
-    it.only('generates schema for MySQL driver', () => {
+    it('generates schema for MySQL driver', () => {
       const template = new ScaffoldingTemplate(
         {
           public: {
@@ -567,10 +558,6 @@ describe('ScaffoldingTemplate', () => {
         mySqlDriver,
         new YamlSchemaFormatter(dbSchema, mySqlDriver)
       );
-
-      console.log('>>>', template.generateFilesByTableNames([
-        'public.accounts',
-      ]));
       
       expect(
         template.generateFilesByTableNames([

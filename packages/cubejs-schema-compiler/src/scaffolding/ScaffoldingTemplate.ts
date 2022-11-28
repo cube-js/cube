@@ -5,7 +5,6 @@ import {
   CubeDescriptor,
   CubeDescriptorMember,
   DatabaseSchema,
-  ScaffoldingSchema,
   TableName,
 } from './ScaffoldingSchema';
 import { BaseSchemaFormatter } from './formatters/BaseSchemaFormatter';
@@ -30,14 +29,11 @@ export type SchemaDescriptor =
 export class ScaffoldingTemplate {
   private formatStrategy: BaseSchemaFormatter;
 
-  private readonly scaffoldingSchema: ScaffoldingSchema;
-
   public constructor(
     dbSchema: DatabaseSchema,
     private readonly driver,
     formatStrategy?: BaseSchemaFormatter
   ) {
-    this.scaffoldingSchema = new ScaffoldingSchema(dbSchema);
     this.formatStrategy =
       formatStrategy ||
       new JavaScriptSchemaFormatter(dbSchema, this.driver);
