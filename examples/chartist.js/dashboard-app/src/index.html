@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>Chartist.js example</title>
+  <link rel="stylesheet" href="../node_modules/chartist/dist/index.css">
+  <title>Chartist.js Dashboard</title>
+  <style>
+    body {
+      min-width: 1140px !important;
+    }
+
+    .dashboard {
+      padding: 64px 5em;
+      background-color: #f3f3fb;
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-row-gap: 5em;
+    }
+
+    #chartist__artwork,
+    #chartist__acquisitions {
+      height: 300px;
+    }
+
+    #chartist__artwork .ct-point {
+      stroke: #8e1ec6;
+      stroke-opacity: 0.5;
+    }
+
+    #chartist__acquisitions .ct-series-a .ct-bar {
+      stroke: #28c730;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="dashboard">
+    <h3>Paintings, tall and wide</h3>
+    <div id="chartist__artwork"></div>
+    <h3>Acquisitions by year</h3>
+    <div id="chartist__acquisitions"></div>
+    <script type="module" src="acquisitions.js"></script>
+    <script type="module">
+      import createExampleWrapper from "@cube-dev/example-wrapper";
+
+      createExampleWrapper({
+        title: "Chartist.js v1.3.0 example with Cube",
+        text: `
+          <p>This demo shows Chartist.js v1.3.0 charts with MoMA data 
+fetched by Cube.</p>
+          <p>Explore the <a 
+href="https://github.com/cube-js/cube.js/tree/master/examples/chartist.js/dashboard-app">source 
+code</a> and check the <a 
+href="https://cube.dev/blog/chartist.js-tutorial">tutorial</a>.</p>
+        `,
+      });
+    </script>
+  </div>
+</body>
+
+</html>
