@@ -773,7 +773,7 @@ impl Config {
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
                 wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 1048576 / 2),
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
-                long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 8),
+                long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 32),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
