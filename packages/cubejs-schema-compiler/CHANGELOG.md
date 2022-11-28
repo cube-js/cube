@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.18](https://github.com/cube-js/cube.js/compare/v0.31.17...v0.31.18) (2022-11-28)
+
+
+### Features
+
+* yaml schema generation ([#5676](https://github.com/cube-js/cube.js/issues/5676)) ([fc0b810](https://github.com/cube-js/cube.js/commit/fc0b81016e5c66156d06f6834187d3323e9e8ca8))
+
+
+
+
+
 ## [0.31.16](https://github.com/cube-js/cube.js/compare/v0.31.15...v0.31.16) (2022-11-23)
 
 

@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.18](https://github.com/cube-js/cube.js/compare/v0.31.17...v0.31.18) (2022-11-28)
+
+
+### Bug Fixes
+
+* **cubesql:** Prevent infinite limit push down ([f26d40a](https://github.com/cube-js/cube.js/commit/f26d40a3b91a2651811cfa622424c6ed2e44dfef))
+* **cubesql:** Push down projection to CubeScan with literals ([207616d](https://github.com/cube-js/cube.js/commit/207616d8e51649a78b854b02fc83611472aea715))
+
+
+### Features
+
+* **cubesql:** Sigma Computing date filters ([404e3f4](https://github.com/cube-js/cube.js/commit/404e3f42ac02be8c0c9eaacb6cf81bb516616001))
+
+
+
+
+
 ## [0.31.14](https://github.com/cube-js/cube.js/compare/v0.31.13...v0.31.14) (2022-11-14)
 
 
