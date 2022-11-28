@@ -198,7 +198,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
     const [, minor] = playgroundContext.coreServerVersion
       ? playgroundContext.coreServerVersion.split('.')
       : [];
-    const isYamlFormatSupported = minor || Number(minor) >= 31;
+    const isYamlFormatSupported: boolean = !minor || Number(minor) >= 31;
 
     const renderTreeNodes = (data) =>
       data.map((item) => {
