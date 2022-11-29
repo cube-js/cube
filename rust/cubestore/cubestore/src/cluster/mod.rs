@@ -1050,7 +1050,7 @@ impl ClusterImpl {
                 server_name: self.server_name.clone(),
                 notify: self.job_notify.clone(),
                 stop_token: self.stop_token.clone(),
-                is_long_term: i < self.config_obj.job_runners_count(),
+                is_long_term: i >= self.config_obj.job_runners_count(),
             };
             futures.push(cube_ext::spawn(async move {
                 job_runner.processing_loop().await;
