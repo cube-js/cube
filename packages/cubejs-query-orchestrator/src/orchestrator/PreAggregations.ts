@@ -1212,6 +1212,10 @@ export class PreAggregationLoader {
       tableData = { rows: await saveCancelFn(client.query(sql, params)) };
     }
 
+    if (!tableData.types && client.queryColumnTypes) {
+      tableData.types = await saveCancelFn(client.queryColumnTypes(sql));
+    }
+
     return tableData;
   }
 

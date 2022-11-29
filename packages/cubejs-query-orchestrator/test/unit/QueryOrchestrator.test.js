@@ -136,6 +136,10 @@ class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
   capabilities() {
     return { unloadWithoutTempTable: true };
   }
+  
+  queryColumnTypes() {
+    return [];
+  }
 }
 
 class StreamingSourceMockDriver extends MockDriver {
