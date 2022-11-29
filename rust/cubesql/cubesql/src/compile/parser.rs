@@ -6,7 +6,10 @@ use sqlparser::{
     parser::Parser,
 };
 
-use crate::{compile::CompilationError, sql::session::DatabaseProtocol};
+use crate::{
+    compile::{qtrace::Qtrace, CompilationError},
+    sql::session::DatabaseProtocol,
+};
 
 use super::CompilationResult;
 
@@ -42,6 +45,7 @@ lazy_static! {
 pub fn parse_sql_to_statements(
     query: &String,
     protocol: DatabaseProtocol,
+    qtrace: &mut Option<Qtrace>,
 ) -> CompilationResult<Vec<Statement>> {
     let original_query = query.clone();
 
@@ -240,6 +244,10 @@ pub fn parse_sql_to_statements(
         "",
     );
 
+    if let Some(qtrace) = qtrace {
+        qtrace.set_replaced_query(&query)
+    }
+
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
@@ -254,8 +262,9 @@ pub fn parse_sql_to_statements(
 pub fn parse_sql_to_statement(
     query: &String,
     protocol: DatabaseProtocol,
+    qtrace: &mut Option<Qtrace>,
 ) -> CompilationResult<Statement> {
-    match parse_sql_to_statements(query, protocol)? {
+    match parse_sql_to_statements(query, protocol, qtrace)? {
         stmts => {
             if stmts.len() == 1 {
                 Ok(stmts[0].clone())
@@ -287,6 +296,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string(),
             DatabaseProtocol::MySQL,
+            &mut None,
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -303,6 +313,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"SELECT NOW(); SELECT NOW();".to_string(),
             DatabaseProtocol::MySQL,
+            &mut None,
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -328,6 +339,7 @@ mod tests {
         "
             .to_string(),
             DatabaseProtocol::MySQL,
+            &mut None,
         );
         match result {
             Ok(_) => {}
@@ -340,6 +352,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string(),
             DatabaseProtocol::PostgreSQL,
+            &mut None,
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -356,6 +369,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"SELECT NOW(); SELECT NOW();".to_string(),
             DatabaseProtocol::PostgreSQL,
+            &mut None,
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -381,6 +395,7 @@ mod tests {
         "
             .to_string(),
             DatabaseProtocol::PostgreSQL,
+            &mut None,
         );
         match result {
             Ok(_) => {}

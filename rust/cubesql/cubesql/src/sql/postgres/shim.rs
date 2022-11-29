@@ -5,6 +5,7 @@ use crate::{
     compile::{
         convert_statement_to_cube_query,
         parser::{parse_sql_to_statement, parse_sql_to_statements},
+        qtrace::Qtrace,
         CompilationError, MetaContext, QueryPlan,
     },
     sql::{
@@ -245,14 +246,37 @@ impl AsyncPostgresShim {
             let mut doing_extended_query_message = false;
 
             let result = match buffer::read_message(&mut self.socket).await? {
-                protocol::FrontendMessage::Query(body) => self.process_query(body.query).await,
+                protocol::FrontendMessage::Query(body) => {
+                    let mut qtrace = Qtrace::new(&body.query);
+                    if let Some(qtrace) = &qtrace {
+                        debug!("Assigned query UUID: {}", qtrace.uuid())
+                    }
+                    let result = self.process_query(body.query, &mut qtrace).await;
+                    if let Some(qtrace) = &qtrace {
+                        qtrace.save_json()
+                    }
+                    result
+                }
                 protocol::FrontendMessage::Flush => self.flush().await,
                 protocol::FrontendMessage::Terminate => return Ok(()),
                 // Extended
                 protocol::FrontendMessage::Parse(body) => {
                     if tracked_error.is_none() {
                         doing_extended_query_message = true;
-                        self.parse(body).await
+                        let mut qtrace = Qtrace::new(&body.query);
+                        if let Some(qtrace) = &qtrace {
+                            debug!("Assigned query UUID: {}", qtrace.uuid())
+                        }
+                        let result = self.parse(body, &mut qtrace).await;
+                        if let Err(err) = &result {
+                            if let Some(qtrace) = &mut qtrace {
+                                qtrace.set_query_error_message(&err.to_string())
+                            }
+                        };
+                        if let Some(qtrace) = &qtrace {
+                            qtrace.save_json()
+                        }
+                        result
                     } else {
                         continue;
                     }
@@ -756,6 +780,7 @@ impl AsyncPostgresShim {
                     &prepared_statement,
                     meta,
                     self.session.clone(),
+                    &mut None,
                 )
                 .await?;
 
@@ -769,7 +794,11 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    pub async fn parse(&mut self, parse: protocol::Parse) -> Result<(), ConnectionError> {
+    pub async fn parse(
+        &mut self,
+        parse: protocol::Parse,
+        qtrace: &mut Option<Qtrace>,
+    ) -> Result<(), ConnectionError> {
         if parse.query.trim() == "" {
             let mut statements_guard = self.session.state.statements.write().await;
             statements_guard.insert(
@@ -780,8 +809,12 @@ impl AsyncPostgresShim {
                 },
             );
         } else {
-            let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL)?;
-            self.prepare_statement(parse.name, query, false).await?;
+            let query = parse_sql_to_statement(&parse.query, DatabaseProtocol::PostgreSQL, qtrace)?;
+            if let Some(qtrace) = qtrace {
+                qtrace.push_statement(&query);
+            }
+            self.prepare_statement(parse.name, query, false, qtrace)
+                .await?;
         }
 
         self.write(protocol::ParseComplete::new()).await?;
@@ -794,6 +827,7 @@ impl AsyncPostgresShim {
         name: String,
         query: Statement,
         from_sql: bool,
+        qtrace: &mut Option<Qtrace>,
     ) -> Result<(), ConnectionError> {
         let prepared_statements_count = self.session.state.statements.read().await.len();
         if prepared_statements_count
@@ -833,7 +867,8 @@ impl AsyncPostgresShim {
         let hacked_query = stmt_replacer.replace(&query)?;
 
         let plan =
-            convert_statement_to_cube_query(&hacked_query, meta, self.session.clone()).await?;
+            convert_statement_to_cube_query(&hacked_query, meta, self.session.clone(), qtrace)
+                .await?;
 
         let description = if let Some(description) = plan.to_row_description(Format::Text)? {
             if description.len() > 0 {
@@ -890,11 +925,15 @@ impl AsyncPostgresShim {
         &mut self,
         stmt: ast::Statement,
         meta: Arc<MetaContext>,
+        qtrace: &mut Option<Qtrace>,
     ) -> Result<(), ConnectionError> {
         let cancel = self.session.state.begin_query(stmt.to_string());
 
         tokio::select! {
             _ = cancel.cancelled() => {
+                if let Some(qtrace) = qtrace {
+                    qtrace.set_statement_error_message("Execution cancelled by user");
+                }
                 self.session.state.end_query();
 
                 // We don't return error, because query can contains multiple statements
@@ -903,7 +942,7 @@ impl AsyncPostgresShim {
 
                 Ok(())
             },
-            res = self.process_simple_query(stmt, meta, cancel.clone()) => {
+            res = self.process_simple_query(stmt, meta, cancel.clone(), qtrace) => {
                 self.session.state.end_query();
 
                 res
@@ -916,6 +955,7 @@ impl AsyncPostgresShim {
         stmt: ast::Statement,
         meta: Arc<MetaContext>,
         cancel: CancellationToken,
+        qtrace: &mut Option<Qtrace>,
     ) -> Result<(), ConnectionError> {
         match stmt {
             Statement::StartTransaction { .. } => {
@@ -1063,9 +1103,13 @@ impl AsyncPostgresShim {
                     )
                 })?;
 
-                let plan =
-                    convert_statement_to_cube_query(&cursor.query, meta, self.session.clone())
-                        .await?;
+                let plan = convert_statement_to_cube_query(
+                    &cursor.query,
+                    meta,
+                    self.session.clone(),
+                    qtrace,
+                )
+                .await?;
 
                 let mut portal = Portal::new(plan, cursor.format, PortalFrom::Fetch);
 
@@ -1126,6 +1170,7 @@ impl AsyncPostgresShim {
                     &select_stmt,
                     meta.clone(),
                     self.session.clone(),
+                    &mut None,
                 )
                 .await?;
 
@@ -1277,7 +1322,8 @@ impl AsyncPostgresShim {
                     _ => *statement,
                 };
 
-                self.prepare_statement(name.value, statement, true).await?;
+                self.prepare_statement(name.value, statement, true, qtrace)
+                    .await?;
 
                 let plan = QueryPlan::MetaOk(StatusFlags::empty(), CommandCompletion::Prepare);
 
@@ -1289,9 +1335,13 @@ impl AsyncPostgresShim {
                 .await?;
             }
             other => {
-                let plan =
-                    convert_statement_to_cube_query(&other, meta.clone(), self.session.clone())
-                        .await?;
+                let plan = convert_statement_to_cube_query(
+                    &other,
+                    meta.clone(),
+                    self.session.clone(),
+                    qtrace,
+                )
+                .await?;
 
                 self.write_portal(
                     &mut Portal::new(plan, Format::Text, PortalFrom::Simple),
@@ -1339,7 +1389,11 @@ impl AsyncPostgresShim {
     ///         handle_simple_query
     ///             process_simple_query -> (portal)
     ///                 write_portal
-    pub async fn execute_query(&mut self, query: &str) -> Result<(), ConnectionError> {
+    pub async fn execute_query(
+        &mut self,
+        query: &str,
+        qtrace: &mut Option<Qtrace>,
+    ) -> Result<(), ConnectionError> {
         let meta = self
             .session
             .server
@@ -1347,21 +1401,38 @@ impl AsyncPostgresShim {
             .meta(self.auth_context()?)
             .await?;
 
-        let statements = parse_sql_to_statements(&query.to_string(), DatabaseProtocol::PostgreSQL)?;
+        let statements =
+            parse_sql_to_statements(&query.to_string(), DatabaseProtocol::PostgreSQL, qtrace)?;
 
         if statements.len() == 0 {
             self.write(protocol::EmptyQuery::new()).await?;
         } else {
             for statement in statements {
-                match std::panic::AssertUnwindSafe(
-                    self.handle_simple_query(statement, meta.clone()),
-                )
+                if let Some(qtrace) = qtrace {
+                    qtrace.push_statement(&statement);
+                }
+                match std::panic::AssertUnwindSafe(self.handle_simple_query(
+                    statement,
+                    meta.clone(),
+                    qtrace,
+                ))
                 .catch_unwind()
                 .await
                 {
-                    Ok(res) => res?,
+                    Ok(res) => {
+                        if let Some(qtrace) = qtrace {
+                            if let Err(err) = &res {
+                                qtrace.set_statement_error_message(&err.to_string());
+                            }
+                        }
+                        res?
+                    }
                     Err(err) => {
-                        return Err(CubeError::panic(err).into());
+                        let err: ConnectionError = CubeError::panic(err).into();
+                        if let Some(qtrace) = qtrace {
+                            qtrace.set_statement_error_message(&err.to_string());
+                        }
+                        return Err(err);
                     }
                 }
             }
@@ -1370,10 +1441,17 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    pub async fn process_query(&mut self, query: String) -> Result<(), ConnectionError> {
+    pub async fn process_query(
+        &mut self,
+        query: String,
+        qtrace: &mut Option<Qtrace>,
+    ) -> Result<(), ConnectionError> {
         debug!("Query: {}", query);
 
-        if let Err(err) = self.execute_query(&query).await {
+        if let Err(err) = self.execute_query(&query, qtrace).await {
+            if let Some(qtrace) = qtrace {
+                qtrace.set_query_error_message(&err.to_string())
+            }
             self.handle_connection_error(err).await?;
         };
 
