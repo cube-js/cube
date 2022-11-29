@@ -702,7 +702,7 @@ async fn filtered_join(service: Box<dyn SqlClient>) {
 
     let result = service
         .exec_query(
-            "select e.name from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name=e.name where b.department_name = 'Marketing' GROUP BY 1 LIMIT 10000",
+            "select e.name from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name=e.name where b.department_name = 'Marketing' GROUP BY 1 ORDER BY 1 LIMIT 10000",
         )
         .await
         .unwrap();
