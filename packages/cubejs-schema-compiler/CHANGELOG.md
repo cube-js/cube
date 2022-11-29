@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
+
+
+### Bug Fixes
+
+* packages/cubejs-schema-compiler/package.json to reduce vulnerabilities ([#5359](https://github.com/cube-js/cube.js/issues/5359)) ([cd81554](https://github.com/cube-js/cube.js/commit/cd81554079533eae2c35ce142b26ad862b6e250d))
+
+
+
+
+
 ## [0.31.18](https://github.com/cube-js/cube.js/compare/v0.31.17...v0.31.18) (2022-11-28)
 
 

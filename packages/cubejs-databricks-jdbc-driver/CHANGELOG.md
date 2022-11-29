@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
+
+
+### Features
+
+* catalog support for the Databricks driver ([#5666](https://github.com/cube-js/cube.js/issues/5666)) ([de5ba9a](https://github.com/cube-js/cube.js/commit/de5ba9a247543b432ea82b4371ddb052f1c91227))
+
+
+
+
+
 ## [0.31.18](https://github.com/cube-js/cube.js/compare/v0.31.17...v0.31.18) (2022-11-28)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

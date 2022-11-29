@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
+
+
+### Bug Fixes
+
+* Incorrect filter pushdown when filtering two left-joined tables ([#5685](https://github.com/cube-js/cube.js/issues/5685)) ([c775869](https://github.com/cube-js/cube.js/commit/c77586961078ec67395af39e3f233025833d4f6e)), closes [#3777](https://github.com/cube-js/cube.js/issues/3777)
+
+
+
+
+
 ## [0.31.17](https://github.com/cube-js/cube.js/compare/v0.31.16...v0.31.17) (2022-11-23)
 
 

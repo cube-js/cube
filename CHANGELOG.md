@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
+
+
+### Bug Fixes
+
+* Incorrect filter pushdown when filtering two left-joined tables ([#5685](https://github.com/cube-js/cube.js/issues/5685)) ([c775869](https://github.com/cube-js/cube.js/commit/c77586961078ec67395af39e3f233025833d4f6e)), closes [#3777](https://github.com/cube-js/cube.js/issues/3777)
+* packages/cubejs-client-core/package.json to reduce vulnerabilities ([#5352](https://github.com/cube-js/cube.js/issues/5352)) ([76e8e43](https://github.com/cube-js/cube.js/commit/76e8e43c05d857ce4338d0d184a987e4edae735c))
+* packages/cubejs-client-vue/package.json to reduce vulnerabilities ([#5361](https://github.com/cube-js/cube.js/issues/5361)) ([effc694](https://github.com/cube-js/cube.js/commit/effc694b29da181899ff74f7f0107eeaa9aaec76))
+* packages/cubejs-query-orchestrator/package.json to reduce vulnerabilities ([#5347](https://github.com/cube-js/cube.js/issues/5347)) ([3442ddf](https://github.com/cube-js/cube.js/commit/3442ddf319caeae8c5506f4cec0fde1ebcf9d147))
+* packages/cubejs-schema-compiler/package.json to reduce vulnerabilities ([#5359](https://github.com/cube-js/cube.js/issues/5359)) ([cd81554](https://github.com/cube-js/cube.js/commit/cd81554079533eae2c35ce142b26ad862b6e250d))
+* packages/cubejs-schema-compiler/package.json to reduce vulnerabilities ([#5408](https://github.com/cube-js/cube.js/issues/5408)) ([6b7a95f](https://github.com/cube-js/cube.js/commit/6b7a95f96dacb42a0a50fe77afcc11216f10c29a))
+* packages/cubejs-templates/package.json to reduce vulnerabilities ([#5342](https://github.com/cube-js/cube.js/issues/5342)) ([825605a](https://github.com/cube-js/cube.js/commit/825605aa8d85dca29b6d3d7a230e361c1374746b))
+
+
+### Features
+
+* catalog support for the Databricks driver ([#5666](https://github.com/cube-js/cube.js/issues/5666)) ([de5ba9a](https://github.com/cube-js/cube.js/commit/de5ba9a247543b432ea82b4371ddb052f1c91227))
+
+
+
+
+
 ## [0.31.18](https://github.com/cube-js/cube.js/compare/v0.31.17...v0.31.18) (2022-11-28)
 
 
