@@ -1,6 +1,7 @@
 use crate::{
     compile::{
         engine::provider::CubeContext,
+        qtrace::{Qtrace, QtraceEclass, QtraceEgraphIteration},
         rewrite::{
             analysis::LogicalPlanAnalysis,
             converter::LanguageToLogicalPlanConverter,
@@ -214,6 +215,7 @@ impl IterDebugInfo {
 #[derive(Debug)]
 pub struct IterInfo {
     debug_info: Option<IterDebugInfo>,
+    debug_qtrace_eclasses: Option<Vec<QtraceEclass>>,
 }
 
 impl IterInfo {
@@ -229,6 +231,17 @@ impl IterationData<LogicalPlanLanguage, LogicalPlanAnalysis> for IterInfo {
         IterInfo {
             debug_info: if Self::egraph_debug_enabled() {
                 Some(IterDebugInfo::make(runner))
+            } else {
+                None
+            },
+            debug_qtrace_eclasses: if Qtrace::is_enabled() {
+                Some(
+                    runner
+                        .egraph
+                        .classes()
+                        .map(|eclass| QtraceEclass::make(eclass))
+                        .collect(),
+                )
             } else {
                 None
             },
@@ -278,88 +291,128 @@ impl Rewriter {
         &mut self,
         root: Id,
         auth_context: AuthContextRef,
+        qtrace: &mut Option<Qtrace>,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
+        if let Some(qtrace) = qtrace {
+            qtrace.set_original_graph(&egraph);
+        }
 
-        tokio::task::spawn_blocking(move || {
-            let rules = Self::rewrite_rules(cube_context.clone());
-            let runner = Self::rewrite_runner(cube_context.clone(), egraph);
-            let runner = runner.run(rules.iter());
-            if !IterInfo::egraph_debug_enabled() {
-                log::debug!("Iterations: {:?}", runner.iterations);
-            }
-            let stop_reason = &runner.iterations[runner.iterations.len() - 1].stop_reason;
-            let stop_reason = match stop_reason {
-                None => Some("timeout reached".to_string()),
-                Some(StopReason::Saturated) => None,
-                Some(StopReason::NodeLimit(limit)) => {
-                    Some(format!("{} AST node limit reached", limit))
+        let (plan, qtrace_egraph_iterations, qtrace_best_graph) =
+            tokio::task::spawn_blocking(move || {
+                let rules = Self::rewrite_rules(cube_context.clone());
+                let runner = Self::rewrite_runner(cube_context.clone(), egraph);
+                let runner = runner.run(rules.iter());
+                if !IterInfo::egraph_debug_enabled() {
+                    log::debug!("Iterations: {:?}", runner.iterations);
                 }
-                Some(StopReason::IterationLimit(limit)) => {
-                    Some(format!("{} iteration limit reached", limit))
-                }
-                Some(StopReason::Other(other)) => Some(other.to_string()),
-                Some(StopReason::TimeLimit(seconds)) => {
-                    Some(format!("{} seconds timeout reached", seconds))
-                }
-            };
-            if let Some(stop_reason) = stop_reason {
-                return Err(CubeError::user(format!(
-                    "Can't find rewrite due to {}",
-                    stop_reason
-                )));
-            }
-            if IterInfo::egraph_debug_enabled() {
-                let _ = fs::remove_dir_all("egraph-debug");
-                let _ = fs::create_dir_all("egraph-debug");
-                let mut nodes = csv::Writer::from_path("egraph-debug/nodes.csv")
-                    .map_err(|e| CubeError::internal(e.to_string()))?;
-                let mut edges = csv::Writer::from_path("egraph-debug/edges.csv")
-                    .map_err(|e| CubeError::internal(e.to_string()))?;
-                nodes
-                    .write_record(&["Id", "Label", "Cluster", "Timeset"])
-                    .map_err(|e| CubeError::internal(e.to_string()))?;
-                edges
-                    .write_record(&["Source", "Target", "Type", "Timeset"])
-                    .map_err(|e| CubeError::internal(e.to_string()))?;
-                for i in runner.iterations {
-                    i.data.debug_info.as_ref().unwrap().export_svg()?;
-                    for node in i
-                        .data
-                        .debug_info
-                        .as_ref()
-                        .unwrap()
-                        .formatted_nodes_csv
-                        .iter()
-                    {
-                        nodes
-                            .write_record(node)
-                            .map_err(|e| CubeError::internal(e.to_string()))?;
+                let stop_reason = &runner.iterations[runner.iterations.len() - 1].stop_reason;
+                let stop_reason = match stop_reason {
+                    None => Some("timeout reached".to_string()),
+                    Some(StopReason::Saturated) => None,
+                    Some(StopReason::NodeLimit(limit)) => {
+                        Some(format!("{} AST node limit reached", limit))
                     }
-                    for edge in i
-                        .data
-                        .debug_info
-                        .as_ref()
-                        .unwrap()
-                        .formatted_edges_csv
-                        .iter()
-                    {
-                        edges
-                            .write_record(edge)
-                            .map_err(|e| CubeError::internal(e.to_string()))?;
+                    Some(StopReason::IterationLimit(limit)) => {
+                        Some(format!("{} iteration limit reached", limit))
+                    }
+                    Some(StopReason::Other(other)) => Some(other.to_string()),
+                    Some(StopReason::TimeLimit(seconds)) => {
+                        Some(format!("{} seconds timeout reached", seconds))
+                    }
+                };
+                if let Some(stop_reason) = stop_reason {
+                    return Err(CubeError::user(format!(
+                        "Can't find rewrite due to {}",
+                        stop_reason
+                    )));
+                }
+                if IterInfo::egraph_debug_enabled() {
+                    let _ = fs::remove_dir_all("egraph-debug");
+                    let _ = fs::create_dir_all("egraph-debug");
+                    let mut nodes = csv::Writer::from_path("egraph-debug/nodes.csv")
+                        .map_err(|e| CubeError::internal(e.to_string()))?;
+                    let mut edges = csv::Writer::from_path("egraph-debug/edges.csv")
+                        .map_err(|e| CubeError::internal(e.to_string()))?;
+                    nodes
+                        .write_record(&["Id", "Label", "Cluster", "Timeset"])
+                        .map_err(|e| CubeError::internal(e.to_string()))?;
+                    edges
+                        .write_record(&["Source", "Target", "Type", "Timeset"])
+                        .map_err(|e| CubeError::internal(e.to_string()))?;
+                    for i in &runner.iterations {
+                        i.data.debug_info.as_ref().unwrap().export_svg()?;
+                        for node in i
+                            .data
+                            .debug_info
+                            .as_ref()
+                            .unwrap()
+                            .formatted_nodes_csv
+                            .iter()
+                        {
+                            nodes
+                                .write_record(node)
+                                .map_err(|e| CubeError::internal(e.to_string()))?;
+                        }
+                        for edge in i
+                            .data
+                            .debug_info
+                            .as_ref()
+                            .unwrap()
+                            .formatted_edges_csv
+                            .iter()
+                        {
+                            edges
+                                .write_record(edge)
+                                .map_err(|e| CubeError::internal(e.to_string()))?;
+                        }
                     }
                 }
-            }
-            let extractor = Extractor::new(&runner.egraph, BestCubePlan);
-            let (_, best) = extractor.find_best(root);
-            let new_root = Id::from(best.as_ref().len() - 1);
-            log::debug!("Best: {:?}", best);
-            let converter =
-                LanguageToLogicalPlanConverter::new(best, cube_context.clone(), auth_context);
-            Ok(converter.to_logical_plan(new_root))
-        })
-        .await??
+                let qtrace_egraph_iterations = if Qtrace::is_enabled() {
+                    runner
+                        .iterations
+                        .iter()
+                        .map(|iteration| {
+                            QtraceEgraphIteration::make(
+                                iteration,
+                                iteration
+                                    .data
+                                    .debug_qtrace_eclasses
+                                    .as_ref()
+                                    .cloned()
+                                    .unwrap(),
+                            )
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                };
+                let extractor = Extractor::new(&runner.egraph, BestCubePlan);
+                let (_, best) = extractor.find_best(root);
+                let qtrace_best_graph = if Qtrace::is_enabled() {
+                    best.as_ref().iter().cloned().collect()
+                } else {
+                    vec![]
+                };
+                let new_root = Id::from(best.as_ref().len() - 1);
+                log::debug!("Best: {:?}", best);
+                let converter =
+                    LanguageToLogicalPlanConverter::new(best, cube_context.clone(), auth_context);
+                Ok((
+                    converter.to_logical_plan(new_root),
+                    qtrace_egraph_iterations,
+                    qtrace_best_graph,
+                ))
+            })
+            .await??;
+
+        if let Some(qtrace) = qtrace {
+            qtrace.set_egraph_iterations(qtrace_egraph_iterations);
+            qtrace.set_best_graph(&qtrace_best_graph);
+        }
+
+        plan
     }
 
     pub fn rewrite_rules(

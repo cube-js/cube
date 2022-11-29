@@ -1265,7 +1265,7 @@ mod tests {
     };
 
     fn parse_expr_from_projection(query: &String, db: DatabaseProtocol) -> ast::Expr {
-        let stmt = parse_sql_to_statement(&query, db).unwrap();
+        let stmt = parse_sql_to_statement(&query, db, &mut None).unwrap();
         match stmt {
             ast::Statement::Query(query) => match &query.body {
                 ast::SetExpr::Select(select) => {
