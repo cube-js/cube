@@ -1,0 +1,163 @@
+---
+title: Row-Level Security
+permalink: /security/row-level
+category: Authentication & Authorization
+subCategory: Authorization
+menuOrder: 4
+---
+
+Row-level security allows controlling access to data based on the rows of data
+in a table. This means that access to individual rows of data can be restricted
+based on the user or group that is trying to access the data.
+
+For example, if a table contains sensitive information, row-level security can
+be used to limit access to that information to only authorized users. This can
+help to prevent unauthorized access to sensitive data and ensure that only
+authorized users are able to view and manipulate the data.
+
+Cube provides row-level security with the
+[`queryRewrite()`][ref-config-conf-queryrewrite] configuration option and the
+[Security Context][ref-sec-ctx]. We'll use the example dataset and cube below to
+illustrate this.
+
+<SnippetGroup>
+
+<Snippet>
+
+| id  | user_id | status     |
+| --- | ------- | ---------- |
+| 1   | 434     | completed  |
+| 2   | 554     | shipped    |
+| 3   | 41      | completed  |
+| 4   | 599     | shipped    |
+| 5   | 34      | processing |
+| 6   | 327     | completed  |
+| 7   | 201     | processing |
+| 8   | 590     | shipped    |
+| 9   | 449     | completed  |
+| 10  | 500     | completed  |
+
+</Snippet>
+
+<Snippet>
+
+<CodeTabs>
+
+```javascript
+// Orders.js
+cube('Orders', {
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primaryKey: true,
+    },
+    user_id: {
+      sql: `user_id`,
+      type: `string`,
+    },
+    status: {
+      sql: `status`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: user_id
+        sql: user_id
+        type: string
+      - name: status
+        sql: status
+        type: string
+```
+
+</CodeTabs>
+
+</Snippet>
+
+</SnippetGroup>
+
+First, configure [`queryRewrite()`][ref-config-conf-queryrewrite] to filter the
+results by `user_id` in the [`cube.js` configuration file][ref-config]:
+
+```typescript
+// cube.js
+module.exports = {
+  queryRewrite: (query, { securityContext }) => {
+    if (!securityContext.user_id) {
+      throw new Error('No User ID found in Security Context!');
+    }
+    query.filters.push({
+      member: 'Orders.user_id',
+      operator: 'equals',
+      values: [securityContext.user_id],
+    });
+
+    return query;
+  },
+};
+```
+
+Next, ensure the JWT payload has a `user_id` claim. We can do this by going to
+the Playground and clicking **Edit Security Context**, and using the payload
+below:
+
+```json
+{
+  "user_id": 434,
+  "exp": 1666571207
+}
+```
+
+<div style="text-align: center">
+  <img
+    alt="Cube Playground with Edit Security Context modal open"
+    src="https://ucarecdn.com/fa5e213f-2f02-4ce0-bc3a-013d756f2351/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Finally, we send a query to Cube and get the results back:
+
+<SnippetGroup>
+
+<Snippet>
+
+```json
+{
+  "dimensions": [
+    "Orders.id",
+    "Orders.user_id",
+    "Orders.status"
+  ],
+  "order": {
+    "Orders.id": "asc"
+  }
+}
+```
+
+</Snippet>
+
+<Snippet>
+
+| id  | user_id | status    |
+| --- | ------ | --------- |
+| 1   | 434    | completed |
+
+</Snippet>
+
+</SnippetGroup>
+
+[ref-config]: /config
+[ref-config-conf-queryrewrite]: /config#options-reference-query-rewrite
+[ref-sec-ctx]: /security/context

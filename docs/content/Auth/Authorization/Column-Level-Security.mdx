@@ -1,0 +1,104 @@
+---
+title: Column-Level Security
+permalink: /security/column-level
+category: Authentication & Authorization
+subCategory: Authorization
+menuOrder: 3
+---
+
+Column-level security allows controlling access to specific columns in a table.
+This type of security is used to limit the visibility and access to sensitive or
+confidential data within a database.
+
+For example, if a table contains columns with sensitive information such as
+social security numbers or salary information, column-level security can be used
+to restrict access to these columns to only authorized users or roles.
+
+Cube provides column-level security by using
+[`COMPILE_CONTEXT`][ref-schema-ref-cube-compile-ctx]. We can write a model that
+only shows the `salary` field if the user JWT's `department_id` claim is `hr`.
+
+```typescript
+// Orders.js
+
+// First extract the security context from the compile context
+const { securityContext } = COMPILE_CONTEXT;
+
+const customDimensions = {};
+// If the `department` value inside the security context is `hr`, then add the
+// salary dimension to the cube.
+if (securityContext.department_id === 'hr') {
+  customDimensions['salary'] = {
+    type: `number`,
+    // We have to use a function definition for the `sql` parameter when we
+    // declare members outside a `cube()` function.
+    sql: (CUBE) => `${CUBE}.number * 100`,
+  };
+}
+
+cube('Users', {
+  // Here we merge the custom dimensions with the static ones inside the cube
+  dimensions: Object.assign(customDimensions, {
+    employee_id: {
+      sql: `employee_id`,
+      type: `string`,
+    },
+  }),
+});
+```
+
+Next, ensure the JWT payload has a `department` claim. We can do this by going
+to the Playground and clicking **Edit Security Context**, and using the payload
+below:
+
+```json
+{
+  "department": "finance",
+  "exp": 1666571207
+}
+```
+
+<div style="text-align: center">
+  <img
+    alt="Cube Playground with Edit Security Context modal open"
+    src="https://ucarecdn.com/c6b7f9e4-cd25-4aa5-9511-e883bd5019b5/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Finally, if we send a request to the [`/meta` endpoint][ref-api-rest-meta], we
+should see the `salary` dimension under `dimensions`:
+
+```json
+{
+  "cubes": [
+    {
+      "name": "Users",
+      "dimensions": [
+        {
+          "name": "Users.salary",
+          "title": "Users Salary",
+          "type": "number",
+          "shortTitle": "Salary",
+          "suggestFilterValues": true,
+          "isVisible": true
+        },
+        {
+          "name": "Users.employee_id",
+          "title": "Users Employee Id",
+          "type": "number",
+          "shortTitle": "Employee Id",
+          "suggestFilterValues": true,
+          "isVisible": true
+        }
+      ]
+    }
+  ]
+}
+```
+
+[ref-api-rest-meta]: /rest-api#api-reference-v-1-meta
+[ref-schema-ref-cube-compile-ctx]:
+  /schema/reference/cube#context-variables-compile-context
+[ref-sec-ctx]: /security/context

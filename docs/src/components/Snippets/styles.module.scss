@@ -1,4 +1,18 @@
 .snippetGroup {
   display: flex;
   gap: 1rem;
+
+  > * {
+    flex: 1;
+  }
+
+  > table,
+  > div[class^='CodeTabs-module'],
+  > :global(.gatsby-highlight) > pre[class^='language'],
+  > :global(.gatsby-highlight) > div[class*='language'] {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  margin-bottom: 1.5rem;
 }
