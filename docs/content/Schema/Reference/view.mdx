@@ -117,15 +117,13 @@ view(`ActiveUsers`, {
 
 ### <--{"id" : "Parameters"}--> shown
 
-The `shown` property is used to manage the visibility of a view. Some data may
-be available only to specific roles within an organization or to specific
-customers. In the example below, we’re making the `ARR` view only visible to
-users with finance permissions:
+The `shown` property is used to manage the visibility of a view. Valid values
+for `shown` are `true` and `false`.
 
 ```typescript
 view(`ARR`, {
   description: `Annual Recurring Revenue`,
-  shown: COMPILE_CONTEXT.securityContext.isFinance,
+  shown: true,
   includes: [Revenue.arr, Revenue.date, Customers.plan],
 });
 ```

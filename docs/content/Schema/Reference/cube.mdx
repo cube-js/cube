@@ -376,15 +376,13 @@ cube(`Tickets`, {
 
 ### <--{"id" : "Parameters"}--> shown
 
-The `shown` property is used to manage the visibility of a cube. Some data may
-be available only to specific roles within an organization or to specific
-customers. In the example below, we’re making the `Orders` cube only visible to
-users with finance permissions:
+The `shown` property is used to manage the visibility of a cube. Valid values
+for `shown` are `true` and `false`.
 
 ```typescript
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
-  shown: COMPILE_CONTEXT.securityContext.isFinance,
+  shown: false,
 });
 ```
 
