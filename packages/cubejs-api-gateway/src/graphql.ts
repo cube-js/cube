@@ -7,7 +7,8 @@ import {
   DirectiveNode,
   FieldNode,
   VariableNode,
-  ValueNode, GraphQLSchema,
+  ValueNode,
+  GraphQLSchema,
 } from 'graphql';
 
 import {
