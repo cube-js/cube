@@ -90,4 +90,9 @@ export class HanaQuery extends BaseQuery {
   wrapSegmentForDimensionSelect(sql) {
     return `IF(${sql}, 1, 0)`;
   }
+
+  preAggregationLoadSql(cube, preAggregation, tableName) {
+    const sqlAndParams = this.preAggregationSql(cube, preAggregation);
+    return [`CREATE TABLE ${tableName} ${this.asSyntaxTable} ( ${sqlAndParams[0]} )`, sqlAndParams[1]];
+  }
 }
