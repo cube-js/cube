@@ -245,7 +245,7 @@ impl StreamingService for StreamingServiceImpl {
                 last_init_seq_check = SystemTime::now();
             }
 
-            let rows = new_rows?;
+            let mut rows = new_rows?;
             debug!("Received {} rows for {}", rows.len(), location);
             let table_cols = table.get_row().get_columns().as_slice();
             let mut builders = create_array_builders(table_cols);
@@ -253,6 +253,10 @@ impl StreamingService for StreamingServiceImpl {
             let mut start_seq: Option<i64> = None;
             let mut end_seq: Option<i64> = None;
 
+            rows.sort_unstable_by_key(|row| match &row.values()[seq_column_index] {
+                TableValue::Int(seq) => *seq,
+                x => panic!("Unexpected type for sequence column: {:?}", x),
+            });
             for row in rows {
                 append_row(&mut builders, table_cols, &row);
                 match &row.values()[seq_column_index] {
