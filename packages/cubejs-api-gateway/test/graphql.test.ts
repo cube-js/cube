@@ -23,6 +23,12 @@ const metaConfig = [
           isVisible: true,
         },
       ],
+      segments: [
+        {
+          name: 'Foo.last1y',
+          isVisible: true,
+        }
+      ]
     },
   },
 ];
