@@ -1,4 +1,4 @@
-/* globals describe,test,expect,jest */
+/* globals describe,test,expect */
 
 import { GraphQLObjectType } from 'graphql';
 import { makeSchema } from '../src/graphql';
@@ -34,7 +34,6 @@ function expectValidSchema(schema) {
   expect(fooFields).toHaveProperty('bar');
   expect(fooFields).toHaveProperty('id');
   expect(fooFields).toHaveProperty('time');
-
 }
 
 describe('Graphql Schema', () => {

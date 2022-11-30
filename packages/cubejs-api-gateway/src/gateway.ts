@@ -438,10 +438,6 @@ class ApiGateway {
   public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
 
-    function visibilityFilter(item) {
-      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
-    }
-
     try {
       const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
         requestId: context.requestId,
