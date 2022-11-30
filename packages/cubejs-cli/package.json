@@ -5,7 +5,7 @@
   "version": "0.31.14",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zhjuncai/cube.js.git",
+    "url": "https://github.com/cube-js/cube.js.git",
     "directory": "packages/cubejs-cli"
   },
   "engines": {
