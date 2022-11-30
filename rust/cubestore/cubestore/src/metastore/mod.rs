@@ -2067,10 +2067,18 @@ impl MetaStore for RocksMetaStore {
             batch_pipe.invalidate_tables_cache();
             let tables_table = TableRocksTable::new(db_ref.clone());
             let indexes_table = IndexRocksTable::new(db_ref.clone());
+            let replay_handles_table = ReplayHandleRocksTable::new(db_ref.clone());
             let indexes = indexes_table.get_row_ids_by_index(
                 &IndexIndexKey::TableId(table_id),
                 &IndexRocksIndex::TableID,
             )?;
+            let replay_handles = replay_handles_table.get_rows_by_index(
+                &ReplayHandleIndexKey::ByTableId(table_id),
+                &ReplayHandleRocksIndex::ByTableId,
+            )?;
+            for replay_handle in replay_handles {
+                replay_handles_table.delete(replay_handle.get_id(), batch_pipe)?;
+            }
             for index in indexes {
                 RocksMetaStore::drop_index(db_ref.clone(), batch_pipe, index, true)?;
             }

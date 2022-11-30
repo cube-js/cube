@@ -1094,6 +1094,17 @@ mod tests {
                 .await
                 .unwrap()
             );
+
+            let result = service
+                .exec_query("DROP TABLE test.events_by_type_1")
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query("SELECT * FROM system.replay_handles")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows().len(), 0);
         })
             .await;
     }
