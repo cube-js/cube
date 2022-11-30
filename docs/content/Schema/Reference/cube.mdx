@@ -107,7 +107,7 @@ Referencing a foreign cube in the `sql` parameter instructs Cube to build an
 implicit join to this cube. Using the schema above, we'll use a query as an
 example:
 
-```jsom
+```json
 {
   "dimensions": ["Users.name"];
 }
@@ -149,42 +149,20 @@ cube(`Contacts`, {
 
 ## Parameters
 
-### <--{"id" : "Parameters"}--> sql
+### <--{"id" : "Parameters"}--> dataSource
 
-The `sql` parameter specifies the SQL that will be used to generate a table that
-will be queried by a cube. It can be any valid SQL query, but usually it takes
-the form of a `select * from my_table` query. Please note that you don't need to
-use `GROUP BY` in a SQL query on the cube level. This query should return a
-plain table, without aggregations.
-
-```javascript
-cube(`Orders`, {
-  sql: `SELECT * FROM orders`,
-});
-```
-
-You can reference others’ cubes SQL statement for code reuse.
+Each cube in schema can have its own `dataSource` name to support scenarios
+where data should be fetched from multiple databases. The value of the
+`dataSource` parameter will be passed to the
+[`driverFactory()`][ref-config-driverfactory] function as part of the `context`
+parameter. By default, each cube has a `default` value for its `dataSource`; to
+override it you can use:
 
 ```javascript
-cube(`Companies`, {
-  sql: `SELECT users.company_name, users.company_id FROM ${Users.sql()} AS users`,
-});
-```
-
-### <--{"id" : "Parameters"}--> title
-
-Use `title` to change the display name of the cube. By default, Cube will
-humanize the cube's name, so for instance, `UsersOrder` would become
-`Users Orders`. If default humanizing doesn't work in your case, please use the
-title parameter. It is highly recommended to give human readable names to your
-cubes. It will help everyone on a team better understand the data structure and
-will help maintain a consistent set of definitions across an organization.
-
-```javascript
-cube(`Orders`, {
+cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
 
-  title: `Product Orders`,
+  dataSource: `prod_db`,
 });
 ```
 
@@ -211,14 +189,14 @@ from `OrderFacts`:
 
 ```javascript
 cube(`OrderFacts`, {
-  sql: `SELECT * FROM orders`
+  sql: `SELECT * FROM orders`,
 
   measures: {
     count: {
       type: `count`,
-      sql: `id`
-    }
-  }
+      sql: `id`,
+    },
+  },
 });
 
 cube(`ExtendedOrderFacts`, {
@@ -227,9 +205,9 @@ cube(`ExtendedOrderFacts`, {
   measures: {
     doubleCount: {
       type: `number`,
-      sql: `${count} * 2`
-    }
-  }
+      sql: `${count} * 2`,
+    },
+  },
 });
 ```
 
@@ -241,14 +219,14 @@ generation and reusing with `extends`. Previous example without defining
 
 ```javascript
 const OrderFacts = cube({
-  sql: `SELECT * FROM orders`
+  sql: `SELECT * FROM orders`,
 
   measures: {
     count: {
       type: `count`,
-      sql: `id`
-    }
-  }
+      sql: `id`,
+    },
+  },
 });
 
 cube(`ExtendedOrderFacts`, {
@@ -257,9 +235,9 @@ cube(`ExtendedOrderFacts`, {
   measures: {
     doubleCount: {
       type: `number`,
-      sql: `${count} * 2`
-    }
-  }
+      sql: `${count} * 2`,
+    },
+  },
 });
 ```
 
@@ -353,7 +331,7 @@ SQL will be:
 SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 ```
 
-### <--{"id" : "Parameters"}--> Supported cron formats
+#### Supported cron formats
 
 - Standard cron syntax
 
@@ -382,20 +360,39 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 └───────────────────────── second (0 - 59, optional)
 ```
 
-### <--{"id" : "Parameters"}--> dataSource
+### <--{"id" : "Parameters"}--> rewriteQueries
 
-Each cube in schema can have its own `dataSource` name to support scenarios
-where data should be fetched from multiple databases. The value of the
-`dataSource` parameter will be passed to the
-[`driverFactory()`][ref-config-driverfactory] function as part of the `context`
-parameter. By default, each cube has a `default` value for its `dataSource`; to
-override it you can use:
+Set this flag to true if you want Cube to rewrite your queries after final SQL
+has been generated. This may be helpful to apply filter pushdown optimizations
+or reduce unnecessary query nesting. For example:
 
 ```javascript
-cube(`OrderFacts`, {
-  sql: `SELECT * FROM orders`,
+cube(`Tickets`, {
+  rewriteQueries: true,
 
-  dataSource: `prod_db`,
+  // ...
+});
+```
+
+### <--{"id" : "Parameters"}--> sql
+
+The `sql` parameter specifies the SQL that will be used to generate a table that
+will be queried by a cube. It can be any valid SQL query, but usually it takes
+the form of a `select * from my_table` query. Please note that you don't need to
+use `GROUP BY` in a SQL query on the cube level. This query should return a
+plain table, without aggregations.
+
+```javascript
+cube(`Orders`, {
+  sql: `SELECT * FROM orders`,
+});
+```
+
+You can reference others’ cubes SQL statement for code reuse.
+
+```javascript
+cube(`Companies`, {
+  sql: `SELECT users.company_name, users.company_id FROM ${Users.sql()} AS users`,
 });
 ```
 
@@ -417,17 +414,20 @@ cube(`OrderFacts`, {
 It'll generate aliases for members such as `ofacts__count`. `sqlAlias` affects
 all member names including pre-aggregation table names.
 
-### <--{"id" : "Parameters"}--> rewriteQueries
+### <--{"id" : "Parameters"}--> title
 
-Set this flag to true if you want Cube to rewrite your queries after final SQL
-has been generated. This may be helpful to apply filter pushdown optimizations
-or reduce unnecessary query nesting. For example:
+Use `title` to change the display name of the cube. By default, Cube will
+humanize the cube's name, so for instance, `UsersOrder` would become
+`Users Orders`. If default humanizing doesn't work in your case, please use the
+title parameter. It is highly recommended to give human readable names to your
+cubes. It will help everyone on a team better understand the data structure and
+will help maintain a consistent set of definitions across an organization.
 
 ```javascript
-cube(`Tickets`, {
-  rewriteQueries: true,
+cube(`Orders`, {
+  sql: `SELECT * FROM orders`,
 
-  // ...
+  title: `Product Orders`,
 });
 ```
 
