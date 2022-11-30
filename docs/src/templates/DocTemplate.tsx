@@ -244,7 +244,18 @@ class DocTemplate extends Component<Props, State> {
           [styles.postClearSection]: isPreviousSectionClearable,
         });
 
-        currentID = kebabCase(item.props.children[0]);
+        let elementId = item.props.children[0];
+        let elementTitle = item.props.children[0];
+        // Handle code-block H2 headers
+        if (Array.isArray(item.props.children) && item.props.children.length === 1 && typeof item.props.children[0] !== 'string') {
+          elementId = item.props.children[0].props.children[0];
+        }
+        // Handle code-block H3 headers with custom ID prefix
+        if (Array.isArray(item.props.children) && item.props.children.length > 1) {
+          elementId = item.props.children[1].props.children[0];
+        }
+
+        currentID = kebabCase(elementId);
 
         if (item.type === 'h2') {
           prevSection.className = cx(prevSection.className, {
@@ -262,7 +273,7 @@ class DocTemplate extends Component<Props, State> {
               : currentID,
           type: item.type,
           nodes: [],
-          title: item.props.children[0],
+          title: elementTitle,
           className,
         });
 
@@ -276,7 +287,7 @@ class DocTemplate extends Component<Props, State> {
               type: 'link',
               className: styles.hTagIcon,
             }),
-            item.props.children[0]
+            elementId
           )
         );
       }
