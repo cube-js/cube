@@ -27,6 +27,7 @@ example below, we create a new view `ActiveUsers` which is made up of properties
 from the `Users` cube:
 
 ```typescript
+// schema/ActiveUsers.ts
 view(`ActiveUsers`, {
   description: `14 days rolling count of active users`,
   includes: [
@@ -40,10 +41,10 @@ view(`ActiveUsers`, {
 ```
 
 You also can reference measures and dimensions one-by-one. This is helpful when
-there is a need to control the join path or to rename measures and dimensions
-from the underlying cubes. In the example below, we create a view
-`CompletedOrders` which brings in dimensions from the `Users` cube through
-nested joins:
+there is a need to [control the join path][ref-schema-joins-direction] or to
+rename measures and dimensions from the underlying cubes. In the example below,
+we create a view `CompletedOrders` which brings in dimensions from the `Users`
+cube through nested joins:
 
 ```typescript
 view(`CompletedOrders`, {
@@ -124,7 +125,15 @@ users with finance permissions:
 ```typescript
 view(`ARR`, {
   description: `Annual Recurring Revenue`,
-  shown: COMPILE_CONTEXT.permissions['finance'],
+  shown: COMPILE_CONTEXT.securityContext.isFinance,
   includes: [Revenue.arr, Revenue.date, Customers.plan],
 });
 ```
+
+To learn more about using `shown` to control visibility based on security
+context, read the [Controlling access to cubes and views
+recipe][ref-recipe-control-access-cubes-views].
+
+[ref-recipe-control-access-cubes-views]:
+  /recipes/controlling-access-to-cubes-and-views
+[ref-schema-joins-direction]: /schema/fundamentals/joins#directions-of-joins

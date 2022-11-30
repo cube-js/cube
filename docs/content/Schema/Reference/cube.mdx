@@ -374,6 +374,24 @@ cube(`Tickets`, {
 });
 ```
 
+### <--{"id" : "Parameters"}--> shown
+
+The `shown` property is used to manage the visibility of a cube. Some data may
+be available only to specific roles within an organization or to specific
+customers. In the example below, we’re making the `Orders` cube only visible to
+users with finance permissions:
+
+```typescript
+cube(`Orders`, {
+  sql: `SELECT * FROM orders`,
+  shown: COMPILE_CONTEXT.securityContext.isFinance,
+});
+```
+
+To learn more about using `shown` to control visibility based on security
+context, read the [Controlling access to cubes and views
+recipe][ref-recipe-control-access-cubes-views].
+
 ### <--{"id" : "Parameters"}--> sql
 
 The `sql` parameter specifies the SQL that will be used to generate a table that
@@ -666,6 +684,8 @@ cube(`Users`, {
 [ref-config-queryrewrite]: /config#query-rewrite
 [ref-config-req-ctx]: /config#request-context
 [ref-dev-playground]: /dev-tools/dev-playground
+[ref-recipe-control-access-cubes-views]:
+  /recipes/controlling-access-to-cubes-and-views
 [ref-restapi-meta]: /rest-api#v-1-meta
 [ref-restapi-sql]: /rest-api#v-1-sql
 [ref-sec-ctx]: /security/context
