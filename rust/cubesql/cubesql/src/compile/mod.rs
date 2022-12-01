@@ -7719,6 +7719,33 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_like_escape_symbol() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "like_escape_symbol",
+            execute_query(
+                "
+                SELECT attname, test
+                FROM (
+                    SELECT
+                        attname,
+                        't%est' test
+                    FROM pg_catalog.pg_attribute
+                ) pga
+                WHERE
+                    attname LIKE 'is\\_%_ale' AND
+                    test LIKE 't\\%e%'
+                ORDER BY attname
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn superset_meta_queries() -> Result<(), CubeError> {
         init_logger();
 
