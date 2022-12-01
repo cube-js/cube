@@ -77,6 +77,12 @@ trait Visitor<'ast, E: Error> {
                 self.visit_expr(&mut *left)?;
                 self.visit_expr(&mut *right)?;
             }
+            Expr::Like { expr, pattern, .. }
+            | Expr::ILike { expr, pattern, .. }
+            | Expr::SimilarTo { expr, pattern, .. } => {
+                self.visit_expr(&mut *expr)?;
+                self.visit_expr(&mut *pattern)?;
+            }
             Expr::InList { expr, list, .. } => {
                 self.visit_expr(&mut *expr)?;
 

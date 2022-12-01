@@ -427,6 +427,16 @@ macro_rules! variant_field_struct {
         );
     };
 
+    ($variant:ident, $var_field:ident, LikeType) => {
+        $crate::variant_field_struct!(
+            @enum_struct $variant, $var_field, { LikeType } -> {
+                LikeType::Like => "Like",
+                LikeType::ILike => "ILike",
+                LikeType::SimilarTo => "SimilarTo",
+            }
+        );
+    };
+
     (@enum_struct $variant:ident, $var_field:ident, { $var_field_type:ty } -> {$($variant_type:ty => $name:literal,)*}) => {
         paste::item! {
             #[derive(Debug, Clone)]

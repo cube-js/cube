@@ -289,6 +289,11 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[2], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::LikeExpr(params) => {
+                push_referenced_columns(params[2], &mut vec)?;
+                push_referenced_columns(params[3], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::InListExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
