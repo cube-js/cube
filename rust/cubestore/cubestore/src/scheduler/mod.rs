@@ -21,6 +21,7 @@ use chrono::Utc;
 use datafusion::cube_ext;
 use flatbuffers::bitflags::_core::cmp::Ordering;
 use flatbuffers::bitflags::_core::time::Duration;
+use futures::future::join_all;
 use futures_timer::Delay;
 use itertools::Itertools;
 use log::error;
@@ -108,7 +109,7 @@ impl SchedulerImpl {
                     .chunk_processing_loop
                     .process(
                         scheduler4.clone(),
-                        async move |_| Ok(Delay::new(Duration::from_micros(200)).await),
+                        async move |_| Ok(Delay::new(Duration::from_millis(200)).await),
                         async move |s, _| s.process_chunk_events().await,
                     )
                     .await;
@@ -685,7 +686,7 @@ impl SchedulerImpl {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    async fn process_chunk_events(&self) -> Result<(), CubeError> {
+    async fn process_chunk_events(self: &Arc<Self>) -> Result<(), CubeError> {
         let ids = {
             let mut chunk_queue = self.chunk_events_queue.lock().await;
             let dur = Duration::from_millis(200);
@@ -715,7 +716,10 @@ impl SchedulerImpl {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    async fn process_active_chunks(&self, chunks: Vec<IdRow<Chunk>>) -> Result<(), CubeError> {
+    async fn process_active_chunks(
+        self: &Arc<Self>,
+        chunks: Vec<IdRow<Chunk>>,
+    ) -> Result<(), CubeError> {
         let mut partition_ids_map: HashMap<u64, bool> = HashMap::new(); // id -> has in_memory chunks
         for chunk in chunks.into_iter() {
             if !chunk.get_row().active() {
@@ -736,23 +740,51 @@ impl SchedulerImpl {
                 .meta_store
                 .get_partitions_out_of_queue(partition_ids)
                 .await?;
+            let mut futures = Vec::with_capacity(partitions.len());
             for partition in partitions.into_iter() {
                 if partition.get_row().is_active() {
                     if *partition_ids_map.get(&partition.get_id()).unwrap_or(&false) {
-                        self.schedule_compaction_in_memory_chunks_if_needed(&partition)
-                            .await?;
+                        let self_to_move = self.clone();
+                        let partition_to_move = partition.clone();
+                        futures.push(cube_ext::spawn(async move {
+                            self_to_move
+                                .schedule_compaction_in_memory_chunks_if_needed(&partition_to_move)
+                                .await
+                        }));
                     }
-                    self.schedule_compaction_if_needed(&partition).await?;
+                    let partition_to_move = partition.clone();
+                    let self_to_move = self.clone();
+                    futures.push(cube_ext::spawn(async move {
+                        self_to_move
+                            .schedule_compaction_if_needed(&partition_to_move)
+                            .await
+                    }));
+                    /* features.push(async move {
+                        self.schedule_compaction_if_needed(&partition_to_move).await?
+                    }); */
                 } else {
-                    self.schedule_repartition(&partition).await?;
+                    let partition_to_move = partition.clone();
+                    let self_to_move = self.clone();
+                    futures.push(cube_ext::spawn(async move {
+                        self_to_move.schedule_repartition(&partition_to_move).await
+                    }));
                 }
             }
+            join_all(futures)
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .collect::<Result<(), _>>()?;
         }
 
         Ok(())
     }
     #[tracing::instrument(level = "trace", skip(self))]
-    async fn process_inactive_chunks(&self, chunks: Vec<IdRow<Chunk>>) -> Result<(), CubeError> {
+    async fn process_inactive_chunks(
+        self: &Arc<Self>,
+        chunks: Vec<IdRow<Chunk>>,
+    ) -> Result<(), CubeError> {
         for chunk in chunks.into_iter() {
             if chunk.get_row().active() {
                 continue;
