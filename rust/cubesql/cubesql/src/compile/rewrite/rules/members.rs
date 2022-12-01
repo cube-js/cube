@@ -9,7 +9,7 @@ use crate::{
             column_name_to_member_to_aliases, column_name_to_member_vec, cross_join, cube_scan,
             cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
             cube_scan_order_empty_tail, dimension_expr, expr_column_name,
-            expr_column_name_with_relation, fun_expr, is_not_null_expr, join, limit,
+            expr_column_name_with_relation, fun_expr, is_not_null_expr, join, like_expr, limit,
             list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
             literal_member, measure_expr, member_pushdown_replacer, member_replacer,
             merged_members_replacer, original_expr_name, projection, projection_expr,
@@ -18,9 +18,10 @@ use crate::{
             rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules, utils},
             segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
             transforming_rewrite, udaf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AliasExprAlias, CastExprDataType, ChangeUserCube,
-            ColumnExprColumn, CubeScanAliasToCube, CubeScanAliases, CubeScanLimit, CubeScanOffset,
-            DimensionName, JoinLeftOn, JoinRightOn, LimitFetch, LimitSkip, LiteralExprValue,
+            AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, CastExprDataType,
+            ChangeUserCube, ColumnExprColumn, CubeScanAliasToCube, CubeScanAliases, CubeScanLimit,
+            CubeScanOffset, DimensionName, JoinLeftOn, JoinRightOn, LikeExprEscapeChar,
+            LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, LiteralExprValue,
             LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
             MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
             MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, MemberReplacerAliases,
@@ -35,7 +36,7 @@ use crate::{
 use cubeclient::models::V1CubeMetaMeasure;
 use datafusion::{
     arrow::datatypes::DataType,
-    logical_plan::{Column, DFSchema, Expr},
+    logical_plan::{Column, DFSchema, Expr, Operator},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
 };
@@ -664,6 +665,19 @@ impl RewriteRules for MemberRules {
                 "case-when-is-not-null-expr-then-expr",
                 case_expr(vec![(is_not_null_expr("?expr"), "?expr".to_string())], None),
                 "?expr".to_string(),
+            ),
+            // LIKE expr to binary expr
+            transforming_rewrite(
+                "like-expr-to-binary-expr",
+                like_expr(
+                    "?like_type",
+                    "?negated",
+                    "?expr",
+                    "?pattern",
+                    "?escape_char",
+                ),
+                binary_expr("?expr", "?op", "?pattern"),
+                self.transform_like_expr("?like_type", "?negated", "?escape_char", "?op"),
             ),
             // Join
             transforming_rewrite(
@@ -2485,6 +2499,47 @@ impl MemberRules {
                     }
 
                     return true;
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_like_expr(
+        &self,
+        like_type_var: &'static str,
+        negated_var: &'static str,
+        escape_char_var: &'static str,
+        op_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let like_type_var = var!(like_type_var);
+        let negated_var = var!(negated_var);
+        let escape_char_var = var!(escape_char_var);
+        let op_var = var!(op_var);
+        move |egraph, subst| {
+            for escape_char in var_iter!(egraph[subst[escape_char_var]], LikeExprEscapeChar) {
+                if escape_char.is_some() {
+                    continue;
+                }
+
+                for like_type in var_iter!(egraph[subst[like_type_var]], LikeExprLikeType) {
+                    for negated in var_iter!(egraph[subst[negated_var]], LikeExprNegated) {
+                        let operator = match (like_type, negated) {
+                            (LikeType::Like, false) => Operator::Like,
+                            (LikeType::Like, true) => Operator::NotLike,
+                            (LikeType::ILike, false) => Operator::ILike,
+                            (LikeType::ILike, true) => Operator::NotILike,
+                            _ => continue,
+                        };
+
+                        subst.insert(
+                            op_var,
+                            egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(operator))),
+                        );
+
+                        return true;
+                    }
                 }
             }
 

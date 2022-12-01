@@ -23,9 +23,32 @@ use egg::{
     rewrite, Applier, EGraph, Id, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
     Symbol, Var,
 };
-use std::{fmt::Display, ops::Index, slice::Iter, str::FromStr};
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Index,
+    slice::Iter,
+    str::FromStr,
+};
 
 // trace_macros!(true);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+pub enum LikeType {
+    Like,
+    ILike,
+    SimilarTo,
+}
+
+impl Display for LikeType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let join_type = match self {
+            LikeType::Like => "Like",
+            LikeType::ILike => "ILike",
+            LikeType::SimilarTo => "SimilarTo",
+        };
+        write!(f, "{}", join_type)
+    }
+}
 
 crate::plan_to_language! {
     pub enum LogicalPlanLanguage {
@@ -138,6 +161,13 @@ crate::plan_to_language! {
             left: Box<Expr>,
             op: Operator,
             right: Box<Expr>,
+        },
+        LikeExpr {
+            like_type: LikeType,
+            negated: bool,
+            expr: Box<Expr>,
+            pattern: Box<Expr>,
+            escape_char: Option<char>,
         },
         NotExpr { expr: Box<Expr>, },
         IsNotNullExpr { expr: Box<Expr>, },
@@ -681,6 +711,19 @@ fn between_expr(
     high: impl Display,
 ) -> String {
     format!("(BetweenExpr {} {} {} {})", expr, negated, low, high)
+}
+
+fn like_expr(
+    like_type: impl Display,
+    negated: impl Display,
+    expr: impl Display,
+    pattern: impl Display,
+    escape_char: impl Display,
+) -> String {
+    format!(
+        "(LikeExpr {} {} {} {} {})",
+        like_type, negated, expr, pattern, escape_char
+    )
 }
 
 fn negative_expr(expr: impl Display) -> String {

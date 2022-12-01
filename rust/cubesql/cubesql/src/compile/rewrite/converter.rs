@@ -12,13 +12,14 @@ use crate::{
             ColumnExprColumn, CubeScanLimit, CubeScanOffset, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
-            JoinRightOn, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
-            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
-            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
-            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
-            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
-            TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
-            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType,
+            LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
+            LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc, OrderMember,
+            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun,
+            ScalarUDFExprFun, ScalarVariableExprDataType, ScalarVariableExprVariable,
+            SegmentMemberMember, SortExprAsc, SortExprNullsFirst, TableScanFetch,
+            TableScanProjection, TableScanSourceTableName, TableScanTableName, TableUDFExprFun,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
             TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
@@ -34,7 +35,7 @@ use datafusion::{
     logical_plan::{
         build_join_schema, build_table_udf_schema, exprlist_to_fields, normalize_cols,
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
-        CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct, EmptyRelation, Expr, Limit,
+        CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct, EmptyRelation, Expr, Like, Limit,
         LogicalPlan, LogicalPlanBuilder, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
@@ -154,6 +155,46 @@ impl LogicalPlanToLanguageConverter {
                 let right = self.add_expr(right)?;
                 self.graph
                     .add(LogicalPlanLanguage::BinaryExpr([left, op, right]))
+            }
+            ast @ Expr::Like(Like {
+                negated,
+                expr,
+                pattern,
+                escape_char,
+            })
+            | ast @ Expr::ILike(Like {
+                negated,
+                expr,
+                pattern,
+                escape_char,
+            })
+            | ast @ Expr::SimilarTo(Like {
+                negated,
+                expr,
+                pattern,
+                escape_char,
+            }) => {
+                let like_type = add_data_node!(
+                    self,
+                    match ast {
+                        Expr::Like(_) => LikeType::Like,
+                        Expr::ILike(_) => LikeType::ILike,
+                        Expr::SimilarTo(_) => LikeType::SimilarTo,
+                        _ => panic!("Expected LIKE, ILIKE, SIMILAR TO, got: {}", ast),
+                    },
+                    LikeExprLikeType
+                );
+                let negated = add_data_node!(self, negated, LikeExprNegated);
+                let expr = self.add_expr(expr)?;
+                let pattern = self.add_expr(pattern)?;
+                let escape_char = add_data_node!(self, escape_char, LikeExprEscapeChar);
+                self.graph.add(LogicalPlanLanguage::LikeExpr([
+                    like_type,
+                    negated,
+                    expr,
+                    pattern,
+                    escape_char,
+                ]))
             }
             Expr::Not(expr) => {
                 let expr = self.add_expr(expr)?;
@@ -653,6 +694,24 @@ pub fn node_to_expr(
             let op = match_data_node!(node_by_id, params[1], BinaryExprOp);
             let right = Box::new(to_expr(params[2].clone())?);
             Expr::BinaryExpr { left, op, right }
+        }
+        LogicalPlanLanguage::LikeExpr(params) => {
+            let like_type = match_data_node!(node_by_id, params[0], LikeExprLikeType);
+            let negated = match_data_node!(node_by_id, params[1], LikeExprNegated);
+            let expr = Box::new(to_expr(params[2].clone())?);
+            let pattern = Box::new(to_expr(params[3].clone())?);
+            let escape_char = match_data_node!(node_by_id, params[4], LikeExprEscapeChar);
+            let like_expr = Like {
+                negated,
+                expr,
+                pattern,
+                escape_char,
+            };
+            match like_type {
+                LikeType::Like => Expr::Like(like_expr),
+                LikeType::ILike => Expr::ILike(like_expr),
+                LikeType::SimilarTo => Expr::SimilarTo(like_expr),
+            }
         }
         LogicalPlanLanguage::NotExpr(params) => {
             let expr = Box::new(to_expr(params[0].clone())?);
