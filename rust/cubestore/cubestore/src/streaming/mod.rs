@@ -271,7 +271,7 @@ impl StreamingService for StreamingServiceImpl {
                             if *new_last_seq - *end_seq != 1 {
                                 return Err(CubeError::internal(format!(
                                     "Unexpected sequence increase gap from {} to {}. Back filling with jumping sequence numbers isn't supported.",
-                                    new_last_seq, end_seq
+                                    end_seq, new_last_seq
                                 )));
                             }
                             *end_seq = (*end_seq).max(*new_last_seq);
@@ -1099,7 +1099,7 @@ mod tests {
                 .unwrap()
             );
 
-            let result = service
+            service
                 .exec_query("DROP TABLE test.events_by_type_1")
                 .await
                 .unwrap();
