@@ -64,6 +64,7 @@ impl ExecutionPlan for TailLimitExec {
         self.input.output_hints()
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn execute(
         &self,
         partition: usize,
@@ -121,6 +122,7 @@ impl TailLimitStream {
     }
 }
 
+#[tracing::instrument(level = "trace", skip(batches, schema))]
 fn batches_tail(
     mut batches: Vec<RecordBatch>,
     limit: usize,
