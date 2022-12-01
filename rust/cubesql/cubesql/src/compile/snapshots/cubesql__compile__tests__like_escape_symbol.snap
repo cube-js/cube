@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT attname, test\n                FROM (\n                    SELECT\n                        attname,\n                        't%est' test\n                    FROM pg_catalog.pg_attribute\n                ) pga\n                WHERE\n                    attname LIKE 'is\\\\_%_ale' AND\n                    test LIKE 't\\\\%e%'\n                ORDER BY attname\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----------+-------+
+| attname   | test  |
++-----------+-------+
+| is_female | t%est |
+| is_male   | t%est |
++-----------+-------+
