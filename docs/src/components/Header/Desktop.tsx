@@ -12,22 +12,22 @@ const layout = {
       xl: 6,
       lg: 7,
       md: 7,
-      xs: 24,
+      xs: 21,
     },
   },
   contentArea: {
     width: {
-      xxl: { span: 12, offset: 1 },
-      xl: { span: 12, offset: 1 },
+      xxl: { span: 10, offset: 1 },
+      xl: { span: 10, offset: 1 },
       lg: { span: 9, offset: 1 },
       md: { span: 7, offset: 1 },
-      xs: 0,
+      xs: 3,
     },
   },
   rightSidebar: {
     width: {
-      xxl: { span: 4, offset: 1 },
-      xl: { span: 4, offset: 1 },
+      xxl: { span: 6, offset: 1 },
+      xl: { span: 6, offset: 1 },
       lg: { span: 6, offset: 1 },
       md: { span: 8, offset: 1 },
       xs: 0,
