@@ -591,8 +591,14 @@ fn scalar_fun_expr_args_empty_tail() -> String {
 }
 
 fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl Display) -> String {
+    let prefix = if fun_name.to_string().starts_with("?") {
+        ""
+    } else {
+        "AggregateFunctionExprFun:"
+    };
     format!(
-        "(AggregateFunctionExpr {} {} {})",
+        "(AggregateFunctionExpr {}{} {} {})",
+        prefix,
         fun_name,
         list_expr("AggregateFunctionExprArgs", args),
         distinct

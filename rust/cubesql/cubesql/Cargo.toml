@@ -9,12 +9,12 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "135a867812d03d8f6c724f6ff1aeb056fdfc909d", default-features = false, features = ["unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "3c4ed45ab983a880fbfb6e9152ea0707b5584d2f", default-features = false, features = ["unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "2b18e22a179770f1297896d52ae384f00949ab2a" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "883cc6a3cf8483ecdcba22ebf9ba8215c9abcb11" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
 tokio = { version = "1.0", features = ["full", "rt", "tracing"] }

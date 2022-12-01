@@ -70,8 +70,8 @@ use crate::{
         dataframe,
         session::DatabaseProtocol,
         statement::{
-            CastReplacer, RedshiftDatePartReplacer, SensitiveDataSanitizer, ToTimestampReplacer,
-            UdfWildcardArgReplacer,
+            ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
+            SensitiveDataSanitizer, ToTimestampReplacer, UdfWildcardArgReplacer,
         },
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
@@ -1329,6 +1329,7 @@ pub fn rewrite_statement(stmt: &ast::Statement) -> ast::Statement {
     let stmt = ToTimestampReplacer::new().replace(&stmt);
     let stmt = UdfWildcardArgReplacer::new().replace(&stmt);
     let stmt = RedshiftDatePartReplacer::new().replace(&stmt);
+    let stmt = ApproximateCountDistinctVisitor::new().replace(&stmt);
 
     stmt
 }
@@ -14166,6 +14167,36 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None
                 },])
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_approximate_count_distinct() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT approximate count(distinct "ta_1"."customer_gender") "ca_1"
+            FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
             }
         )
     }
