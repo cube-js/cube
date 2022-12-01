@@ -12,7 +12,7 @@ const layout = {
       xl: 6,
       lg: 7,
       md: 7,
-      xs: 24,
+      xs: 21,
     },
   },
   contentArea: {
@@ -21,7 +21,7 @@ const layout = {
       xl: { span: 10, offset: 1 },
       lg: { span: 9, offset: 1 },
       md: { span: 7, offset: 1 },
-      xs: 0,
+      xs: 3,
     },
   },
   rightSidebar: {
