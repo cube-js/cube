@@ -342,7 +342,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
      * Nullable(DateTime('UTC'))
      */
     if (columnType.includes('(')) {
-      const types = columnType.toLowerCase().match(/([a-z']+)/g);
+      const types = columnType.toLowerCase().match(/([a-z0-9']+)/g);
       if (types) {
         for (const type of types) {
           if (type in ClickhouseTypeToGeneric) {
