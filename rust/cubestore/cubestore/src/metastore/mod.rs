@@ -924,6 +924,11 @@ pub trait MetaStore: DIService + Send + Sync {
         in_memory: bool,
     ) -> Result<IdRow<Chunk>, CubeError>;
     async fn get_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
+    async fn get_chunks_out_of_queue(&self, ids: Vec<u64>) -> Result<Vec<IdRow<Chunk>>, CubeError>;
+    async fn get_partitions_out_of_queue(
+        &self,
+        ids: Vec<u64>,
+    ) -> Result<Vec<IdRow<Partition>>, CubeError>;
     async fn get_chunks_by_partition(
         &self,
         partition_id: u64,
@@ -3034,6 +3039,36 @@ impl MetaStore for RocksMetaStore {
     async fn get_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError> {
         self.read_operation(move |db_ref| {
             ChunkRocksTable::new(db_ref).get_row_or_not_found(chunk_id)
+        })
+        .await
+    }
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_chunks_out_of_queue(&self, ids: Vec<u64>) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        self.read_operation_out_of_queue(move |db| {
+            let db = ChunkRocksTable::new(db.clone());
+            let mut res = Vec::with_capacity(ids.len());
+            for id in ids.into_iter() {
+                if let Some(chunk) = db.get_row(id)? {
+                    res.push(chunk);
+                }
+            }
+            Ok(res)
+        })
+        .await
+    }
+    async fn get_partitions_out_of_queue(
+        &self,
+        ids: Vec<u64>,
+    ) -> Result<Vec<IdRow<Partition>>, CubeError> {
+        self.read_operation_out_of_queue(move |db| {
+            let db = PartitionRocksTable::new(db.clone());
+            let mut res = Vec::with_capacity(ids.len());
+            for id in ids.into_iter() {
+                if let Some(partition) = db.get_row(id)? {
+                    res.push(partition);
+                }
+            }
+            Ok(res)
         })
         .await
     }

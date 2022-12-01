@@ -676,8 +676,6 @@ impl RocksStore {
         cube_ext::spawn_blocking(move || {
             let res = rw_loop_sender.send(Box::new(move || {
                 let db_span = warn_long("store write operation", Duration::from_millis(100));
-                let span = tracing::trace_span!("metastore write operation");
-                let span_holder = span.enter();
 
                 let mut batch = BatchPipe::new(db_to_send.as_ref());
                 let snapshot = db_to_send.snapshot();
@@ -713,7 +711,6 @@ impl RocksStore {
                     }
                 }
 
-                mem::drop(span_holder);
                 mem::drop(db_span);
 
                 Ok(())
@@ -875,8 +872,6 @@ impl RocksStore {
         cube_ext::spawn_blocking(move || {
             let res = rw_loop_sender.send(Box::new(move || {
                 let db_span = warn_long("metastore read operation", Duration::from_millis(100));
-                let span = tracing::trace_span!("metastore read operation");
-                let span_holder = span.enter();
 
                 let snapshot = db_to_send.snapshot();
                 let res = f(DbTableRef {
@@ -893,7 +888,6 @@ impl RocksStore {
                     ))
                 })?;
 
-                mem::drop(span_holder);
                 mem::drop(db_span);
 
                 Ok(())

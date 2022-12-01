@@ -7,6 +7,7 @@ use crate::metastore::replay_handle::{
     union_seq_pointer_by_location, SeqPointerForLocation,
 };
 use crate::metastore::table::Table;
+use crate::metastore::Chunk;
 use crate::metastore::{
     deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, IdRow, MetaStore,
     MetaStoreEvent, Partition, RowKey, TableId,
@@ -23,8 +24,9 @@ use flatbuffers::bitflags::_core::time::Duration;
 use futures_timer::Delay;
 use itertools::Itertools;
 use log::error;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::sync::Arc;
+use std::time::SystemTime;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::{broadcast, Mutex, Notify, RwLock};
 use tokio::task::JoinHandle;
@@ -40,6 +42,8 @@ pub struct SchedulerImpl {
     gc_loop: Arc<DataGCLoop>,
     config: Arc<dyn ConfigObj>,
     reconcile_loop: WorkerLoop,
+    chunk_processing_loop: WorkerLoop,
+    chunk_events_queue: Mutex<Vec<(SystemTime, u64)>>,
 }
 
 crate::di_service!(SchedulerImpl, []);
@@ -68,12 +72,15 @@ impl SchedulerImpl {
             gc_loop,
             config,
             reconcile_loop: WorkerLoop::new("Reconcile"),
+            chunk_events_queue: Mutex::new(Vec::with_capacity(1000)),
+            chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
         }
     }
 
     pub fn spawn_processing_loops(self: Arc<Self>) -> Vec<JoinHandle<Result<(), CubeError>>> {
         let scheduler2 = self.clone();
         let scheduler3 = self.clone();
+        let scheduler4 = self.clone();
 
         vec![
             cube_ext::spawn(async move {
@@ -92,6 +99,17 @@ impl SchedulerImpl {
                         scheduler3.clone(),
                         async move |_| Ok(Delay::new(Duration::from_secs(30)).await),
                         async move |s, _| s.reconcile().await,
+                    )
+                    .await;
+                Ok(())
+            }),
+            cube_ext::spawn(async move {
+                scheduler4
+                    .chunk_processing_loop
+                    .process(
+                        scheduler4.clone(),
+                        async move |_| Ok(Delay::new(Duration::from_micros(500)).await),
+                        async move |s, _| s.process_chunk_events().await,
                     )
                     .await;
                 Ok(())
@@ -475,6 +493,7 @@ impl SchedulerImpl {
     pub fn stop_processing_loops(&self) -> Result<(), CubeError> {
         self.cancel_token.cancel();
         self.reconcile_loop.stop();
+        self.chunk_processing_loop.stop();
         Ok(())
     }
 
@@ -511,6 +530,13 @@ impl SchedulerImpl {
         if let MetaStoreEvent::Insert(TableId::Chunks, row_id)
         | MetaStoreEvent::Update(TableId::Chunks, row_id) = event
         {
+            let mut chunk_queue = self.chunk_events_queue.lock().await;
+            if let Some(itm) = chunk_queue.iter_mut().find(|(_, id)| id == &row_id) {
+                itm.0 = SystemTime::now();
+            } else {
+                chunk_queue.push((SystemTime::now(), row_id))
+            }
+
             let chunk = self.meta_store.get_chunk(row_id).await?;
             if chunk.get_row().uploaded() {
                 let partition = self
@@ -690,6 +716,95 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn process_chunk_events(&self) -> Result<(), CubeError> {
+        let ids = {
+            let mut chunk_queue = self.chunk_events_queue.lock().await;
+            let dur = Duration::from_millis(500);
+            let (to_process, mut rest) = chunk_queue
+                .iter()
+                .partition::<Vec<_>, _>(|(t, _)| t.elapsed().map_or(true, |d| d > dur));
+            std::mem::swap(&mut rest, &mut chunk_queue);
+            to_process.into_iter().map(|(_, id)| id).collect::<Vec<_>>()
+        };
+        if !ids.is_empty() {
+            let uploaded_chunks = self
+                .meta_store
+                .get_chunks_out_of_queue(ids)
+                .await?
+                .into_iter()
+                .filter(|c| c.get_row().uploaded())
+                .collect::<Vec<_>>();
+            let (active_chunks, inactive_chunks) = uploaded_chunks
+                .into_iter()
+                .partition(|c| c.get_row().active());
+
+            self.process_active_chunks(active_chunks).await?;
+            self.process_inactive_chunks(inactive_chunks).await?;
+        }
+
+        Ok(())
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn process_active_chunks(&self, chunks: Vec<IdRow<Chunk>>) -> Result<(), CubeError> {
+        let mut partition_ids_map: HashMap<u64, bool> = HashMap::new(); // id -> has in_memory chunks
+        for chunk in chunks.into_iter() {
+            if !chunk.get_row().active() {
+                continue;
+            }
+
+            let entry = partition_ids_map
+                .entry(chunk.get_row().get_partition_id())
+                .or_insert(false);
+            if chunk.get_row().in_memory() {
+                *entry = true;
+            }
+        }
+
+        if !partition_ids_map.is_empty() {
+            let partition_ids = partition_ids_map.iter().map(|(id, _)| *id).collect();
+            let partitions = self
+                .meta_store
+                .get_partitions_out_of_queue(partition_ids)
+                .await?;
+            for partition in partitions.into_iter() {
+                if partition.get_row().is_active() {
+                    if *partition_ids_map.get(&partition.get_id()).unwrap_or(&false) {
+                        self.schedule_compaction_in_memory_chunks_if_needed(&partition)
+                            .await?;
+                    }
+                    self.schedule_compaction_if_needed(&partition).await?;
+                } else {
+                    self.schedule_repartition(&partition).await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn process_inactive_chunks(&self, chunks: Vec<IdRow<Chunk>>) -> Result<(), CubeError> {
+        for chunk in chunks.into_iter() {
+            if chunk.get_row().active() {
+                continue;
+            }
+            let seconds = if chunk.get_row().in_memory() {
+                self.config.in_memory_not_used_timeout()
+            } else {
+                self.config.not_used_timeout()
+            };
+            let deadline = Instant::now() + Duration::from_secs(seconds);
+            self.gc_loop
+                .send(GCTimedTask {
+                    deadline,
+                    task: GCTask::DeleteChunk(chunk.get_id()),
+                })
+                .await?;
+        }
+        Ok(())
+    }
+
     async fn schedule_compaction_if_needed(
         &self,
         partition: &IdRow<Partition>,
@@ -736,7 +851,7 @@ impl SchedulerImpl {
 
         let chunks = self
             .meta_store
-            .get_chunks_by_partition(partition_id, false)
+            .get_chunks_by_partition_out_of_queue(partition_id, false)
             .await?
             .into_iter()
             .filter(|c| c.get_row().in_memory() && c.get_row().active())
