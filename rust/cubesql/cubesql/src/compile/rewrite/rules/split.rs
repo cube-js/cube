@@ -1577,6 +1577,39 @@ impl RewriteRules for SplitRules {
                     "?cube", "?fun", "?arg", "?column", "?alias", false,
                 ),
             ),
+            transforming_rewrite(
+                "split-push-down-aggr-approx-distinct-dimension-fun-inner-replacer",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr(
+                        "ApproxDistinct",
+                        vec![column_expr("?column")],
+                        "AggregateFunctionExprDistinct:false",
+                    ),
+                    "?alias_to_cube",
+                ),
+                inner_aggregate_split_replacer(column_expr("?column"), "?alias_to_cube"),
+                self.transform_inner_dimension("?alias_to_cube", "?column"),
+            ),
+            transforming_rewrite(
+                "split-push-down-aggr-approx-distinct-dimension-fun-outer-aggr-replacer",
+                outer_aggregate_split_replacer(
+                    agg_fun_expr(
+                        "ApproxDistinct",
+                        vec![column_expr("?column")],
+                        "AggregateFunctionExprDistinct:false",
+                    ),
+                    "?alias_to_cube",
+                ),
+                agg_fun_expr(
+                    "ApproxDistinct",
+                    vec![outer_aggregate_split_replacer(
+                        column_expr("?column"),
+                        "?alias_to_cube",
+                    )],
+                    "AggregateFunctionExprDistinct:false",
+                ),
+                self.transform_outer_aggr_dimension("?alias_to_cube", "?column"),
+            ),
             // ?expr ?op literal_expr("?right")
             transforming_rewrite(
                 "split-push-down-binary-inner-replacer",
@@ -1926,7 +1959,7 @@ impl RewriteRules for SplitRules {
                     literal_string("split-count-distinct-to-sum-notification"),
                     alias_expr(
                         agg_fun_expr(
-                            "AggregateFunctionExprFun:Sum",
+                            "Sum",
                             vec!["?alias".to_string()],
                             "AggregateFunctionExprDistinct:false".to_string(),
                         ),
@@ -2591,6 +2624,31 @@ impl SplitRules {
         }
     }
 
+    fn transform_inner_dimension(
+        &self,
+        alias_to_cube_var: &'static str,
+        column_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let column_var = var!(column_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                InnerAggregateSplitReplacerAliasToCube
+            ) {
+                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
+                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                        if cube.lookup_dimension(&column.name).is_some() {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
     fn transform_inner_measure_missing_count(
         &self,
         cube_expr_var: &'static str,
@@ -3049,6 +3107,31 @@ impl SplitRules {
                 );
 
                 return true;
+            }
+            false
+        }
+    }
+
+    fn transform_outer_aggr_dimension(
+        &self,
+        alias_to_cube_var: &'static str,
+        column_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let column_var = var!(column_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                OuterAggregateSplitReplacerAliasToCube
+            ) {
+                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
+                    if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                        if cube.lookup_dimension(&column.name).is_some() {
+                            return true;
+                        }
+                    }
+                }
             }
             false
         }
