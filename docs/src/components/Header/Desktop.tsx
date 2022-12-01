@@ -17,8 +17,8 @@ const layout = {
   },
   contentArea: {
     width: {
-      xxl: { span: 12, offset: 1 },
-      xl: { span: 12, offset: 1 },
+      xxl: { span: 10, offset: 1 },
+      xl: { span: 10, offset: 1 },
       lg: { span: 9, offset: 1 },
       md: { span: 7, offset: 1 },
       xs: 0,
@@ -26,8 +26,8 @@ const layout = {
   },
   rightSidebar: {
     width: {
-      xxl: { span: 4, offset: 1 },
-      xl: { span: 4, offset: 1 },
+      xxl: { span: 6, offset: 1 },
+      xl: { span: 6, offset: 1 },
       lg: { span: 6, offset: 1 },
       md: { span: 8, offset: 1 },
       xs: 0,
