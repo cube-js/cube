@@ -48,7 +48,7 @@ interface Args {
   log: Log,
 }
 
-export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift' | 'databricks-jdbc' | 'prestodb' | 'mssql';
+export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift' | 'databricks-jdbc' | 'prestodb' | 'mssql' | 'hana';
 
 export type Schemas = string[];
 
@@ -105,6 +105,7 @@ const driverNameToFolderNameMapper: Record<DriverType, string> = {
   'databricks-jdbc': 'databricks-jdbc',
   prestodb: 'postgresql',
   mssql: 'mssql',
+  hana: 'hana'
 };
 
 /**
