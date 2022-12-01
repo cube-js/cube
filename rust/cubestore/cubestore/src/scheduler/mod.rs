@@ -108,7 +108,7 @@ impl SchedulerImpl {
                     .chunk_processing_loop
                     .process(
                         scheduler4.clone(),
-                        async move |_| Ok(Delay::new(Duration::from_micros(500)).await),
+                        async move |_| Ok(Delay::new(Duration::from_micros(200)).await),
                         async move |s, _| s.process_chunk_events().await,
                     )
                     .await;
@@ -536,38 +536,6 @@ impl SchedulerImpl {
             } else {
                 chunk_queue.push((SystemTime::now(), row_id))
             }
-
-            let chunk = self.meta_store.get_chunk(row_id).await?;
-            if chunk.get_row().uploaded() {
-                let partition = self
-                    .meta_store
-                    .get_partition(chunk.get_row().get_partition_id())
-                    .await?;
-                if chunk.get_row().active() {
-                    if partition.get_row().is_active() {
-                        if chunk.get_row().in_memory() {
-                            self.schedule_compaction_in_memory_chunks_if_needed(&partition)
-                                .await?;
-                        }
-                        self.schedule_compaction_if_needed(&partition).await?;
-                    } else {
-                        self.schedule_repartition(&partition).await?;
-                    }
-                } else {
-                    let seconds = if chunk.get_row().in_memory() {
-                        self.config.in_memory_not_used_timeout()
-                    } else {
-                        self.config.not_used_timeout()
-                    };
-                    let deadline = Instant::now() + Duration::from_secs(seconds);
-                    self.gc_loop
-                        .send(GCTimedTask {
-                            deadline,
-                            task: GCTask::DeleteChunk(chunk.get_id()),
-                        })
-                        .await?;
-                }
-            }
         }
         if let MetaStoreEvent::Insert(TableId::Tables, row_id) = event {
             let table = self.meta_store.get_table_by_id(row_id).await?;
@@ -720,7 +688,7 @@ impl SchedulerImpl {
     async fn process_chunk_events(&self) -> Result<(), CubeError> {
         let ids = {
             let mut chunk_queue = self.chunk_events_queue.lock().await;
-            let dur = Duration::from_millis(500);
+            let dur = Duration::from_millis(200);
             let (to_process, mut rest) = chunk_queue
                 .iter()
                 .partition::<Vec<_>, _>(|(t, _)| t.elapsed().map_or(true, |d| d > dur));
