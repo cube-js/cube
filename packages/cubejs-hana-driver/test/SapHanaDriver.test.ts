@@ -50,10 +50,10 @@ maybe('SapHanaDriver', () => {
     });
 
     // HANA always use upper case in result set if not double quotes
-    let trueResult = await hanaDriver.query('select * from test.boolean where "b_value" = ?', [true]);
+    const trueResult = await hanaDriver.query('select * from test.boolean where "b_value" = ?', [true]);
     expect(JSON.parse(JSON.stringify(trueResult))).toStrictEqual([{ b_value: true }, { b_value: true }]);
     
-    let falseResult = await hanaDriver.query('select * from test.boolean where "b_value" = ?', [false]);
+    const falseResult = await hanaDriver.query('select * from test.boolean where "b_value" = ?', [false]);
     expect(JSON.parse(JSON.stringify(falseResult))).toStrictEqual([{ b_value: false }]);
   });
 

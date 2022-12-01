@@ -226,13 +226,8 @@ export class SapHanaDriver extends BaseDriver implements DriverInterface {
   public async downloadQueryResults(
     query: string,
     values: unknown[],
-    options: DownloadQueryResultsOptions
+    _: DownloadQueryResultsOptions
   ) {
-    if (options.streamImport) {
-      // throw new Error('No support on the HANA stream yet');
-      return this.stream(query, values, options);
-    }
-
     const resultSet = await this.queryResultSet(query, values);
     const rows = [];
     while (resultSet.next()) {
