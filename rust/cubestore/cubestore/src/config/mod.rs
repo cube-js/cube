@@ -325,6 +325,8 @@ pub trait ConfigObj: DIService {
 
     fn job_runners_count(&self) -> usize;
 
+    fn long_term_job_runners_count(&self) -> usize;
+
     fn bind_address(&self) -> &Option<String>;
 
     fn status_bind_address(&self) -> &Option<String>;
@@ -405,6 +407,7 @@ pub struct ConfigObjImpl {
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
     pub job_runners_count: usize,
+    pub long_term_job_runners_count: usize,
     pub bind_address: Option<String>,
     pub status_bind_address: Option<String>,
     pub http_bind_address: Option<String>,
@@ -494,6 +497,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn job_runners_count(&self) -> usize {
         self.job_runners_count
+    }
+
+    fn long_term_job_runners_count(&self) -> usize {
+        self.long_term_job_runners_count
     }
 
     fn bind_address(&self) -> &Option<String> {
@@ -767,6 +774,7 @@ impl Config {
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
                 wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 1048576 / 2),
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
+                long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 32),
                 connection_timeout: 60,
                 server_name: env::var("CUBESTORE_SERVER_NAME")
                     .ok()
@@ -821,6 +829,7 @@ impl Config {
                 },
                 select_worker_pool_size: 0,
                 job_runners_count: 4,
+                long_term_job_runners_count: 8,
                 bind_address: None,
                 status_bind_address: None,
                 http_bind_address: None,
