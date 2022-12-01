@@ -1549,11 +1549,8 @@ export class PreAggregationPartitionRangeLoader {
       const resolveResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation(false)));
       const loadResults = resolveResults.filter(res => res !== null);
       if (this.options.externalRefresh && loadResults.length === 0) {
-        const noPreAggregationPartitionsBuiltMessage = 'No pre-aggregation partitions were built yet for the pre-aggregation serving this query ' +
-          'and this API instance wasn\'t set up to build pre-aggregations. ' +
-          'Please make sure your refresh worker is configured ' +
-          'correctly, running, pre-aggregation tables are built and all pre-aggregation refresh settings like timezone match.';
         throw new Error(
+          // eslint-disable-next-line no-use-before-define
           PreAggregations.noPreAggregationPartitionsBuiltMessage(partitionLoaders.map(p => p.preAggregation))
         );
       }
