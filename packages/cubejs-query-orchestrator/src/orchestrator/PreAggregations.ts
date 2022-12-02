@@ -460,7 +460,7 @@ export class PreAggregationLoader {
   // eslint-disable-next-line no-use-before-define
   private preAggregations: PreAggregations;
 
-  private preAggregation: any;
+  public preAggregation: any;
 
   private preAggregationsTablesToTempTables: any;
 
@@ -567,12 +567,8 @@ export class PreAggregationLoader {
       const versionEntryByStructureVersion = byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (this.externalRefresh) {
         if (!versionEntryByStructureVersion && throwOnMissingPartition) {
-          throw new Error(
-            'Your configuration restricts query requests to only be served from ' +
-            'pre-aggregations, and required pre-aggregation partitions were not ' +
-            'built yet. Please make sure your refresh worker is configured ' +
-            'correctly and running.'
-          );
+          // eslint-disable-next-line no-use-before-define
+          throw new Error(PreAggregations.noPreAggregationPartitionsBuiltMessage([this.preAggregation]));
         }
         if (!versionEntryByStructureVersion) {
           return null;
@@ -1554,8 +1550,8 @@ export class PreAggregationPartitionRangeLoader {
       const loadResults = resolveResults.filter(res => res !== null);
       if (this.options.externalRefresh && loadResults.length === 0) {
         throw new Error(
-          'No pre-aggregation partitions were built yet for the pre-aggregation serving this query. ' +
-          'Please ensure your refresh worker is configured correctly, running, and has already built this pre-aggregation.'
+          // eslint-disable-next-line no-use-before-define
+          PreAggregations.noPreAggregationPartitionsBuiltMessage(partitionLoaders.map(p => p.preAggregation))
         );
       }
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
@@ -2171,10 +2167,25 @@ export class PreAggregations {
 
   public static targetTableName(versionEntry): string {
     if (versionEntry.naming_version === 2) {
-      return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${encodeTimeStamp(versionEntry.last_updated_at)}`;
+      return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at === '*' ? versionEntry.last_updated_at : encodeTimeStamp(versionEntry.last_updated_at)}`;
     }
 
     return `${versionEntry.table_name}_${versionEntry.content_version}_${versionEntry.structure_version}_${versionEntry.last_updated_at}`;
+  }
+
+  public static noPreAggregationPartitionsBuiltMessage(preAggregations: PreAggregationDescription[]): string {
+    const expectedTableNames = preAggregations.map(p => PreAggregations.targetTableName({
+      table_name: p.tableName,
+      structure_version: getStructureVersion(p),
+      content_version: '*',
+      last_updated_at: '*',
+      naming_version: 2,
+    }));
+    return 'No pre-aggregation partitions were built yet for the pre-aggregation serving this query and ' +
+      'this API instance wasn\'t set up to build pre-aggregations. ' +
+      'Please make sure your refresh worker is configured correctly, running, pre-aggregation tables are built and ' +
+      'all pre-aggregation refresh settings like timezone match. ' +
+      `Expected table name patterns: ${expectedTableNames.join(', ')}`;
   }
 
   public static structureVersion(preAggregation) {
