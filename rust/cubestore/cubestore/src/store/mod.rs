@@ -452,7 +452,7 @@ impl ChunkDataStore for ChunkStore {
             merge_replay_handles(self.meta_store.clone(), &chunks, table.get_id()).await?;
 
         self.meta_store
-            .swap_chunks(old_chunks_ids, new_chunk_ids?, replay_handle_id)
+            .swap_chunks_without_check(old_chunks_ids, new_chunk_ids?, replay_handle_id)
             .await?;
 
         Ok(())
