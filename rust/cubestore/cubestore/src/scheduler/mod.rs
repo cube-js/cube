@@ -351,7 +351,7 @@ impl SchedulerImpl {
                     .unwrap_or(true);
                 if empty_seq_pointers && *no_active_chunks {
                     ids.push(failed_handle.get_id());
-                } else {
+                } else if !empty_seq_pointers {
                     subtract_from_right_seq_pointer_by_location(
                         &mut seq_pointer_by_location,
                         failed_handle.get_row().seq_pointers_by_location(),
