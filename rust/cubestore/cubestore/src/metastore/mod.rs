@@ -3384,6 +3384,9 @@ impl MetaStore for RocksMetaStore {
         new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
     ) -> Result<IdRow<ReplayHandle>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
+            if old_ids.is_empty() {
+                return Err(CubeError::internal("Can't merge empty replay handles list".to_string()));
+            }
             let table = ReplayHandleRocksTable::new(db_ref.clone());
             let chunks_table = ChunkRocksTable::new(db_ref);
             let mut replay_handles: Vec<IdRow<ReplayHandle>> = Vec::new();
