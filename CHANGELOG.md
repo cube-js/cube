@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.20](https://github.com/cube-js/cube.js/compare/v0.31.19...v0.31.20) (2022-12-02)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Make ClickHouse driver `readOnly` by default ([e6a85d1](https://github.com/cube-js/cube.js/commit/e6a85d1856ee0a7d6b2b4f3e59f6e8edaed609a2)), closes [#5479](https://github.com/cube-js/cube.js/issues/5479)
+* **clickhouse-driver:** ParserError("Expected ',' or ')' after column definition, found: (") when Nullable(Float64) is present ([81b2247](https://github.com/cube-js/cube.js/commit/81b224747f1423f263f384546f182b3d47f22a3d))
+* **cubesql:** Fix escape symbols in `LIKE` expressions ([5f3cd50](https://github.com/cube-js/cube.js/commit/5f3cd50ea311900adc27ba2b30c72a05a3453a1d))
+* **cubestore:** Orphaned replay handles after table drop ([0e4b876](https://github.com/cube-js/cube.js/commit/0e4b876556d8d88e6fb3e4270d6a7852acb0fd00))
+* **cubestore:** Sort by seq column to reduce Unexpected sequence increase gap ([b5f06d0](https://github.com/cube-js/cube.js/commit/b5f06d0c10217f6e193e6729adba30e2d9af2b92))
+* **oracle-driver:** Make oracle driver `readOnly` by default so pre-aggregations can be used ([5efccba](https://github.com/cube-js/cube.js/commit/5efccbaa8e15d4c85f59f0465bca62a919ace78b))
+
+
+### Features
+
+* **cubesql:** Support Thoughtspot include filter search ([745fe5d](https://github.com/cube-js/cube.js/commit/745fe5d2806b4c6c9e76d6061aa038892ec7438f))
+* **cubesql:** Support ThoughtSpot search filters ([ee0fde4](https://github.com/cube-js/cube.js/commit/ee0fde4798894c619f63cfd87cfc118c7ff1fc78))
+
+
+
+
+
 ## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
 
 

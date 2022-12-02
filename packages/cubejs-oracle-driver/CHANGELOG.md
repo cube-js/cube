@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.20](https://github.com/cube-js/cube.js/compare/v0.31.19...v0.31.20) (2022-12-02)
+
+
+### Bug Fixes
+
+* **oracle-driver:** Make oracle driver `readOnly` by default so pre-aggregations can be used ([5efccba](https://github.com/cube-js/cube.js/commit/5efccbaa8e15d4c85f59f0465bca62a919ace78b))
+
+
+
+
+
 ## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
 
 **Note:** Version bump only for package @cubejs-backend/oracle-driver

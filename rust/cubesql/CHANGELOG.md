@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.20](https://github.com/cube-js/cube.js/compare/v0.31.19...v0.31.20) (2022-12-02)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix escape symbols in `LIKE` expressions ([5f3cd50](https://github.com/cube-js/cube.js/commit/5f3cd50ea311900adc27ba2b30c72a05a3453a1d))
+
+
+### Features
+
+* **cubesql:** Support Thoughtspot include filter search ([745fe5d](https://github.com/cube-js/cube.js/commit/745fe5d2806b4c6c9e76d6061aa038892ec7438f))
+* **cubesql:** Support ThoughtSpot search filters ([ee0fde4](https://github.com/cube-js/cube.js/commit/ee0fde4798894c619f63cfd87cfc118c7ff1fc78))
+
+
+
+
+
 ## [0.31.18](https://github.com/cube-js/cube.js/compare/v0.31.17...v0.31.18) (2022-11-28)
 
 

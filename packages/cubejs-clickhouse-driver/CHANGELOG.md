@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.20](https://github.com/cube-js/cube.js/compare/v0.31.19...v0.31.20) (2022-12-02)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Make ClickHouse driver `readOnly` by default ([e6a85d1](https://github.com/cube-js/cube.js/commit/e6a85d1856ee0a7d6b2b4f3e59f6e8edaed609a2)), closes [#5479](https://github.com/cube-js/cube.js/issues/5479)
+* **clickhouse-driver:** ParserError("Expected ',' or ')' after column definition, found: (") when Nullable(Float64) is present ([81b2247](https://github.com/cube-js/cube.js/commit/81b224747f1423f263f384546f182b3d47f22a3d))
+
+
+
+
+
 ## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
 
 **Note:** Version bump only for package @cubejs-backend/clickhouse-driver
