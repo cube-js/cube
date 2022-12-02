@@ -708,7 +708,13 @@ impl StreamingSource for KSqlStreamingSource {
                             .as_ref()
                             .map(|o| match o {
                                 StreamOffset::Earliest => "earliest".to_string(),
-                                StreamOffset::Latest => "latest".to_string(),
+                                StreamOffset::Latest => {
+                                    if let Some(_) = initial_seq_value {
+                                        "earliest".to_string()
+                                    } else {
+                                        "latest".to_string()
+                                    }
+                                }
                             })
                             .unwrap_or("latest".to_string()),
                     },
@@ -1073,7 +1079,6 @@ mod tests {
             ]);
             timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
             Delay::new(Duration::from_millis(10000)).await;
-            let partitions = meta_store.partition_table().all_rows().await.unwrap();
 
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
