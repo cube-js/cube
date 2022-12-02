@@ -159,15 +159,19 @@ impl CompactionServiceImpl {
 
         for group in compact_groups.iter() {
             let group_chunks = &chunks[group.0..group.1];
-            let in_memory_columns = self
+            let (in_memory_columns, mut old_ids) = self
                 .chunk_store
-                .concat_and_sort_chunks(
+                .concat_and_sort_chunks_data(
                     &chunks[group.0..group.1],
                     partition.clone(),
                     index.clone(),
                     key_size,
                 )
                 .await?;
+
+            if old_ids.is_empty() {
+                continue;
+            }
 
             // Get merged RecordBatch
             let batches_stream = merge_chunks(
@@ -207,7 +211,7 @@ impl CompactionServiceImpl {
                 .add_memory_chunk(chunk.get_id(), batch)
                 .await?;
 
-            old_chunk_ids.extend(group_chunks.iter().map(|c| c.get_id()));
+            old_chunk_ids.append(&mut old_ids);
             new_chunk_ids.push((chunk.get_id(), None));
         }
 
@@ -242,7 +246,6 @@ impl CompactionServiceImpl {
             IndexType::Aggregate => Some(table.get_row().aggregate_columns()),
         };
 
-        let old_chunk_ids = chunks.iter().map(|c| c.get_id()).collect::<Vec<_>>();
         let oldest_insert_at = chunks
             .iter()
             .filter_map(|c| {
@@ -255,10 +258,15 @@ impl CompactionServiceImpl {
             })
             .min();
 
-        let in_memory_columns = self
+        let (in_memory_columns, old_chunk_ids) = self
             .chunk_store
-            .concat_and_sort_chunks(&chunks[..], partition.clone(), index.clone(), key_size)
+            .concat_and_sort_chunks_data(&chunks[..], partition.clone(), index.clone(), key_size)
             .await?;
+
+        if old_chunk_ids.is_empty() {
+            return Ok(());
+        }
+
         let batches_stream = merge_chunks(
             key_size,
             main_table.clone(),

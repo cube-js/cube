@@ -233,13 +233,15 @@ pub trait ChunkDataStore: DIService + Send + Sync {
         partition: IdRow<Partition>,
         index: IdRow<Index>,
     ) -> Result<Vec<RecordBatch>, CubeError>;
-    async fn concat_and_sort_chunks(
+    ///Return tuple with concated and sorted chunks data and vectore of non-empty chunks
+    ///Deactiveat empty chunks
+    async fn concat_and_sort_chunks_data(
         &self,
         chunks: &[IdRow<Chunk>],
         partition: IdRow<Partition>,
         index: IdRow<Index>,
         sort_key_size: usize,
-    ) -> Result<Vec<ArrayRef>, CubeError>;
+    ) -> Result<(Vec<ArrayRef>, Vec<u64>), CubeError>;
     async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
     async fn add_persistent_chunk(
@@ -392,12 +394,8 @@ impl ChunkDataStore for ChunkStore {
         if chunks.is_empty() {
             return Ok(());
         }
-        let old_chunks_ids = chunks
-            .iter()
-            .map(|c| c.get_id().clone())
-            .collect::<Vec<_>>();
-        //Merge all partition in memory chunk into one
 
+        //Merge all partition in memory chunk into one
         let key_size = index.get_row().sort_key_size() as usize;
         let schema = Arc::new(arrow_schema(index.get_row()));
         let main_table: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, schema.clone()));
@@ -407,9 +405,13 @@ impl ChunkDataStore for ChunkStore {
         };
 
         let unique_key = table.get_row().unique_key_columns();
-        let in_memory_columns = self
-            .concat_and_sort_chunks(&chunks[..], partition.clone(), index.clone(), key_size)
+        let (in_memory_columns, old_chunk_ids) = self
+            .concat_and_sort_chunks_data(&chunks[..], partition.clone(), index.clone(), key_size)
             .await?;
+
+        if old_chunk_ids.is_empty() {
+            return Ok(());
+        }
         let batches_stream = merge_chunks(
             key_size,
             main_table.clone(),
@@ -421,7 +423,7 @@ impl ChunkDataStore for ChunkStore {
         let batches = common_collect(batches_stream).await?;
 
         if batches.is_empty() {
-            self.meta_store.deactivate_chunks(old_chunks_ids).await?;
+            self.meta_store.deactivate_chunks(old_chunk_ids).await?;
             return Ok(());
         }
 
@@ -452,7 +454,7 @@ impl ChunkDataStore for ChunkStore {
             merge_replay_handles(self.meta_store.clone(), &chunks, table.get_id()).await?;
 
         self.meta_store
-            .swap_chunks_without_check(old_chunks_ids, new_chunk_ids?, replay_handle_id)
+            .swap_chunks_without_check(old_chunk_ids, new_chunk_ids?, replay_handle_id)
             .await?;
 
         Ok(())
@@ -568,14 +570,17 @@ impl ChunkDataStore for ChunkStore {
             .await??)
         }
     }
-    async fn concat_and_sort_chunks(
+
+    async fn concat_and_sort_chunks_data(
         &self,
         chunks: &[IdRow<Chunk>],
         partition: IdRow<Partition>,
         index: IdRow<Index>,
         sort_key_size: usize,
-    ) -> Result<Vec<ArrayRef>, CubeError> {
+    ) -> Result<(Vec<ArrayRef>, Vec<u64>), CubeError> {
         let mut data: Vec<RecordBatch> = Vec::new();
+        let mut empty_chunk_ids = Vec::new();
+        let mut non_empty_chunk_ids = Vec::new();
 
         for chunk in chunks.iter() {
             for b in self
@@ -586,14 +591,19 @@ impl ChunkDataStore for ChunkStore {
                 )
                 .await?
             {
-                data.push(b)
+                if b.num_rows() == 0 {
+                    empty_chunk_ids.push(chunk.get_id());
+                } else {
+                    non_empty_chunk_ids.push(chunk.get_id());
+                    data.push(b)
+                }
             }
         }
+        if !empty_chunk_ids.is_empty() {
+            self.meta_store.deactivate_chunks(empty_chunk_ids).await?;
+        }
         if data.is_empty() {
-            return Err(CubeError::internal(format!(
-                "no data in chunks {:?}",
-                chunks.iter().map(|c| c.get_id().clone())
-            )));
+            return Ok((Vec::new(), Vec::new()));
         }
         let new = cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
             // Concat rows from all chunks.
@@ -625,7 +635,7 @@ impl ChunkDataStore for ChunkStore {
         })
         .await??;
 
-        Ok(new)
+        Ok((new, non_empty_chunk_ids))
     }
 
     async fn has_in_memory_chunk(
