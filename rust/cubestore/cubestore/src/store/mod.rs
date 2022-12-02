@@ -420,6 +420,11 @@ impl ChunkDataStore for ChunkStore {
         .await?;
         let batches = common_collect(batches_stream).await?;
 
+        if batches.is_empty() {
+            self.meta_store.deactivate_chunks(old_chunks_ids).await?;
+            return Ok(());
+        }
+
         let mut columns = Vec::new();
         for i in 0..batches[0].num_columns() {
             columns.push(arrow::compute::concat(
