@@ -144,7 +144,6 @@ impl CompactionServiceImpl {
 
         // Prepare merge params
         let unique_key = table.get_row().unique_key_columns();
-        let num_columns = index.get_row().columns().len();
         let key_size = index.get_row().sort_key_size() as usize;
         let schema = Arc::new(arrow_schema(index.get_row()));
         // Use empty execution plan for main_table, read only from memory chunks
@@ -158,20 +157,17 @@ impl CompactionServiceImpl {
         let mut old_chunk_ids = Vec::new();
         let mut new_chunk_ids = Vec::new();
 
-        let chunks_with_meta = chunks
-            .iter()
-            .map(|c| (c.clone(), partition.clone(), index.clone()))
-            .collect::<Vec<_>>();
-
         for group in compact_groups.iter() {
             let group_chunks = &chunks[group.0..group.1];
-            let in_memory_columns = prepare_in_memory_columns(
-                &self.chunk_store,
-                num_columns,
-                key_size,
-                &chunks_with_meta[group.0..group.1],
-            )
-            .await?;
+            let in_memory_columns = self
+                .chunk_store
+                .concat_and_sort_chunks(
+                    &chunks[group.0..group.1],
+                    partition.clone(),
+                    index.clone(),
+                    key_size,
+                )
+                .await?;
 
             // Get merged RecordBatch
             let batches_stream = merge_chunks(
@@ -215,32 +211,8 @@ impl CompactionServiceImpl {
             new_chunk_ids.push((chunk.get_id(), None));
         }
 
-        let handles = self
-            .meta_store
-            .get_replay_handles_by_ids(
-                chunks
-                    .iter()
-                    .filter_map(|c| c.get_row().replay_handle_id().clone())
-                    .collect(),
-            )
-            .await?;
-        let mut seq_pointer_by_location = None;
-        for handle in handles.iter() {
-            union_seq_pointer_by_location(
-                &mut seq_pointer_by_location,
-                handle.get_row().seq_pointers_by_location(),
-            )?;
-        }
-        let replay_handle_id = if let Some(_) = seq_pointer_by_location {
-            let replay_handle = self
-                .meta_store
-                .create_replay_handle_from_seq_pointers(table.get_id(), seq_pointer_by_location)
-                .await?;
-
-            Some(replay_handle.get_id())
-        } else {
-            None
-        };
+        let replay_handle_id =
+            merge_replay_handles(self.meta_store.clone(), &chunks, table.get_id()).await?;
         self.meta_store
             .swap_chunks_without_check(old_chunk_ids, new_chunk_ids, replay_handle_id)
             .await?;
@@ -260,7 +232,6 @@ impl CompactionServiceImpl {
 
         // Prepare merge params
         let unique_key = table.get_row().unique_key_columns();
-        let num_columns = index.get_row().columns().len();
         let key_size = index.get_row().sort_key_size() as usize;
         let schema = Arc::new(arrow_schema(index.get_row()));
         // Use empty execution plan for main_table, read only from memory chunks
@@ -284,18 +255,10 @@ impl CompactionServiceImpl {
             })
             .min();
 
-        let chunks_with_meta = chunks
-            .iter()
-            .map(|c| (c.clone(), partition.clone(), index.clone()))
-            .collect::<Vec<_>>();
-
-        let in_memory_columns = prepare_in_memory_columns(
-            &self.chunk_store,
-            num_columns,
-            key_size,
-            &chunks_with_meta[..],
-        )
-        .await?;
+        let in_memory_columns = self
+            .chunk_store
+            .concat_and_sort_chunks(&chunks[..], partition.clone(), index.clone(), key_size)
+            .await?;
         let batches_stream = merge_chunks(
             key_size,
             main_table.clone(),
@@ -882,55 +845,6 @@ impl CompactionService for CompactionServiceImpl {
     }
 }
 
-// TODO: re-use it in the compact function?
-pub async fn prepare_in_memory_columns(
-    chunk_store: &Arc<dyn ChunkDataStore>,
-    num_columns: usize,
-    key_size: usize,
-    chunks_with_meta: &[(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)],
-) -> Result<Vec<ArrayRef>, CubeError> {
-    let mut data: Vec<RecordBatch> = Vec::new();
-
-    for (chunk, partition, index) in chunks_with_meta.iter() {
-        for b in chunk_store
-            .get_chunk_columns_with_preloaded_meta(chunk.clone(), partition.clone(), index.clone())
-            .await?
-        {
-            data.push(b)
-        }
-    }
-
-    let new = cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
-        // Concat rows from all chunks.
-        let mut columns = Vec::with_capacity(num_columns);
-        for i in 0..num_columns {
-            let v =
-                arrow::compute::concat(&data.iter().map(|a| a.column(i).as_ref()).collect_vec())?;
-            columns.push(v);
-        }
-        // Sort rows from all chunks.
-        let mut sort_key = Vec::with_capacity(key_size);
-        for i in 0..key_size {
-            sort_key.push(SortColumn {
-                values: columns[i].clone(),
-                options: Some(SortOptions {
-                    descending: false,
-                    nulls_first: true,
-                }),
-            });
-        }
-        let indices = lexsort_to_indices(&sort_key, None)?;
-        let mut new = Vec::with_capacity(num_columns);
-        for c in columns {
-            new.push(arrow::compute::take(c.as_ref(), &indices, None)?)
-        }
-        Ok(new)
-    })
-    .await??;
-
-    Ok(new)
-}
-
 /// Compute keys that partitions must be split by.
 async fn find_partition_keys(
     p: HashAggregateExec,
@@ -1335,6 +1249,37 @@ pub async fn merge_chunks(
     }
 
     Ok(res.execute(0).await?)
+}
+
+pub async fn merge_replay_handles(
+    meta_store: Arc<dyn MetaStore>,
+    chunks: &Vec<IdRow<Chunk>>,
+    table_id: u64,
+) -> Result<Option<u64>, CubeError> {
+    let handles = meta_store
+        .get_replay_handles_by_ids(
+            chunks
+                .iter()
+                .filter_map(|c| c.get_row().replay_handle_id().clone())
+                .collect(),
+        )
+        .await?;
+    let mut seq_pointer_by_location = None;
+    for handle in handles.iter() {
+        union_seq_pointer_by_location(
+            &mut seq_pointer_by_location,
+            handle.get_row().seq_pointers_by_location(),
+        )?;
+    }
+    if let Some(_) = seq_pointer_by_location {
+        let replay_handle = meta_store
+            .create_replay_handle_from_seq_pointers(table_id, seq_pointer_by_location)
+            .await?;
+
+        Ok(Some(replay_handle.get_id()))
+    } else {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
