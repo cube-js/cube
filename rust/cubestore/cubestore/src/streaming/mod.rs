@@ -194,7 +194,8 @@ impl StreamingService for StreamingServiceImpl {
                 seq_column.clone(),
                 initial_seq_value.clone(),
             )
-            .await?;
+            .await?
+            .chunks(self.config_obj.wal_split_threshold() as usize);
 
         let finish = |builders: Vec<Box<dyn ArrayBuilder>>| {
             builders.into_iter().map(|mut b| b.finish()).collect_vec()
@@ -245,7 +246,7 @@ impl StreamingService for StreamingServiceImpl {
                 last_init_seq_check = SystemTime::now();
             }
 
-            let mut rows = new_rows?;
+            let rows = new_rows;
             debug!("Received {} rows for {}", rows.len(), location);
             let table_cols = table.get_row().get_columns().as_slice();
             let mut builders = create_array_builders(table_cols);
@@ -253,11 +254,8 @@ impl StreamingService for StreamingServiceImpl {
             let mut start_seq: Option<i64> = None;
             let mut end_seq: Option<i64> = None;
 
-            rows.sort_unstable_by_key(|row| match &row.values()[seq_column_index] {
-                TableValue::Int(seq) => *seq,
-                x => panic!("Unexpected type for sequence column: {:?}", x),
-            });
             for row in rows {
+                let row = row?;
                 append_row(&mut builders, table_cols, &row);
                 match &row.values()[seq_column_index] {
                     TableValue::Int(new_last_seq) => {
@@ -268,12 +266,6 @@ impl StreamingService for StreamingServiceImpl {
                         }
 
                         if let Some(end_seq) = &mut end_seq {
-                            if *new_last_seq - *end_seq != 1 {
-                                return Err(CubeError::internal(format!(
-                                    "Unexpected sequence increase gap from {} to {}. Back filling with jumping sequence numbers isn't supported.",
-                                    end_seq, new_last_seq
-                                )));
-                            }
                             *end_seq = (*end_seq).max(*new_last_seq);
                         } else {
                             end_seq = Some(*new_last_seq);
@@ -333,7 +325,7 @@ pub trait StreamingSource: Send + Sync {
         columns: Vec<Column>,
         seq_column: Column,
         initial_seq_value: Option<i64>,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<Vec<Row>, CubeError>> + Send>>, CubeError>;
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError>;
 
     fn validate_table_location(&self) -> Result<(), CubeError>;
 }
@@ -696,7 +688,7 @@ impl StreamingSource for KSqlStreamingSource {
         columns: Vec<Column>,
         _seq_column: Column,
         initial_seq_value: Option<i64>,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<Vec<Row>, CubeError>> + Send>>, CubeError> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError> {
         let res = self
             .post_req(
                 "/query-stream",
@@ -722,43 +714,30 @@ impl StreamingSource for KSqlStreamingSource {
             )
             .await?;
         let column_to_move = columns.clone();
-        Ok(
-            Box::pin(
-                res.bytes_stream()
-                    .scan(
-                        Bytes::new(),
-                        move |tail_bytes,
-                              bytes: Result<_, _>|
-                              -> futures_util::future::Ready<
-                            Option<Result<Vec<Row>, CubeError>>,
-                        > {
-                            let rows = Self::parse_lines(tail_bytes, bytes, column_to_move.clone())
-                                .map_err(|e| {
-                                    CubeError::internal(format!(
-                                        "Error during parsing ksql response: {}",
-                                        e
-                                    ))
-                                });
-                            futures_util::future::ready(Some(rows))
-                        },
-                    )
-                    .ready_chunks(16384)
-                    .map(move |chunks| -> Result<Vec<Row>, CubeError> {
-                        let mut rows = Vec::new();
-                        for chunk in chunks.into_iter() {
-                            match chunk {
-                                Ok(mut vec) => {
-                                    rows.append(&mut vec);
-                                }
-                                Err(e) => {
-                                    return Err(e);
-                                }
-                            }
-                        }
-                        Ok(rows)
-                    }),
-            ),
-        )
+        Ok(Box::pin(
+            res.bytes_stream()
+                .scan(
+                    Bytes::new(),
+                    move |tail_bytes,
+                          bytes: Result<_, _>|
+                          -> futures_util::future::Ready<
+                        Option<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>>,
+                    > {
+                        let rows = Self::parse_lines(tail_bytes, bytes, column_to_move.clone())
+                            .map_err(|e| {
+                                CubeError::internal(format!(
+                                    "Error during parsing ksql response: {}",
+                                    e
+                                ))
+                            });
+                        futures_util::future::ready(Some(Box::pin(stream::iter(match rows {
+                            Ok(rows) => rows.into_iter().map(|r| Ok(r)).collect::<Vec<_>>(),
+                            Err(e) => vec![Err(e)],
+                        }))))
+                    },
+                )
+                .flatten(),
+        ))
     }
 
     fn validate_table_location(&self) -> Result<(), CubeError> {
@@ -789,35 +768,33 @@ mod stream_debug {
     }
 
     impl Stream for MockRowStream {
-        type Item = Result<Vec<Row>, CubeError>;
+        type Item = Result<Row, CubeError>;
 
         fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
             /* if Utc::now().signed_duration_since(self.last_readed).num_milliseconds() < 10 {
             return Poll::Pending;
             } */
 
-            let mut res = Vec::new();
-
             let mut last_id = self.last_id;
-            let count = rand::random::<u64>() % 200;
-            for _ in 0..count {
-                last_id += 1;
-                let row = Row::new(vec![
-                    TableValue::Int(last_id),
-                    TableValue::Int(last_id % 10),
-                    TableValue::Timestamp(TimestampValue::new(Utc::now().timestamp_nanos())),
-                    TableValue::Int(last_id),
-                ]);
-                res.push(row);
-            }
+            last_id += 1;
+            let row = Row::new(vec![
+                TableValue::Int(last_id),
+                TableValue::Int(last_id % 10),
+                TableValue::Timestamp(TimestampValue::new(Utc::now().timestamp_nanos())),
+                TableValue::Int(last_id),
+            ]);
             unsafe {
                 let self_mut = self.get_unchecked_mut();
 
                 self_mut.last_id = last_id;
                 self_mut.last_readed = Utc::now();
             }
-            std::thread::sleep(Duration::from_millis(500));
-            Poll::Ready(Some(Ok(res)))
+            std::thread::sleep(Duration::from_millis(if rand::random::<u64>() % 200 == 7 {
+                500
+            } else {
+                0
+            }));
+            Poll::Ready(Some(Ok(row)))
         }
     }
 
@@ -830,8 +807,7 @@ mod stream_debug {
             _columns: Vec<Column>,
             _seq_column: Column,
             initial_seq_value: Option<i64>,
-        ) -> Result<Pin<Box<dyn Stream<Item = Result<Vec<Row>, CubeError>> + Send>>, CubeError>
-        {
+        ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError> {
             Ok(Box::pin(MockRowStream::new(initial_seq_value.unwrap_or(0))))
         }
 
@@ -990,6 +966,7 @@ mod tests {
             c.compaction_chunks_count_threshold = 100;
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
+            c.wal_split_threshold = 16384;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KsqlClient, _, _, _>(async move |_| {
