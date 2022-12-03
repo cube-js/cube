@@ -997,7 +997,7 @@ mod tests {
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://ksql/EVENTS_BY_TYPE/0".to_string())),
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://ksql/EVENTS_BY_TYPE/1".to_string())),
             ]);
-            timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
+            timeout(Duration::from_secs(15), wait).await.unwrap().unwrap();
 
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
