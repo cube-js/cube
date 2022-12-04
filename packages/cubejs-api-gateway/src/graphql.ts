@@ -179,10 +179,6 @@ function normalizeCubeCapital(cube: any) {
   if (config.name[0] === config.name[0].toUpperCase()) {
     return cube;
   }
-  console.warn(
-    'Warning: It\'s recommended to use PascalCase for cube names. ' +
-      `Please rename ${config.name} to ${capitalize(config.name)}`
-  );
   const normalizedConfig = { ...config };
   normalizedConfig.name = capitalize(config.name);
   if (config.measures) {
