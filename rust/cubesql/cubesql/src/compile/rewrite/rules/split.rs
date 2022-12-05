@@ -453,24 +453,28 @@ impl RewriteRules for SplitRules {
                 self.transform_aggr_fun_with_literal("?fun", "?expr"),
             ),
             // Date trunc
-            transforming_rewrite(
+            transforming_chain_rewrite(
                 "split-push-down-date-trunc-inner-replacer",
-                inner_aggregate_split_replacer(
+                inner_aggregate_split_replacer("?expr", "?cube"),
+                vec![(
+                    "?expr",
                     fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?granularity"), column_expr("?column")],
                     ),
-                    "?cube",
-                ),
-                fun_expr(
-                    "DateTrunc",
-                    vec![
-                        literal_expr("?rewritten_granularity"),
-                        column_expr("?column"),
-                    ],
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![
+                            literal_expr("?rewritten_granularity"),
+                            column_expr("?column"),
+                        ],
+                    ),
+                    "?alias",
                 ),
                 // To validate & de-aliasing granularity
-                self.split_date_trunc("?granularity", "?rewritten_granularity"),
+                self.split_date_trunc("?granularity", "?rewritten_granularity", "?expr", "?alias"),
             ),
             // Date part
             transforming_chain_rewrite(
@@ -2991,10 +2995,13 @@ impl SplitRules {
         &self,
         granularity_var: &'static str,
         out_granularity_var: &'static str,
+        expr_var: &'static str,
+        alias_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let granularity_var = var!(granularity_var);
         let out_granularity_var = var!(out_granularity_var);
-
+        let expr_var = var!(expr_var);
+        let alias_var = var!(alias_var);
         move |egraph, subst| {
             for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
                 let output_granularity = match utils::parse_granularity(granularity, false) {
@@ -3002,14 +3009,28 @@ impl SplitRules {
                     None => continue,
                 };
 
-                subst.insert(
-                    out_granularity_var,
-                    egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
-                        ScalarValue::Utf8(Some(output_granularity)),
-                    ))),
+                let original_expr_id = subst[expr_var];
+                let res = egraph[original_expr_id].data.original_expr.as_ref().ok_or(
+                    CubeError::internal(format!(
+                        "Original expr wasn't prepared for {:?}",
+                        original_expr_id
+                    )),
                 );
+                if let Ok(expr) = res {
+                    let name = expr.name(&DFSchema::empty()).unwrap();
+                    subst.insert(
+                        alias_var,
+                        egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(name))),
+                    );
+                    subst.insert(
+                        out_granularity_var,
+                        egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                            ScalarValue::Utf8(Some(output_granularity)),
+                        ))),
+                    );
 
-                return true;
+                    return true;
+                }
             }
 
             return false;
