@@ -56,12 +56,25 @@ export class HanaQuery extends BaseQuery {
     return `TO_TIMESTAMP(${value})`;
   }
 
+  calcInterval(operation, date, interval) {
+    const [intervalValue, intervalUnit] = interval.split(' ');
+    // eslint-disable-next-line prefer-template
+    const fn = operation + intervalUnit[0].toUpperCase() + intervalUnit.substring(1) + 's';
+    return `${fn}(${date}, ${intervalValue})`;
+  }
+
   subtractInterval(date, interval) {
-    return `ADD_DAYS(${date}, -${interval})`;
+    const [intervalValue, intervalUnit] = interval.split(' ', 2);
+    const negativeInterval = (intervalValue) * -1;
+    const fn = 'ADD_' + intervalUnit.toUpperCase() + 'S';
+    return `${fn}(${date}, ${negativeInterval})`;
+
   }
 
   addInterval(date, interval) {
-    return `ADD_DAYS(${date}, ${interval})`;
+    const [intervalValue, intervalUnit] = interval.split(' ', 2);
+    const fn = 'ADD_' + intervalUnit.toUpperCase() + 'S';
+    return `${fn}(${date}, ${intervalValue})`;
   }
 
   timeGroupedColumn(granularity, dimension) {
@@ -74,9 +87,9 @@ export class HanaQuery extends BaseQuery {
 
   seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
-      ([from, to]) => `select '${from}' f, '${to}' t`
+      ([from, to]) => `select '${from}' f, '${to}' t from dummy`
     ).join(' UNION ALL ');
-    return `SELECT TO_TIMESTAMP(dates.f) date_from, TO_TIMESTAMP(dates.t) date_to FROM (${values}) AS dates`;
+    return `SELECT TO_TIMESTAMP(dates.f) "date_from", TO_TIMESTAMP(dates.t) "date_to" FROM (${values}) AS dates`;
   }
 
   concatStringsSql(strings) {
