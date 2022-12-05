@@ -137,16 +137,6 @@ async function resolveJDBCDriver(): Promise<string> {
 }
 
 /**
- * Returns pre-aggregations schema name.
- */
-function getPreaggsSchemaName(): string {
-  const devMode = process.env.NODE_ENV !== 'production' || getEnv('devMode');
-  return getEnv('preAggregationsSchema') || devMode
-    ? 'dev_pre_aggregations'
-    : 'prod_pre_aggregations';
-}
-
-/**
  * Databricks driver class.
  */
 export class DatabricksDriver extends JDBCDriver {
@@ -318,13 +308,29 @@ export class DatabricksDriver extends JDBCDriver {
     if (this.config.catalog) {
       return super.query(
         query.replace(
-          new RegExp(`(?<=\\s)${getPreaggsSchemaName()}\\.(?=[^\\s]+)`, 'g'),
-          `${this.config.catalog}.${getPreaggsSchemaName()}.`
+          new RegExp(`(?<=\\s)${this.getPreaggsSchemaName()}\\.(?=[^\\s]+)`, 'g'),
+          `${this.config.catalog}.${this.getPreaggsSchemaName()}.`
         ),
         values,
       );
     } else {
       return super.query(query, values);
+    }
+  }
+
+  /**
+   * Returns pre-aggregation schema name.
+   */
+  public getPreaggsSchemaName(): string {
+    const schema = getEnv('preAggregationsSchema');
+    if (schema) {
+      return schema;
+    } else {
+      const devMode =
+        process.env.NODE_ENV !== 'production' || getEnv('devMode');
+      return devMode
+        ? 'dev_pre_aggregations'
+        : 'prod_pre_aggregations';
     }
   }
 
