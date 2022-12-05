@@ -221,22 +221,6 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("inline_tables_2x", inline_tables_2x),
         t("build_range_end", build_range_end),
         t("cache_incr", cache_incr),
-<<<<<<< HEAD
-=======
-        t("limit_pushdown_group", limit_pushdown_group),
-        t("limit_pushdown_group_order", limit_pushdown_group_order),
-        t(
-            "limit_pushdown_group_where_order",
-            limit_pushdown_group_where_order,
-        ),
-        t("limit_pushdown_without_group", limit_pushdown_without_group),
-        t(
-            "limit_pushdown_without_group_resort",
-            limit_pushdown_without_group_resort,
-        ),
-        t("limit_pushdown_unique_key", limit_pushdown_unique_key),
-        t("union_projection_unique_keys", union_projection_unique_keys),
->>>>>>> 23f9d614a (fix)
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
