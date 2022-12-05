@@ -195,7 +195,7 @@ impl StreamingService for StreamingServiceImpl {
                 initial_seq_value.clone(),
             )
             .await?
-            .chunks(self.config_obj.wal_split_threshold() as usize);
+            .ready_chunks(self.config_obj.wal_split_threshold() as usize);
 
         let finish = |builders: Vec<Box<dyn ArrayBuilder>>| {
             builders.into_iter().map(|mut b| b.finish()).collect_vec()
