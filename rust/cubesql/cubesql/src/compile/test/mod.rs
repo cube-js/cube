@@ -73,6 +73,12 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     _type: "number".to_string(),
                     agg_type: Some("countDistinct".to_string()),
                 },
+                V1CubeMetaMeasure {
+                    name: "KibanaSampleDataEcommerce.payingPercentage".to_string(),
+                    title: None,
+                    _type: "number".to_string(),
+                    agg_type: Some("number".to_string()),
+                },
             ],
             segments: vec![
                 V1CubeMetaSegment {

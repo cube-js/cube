@@ -11,6 +11,7 @@ expression: "execute_query(\"show create table `db`.`KibanaSampleDataEcommerce`;
 |                           |   `minPrice` numeric,                      |
 |                           |   `avgPrice` numeric,                      |
 |                           |   `countDistinct` int,                     |
+|                           |   `payingPercentage` numeric,              |
 |                           |   `order_date` datetime NOT NULL,          |
 |                           |   `customer_gender` varchar(255) NOT NULL, |
 |                           |   `taxful_total_price` numeric NOT NULL,   |

@@ -17,6 +17,7 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.KibanaSampleDataEcommerce | maxPrice           | numeric                     |
 | public.KibanaSampleDataEcommerce | minPrice           | numeric                     |
 | public.KibanaSampleDataEcommerce | order_date         | timestamp without time zone |
+| public.KibanaSampleDataEcommerce | payingPercentage   | numeric                     |
 | public.KibanaSampleDataEcommerce | taxful_total_price | numeric                     |
 | public.Logs                      | __cubeJoinField    | text                        |
 | public.Logs                      | __user             | text                        |

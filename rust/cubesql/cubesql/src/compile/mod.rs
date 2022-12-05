@@ -2500,6 +2500,7 @@ mod tests {
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                     "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                    "KibanaSampleDataEcommerce.payingPercentage".to_string(),
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![
@@ -11023,6 +11024,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                     "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                    "KibanaSampleDataEcommerce.payingPercentage".to_string(),
                     "Logs.agentCount".to_string(),
                     "Logs.agentCountApprox".to_string(),
                 ]),
@@ -13465,6 +13467,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                     "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                    "KibanaSampleDataEcommerce.payingPercentage".to_string(),
                     "Logs.agentCount".to_string(),
                     "Logs.agentCountApprox".to_string(),
                     "NumberCube.someNumber".to_string(),
@@ -13938,6 +13941,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                     "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                    "KibanaSampleDataEcommerce.payingPercentage".to_string(),
                 ]),
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.order_date".to_string(),
@@ -14410,6 +14414,38 @@ ORDER BY \"COUNT(count)\" DESC"
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_measure_number_post_aggr() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT payingPercentage payingPercentage, CHAR_LENGTH(customer_gender) gender_len
+            FROM KibanaSampleDataEcommerce
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.payingPercentage".to_string()
+                ]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
                 time_dimensions: None,
