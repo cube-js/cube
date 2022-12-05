@@ -776,7 +776,8 @@ impl JobRunner {
                 "Running job {} ({:?}): {:?}",
                 e.message,
                 start.elapsed()?,
-                self.meta_store.get_job(job_id).await?
+                // Job can be removed by the time of fetch
+                self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else if let Ok(Err(cube_err)) = res {
             self.meta_store
@@ -785,7 +786,8 @@ impl JobRunner {
             error!(
                 "Running job join error ({:?}): {:?}",
                 start.elapsed()?,
-                self.meta_store.get_job(job_id).await?
+                // Job can be removed by the time of fetch
+                self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else if let Ok(Ok(Err(cube_err))) = res {
             self.meta_store
@@ -799,7 +801,8 @@ impl JobRunner {
             error!(
                 "Running job error ({:?}): {:?}",
                 start.elapsed()?,
-                self.meta_store.get_job(job_id).await?
+                // Job can be removed by the time of fetch
+                self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else {
             let job = self
