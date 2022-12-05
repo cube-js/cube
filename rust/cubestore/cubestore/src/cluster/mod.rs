@@ -266,6 +266,7 @@ struct JobRunner {
     server_name: String,
     notify: Arc<Notify>,
     stop_token: CancellationToken,
+    is_long_term: bool,
 }
 
 lazy_static! {
@@ -703,7 +704,7 @@ impl JobRunner {
     async fn fetch_and_process(&self) -> Result<(), CubeError> {
         let job = self
             .meta_store
-            .start_processing_job(self.server_name.to_string())
+            .start_processing_job(self.server_name.to_string(), self.is_long_term)
             .await?;
         if let Some(to_process) = job {
             self.run_local(to_process).await?;
@@ -1008,7 +1009,9 @@ impl ClusterImpl {
             ));
         }
 
-        for _ in 0..self.config_obj.job_runners_count() {
+        for i in
+            0..self.config_obj.job_runners_count() + self.config_obj.long_term_job_runners_count()
+        {
             // TODO number of job event loops
             let job_runner = JobRunner {
                 config_obj: self.config_obj.clone(),
@@ -1019,6 +1022,7 @@ impl ClusterImpl {
                 server_name: self.server_name.clone(),
                 notify: self.job_notify.clone(),
                 stop_token: self.stop_token.clone(),
+                is_long_term: i >= self.config_obj.job_runners_count(),
             };
             futures.push(cube_ext::spawn(async move {
                 job_runner.processing_loop().await;
