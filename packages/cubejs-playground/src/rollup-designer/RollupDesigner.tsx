@@ -111,7 +111,7 @@ export function RollupDesigner({
   const token = appToken || designerToken;
 
   const { isCloud, ...cloud } = useCloud();
-  const { query, transformedQuery, isLoading, error } =
+  const { query, transformedQuery, isLoading, error, toggleModal } =
     useRollupDesignerContext();
 
   const [isCronValid, setCronValidity] = useState<boolean>(true);
@@ -129,8 +129,6 @@ export function RollupDesigner({
   );
 
   const { order, limit, filters, ...matchedQuery } = query || {};
-
-  const [timeDimension] = matchedQuery.timeDimensions || [];
 
   const segments = new Set<string>();
   memberTypeCubeMap.segments.forEach(({ members }) => {
@@ -335,6 +333,7 @@ export function RollupDesigner({
 
       if (response.ok) {
         showSuccessMessage();
+        toggleModal();
       } else {
         const { error } = response.json;
         notification.error({
@@ -349,6 +348,7 @@ export function RollupDesigner({
       const { error } = await cloud.addPreAggregationToSchema(definition);
       if (!error) {
         showSuccessMessage();
+        toggleModal();
       } else {
         notification.error({
           message: error,

@@ -273,7 +273,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
                       disabled={!isYamlFormatSupported}
                       onClick={() => this.generateSchema(SchemaFormat.Yaml)}
                     >
-                      Yaml
+                      YAML
                     </Menu.Item>
                   </Menu>
                 }
