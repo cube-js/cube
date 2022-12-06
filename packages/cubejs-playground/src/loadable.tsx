@@ -58,7 +58,7 @@ export function loadable(
     toggle?.();
     try {
       await factory();
-    } catch (error) {
+    } catch (error: any) {
       handleChunkLoadError(error);
     }
     toggle?.();
