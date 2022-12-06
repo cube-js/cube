@@ -48,6 +48,7 @@
     "html-entities": "^2.3.3",
     "js-cookie": "^2.2.1",
     "js-object-pretty-print": "^0.3.0",
+    "js-yaml": "^4.1.0",
     "jwt-decode": "^3.1.2",
     "less": "^4.1.1",
     "mitt": "^2.1.0",
