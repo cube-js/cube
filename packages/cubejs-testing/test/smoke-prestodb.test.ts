@@ -76,8 +76,8 @@ describe('prestodb', () => {
       ],
       timeDimensions: [
         {
-          "dimension": "Orders.createdAt",
-          "granularity": "hour"
+          dimension: 'Orders.createdAt',
+          granularity: 'hour'
         }
       ],
       timezone: 'Europe/Kiev'
