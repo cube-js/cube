@@ -6,3 +6,4 @@ export * from './materialize';
 export * from './crate';
 export * from './prestodb';
 export * from './mssql';
+export * from './trino';

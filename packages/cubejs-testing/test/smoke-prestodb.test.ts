@@ -68,4 +68,21 @@ describe('prestodb', () => {
 
     expect(response.rawData()).toMatchSnapshot('dimensions');
   });
+
+  test('query measure grouped by time dimension with timezone', async () => {
+    const response = await client.load({
+      measures: [
+        'Orders.totalAmount',
+      ],
+      timeDimensions: [
+        {
+          "dimension": "Orders.createdAt",
+          "granularity": "hour"
+        }
+      ],
+      timezone: 'Europe/Kiev'
+    });
+
+    expect(response.rawData()).toMatchSnapshot('measure-group-by');
+  });
 });
