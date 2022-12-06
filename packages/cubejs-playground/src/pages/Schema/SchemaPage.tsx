@@ -1,8 +1,6 @@
 import React, { Component } from 'react';
 import {
   Layout,
-  Button,
-  // Menu as Menu,
   Modal,
   Empty,
   Typography,
@@ -16,11 +14,7 @@ import { Alert, CubeLoader } from '../../atoms';
 import { playgroundFetch } from '../../shared/helpers';
 import { AppContext, AppContextConsumer } from '../../components/AppContext';
 import ButtonDropdown from '../../QueryBuilder/ButtonDropdown';
-
-enum SchemaFormat {
-  JavaScript = 'js',
-  Yaml = 'yaml',
-}
+import { SchemaFormat } from '../../types';
 
 const { Content, Sider } = Layout;
 
@@ -108,7 +102,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
     });
   }
 
-  async generateSchema(format: SchemaFormat = SchemaFormat.JavaScript) {
+  async generateSchema(format: SchemaFormat = SchemaFormat.js) {
     const { checkedKeys, tablesSchema } = this.state;
     const { history } = this.props;
     
@@ -271,7 +265,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
                           : ''
                       }
                       disabled={!isYamlFormatSupported}
-                      onClick={() => this.generateSchema(SchemaFormat.Yaml)}
+                      onClick={() => this.generateSchema(SchemaFormat.yaml)}
                     >
                       YAML
                     </Menu.Item>
