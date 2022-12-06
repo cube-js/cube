@@ -39,7 +39,7 @@ export function loadable(
   const Component = lazy(async () => {
     try {
       return await factory();
-    } catch (error) {
+    } catch (error: any) {
       handleChunkLoadError(error);
     }
 
