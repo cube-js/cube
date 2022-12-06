@@ -144,6 +144,7 @@ type ChartContainerProps = {
 };
 
 type ChartContainerState = {
+  activeTab: string;
   sql: {
     loading: boolean;
     value?: string;
@@ -213,7 +214,7 @@ class ChartContainer extends Component<
   constructor(props) {
     super(props);
     this.state = {
-      showCode: false,
+      activeTab: 'chart',
       chartRendererError: null,
       sql: {
         loading: false,
@@ -227,7 +228,7 @@ class ChartContainer extends Component<
       codesandboxFiles,
       dependencies,
       redirectToDashboard,
-      showCode,
+      activeTab,
       addingToDashboard,
       chartRendererError,
       sql,
@@ -344,13 +345,11 @@ class ChartContainer extends Component<
             <Button
               data-testid="chart-btn"
               size="small"
-              type={!showCode ? 'primary' : 'default'}
+              type={activeTab === 'chart' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Chart');
-                this.setState({
-                  showCode: null,
-                });
+                this.setState({ activeTab: 'chart' });
               }}
             >
               Chart
@@ -359,12 +358,12 @@ class ChartContainer extends Component<
             <Button
               data-testid="json-query-btn"
               size="small"
-              type={showCode === 'query' ? 'primary' : 'default'}
+              type={activeTab === 'query' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Query');
                 this.setState({
-                  showCode: 'query',
+                  activeTab: 'query',
                 });
               }}
             >
@@ -375,11 +374,11 @@ class ChartContainer extends Component<
               data-testid="graphiql-btn"
               icon={<GraphQLIcon />}
               size="small"
-              type={showCode === 'graphiql' ? 'primary' : 'default'}
+              type={activeTab === 'graphiql' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show GraphiQL');
-                this.setState({ showCode: 'graphiql' });
+                this.setState({ activeTab: 'graphiql' });
               }}
             >
               GraphiQL
@@ -389,11 +388,11 @@ class ChartContainer extends Component<
               data-testid="code-btn"
               icon={<CodeOutlined />}
               size="small"
-              type={showCode === 'code' ? 'primary' : 'default'}
+              type={activeTab === 'code' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Code');
-                this.setState({ showCode: 'code' });
+                this.setState({ activeTab: 'code' });
               }}
             >
               Code
@@ -403,11 +402,11 @@ class ChartContainer extends Component<
               data-testid="sql-btn"
               icon={<QuestionCircleOutlined />}
               size="small"
-              type={showCode === 'sql' ? 'primary' : 'default'}
+              type={activeTab === 'sql' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show SQL');
-                this.setState({ showCode: 'sql' });
+                this.setState({ activeTab: 'sql' });
               }}
             >
               SQL
@@ -417,12 +416,12 @@ class ChartContainer extends Component<
               data-testid="cache-btn"
               icon={<SyncOutlined />}
               size="small"
-              type={showCode === 'cache' ? 'primary' : 'default'}
+              type={activeTab === 'cache' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Cache');
                 this.setState({
-                  showCode: 'cache',
+                  activeTab: 'cache',
                 });
               }}
             >
@@ -496,15 +495,15 @@ class ChartContainer extends Component<
       if (frameworkItem?.placeholder) {
         const Placeholder = frameworkItem.placeholder;
         return <Placeholder framework={framework} />;
-      } else if (showCode === 'code') {
+      } else if (activeTab === 'code') {
         if (error) {
           return <FatalError error={error} />;
         }
 
         return <PrismCode code={codeExample} />;
-      } else if (showCode === 'query') {
+      } else if (activeTab === 'query') {
         return <PrismCode code={queryText} />;
-      } else if (showCode === 'sql') {
+      } else if (activeTab === 'sql') {
         return (
           <Suspense
             fallback={
@@ -521,7 +520,7 @@ class ChartContainer extends Component<
             />
           </Suspense>
         );
-      } else if (showCode === 'cache') {
+      } else if (activeTab === 'cache') {
         return (
           <Suspense
             fallback={
@@ -533,7 +532,7 @@ class ChartContainer extends Component<
             <CachePane query={query} />
           </Suspense>
         );
-      } else if (showCode === 'graphiql' && meta) {
+      } else if (activeTab === 'graphiql' && meta) {
         if (!this.props.isGraphQLSupported) {
           return <div>GraphQL API is supported since version 0.29.0</div>;
         }
@@ -555,12 +554,12 @@ class ChartContainer extends Component<
         );
       }
 
-      return render({ framework, error });
+      return null;
     };
 
     let title;
 
-    if (showCode === 'code') {
+    if (activeTab === 'code') {
       title = (
         <SectionRow style={{ alignItems: 'center' }}>
           <div>Code</div>
@@ -580,7 +579,7 @@ class ChartContainer extends Component<
           </Button>
         </SectionRow>
       );
-    } else if (showCode === 'query') {
+    } else if (activeTab === 'query') {
       title = (
         <SectionRow>
           <div>Query</div>
@@ -599,7 +598,7 @@ class ChartContainer extends Component<
           </Button>
         </SectionRow>
       );
-    } else if (showCode === 'sql') {
+    } else if (activeTab === 'sql') {
       title = (
         <SectionRow>
           <div>SQL</div>
@@ -620,9 +619,9 @@ class ChartContainer extends Component<
           ) : null}
         </SectionRow>
       );
-    } else if (showCode === 'cache') {
+    } else if (activeTab === 'cache') {
       title = 'Cache';
-    } else if (showCode === 'graphiql') {
+    } else if (activeTab === 'graphiql') {
       title = 'GraphQL API';
     } else {
       title = 'Chart';
@@ -633,6 +632,11 @@ class ChartContainer extends Component<
     ) : (
       <StyledCard title={title} extra={extra}>
         {renderChart()}
+        {activeTab === 'chart' ? (
+          render({ framework, error })
+        ) : (
+          <div style={{ display: 'none' }}>{render({ framework, error })}</div>
+        )}
       </StyledCard>
     );
   }

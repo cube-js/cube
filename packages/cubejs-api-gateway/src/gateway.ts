@@ -1542,7 +1542,7 @@ class ApiGateway {
   public handleError({
     e, context, query, res, requestStarted
   }: any) {
-    const { requestId } = context ?? {};
+    const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
     
     const plainError = e.plainMessages;
     
@@ -1559,9 +1559,9 @@ class ApiGateway {
         type: 'Continue wait',
         query,
         error: e.message,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
       }, context);
-      res(e, { status: 200 });
+      res({ error: e.message || e.error.message || e.error.toString(), requestId }, { status: 200 });
     } else if (e.error) {
       this.log({
         type: 'Orchestrator error',
@@ -1569,7 +1569,7 @@ class ApiGateway {
         error: e.error,
         duration: this.duration(requestStarted),
       }, context);
-      res(e, { status: 400 });
+      res({ error: e.message || e.error.message || e.error.toString(), requestId }, { status: 400 });
     } else if (e.type === 'UserError') {
       this.log({
         type: e.type,
