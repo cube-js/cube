@@ -11,7 +11,7 @@ import {
   getEnv, assertDataSource, getRealType, internalExceptions, track,
 } from '@cubejs-backend/shared';
 
-import type { Application as ExpressApplication } from 'express';
+import type { Application as ExpressApplication, NextFunction } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
 import { FileRepository, SchemaFileRepository } from './FileRepository';
@@ -419,7 +419,7 @@ export class CubejsServerCore {
       return this.apiGatewayInstance;
     }
 
-    return this.apiGatewayInstance = new ApiGateway(
+    return (this.apiGatewayInstance = new ApiGateway(
       this.options.apiSecret,
       this.getCompilerApi.bind(this),
       this.getOrchestratorApi.bind(this),
@@ -429,17 +429,49 @@ export class CubejsServerCore {
         dataSourceStorage: this.orchestratorStorage,
         basePath: this.options.basePath,
         checkAuthMiddleware: this.options.checkAuthMiddleware,
+        contextRejectionMiddleware: this.contextRejectionMiddleware.bind(this),
         checkAuth: this.options.checkAuth,
-        queryRewrite: this.options.queryRewrite || this.options.queryTransformer,
+        queryRewrite:
+          this.options.queryRewrite || this.options.queryTransformer,
         extendContext: this.options.extendContext,
-        playgroundAuthSecret: getEnv('playgroundAuthSecret'),
+        playgroundAuthSecret: getEnv("playgroundAuthSecret"),
         jwt: this.options.jwt,
         refreshScheduler: () => new RefreshScheduler(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
-        serverCoreVersion: this.coreServerVersion
+        serverCoreVersion: this.coreServerVersion,
       }
-    );
+    ));
+  }
+
+  protected async contextRejectionMiddleware(req, res, next) {
+    function hashCode(str) {
+      let hash = 0;
+      for (let i = 0, len = str.length; i < len; i++) {
+        const chr = str.charCodeAt(i);
+        hash = (hash << 5) - hash + chr;
+        hash |= 0;
+      }
+      return hash;
+    }
+
+    const selfBucketId = parseInt(process.env.CUBE_CLOUD_API_BUCKET_ID, 10);
+    const numBuckets = parseInt(process.env.CUBE_CLOUD_API_NUM_BUCKETS, 10);
+
+    if (!this.standalone && numBuckets > 1) {
+      const appId = this.contextToAppId(req.context);
+      const targetBucket = hashCode(appId) % numBuckets;
+      if (targetBucket !== selfBucketId) {
+        res.writeHead(421, {
+          'X-Cube-Cloud-Route-To-Bucket': `${targetBucket}`,
+        });
+        res.send();
+        return;
+      }
+    }
+    if (next) {
+      next();
+    }
   }
 
   public getCompilerApi(context: RequestContext) {

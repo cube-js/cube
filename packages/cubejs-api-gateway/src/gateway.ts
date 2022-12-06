@@ -54,6 +54,7 @@ import {
 import {
   CheckAuthMiddlewareFn,
   RequestLoggerMiddlewareFn,
+  ContextRejectionMiddlewareFn,
 } from './interfaces';
 import { getRequestIdFromRequest, requestParser } from './requestParser';
 import { UserError } from './UserError';
@@ -126,6 +127,8 @@ class ApiGateway {
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
   protected readonly securityContextExtractor: SecurityContextExtractorFn;
+  
+  protected readonly contextRejectionMiddleware: ContextRejectionMiddlewareFn;
 
   protected readonly releaseListeners: (() => any)[] = [];
 
@@ -158,12 +161,14 @@ class ApiGateway {
       : this.checkAuth;
     this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
+    this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => { next(); });
   }
 
   public initApp(app: ExpressApplication) {
     const userMiddlewares: RequestHandler[] = [
       this.checkAuthMiddleware,
       this.requestContextMiddleware,
+      this.contextRejectionMiddleware,
       this.logNetworkUsage,
       this.requestLoggerMiddleware
     ];
@@ -279,6 +284,7 @@ class ApiGateway {
       const systemMiddlewares: RequestHandler[] = [
         this.checkAuthSystemMiddleware,
         this.requestContextMiddleware,
+        this.contextRejectionMiddleware,
         this.requestLoggerMiddleware
       ];
 
