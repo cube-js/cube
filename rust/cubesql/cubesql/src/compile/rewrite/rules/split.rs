@@ -2133,7 +2133,8 @@ impl RewriteRules for SplitRules {
                     )
                 },
                 |_, _| true,
-                false,
+                // TODO: change to false after post-aggregation improvements
+                true,
                 false,
                 true,
                 Some(vec![("?expr", column_expr("?column"))]),
