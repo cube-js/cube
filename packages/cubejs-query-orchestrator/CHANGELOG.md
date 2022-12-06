@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.21](https://github.com/cube-js/cube.js/compare/v0.31.20...v0.31.21) (2022-12-06)
+
+
+### Bug Fixes
+
+* More explanatory `No pre-aggregation partitions were built yet` message ([#5702](https://github.com/cube-js/cube.js/issues/5702)) ([ec39baa](https://github.com/cube-js/cube.js/commit/ec39baa80b9980e4b72be31c53f6704884b8ac5c))
+
+
+
+
+
 ## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
 
 

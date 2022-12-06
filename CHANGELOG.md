@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.21](https://github.com/cube-js/cube.js/compare/v0.31.20...v0.31.21) (2022-12-06)
+
+
+### Bug Fixes
+
+* **cubestore:** `Error in processing loop: Row with id is not found for JobRocksTable` for streaming jobs ([f2de503](https://github.com/cube-js/cube.js/commit/f2de503365c4dece0b01a2f8817b231ab0fced4e))
+* **cubestore:** Avoid streaming jobs waiting for regular jobs to complete ([#5725](https://github.com/cube-js/cube.js/issues/5725)) ([89d5bf4](https://github.com/cube-js/cube.js/commit/89d5bf4eda6d2b8ba41febe121322aba5605d107))
+* **cubestore:** Chunk all streaming input into bigger chunks based on time spent in write chunk operations and remove sequence gap checks as those fail for tables ([1f2d9bf](https://github.com/cube-js/cube.js/commit/1f2d9bf6f1df8e8d961300d4c632240bc5290eb3))
+* **cubestore:** Replay streams with `earliest` offset even for `latest` setting after failure ([7ca71f5](https://github.com/cube-js/cube.js/commit/7ca71f5969f9550151afcd646864a4d5eaeca3ab))
+* **cubestore:** ReplayHandle reconcile fails due to merge ReplayHandles with Chunks ([#5713](https://github.com/cube-js/cube.js/issues/5713)) ([ac213a7](https://github.com/cube-js/cube.js/commit/ac213a7bb648fbe4a6f645227640d7085a0b578e))
+* **cubestore:** Streaming jobs stuck as stale ([1cf3432](https://github.com/cube-js/cube.js/commit/1cf3432c23a20ec682a40fd0f86192b98b0a6fc0))
+* **databricks-jdbc:** Databricks pre-aggregations schema with UC ([#5726](https://github.com/cube-js/cube.js/issues/5726)) ([6281471](https://github.com/cube-js/cube.js/commit/6281471ad981372a938449114cd51e5cf1326884))
+* **playground:** clear search value ([#5720](https://github.com/cube-js/cube.js/issues/5720)) ([5b177f2](https://github.com/cube-js/cube.js/commit/5b177f2531789928a75f1e0c47c8f25bdd7c0251))
+* More explanatory `No pre-aggregation partitions were built yet` message ([#5702](https://github.com/cube-js/cube.js/issues/5702)) ([ec39baa](https://github.com/cube-js/cube.js/commit/ec39baa80b9980e4b72be31c53f6704884b8ac5c))
+
+
+
+
+
 ## [0.31.20](https://github.com/cube-js/cube.js/compare/v0.31.19...v0.31.20) (2022-12-02)
 
 
