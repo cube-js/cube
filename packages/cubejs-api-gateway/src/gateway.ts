@@ -1542,7 +1542,7 @@ class ApiGateway {
   public handleError({
     e, context, query, res, requestStarted
   }: any) {
-    const requestId = getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
+    const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
     
     const plainError = e.plainMessages;
     
