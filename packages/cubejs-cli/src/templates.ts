@@ -230,6 +230,7 @@ const ordersJs = `cube(\`Orders\`, {
 `;
 
 const cubeJs = `// Cube.js configuration options: https://cube.dev/docs/config
+/** @type{ import('@cubejs-backend/server-core').CreateOptions } */
 module.exports = {
 };
 `;
