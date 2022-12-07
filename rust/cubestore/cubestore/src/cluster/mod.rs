@@ -173,6 +173,7 @@ pub struct ClusterImpl {
     server_name: String,
     server_addresses: Vec<String>,
     job_notify: Arc<Notify>,
+    long_running_job_notify: Arc<Notify>,
     meta_store_sender: Sender<MetaStoreEvent>,
     #[cfg(not(target_os = "windows"))]
     select_process_pool: RwLock<
@@ -278,7 +279,9 @@ lazy_static! {
 impl Cluster for ClusterImpl {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError> {
         if self.server_name == node_name || is_self_reference(&node_name) {
-            self.job_notify.notify_waiters();
+            // TODO `notify_one()` was replaced by `notify_waiters()` here. Revisit in case of delays in job processing.
+            self.job_notify.notify_one();
+            self.long_running_job_notify.notify_one();
         } else {
             self.send_to_worker(&node_name, NetworkMessage::NotifyJobListeners)
                 .await?;
@@ -545,7 +548,9 @@ impl Cluster for ClusterImpl {
                 panic!("MetaStoreCall sent to worker");
             }
             NetworkMessage::NotifyJobListeners => {
-                self.job_notify.notify_waiters();
+                // TODO `notify_one()` was replaced by `notify_waiters()` here. Revisit in case of delays in job processing.
+                self.job_notify.notify_one();
+                self.long_running_job_notify.notify_one();
                 NetworkMessage::NotifyJobListenersSuccess
             }
             NetworkMessage::NotifyJobListenersSuccess => {
@@ -967,6 +972,7 @@ impl ClusterImpl {
             meta_store,
             cluster_transport,
             job_notify: Arc::new(Notify::new()),
+            long_running_job_notify: Arc::new(Notify::new()),
             meta_store_sender,
             #[cfg(not(target_os = "windows"))]
             select_process_pool: RwLock::new(None),
@@ -1016,6 +1022,7 @@ impl ClusterImpl {
             0..self.config_obj.job_runners_count() + self.config_obj.long_term_job_runners_count()
         {
             // TODO number of job event loops
+            let is_long_running = i >= self.config_obj.job_runners_count();
             let job_runner = JobRunner {
                 config_obj: self.config_obj.clone(),
                 meta_store: self.meta_store.clone(),
@@ -1023,9 +1030,13 @@ impl ClusterImpl {
                 compaction_service: self.injector.upgrade().unwrap().get_service_typed().await,
                 import_service: self.injector.upgrade().unwrap().get_service_typed().await,
                 server_name: self.server_name.clone(),
-                notify: self.job_notify.clone(),
+                notify: if is_long_running {
+                    self.long_running_job_notify.clone()
+                } else {
+                    self.job_notify.clone()
+                },
                 stop_token: self.stop_token.clone(),
-                is_long_term: i >= self.config_obj.job_runners_count(),
+                is_long_term: is_long_running,
             };
             futures.push(cube_ext::spawn(async move {
                 job_runner.processing_loop().await;
