@@ -2305,7 +2305,7 @@ impl SplitRules {
         if is_measure {
             rules.extend(
                 vec![
-                    // Group expr -- skip measures
+                    // Group expr -- skip measures that can be aggregated
                     transforming_chain_rewrite(
                         &format!("{}-group-expr-measure", base_name),
                         main_searcher(group_expr_split_replacer),
@@ -2321,7 +2321,15 @@ impl SplitRules {
                             transform_fn.clone(),
                         ),
                     ),
-                    // Group aggr -- keep & wrap measures
+                    // Group expr -- keep measures that cannot be aggregated
+                    transforming_chain_rewrite(
+                        &format!("{}-group-expr-measure-nonaggr", base_name),
+                        main_searcher(group_expr_split_replacer),
+                        chain(group_expr_split_replacer),
+                        applier(group_expr_split_replacer),
+                        self.transform_group_expr_measure_nonaggr("?cube", column_subst),
+                    ),
+                    // Group aggr -- keep & wrap measures that can be aggregated
                     transforming_chain_rewrite(
                         &format!("{}-group-aggr-measure", base_name),
                         main_searcher(group_aggregate_split_replacer),
@@ -2346,6 +2354,18 @@ impl SplitRules {
                             if unwrap_expr { None } else { Some("?distinct") },
                             transform_fn.clone(),
                         ),
+                    ),
+                    // Group aggr -- skip measures that cannot be aggregated
+                    transforming_chain_rewrite(
+                        &format!("{}-group-aggr-measure-number", base_name),
+                        main_searcher(group_aggregate_split_replacer),
+                        chain(group_aggregate_split_replacer),
+                        if unwrap_expr {
+                            applier(group_aggregate_split_replacer)
+                        } else {
+                            aggr_aggr_expr_empty_tail()
+                        },
+                        self.transform_group_aggregate_measure_nonaggr("?cube", column_subst),
                     ),
                 ]
                 .into_iter(),
@@ -2700,8 +2720,16 @@ impl SplitRules {
                 {
                     for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                         if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
-                            if cube.lookup_measure(&column.name).is_some() {
-                                return true;
+                            if let Some(measure) = cube.lookup_measure(&column.name) {
+                                if measure.agg_type != Some("number".to_string()) {
+                                    return true;
+                                }
+
+                                match measure.agg_type.as_deref() {
+                                    Some("count") | Some("sum") | Some("min") | Some("max")
+                                    | None => return true,
+                                    _ => continue,
+                                };
                             }
                         }
                     }
@@ -2711,6 +2739,41 @@ impl SplitRules {
             }
 
             original_transform_fn(egraph, subst)
+        }
+    }
+
+    fn transform_group_expr_measure_nonaggr(
+        &self,
+        alias_to_cube_var: &'static str,
+        column_var: Option<&'static str>,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let column_var = column_var.map(|column_var| var!(column_var));
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            if let Some(column_var) = column_var {
+                for alias_to_cube in var_iter!(
+                    egraph[subst[alias_to_cube_var]],
+                    GroupExprSplitReplacerAliasToCube
+                )
+                .cloned()
+                {
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                            if let Some(measure) = cube.lookup_measure(&column.name) {
+                                if let Some(agg_type) = &measure.agg_type {
+                                    match agg_type.as_str() {
+                                        "count" | "sum" | "min" | "max" => continue,
+                                        _ => return true,
+                                    };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            false
         }
     }
 
@@ -2741,6 +2804,7 @@ impl SplitRules {
                     for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                         if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
                             if cube.lookup_dimension(&column.name).is_some()
+                                || cube.lookup_segment(&column.name).is_some()
                                 || column.name == "__user"
                                 || column.name == "__cubeJoinField"
                             {
@@ -2826,6 +2890,41 @@ impl SplitRules {
         }
     }
 
+    fn transform_group_aggregate_measure_nonaggr(
+        &self,
+        alias_to_cube_var: &'static str,
+        column_var: Option<&'static str>,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let column_var = column_var.map(|column_var| var!(column_var));
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            if let Some(column_var) = column_var {
+                for alias_to_cube in var_iter!(
+                    egraph[subst[alias_to_cube_var]],
+                    GroupAggregateSplitReplacerAliasToCube
+                )
+                .cloned()
+                {
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
+                            if let Some(measure) = cube.lookup_measure(&column.name) {
+                                if let Some(agg_type) = &measure.agg_type {
+                                    match agg_type.as_str() {
+                                        "count" | "sum" | "min" | "max" => continue,
+                                        _ => return true,
+                                    };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
     fn transform_group_aggregate_dimension<T>(
         &self,
         alias_to_cube_var: &'static str,
@@ -2849,6 +2948,7 @@ impl SplitRules {
                     for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                         if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
                             if cube.lookup_dimension(&column.name).is_some()
+                                || cube.lookup_segment(&column.name).is_some()
                                 || column.name == "__user"
                                 || column.name == "__cubeJoinField"
                             {

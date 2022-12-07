@@ -10,6 +10,7 @@ expression: "execute_query(r#\"SELECT\n                a.attname,\n             
 | minPrice           | numeric                             | NULL    | true       | 18000     | NULL    |           | NULL             |
 | avgPrice           | numeric                             | NULL    | true       | 18000     | NULL    |           | NULL             |
 | countDistinct      | bigint                              | NULL    | true       | 18000     | NULL    |           | NULL             |
+| payingPercentage   | numeric                             | NULL    | true       | 18000     | NULL    |           | NULL             |
 | order_date         | timestamp without time zone         | NULL    | false      | 18000     | NULL    |           | NULL             |
 | customer_gender    | text                                | NULL    | false      | 18000     | NULL    |           | NULL             |
 | taxful_total_price | numeric                             | NULL    | false      | 18000     | NULL    |           | NULL             |

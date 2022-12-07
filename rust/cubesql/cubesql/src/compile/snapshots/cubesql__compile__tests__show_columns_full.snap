@@ -10,6 +10,7 @@ expression: "execute_query(\"show full columns from KibanaSampleDataEcommerce;\"
 | minPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
 | avgPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
 | countDistinct      | int          | NULL               | NO   |     | NULL    |       | select     |         |
+| payingPercentage   | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
 | order_date         | datetime     | NULL               | YES  |     | NULL    |       | select     |         |
 | customer_gender    | varchar(255) | utf8mb4_0900_ai_ci | YES  |     | NULL    |       | select     |         |
 | taxful_total_price | numeric      | NULL               | YES  |     | NULL    |       | select     |         |
