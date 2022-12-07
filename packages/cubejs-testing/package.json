@@ -72,9 +72,7 @@
     "smoke:prestodb": "jest --verbose -i dist/test/smoke-prestodb.test.js",
     "smoke:prestodb:snapshot": "jest --verbose --forceExit --updateSnapshot -i dist/test/smoke-prestodb.test.js",
     "smoke:mssql": "jest --verbose -i dist/test/smoke-mssql.test.js",
-    "smoke:mssql:snapshot": "jest --verbose --forceExit --updateSnapshot -i dist/test/smoke-mssql.test.js",
-    "smoke:hana": "jest --verbose -i dist/test/smoke-hana.test.js",
-    "smoke:hana:snapshot": "jest --verbose --forceExit --updateSnapshot -i dist/test/smoke-hana.test.js"
+    "smoke:mssql:snapshot": "jest --verbose --forceExit --updateSnapshot -i dist/test/smoke-mssql.test.js"
   },
   "files": [
     "dist/src",
