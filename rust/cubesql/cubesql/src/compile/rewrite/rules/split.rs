@@ -2133,7 +2133,8 @@ impl RewriteRules for SplitRules {
                     )
                 },
                 |_, _| true,
-                false,
+                // TODO: change to false after post-aggregation improvements
+                true,
                 false,
                 true,
                 Some(vec![("?expr", column_expr("?column"))]),
@@ -2741,6 +2742,7 @@ impl SplitRules {
                     for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                         if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
                             if cube.lookup_dimension(&column.name).is_some()
+                                || cube.lookup_segment(&column.name).is_some()
                                 || column.name == "__user"
                                 || column.name == "__cubeJoinField"
                             {
@@ -2849,6 +2851,7 @@ impl SplitRules {
                     for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                         if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
                             if cube.lookup_dimension(&column.name).is_some()
+                                || cube.lookup_segment(&column.name).is_some()
                                 || column.name == "__user"
                                 || column.name == "__cubeJoinField"
                             {
