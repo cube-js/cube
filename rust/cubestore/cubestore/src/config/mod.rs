@@ -756,7 +756,7 @@ impl Config {
                 meta_store_log_upload_interval: 30,
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
-                stale_stream_timeout: 60,
+                stale_stream_timeout: env_parse("CUBESTORE_STALE_STREAM_TIMEOUT", 600),
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
                     .map(|v| v.split(",").map(|s| s.to_string()).collect())
