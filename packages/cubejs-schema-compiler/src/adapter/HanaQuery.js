@@ -1,3 +1,4 @@
+import R from 'ramda';
 import moment from 'moment-timezone';
 
 import { BaseQuery } from './BaseQuery';
@@ -33,11 +34,11 @@ export class HanaQuery extends BaseQuery {
    * using forSelect dimensions for grouping
    */
   groupByClause() {
-    const dimensions = this.forSelect().filter(item => !!item.dimension);
-    if (!dimensions.length) {
-      return '';
-    }
-    return ` GROUP BY ${dimensions.map(item => item.dimensionSql()).join(', ')}`;
+    const dimensionsForSelect = this.dimensionsForSelect();
+    const dimensionColumns = R.flatten(
+      dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())
+    ).filter(s => !!s);
+    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
   convertTz(field) {
