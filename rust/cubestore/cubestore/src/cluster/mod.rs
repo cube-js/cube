@@ -696,9 +696,6 @@ impl JobRunner {
                 _ = self.notify.notified() => {
                     self.fetch_and_process().await
                 }
-                _ = Delay::new(Duration::from_secs(5)) => {
-                    self.fetch_and_process().await
-                }
             };
             if let Err(e) = res {
                 error!("Error in processing loop: {}", e);
@@ -1042,6 +1039,25 @@ impl ClusterImpl {
                 job_runner.processing_loop().await;
             }));
         }
+
+        let stop_token = self.stop_token.clone();
+        let long_running_job_notify = self.long_running_job_notify.clone();
+        let job_notify = self.job_notify.clone();
+
+        futures.push(cube_ext::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = stop_token.cancelled() => {
+                        return;
+                    }
+                    _ = Delay::new(Duration::from_secs(5)) => {
+                        job_notify.notify_one();
+                        long_running_job_notify.notify_one();
+                    }
+                };
+            }
+        }));
+
         join_all(futures)
             .await
             .into_iter()
