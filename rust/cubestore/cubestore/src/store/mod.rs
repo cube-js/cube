@@ -631,7 +631,8 @@ mod tests {
                     Path::new(path),
                     BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                     config.config_obj(),
-                ),
+                )
+                .unwrap(),
                 remote_fs.clone(),
                 10,
             );
@@ -722,7 +723,8 @@ mod tests {
                 Path::new(path),
                 BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
                 remote_fs.clone(),
@@ -820,7 +822,8 @@ mod tests {
                 Path::new(path),
                 BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
                 remote_fs.clone(),
