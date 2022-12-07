@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.22](https://github.com/cube-js/cube.js/compare/v0.31.21...v0.31.22) (2022-12-07)
+
+
+### Bug Fixes
+
+* **cubestore:** Added long running job fetches burst network ([385c4a6](https://github.com/cube-js/cube.js/commit/385c4a6f92e2da209804276d85f1dec1d404ed8e))
+* **cubestore:** Increase default stale stream timeout to allow replays to catch up with large kafka streams ([43cf0b1](https://github.com/cube-js/cube.js/commit/43cf0b1c700c5fc15ed907c694916569e5647bf3))
+* **cubestore:** Row with id 1 is not found for SchemaRocksTable -- fix log replay order during metastore loading from dump ([b74c072](https://github.com/cube-js/cube.js/commit/b74c0721fb8d62d9e52570a3d5b883604b00648c))
+
+
+
+
+
 ## [0.31.21](https://github.com/cube-js/cube.js/compare/v0.31.20...v0.31.21) (2022-12-06)
 
 

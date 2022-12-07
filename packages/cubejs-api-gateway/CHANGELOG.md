@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.22](https://github.com/cube-js/cube.js/compare/v0.31.21...v0.31.22) (2022-12-07)
+
+
+### Bug Fixes
+
+* return failed query request ids ([#5729](https://github.com/cube-js/cube.js/issues/5729)) ([22cd580](https://github.com/cube-js/cube.js/commit/22cd580c412a64ce92dd1410f13af19709c27b9d))
+
+
+
+
+
 ## [0.31.20](https://github.com/cube-js/cube.js/compare/v0.31.19...v0.31.20) (2022-12-02)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.22](https://github.com/cube-js/cube.js/compare/v0.31.21...v0.31.22) (2022-12-07)
+
+
+### Bug Fixes
+
+* **cubesql:** Metabase - auto-generated charts for cubes containing string dimensions ([#5728](https://github.com/cube-js/cube.js/issues/5728)) ([72be686](https://github.com/cube-js/cube.js/commit/72be68671faaa4c938374f95cb8cb81578ef4fdb))
+
+
+
+
+
 ## [0.31.20](https://github.com/cube-js/cube.js/compare/v0.31.19...v0.31.20) (2022-12-02)
 
 

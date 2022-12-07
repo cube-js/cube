@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.22](https://github.com/cube-js/cube.js/compare/v0.31.21...v0.31.22) (2022-12-07)
+
+
+### Bug Fixes
+
+* **cubesql:** Metabase - auto-generated charts for cubes containing string dimensions ([#5728](https://github.com/cube-js/cube.js/issues/5728)) ([72be686](https://github.com/cube-js/cube.js/commit/72be68671faaa4c938374f95cb8cb81578ef4fdb))
+* **cubestore:** Added long running job fetches burst network ([385c4a6](https://github.com/cube-js/cube.js/commit/385c4a6f92e2da209804276d85f1dec1d404ed8e))
+* **cubestore:** Increase default stale stream timeout to allow replays to catch up with large kafka streams ([43cf0b1](https://github.com/cube-js/cube.js/commit/43cf0b1c700c5fc15ed907c694916569e5647bf3))
+* **cubestore:** Row with id 1 is not found for SchemaRocksTable -- fix log replay order during metastore loading from dump ([b74c072](https://github.com/cube-js/cube.js/commit/b74c0721fb8d62d9e52570a3d5b883604b00648c))
+* **playground:** reload the page in case chunks got stale ([#5646](https://github.com/cube-js/cube.js/issues/5646)) ([2215595](https://github.com/cube-js/cube.js/commit/2215595369ac0ceab89c95760ecea6e9fd9cc1af))
+* return failed query request ids ([#5729](https://github.com/cube-js/cube.js/issues/5729)) ([22cd580](https://github.com/cube-js/cube.js/commit/22cd580c412a64ce92dd1410f13af19709c27b9d))
+
+
+### Features
+
+* **playground:** yaml rollup support ([#5727](https://github.com/cube-js/cube.js/issues/5727)) ([7a267f9](https://github.com/cube-js/cube.js/commit/7a267f99def74fe56f1505c7d56d42ea0c24f842))
+
+
+
+
+
 ## [0.31.21](https://github.com/cube-js/cube.js/compare/v0.31.20...v0.31.21) (2022-12-06)
 
 

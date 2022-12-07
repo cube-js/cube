@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.22](https://github.com/cube-js/cube.js/compare/v0.31.21...v0.31.22) (2022-12-07)
+
+
+### Bug Fixes
+
+* **playground:** reload the page in case chunks got stale ([#5646](https://github.com/cube-js/cube.js/issues/5646)) ([2215595](https://github.com/cube-js/cube.js/commit/2215595369ac0ceab89c95760ecea6e9fd9cc1af))
+* return failed query request ids ([#5729](https://github.com/cube-js/cube.js/issues/5729)) ([22cd580](https://github.com/cube-js/cube.js/commit/22cd580c412a64ce92dd1410f13af19709c27b9d))
+
+
+### Features
+
+* **playground:** yaml rollup support ([#5727](https://github.com/cube-js/cube.js/issues/5727)) ([7a267f9](https://github.com/cube-js/cube.js/commit/7a267f99def74fe56f1505c7d56d42ea0c24f842))
+
+
+
+
+
 ## [0.31.21](https://github.com/cube-js/cube.js/compare/v0.31.20...v0.31.21) (2022-12-06)
 
 
