@@ -66,14 +66,13 @@ export class HanaQuery extends BaseQuery {
   subtractInterval(date, interval) {
     const [intervalValue, intervalUnit] = interval.split(' ', 2);
     const negativeInterval = (intervalValue) * -1;
-    const fn = 'ADD_' + intervalUnit.toUpperCase() + 'S';
+    const fn = `ADD_${intervalUnit.toUpperCase()}S`;
     return `${fn}(${date}, ${negativeInterval})`;
-
   }
 
   addInterval(date, interval) {
     const [intervalValue, intervalUnit] = interval.split(' ', 2);
-    const fn = 'ADD_' + intervalUnit.toUpperCase() + 'S';
+    const fn = `ADD_${intervalUnit.toUpperCase()}S`;
     return `${fn}(${date}, ${intervalValue})`;
   }
 
