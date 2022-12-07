@@ -4895,6 +4895,109 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn log_replay_ordering() {
+        {
+            let config = Config::test("log_replay_ordering");
+
+            let _ = fs::remove_dir_all(config.local_dir());
+            let _ = fs::remove_dir_all(config.remote_dir());
+
+            let services = config.configure().await;
+            services.start_processing_loops().await.unwrap();
+            services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .upload_check_point()
+                .await
+                .unwrap();
+            for i in 0..100 {
+                let schema = services
+                    .meta_store
+                    .create_schema(format!("foo{}", i), false)
+                    .await
+                    .unwrap();
+                services
+                    .rocks_meta_store
+                    .as_ref()
+                    .unwrap()
+                    .run_upload()
+                    .await
+                    .unwrap();
+                let table = services
+                    .meta_store
+                    .create_table(
+                        format!("foo{}", i),
+                        format!("table{}", i),
+                        vec![Column::new("foo".to_string(), ColumnType::String, 0)],
+                        None,
+                        None,
+                        Vec::new(),
+                        false,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .await
+                    .unwrap();
+                services
+                    .rocks_meta_store
+                    .as_ref()
+                    .unwrap()
+                    .run_upload()
+                    .await
+                    .unwrap();
+                services
+                    .meta_store
+                    .drop_table(table.get_id())
+                    .await
+                    .unwrap();
+                services
+                    .rocks_meta_store
+                    .as_ref()
+                    .unwrap()
+                    .run_upload()
+                    .await
+                    .unwrap();
+                services
+                    .meta_store
+                    .delete_schema_by_id(schema.get_id())
+                    .await
+                    .unwrap();
+                services
+                    .rocks_meta_store
+                    .as_ref()
+                    .unwrap()
+                    .run_upload()
+                    .await
+                    .unwrap();
+            }
+            services.stop_processing_loops().await.unwrap();
+
+            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            fs::remove_dir_all(config.local_dir()).unwrap();
+        }
+
+        {
+            let config = Config::test("log_replay_ordering");
+
+            let services2 = config.configure().await;
+            let tables = services2
+                .meta_store
+                .get_tables_with_path(true)
+                .await
+                .unwrap();
+            assert_eq!(tables.len(), 0);
+            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.remote_dir()).unwrap();
+        }
+    }
+
+    #[tokio::test]
     async fn discard_logs() {
         {
             let config = Config::test("discard_logs");

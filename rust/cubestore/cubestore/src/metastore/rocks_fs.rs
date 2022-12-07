@@ -210,7 +210,22 @@ impl BaseRocksStoreFs {
             .remote_fs
             .list(&format!("{}-{}-logs", self.name, snapshot))
             .await?;
-        for log_file in logs_to_batch.iter() {
+        let mut logs_to_batch_to_seq = logs_to_batch
+            .into_iter()
+            .map(|f| -> Result<_, CubeError> {
+                let last = f
+                    .split("/")
+                    .last()
+                    .ok_or(CubeError::internal(format!("Can't split path: {}", f)))?;
+                let result = last.replace(".flex", "").parse::<usize>().map_err(|e| {
+                    CubeError::internal(format!("Can't parse flex path {}: {}", f, e))
+                })?;
+                Ok((f, result))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        logs_to_batch_to_seq.sort_unstable_by_key(|(_, seq)| *seq);
+
+        for (log_file, _) in logs_to_batch_to_seq.iter() {
             let path_to_log = self.remote_fs.local_file(log_file).await?;
             let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
             if let Ok(batch) = batch {
