@@ -1096,14 +1096,14 @@ impl RocksMetaStore {
         path: &Path,
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
-    ) -> Arc<Self> {
-        Self::new_from_store(RocksStore::with_listener(
+    ) -> Result<Arc<Self>, CubeError> {
+        Ok(Self::new_from_store(RocksStore::with_listener(
             path,
             vec![],
             metastore_fs,
             config,
             Arc::new(RocksMetaStoreDetails {}),
-        ))
+        )?))
     }
 
     fn new_from_store(store: Arc<RocksStore>) -> Arc<Self> {
@@ -1187,7 +1187,8 @@ impl RocksMetaStore {
             BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
             config.config_obj(),
             details,
-        );
+        )
+        .unwrap();
 
         (remote_fs, Self::new_from_store(store))
     }
@@ -4151,7 +4152,8 @@ mod tests {
                 store_path.join("metastore").as_path(),
                 BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
 
             let schema_1 = meta_store
                 .create_schema("foo".to_string(), false)
@@ -4338,7 +4340,8 @@ mod tests {
             store_path.join("metastore").as_path(),
             BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
             config.config_obj(),
-        );
+        )
+        .unwrap();
 
         let schema1 = meta_store
             .create_schema("foo".to_string(), false)
@@ -4416,7 +4419,8 @@ mod tests {
                 store_path.join("metastore").as_path(),
                 BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
 
             meta_store
                 .create_schema("foo".to_string(), false)
@@ -4464,7 +4468,8 @@ mod tests {
                 store_path.clone().join("metastore").as_path(),
                 BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
 
             let schema_1 = meta_store
                 .create_schema("foo".to_string(), false)
@@ -4571,7 +4576,8 @@ mod tests {
                 store_path.clone().join("metastore").as_path(),
                 BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
 
             meta_store
                 .create_schema("foo".to_string(), false)
@@ -4658,7 +4664,8 @@ mod tests {
                 store_path.clone().join("metastore").as_path(),
                 BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
 
             meta_store
                 .create_schema("foo".to_string(), false)
@@ -5138,7 +5145,8 @@ mod tests {
                 store_path.join("metastore").as_path(),
                 BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
             meta_store
                 .create_schema("foo".to_string(), false)
                 .await
@@ -5275,7 +5283,8 @@ mod tests {
                 store_path.join("metastore").as_path(),
                 BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
             meta_store
                 .create_schema("foo".to_string(), false)
                 .await

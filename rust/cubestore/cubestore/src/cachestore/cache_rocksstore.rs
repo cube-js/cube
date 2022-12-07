@@ -54,14 +54,14 @@ impl RocksCacheStore {
         path: &Path,
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
-    ) -> Arc<Self> {
-        Self::new_from_store(RocksStore::with_listener(
+    ) -> Result<Arc<Self>, CubeError> {
+        Ok(Self::new_from_store(RocksStore::with_listener(
             path,
             vec![],
             metastore_fs,
             config,
             Arc::new(RocksCacheStoreDetails {}),
-        ))
+        )?))
     }
 
     fn new_from_store(store: Arc<RocksStore>) -> Arc<Self> {
@@ -145,7 +145,8 @@ impl RocksCacheStore {
             BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
             config.config_obj(),
             details,
-        );
+        )
+        .unwrap();
 
         (remote_fs, Self::new_from_store(store))
     }

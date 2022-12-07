@@ -400,9 +400,9 @@ impl RocksStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
         details: Arc<dyn RocksStoreDetails>,
-    ) -> Arc<Self> {
-        let meta_store = Self::with_listener_impl(path, listeners, metastore_fs, config, details);
-        Arc::new(meta_store)
+    ) -> Result<Arc<Self>, CubeError> {
+        let meta_store = Self::with_listener_impl(path, listeners, metastore_fs, config, details)?;
+        Ok(Arc::new(meta_store))
     }
 
     pub fn with_listener_impl(
@@ -411,8 +411,8 @@ impl RocksStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
         details: Arc<dyn RocksStoreDetails>,
-    ) -> Self {
-        let db = details.open_db(path).unwrap();
+    ) -> Result<Self, CubeError> {
+        let db = details.open_db(path)?;
         let db_arc = Arc::new(db);
 
         let (rw_loop_tx, rw_loop_rx) = std::sync::mpsc::sync_channel::<
@@ -449,7 +449,7 @@ impl RocksStore {
             details,
         };
 
-        meta_store
+        Ok(meta_store)
     }
 
     pub fn new(
@@ -457,7 +457,7 @@ impl RocksStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
         details: Arc<dyn RocksStoreDetails>,
-    ) -> Arc<Self> {
+    ) -> Result<Arc<Self>, CubeError> {
         Self::with_listener(path, vec![], metastore_fs, config, details)
     }
 
@@ -484,7 +484,7 @@ impl RocksStore {
             );
         }
 
-        let meta_store = Self::new(path, metastore_fs, config, details);
+        let meta_store = Self::new(path, metastore_fs, config, details)?;
         Self::check_all_indexes(&meta_store).await?;
 
         Ok(meta_store)

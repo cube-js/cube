@@ -298,7 +298,7 @@ impl MetaStoreFs for BaseRocksStoreFs {
 
                     return self
                         .check_rocks_store(
-                            RocksStore::new(Path::new(path), self.clone(), config, rocks_details),
+                            RocksStore::new(Path::new(path), self.clone(), config, rocks_details)?,
                             Some(snapshot),
                         )
                         .await;
@@ -313,7 +313,7 @@ impl MetaStoreFs for BaseRocksStoreFs {
 
         return self
             .check_rocks_store(
-                RocksStore::new(Path::new(path), self.clone(), config, rocks_details),
+                RocksStore::new(Path::new(path), self.clone(), config, rocks_details)?,
                 None,
             )
             .await;
