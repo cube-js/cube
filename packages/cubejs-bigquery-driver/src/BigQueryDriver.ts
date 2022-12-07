@@ -194,10 +194,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async tablesSchema() {
     const dataSets = await this.bigquery.getDatasets();
-    const dataSetsColumns = await Promise.all(
-      dataSets[0].map((dataSet) => this.loadTablesForDataset(dataSet))
-    );
-
+    let dataSetsColumns = [];
+    while (dataSets[0].length) {
+      const columns = await Promise.all(dataSets[0].splice(0, 10).map((dataSet) => this.loadTablesForDataset(dataSet)));
+      dataSetsColumns = dataSetsColumns.concat(dataSetsColumns);
+    }
     return dataSetsColumns.reduce((prev, current) => Object.assign(prev, current), {});
   }
 
