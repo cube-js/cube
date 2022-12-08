@@ -5,11 +5,11 @@ use crate::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr,
             analysis::LogicalPlanAnalysis,
-            binary_expr, case_expr, cast_expr, change_user_expr, column_expr,
+            binary_expr, cast_expr, change_user_expr, column_expr,
             column_name_to_member_to_aliases, column_name_to_member_vec, cross_join, cube_scan,
             cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
             cube_scan_order_empty_tail, dimension_expr, expr_column_name,
-            expr_column_name_with_relation, fun_expr, is_not_null_expr, join, like_expr, limit,
+            expr_column_name_with_relation, fun_expr, join, like_expr, limit,
             list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
             literal_member, measure_expr, member_pushdown_replacer, member_replacer,
             merged_members_replacer, original_expr_name, projection, projection_expr,
@@ -659,12 +659,6 @@ impl RewriteRules for MemberRules {
                 "binary-expr-multi-assoc",
                 binary_expr(binary_expr("?a", "*", "?b"), "*", "?c"),
                 binary_expr("?a", "*", binary_expr("?b", "*", "?c")),
-            ),
-            // Equivalent CASE variants
-            rewrite(
-                "case-when-is-not-null-expr-then-expr",
-                case_expr(vec![(is_not_null_expr("?expr"), "?expr".to_string())], None),
-                "?expr".to_string(),
             ),
             // LIKE expr to binary expr
             transforming_rewrite(

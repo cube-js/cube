@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"show create table `db`.`KibanaSampleDataEcommerce`;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
+expression: "execute_query(\"show create table KibanaSampleDataEcommerce;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +---------------------------+--------------------------------------------+
 | Table                     | Create Table                               |
@@ -13,6 +13,7 @@ expression: "execute_query(\"show create table `db`.`KibanaSampleDataEcommerce`;
 |                           |   `countDistinct` int,                     |
 |                           |   `order_date` datetime NOT NULL,          |
 |                           |   `customer_gender` varchar(255) NOT NULL, |
+|                           |   `notes` varchar(255) NOT NULL,           |
 |                           |   `taxful_total_price` numeric NOT NULL,   |
 |                           |   `has_subscription` tinyint(1) NOT NULL,  |
 |                           |   `is_male` tinyint(1),                    |

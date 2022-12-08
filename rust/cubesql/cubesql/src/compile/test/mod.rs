@@ -34,6 +34,10 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     _type: "string".to_string(),
                 },
                 V1CubeMetaDimension {
+                    name: "KibanaSampleDataEcommerce.notes".to_string(),
+                    _type: "string".to_string(),
+                },
+                V1CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     _type: "number".to_string(),
                 },

@@ -366,6 +366,11 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
         },
+        // NOTE: converting this to a list might provide rewrite improvements
+        CaseExprReplacer {
+            members: Vec<LogicalPlan>,
+            alias_to_cube: Vec<(String, String)>,
+        },
         EventNotification {
             name: String,
             members: Vec<LogicalPlan>,
@@ -770,9 +775,13 @@ fn case_expr_var_arg(
     format!("(CaseExpr {} {} {})", expr, when_then, else_expr)
 }
 
-fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: Option<String>) -> String {
+fn case_expr<D: Display>(
+    expr: Option<String>,
+    when_then: Vec<(D, D)>,
+    else_expr: Option<String>,
+) -> String {
     case_expr_var_arg(
-        "CaseExprExpr",
+        case_expr_expr(expr),
         list_expr(
             "CaseExprWhenThenExpr",
             when_then
@@ -781,13 +790,35 @@ fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: Option<String>) -> S
                 .flatten()
                 .collect(),
         ),
-        list_expr(
-            "CaseExprElseExpr",
-            match else_expr {
-                Some(else_expr) => vec![else_expr],
-                None => vec![],
-            },
-        ),
+        case_expr_else_expr(else_expr),
+    )
+}
+
+fn case_expr_expr(expr: Option<String>) -> String {
+    list_expr(
+        "CaseExprExpr",
+        match expr {
+            Some(expr) => vec![expr],
+            None => vec![],
+        },
+    )
+}
+
+fn case_expr_when_then_expr(left: impl Display, right: impl Display) -> String {
+    format!("(CaseExprWhenThenExpr {} {})", left, right)
+}
+
+fn case_expr_when_then_expr_empty_tail() -> String {
+    format!("CaseExprWhenThenExpr")
+}
+
+fn case_expr_else_expr(else_expr: Option<String>) -> String {
+    list_expr(
+        "CaseExprElseExpr",
+        match else_expr {
+            Some(else_expr) => vec![else_expr],
+            None => vec![],
+        },
     )
 }
 
@@ -942,6 +973,10 @@ fn group_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Dis
         "(GroupAggregateSplitReplacer {} {})",
         members, alias_to_cube
     )
+}
+
+fn case_expr_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
+    format!("(CaseExprReplacer {} {})", members, alias_to_cube)
 }
 
 fn event_notification(name: impl Display, members: impl Display, meta: impl Display) -> String {

@@ -927,6 +927,7 @@ impl RewriteRules for FilterRules {
                             "Strpos",
                             vec![
                                 case_expr(
+                                    None,
                                     vec![(
                                         is_not_null_expr(column_expr("?column")),
                                         column_expr("?column"),
@@ -1122,6 +1123,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     binary_expr(
                         case_expr(
+                            None,
                             vec![(
                                 binary_expr(
                                     fun_expr(
