@@ -4,6 +4,12 @@ import fs from 'fs-extra';
 import path from 'path';
 import fetch from 'node-fetch';
 
+type MetricFilterDefintion = {
+  field: string;
+  operator: string;
+  value: string;
+};
+
 type MetricDefinition = {
   // eslint-disable-next-line camelcase
   unique_id: string;
@@ -11,10 +17,12 @@ type MetricDefinition = {
   model: string;
   // eslint-disable-next-line camelcase
   package_name: string;
-  type: string;
-  sql: string;
+  // eslint-disable-next-line camelcase
+  calculation_method: string;
+  expression: string;
   dimensions?: string[];
   timestamp?: string;
+  filters?: MetricFilterDefintion[];
 };
 
 type NodeDefinition = {
@@ -26,16 +34,16 @@ type NodeDefinition = {
   alias?: string;
 };
 
-type DbtManifest = {
-  metrics: { [metricName: string]: MetricDefinition };
-  nodes: { [nodeName: string]: NodeDefinition };
-};
-
-type ModelCubeDef = {
+type ModelCubeDefinition = {
   cubeName: string;
   metrics: MetricDefinition[],
   dimensions: string[]
   timeDimensions: string[]
+};
+
+type DbtManifest = {
+  metrics: { [metricName: string]: MetricDefinition };
+  nodes: { [nodeName: string]: NodeDefinition };
 };
 
 type DbtLoadOptions = {
@@ -180,8 +188,8 @@ export class Dbt extends AbstractExtension {
           model: metricDef.model.uniqueId,
           // eslint-disable-next-line camelcase
           package_name: metricDef.packageName,
-          type: metricDef.type,
-          sql: metricDef.sql,
+          calculation_method: metricDef.type,
+          expression: metricDef.sql,
           dimensions: metricDef.dimensions,
           timestamp: metricDef.timestamp,
         }
@@ -198,7 +206,7 @@ export class Dbt extends AbstractExtension {
   }
 
   private loadMetricCubesFromNormalizedManifest(manifest: DbtManifest, manifestPath: string, options?: DbtLoadOptions) {
-    const cubeDefs: { [model: string]: ModelCubeDef } = {};
+    const cubeDefs: { [model: string]: ModelCubeDefinition } = {};
     Object.keys(manifest.metrics || {}).forEach(
       metric => {
         const metricDef = manifest.metrics[metric];
@@ -239,8 +247,11 @@ export class Dbt extends AbstractExtension {
 
         measures: cubeDefs[model].metrics.map(metric => ({
           [camelize(metric.name, true)]: {
-            sql: () => metric.sql,
-            type: mapMetricType(metric.type),
+            sql: () => metric.expression,
+            type: mapMetricType(metric.calculation_method),
+            filters: (metric.filters || []).map(filter => ({
+              sql: () => `${filter.field} ${filter.operator} ${filter.value}`
+            }))
           },
         })).reduce((a, b) => ({ ...a, ...b }), {}),
 
