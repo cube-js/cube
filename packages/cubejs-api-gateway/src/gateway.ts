@@ -251,6 +251,19 @@ class ApiGateway {
       }
     }));
 
+    app.post(
+      `${this.basePath}/v1/sql-runner`,
+      jsonParser,
+      userMiddlewares,
+      async (req: Request, res: Response) => {
+        await this.sqlRunner({
+          query: req.body.query,
+          context: req.context!,
+          res: this.resToResultFn(res),
+        });
+      }
+    );
+
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
       await this.runScheduledRefresh({
         queryingOptions: req.query.queryingOptions,
@@ -1061,6 +1074,54 @@ class ApiGateway {
       res(queryType === QueryTypeEnum.REGULAR_QUERY ?
         { sql: toQuery(sqlQueries[0]) } :
         sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
+    } catch (e) {
+      this.handleError({
+        e, context, query, res, requestStarted
+      });
+    }
+  }
+
+  public async sqlRunner({ query, context, res }: QueryRequest) {
+    const requestStarted = new Date();
+    try {
+      if (!query) {
+        throw new UserError(
+          'A user\'s query must contain a body'
+        );
+      }
+      
+      if (!(query as Record<string, any>).query) {
+        throw new UserError(
+          'A user\'s query must contain at least one query param.'
+        );
+      }
+
+      query = {
+        ...query,
+        requestId: context.requestId
+      };
+
+      this.log(
+        {
+          type: 'Load SQL Runner Request',
+          query,
+        },
+        context
+      );
+
+      const result = await this.getAdapterApi(context).executeQuery(query);
+
+      this.log(
+        {
+          type: 'Load SQL Runner Request Success',
+          query,
+          duration: this.duration(requestStarted),
+          dbType: result.dbType,
+        },
+        context
+      );
+
+      res(result);
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted
