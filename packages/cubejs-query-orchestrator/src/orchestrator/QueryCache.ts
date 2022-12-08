@@ -89,10 +89,12 @@ export type PreAggTableToTempTable = [
   TempTable,
 ];
 
-export type CacheKey = [
-  query: string | QueryTuple,
-  opts?: string[]
-];
+export type CacheKey =
+  | string
+  | [
+      query: string | QueryTuple,
+      options?: string[]
+    ];
 
 type CacheEntry = {
   time: number;

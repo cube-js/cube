@@ -6,6 +6,11 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
 
+// /**
+//  * @typedef {[sql: string, params: unknown[], options?: Object]} QueryTuple
+//  * @typedef {string | [query: string | QueryTuple, options?: string[]]} CacheKey
+//  */
+
 /**
  * QueryQueue class.
  */

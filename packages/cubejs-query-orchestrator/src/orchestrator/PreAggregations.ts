@@ -103,18 +103,12 @@ function getStructureVersion(preAggregation) {
 }
 
 type VersionEntry = {
-  // eslint-disable-next-line camelcase
-  table_name: string,
-  // eslint-disable-next-line camelcase
-  content_version: string,
-  // eslint-disable-next-line camelcase
-  structure_version: string,
-  // eslint-disable-next-line camelcase
-  last_updated_at: number,
-  // eslint-disable-next-line camelcase
-  build_range_end?: string,
-  // eslint-disable-next-line camelcase
-  naming_version?: number
+  'table_name': string,
+  'content_version': string,
+  'structure_version': string,
+  'last_updated_at': number,
+  'build_range_end'?: string,
+  'naming_version'?: number
 };
 
 type IndexesSql = { sql: [string, unknown[]], indexName: string }[];
