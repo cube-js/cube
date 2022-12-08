@@ -7,8 +7,8 @@ use crate::{
             converter::LanguageToLogicalPlanConverter,
             cost::BestCubePlan,
             rules::{
-                dates::DateRules, filters::FilterRules, members::MemberRules, order::OrderRules,
-                split::SplitRules,
+                case::CaseRules, dates::DateRules, filters::FilterRules, members::MemberRules,
+                order::OrderRules, split::SplitRules,
             },
             LogicalPlanLanguage,
         },
@@ -424,6 +424,7 @@ impl Rewriter {
             Box::new(DateRules::new(cube_context.clone())),
             Box::new(OrderRules::new(cube_context.clone())),
             Box::new(SplitRules::new(cube_context.clone())),
+            Box::new(CaseRules::new(cube_context.clone())),
         ];
         let mut rewrites = Vec::new();
         for r in rules {

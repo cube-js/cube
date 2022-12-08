@@ -12,6 +12,7 @@ expression: "execute_query(\"\n                with\n                    nsp as 
 | countDistinct      | int8      | NULL        |
 | order_date         | timestamp | NULL        |
 | customer_gender    | text      | NULL        |
+| notes              | text      | NULL        |
 | taxful_total_price | numeric   | NULL        |
 | has_subscription   | bool      | NULL        |
 | is_male            | bool      | NULL        |

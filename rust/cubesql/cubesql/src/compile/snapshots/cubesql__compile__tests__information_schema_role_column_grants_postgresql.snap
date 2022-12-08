@@ -12,6 +12,7 @@ expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | countDistinct      | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | order_date         | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | customer_gender    | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | notes              | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | taxful_total_price | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | has_subscription   | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | is_male            | SELECT         | YES          |
