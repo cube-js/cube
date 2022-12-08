@@ -19,7 +19,7 @@ use crate::{
 use datafusion::{logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner};
 use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner, StopReason};
 use itertools::Itertools;
-use std::{env, ffi::OsStr, fs, io::Write, sync::Arc, time::Duration};
+use std::{collections::HashSet, env, ffi::OsStr, fs, io::Write, sync::Arc, time::Duration};
 
 pub struct Rewriter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
@@ -429,6 +429,17 @@ impl Rewriter {
         let mut rewrites = Vec::new();
         for r in rules {
             rewrites.extend(r.rewrite_rules());
+        }
+        if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {
+            let disabled_rule_names = disabled_rule_names
+                .split(",")
+                .map(|name| name.trim())
+                .collect::<HashSet<_>>();
+            let filtered_rewrites = rewrites
+                .into_iter()
+                .filter(|rewrite| !disabled_rule_names.contains(rewrite.name.as_str()))
+                .collect();
+            return filtered_rewrites;
         }
         rewrites
     }
