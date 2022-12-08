@@ -6,6 +6,7 @@ import {
   DriverFactoryByDataSource,
   DriverType,
   QueryOrchestratorOptions,
+  QueryBody,
 } from '@cubejs-backend/query-orchestrator';
 
 import { DbTypeAsyncFn, ExternalDbTypeFn, RequestContext } from './types';
@@ -57,7 +58,7 @@ export class OrchestratorApi {
    * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
    * error otherwise.
    */
-  public async executeQuery(query) {
+  public async executeQuery(query: QueryBody) {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
 
@@ -68,9 +69,9 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      let fetchQueryPromise = query.loadRefreshKeysOnly ?
-        this.orchestrator.loadRefreshKeys(query) :
-        this.orchestrator.fetchQuery(query);
+      let fetchQueryPromise = query.loadRefreshKeysOnly
+        ? this.orchestrator.loadRefreshKeys(query)
+        : this.orchestrator.fetchQuery(query);
 
       if (query.isJob) {
         // We want to immediately resolve and return a jobed build query result
