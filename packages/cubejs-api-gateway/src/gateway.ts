@@ -1257,6 +1257,7 @@ class ApiGateway {
     context: RequestContext,
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
+    apiType: string,
   ) {
     const queries = [{
       ...sqlQuery,
@@ -1265,7 +1266,8 @@ class ApiGateway {
       continueWait: true,
       renewQuery: normalizedQuery.renewQuery,
       requestId: context.requestId,
-      context
+      context,
+      persistent: apiType === 'sql',
     }];
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
@@ -1420,6 +1422,7 @@ class ApiGateway {
             context,
             normalizedQuery,
             sqlQueries[index],
+            apiType,
           );
 
           return this.getResultInternal(

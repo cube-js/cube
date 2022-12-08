@@ -6,6 +6,14 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
 
+// /**
+//  * @typedef {[sql: string, params: unknown[], options?: Object]} QueryTuple
+//  * @typedef {string | [query: string | QueryTuple, options?: string[]]} CacheKey
+//  */
+
+/**
+ * QueryQueue class.
+ */
 export class QueryQueue {
   constructor(redisQueuePrefix, options) {
     this.redisQueuePrefix = redisQueuePrefix;
@@ -14,6 +22,10 @@ export class QueryQueue {
     this.executionTimeout = options.executionTimeout || getEnv('dbQueryTimeout');
     this.orphanedTimeout = options.orphanedTimeout || 120;
     this.heartBeatInterval = options.heartBeatInterval || 30;
+
+    /**
+     * @type function(string): Promise<void>
+     */
     this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey) => { this.processQuery(queryKey); });
     this.sendCancelMessageFn = options.sendCancelMessageFn || ((query) => { this.processCancel(query); });
     this.queryHandlers = options.queryHandlers;
@@ -34,7 +46,25 @@ export class QueryQueue {
     this.skipQueue = options.skipQueue;
   }
 
-  async executeInQueue(queryHandler, queryKey, query, priority, options) {
+  /**
+   * Push query to the queue and call `QueryQueue.reconcileQueue()` method.
+   *
+   * @throw {ContinueWaitError}
+   *
+   * @param {string} queryHandler For the regular query is eq to 'query'.
+   * @param {*} queryKey
+   * @param {*} query
+   * @param {number=} priority
+   * @param {Object=} options
+   * @returns
+   */
+  async executeInQueue(
+    queryHandler,
+    queryKey,
+    query,
+    priority,
+    options,
+  ) {
     options = options || {};
     if (this.skipQueue) {
       const queryDef = {

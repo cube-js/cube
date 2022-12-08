@@ -19,8 +19,15 @@ type QueryOptions = {
   renewalThresholdOutsideUpdateWindow?: number;
   incremental?: boolean;
 };
-export type QueryTuple = [sql: string, params: unknown[], options?: QueryOptions];
+
+export type QueryTuple = [
+  sql: string,
+  params: unknown[],
+  options?: QueryOptions
+];
+
 export type QueryWithParams = QueryTuple;
+
 export type Query = {
   requestId?: string;
   dataSource: string;
@@ -29,6 +36,65 @@ export type Query = {
   preAggregationsLoadCacheByDataSource?: any;
   renewQuery?: boolean;
 };
+
+export type QueryBody = {
+  dataSource?: string;
+  persistent?: boolean;
+  query?: string;
+  values?: string[];
+  continueWait?: boolean;
+  renewQuery?: boolean;
+  requestId?: string;
+  context?: any;
+  external?: boolean;
+  isJob?: boolean;
+  forceNoCache?: boolean;
+  preAggregations?: PreAggregationDescription[];
+  groupedPartitionPreAggregations?: PreAggregationDescription[][];
+  preAggregationsLoadCacheByDataSource?: {
+    [key: string]: any;
+  };
+  [key: string]: any;
+};
+
+/**
+ * Temp (partition/lambda) table definition.
+ */
+export type TempTable = {
+  type: string; // for ex.: "rollup"
+  buildRangeEnd: string;
+  lastUpdatedAt: number;
+  queryKey: unknown;
+  refreshKeyValues: [{
+    'refresh_key': string,
+  }][];
+  targetTableName: string; // full table name (with suffix)
+  lambdaTable?: {
+    name: string,
+    columns: {
+      name: string,
+      type: string,
+      attributes?: string[],
+    }[];
+    csvRows: string;
+  };
+};
+
+/**
+ * Pre-aggregation table (stored in the first element) to temp table
+ * definition (stored in the second element) link.
+ */
+export type PreAggTableToTempTable = [
+  string, // common table name (without sufix)
+  TempTable,
+];
+
+export type CacheKey =
+  | string
+  | [
+      query: string | QueryTuple,
+      options?: string[]
+    ];
 
 type CacheEntry = {
   time: number;
@@ -98,37 +164,60 @@ export class QueryCache {
     }
   }
 
-  public async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {
-    const replacePreAggregationTableNames = (queryAndParams: QueryWithParams) => QueryCache
-      .replacePreAggregationTableNames(
-        queryAndParams, preAggregationsTablesToTempTables
+  public async cachedQueryResult(
+    queryBody: QueryBody,
+    preAggregationsTablesToTempTables: PreAggTableToTempTable[],
+  ) {
+    const replacePreAggregationTableNames =
+      (queryAndParams: string | QueryWithParams) => (
+        QueryCache.replacePreAggregationTableNames(
+          queryAndParams,
+          preAggregationsTablesToTempTables,
+        )
       );
+
     const query = replacePreAggregationTableNames(queryBody.query);
-    const inlineTables = preAggregationsTablesToTempTables.flatMap(([_, preAggregation]) => (preAggregation.lambdaTable ? [preAggregation.lambdaTable] : []));
+
+    const inlineTables = preAggregationsTablesToTempTables.flatMap(
+      ([_, preAggregation]) => (
+        preAggregation.lambdaTable ? [preAggregation.lambdaTable] : []
+      )
+    );
 
     let queuePriority = 10;
+
     if (Number.isInteger(queryBody.queuePriority)) {
-      // eslint-disable-next-line prefer-destructuring
       queuePriority = queryBody.queuePriority;
     }
-    const forceNoCache = queryBody.forceNoCache || false;
-    const { values } = queryBody;
-    const cacheKeyQueries =
-      this.cacheKeyQueriesFrom(queryBody).map(replacePreAggregationTableNames);
 
-    const renewalThreshold = queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.renewalThreshold;
+    const forceNoCache = queryBody.forceNoCache || false;
+
+    const { values } = queryBody;
+
+    const cacheKeyQueries = this
+      .cacheKeyQueriesFrom(queryBody)
+      .map(replacePreAggregationTableNames);
+
+    const renewalThreshold =
+      queryBody.cacheKeyQueries &&
+      queryBody.cacheKeyQueries.renewalThreshold;
 
     const expireSecs = this.getExpireSecs(queryBody);
 
     if (!cacheKeyQueries || queryBody.external && this.options.skipExternalCacheAndQueue) {
       return {
-        data: await this.queryWithRetryAndRelease(query, values, {
-          cacheKey: [query, values],
-          external: queryBody.external,
-          requestId: queryBody.requestId,
-          dataSource: queryBody.dataSource,
-          inlineTables,
-        }),
+        data: await this.queryWithRetryAndRelease(
+          query,
+          values,
+          {
+            cacheKey: [query, values],
+            external: queryBody.external,
+            requestId: queryBody.requestId,
+            dataSource: queryBody.dataSource,
+            persistent: queryBody.persistent,
+            inlineTables,
+          }
+        ),
       };
     }
 
@@ -136,26 +225,53 @@ export class QueryCache {
 
     if (queryBody.renewQuery) {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
-      return this.renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
-        external: queryBody.external,
-        requestId: queryBody.requestId,
-        dataSource: queryBody.dataSource,
-      });
+      return this.renewQuery(
+        query,
+        values,
+        cacheKeyQueries,
+        expireSecs,
+        cacheKey,
+        renewalThreshold,
+        {
+          external: queryBody.external,
+          requestId: queryBody.requestId,
+          dataSource: queryBody.dataSource,
+          persistent: queryBody.persistent,
+        }
+      );
     }
 
     if (!this.options.backgroundRenew) {
-      const resultPromise = this.renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
-        external: queryBody.external,
-        requestId: queryBody.requestId,
-        dataSource: queryBody.dataSource,
-        skipRefreshKeyWaitForRenew: true
-      });
+      const resultPromise = this.renewQuery(
+        query,
+        values,
+        cacheKeyQueries,
+        expireSecs,
+        cacheKey,
+        renewalThreshold,
+        {
+          external: queryBody.external,
+          requestId: queryBody.requestId,
+          dataSource: queryBody.dataSource,
+          persistent: queryBody.persistent,
+          skipRefreshKeyWaitForRenew: true
+        }
+      );
 
-      this.startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
-        external: queryBody.external,
-        requestId: queryBody.requestId,
-        dataSource: queryBody.dataSource,
-      });
+      this.startRenewCycle(
+        query,
+        values,
+        cacheKeyQueries,
+        expireSecs,
+        cacheKey,
+        renewalThreshold,
+        {
+          external: queryBody.external,
+          requestId: queryBody.requestId,
+          dataSource: queryBody.dataSource,
+          persistent: queryBody.persistent,
+        }
+      );
 
       return resultPromise;
     }
@@ -163,7 +279,8 @@ export class QueryCache {
     this.logger('Background fetch', { cacheKey, requestId: queryBody.requestId });
 
     const mainPromise = this.cacheQueryResult(
-      query, values,
+      query,
+      values,
       cacheKey,
       expireSecs,
       {
@@ -172,15 +289,25 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
+        persistent: queryBody.persistent,
       }
     );
 
     if (!forceNoCache) {
-      this.startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, {
-        external: queryBody.external,
-        requestId: queryBody.requestId,
-        dataSource: queryBody.dataSource,
-      });
+      this.startRenewCycle(
+        query,
+        values,
+        cacheKeyQueries,
+        expireSecs,
+        cacheKey,
+        renewalThreshold,
+        {
+          external: queryBody.external,
+          requestId: queryBody.requestId,
+          dataSource: queryBody.dataSource,
+          persistent: queryBody.persistent,
+        }
+      );
     }
 
     return {
@@ -189,17 +316,17 @@ export class QueryCache {
     };
   }
 
-  private getExpireSecs(queryBody): number {
+  private getExpireSecs(queryBody: QueryBody): number {
     return queryBody.expireSecs || 24 * 3600;
   }
 
-  private cacheKeyQueriesFrom(queryBody): QueryWithParams[] {
+  private cacheKeyQueriesFrom(queryBody: QueryBody): QueryWithParams[] {
     return queryBody.cacheKeyQueries && queryBody.cacheKeyQueries.queries ||
       queryBody.cacheKeyQueries ||
       [];
   }
 
-  public static queryCacheKey(queryBody) {
+  public static queryCacheKey(queryBody: QueryBody): CacheKey {
     const key = [
       queryBody.query,
       queryBody.values,
@@ -208,7 +335,7 @@ export class QueryCache {
     if (queryBody.invalidate) {
       key.push(queryBody.invalidate);
     }
-    return key;
+    return <CacheKey>key;
   }
 
   protected static replaceAll(replaceThis, withThis, inThis) {
@@ -219,38 +346,72 @@ export class QueryCache {
     );
   }
 
-  public static replacePreAggregationTableNames(queryAndParams: QueryWithParams, preAggregationsTablesToTempTables) {
-    const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams) ? queryAndParams : [queryAndParams, []];
-    const replacedKeqQuery = preAggregationsTablesToTempTables.reduce(
-      (query, [tableName, { targetTableName }]) => QueryCache.replaceAll(tableName, targetTableName, query),
+  public static replacePreAggregationTableNames(
+    queryAndParams: string | QueryWithParams,
+    preAggregationsTablesToTempTables: PreAggTableToTempTable[],
+  ): string | QueryTuple {
+    const [keyQuery, params, queryOptions] = Array.isArray(queryAndParams)
+      ? queryAndParams
+      : [queryAndParams, []];
+    const replacedKeyQuery: string = preAggregationsTablesToTempTables.reduce(
+      (query, [tableName, { targetTableName }]) => (
+        QueryCache.replaceAll(tableName, targetTableName, query)
+      ),
       keyQuery
     );
-    return Array.isArray(queryAndParams) ? [replacedKeqQuery, params, queryOptions] : replacedKeqQuery;
+    return Array.isArray(queryAndParams)
+      ? [replacedKeyQuery, params, queryOptions]
+      : replacedKeyQuery;
   }
 
-  public async queryWithRetryAndRelease(query, values, {
-    priority, cacheKey, external, requestId, dataSource, inlineTables, useCsvQuery,
-  }: {
-    priority?: number,
-    cacheKey: object,
-    external: boolean
-    requestId?: string,
-    dataSource: string,
-    inlineTables?: InlineTables,
-    useCsvQuery?: boolean,
-  }) {
+  public async queryWithRetryAndRelease(
+    query: string | QueryTuple,
+    values: string[],
+    {
+      cacheKey,
+      dataSource,
+      external,
+      priority,
+      requestId,
+      persistent,
+      inlineTables,
+      useCsvQuery,
+    }: {
+      cacheKey: CacheKey,
+      dataSource: string,
+      external: boolean,
+      priority?: number,
+      requestId?: string,
+      persistent?: boolean,
+      inlineTables?: InlineTables,
+      useCsvQuery?: boolean,
+    }
+  ) {
+    persistent = persistent || false;
     const queue = external
       ? this.getExternalQueue()
       : await this.getQueue(dataSource);
-    return queue.executeInQueue('query', cacheKey, {
-      queryKey: cacheKey, query, values, requestId, inlineTables, useCsvQuery
-    }, priority, {
-      stageQueryKey: cacheKey,
-      requestId,
-    });
+    return queue.executeInQueue(
+      'query',
+      cacheKey,
+      {
+        queryKey: cacheKey,
+        query,
+        values,
+        requestId,
+        persistent,
+        inlineTables,
+        useCsvQuery,
+      },
+      priority,
+      {
+        stageQueryKey: cacheKey,
+        requestId,
+      }
+    );
   }
 
-  public async getQueue(dataSource: string = 'default') {
+  public async getQueue(dataSource = 'default') {
     if (!this.queue[dataSource]) {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
@@ -376,14 +537,29 @@ export class QueryCache {
     return this.queue;
   }
 
-  public startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options: {
-    requestId?: string,
-    skipRefreshKeyWaitForRenew?: boolean,
-    external?: boolean,
-    dataSource: string,
-  }) {
+  public startRenewCycle(
+    query: string | QueryTuple,
+    values: string[],
+    cacheKeyQueries: (string | QueryTuple)[],
+    expireSecs: number,
+    cacheKey: CacheKey,
+    renewalThreshold: any,
+    options: {
+      requestId?: string,
+      skipRefreshKeyWaitForRenew?: boolean,
+      external?: boolean,
+      dataSource: string,
+      persistent?: boolean,
+    }
+  ) {
     this.renewQuery(
-      query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options
+      query,
+      values,
+      cacheKeyQueries,
+      expireSecs,
+      cacheKey,
+      renewalThreshold,
+      options,
     ).catch(e => {
       if (!(e instanceof ContinueWaitError)) {
         this.logger('Error while renew cycle', {
@@ -393,16 +569,25 @@ export class QueryCache {
     });
   }
 
-  public renewQuery(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options: {
-    requestId?: string,
-    skipRefreshKeyWaitForRenew?: boolean,
-    external?: boolean,
-    dataSource: string,
-    useCsvQuery?: boolean,
-  }) {
+  public renewQuery(
+    query: string | QueryTuple,
+    values: string[],
+    cacheKeyQueries: (string | QueryTuple)[],
+    expireSecs: number,
+    cacheKey: CacheKey,
+    renewalThreshold: any,
+    options: {
+      requestId?: string,
+      skipRefreshKeyWaitForRenew?: boolean,
+      external?: boolean,
+      dataSource: string,
+      persistent?: boolean,
+      useCsvQuery?: boolean,
+    }
+  ) {
     options = options || { dataSource: 'default' };
     return Promise.all(
-      this.loadRefreshKeys(cacheKeyQueries, expireSecs, options)
+      this.loadRefreshKeys(<QueryTuple[]>cacheKeyQueries, expireSecs, options),
     )
       .catch(e => {
         if (e instanceof ContinueWaitError) {
@@ -420,12 +605,15 @@ export class QueryCache {
             {
               renewalThreshold: renewalThreshold || 6 * 60 * 60,
               renewalKey: cacheKeyQueryResults && [
-                cacheKeyQueries, cacheKeyQueryResults, this.queryRedisKey([query, values])
+                cacheKeyQueries,
+                cacheKeyQueryResults,
+                this.queryRedisKey([query, values]),
               ],
               waitForRenew: true,
               external: options.external,
               requestId: options.requestId,
               dataSource: options.dataSource,
+              persistent: options.persistent,
               useCsvQuery: options.useCsvQuery,
             }
           ),
@@ -462,8 +650,8 @@ export class QueryCache {
 
       return this.cacheQueryResult(
         query,
-        values,
-        [query, values],
+        <string[]>values,
+        [query, <string[]>values],
         expireSecs,
         {
           renewalThreshold: this.options.refreshKeyRenewalThreshold || queryOptions?.renewalThreshold || 2 * 60,
@@ -484,29 +672,37 @@ export class QueryCache {
     callback: () => MaybeCancelablePromise<T>,
   ) => this.cacheDriver.withLock(`lock:${key}`, callback, ttl, true);
 
-  public async cacheQueryResult(query, values, cacheKey, expiration, options: {
-    renewalThreshold?: number,
-    renewalKey?: any,
-    priority?: number,
-    external?: boolean,
-    requestId?: string,
-    dataSource: string,
-    waitForRenew?: boolean,
-    forceNoCache?: boolean,
-    useInMemory?: boolean,
-    useCsvQuery?: boolean,
-  }) {
+  public async cacheQueryResult(
+    query: string | QueryTuple,
+    values: string[],
+    cacheKey: CacheKey,
+    expiration: number,
+    options: {
+      renewalThreshold?: number,
+      renewalKey?: any,
+      priority?: number,
+      external?: boolean,
+      requestId?: string,
+      dataSource: string,
+      waitForRenew?: boolean,
+      forceNoCache?: boolean,
+      useInMemory?: boolean,
+      useCsvQuery?: boolean,
+      persistent?: boolean,
+    }
+  ) {
     options = options || { dataSource: 'default' };
     const { renewalThreshold } = options;
     const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
     const redisKey = this.queryRedisKey(cacheKey);
     const fetchNew = () => (
       this.queryWithRetryAndRelease(query, values, {
-        priority: options.priority,
         cacheKey,
+        priority: options.priority,
         external: options.external,
         requestId: options.requestId,
         dataSource: options.dataSource,
+        persistent: options.persistent,
         useCsvQuery: options.useCsvQuery,
       }).then(res => {
         const result = {
