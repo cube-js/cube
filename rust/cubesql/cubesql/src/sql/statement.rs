@@ -315,6 +315,10 @@ trait Visitor<'ast, E: Error> {
             self.visit_table_with_joins(from)?;
         }
 
+        if let Some(having) = &mut select.having {
+            self.visit_expr(having)?;
+        }
+
         Ok(())
     }
 
