@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
+
+
+### Bug Fixes
+
+* **jdbc-driver:** set default encoding ([#5773](https://github.com/cube-js/cube.js/issues/5773)) ([734167a](https://github.com/cube-js/cube.js/commit/734167a4fd555d15f722945fe5d2957663a144df))
+
+
+### Features
+
+* query limits ([#5763](https://github.com/cube-js/cube.js/issues/5763)) ([4ec172b](https://github.com/cube-js/cube.js/commit/4ec172b3dd27193d145afcdb8d9bf7ef1bd7505d))
+* **cubesql:** Support `CASE` statements in cube projection ([e7ae68c](https://github.com/cube-js/cube.js/commit/e7ae68c1afcb1152c0248f61ee355f0b30cc9b73))
+* introducing query persistent flag ([#5744](https://github.com/cube-js/cube.js/issues/5744)) ([699e772](https://github.com/cube-js/cube.js/commit/699e772be0e2e1b6eef4e59ff8e3857d1166bcef))
+
+
+
+
+
 ## [0.31.22](https://github.com/cube-js/cube.js/compare/v0.31.21...v0.31.22) (2022-12-07)
 
 

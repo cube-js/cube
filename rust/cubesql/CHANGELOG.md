@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
+
+
+### Features
+
+* **cubesql:** Support `CASE` statements in cube projection ([e7ae68c](https://github.com/cube-js/cube.js/commit/e7ae68c1afcb1152c0248f61ee355f0b30cc9b73))
+
+
+
+
+
 ## [0.31.22](https://github.com/cube-js/cube.js/compare/v0.31.21...v0.31.22) (2022-12-07)
 
 

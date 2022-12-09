@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
+
+
+### Bug Fixes
+
+* **jdbc-driver:** set default encoding ([#5773](https://github.com/cube-js/cube.js/issues/5773)) ([734167a](https://github.com/cube-js/cube.js/commit/734167a4fd555d15f722945fe5d2957663a144df))
+
+
+
+
+
 ## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
 
 **Note:** Version bump only for package @cubejs-backend/jdbc-driver
