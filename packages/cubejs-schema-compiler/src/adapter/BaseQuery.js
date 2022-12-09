@@ -11,7 +11,13 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { FROM_PARTITION_RANGE, MAX_SOURCE_ROW_LIMIT, inDbTimeZone, QueryAlias } from '@cubejs-backend/shared';
+import {
+  FROM_PARTITION_RANGE,
+  MAX_SOURCE_ROW_LIMIT,
+  inDbTimeZone,
+  QueryAlias,
+  getEnv,
+} from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -1604,7 +1610,15 @@ class BaseQuery {
       if (this.rowLimit === MAX_SOURCE_ROW_LIMIT) {
         limitClause = ` LIMIT ${this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT)}`;
       } else {
-        limitClause = ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+        const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
+          ? getEnv('dbQueryDefaultLimit')
+          : getEnv('dbQueryLimit');
+        const row = this.rowLimit ? parseInt(this.rowLimit, 10) : false;
+        if (row && row > getEnv('dbQueryLimit')) {
+          throw new Error('The query limit has been exceeded.');
+        }
+        const lim = row || def;
+        limitClause = ` LIMIT ${lim}`;
       }
     }
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';

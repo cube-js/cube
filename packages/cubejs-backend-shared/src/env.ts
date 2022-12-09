@@ -508,6 +508,21 @@ const variables: Record<string, (...args: any) => any> = {
     return convertTimeStrToMs(value, key);
   },
 
+  /**
+   * Max limit which can be specified in the incoming query.
+   */
+  dbQueryLimit: (): number => get('CUBEJS_DB_QUERY_LIMIT')
+    .default(50000)
+    .asInt(),
+
+  /**
+   * Query limit wich will be used in the query to the data source if
+   * limit property was not specified in the query.
+   */
+  dbQueryDefaultLimit: (): number => get('CUBEJS_DB_QUERY_DEFAULT_LIMIT')
+    .default(10000)
+    .asInt(),
+
   /** ****************************************************************
    * JDBC options                                                    *
    ***************************************************************** */
