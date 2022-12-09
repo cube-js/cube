@@ -14665,4 +14665,66 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_thoughtspot_lower() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            WITH "qt_0" AS (
+                SELECT "ta_1"."notes" "ca_1"
+                FROM KibanaSampleDataEcommerce "ta_1"
+                WHERE (
+                    NOT(LOWER("ta_1"."customer_gender") IN (
+                        'f', 'm'
+                    ))
+                    OR NOT("ta_1"."customer_gender" IS NOT NULL)
+                )
+                GROUP BY "ca_1"
+            )
+            SELECT count(DISTINCT "ta_2"."ca_1") "ca_2"
+            FROM "qt_0" "ta_2"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.notes".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notEquals".to_string()),
+                            values: Some(vec!["f".to_string(), "m".to_string()]),
+                            or: None,
+                            and: None
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                            operator: Some("notSet".to_string()),
+                            values: None,
+                            or: None,
+                            and: None
+                        }),
+                    ]),
+                    and: None
+                }])
+            }
+        )
+    }
 }
