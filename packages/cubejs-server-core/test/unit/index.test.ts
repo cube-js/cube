@@ -52,6 +52,34 @@ cube('Bar', {
   ]),
 };
 
+const repositoryWithDataSource: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([
+    {
+      fileName: 'main.js', content: `
+cube('Bar', {
+  sql: 'select * from bar',
+  
+  measures: {
+    count: {
+      type: 'count'
+    }
+  },
+
+  dataSource: 'dataSource',
+
+  dimensions: {
+    time: {
+      sql: 'timestamp',
+      type: 'time'
+    }
+  }
+});
+`,
+    },
+  ]),
+};
+
 const repositoryWithoutContent: SchemaFileRepository = {
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: '' }]),
@@ -335,6 +363,29 @@ describe('index.test', () => {
       expect(metaConfigExtended).toHaveProperty('metaConfig');
       expect(metaConfigExtended.metaConfig.length).toBeGreaterThan(0);
       expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
+      expect(metaConfigExtended).toHaveProperty('dataSources');
+      expect(metaConfigExtended.dataSources).toEqual(['default']);
+      expect(metaConfigExtendedSpy).toHaveBeenCalled();
+      metaConfigExtendedSpy.mockClear();
+    });
+  });
+  
+  describe('CompilerApi with dataSource', () => {
+    const logger = jest.fn(() => {});
+    const compilerApi = new CompilerApi(
+      repositoryWithDataSource,
+      async () => 'mysql',
+      { logger }
+    );
+    const metaConfigExtendedSpy = jest.spyOn(compilerApi, 'metaConfigExtended');
+
+    test('CompilerApi metaConfigExtended', async () => {
+      const metaConfigExtended = await compilerApi.metaConfigExtended({ requestId: 'XXX' });
+      expect(metaConfigExtended).toHaveProperty('metaConfig');
+      expect(metaConfigExtended.metaConfig.length).toBeGreaterThan(0);
+      expect(metaConfigExtended).toHaveProperty('cubeDefinitions');
+      expect(metaConfigExtended).toHaveProperty('dataSources');
+      expect(metaConfigExtended.dataSources).toEqual(['dataSource']);
       expect(metaConfigExtendedSpy).toHaveBeenCalled();
       metaConfigExtendedSpy.mockClear();
     });

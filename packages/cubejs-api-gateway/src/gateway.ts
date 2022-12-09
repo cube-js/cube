@@ -461,7 +461,7 @@ class ApiGateway {
       const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
         requestId: context.requestId,
       });
-      const { metaConfig, cubeDefinitions } = metaConfigExtended;
+      const { metaConfig, cubeDefinitions, dataSources } = metaConfigExtended;
 
       const cubes = this.filterVisibleItemsInMeta(context, metaConfig)
         .map((meta) => meta.config)
@@ -479,7 +479,7 @@ class ApiGateway {
           joins: transformJoins(cubeDefinitions[cube.name]?.joins),
           preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
-      res({ cubes });
+      res({ cubes, dataSources });
     } catch (e) {
       this.handleError({
         e,
