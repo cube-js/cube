@@ -265,7 +265,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
         debug!("[mysql] on_execute: {}", input);
 
         let mut statement =
-            match parse_sql_to_statement(&input.to_string(), DatabaseProtocol::MySQL) {
+            match parse_sql_to_statement(&input.to_string(), DatabaseProtocol::MySQL, &mut None) {
                 Ok(s) => s,
                 Err(e) => {
                     info.error(ErrorKind::ER_PARSE_ERROR, e.to_string().as_bytes())?;

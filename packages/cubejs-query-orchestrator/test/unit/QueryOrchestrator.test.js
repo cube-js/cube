@@ -136,6 +136,10 @@ class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
   capabilities() {
     return { unloadWithoutTempTable: true };
   }
+  
+  queryColumnTypes() {
+    return [];
+  }
 }
 
 class StreamingSourceMockDriver extends MockDriver {
@@ -1165,6 +1169,9 @@ describe('QueryOrchestrator', () => {
         query: 'SELECT refreshKey in source database',
         values: [],
         requestId: preAggregationExternalRefreshKey.requestId,
+        useCsvQuery: undefined,
+        inlineTables: undefined,
+        persistent: false,
       }
     ]);
 
@@ -1180,6 +1187,9 @@ describe('QueryOrchestrator', () => {
         query: 'SELECT refreshKey in external database',
         values: [],
         requestId: preAggregationExternalRefreshKey.requestId,
+        useCsvQuery: undefined,
+        inlineTables: undefined,
+        persistent: false,
       }
     ]);
   });

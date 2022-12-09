@@ -516,8 +516,6 @@ fn compiled_binary_op_expr(
         // Compile to CompiledFilter::Filter
         Selection::Measure(_measure) => {
             let (value, operator) = match op {
-                ast::BinaryOperator::NotLike => (filter_expr, "notContains".to_string()),
-                ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
                 ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
                 ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
                 ast::BinaryOperator::GtEq => (filter_expr, "gte".to_string()),
@@ -556,8 +554,6 @@ fn compiled_binary_op_expr(
             };
 
             let (value, operator) = match op {
-                ast::BinaryOperator::NotLike => (filter_expr, "notContains".to_string()),
-                ast::BinaryOperator::Like => (filter_expr, "contains".to_string()),
                 ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
                 ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
                 ast::BinaryOperator::GtEq => match filter_expr {
@@ -626,6 +622,99 @@ fn compiled_binary_op_expr(
             return Err(CompilationError::unsupported(format!(
                 "Binary expression: {} {} {}",
                 left, op, right
+            )))
+        }
+    };
+
+    Ok(CompiledFilterTree::Filter(compiled_filter))
+}
+
+fn compiled_like_expr(
+    negated: bool,
+    expr: &Box<ast::Expr>,
+    pattern: &Box<ast::Expr>,
+    ctx: &QueryContext,
+) -> CompilationResult<CompiledFilterTree> {
+    let expr_ce = compile_expression(expr, ctx)?;
+    let pattern_ce = compile_expression(pattern, ctx)?;
+
+    // Group selection to left, expr for filtering to right
+    let (selection_to_filter, filter_expr) = match (expr_ce, pattern_ce) {
+        (CompiledExpression::Selection(selection), non_selection) => (selection, non_selection),
+        (non_selection, CompiledExpression::Selection(selection)) => (selection, non_selection),
+        // CubeSQL doesnt support BinaryExpression with literals in both sides
+        (l, r) => {
+            return Err(CompilationError::unsupported(format!(
+                "Unable to compile binary expression (unbound expr): ({:?}, {:?})",
+                l, r
+            )))
+        }
+    };
+
+    let member = match selection_to_filter.clone() {
+        Selection::TimeDimension(d, _) => d.name,
+        Selection::Dimension(d) => d.name,
+        Selection::Measure(m) => m.name,
+        Selection::Segment(m) => m.name,
+    };
+
+    let compiled_filter = match selection_to_filter {
+        // Compile to CompiledFilter::Filter
+        Selection::Measure(_measure) => {
+            let (value, operator) = match negated {
+                true => (filter_expr, "notContains".to_string()),
+                false => (filter_expr, "contains".to_string()),
+            };
+
+            CompiledFilter::Filter {
+                member,
+                operator,
+                values: Some(vec![value.to_value_as_str()?]),
+            }
+        }
+        // Compile to CompiledFilter::Filter
+        Selection::Dimension(dim) => {
+            let filter_expr = if dim.is_time() {
+                let date = filter_expr.to_date();
+                if let Some(dt) = date {
+                    CompiledExpression::DateLiteral(dt)
+                } else {
+                    return Err(CompilationError::user(format!(
+                        "Unable to compare time dimension \"{}\" with not a date value: {}",
+                        dim.get_real_name(),
+                        filter_expr.to_value_as_str()?
+                    )));
+                }
+            } else {
+                filter_expr
+            };
+
+            let (value, operator) = match negated {
+                true => (filter_expr, "notContains".to_string()),
+                false => (filter_expr, "contains".to_string()),
+            };
+
+            CompiledFilter::Filter {
+                member,
+                operator,
+                values: Some(vec![value.to_value_as_str()?]),
+            }
+        }
+        // Compile to CompiledFilter::SegmentFilter (it will be pushed to segments via optimization)
+        Selection::Segment(_) => {
+            return Err(CompilationError::user(format!(
+                "Unable to use LIKE with segment: {} {}LIKE {}",
+                expr,
+                if negated { "NOT " } else { "" },
+                pattern
+            )))
+        }
+        _ => {
+            return Err(CompilationError::unsupported(format!(
+                "Binary expression: {} {} {}",
+                expr,
+                if negated { "NOT " } else { "" },
+                pattern
             )))
         }
     };
@@ -706,6 +795,20 @@ fn compile_where_expression(
             }
             _ => compiled_binary_op_expr(left, op, right, ctx),
         },
+        binary @ ast::Expr::Like {
+            negated,
+            expr,
+            pattern,
+            escape_char,
+        } => {
+            if escape_char.is_some() {
+                return Err(CompilationError::user(format!(
+                    "LIKE doesn't support ESCAPE: {:?}",
+                    binary
+                )));
+            }
+            compiled_like_expr(*negated, expr, pattern, ctx)
+        }
         ast::Expr::IsNull(expr) => {
             let compiled_expr = compile_expression(expr, ctx)?;
             let column_for_filter = match &compiled_expr {
@@ -1114,9 +1217,7 @@ pub fn compile_where(
 ) -> CompilationResult<()> {
     let filters = match &selection {
         binary @ ast::Expr::BinaryOp { left, right, op } => match op {
-            ast::BinaryOperator::Like
-            | ast::BinaryOperator::NotLike
-            | ast::BinaryOperator::Lt
+            ast::BinaryOperator::Lt
             | ast::BinaryOperator::LtEq
             | ast::BinaryOperator::Gt
             | ast::BinaryOperator::GtEq
@@ -1141,6 +1242,7 @@ pub fn compile_where(
                 )));
             }
         },
+        binary @ ast::Expr::Like { .. } => compile_where_expression(binary, ctx)?,
         ast::Expr::Nested(nested) => compile_where_expression(nested, ctx)?,
         inlist @ ast::Expr::InList { .. } => compile_where_expression(inlist, ctx)?,
         isnull @ ast::Expr::IsNull { .. } => compile_where_expression(isnull, ctx)?,
@@ -1265,7 +1367,7 @@ mod tests {
     };
 
     fn parse_expr_from_projection(query: &String, db: DatabaseProtocol) -> ast::Expr {
-        let stmt = parse_sql_to_statement(&query, db).unwrap();
+        let stmt = parse_sql_to_statement(&query, db, &mut None).unwrap();
         match stmt {
             ast::Statement::Query(query) => match &query.body {
                 ast::SetExpr::Select(select) => {

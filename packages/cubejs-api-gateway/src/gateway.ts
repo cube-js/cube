@@ -251,6 +251,19 @@ class ApiGateway {
       }
     }));
 
+    app.post(
+      `${this.basePath}/v1/sql-runner`,
+      jsonParser,
+      userMiddlewares,
+      async (req: Request, res: Response) => {
+        await this.sqlRunner({
+          query: req.body.query,
+          context: req.context!,
+          res: this.resToResultFn(res),
+        });
+      }
+    );
+
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
       await this.runScheduledRefresh({
         queryingOptions: req.query.queryingOptions,
@@ -438,11 +451,17 @@ class ApiGateway {
   public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
 
+    // TODO: test and remove this function.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    function visibilityFilter(item) {
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+    }
+
     try {
       const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
         requestId: context.requestId,
       });
-      const { metaConfig, cubeDefinitions } = metaConfigExtended;
+      const { metaConfig, cubeDefinitions, dataSources } = metaConfigExtended;
 
       const cubes = this.filterVisibleItemsInMeta(context, metaConfig)
         .map((meta) => meta.config)
@@ -460,7 +479,7 @@ class ApiGateway {
           joins: transformJoins(cubeDefinitions[cube.name]?.joins),
           preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
-      res({ cubes });
+      res({ cubes, dataSources });
     } catch (e) {
       this.handleError({
         e,
@@ -1064,6 +1083,54 @@ class ApiGateway {
     }
   }
 
+  public async sqlRunner({ query, context, res }: QueryRequest) {
+    const requestStarted = new Date();
+    try {
+      if (!query) {
+        throw new UserError(
+          'A user\'s query must contain a body'
+        );
+      }
+
+      if (!(query as Record<string, any>).query) {
+        throw new UserError(
+          'A user\'s query must contain at least one query param.'
+        );
+      }
+
+      query = {
+        ...query,
+        requestId: context.requestId
+      };
+
+      this.log(
+        {
+          type: 'Load SQL Runner Request',
+          query,
+        },
+        context
+      );
+
+      const result = await this.getAdapterApi(context).executeQuery(query);
+
+      this.log(
+        {
+          type: 'Load SQL Runner Request Success',
+          query,
+          duration: this.duration(requestStarted),
+          dbType: result.dbType,
+        },
+        context
+      );
+
+      res(result);
+    } catch (e) {
+      this.handleError({
+        e, context, query, res, requestStarted
+      });
+    }
+  }
+
   protected createSecurityContextExtractor(options?: JWTOptions): SecurityContextExtractorFn {
     if (options?.claimsNamespace) {
       return (ctx: Readonly<RequestContext>) => {
@@ -1192,6 +1259,7 @@ class ApiGateway {
     context: RequestContext,
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
+    apiType: string,
   ) {
     const queries = [{
       ...sqlQuery,
@@ -1200,7 +1268,8 @@ class ApiGateway {
       continueWait: true,
       renewQuery: normalizedQuery.renewQuery,
       requestId: context.requestId,
-      context
+      context,
+      persistent: apiType === 'sql',
     }];
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
@@ -1355,6 +1424,7 @@ class ApiGateway {
             context,
             normalizedQuery,
             sqlQueries[index],
+            apiType,
           );
 
           return this.getResultInternal(
@@ -1538,7 +1608,7 @@ class ApiGateway {
   public handleError({
     e, context, query, res, requestStarted
   }: any) {
-    const { requestId } = context ?? {};
+    const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
     
     const plainError = e.plainMessages;
     
@@ -1555,9 +1625,9 @@ class ApiGateway {
         type: 'Continue wait',
         query,
         error: e.message,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
       }, context);
-      res(e, { status: 200 });
+      res({ error: e.message || e.error.message || e.error.toString(), requestId }, { status: 200 });
     } else if (e.error) {
       this.log({
         type: 'Orchestrator error',
@@ -1565,7 +1635,7 @@ class ApiGateway {
         error: e.error,
         duration: this.duration(requestStarted),
       }, context);
-      res(e, { status: 400 });
+      res({ error: e.message || e.error.message || e.error.toString(), requestId }, { status: 400 });
     } else if (e.type === 'UserError') {
       this.log({
         type: e.type,

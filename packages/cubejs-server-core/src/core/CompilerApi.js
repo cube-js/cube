@@ -66,6 +66,10 @@ export class CompilerApi {
     return this.compilers;
   }
 
+  async getDataSources(cubeEvaluator) {
+    return Promise.all(cubeEvaluator.cubeNames().map(async cube => cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default'));
+  }
+
   async createQueryFactory(compilers) {
     const { cubeEvaluator } = compilers;
 
@@ -180,9 +184,10 @@ export class CompilerApi {
   }
 
   async metaConfigExtended(options) {
-    const { metaTransformer } = await this.getCompilers(options);
+    const { metaTransformer, cubeEvaluator } = await this.getCompilers(options);
     return {
       metaConfig: metaTransformer?.cubes,
+      dataSources: await this.getDataSources(cubeEvaluator),
       cubeDefinitions: metaTransformer?.cubeEvaluator?.cubeDefinitions,
     };
   }

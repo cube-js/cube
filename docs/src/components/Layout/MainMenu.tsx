@@ -139,7 +139,9 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
                       }
                     );
 
-                    return subItems.map(nodeParser);
+                    return item === 'Release Notes'
+                      ? subItems.reverse().map(nodeParser)
+                      : subItems.map(nodeParser);
                   }
                   return (
                     <Menu.ItemGroup key={subCategory} title={subCategory}>

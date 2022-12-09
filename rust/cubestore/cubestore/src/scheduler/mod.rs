@@ -228,7 +228,7 @@ impl SchedulerImpl {
         )
         .await
         {
-            error!("Error deleting middle man partitions: {}", e);
+            error!("Error merging replay handles: {}", e);
         }
 
         Ok(())
@@ -297,7 +297,7 @@ impl SchedulerImpl {
 
         let table_to_failed = failed
             .into_iter()
-            .map(|(h, _)| (h.get_row().table_id(), h))
+            .map(|(h, no_active_chunks)| (h.get_row().table_id(), (h, no_active_chunks)))
             .into_group_map();
 
         let mut to_merge = Vec::new();
@@ -311,7 +311,7 @@ impl SchedulerImpl {
             let handles = handles.collect::<Vec<_>>();
             for (handle, _) in handles
                 .iter()
-                .filter(|(_, has_active_chunks)| *has_active_chunks)
+                .filter(|(_, no_active_chunks)| *no_active_chunks)
             {
                 union_seq_pointer_by_location(
                     &mut seq_pointer_by_location,
@@ -322,7 +322,7 @@ impl SchedulerImpl {
             let empty_vec = Vec::new();
             let failed = table_to_failed.get(&table_id).unwrap_or(&empty_vec);
 
-            for failed_handle in failed.iter() {
+            for (failed_handle, no_active_chunks) in failed.iter() {
                 let mut failed_seq_pointers =
                     failed_handle.get_row().seq_pointers_by_location().clone();
                 let mut replay_after_failed_union = None;
@@ -349,9 +349,9 @@ impl SchedulerImpl {
                             .all(|p| p.as_ref().map(|p| p.is_empty()).unwrap_or(true))
                     })
                     .unwrap_or(true);
-                if empty_seq_pointers {
+                if empty_seq_pointers && *no_active_chunks {
                     ids.push(failed_handle.get_id());
-                } else {
+                } else if !empty_seq_pointers {
                     subtract_from_right_seq_pointer_by_location(
                         &mut seq_pointer_by_location,
                         failed_handle.get_row().seq_pointers_by_location(),
@@ -363,9 +363,11 @@ impl SchedulerImpl {
         }
 
         for (ids, seq_pointer_by_location) in to_merge.into_iter() {
-            self.meta_store
-                .replace_replay_handles(ids, seq_pointer_by_location)
-                .await?;
+            if !ids.is_empty() {
+                self.meta_store
+                    .replace_replay_handles(ids, seq_pointer_by_location)
+                    .await?;
+            }
         }
 
         Ok(())

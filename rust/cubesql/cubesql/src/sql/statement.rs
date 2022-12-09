@@ -77,6 +77,12 @@ trait Visitor<'ast, E: Error> {
                 self.visit_expr(&mut *left)?;
                 self.visit_expr(&mut *right)?;
             }
+            Expr::Like { expr, pattern, .. }
+            | Expr::ILike { expr, pattern, .. }
+            | Expr::SimilarTo { expr, pattern, .. } => {
+                self.visit_expr(&mut *expr)?;
+                self.visit_expr(&mut *pattern)?;
+            }
             Expr::InList { expr, list, .. } => {
                 self.visit_expr(&mut *expr)?;
 
@@ -842,6 +848,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                             over: None,
                             distinct: false,
                             special: false,
+                            approximate: false,
                         })
                     }
                 },
@@ -1017,6 +1024,34 @@ impl<'a> Visitor<'a, ConnectionError> for UdfWildcardArgReplacer {
             for order_expr in over.order_by.iter_mut() {
                 self.visit_expr(&mut order_expr.expr)?;
             }
+        }
+
+        Ok(())
+    }
+}
+
+pub struct ApproximateCountDistinctVisitor {}
+
+impl ApproximateCountDistinctVisitor {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result).unwrap();
+
+        result
+    }
+}
+
+impl<'a> Visitor<'a, ConnectionError> for ApproximateCountDistinctVisitor {
+    fn visit_function(&mut self, fun: &mut ast::Function) -> Result<(), ConnectionError> {
+        if fun.approximate && fun.distinct && &fun.name.to_string().to_uppercase() == "COUNT" {
+            fun.name = ast::ObjectName(vec![ast::Ident::new("APPROX_DISTINCT")]);
+            fun.approximate = false;
+            fun.distinct = false;
         }
 
         Ok(())

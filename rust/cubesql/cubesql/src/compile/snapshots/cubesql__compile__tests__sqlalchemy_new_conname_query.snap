@@ -12,6 +12,7 @@ expression: "execute_query(r#\"SELECT\n                a.attname,\n             
 | countDistinct      | bigint                              | NULL    | true       | 18000     | NULL    |           | NULL             |
 | order_date         | timestamp without time zone         | NULL    | false      | 18000     | NULL    |           | NULL             |
 | customer_gender    | text                                | NULL    | false      | 18000     | NULL    |           | NULL             |
+| notes              | text                                | NULL    | false      | 18000     | NULL    |           | NULL             |
 | taxful_total_price | numeric                             | NULL    | false      | 18000     | NULL    |           | NULL             |
 | has_subscription   | boolean                             | NULL    | false      | 18000     | NULL    |           | NULL             |
 | is_male            | boolean                             | NULL    | true       | 18000     | NULL    |           | NULL             |

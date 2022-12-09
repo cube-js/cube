@@ -305,7 +305,7 @@ class DocTemplate extends Component<Props, State> {
           <meta name="description" content={`${frontmatter.title} | Documentation for working with Cube, the open-source analytics framework`}></meta>
         </Helmet>
         <div className={styles.docContentWrapper}>
-          <div className={styles.docContent}>
+          <div className={cx(styles.docContent, 'docContent')}>
             <h1 id={kebabCase(frontmatter.title)}>{frontmatter.title}</h1>
             <MDX {...this.props} />
             {!isDisableFeedbackBlock && (

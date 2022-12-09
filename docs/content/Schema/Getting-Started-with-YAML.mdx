@@ -197,11 +197,11 @@ Use dot-notation to specify the property from [`COMPILE_CONTEXT`
 cubes:
   - name: Orders
     sql: SELECT * FROM public.orders
-    shown: COMPILE_CONTEXT.securityContext.property
+    shown: COMPILE_CONTEXT.securityContext.<PROPERTY_NAME>
 ```
 
-If referencing the security context, ensure that you use camel-case (i.e.
-`securityContext`).
+If referencing the [security context][ref-security-ctx], ensure that you use
+camel-case (i.e. `securityContext`).
 
 ### <--{"id" : "Using context variables"}--> FILTER_PARAMS
 
@@ -248,3 +248,4 @@ please post an issue on GitHub.
 [ref-schema-ref-measure-types]:
   /schema/reference/types-and-formats#measures-types
 [ref-schema-ref-preaggs]: schema/reference/pre-aggregations
+[ref-security-ctx]: /security/context
