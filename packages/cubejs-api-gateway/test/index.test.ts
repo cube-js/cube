@@ -501,6 +501,31 @@ describe('API Gateway', () => {
       const res = await req;
       expect(res.body).toMatchObject(successResult);
     };
+       
+    const wrongPayloadsTestFactory = ({ route, wrongPayloads }: {
+      route: string,
+      method: string,
+      wrongPayloads: {
+        result: {
+          status: number,
+          error: string
+        },
+        body: {}
+      }[]
+    }) => async () => {
+      const { app, token } = appPrepareFactory();
+
+      for (const payload of wrongPayloads) {
+        const req = request(app).post(`/cubejs-system/v1/${route}`)
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(payload.result.status);
+
+        req.send(payload.body);
+        const res = await req;
+        expect(res.body.error).toBe(payload.result.error);
+      }
+    };
 
     const testConfigs = [
       { route: 'context', successResult: { basePath: 'awesomepathtotest' } },
@@ -521,7 +546,30 @@ describe('API Gateway', () => {
           }
         },
         successResult: { preAggregationPartitions: preAggregationPartitionsResultFactory() }
-      }
+      },
+      {
+        route: 'sql-runner',
+        method: 'post',
+        successBody: {
+          query: {
+            query: 'SELECT * FROM test'
+          }
+        },
+        successResult: { data: [{ foo__bar: 42 }] },
+        wrongPayloads: [{
+          result: {
+            status: 400,
+            error: 'A user\'s query must contain a body'
+          },
+          body: {}
+        }, {
+          result: {
+            status: 400,
+            error: 'A user\'s query must contain at least one query param.'
+          },
+          body: { query: {} }
+        }]
+      },
     ];
 
     testConfigs.forEach((config) => {
@@ -530,6 +578,9 @@ describe('API Gateway', () => {
         test('not allowed with user token', notAllowedWithUserTokenTestFactory(config));
         test('not route (works only with playgroundAuthSecret)', notExistsTestFactory(config));
         test('success', successTestFactory(config));
+        if (config.method === 'post' && config.wrongPayloads?.length) {
+          test('wrong params', wrongPayloadsTestFactory(config));
+        }
       });
     });
   });
