@@ -2964,9 +2964,23 @@ impl FilterRules {
                 } else if let Some((_, cube)) =
                     meta_context.find_cube_by_column(alias_to_cube, &column)
                 {
-                    return Some((format!("{}.{}", cube.name, column.name), cube));
+                    if let Some(original_name) = Self::original_member_name(&cube, &column.name) {
+                        return Some((original_name, cube));
+                    }
                 }
             }
+        }
+
+        None
+    }
+
+    fn original_member_name(cube: &V1CubeMeta, name: &String) -> Option<String> {
+        if let Some(measure) = cube.lookup_measure(name) {
+            return Some(measure.name.clone());
+        } else if let Some(dimension) = cube.lookup_dimension(name) {
+            return Some(dimension.name.clone());
+        } else if let Some(dimension) = cube.lookup_segment(name) {
+            return Some(dimension.name.clone());
         }
 
         None
