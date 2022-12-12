@@ -625,12 +625,10 @@ impl RocksStore {
 
         if max.is_some() {
             let checkpoint_time = self.last_checkpoint_time.read().await;
-            let log_name = format!(
-                "{}-logs/{}.flex",
-                self.get_store_path(&checkpoint_time),
-                min.unwrap()
-            );
-            self.metastore_fs.upload_log(&log_name, &serializer).await?;
+            let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
+            self.metastore_fs
+                .upload_log(&dir_name, min.unwrap(), &serializer)
+                .await?;
             let mut seq = self.last_upload_seq.write().await;
             *seq = max.unwrap();
             self.write_completed_notify.notify_waiters();
