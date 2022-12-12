@@ -18,7 +18,7 @@ To enable it, set the `CUBEJS_DB_SSL` environment variable to `true`. Cube.js
 can also be configured to use custom connection settings. For example, to use a
 custom certificate authority and certificates, you could do the following:
 
-```dotenv
+```bash
 CUBEJS_DB_SSL_CA=/path/to/ssl/ca.pem
 CUBEJS_DB_SSL_CERT=/path/to/ssl/cert.pem
 CUBEJS_DB_SSL_KEY=/path/to/ssl/key.pem
@@ -27,7 +27,7 @@ CUBEJS_DB_SSL_KEY=/path/to/ssl/key.pem
 You can also set the above environment variables to the contents of the PEM
 files; for example:
 
-```dotenv
+```bash
 CUBEJS_DB_SSL_CA="-----BEGIN CERTIFICATE-----
 MIIDDjCCAfYCCQCN/HhSZ3ofTDANBgkqhkiG9w0BAQsFADBJMQswCQYDVQQGEwJV
 SzEMMAoGA1UECgwDSUJNMQ0wCwYDVQQLDARBSU9TMR0wGwYDVQQDDBRhaW9zLW9y

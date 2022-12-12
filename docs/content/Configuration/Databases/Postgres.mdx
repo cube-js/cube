@@ -102,7 +102,7 @@ description of the issue from Heroku][heroku-postgres-issue].
 As a workaround, you can set `rejectUnauthorized` option to `false` in the Cube
 Postgres driver:
 
-```js
+```javascript
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
 module.exports = {
   driverFactory: () =>

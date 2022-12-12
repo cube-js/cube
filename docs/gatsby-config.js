@@ -73,6 +73,13 @@ const config = {
             },
           },
           {
+            resolve: `gatsby-remark-prismjs`,
+            options: {
+              inlineCodeMarker: null,
+              noInlineHighlight: true,
+            },
+          },
+          {
             resolve: 'gatsby-remark-find-replace',
             options: {
               replacements: {

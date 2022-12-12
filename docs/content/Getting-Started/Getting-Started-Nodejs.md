@@ -140,7 +140,7 @@ Instantiate the Cube API and then use it to fetch data. `CubejsApi.load()`
 accepts a query, which is a plain Javascript object.
 [Learn more about the query format here](query-format).
 
-```js
+```javascript
 import cubejs from '@cubejs-client/core';
 import Chart from 'chart.js';
 import chartjsConfig from './toChartjsData';
@@ -209,7 +209,7 @@ export default () => {
 Import `cubejs` and `QueryRenderer` components, and use them to fetch the data.
 In the example below, we use `vue-chartkick` to visualize data.
 
-```vue
+```javascript
 <template>
   <div class="hello">
     <query-renderer :cubejs-api="cubejsApi" :query="query">
