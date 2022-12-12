@@ -592,6 +592,7 @@ describe('API Gateway', () => {
           }
         }]
       },
+      { route: 'data-sources', successResult: { dataSources: ['default'] } },
     ];
 
     testConfigs.forEach((config) => {

@@ -39,7 +39,7 @@ cube('Bar', {
       type: 'count'
     }
   },
-  
+
   dimensions: {
     time: {
       sql: 'timestamp',
@@ -55,6 +55,28 @@ cube('Bar', {
 const repositoryWithoutContent: SchemaFileRepository = {
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: '' }]),
+};
+
+const repositoryWithDataSource: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: `
+cube('Bar', {
+  sql: 'select * from bar',
+  
+  measures: {
+    count: {
+      type: 'count'
+    }
+  },
+  dimensions: {
+    time: {
+      sql: 'timestamp',
+      type: 'time'
+    }
+  }, 
+  dataSource: 'main'
+});
+` }]),
 };
 
 describe('index.test', () => {
@@ -365,6 +387,58 @@ describe('index.test', () => {
       expect(metaConfigExtended.cubeDefinitions).toEqual({});
       expect(metaConfigExtendedSpy).toHaveBeenCalled();
       metaConfigExtendedSpy.mockClear();
+    });
+
+    test('CompilerApi dataSources default', async () => {
+      const dataSources = await compilerApi.dataSources({
+        requestId: 'XXX',
+        skipQueryFactory: true,
+      }, {
+        driverFactory: jest.fn(async () => true)
+      });
+
+      expect(dataSources).toHaveProperty('dataSources');
+      expect(dataSources.dataSources).toEqual([]);
+    });
+  });
+  
+  describe('CompilerApi dataSources method', () => {
+    const logger = jest.fn(() => {});
+    const compilerApi = new CompilerApi(
+      repositoryWithDataSource,
+      async () => 'mysql',
+      { logger }
+    );
+
+    const dataSourcesSpy = jest.spyOn(compilerApi, 'dataSources');
+    test('CompilerApi dataSources', async () => {
+      const dataSources = await compilerApi.dataSources({
+        requestId: 'XXX',
+        skipQueryFactory: true,
+      }, {
+        driverFactory: jest.fn(async () => true)
+      });
+
+      expect(dataSources).toHaveProperty('dataSources');
+      expect(dataSources.dataSources).toEqual(['main']);
+      expect(dataSourcesSpy).toHaveBeenCalled();
+      dataSourcesSpy.mockClear();
+    });
+
+    test('CompilerApi dataSources with driverFactory error', async () => {
+      const dataSources = await compilerApi.dataSources({
+        requestId: 'XXX',
+        skipQueryFactory: true,
+      }, {
+        driverFactory: jest.fn(async () => {
+          throw new Error('Some driverFactory error');
+        })
+      });
+
+      expect(dataSources).toHaveProperty('dataSources');
+      expect(dataSources.dataSources).toEqual([]);
+      expect(dataSourcesSpy).toHaveBeenCalled();
+      dataSourcesSpy.mockClear();
     });
   });
 

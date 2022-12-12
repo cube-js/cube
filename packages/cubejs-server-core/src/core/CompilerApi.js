@@ -33,7 +33,7 @@ export class CompilerApi {
     return this.graphqlSchema;
   }
 
-  async getCompilers({ requestId } = {}) {
+  async getCompilers({ requestId, skipQueryFactory = false } = {}) {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'
@@ -60,7 +60,9 @@ export class CompilerApi {
         standalone: this.standalone,
       });
       this.compilerVersion = compilerVersion;
-      this.queryFactory = await this.createQueryFactory(this.compilers);
+      if (!skipQueryFactory) {
+        this.queryFactory = await this.createQueryFactory(this.compilers);
+      }
     }
 
     return this.compilers;
@@ -193,6 +195,35 @@ export class CompilerApi {
     return {
       metaConfig: metaTransformer?.cubes,
       cubeDefinitions: metaTransformer?.cubeEvaluator?.cubeDefinitions,
+    };
+  }
+
+  async dataSources(options, orchestratorApi) {
+    const { cubeEvaluator } = await this.getCompilers(options);
+
+    let dataSources = await Promise.all(
+      cubeEvaluator
+        .cubeNames()
+        .map(
+          async (cube) => cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default'
+        )
+    );
+
+    dataSources = [...new Set(dataSources)];
+
+    dataSources = await Promise.all(
+      dataSources.map(async (dataSource) => {
+        try {
+          await orchestratorApi.driverFactory(dataSource);
+          return dataSource;
+        } catch (err) {
+          return null;
+        }
+      })
+    );
+
+    return {
+      dataSources: dataSources.filter((source) => source),
     };
   }
 
