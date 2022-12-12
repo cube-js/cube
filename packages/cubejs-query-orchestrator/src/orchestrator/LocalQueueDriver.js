@@ -78,7 +78,7 @@ export class LocalQueueDriverConnection {
    * with the operation result.
    *
    * @typedef {[added: number, _b: null, _c: null, toProcessLength: number, addedTime: number]} AddedTuple
-   * 
+   *
    * @param {number} keyScore
    * @param {*} queryKey
    * @param {number} orphanedTime

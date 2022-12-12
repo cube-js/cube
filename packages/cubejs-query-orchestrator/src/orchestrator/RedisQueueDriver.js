@@ -36,7 +36,7 @@ export class RedisQueueDriverConnection {
    * with the operation result.
    *
    * @typedef {[added: number, _b: *, _c: *, toProcessLength: number, addedTime: number]} AddedTuple
-   * 
+   *
    * @param {number} keyScore
    * @param {*} queryKey
    * @param {number} orphanedTime

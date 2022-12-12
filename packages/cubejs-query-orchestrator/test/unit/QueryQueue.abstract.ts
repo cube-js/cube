@@ -66,7 +66,7 @@ export const QueryQueueTest = (name: string, options?: any) => {
           await queue.executeInQueue('delay', query, { delay: 3000, result: '1' });
           console.log(`Delay ${i}`);
         } catch (e) {
-          if (e.message === 'Continue wait') {
+          if ((<Error>e).message === 'Continue wait') {
             // eslint-disable-next-line no-continue
             continue;
           }
@@ -138,8 +138,9 @@ export const QueryQueueTest = (name: string, options?: any) => {
 
     test('removed before reconciled', async () => {
       const query = ['select * from'];
-      await queue.processQuery(query);
-      const result = await queue.executeInQueue('foo', query, query);
+      const key = queue.redisHash(query);
+      await queue.processQuery(key);
+      const result = await queue.executeInQueue('foo', key, query);
       expect(result).toBe('select * from bar');
     });
 

@@ -83,7 +83,7 @@ export class QueryQueue {
     };
 
     /**
-     * @type {BaseQueueDriver}
+     * @type {LocalQueueDriver | RedisQueueDriver}
      */
     this.queueDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisQueueDriver(queueDriverOptions) :
