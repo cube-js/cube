@@ -1,5 +1,6 @@
 /* globals describe, test, expect, afterAll */
 import { QueryQueue } from '../../src/orchestrator/QueryQueue';
+import { processUidRE } from '../../src/orchestrator/utils';
 
 export const QueryQueueTest = (name: string, options?: any) => {
   describe(`QueryQueue${name}`, () => {
@@ -134,6 +135,25 @@ export const QueryQueueTest = (name: string, options?: any) => {
       await delayFn(null, 200);
       expect(cancelledQuery).toBe('114');
       await queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0);
+    });
+
+    test('queue hash process persistent flag properly', () => {
+      const query = ['select * from table'];
+      const key1 = queue.redisHash(query);
+      // @ts-ignore
+      query.persistent = false;
+      const key2 = queue.redisHash(query);
+      // @ts-ignore
+      query.persistent = true;
+      const key3 = queue.redisHash(query);
+      const key4 = queue.redisHash(query);
+
+      expect(key1).toEqual(key2);
+      expect(key1.split('::').length).toBe(1);
+      expect(key3).toEqual(key4);
+      expect(key3.split('::').length).toBe(2);
+      expect(processUidRE.test(key3.split('::')[1])).toBeTruthy();
+      expect(queue.redisHash('string')).toBe('string');
     });
 
     test('removed before reconciled', async () => {
