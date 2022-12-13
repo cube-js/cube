@@ -391,7 +391,6 @@ export class QueryQueue {
       await Promise.all(
         R.pipe(
           R.filter(p => {
-            console.log(p);
             if (active.indexOf(p) === -1) {
               const subKeys = p.split('::');
               if (subKeys.length === 1) {
