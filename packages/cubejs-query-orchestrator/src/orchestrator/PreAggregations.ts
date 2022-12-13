@@ -623,8 +623,11 @@ export class PreAggregationLoader {
 
     const versionEntryByContentVersion = getVersionEntryByContentVersion(versionEntries);
     if (versionEntryByContentVersion && !this.forceBuild) {
+      const targetTableName = this.targetTableName(versionEntryByContentVersion);
+      // No need to block here
+      this.updateLastTouch(targetTableName);
       return {
-        targetTableName: this.targetTableName(versionEntryByContentVersion),
+        targetTableName,
         refreshKeyValues: [],
         lastUpdatedAt: versionEntryByContentVersion.last_updated_at,
         buildRangeEnd: versionEntryByContentVersion.build_range_end,
@@ -639,8 +642,11 @@ export class PreAggregationLoader {
     ) {
       const versionEntryByStructureVersion = versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (versionEntryByStructureVersion) {
+        const targetTableName = this.targetTableName(versionEntryByStructureVersion);
+        // No need to block here
+        this.updateLastTouch(targetTableName);
         return {
-          targetTableName: this.targetTableName(versionEntryByStructureVersion),
+          targetTableName,
           refreshKeyValues: [],
           lastUpdatedAt: versionEntryByStructureVersion.last_updated_at,
           buildRangeEnd: versionEntryByStructureVersion.build_range_end,
@@ -677,8 +683,10 @@ export class PreAggregationLoader {
       if (!lastVersion) {
         throw new Error(`Pre-aggregation table is not found for ${this.preAggregation.tableName} after it was successfully created`);
       }
+      const targetTableName = this.targetTableName(lastVersion);
+      this.updateLastTouch(targetTableName);
       return {
-        targetTableName: this.targetTableName(lastVersion),
+        targetTableName,
         refreshKeyValues: [],
         lastUpdatedAt: lastVersion.last_updated_at,
         buildRangeEnd: lastVersion.build_range_end,
@@ -697,8 +705,10 @@ export class PreAggregationLoader {
         // We don't want to wait for the jobed build query result. So we run the
         // executeInQueue method and immediately return the LoadPreAggregationResult object.
         this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+        const targetTableName = this.targetTableName(newVersionEntry);
+        this.updateLastTouch(targetTableName);
         return {
-          targetTableName: this.targetTableName(newVersionEntry),
+          targetTableName,
           refreshKeyValues: [],
           lastUpdatedAt: newVersionEntry.last_updated_at,
         };
@@ -742,12 +752,22 @@ export class PreAggregationLoader {
       await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
       return mostRecentResult();
     }
+    const targetTableName = this.targetTableName(versionEntry);
+    this.updateLastTouch(targetTableName);
     return {
-      targetTableName: this.targetTableName(versionEntry),
+      targetTableName,
       refreshKeyValues: [],
       lastUpdatedAt: versionEntry.last_updated_at,
       buildRangeEnd: versionEntry.build_range_end,
     };
+  }
+
+  private updateLastTouch(tableName: string) {
+    this.preAggregations.updateLastTouch(tableName).catch(e => {
+      this.logger('Error on pre-aggregation touch', {
+        error: (e.stack || e), preAggregation: this.preAggregation, requestId: this.requestId,
+      });
+    });
   }
 
   protected contentVersion(invalidationKeys) {
@@ -1347,10 +1367,14 @@ export class PreAggregationLoader {
         )(versionEntries);
 
       const tablesToSave =
-        (await this.preAggregations.tablesUsed())
-          .concat(structureVersionsToSave.map(v => this.targetTableName(v)))
-          .concat(versionEntriesToSave.map(v => this.targetTableName(v)))
-          .concat([justCreatedTable]);
+        this.preAggregations.dropPreAggregationsWithoutTouch ?
+          (await this.preAggregations.tablesUsed()).concat(await this.preAggregations.tablesTouched()).concat([justCreatedTable]) :
+          (
+            (await this.preAggregations.tablesUsed())
+              .concat(structureVersionsToSave.map(v => this.targetTableName(v)))
+              .concat(versionEntriesToSave.map(v => this.targetTableName(v)))
+              .concat([justCreatedTable])
+          );
 
       const toDrop = actualTables
         .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`)
@@ -1817,6 +1841,10 @@ export class PreAggregations {
 
   public structureVersionPersistTime: any;
 
+  private readonly touchTablePersistTime: number;
+
+  public readonly dropPreAggregationsWithoutTouch: boolean;
+
   private readonly usedTablePersistTime: number;
 
   private readonly externalRefresh: boolean;
@@ -1838,6 +1866,8 @@ export class PreAggregations {
 
     this.externalDriverFactory = options.externalDriverFactory;
     this.structureVersionPersistTime = options.structureVersionPersistTime || 60 * 60 * 24 * 30;
+    this.touchTablePersistTime = options.touchTablePersistTime || getEnv('touchPreAggregationTimeout');
+    this.dropPreAggregationsWithoutTouch = options.dropPreAggregationsWithoutTouch || getEnv('dropPreAggregationsWithoutTouch');
     this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
     this.externalRefresh = options.externalRefresh;
     this.getQueueEventsBus = options.getQueueEventsBus;
@@ -1848,6 +1878,11 @@ export class PreAggregations {
     return `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_TABLES_USED_${tableName}`;
   }
 
+  protected tablesTouchRedisKey(tableName) {
+    // TODO add dataSource?
+    return `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_TABLES_TOUCH_${tableName}`;
+  }
+
   public async addTableUsed(tableName) {
     return this.queryCache.getCacheDriver().set(this.tablesUsedRedisKey(tableName), true, this.usedTablePersistTime);
   }
@@ -1855,6 +1890,15 @@ export class PreAggregations {
   public async tablesUsed() {
     return (await this.queryCache.getCacheDriver().keysStartingWith(this.tablesUsedRedisKey('')))
       .map(k => k.replace(this.tablesUsedRedisKey(''), ''));
+  }
+
+  public async updateLastTouch(tableName) {
+    return this.queryCache.getCacheDriver().set(this.tablesTouchRedisKey(tableName), new Date().getTime(), this.touchTablePersistTime);
+  }
+
+  public async tablesTouched() {
+    return (await this.queryCache.getCacheDriver().keysStartingWith(this.tablesTouchRedisKey('')))
+      .map(k => k.replace(this.tablesTouchRedisKey(''), ''));
   }
 
   /**
