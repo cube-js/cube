@@ -1,21 +1,21 @@
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
-import { PrestoDbRunner } from '@cubejs-backend/testing-shared';
+import { TrinoDBRunner } from '@cubejs-backend/testing-shared';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
+import { DEFAULT_CONFIG } from './smoke-tests';
 
-describe('prestodb', () => {
+describe('trino', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
   let client: CubejsApi;
 
   beforeAll(async () => {
-    const db = await PrestoDbRunner.startContainer({});
+    const db = await TrinoDBRunner.startContainer({});
     birdbox = await getBirdbox(
-      'prestodb',
+      'trino',
       {
-        CUBEJS_DB_TYPE: 'prestodb',
+        CUBEJS_DB_TYPE: 'trino',
 
         CUBEJS_DB_HOST: db.getHost(),
         CUBEJS_DB_PORT: `${db.getMappedPort(8080)}`,
@@ -35,38 +35,6 @@ describe('prestodb', () => {
 
   afterAll(async () => {
     await birdbox.stop();
-  });
-
-  test('query measure', () => testQueryMeasure(client));
-
-  test('query dimensions', async () => {
-    const response = await client.load({
-      measures: [
-        'Orders.totalAmount',
-      ],
-      dimensions: [
-        'Orders.status',
-      ],
-    });
-
-    expect(response.rawData()).toMatchSnapshot('dimensions');
-  });
-
-  test('query dimensions with underscore filter', async () => {
-    const response = await client.load({
-      filters: [
-        {
-          member: 'Orders.status',
-          operator: 'contains',
-          values: ['cancelled_']
-        }
-      ],
-      dimensions: [
-        'Orders.status',
-      ],
-    });
-
-    expect(response.rawData()).toMatchSnapshot('dimensions');
   });
 
   test('query measure grouped by time dimension with timezone', async () => {
