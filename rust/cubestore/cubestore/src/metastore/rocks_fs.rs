@@ -24,13 +24,24 @@ pub trait MetaStoreFs: Send + Sync {
     ) -> Result<Arc<RocksStore>, CubeError>;
     async fn upload_log(
         &self,
-        log_name: &str,
+        dir: &str,
+        seq_number: u64,
         serializer: &WriteBatchContainer,
     ) -> Result<u64, CubeError>;
     async fn upload_checkpoint(
         &self,
         remote_path: String,
         checkpoint_path: PathBuf,
+    ) -> Result<(), CubeError>;
+    async fn check_rocks_store(
+        &self,
+        rocks_store: Arc<RocksStore>,
+        snapshot: Option<u128>,
+    ) -> Result<Arc<RocksStore>, CubeError>;
+    async fn load_metastore_logs(
+        &self,
+        snapshot: u128,
+        rocks_store: &Arc<RocksStore>,
     ) -> Result<(), CubeError>;
 }
 
@@ -201,60 +212,6 @@ impl BaseRocksStoreFs {
         };
         Ok(last_metastore_snapshot)
     }
-    pub async fn load_metastore_logs(
-        &self,
-        snapshot: u128,
-        rocks_store: &Arc<RocksStore>,
-    ) -> Result<(), CubeError> {
-        let logs_to_batch = self
-            .remote_fs
-            .list(&format!("{}-{}-logs", self.name, snapshot))
-            .await?;
-        let mut logs_to_batch_to_seq = logs_to_batch
-            .into_iter()
-            .map(|f| -> Result<_, CubeError> {
-                let last = f
-                    .split("/")
-                    .last()
-                    .ok_or(CubeError::internal(format!("Can't split path: {}", f)))?;
-                let result = last.replace(".flex", "").parse::<usize>().map_err(|e| {
-                    CubeError::internal(format!("Can't parse flex path {}: {}", f, e))
-                })?;
-                Ok((f, result))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        logs_to_batch_to_seq.sort_unstable_by_key(|(_, seq)| *seq);
-
-        for (log_file, _) in logs_to_batch_to_seq.iter() {
-            let path_to_log = self.remote_fs.local_file(log_file).await?;
-            let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
-            if let Ok(batch) = batch {
-                let db = rocks_store.db.clone();
-                db.write(batch.write_batch())?;
-            } else if let Err(e) = batch {
-                error!(
-                    "Corrupted {} WAL file. Discarding: {:?} {}",
-                    self.name, log_file, e
-                );
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    pub async fn check_rocks_store(
-        &self,
-        rocks_store: Arc<RocksStore>,
-        snapshot: Option<u128>,
-    ) -> Result<Arc<RocksStore>, CubeError> {
-        if let Some(snapshot) = snapshot {
-            self.load_metastore_logs(snapshot, &rocks_store).await?;
-        }
-
-        RocksStore::check_all_indexes(&rocks_store).await?;
-
-        Ok(rocks_store)
-    }
 
     pub async fn files_to_load(&self, snapshot: u128) -> Result<Vec<(String, u64)>, CubeError> {
         let res = self
@@ -270,6 +227,19 @@ impl BaseRocksStoreFs {
 
 #[async_trait]
 impl MetaStoreFs for BaseRocksStoreFs {
+    async fn check_rocks_store(
+        &self,
+        rocks_store: Arc<RocksStore>,
+        snapshot: Option<u128>,
+    ) -> Result<Arc<RocksStore>, CubeError> {
+        if let Some(snapshot) = snapshot {
+            self.load_metastore_logs(snapshot, &rocks_store).await?;
+        }
+
+        RocksStore::check_all_indexes(&rocks_store).await?;
+
+        Ok(rocks_store)
+    }
     async fn load_from_remote(
         self: Arc<Self>,
         path: &str,
@@ -321,10 +291,12 @@ impl MetaStoreFs for BaseRocksStoreFs {
 
     async fn upload_log(
         &self,
-        log_name: &str,
+        dir: &str,
+        seq_number: u64,
         serializer: &WriteBatchContainer,
     ) -> Result<u64, CubeError> {
-        let file_name = self.remote_fs.local_file(log_name).await?;
+        let log_name = format!("{}/{}.flex", dir, seq_number);
+        let file_name = self.remote_fs.local_file(&log_name).await?;
         serializer.write_to_file(&file_name).await?;
         // TODO persist file size
         self.remote_fs.upload_file(&file_name, &log_name).await
@@ -342,6 +314,46 @@ impl MetaStoreFs for BaseRocksStoreFs {
 
         self.write_metastore_current(&remote_path).await?;
 
+        Ok(())
+    }
+    async fn load_metastore_logs(
+        &self,
+        snapshot: u128,
+        rocks_store: &Arc<RocksStore>,
+    ) -> Result<(), CubeError> {
+        let logs_to_batch = self
+            .remote_fs
+            .list(&format!("{}-{}-logs", self.name, snapshot))
+            .await?;
+        let mut logs_to_batch_to_seq = logs_to_batch
+            .into_iter()
+            .map(|f| -> Result<_, CubeError> {
+                let last = f
+                    .split("/")
+                    .last()
+                    .ok_or(CubeError::internal(format!("Can't split path: {}", f)))?;
+                let result = last.replace(".flex", "").parse::<usize>().map_err(|e| {
+                    CubeError::internal(format!("Can't parse flex path {}: {}", f, e))
+                })?;
+                Ok((f, result))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        logs_to_batch_to_seq.sort_unstable_by_key(|(_, seq)| *seq);
+
+        for (log_file, _) in logs_to_batch_to_seq.iter() {
+            let path_to_log = self.remote_fs.local_file(log_file).await?;
+            let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
+            if let Ok(batch) = batch {
+                let db = rocks_store.db.clone();
+                db.write(batch.write_batch())?;
+            } else if let Err(e) = batch {
+                error!(
+                    "Corrupted {} WAL file. Discarding: {:?} {}",
+                    self.name, log_file, e
+                );
+                break;
+            }
+        }
         Ok(())
     }
 }
