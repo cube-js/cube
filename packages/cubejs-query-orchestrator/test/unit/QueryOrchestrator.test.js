@@ -1171,7 +1171,6 @@ describe('QueryOrchestrator', () => {
         requestId: preAggregationExternalRefreshKey.requestId,
         useCsvQuery: undefined,
         inlineTables: undefined,
-        persistent: false,
       }
     ]);
 
@@ -1189,7 +1188,6 @@ describe('QueryOrchestrator', () => {
         requestId: preAggregationExternalRefreshKey.requestId,
         useCsvQuery: undefined,
         inlineTables: undefined,
-        persistent: false,
       }
     ]);
   });
