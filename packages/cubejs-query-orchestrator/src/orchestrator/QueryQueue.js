@@ -5,32 +5,74 @@ import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
-
-// /**
-//  * @typedef {[sql: string, params: unknown[], options?: Object]} QueryTuple
-//  * @typedef {string | [query: string | QueryTuple, options?: string[]]} CacheKey
-//  */
+import { getProcessUid } from './utils';
 
 /**
  * QueryQueue class.
  */
 export class QueryQueue {
+  /**
+   * Class constructor.
+   *
+   * @param {*} redisQueuePrefix
+   * @param {*} options
+   */
   constructor(redisQueuePrefix, options) {
+    /**
+     * @type {string}
+     */
     this.redisQueuePrefix = redisQueuePrefix;
+
+    /**
+     * @type {number}
+     */
     this.concurrency = options.concurrency || 2;
+
+    /**
+     * @type {number}
+     */
     this.continueWaitTimeout = options.continueWaitTimeout || 5;
+
+    /**
+     * @type {number}
+     */
     this.executionTimeout = options.executionTimeout || getEnv('dbQueryTimeout');
+
+    /**
+     * @type {number}
+     */
     this.orphanedTimeout = options.orphanedTimeout || 120;
+
+    /**
+     * @type {number}
+     */
     this.heartBeatInterval = options.heartBeatInterval || 30;
 
     /**
-     * @type function(string): Promise<void>
+     * @type {function(string): Promise<void>}
      */
     this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey) => { this.processQuery(queryKey); });
+
+    /**
+     * @type {function(*): Promise<void>}
+     */
     this.sendCancelMessageFn = options.sendCancelMessageFn || ((query) => { this.processCancel(query); });
+
+    /**
+     * @type {*}
+     */
     this.queryHandlers = options.queryHandlers;
+
+    /**
+     * @type {*}
+     */
     this.cancelHandlers = options.cancelHandlers;
+
+    /**
+     * @type {function(string, *): void}
+     */
     this.logger = options.logger || ((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
+
     const queueDriverOptions = {
       redisQueuePrefix: this.redisQueuePrefix,
       concurrency: this.concurrency,
@@ -40,23 +82,33 @@ export class QueryQueue {
       redisPool: options.redisPool,
       getQueueEventsBus: options.getQueueEventsBus
     };
+
+    /**
+     * @type {LocalQueueDriver | RedisQueueDriver}
+     */
     this.queueDriver = options.cacheAndQueueDriver === 'redis' ?
       new RedisQueueDriver(queueDriverOptions) :
       new LocalQueueDriver(queueDriverOptions);
+
+    /**
+     * @type {boolean}
+     */
     this.skipQueue = options.skipQueue;
   }
 
   /**
-   * Push query to the queue and call `QueryQueue.reconcileQueue()` method.
-   *
-   * @throw {ContinueWaitError}
+   * Push query to the queue and call `QueryQueue.reconcileQueue()` method if
+   * `options.skipQueue` is set to `false`, execute query skipping queue
+   * otherwise.
    *
    * @param {string} queryHandler For the regular query is eq to 'query'.
    * @param {*} queryKey
    * @param {*} query
    * @param {number=} priority
-   * @param {Object=} options
-   * @returns
+   * @param {*=} options
+   * @returns {*}
+   *
+   * @throw {ContinueWaitError}
    */
   async executeInQueue(
     queryHandler,
@@ -147,8 +199,8 @@ export class QueryQueue {
           requestId: options.requestId,
           activeQueryKeys: active,
           toProcessQueryKeys: toProcess,
-          active: active.indexOf(redisClient.redisHash(queryKey)) !== -1,
-          queueIndex: toProcess.indexOf(redisClient.redisHash(queryKey)),
+          active: active.indexOf(this.redisHash(queryKey)) !== -1,
+          queueIndex: toProcess.indexOf(this.redisHash(queryKey)),
           waitingForRequestId: queryDef.requestId
         });
       }
@@ -168,6 +220,14 @@ export class QueryQueue {
     }
   }
 
+  /**
+   * Parse query result.
+   *
+   * @param {*} result
+   * @returns {*}
+   *
+   * @throw {Error}
+   */
   parseResult(result) {
     if (!result) {
       return;
@@ -180,6 +240,13 @@ export class QueryQueue {
     }
   }
 
+  /**
+   * Run query queue reconciliation flow by calling internal `reconcileQueueImpl`
+   * method. Returns promise which will be resolved with the reconciliation
+   * result.
+   *
+   * @returns {Promise}
+   */
   async reconcileQueue() {
     if (!this.reconcilePromise) {
       this.reconcileAgain = false;
@@ -205,6 +272,12 @@ export class QueryQueue {
     return this.reconcilePromise;
   }
 
+  /**
+   * Returns a full list of queued queries, including stalled, orphaned, active
+   * and planned to be processed with their statuses and queries definitions.
+   *
+   * @returns {Promise<Object>}
+   */
   async getQueries() {
     const redisClient = await this.queueDriver.createConnection();
     try {
@@ -249,6 +322,12 @@ export class QueryQueue {
     }
   }
 
+  /**
+   * Cancel query by its `queryKey`.
+   *
+   * @param {*} queryKey
+   * @returns {void}
+   */
   async cancelQuery(queryKey) {
     const redisClient = await this.queueDriver.createConnection();
     try {
@@ -274,10 +353,17 @@ export class QueryQueue {
     }
   }
 
+  /**
+   * Reconciliation logic: cancel stalled and orphaned queries from the queue
+   * and pick some planned to be processed queries to process.
+   *
+   * @private
+   * @returns {Promise<void>}
+   */
   async reconcileQueueImpl() {
     const redisClient = await this.queueDriver.createConnection();
     try {
-      const toCancel = (
+      const toCancel = /** @type {Array<string>} */(
         await redisClient.getStalledQueries()
       ).concat(
         await redisClient.getOrphanedQueries()
@@ -304,7 +390,23 @@ export class QueryQueue {
       const toProcess = await redisClient.getToProcessQueries();
       await Promise.all(
         R.pipe(
-          R.filter(p => active.indexOf(p) === -1),
+          R.filter(p => {
+            if (active.indexOf(p) === -1) {
+              const subKeys = p.split('::');
+              if (subKeys.length === 1) {
+                // common queries
+                return true;
+              } else if (subKeys[1] === getProcessUid()) {
+                // current process persistent queries
+                return true;
+              } else {
+                // other processes persistent queries
+                return false;
+              }
+            } else {
+              return false;
+            }
+          }),
           R.take(this.concurrency),
           R.map(this.sendProcessMessageFn)
         )(toProcess)
@@ -314,6 +416,15 @@ export class QueryQueue {
     }
   }
 
+  /**
+   * Apply query timeout to the query. Throw if query execution time takes more
+   * then specified timeout. Returns resolved `promise` value.
+   *
+   * @param {Promise<*>} promise
+   * @returns {Promise<*>}
+   *
+   * @throw
+   */
   queryTimeout(promise) {
     let timeout;
     const { executionTimeout } = this;
@@ -334,6 +445,12 @@ export class QueryQueue {
     });
   }
 
+  /**
+   * Returns the list of queries planned to be processed and the list of active
+   * queries.
+   *
+   * @returns {Array}
+   */
   async fetchQueryStageState() {
     const redisClient = await this.queueDriver.createConnection();
     try {
@@ -343,12 +460,23 @@ export class QueryQueue {
     }
   }
 
+  /**
+   * Returns current state of the specified by the `stageQueryKey` query if it
+   * exists.
+   *
+   * @param {*} stageQueryKey
+   * @param {number=} priorityFilter
+   * @param {Array=} queryStageState
+   * @returns {Promise<undefined> | Promise<{ stage: string, timeElapsed: number }>}
+   */
   async getQueryStage(stageQueryKey, priorityFilter, queryStageState) {
     const [active, toProcess, allQueryDefs] = queryStageState || await this.fetchQueryStageState();
 
     const queryDefs = toProcess.map(k => allQueryDefs[k]).filter(q => !!q);
-    const queryInQueue = queryDefs.find(q => this.redisHash(q.stageQueryKey) === this.redisHash(stageQueryKey) &&
-      (priorityFilter != null ? q.priority === priorityFilter : true));
+    const queryInQueue = queryDefs.find(
+      q => this.redisHash(q.stageQueryKey) === this.redisHash(stageQueryKey) &&
+      (priorityFilter != null ? q.priority === priorityFilter : true)
+    );
 
     if (queryInQueue) {
       if (active.indexOf(this.redisHash(queryInQueue.queryKey)) !== -1) {
@@ -366,6 +494,12 @@ export class QueryQueue {
     return undefined;
   }
 
+  /**
+   * Execute query without adding it to the queue.
+   *
+   * @param {*} query
+   * @returns {Promise<{ result: undefined | Object, error: string | undefined }>}
+   */
   async processQuerySkipQueue(query) {
     const startQueryTime = (new Date()).getTime();
     this.logger('Performing query', {
@@ -424,6 +558,13 @@ export class QueryQueue {
     return executionResult;
   }
 
+  /**
+   * Processing query specified by the `queryKey`. This method incapsulate most
+   * of the logic related with the queues updates, heartbeating, etc.
+   *
+   * @param {string} queryKey
+   * @return {Promise<{ result: undefined | Object, error: string | undefined }>}
+   */
   async processQuery(queryKey) {
     const redisClient = await this.queueDriver.createConnection();
     let insertedCount;
@@ -603,6 +744,11 @@ export class QueryQueue {
     }
   }
 
+  /**
+   * Processing cancel query flow.
+   *
+   * @param {*} query
+   */
   async processCancel(query) {
     const { queryHandler } = query;
     try {
@@ -620,6 +766,12 @@ export class QueryQueue {
     }
   }
 
+  /**
+   * Returns hash sum of the specified `queryKey`.
+   *
+   * @param {*} queryKey
+   * @returns {string}
+   */
   redisHash(queryKey) {
     return this.queueDriver.redisHash(queryKey);
   }

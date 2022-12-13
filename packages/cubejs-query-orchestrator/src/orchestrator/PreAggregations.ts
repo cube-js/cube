@@ -704,7 +704,16 @@ export class PreAggregationLoader {
       if (this.isJob) {
         // We don't want to wait for the jobed build query result. So we run the
         // executeInQueue method and immediately return the LoadPreAggregationResult object.
-        this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);
+        this
+          .executeInQueue(invalidationKeys, this.priority(10), newVersionEntry)
+          .catch((e: any) => {
+            this.logger('Pre-aggregations build job error', {
+              preAggregation: this.preAggregation,
+              requestId: this.requestId,
+              newVersionEntry,
+              error: (e.stack || e),
+            });
+          });
         const targetTableName = this.targetTableName(newVersionEntry);
         this.updateLastTouch(targetTableName);
         return {

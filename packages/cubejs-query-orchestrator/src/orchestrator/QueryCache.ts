@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
 import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
@@ -11,6 +10,7 @@ import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { PreAggregationDescription } from './PreAggregations';
+import { getCacheHash } from './utils';
 
 type QueryOptions = {
   external?: boolean;
@@ -335,6 +335,8 @@ export class QueryCache {
     if (queryBody.invalidate) {
       key.push(queryBody.invalidate);
     }
+    // @ts-ignore
+    key.persistent = queryBody.persistent;
     return <CacheKey>key;
   }
 
@@ -387,7 +389,6 @@ export class QueryCache {
       useCsvQuery?: boolean,
     }
   ) {
-    persistent = persistent || false;
     const queue = external
       ? this.getExternalQueue()
       : await this.getQueue(dataSource);
@@ -399,7 +400,6 @@ export class QueryCache {
         query,
         values,
         requestId,
-        persistent,
         inlineTables,
         useCsvQuery,
       },
@@ -407,6 +407,7 @@ export class QueryCache {
       {
         stageQueryKey: cacheKey,
         requestId,
+        persistent,
       }
     );
   }
@@ -840,7 +841,7 @@ export class QueryCache {
   }
 
   public queryRedisKey(cacheKey) {
-    return `SQL_QUERY_RESULT_${this.redisPrefix}_${crypto.createHash('md5').update(JSON.stringify(cacheKey)).digest('hex')}`;
+    return `SQL_QUERY_RESULT_${this.redisPrefix}_${getCacheHash(cacheKey)}`;
   }
 
   public async cleanup() {

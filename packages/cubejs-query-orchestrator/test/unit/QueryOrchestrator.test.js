@@ -1,6 +1,4 @@
 /* globals jest, describe, beforeEach, afterEach, test, expect */
-
-import { BaseDriver } from '@cubejs-backend/base-driver';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
@@ -1171,7 +1169,6 @@ describe('QueryOrchestrator', () => {
         requestId: preAggregationExternalRefreshKey.requestId,
         useCsvQuery: undefined,
         inlineTables: undefined,
-        persistent: false,
       }
     ]);
 
@@ -1189,7 +1186,6 @@ describe('QueryOrchestrator', () => {
         requestId: preAggregationExternalRefreshKey.requestId,
         useCsvQuery: undefined,
         inlineTables: undefined,
-        persistent: false,
       }
     ]);
   });
