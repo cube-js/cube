@@ -5,6 +5,7 @@ import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
+import { getProcessUid } from './utils';
 
 /**
  * QueryQueue class.
@@ -99,11 +100,6 @@ export class QueryQueue {
    * Push query to the queue and call `QueryQueue.reconcileQueue()` method if
    * `options.skipQueue` is set to `false`, execute query skipping queue
    * otherwise.
-   *
-   * @typedef {[{ refresh_key: string }][]} InvalidationKeys
-   * @typedef {{ sql: [string, unknown[]], indexName: string }[]} IndexesSql
-   * @typedef {[sql: string, params: unknown[], options?: Object]} QueryTuple
-   * @typedef {string | [query: string | QueryTuple, options?: string[]]} CacheKey
    *
    * @param {string} queryHandler For the regular query is eq to 'query'.
    * @param {*} queryKey
@@ -367,15 +363,13 @@ export class QueryQueue {
   async reconcileQueueImpl() {
     const redisClient = await this.queueDriver.createConnection();
     try {
-      const toCancel = (
+      const toCancel = /** @type {Array<string>} */(
         await redisClient.getStalledQueries()
       ).concat(
         await redisClient.getOrphanedQueries()
       );
 
       await Promise.all(toCancel.map(async queryKey => {
-        // TODO: check if this query is a persistent?
-
         const [query] = await redisClient.getQueryAndRemove(queryKey);
         if (query) {
           this.logger('Removing orphaned query', {
@@ -396,9 +390,24 @@ export class QueryQueue {
       const toProcess = await redisClient.getToProcessQueries();
       await Promise.all(
         R.pipe(
-          // TODO: check if this query is a persistent?
-
-          R.filter(p => active.indexOf(p) === -1),
+          R.filter(p => {
+            console.log(p);
+            if (active.indexOf(p) === -1) {
+              const subKeys = p.split('::');
+              if (subKeys.length === 1) {
+                // common queries
+                return true;
+              } else if (subKeys[1] === getProcessUid()) {
+                // current process persistent queries
+                return true;
+              } else {
+                // other processes persistent queries
+                return false;
+              }
+            } else {
+              return false;
+            }
+          }),
           R.take(this.concurrency),
           R.map(this.sendProcessMessageFn)
         )(toProcess)
