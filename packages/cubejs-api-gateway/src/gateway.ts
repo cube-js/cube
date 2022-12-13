@@ -1208,7 +1208,7 @@ class ApiGateway {
       renewQuery: normalizedQuery.renewQuery,
       requestId: context.requestId,
       context,
-      persistent: apiType === 'sql',
+      persistent: false, // apiType === 'sql',
     }];
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
