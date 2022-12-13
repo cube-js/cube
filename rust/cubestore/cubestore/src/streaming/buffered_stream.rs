@@ -199,13 +199,13 @@ mod tests {
     }
     #[tokio::test]
     async fn buffered_out_with_long_pending() {
-        let stream = TestPendingStream::new(3, 500);
-        let mut buff_stream = BufferedStream::new(stream, 20, Duration::from_secs(300));
+        let stream = TestPendingStream::new(5, 500);
+        let mut buff_stream = BufferedStream::new(stream, 20, Duration::from_millis(300));
         let mut res = Vec::new();
         while let Some(mut part) = buff_stream.next().await {
-            assert!(part.len() < 20);
+            assert_eq!(part.len(), 1);
             res.append(&mut part);
         }
-        assert_eq!(res, (0..3).collect::<Vec<_>>());
+        assert_eq!(res, (0..5).collect::<Vec<_>>());
     }
 }
