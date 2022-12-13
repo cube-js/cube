@@ -523,6 +523,20 @@ const variables: Record<string, (...args: any) => any> = {
     .default(10000)
     .asInt(),
 
+  /**
+   * Expire time for touch records
+   */
+  touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
+    .default(60 * 60 * 24)
+    .asInt(),
+
+  /**
+   * Expire time for touch records
+   */
+  dropPreAggregationsWithoutTouch: (): boolean => get('CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH')
+    .default('false')
+    .asBoolStrict(),
+
   /** ****************************************************************
    * JDBC options                                                    *
    ***************************************************************** */
