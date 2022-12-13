@@ -1,119 +1,21 @@
 ---
-title: REST API
-permalink: /rest-api
-category: API Reference
-menuOrder: 1
+title: REST API Reference
+menuTitle: REST API
+permalink: /backend/rest-api/reference
+category: REST/GraphQL API
+subCategory: Reference
+menuOrder: 2
+redirect_from:
+  - /rest-api
 ---
 
-## Prerequisites
-
-### <--{"id" : "Prerequisites"}--> Base path
-
-REST API is used to communicate with Cube backend. All requests are prefixed
-with **basePath** described in
-[Backend Server Core](@cubejs-backend-server-core). By default, it is set to
-`/cubejs-api`.
-
-### <--{"id" : "Prerequisites"}--> Authentication
-
-Cube uses API tokens to authorize requests and also for passing additional
-security context, which can be used in the
-[`queryRewrite`][ref-config-queryrewrite] property in your [`cube.js`
-configuration file][ref-config-js].
-
-[ref-config-queryrewrite]: /config#query-rewrite
-[ref-config-js]: /config
-
-The API Token is passed via the Authorization Header. The token itself is a
-[JSON Web Token](https://jwt.io), the [Security section](security) describes how
-to generate it.
-
-In the development environment the token is not required for authorization, but
-you can still use it to pass a security context.
-
-### <--{"id" : "Prerequisites"}--> Example request
-
-```bash
-curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
-```
-
-### <--{"id" : "Prerequisites"}--> Continue wait
-
-If the request takes too long to be processed, Cube Backend responds with
-`{ "error": "Continue wait" }` and 200 status code. This is how the long polling
-mechanism in Cube is implemented. Clients should continuously retry the same
-query in a loop until they get a successful result. Subsequent calls to the Cube
-endpoints are idempotent and don't lead to scheduling new database queries if
-not required by `refreshKey`. Also, receiving `Continue wait` doesn't mean the
-database query has been canceled, and it's actually still being processed by the
-Cube. Database queries that weren't started and are no longer waited by the
-client's long polling loop will be marked as orphaned and removed from the
-querying queue.
-
-Possible reasons of **Continue wait**:
-
-- The query requested is heavy, and it takes some time for the database to
-  process it. Clients should wait for its completion, continuously sending the
-  same REST API request. [continueWaitTimeout](config#queue-options) can be
-  adjusted in order to change the time Cube waits before returning
-  `Continue wait` message.
-- There are many queries requested and Cube backend queues them to save database
-  from overloading.
-
-### <--{"id" : "Prerequisites"}--> Error Handling
-
-Cube REST API has basic errors and HTTP Error codes for all requests.
-
-| Status | Error response                 | Description                                                                                          |
-| ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| 400    | Error message                  | General error. It may be a database error, timeout, or other issue. Check error message for details. |
-| 403    | Authorization header isn't set | You didn't provide an auth token. Provide a valid API Token or disable authorization.                |
-| 403    | Invalid token                  | The auth token provided is not valid. It may be expired or have invalid signature.                   |
-| 500    | Error message                  | Cube internal server error. Check error message for details.                                         |
-
-### <--{"id" : "Prerequisites"}--> Request Span Annotation
-
-For monitoring tools such as Cube Cloud proper request span annotation should be
-provided in `x-request-id` header of a request. Each request id should consist
-of two parts: `spanId` and `requestSequenceId` which define `x-request-id` as
-whole: `${spanId}-span-${requestSequenceId}`. Values of `x-request-id` header
-should be unique for each separate request. `spanId` should define user
-interaction span such us `Continue wait` retry cycle and it's value shouldn't
-change during one single interaction.
-
-### <--{"id" : "Prerequisites"}--> Pagination
-
-Cube supports paginated requests for the `/v1/load` endpoint by including
-[`limit` and `offset` parameters][ref-api-ref-query-format] in the query. For
-example, the following query will retrieve rows 101-200 from the `Orders` cube:
-
-```json
-{
-  "dimensions": ["Orders.status"],
-  "measures": ["Orders.count"],
-  "timeDimensions": [
-    {
-      "dimension": "Orders.createdAt",
-      "dateRange": "last year",
-      "granularity": "day"
-    }
-  ],
-  "limit": 100,
-  "offset": 100
-}
-```
-
-[ref-api-ref-query-format]: /query-format#query-properties
-
-## API Reference
-
-### <--{"id" : "API Reference"}--> /v1/load
+## /v1/load
 
 Get the data for a query.
 
 | Parameter   | Description                                                                                                           |
 | ----------- | --------------------------------------------------------------------------------------------------------------------- |
-| `query`     | Either a single URL encoded Cube [Query](/query-format), or an array of queries                                       |
+| `query`     | Either a single URL encoded Cube [Query][ref-rest-graphql-ref-query], or an array of queries                          |
 | `queryType` | If multiple queries are passed in `query` for [data blending][ref-recipes-data-blending], this must be set to `multi` |
 
 Response
@@ -190,13 +92,13 @@ values.
 
 </WarningBox>
 
-### <--{"id" : "API Reference"}--> /v1/sql
+## /v1/sql
 
 Get the SQL Code generated by Cube to be executed in the database.
 
-| Parameter | Description                            |
-| --------- | -------------------------------------- |
-| query     | URLencoded Cube [Query](/query-format) |
+| Parameter | Description                                         |
+| --------- | --------------------------------------------------- |
+| query     | URLencoded Cube [Query][ref-rest-graphql-ref-query] |
 
 Response
 
@@ -251,7 +153,7 @@ Example response:
 }
 ```
 
-### <--{"id" : "API Reference"}--> /v1/meta
+## /v1/meta
 
 Get meta-information for cubes defined in data schema
 
@@ -311,7 +213,7 @@ Example response:
 }
 ```
 
-### <--{"id" : "API Reference"}--> /v1/run-scheduled-refresh
+## /v1/run-scheduled-refresh
 
 Trigger a scheduled refresh run to refresh pre-aggregations.
 
@@ -327,9 +229,9 @@ as orphaned, and they will be removed from the queue.
 Learn more about
 [scheduled refresh here](/caching/pre-aggregations/getting-started#keeping-pre-aggregations-up-to-date).
 
-| Parameter       | Description                                                               |
-| --------------- | ------------------------------------------------------------------------- |
-| queryingOptions | Optional URL encoded Cube [Query](/query-format) options such as timezone |
+| Parameter       | Description                                                                            |
+| --------------- | -------------------------------------------------------------------------------------- |
+| queryingOptions | Optional URL encoded Cube [Query][ref-rest-graphql-ref-query] options such as timezone |
 
 Empty object response if scheduled successfully.
 
@@ -343,7 +245,7 @@ curl \
  http://localhost:4000/cubejs-api/v1/run-scheduled-refresh
 ```
 
-### <--{"id" : "API Reference"}--> /cubejs-system/v1/pre-aggregations/jobs
+## /cubejs-system/v1/pre-aggregations/jobs
 
 Submit pre-aggregation build jobs and retrieve their refresh status.
 
@@ -568,7 +470,7 @@ Example response with `resType: object`:
 }
 ```
 
-### <--{"id" : "API Reference"}--> /readyz
+## /readyz
 
 Returns the ready state of the deployment.
 
@@ -616,7 +518,7 @@ Keep-Alive: timeout=5
 {"health":"DOWN"}
 ```
 
-### <--{"id" : "API Reference"}--> /livez
+## /livez
 
 Returns the liveness state of the deployment. This is confirmed by testing any
 existing connections to `dataSource`. If no connections exist, it will report as
@@ -658,4 +560,5 @@ Keep-Alive: timeout=5
 {"health":"DOWN"}
 ```
 
+[ref-rest-graphql-ref-query]: /backend/rest-api/query-format/reference
 [ref-recipes-data-blending]: /recipes/data-blending

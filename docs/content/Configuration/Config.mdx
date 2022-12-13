@@ -239,8 +239,10 @@ requires their own Query Orchestrator.
 
 <WarningBox>
 
-Please remember to override [`preAggregationsSchema`][self-pre-aggregations-schema] if you override `contextToOrchestratorId`.
-Otherwise, you end up with table name clashes for your pre-aggregations.
+Please remember to override
+[`preAggregationsSchema`][self-pre-aggregations-schema] if you override
+`contextToOrchestratorId`. Otherwise, you end up with table name clashes for
+your pre-aggregations.
 
 </WarningBox>
 
@@ -310,10 +312,15 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> checkSqlAuth
 
-Used in [SQL API][ref-sql-api], and can be an `async` function. Default
-implementation verify username & password from environment variables:
-`CUBEJS_SQL_USER`, `CUBEJS_SQL_PASSWORD`, but in [development
-mode][ref-development-mode] it ignores validation.
+Used in [SQL API][ref-sql-api], and can be an `async` function. This function
+should verify username and return an object with password and security context.
+If the password returned from this function matches the one provided in the
+connection string, the user will be authenticated with the given security
+context.
+
+The default implementation verifies the username and password from the
+`CUBEJS_SQL_USER` and `CUBEJS_SQL_PASSWORD` environment variables, but in
+[development mode][ref-development-mode], it ignores validation.
 
 Called on each request from Cube SQL API.
 
@@ -321,7 +328,7 @@ For example, you can use `checkSqlAuth` to validate username and password.
 
 ```javascript
 module.exports = {
-  checkSqlAuth: (req, username) => {
+  checkSqlAuth: async (req, username) => {
     if (username === 'fooUser') {
       return {
         password: 'mypassword',
@@ -761,20 +768,21 @@ Defaults to `5000`.
 
 <WarningBox>
 
-Setting these options is highly discouraged as these are considered to be system-level settings.
-Please use `CUBEJS_DB_QUERY_TIMEOUT` and `CUBEJS_CONCURRENCY` [environment variables][ref-environment-variables] instead.
+Setting these options is highly discouraged as these are considered to be
+system-level settings. Please use `CUBEJS_DB_QUERY_TIMEOUT` and
+`CUBEJS_CONCURRENCY` [environment variables][ref-environment-variables] instead.
 
 </WarningBox>
 
 Timeout and interval options' values are in seconds.
 
-| Option              | Description                                                                                                                                    | Default Value |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| Option              | Description                                                                                                                                                                                                                        | Default Value |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
 | concurrency         | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. Typically pool size should be at least twice of total concurrency among all queues. | `2`           |
-| continueWaitTimeout | Long polling interval                                                                                                                          | `5`           |
-| executionTimeout    | Total timeout of single query                                                                                                                  | `600`         |
-| orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                                                     | `120`         |
-| heartBeatInterval   | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                   | `30`          |
+| continueWaitTimeout | Long polling interval                                                                                                                                                                                                              | `5`           |
+| executionTimeout    | Total timeout of single query                                                                                                                                                                                                      | `600`         |
+| orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                                                                                                                                         | `120`         |
+| heartBeatInterval   | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                                                                                                       | `30`          |
 
 ## RequestContext
 
@@ -855,5 +863,4 @@ module.exports = {
 [self-schemapath]: #schemaPath
 [ref-exec-environment-globals]:
   /schema/reference/execution-environment#node-js-globals-process-env-console-log-and-others
-[ref-environment-variables]:
-  /reference/environment-variables
+[ref-environment-variables]: /reference/environment-variables

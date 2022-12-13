@@ -1,0 +1,112 @@
+---
+title: Using the REST API
+category: REST/GraphQL API
+permalink: /backend/rest-api/getting-started
+menuOrder: 3
+---
+
+## Prerequisites
+
+### <--{"id" : "Prerequisites"}--> Base path
+
+REST API is used to communicate with Cube backend. All requests are prefixed
+with **basePath** described in [Backend Server Core][ref-conf-ref-server-core].
+By default, it is set to `/cubejs-api`.
+
+### <--{"id" : "Prerequisites"}--> Authentication
+
+<WarningBox>
+
+In development environments, the JWT is not required for authentication, but you
+can still use it to pass a security context.
+
+</WarningBox>
+
+Cube uses JWTs to authorize requests and also for creating a [Security
+Context][ref-sec-ctx], which can be used in the
+[`queryRewrite()`][ref-conf-queryrewrite] property in your [`cube.js`
+configuration file][ref-conf-js]. The JWT should be passed via the
+`Authorization` HTTP header.
+
+For more information, see the [Authentication & Authorization
+page][ref-rest-graphql-sec].
+
+### <--{"id" : "Prerequisites"}--> Example request
+
+```bash
+curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
+```
+
+### <--{"id" : "Prerequisites"}--> Continue wait
+
+If the request takes too long to be processed, the Cube API responds with
+`{ "error": "Continue wait" }` and 200 status code. This is how the long polling
+mechanism in Cube is implemented. Clients should continuously retry the same
+query in a loop until they get a successful result. Subsequent calls to the Cube
+endpoints are idempotent and don't lead to scheduling new database queries if
+not required by `refreshKey`. Also, receiving `Continue wait` doesn't mean the
+database query has been canceled, and it's actually still being processed by the
+Cube. Database queries that weren't started and are no longer waited by the
+client's long polling loop will be marked as orphaned and removed from the
+querying queue.
+
+Possible reasons of **Continue wait**:
+
+- The query requested is heavy, and it takes some time for the database to
+  process it. Clients should wait for its completion, continuously sending the
+  same REST API request. [`continueWaitTimeout`][ref-conf-queue-opts] can be
+  adjusted in order to change the time Cube waits before returning
+  `Continue wait` message.
+- There are many queries requested and Cube backend queues them to save database
+  from overloading.
+
+### <--{"id" : "Prerequisites"}--> Error Handling
+
+Cube REST API has basic errors and HTTP Error codes for all requests.
+
+| Status | Error response                 | Description                                                                                          |
+| ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| 400    | Error message                  | General error. It may be a database error, timeout, or other issue. Check error message for details. |
+| 403    | Authorization header isn't set | You didn't provide an auth token. Provide a valid API Token or disable authorization.                |
+| 403    | Invalid token                  | The auth token provided is not valid. It may be expired or have invalid signature.                   |
+| 500    | Error message                  | Cube internal server error. Check error message for details.                                         |
+
+### <--{"id" : "Prerequisites"}--> Request Span Annotation
+
+For monitoring tools such as Cube Cloud proper request span annotation should be
+provided in `x-request-id` header of a request. Each request id should consist
+of two parts: `spanId` and `requestSequenceId` which define `x-request-id` as
+whole: `${spanId}-span-${requestSequenceId}`. Values of `x-request-id` header
+should be unique for each separate request. `spanId` should define user
+interaction span such us `Continue wait` retry cycle and it's value shouldn't
+change during one single interaction.
+
+### <--{"id" : "Prerequisites"}--> Pagination
+
+Cube supports paginated requests for the `/v1/load` endpoint by including
+[`limit` and `offset` parameters][ref-api-ref-query-format] in the query. For
+example, the following query will retrieve rows 101-200 from the `Orders` cube:
+
+```json
+{
+  "dimensions": ["Orders.status"],
+  "measures": ["Orders.count"],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.createdAt",
+      "dateRange": "last year",
+      "granularity": "day"
+    }
+  ],
+  "limit": 100,
+  "offset": 100
+}
+```
+
+[ref-api-ref-query-format]: /query-format#query-properties
+[ref-conf-ref-server-core]: /config/reference/@cubejs-backend-server-core
+[ref-conf-queryrewrite]: /config#query-rewrite
+[ref-conf-queue-opts]: /config#queue-options
+[ref-conf-js]: /config
+[ref-rest-graphql-sec]: /backend/rest-graphql/security
+[ref-sec-ctx]: /security/context

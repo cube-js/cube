@@ -1,0 +1,179 @@
+---
+title: Authentication & Authorization
+permalink: /backend/rest-graphql/security
+category: REST/GraphQL API
+menuOrder: 1
+---
+
+Authentication in the REST and GraphQL APIs uses JSON Web Tokens (JWT). For
+these APIs, the initial steps of authentication should be handled by the client
+application, the client application should then send the JWT as the
+`Authorization` header in all its' requests to Cube. Cube can then verify the
+JWT using either `CUBEJS_API_SECRET`, or using JSON Web Key Sets (JWKS) if
+configured.
+
+<div style="text-align: center">
+  <img
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/authentication-overview.png"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Authentication is handled outside of Cube. A typical use case would be:
+
+1. A web server serves an HTML page containing the Cube client, which needs to
+   communicate securely with the Cube API.
+2. The web server should generate a JWT with an expiry to achieve this. The
+   server could include the token in the HTML it serves or provide the token to
+   the frontend via an XHR request, which is then stored it in local storage or
+   a cookie.
+3. The JavaScript client is initialized using this token, and includes it in
+   calls to the Cube API.
+4. The token is received by Cube, and verified using any available JWKS (if
+   configured)
+5. Once decoded, the token claims are injected into the [security
+   context][ref-sec-ctx].
+
+## Using `CUBEJS_API_SECRET`
+
+When you scaffold a new project via the Cube CLI, an API Secret is automatically
+created and saved in the `.env` file as `CUBEJS_API_SECRET`. This secret key
+must then be used to sign the JWTs that are sent to Cube. To see an example of
+how this is done, check out the [Generating JWTs for Web
+Apps][ref-recipe-gen-jwt-for-web-apps] recipe.
+
+## Using JSON Web Key Sets (JWKS)
+
+Cube has out-of-the-box support for the following identity providers:
+
+- [Auth0][ref-jwt-auth0]
+- [AWS Cognito][ref-jwt-aws-cognito]
+
+Cube supports verifying JWTs using industry-standard JWKS. The JWKS can be
+provided either from a URL, or as a JSON object conforming to [JWK specification
+RFC 7517 Section 4][link-jwk-ref], encoded as a string.
+
+#### Using a key as a JSON string
+
+Add the following to your `cube.js` configuration file:
+
+```javascript
+module.exports = {
+  jwt: {
+    key: '<JWK_AS_STRING>',
+  },
+};
+```
+
+Or configure the same using environment variables:
+
+```bash
+CUBEJS_JWT_KEY='<JWK_AS_STRING>'
+```
+
+#### Using a key from a URL
+
+<InfoBox>
+
+When using a URL to fetch the JWKS, Cube will automatically cache the response,
+re-use it and update if a key rotation has occurred.
+
+</InfoBox>
+
+Add the following to your `cube.js` configuration file:
+
+```javascript
+module.exports = {
+  jwt: {
+    jwkUrl: '<URL_TO_JWKS_JSON>',
+  },
+};
+```
+
+Or configure the same using environment variables:
+
+```bash
+CUBEJS_JWK_URL='<URL_TO_JWKS_JSON>'
+```
+
+### <--{"id" : "Using JSON Web Key Sets (JWKS)"}--> Verifying claims
+
+Cube can also verify the audience, subject and issuer claims in JWTs. Similarly
+to JWK configuration, these can also be configured in the `cube.js`
+configuration file:
+
+```javascript
+module.exports = {
+  jwt: {
+    audience: '<AUDIENCE_FROM_IDENTITY_PROVIDER>',
+    issuer: ['<ISSUER_FROM_IDENTITY_PROVIDER>'],
+    subject: '<SUBJECT_FROM_IDENTITY_PROVIDER>',
+  },
+};
+```
+
+Using environment variables:
+
+```bash
+CUBEJS_JWT_AUDIENCE='<AUDIENCE_FROM_IDENTITY_PROVIDER>'
+CUBEJS_JWT_ISSUER='<ISSUER_FROM_IDENTITY_PROVIDER>'
+CUBEJS_JWT_SUBJECT='<SUBJECT_FROM_IDENTITY_PROVIDER>'
+```
+
+### <--{"id" : "Using JSON Web Key Sets (JWKS)"}--> Custom claims namespace
+
+Cube can also extract claims defined in custom namespaces. Simply specify the
+namespace in your `cube.js` configuration file:
+
+```javascript
+module.exports = {
+  jwt: {
+    claimsNamespace: 'my-custom-namespace',
+  },
+};
+```
+
+### <--{"id" : "Using JSON Web Key Sets (JWKS)"}--> Caching
+
+Cube caches JWKS by default when
+[`CUBEJS_JWK_URL` or `jwt.jwkUrl` is specified](#configuration).
+
+- If the response contains a `Cache-Control` header, then Cube uses it to
+  determine cache expiry.
+- The keys inside the JWKS are checked for expiry values and used for cache
+  expiry.
+- If an inbound request supplies a JWT referencing a key not found in the cache,
+  the cache is refreshed.
+
+## Custom authentication
+
+Cube also allows you to provide your own JWT verification logic by setting a
+[`checkAuth()`][ref-config-check-auth] function in the `cube.js` configuration
+file. This function is expected to verify a JWT and assigns its' claims to the
+security context.
+
+As an example, if you needed to retrieve user information from an LDAP server,
+you might do the following:
+
+```javascript
+module.exports = {
+  checkAuth: async (req, auth) => {
+    try {
+      const userInfo = await getUserFromLDAP(req.get('X-LDAP-User-ID'));
+      req.securityContext = userInfo;
+    } catch {
+      throw new Error('Could not authenticate user from LDAP');
+    }
+  },
+};
+```
+
+[link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
+[ref-config-check-auth]: /config#check-auth
+[ref-config-migrate-cubejs]:
+  /configuration/overview#migration-from-express-to-docker-template
+[ref-recipe-gen-jwt-for-web-apps]: /recipes/generating-jwts-for-web-apps
+[ref-sec-ctx]: /security/context
+[ref-jwt-auth0]: /security/jwt/auth0
+[ref-jwt-aws-cognito]: /security/jwt/aws-cognito

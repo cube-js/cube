@@ -5,13 +5,31 @@ permalink: /backend/sql/security
 menuOrder: 3
 ---
 
-Cube can be configured with dynamic username & password verification system by
-setting a [`checkSqlAuth()`][ref-config-check-sql-auth] function in the
-`cube.js` configuration file. This function should verify username and return
-object with password and security context.
+Authentication in the SQL API uses standard Postgres authentication with a
+username and password. In Cube, the `checkSqlAuth()` configuration option is
+used to check authentication.
 
-If password returned from this function matches provided in connection string
-user will be authenticated with provided security context.
+```javascript
+module.exports = {
+  checkSqlAuth: async (req, username) => {
+    if (username === 'fooUser') {
+      return {
+        password: 'mypassword',
+        securityContext: {},
+      };
+    }
+
+    throw new Error('Incorrect user name or password');
+  },
+};
+```
+
+Cube's SQL API uses a standard Postgres username and password authentication mechanism. This can be configured as a
+dynamic username & password verification system by
+configuring a [`checkSqlAuth()`][ref-config-check-sql-auth] function in the
+`cube.js` configuration file. This function should verify the username and return
+an object with password and security context. If the password returned from this function matches the one provided in the connection string,
+the user will be authenticated with the provided security context.
 
 ```javascript
 module.exports = {
