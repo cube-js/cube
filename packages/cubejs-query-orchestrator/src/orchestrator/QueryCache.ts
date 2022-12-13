@@ -205,16 +205,18 @@ export class QueryCache {
     const expireSecs = this.getExpireSecs(queryBody);
 
     if (!cacheKeyQueries || queryBody.external && this.options.skipExternalCacheAndQueue) {
+      const key: CacheKey = [query, values];
+      // @ts-ignore
+      key.persistent = queryBody.persistent;
       return {
         data: await this.queryWithRetryAndRelease(
           query,
           values,
           {
-            cacheKey: [query, values],
+            cacheKey: key,
             external: queryBody.external,
             requestId: queryBody.requestId,
             dataSource: queryBody.dataSource,
-            persistent: queryBody.persistent,
             inlineTables,
           }
         ),
@@ -236,7 +238,6 @@ export class QueryCache {
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
-          persistent: queryBody.persistent,
         }
       );
     }
@@ -253,7 +254,6 @@ export class QueryCache {
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
-          persistent: queryBody.persistent,
           skipRefreshKeyWaitForRenew: true
         }
       );
@@ -269,7 +269,6 @@ export class QueryCache {
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
-          persistent: queryBody.persistent,
         }
       );
 
@@ -289,7 +288,6 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
-        persistent: queryBody.persistent,
       }
     );
 
@@ -305,7 +303,6 @@ export class QueryCache {
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
-          persistent: queryBody.persistent,
         }
       );
     }
@@ -375,7 +372,6 @@ export class QueryCache {
       external,
       priority,
       requestId,
-      persistent,
       inlineTables,
       useCsvQuery,
     }: {
@@ -384,7 +380,6 @@ export class QueryCache {
       external: boolean,
       priority?: number,
       requestId?: string,
-      persistent?: boolean,
       inlineTables?: InlineTables,
       useCsvQuery?: boolean,
     }
@@ -407,7 +402,6 @@ export class QueryCache {
       {
         stageQueryKey: cacheKey,
         requestId,
-        persistent,
       }
     );
   }
@@ -550,7 +544,6 @@ export class QueryCache {
       skipRefreshKeyWaitForRenew?: boolean,
       external?: boolean,
       dataSource: string,
-      persistent?: boolean,
     }
   ) {
     this.renewQuery(
@@ -582,7 +575,6 @@ export class QueryCache {
       skipRefreshKeyWaitForRenew?: boolean,
       external?: boolean,
       dataSource: string,
-      persistent?: boolean,
       useCsvQuery?: boolean,
     }
   ) {
@@ -614,7 +606,6 @@ export class QueryCache {
               external: options.external,
               requestId: options.requestId,
               dataSource: options.dataSource,
-              persistent: options.persistent,
               useCsvQuery: options.useCsvQuery,
             }
           ),
@@ -689,7 +680,6 @@ export class QueryCache {
       forceNoCache?: boolean,
       useInMemory?: boolean,
       useCsvQuery?: boolean,
-      persistent?: boolean,
     }
   ) {
     options = options || { dataSource: 'default' };
@@ -703,7 +693,6 @@ export class QueryCache {
         external: options.external,
         requestId: options.requestId,
         dataSource: options.dataSource,
-        persistent: options.persistent,
         useCsvQuery: options.useCsvQuery,
       }).then(res => {
         const result = {
