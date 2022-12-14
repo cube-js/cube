@@ -977,6 +977,7 @@ pub trait MetaStore: DIService + Send + Sync {
         replay_handle_id: Option<u64>,
     ) -> Result<(), CubeError>;
     async fn delete_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
+    async fn delete_chunks_without_checks(&self, chunk_ids: Vec<u64>) -> Result<(), CubeError>;
     async fn all_inactive_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn all_inactive_not_uploaded_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError>;
 
@@ -3283,6 +3284,19 @@ impl MetaStore for RocksMetaStore {
                 )));
             }
             Ok(chunks.delete(chunk_id, batch_pipe)?)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn delete_chunks_without_checks(&self, chunk_ids: Vec<u64>) -> Result<(), CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let chunks = ChunkRocksTable::new(db_ref.clone());
+            for id in chunk_ids {
+                chunks.delete(id, batch_pipe)?;
+            }
+
+            Ok(())
         })
         .await
     }

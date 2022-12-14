@@ -410,12 +410,17 @@ impl SchedulerImpl {
         let all_inactive_not_uploaded_chunks =
             self.meta_store.all_inactive_not_uploaded_chunks().await?;
 
-        for chunk in all_inactive_not_uploaded_chunks.iter() {
-            let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
+        let ids = all_inactive_not_uploaded_chunks
+            .iter()
+            .map(|c| c.get_id().clone())
+            .collect::<Vec<_>>();
+
+        let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
+        for part in ids.as_slice().chunks(10000) {
             self.gc_loop
                 .send(GCTimedTask {
                     deadline,
-                    task: GCTask::DeleteChunk(chunk.get_id()),
+                    task: GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
                 })
                 .await?;
         }
@@ -426,6 +431,7 @@ impl SchedulerImpl {
         // TODO we can do this reconciliation more rarely
         let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
 
+        log::info!("send {} inactive chunks to GC", all_inactive_chunks.len());
         let (in_memory_inactive, persistent_inactive): (Vec<_>, Vec<_>) = all_inactive_chunks
             .iter()
             .partition(|c| c.get_row().in_memory());
@@ -437,12 +443,14 @@ impl SchedulerImpl {
                 .iter()
                 .map(|c| c.get_id().clone())
                 .collect::<Vec<_>>();
-            self.gc_loop
-                .send(GCTimedTask {
-                    deadline,
-                    task: GCTask::DeleteChunks(ids),
-                })
-                .await?;
+            for part in ids.as_slice().chunks(10000) {
+                self.gc_loop
+                    .send(GCTimedTask {
+                        deadline,
+                        task: GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
+                    })
+                    .await?;
+            }
         }
 
         if !persistent_inactive.is_empty() {
@@ -452,12 +460,14 @@ impl SchedulerImpl {
                 .iter()
                 .map(|c| c.get_id())
                 .collect::<Vec<_>>();
-            self.gc_loop
-                .send(GCTimedTask {
-                    deadline,
-                    task: GCTask::DeleteChunks(ids),
-                })
-                .await?;
+            for part in ids.as_slice().chunks(10000) {
+                self.gc_loop
+                    .send(GCTimedTask {
+                        deadline,
+                        task: GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
+                    })
+                    .await?;
+            }
         }
 
         Ok(())
@@ -1224,26 +1234,33 @@ impl DataGCLoop {
                     }
                     GCTask::DeleteChunks(chunk_ids) => {
                         log::info!("Delete chunks: {}", chunk_ids.len());
-                        println!("Delete chunks: {}", chunk_ids.len());
-                        for chunk_id in chunk_ids.into_iter() {
-                            if let Ok(chunk) = self.metastore.get_chunk(chunk_id).await {
-                                if !chunk.get_row().active() {
-                                    log::trace!("Removing deactivated chunk {}", chunk_id);
-                                    if let Err(e) = self.metastore.delete_chunk(chunk_id).await {
-                                        log::error!(
-                                            "Could not remove deactivated chunk ({}): {}",
-                                            chunk_id,
-                                            e
-                                        );
-                                    }
-                                } else {
-                                    log::trace!(
-                                        "Skipping removing of chunk {} because it was activated",
-                                        chunk_id
+                        match self.metastore.get_chunks_out_of_queue(chunk_ids).await {
+                            Ok(chunks) => {
+                                let ids = chunks
+                                    .into_iter()
+                                    .filter_map(|c| {
+                                        if c.get_row().active() {
+                                            None
+                                        } else {
+                                            Some(c.get_id())
+                                        }
+                                    })
+                                    .collect::<Vec<_>>();
+
+                                if let Err(e) =
+                                    self.metastore.delete_chunks_without_checks(ids).await
+                                {
+                                    log::error!(
+                                        "Could not delete chunks. Get error {} when deleting chunks",
+                                        e
                                     );
                                 }
-                            } else {
-                                log::trace!("Skipping removing of deactivated chunk {} because it was already removed", chunk_id);
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Could not delete chunks. Get error {} when trying get chunks for deletion",
+                                    e
+                                );
                             }
                         }
                         log::info!("Delete chunks completed");
