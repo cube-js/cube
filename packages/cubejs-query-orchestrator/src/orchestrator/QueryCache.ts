@@ -204,9 +204,10 @@ export class QueryCache {
 
     const expireSecs = this.getExpireSecs(queryBody);
 
+    // TODO (buntarb): Seems like the `!cacheKeyQueries` can never be true. Should we remove it?
     if (!cacheKeyQueries || queryBody.external && this.options.skipExternalCacheAndQueue) {
       const key: CacheKey = [query, values];
-      // @ts-ignore
+      // @ts-ignore TODO (buntarb): check if it's necessary here?
       key.persistent = queryBody.persistent;
       return {
         data: await this.queryWithRetryAndRelease(
@@ -592,7 +593,8 @@ export class QueryCache {
       .then(async cacheKeyQueryResults => (
         {
           data: await this.cacheQueryResult(
-            query, values,
+            query,
+            values,
             cacheKey,
             expireSecs,
             {

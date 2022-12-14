@@ -524,6 +524,14 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   /**
+   * Query limit wich will be used in the query to the data source if
+   * limit property was not specified in the query.
+   */
+  dbQueryStreamOffset: (): number => get('CUBEJS_DB_QUERY_STREAM_OFFSET')
+    .default(5000)
+    .asInt(),
+
+  /**
    * Expire time for touch records
    */
   touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')

@@ -209,7 +209,7 @@ export class QueryQueue {
       // the /cubejs-system/v1/pre-aggregations/jobs endpoint).
       result = !query.isJob && await redisClient.getResultBlocking(queryKey);
       
-      // We don't want to throw the ContinueWaitError for  a jobed build query.
+      // We don't want to throw the ContinueWaitError for a jobed build query.
       if (!query.isJob && !result) {
         throw new ContinueWaitError();
       }

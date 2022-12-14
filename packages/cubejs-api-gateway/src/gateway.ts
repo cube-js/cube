@@ -83,6 +83,7 @@ import {
   transformJoins,
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
+import { DataStream, StreamResponse } from './DataStream';
 
 // const timeoutPromise = (timeout) => (
 //   new Promise((resolve) => (
@@ -210,6 +211,22 @@ class ApiGateway {
         res: this.resToResultFn(res),
         queryType: req.body.queryType
       });
+    }));
+
+    app.post(`${this.basePath}/v1/stream`, jsonParser, userMiddlewares, (async (req, res) => {
+      const streamResponse = await this.stream(req.context, req.body.query);
+      let data = [];
+      streamResponse.rowStream.on('data', (chunk) => {
+        data = data.concat(JSON.parse(chunk.toString()));
+      });
+      streamResponse.rowStream.on('end', () => {
+        console.log('Data length: ', data.length);
+        console.log(JSON.stringify(data, undefined, 2));
+      });
+      streamResponse.rowStream.on('close', () => {
+        streamResponse.release();
+      });
+      this.resToResultFn(res)(true);
     }));
 
     app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, (async (req, res) => {
@@ -1208,7 +1225,7 @@ class ApiGateway {
       renewQuery: normalizedQuery.renewQuery,
       requestId: context.requestId,
       context,
-      persistent: false, // apiType === 'sql',
+      persistent: apiType === 'stream',
     }];
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
@@ -1305,6 +1322,92 @@ class ApiGateway {
       slowQuery: Boolean(response.slowQuery),
       total: normalizedQuery.total ? response.total : null,
     };
+  }
+
+  /**
+   * Returns stream object to fetch data.
+   */
+  public async stream(context: RequestContext, query: Query): Promise<StreamResponse> {
+    // const CUBEJS_DB_QUERY_LIMIT = getEnv('dbQueryLimit'); // 50000
+    // const CUBEJS_DB_QUERY_DEFAULT_LIMIT = getEnv('dbQueryDefaultLimit'); // 10000
+    const CUBEJS_DB_QUERY_STREAM_OFFSET = getEnv('dbQueryStreamOffset'); // 5000
+
+    const { limit, offset } = query;
+
+    const response = {
+      types: [],
+      rowStream: new DataStream(),
+      release: async () => {
+        if (!response.rowStream.destroyed) {
+          response.rowStream.destroy();
+        }
+        return response.rowStream;
+      }
+    };
+
+    const chunk = async (lim: number, ofs: number) => {
+      try {
+        await this.load({
+          apiType: 'stream',
+          queryType: 'multi',
+          query: {
+            ...query,
+            limit: lim,
+            offset: ofs,
+          },
+          res: (message: Record<string, any> | Record<string, any>[]) => {
+            const { results, error } = <{
+              queryType?: any,
+              results?: any,
+              error?: string,
+              requestId?: string,
+            }>message;
+
+            if (error) {
+              throw new Error(error);
+            } else {
+              const cnt = results[0].data.length;
+              const data = cnt > 0 && JSON.stringify(results[0].data);
+              const added = cnt > 0 && response.rowStream.write(data, 'utf8');
+
+              // The stream is blocked:
+              if (cnt > 0 && !added) {
+                response.rowStream.once('drain', () => chunk(lim, ofs));
+              }
+
+              // No more data:
+              if (cnt === 0 || (cnt > 0 && cnt < CUBEJS_DB_QUERY_STREAM_OFFSET)) {
+                response.rowStream.destroy();
+              }
+              
+              // Next chunk:
+              if (added && cnt === CUBEJS_DB_QUERY_STREAM_OFFSET) {
+                chunk(
+                  limit && ((ofs + 2 * lim) > limit)
+                    ? limit - (ofs + lim)
+                    : lim,
+                  ofs + lim,
+                );
+              }
+            }
+          },
+          context,
+        });
+      } catch (e) {
+        if ((<any>e).error === 'Continue wait') {
+          chunk(lim, ofs);
+        }
+      }
+    };
+
+    chunk(
+      limit && limit < CUBEJS_DB_QUERY_STREAM_OFFSET
+        ? limit
+        : CUBEJS_DB_QUERY_STREAM_OFFSET,
+      offset || 0
+    );
+
+    return response;
   }
 
   /**
