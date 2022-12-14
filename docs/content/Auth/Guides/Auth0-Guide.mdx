@@ -8,13 +8,13 @@ menuOrder: 3
 
 ## Introduction
 
-In this guide, you'll learn how to integrate Auth0 authentication with a Cube.js
+In this guide, you'll learn how to integrate Auth0 authentication with a Cube
 deployment. If you already have a pre-existing application on Auth0 that you'd
-like to re-use, please skip ahead to [Configure Cube.js][ref-config-auth0].
+like to re-use, please skip ahead to [Configure Cube][ref-config-auth0].
 
 We'll be creating an Auth0 [application][link-auth0-docs-app] and
 [API][link-auth0-docs-api], configuring a [rule on Auth0][link-auth0-docs-rules]
-to add custom claims to vended JWTs, and finally configuring Cube.js to use
+to add custom claims to vended JWTs, and finally configuring Cube to use
 Auth0.
 
 ## Create an application
@@ -25,7 +25,7 @@ button.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/auth0-01-new-app-01.png"
+    src="https://ucarecdn.com/fe4c461b-582a-4f63-80e0-ad2f9012e74c/"
     style="border: none"
     width="80%"
   />
@@ -36,7 +36,7 @@ Applications.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/auth0-01-new-app-02.png"
+    src="https://ucarecdn.com/89cd0632-7fc1-46b5-b9f3-e8231e4c669e/"
     style="border: none"
     width="80%"
   />
@@ -62,7 +62,7 @@ claims to the JWT.
 <InfoBox>
 
 Take note of the value of `namespace` here, you will need it later to [configure
-Cube.js][ref-config-auth0].
+Cube][ref-config-auth0].
 
 </InfoBox>
 
@@ -88,7 +88,7 @@ button.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/auth0-02-new-api-01.png"
+    src="https://ucarecdn.com/2f54c99d-569b-40e9-a434-8c721e471623/"
     style="border: none"
     width="80%"
   />
@@ -99,7 +99,7 @@ In the 'New API' popup, set a name for this API and an identifier (e.g.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/auth0-02-new-api-02.png"
+    src="https://ucarecdn.com/e96cf57b-71e5-44c0-b305-9f572c696707/"
     style="border: none"
     width="80%"
   />
@@ -108,7 +108,7 @@ In the 'New API' popup, set a name for this API and an identifier (e.g.
 <InfoBox>
 
 Take note of the Identifier here, as it is used to [set the JWT Audience option
-in Cube.js][ref-config-auth0].
+in Cube][ref-config-auth0].
 
 </InfoBox>
 
@@ -129,9 +129,9 @@ application front-end, this might look something like this:
 Refer to Auth0's documentation for instructions on configuring
 [Angular][link-auth0-angular] or [Vue][link-auth0-vue] applications.
 
-## Configure Cube.js
+## Configure Cube
 
-Now we're ready to configure Cube.js to use Auth0. Go to your Cube.js project
+Now we're ready to configure Cube to use Auth0. Go to your Cube project
 and open the `.env` file and add the following, replacing the values wrapped in
 `<>`.
 
@@ -152,7 +152,7 @@ Configuration.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/auth0-03-get-jwt-01.png"
+    src="https://ucarecdn.com/1f6423f3-b6c2-47e4-a915-eaae99c80fe3/"
     style="border: none"
     width="80%"
   />
@@ -170,7 +170,7 @@ click Save.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/auth0-03-get-jwt-02.png"
+    src="https://ucarecdn.com/18aba0a0-9864-4d30-ad5f-10e5486c2344/"
     style="border: none"
     width="80%"
   />
@@ -188,7 +188,7 @@ a button called 'Exchange'. Click on it to exchange the code for your tokens:
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/auth0-03-get-jwt-03.png"
+    src="https://ucarecdn.com/ed8c59ac-8014-4e98-8eb3-ceda2224e387/"
     style="border: none"
     width="80%"
   />
@@ -205,7 +205,7 @@ page, click Add Security Context.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/auth0-04-dev-playground-01.png"
+    src="https://ucarecdn.com/f301fb92-b8a8-41f4-a1ea-78b302dc2822/"
     style="border: none"
     width="80%"
   />
@@ -216,7 +216,7 @@ button.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Auth/auth0-04-dev-playground-02.png"
+    src="https://ucarecdn.com/c4897c12-07d7-40c0-8198-bd132fd7bacd/"
     style="border: none"
     width="80%"
   />
@@ -229,8 +229,8 @@ using the [Security Context][ref-sec-ctx] should now work as expected.
 
 To help you get up and running, we have [an example project which is configured
 to use Auth0][gh-cubejs-auth0-example]. You can use it as a starting point for
-your own Cube.js application. You can also use our [Multi-Tenant Analytics with
-Auth0 and Cube.js guide][link-multitenant-auth0-guide] for a more detailed
+your own Cube application. You can also use our [Multi-Tenant Analytics with
+Auth0 and Cube guide][link-multitenant-auth0-guide] for a more detailed
 walkthrough.
 
 [link-auth0-angular]: https://auth0.com/docs/quickstart/spa/angular/01-login
