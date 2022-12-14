@@ -199,6 +199,15 @@ impl SchedulerImpl {
         {
             error!("Error removing inactive not uploaded chunks: {}", e);
         }
+        if let Err(e) = warn_long_fut(
+            "deactivate_chunks_without_partitions",
+            Duration::from_millis(5000),
+            self.deactivate_chunks_without_partitions(),
+        )
+        .await
+        {
+            error!("Error scheduling partitions compaction: {}", e);
+        }
 
         if let Err(e) = warn_long_fut(
             "Scheduling compactions",
@@ -398,11 +407,39 @@ impl SchedulerImpl {
             // TODO config
             .get_partitions_with_chunks_created_seconds_ago(60)
             .await?;
+        log::info!(
+            "schedule all pending compaction {}",
+            partition_compaction_candidates_id.len()
+        );
         for p in partition_compaction_candidates_id {
             self.schedule_compaction_in_memory_chunks_if_needed(&p)
                 .await?;
             self.schedule_compaction_if_needed(&p).await?;
         }
+        Ok(())
+    }
+    async fn deactivate_chunks_without_partitions(&self) -> Result<(), CubeError> {
+        let chunks_without_partitions = self
+            .meta_store
+            .get_chunks_without_partition_created_seconds_ago(60)
+            .await?;
+        let clen = chunks_without_partitions.len();
+        log::info!("schedule deactivating chunks without partition {}", clen);
+
+        let mut ids = Vec::new();
+        for chunk in chunks_without_partitions {
+            if let Some(handle_id) = chunk.get_row().replay_handle_id() {
+                self.meta_store
+                    .update_replay_handle_failed(*handle_id, true)
+                    .await?;
+                ids.push(chunk.get_id());
+            }
+        }
+        self.meta_store.deactivate_chunks_without_check(ids).await?;
+        log::info!(
+            "schedule deactivating chunks without partition  completed {}",
+            clen
+        );
         Ok(())
     }
 

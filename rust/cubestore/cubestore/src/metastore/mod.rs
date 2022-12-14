@@ -843,6 +843,10 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         seconds_ago: i64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
+    async fn get_chunks_without_partition_created_seconds_ago(
+        &self,
+        seconds_ago: i64,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
 
     fn index_table(&self) -> IndexMetaStoreTable;
     async fn create_index(
@@ -2757,12 +2761,57 @@ impl MetaStore for RocksMetaStore {
             }
 
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
-            let partitions = partition_ids
-                .into_iter()
-                .map(|id| partitions_table.get_row_or_not_found(id))
-                .collect::<Result<Vec<_>, _>>()?;
+            let mut partitions = Vec::new();
+            for id in partition_ids {
+                if let Some(partition) = partitions_table.get_row(id)? {
+                    partitions.push(partition);
+                }
+            }
 
             Ok(partitions)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_chunks_without_partition_created_seconds_ago(
+        &self,
+        seconds_ago: i64,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let now = Utc::now();
+            let mut partitions = HashMap::new();
+            for c in chunks_table.scan_all_rows()? {
+                let c = c?;
+                if c.get_row().active()
+                    && c.get_row()
+                        .created_at()
+                        .as_ref()
+                        .map(|created_at| {
+                            now.signed_duration_since(created_at.clone()).num_seconds()
+                                >= seconds_ago
+                        })
+                        .unwrap_or(false)
+                {
+                    partitions
+                        .entry(c.get_row().get_partition_id())
+                        .or_insert(vec![])
+                        .push(c);
+                }
+            }
+
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+
+            let mut result = Vec::new();
+            for (id, mut chunks) in partitions {
+                if partitions_table.get_row(id)?.is_none() {
+                    result.append(&mut chunks);
+                }
+            }
+
+            Ok(result)
         })
         .await
     }
