@@ -432,8 +432,8 @@ impl SchedulerImpl {
                 self.meta_store
                     .update_replay_handle_failed(*handle_id, true)
                     .await?;
-                ids.push(chunk.get_id());
             }
+            ids.push(chunk.get_id());
         }
         self.meta_store.deactivate_chunks_without_check(ids).await?;
         log::info!(

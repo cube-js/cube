@@ -3711,8 +3711,11 @@ impl MetaStore for RocksMetaStore {
             let table = ReplayHandleRocksTable::new(db_ref);
             let rows = ids
                 .iter()
-                .map(|id| table.get_row_or_not_found(*id))
-                .collect::<Result<Vec<_>, _>>()?;
+                .map(|id| table.get_row(*id))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .filter_map(|v| v)
+                .collect::<Vec<_>>();
             Ok(rows)
         })
         .await
