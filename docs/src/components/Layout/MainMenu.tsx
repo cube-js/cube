@@ -40,6 +40,7 @@ const menuOrder = [
   'Deployment',
   'Developer Tools',
   'Examples & Tutorials',
+  'FAQs',
   'Release Notes',
 ];
 
