@@ -426,20 +426,40 @@ impl SchedulerImpl {
         // TODO we can do this reconciliation more rarely
         let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
 
-        for chunk in all_inactive_chunks.iter() {
-            let seconds = if chunk.get_row().in_memory() {
-                self.config.in_memory_not_used_timeout()
-            } else {
-                self.config.not_used_timeout()
-            };
+        let (in_memory_inactive, persistent_inactive): (Vec<_>, Vec<_>) = all_inactive_chunks
+            .iter()
+            .partition(|c| c.get_row().in_memory());
+
+        if !in_memory_inactive.is_empty() {
+            let seconds = self.config.in_memory_not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
+            let ids = in_memory_inactive
+                .iter()
+                .map(|c| c.get_id().clone())
+                .collect::<Vec<_>>();
             self.gc_loop
                 .send(GCTimedTask {
                     deadline,
-                    task: GCTask::DeleteChunk(chunk.get_id()),
+                    task: GCTask::DeleteChunks(ids),
                 })
                 .await?;
         }
+
+        if !persistent_inactive.is_empty() {
+            let seconds = self.config.not_used_timeout();
+            let deadline = Instant::now() + Duration::from_secs(seconds);
+            let ids = persistent_inactive
+                .iter()
+                .map(|c| c.get_id())
+                .collect::<Vec<_>>();
+            self.gc_loop
+                .send(GCTimedTask {
+                    deadline,
+                    task: GCTask::DeleteChunks(ids),
+                })
+                .await?;
+        }
+
         Ok(())
     }
 
@@ -1204,6 +1224,7 @@ impl DataGCLoop {
                     }
                     GCTask::DeleteChunks(chunk_ids) => {
                         log::info!("Delete chunks: {}", chunk_ids.len());
+                        println!("Delete chunks: {}", chunk_ids.len());
                         for chunk_id in chunk_ids.into_iter() {
                             if let Ok(chunk) = self.metastore.get_chunk(chunk_id).await {
                                 if !chunk.get_row().active() {
