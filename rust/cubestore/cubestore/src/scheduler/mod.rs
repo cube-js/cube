@@ -785,20 +785,38 @@ impl SchedulerImpl {
         self: &Arc<Self>,
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<(), CubeError> {
-        for chunk in chunks.into_iter() {
-            if chunk.get_row().active() {
-                continue;
-            }
-            let seconds = if chunk.get_row().in_memory() {
-                self.config.in_memory_not_used_timeout()
-            } else {
-                self.config.not_used_timeout()
-            };
+        let (in_memory_inactive, persistent_inactive): (Vec<_>, Vec<_>) = chunks
+            .into_iter()
+            .filter(|c| !c.get_row().active())
+            .partition(|c| c.get_row().in_memory());
+
+        if !in_memory_inactive.is_empty() {
+            let seconds = self.config.in_memory_not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
             self.gc_loop
                 .send(GCTimedTask {
                     deadline,
-                    task: GCTask::DeleteChunk(chunk.get_id()),
+                    task: GCTask::DeleteChunks(
+                        in_memory_inactive
+                            .into_iter()
+                            .map(|c| c.get_id())
+                            .collect::<Vec<_>>(),
+                    ),
+                })
+                .await?;
+        }
+        if !persistent_inactive.is_empty() {
+            let seconds = self.config.not_used_timeout();
+            let deadline = Instant::now() + Duration::from_secs(seconds);
+            self.gc_loop
+                .send(GCTimedTask {
+                    deadline,
+                    task: GCTask::DeleteChunks(
+                        persistent_inactive
+                            .into_iter()
+                            .map(|c| c.get_id())
+                            .collect::<Vec<_>>(),
+                    ),
                 })
                 .await?;
         }
@@ -1058,6 +1076,7 @@ impl Ord for GCTimedTask {
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 enum GCTask {
     RemoveRemoteFile(/*remote_path*/ String),
+    DeleteChunks(/*chunk_ids*/ Vec<u64>),
     DeleteChunk(/*chunk_id*/ u64),
     DeleteMiddleManPartition(/*partition_id*/ u64),
     DeletePartition(/*partition_id*/ u64),
@@ -1182,6 +1201,31 @@ impl DataGCLoop {
                         } else {
                             log::trace!("Skipping removing of deactivated chunk {} because it was already removed", chunk_id);
                         }
+                    }
+                    GCTask::DeleteChunks(chunk_ids) => {
+                        log::info!("Delete chunks: {}", chunk_ids.len());
+                        for chunk_id in chunk_ids.into_iter() {
+                            if let Ok(chunk) = self.metastore.get_chunk(chunk_id).await {
+                                if !chunk.get_row().active() {
+                                    log::trace!("Removing deactivated chunk {}", chunk_id);
+                                    if let Err(e) = self.metastore.delete_chunk(chunk_id).await {
+                                        log::error!(
+                                            "Could not remove deactivated chunk ({}): {}",
+                                            chunk_id,
+                                            e
+                                        );
+                                    }
+                                } else {
+                                    log::trace!(
+                                        "Skipping removing of chunk {} because it was activated",
+                                        chunk_id
+                                    );
+                                }
+                            } else {
+                                log::trace!("Skipping removing of deactivated chunk {} because it was already removed", chunk_id);
+                            }
+                        }
+                        log::info!("Delete chunks completed");
                     }
                     GCTask::DeleteMiddleManPartition(partition_id) => {
                         if let Ok(true) = self
