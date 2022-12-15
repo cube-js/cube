@@ -11,12 +11,13 @@ expression: "execute_query(\"select COLUMN_NAME, ORDINAL_POSITION, IS_NULLABLE, 
 | avgPrice           | 4                | NO          | numeric                     |
 | countDistinct      | 5                | NO          | bigint                      |
 | order_date         | 6                | YES         | timestamp without time zone |
-| customer_gender    | 7                | YES         | text                        |
-| notes              | 8                | YES         | text                        |
-| taxful_total_price | 9                | YES         | numeric                     |
-| has_subscription   | 10               | YES         | boolean                     |
-| is_male            | 11               | NO          | boolean                     |
-| is_female          | 12               | NO          | boolean                     |
-| __user             | 13               | YES         | text                        |
-| __cubeJoinField    | 14               | YES         | text                        |
+| last_mod           | 7                | YES         | timestamp without time zone |
+| customer_gender    | 8                | YES         | text                        |
+| notes              | 9                | YES         | text                        |
+| taxful_total_price | 10               | YES         | numeric                     |
+| has_subscription   | 11               | YES         | boolean                     |
+| is_male            | 12               | NO          | boolean                     |
+| is_female          | 13               | NO          | boolean                     |
+| __user             | 14               | YES         | text                        |
+| __cubeJoinField    | 15               | YES         | text                        |
 +--------------------+------------------+-------------+-----------------------------+

@@ -11,6 +11,7 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | 18000    | avgPrice           | numeric   | 1700  | -1     | NULL   |
 | 18000    | countDistinct      | int8      | 20    | -1     | 64     |
 | 18000    | order_date         | timestamp | 1114  | -1     | NULL   |
+| 18000    | last_mod           | timestamp | 1114  | -1     | NULL   |
 | 18000    | customer_gender    | text      | 25    | -1     | NULL   |
 | 18000    | notes              | text      | 25    | -1     | NULL   |
 | 18000    | taxful_total_price | numeric   | 1700  | -1     | NULL   |
@@ -19,12 +20,13 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | 18000    | is_female          | bool      | 16    | -1     | NULL   |
 | 18000    | __user             | text      | 25    | -1     | NULL   |
 | 18000    | __cubeJoinField    | text      | 25    | -1     | NULL   |
-| 18017    | agentCount         | int8      | 20    | -1     | 64     |
-| 18017    | agentCountApprox   | int8      | 20    | -1     | 64     |
-| 18017    | read               | bool      | 16    | -1     | NULL   |
-| 18017    | __user             | text      | 25    | -1     | NULL   |
-| 18017    | __cubeJoinField    | text      | 25    | -1     | NULL   |
-| 18025    | someNumber         | numeric   | 1700  | -1     | NULL   |
-| 18025    | __user             | text      | 25    | -1     | NULL   |
-| 18025    | __cubeJoinField    | text      | 25    | -1     | NULL   |
+| 18018    | agentCount         | int8      | 20    | -1     | 64     |
+| 18018    | agentCountApprox   | int8      | 20    | -1     | 64     |
+| 18018    | read               | bool      | 16    | -1     | NULL   |
+| 18018    | content            | text      | 25    | -1     | NULL   |
+| 18018    | __user             | text      | 25    | -1     | NULL   |
+| 18018    | __cubeJoinField    | text      | 25    | -1     | NULL   |
+| 18027    | someNumber         | numeric   | 1700  | -1     | NULL   |
+| 18027    | __user             | text      | 25    | -1     | NULL   |
+| 18027    | __cubeJoinField    | text      | 25    | -1     | NULL   |
 +----------+--------------------+-----------+-------+--------+--------+

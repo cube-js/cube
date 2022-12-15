@@ -14,17 +14,19 @@ expression: "execute_query(\"\n                SELECT\n                    attre
 | 18000    | has_subscription   | NULL    |
 | 18000    | is_female          | NULL    |
 | 18000    | is_male            | NULL    |
+| 18000    | last_mod           | NULL    |
 | 18000    | maxPrice           | NULL    |
 | 18000    | minPrice           | NULL    |
 | 18000    | notes              | NULL    |
 | 18000    | order_date         | NULL    |
 | 18000    | taxful_total_price | NULL    |
-| 18017    | __cubeJoinField    | NULL    |
-| 18017    | __user             | NULL    |
-| 18017    | agentCount         | NULL    |
-| 18017    | agentCountApprox   | NULL    |
-| 18017    | read               | NULL    |
-| 18025    | __cubeJoinField    | NULL    |
-| 18025    | __user             | NULL    |
-| 18025    | someNumber         | NULL    |
+| 18018    | __cubeJoinField    | NULL    |
+| 18018    | __user             | NULL    |
+| 18018    | agentCount         | NULL    |
+| 18018    | agentCountApprox   | NULL    |
+| 18018    | content            | NULL    |
+| 18018    | read               | NULL    |
+| 18027    | __cubeJoinField    | NULL    |
+| 18027    | __user             | NULL    |
+| 18027    | someNumber         | NULL    |
 +----------+--------------------+---------+

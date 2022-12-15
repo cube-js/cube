@@ -11,12 +11,13 @@ expression: "execute_query(\"\n                SELECT\n                    cl.re
 | KibanaSampleDataEcommerce | avgPrice           | 4        | false    | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
 | KibanaSampleDataEcommerce | countDistinct      | 5        | false    | false | false           | int8      | -1     | 64        | 0     | NULL           |
 | KibanaSampleDataEcommerce | order_date         | 6        | true     | false | false           | timestamp | -1     | NULL      | NULL  | 6              |
-| KibanaSampleDataEcommerce | customer_gender    | 7        | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | notes              | 8        | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | taxful_total_price | 9        | true     | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | has_subscription   | 10       | true     | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | is_male            | 11       | false    | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | is_female          | 12       | false    | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | __user             | 13       | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
-| KibanaSampleDataEcommerce | __cubeJoinField    | 14       | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | last_mod           | 7        | true     | false | false           | timestamp | -1     | NULL      | NULL  | 6              |
+| KibanaSampleDataEcommerce | customer_gender    | 8        | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | notes              | 9        | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | taxful_total_price | 10       | true     | false | false           | numeric   | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | has_subscription   | 11       | true     | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | is_male            | 12       | false    | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | is_female          | 13       | false    | false | false           | bool      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | __user             | 14       | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
+| KibanaSampleDataEcommerce | __cubeJoinField    | 15       | true     | false | false           | text      | -1     | NULL      | NULL  | NULL           |
 +---------------------------+--------------------+----------+----------+-------+-----------------+-----------+--------+-----------+-------+----------------+

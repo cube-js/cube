@@ -30,6 +30,10 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     _type: "time".to_string(),
                 },
                 V1CubeMetaDimension {
+                    name: "KibanaSampleDataEcommerce.last_mod".to_string(),
+                    _type: "time".to_string(),
+                },
+                V1CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     _type: "string".to_string(),
                 },
@@ -98,10 +102,16 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
         V1CubeMeta {
             name: "Logs".to_string(),
             title: None,
-            dimensions: vec![V1CubeMetaDimension {
-                name: "Logs.read".to_string(),
-                _type: "boolean".to_string(),
-            }],
+            dimensions: vec![
+                V1CubeMetaDimension {
+                    name: "Logs.read".to_string(),
+                    _type: "boolean".to_string(),
+                },
+                V1CubeMetaDimension {
+                    name: "Logs.content".to_string(),
+                    _type: "string".to_string(),
+                },
+            ],
             measures: vec![
                 V1CubeMetaMeasure {
                     name: "Logs.agentCount".to_string(),
