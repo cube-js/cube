@@ -110,6 +110,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         config.workGroup ||
         getEnv('athenaAwsWorkgroup', { dataSource }) ||
         'primary',
+      catalog:
+        config.catalog ||
+        getEnv('athenaAwsCatalog', { dataSource }),
       exportBucket:
         config.exportBucket ||
         getEnv('dbExportBucket', { dataSource }),
