@@ -26,7 +26,7 @@ impl<St: StreamExt> BufferedStream<St> {
             stream: stream.fuse(),
             items: Vec::with_capacity(capacity),
             cap: capacity,
-            delay: interval(Duration::from_millis(100)),
+            delay: interval(period),
             period,
             send_deadline: Instant::now() + period,
         }
@@ -40,9 +40,7 @@ impl<St: StreamExt> Stream for BufferedStream<St> {
         let mut this = self.project();
 
         match this.delay.as_mut().poll_tick(cx) {
-            Poll::Pending => {
-                return Poll::Pending;
-            }
+            Poll::Pending => {}
             Poll::Ready(_) => {}
         }
         loop {
@@ -67,9 +65,11 @@ impl<St: StreamExt> Stream for BufferedStream<St> {
 
                 Poll::Ready(Some(item)) => {
                     this.items.push(item);
+
                     if this.items.len() >= *this.cap {
                         *this.send_deadline = Instant::now() + *this.period;
                         this.delay.as_mut().reset();
+
                         return Poll::Ready(Some(std::mem::replace(
                             this.items,
                             Vec::with_capacity(*this.cap),

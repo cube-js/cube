@@ -336,8 +336,25 @@ impl StreamingService for StreamingServiceImpl {
                     Ok((c.get_id(), file_size))
                 })
                 .collect();
+
+            let replay_handle = match table
+                .get_row()
+                .stream_offset()
+                .clone()
+                .unwrap_or(StreamOffset::Latest)
+            {
+                StreamOffset::Latest => None,
+                StreamOffset::Earliest => {
+                    let seq_pointer = SeqPointer::new(start_seq, end_seq);
+                    let replay_handle = self
+                        .meta_store
+                        .create_replay_handle(table.get_id(), location_index, seq_pointer)
+                        .await?;
+                    Some(replay_handle.get_id())
+                }
+            };
             self.meta_store
-                .activate_chunks(table.get_id(), new_chunk_ids?, Some(replay_handle.get_id()))
+                .activate_chunks(table.get_id(), new_chunk_ids?, replay_handle)
                 .await?;
 
             sealed = self.try_seal_table(&table).await?;
@@ -781,13 +798,7 @@ impl StreamingSource for KSqlStreamingSource {
                             .as_ref()
                             .map(|o| match o {
                                 StreamOffset::Earliest => "earliest".to_string(),
-                                StreamOffset::Latest => {
-                                    if let Some(_) = initial_seq_value {
-                                        "earliest".to_string()
-                                    } else {
-                                        "latest".to_string()
-                                    }
-                                }
+                                StreamOffset::Latest => "latest".to_string(),
                             })
                             .unwrap_or("latest".to_string()),
                     },
