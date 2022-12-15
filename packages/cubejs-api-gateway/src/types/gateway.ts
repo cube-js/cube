@@ -14,6 +14,7 @@ import {
   CheckAuthFn,
 } from './auth';
 import {
+  CheckRestAclFn,
   CheckAuthMiddlewareFn,
   RequestLoggerMiddlewareFn,
 } from '../interfaces';
@@ -64,6 +65,7 @@ interface ApiGatewayOptions {
    * @deprecated Use checkAuth property instead.
    */
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
+  checkRestAcl?: CheckRestAclFn;
 }
 
 export {

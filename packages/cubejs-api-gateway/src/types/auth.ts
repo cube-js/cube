@@ -5,6 +5,8 @@
  * Cube.js auth related data types definition.
  */
 
+import { Request } from './request';
+
 /**
  * Internal auth logic options object data type.
  */
@@ -43,6 +45,17 @@ type CheckAuthFn =
   (ctx: any, authorization?: string) => Promise<void> | void;
 
 /**
+ * Function that must provide REST API ACL validation logic.
+ *
+ * @throw CubejsHandlerError
+ */
+type CheckRestAclFn = (
+  req: Request,
+  whiteList: [url: string, methods: string[]][],
+  blackList: [url: string, methods: string[]][],
+) => Promise<void>;
+
+/**
  * Result of the SQL auth workflow.
  */
 type CheckSQLAuthSuccessResponse = {
@@ -74,6 +87,7 @@ export {
   CheckAuthInternalOptions,
   JWTOptions,
   CheckAuthFn,
+  CheckRestAclFn,
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,

@@ -42,6 +42,7 @@ import {
   CheckAuthInternalOptions,
   JWTOptions,
   CheckAuthFn,
+  CheckRestAclFn,
 } from './types/auth';
 import {
   Query,
@@ -83,6 +84,7 @@ import {
   transformJoins,
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
+import { DEFAULT_BLACK_LIST, DEFAULT_WHITE_LIST } from './RestAcl';
 
 // const timeoutPromise = (timeout) => (
 //   new Promise((resolve) => (
@@ -118,6 +120,8 @@ class ApiGateway {
   protected readonly dataSourceStorage: any;
 
   public readonly checkAuthFn: CheckAuthFn;
+
+  public readonly checkRestAcl: CheckRestAclFn;
 
   public readonly checkAuthSystemFn: CheckAuthFn;
 
@@ -156,6 +160,7 @@ class ApiGateway {
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
       : this.checkAuth;
+    this.checkRestAcl = this.createCheckRestAclFn(options);
     this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
   }
@@ -164,6 +169,7 @@ class ApiGateway {
     const userMiddlewares: RequestHandler[] = [
       this.checkAuthMiddleware,
       this.requestContextMiddleware,
+      this.restAclMiddleware,
       this.logNetworkUsage,
       this.requestLoggerMiddleware
     ];
@@ -275,10 +281,17 @@ class ApiGateway {
       });
     }));
 
+    app.post(
+      `${this.basePath}/v1/pre-aggregations/jobs`,
+      userMiddlewares,
+      this.preAggregationsJobs.bind(this),
+    );
+
     if (this.playgroundAuthSecret) {
       const systemMiddlewares: RequestHandler[] = [
         this.checkAuthSystemMiddleware,
         this.requestContextMiddleware,
+        this.restAclMiddleware,
         this.requestLoggerMiddleware
       ];
 
@@ -345,17 +358,13 @@ class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
-
-      app.post(
-        '/cubejs-system/v1/pre-aggregations/jobs',
-        systemMiddlewares,
-        this.preAggregationsJobs.bind(this),
-      );
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
     app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
 
+    // TODO (buntarb): Maybe we can use ACL list here?
+    // This public endpoint doesn't work for non playground secrets.
     app.post(`${this.basePath}/v1/pre-aggregations/can-use`, userMiddlewares, (req: Request, res: Response) => {
       const { transformedQuery, references } = req.body;
 
@@ -607,7 +616,7 @@ class ApiGateway {
   }
 
   /**
-   * Entry point for the `/cubejs-system/v1/pre-aggregations/jobs` endpoint.
+   * Entry point for the `/v1/pre-aggregations/jobs` endpoint.
    * Post object example:
    * ```
    * {
@@ -1784,6 +1793,57 @@ class ApiGateway {
     return (ctx, authorization) => mainCheckAuthFn(ctx, authorization);
   }
 
+  /**
+   * Returns REST API ACL validation function. Generate it if it wasn't
+   * specified in the initial options.
+   */
+  protected createCheckRestAclFn(options: ApiGatewayOptions): CheckRestAclFn {
+    let { checkRestAcl } = options;
+    if (!checkRestAcl && typeof checkRestAcl !== 'function') {
+      checkRestAcl = async (
+        req: Request,
+        whiteList: [url: string, methods: string[]][],
+        blackList: [url: string, methods: string[]][],
+      ) => {
+        let allowed = false;
+        let denied = false;
+        whiteList.forEach((white) => {
+          allowed = allowed || (
+            (
+              req.path === white[0] ||
+              req.path === `${this.basePath}${white[0]}` ||
+              req.path === `/cubejs-system${white[0]}`
+            ) &&
+            white[1].indexOf(req.method) >= 0
+          );
+        });
+        blackList.forEach((black) => {
+          denied = denied || (
+            (
+              req.path === black[0] ||
+              req.path === `${this.basePath}${black[0]}` ||
+              req.path === `/cubejs-system${black[0]}`
+            ) &&
+            black[1].indexOf(req.method) >= 0
+          );
+        });
+        if (!allowed && !denied) {
+          throw new CubejsHandlerError(
+            403,
+            'Forbidden', `Missing ACL config for the API endpoint: ${req.method} ${req.url}`
+          );
+        }
+        if (!allowed || denied) {
+          throw new CubejsHandlerError(
+            403,
+            'Forbidden', `Access denied for the API call: ${req.method} ${req.url}`
+          );
+        }
+      };
+    }
+    return checkRestAcl;
+  }
+
   protected createCheckAuthSystemFn(): CheckAuthFn {
     const systemCheckAuthFn = this.createDefaultCheckAuth(
       {
@@ -1849,6 +1909,30 @@ class ApiGateway {
     req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
     if (next) {
       next();
+    }
+  };
+
+  protected restAclMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.checkRestAcl(
+        req,
+        req?.context?.securityContext?.acl?.whiteAPIs || DEFAULT_WHITE_LIST,
+        req?.context?.securityContext?.acl?.blackAPIs || DEFAULT_BLACK_LIST,
+      );
+      if (next) next();
+    } catch (e: unknown) {
+      if (e instanceof CubejsHandlerError) {
+        res.status(e.status).json({ error: e.message });
+      } else if (e instanceof Error) {
+        this.log(
+          { type: 'REST ACL Error', error: e.stack || e.toString() },
+          <any>req,
+        );
+        res.status(500).json({
+          error: e.toString(),
+          stack: e.stack
+        });
+      }
     }
   };
 

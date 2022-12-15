@@ -430,6 +430,7 @@ export class CubejsServerCore {
         basePath: this.options.basePath,
         checkAuthMiddleware: this.options.checkAuthMiddleware,
         checkAuth: this.options.checkAuth,
+        checkRestAcl: this.options.checkRestAcl,
         queryRewrite: this.options.queryRewrite || this.options.queryTransformer,
         extendContext: this.options.extendContext,
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),

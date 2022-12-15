@@ -25,6 +25,7 @@ import {
 import {
   JWTOptions,
   CheckAuthFn,
+  CheckRestAclFn,
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
@@ -52,6 +53,7 @@ export {
   NormalizedQuery,
   JWTOptions,
   CheckAuthFn,
+  CheckRestAclFn,
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
