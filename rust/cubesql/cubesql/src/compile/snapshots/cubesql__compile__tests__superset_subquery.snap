@@ -11,12 +11,13 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | avgPrice           | numeric                             | NULL    | true       | 4      | 18000     | NULL    |           |
 | countDistinct      | bigint                              | NULL    | true       | 5      | 18000     | NULL    |           |
 | order_date         | timestamp without time zone         | NULL    | false      | 6      | 18000     | NULL    |           |
-| customer_gender    | text                                | NULL    | false      | 7      | 18000     | NULL    |           |
-| notes              | text                                | NULL    | false      | 8      | 18000     | NULL    |           |
-| taxful_total_price | numeric                             | NULL    | false      | 9      | 18000     | NULL    |           |
-| has_subscription   | boolean                             | NULL    | false      | 10     | 18000     | NULL    |           |
-| is_male            | boolean                             | NULL    | true       | 11     | 18000     | NULL    |           |
-| is_female          | boolean                             | NULL    | true       | 12     | 18000     | NULL    |           |
-| __user             | text                                | NULL    | false      | 13     | 18000     | NULL    |           |
-| __cubeJoinField    | text                                | NULL    | false      | 14     | 18000     | NULL    |           |
+| last_mod           | timestamp without time zone         | NULL    | false      | 7      | 18000     | NULL    |           |
+| customer_gender    | text                                | NULL    | false      | 8      | 18000     | NULL    |           |
+| notes              | text                                | NULL    | false      | 9      | 18000     | NULL    |           |
+| taxful_total_price | numeric                             | NULL    | false      | 10     | 18000     | NULL    |           |
+| has_subscription   | boolean                             | NULL    | false      | 11     | 18000     | NULL    |           |
+| is_male            | boolean                             | NULL    | true       | 12     | 18000     | NULL    |           |
+| is_female          | boolean                             | NULL    | true       | 13     | 18000     | NULL    |           |
+| __user             | text                                | NULL    | false      | 14     | 18000     | NULL    |           |
+| __cubeJoinField    | text                                | NULL    | false      | 15     | 18000     | NULL    |           |
 +--------------------+-------------------------------------+---------+------------+--------+-----------+---------+-----------+

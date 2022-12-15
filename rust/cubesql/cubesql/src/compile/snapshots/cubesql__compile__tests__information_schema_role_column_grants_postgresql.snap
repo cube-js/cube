@@ -11,6 +11,7 @@ expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | avgPrice           | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | countDistinct      | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | order_date         | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | last_mod           | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | customer_gender    | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | notes              | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | taxful_total_price | SELECT         | YES          |
@@ -22,6 +23,7 @@ expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants
 | ovr     | ovr     | cubedb        | public       | Logs                      | agentCount         | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | Logs                      | agentCountApprox   | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | Logs                      | read               | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | Logs                      | content            | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | Logs                      | __user             | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | Logs                      | __cubeJoinField    | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | NumberCube                | someNumber         | SELECT         | YES          |

@@ -14,6 +14,7 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.KibanaSampleDataEcommerce | has_subscription   | boolean                     |
 | public.KibanaSampleDataEcommerce | is_female          | boolean                     |
 | public.KibanaSampleDataEcommerce | is_male            | boolean                     |
+| public.KibanaSampleDataEcommerce | last_mod           | timestamp without time zone |
 | public.KibanaSampleDataEcommerce | maxPrice           | numeric                     |
 | public.KibanaSampleDataEcommerce | minPrice           | numeric                     |
 | public.KibanaSampleDataEcommerce | notes              | text                        |
@@ -23,6 +24,7 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.Logs                      | __user             | text                        |
 | public.Logs                      | agentCount         | bigint                      |
 | public.Logs                      | agentCountApprox   | bigint                      |
+| public.Logs                      | content            | text                        |
 | public.Logs                      | read               | boolean                     |
 | public.NumberCube                | __cubeJoinField    | text                        |
 | public.NumberCube                | __user             | text                        |

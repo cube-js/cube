@@ -6,6 +6,6 @@ expression: "execute_query(\"select t.oid as oid from (select oid as oid from pg
 | oid   |
 +-------+
 | 18000 |
-| 18017 |
-| 18025 |
+| 18018 |
+| 18027 |
 +-------+
