@@ -165,7 +165,7 @@ class ApiGateway {
     this.checkAuthSystemFn = this.createCheckAuthSystemFn();
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
-      : this.checkAuth;    
+      : this.checkAuth;
     this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
     this.defaultPermissions = this.createDefaultPermissionsFn(options);
@@ -666,8 +666,9 @@ class ApiGateway {
     const started = new Date();
     const context = <RequestContext>req.context;
     const query = <PreAggsJobsRequest>req.body;
+    let result;
     try {
-      let result;
+      assertPermission('jobs', await this.fetchPermissions(context.securityContext));
       switch (query.action) {
         case 'post':
           if (
