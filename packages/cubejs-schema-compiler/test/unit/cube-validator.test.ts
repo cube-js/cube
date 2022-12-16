@@ -75,7 +75,7 @@ describe('Cube Validation', () => {
     const validationResult = cubeValidator.validate(cube, {
       error: (message, e) => {
         console.log(message);
-        expect(message).toContain('must be one of [count, number, sum');
+        expect(message).toContain('must be one of [count, number,');
       }
     });
 
