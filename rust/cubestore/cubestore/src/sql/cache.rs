@@ -6,7 +6,7 @@ use futures::Future;
 use log::trace;
 use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::sync::{watch, RwLock};
+use tokio::sync::{watch, Mutex};
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub struct SqlResultCacheKey {
@@ -41,19 +41,33 @@ impl SqlResultCacheKey {
     }
 }
 
+#[derive(Clone, Hash, Eq, PartialEq, Debug)]
+pub struct SqlQueueCacheKey {
+    query: String,
+    inline_tables: InlineTables,
+}
+
+impl SqlQueueCacheKey {
+    pub fn from_query(query: &str, inline_tables: &InlineTables) -> Self {
+        Self {
+            query: query.to_string(),
+            inline_tables: (*inline_tables).clone(),
+        }
+    }
+}
+
 pub struct SqlResultCache {
-    cache: RwLock<
-        lru::LruCache<
-            SqlResultCacheKey,
-            watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>,
-        >,
+    queue_cache: Mutex<
+        lru::LruCache<SqlQueueCacheKey, watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>,
     >,
+    result_cache: Mutex<lru::LruCache<SqlResultCacheKey, Arc<DataFrame>>>,
 }
 
 impl SqlResultCache {
     pub fn new(capacity: usize) -> Self {
         Self {
-            cache: RwLock::new(lru::LruCache::new(capacity)),
+            queue_cache: Mutex::new(lru::LruCache::new(capacity)),
+            result_cache: Mutex::new(lru::LruCache::new(capacity)),
         }
     }
 
@@ -67,10 +81,20 @@ impl SqlResultCache {
     where
         F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
     {
-        let key = SqlResultCacheKey::from_plan(query, inline_tables, &plan);
+        let result_key = SqlResultCacheKey::from_plan(query, inline_tables, &plan);
+        let cached_result = {
+            let mut result_cache = self.result_cache.lock().await;
+            result_cache.get(&result_key).cloned()
+        };
+        if let Some(result) = cached_result {
+            trace!("Using result cache for '{}'", query);
+            return Ok(result);
+        }
+
+        let queue_key = SqlQueueCacheKey::from_query(query, inline_tables);
         let (sender, mut receiver) = {
-            let key = key.clone();
-            let mut cache = self.cache.write().await;
+            let key = queue_key.clone();
+            let mut cache = self.queue_cache.lock().await;
             if !cache.contains(&key) {
                 let (tx, rx) = watch::channel(None);
                 cache.put(key, rx);
@@ -89,10 +113,19 @@ impl SqlResultCache {
                     e
                 );
             }
-            if result.is_err() {
-                trace!("Removing error result from cache");
-                self.cache.write().await.pop(&key);
+            match &result {
+                Ok(r) => {
+                    let mut result_cache = self.result_cache.lock().await;
+                    if !result_cache.contains(&result_key) {
+                        result_cache.put(result_key.clone(), r.clone());
+                    }
+                }
+                Err(_) => {
+                    trace!("Removing error result from cache");
+                }
             }
+            self.queue_cache.lock().await.pop(&queue_key);
+
             return result;
         }
 
