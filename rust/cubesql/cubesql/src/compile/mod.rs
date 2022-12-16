@@ -1515,7 +1515,9 @@ pub fn find_cube_scans_deep_search(
 #[cfg(test)]
 mod tests {
     use chrono::Datelike;
-    use cubeclient::models::{V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension};
+    use cubeclient::models::{
+        V1CubeMeta, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+    };
     use datafusion::{dataframe::DataFrame as DFDataFrame, logical_plan::plan::Filter};
     use pretty_assertions::assert_eq;
     use regex::Regex;
@@ -1524,7 +1526,10 @@ mod tests {
         test::{get_test_session, get_test_tenant_ctx},
         *,
     };
-    use crate::sql::{dataframe::batch_to_dataframe, types::StatusFlags};
+    use crate::{
+        compile::test::{get_string_cube_meta, get_test_tenant_ctx_with_meta},
+        sql::{dataframe::batch_to_dataframe, types::StatusFlags},
+    };
     use datafusion::logical_plan::PlanVisitor;
     use log::Level;
     use serde_json::json;
@@ -1558,6 +1563,22 @@ mod tests {
         let query =
             convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db).await)
                 .await;
+
+        query.unwrap()
+    }
+
+    async fn convert_select_to_query_plan_with_meta(
+        query: String,
+        meta: Vec<V1CubeMeta>,
+    ) -> QueryPlan {
+        env::set_var("TZ", "UTC");
+
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx_with_meta(meta),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
+        )
+        .await;
 
         query.unwrap()
     }
@@ -3546,6 +3567,35 @@ ORDER BY \"COUNT(count)\" DESC"
 
             assert_eq!(&logical_plan.find_cube_scan().request, expected_request);
         }
+    }
+
+    #[tokio::test]
+    async fn test_string_measure() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan_with_meta(
+            r#"
+            SELECT MIN(StringCube.someString), MAX(StringCube.someString) FROM StringCube
+            "#
+            .to_string(),
+            get_string_cube_meta(),
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["StringCube.someString".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        )
     }
 
     #[tokio::test]

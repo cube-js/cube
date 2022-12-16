@@ -3,7 +3,7 @@ import R from 'ramda';
 import camelCase from 'camelcase';
 
 import { UserError } from './UserError';
-import { BaseMeasure } from '../adapter';
+import { BaseMeasure, BaseQuery } from '../adapter';
 
 export class CubeToMetaTransformer {
   constructor(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph) {
@@ -106,6 +106,9 @@ export class CubeToMetaTransformer {
       cubeName, drillMembers, { originalSorting: true }
     )) || [];
 
+    // TODO support type qualifiers on min and max
+    const type = BaseQuery.isCalculatedMeasureType(nameToMetric[1].type) ? nameToMetric[1].type : 'number';
+
     return {
       name,
       title: this.title(cubeTitle, nameToMetric),
@@ -114,7 +117,7 @@ export class CubeToMetaTransformer {
       format: nameToMetric[1].format,
       cumulativeTotal: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       cumulative: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
-      type: 'number', // TODO
+      type,
       aggType: nameToMetric[1].type,
       drillMembers: drillMembersArray,
       drillMembersGrouped: {
