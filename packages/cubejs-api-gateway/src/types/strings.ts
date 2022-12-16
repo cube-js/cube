@@ -97,6 +97,17 @@ type QueryOrderType =
   'asc' |
   'desc';
 
+/**
+ * HTTP method name.
+ */
+type HttpMethod =
+  'GET' |
+  'POST' |
+  'PUT' |
+  'PATCH' |
+  'DELETE' |
+  'HEAD';
+
 export {
   RequestType,
   ResultType,
@@ -108,4 +119,5 @@ export {
   FilterOperator,
   QueryTimeDimensionGranularity,
   QueryOrderType,
+  HttpMethod,
 };

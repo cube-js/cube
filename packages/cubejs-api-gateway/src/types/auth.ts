@@ -45,6 +45,18 @@ type CheckAuthFn =
   (ctx: any, authorization?: string) => Promise<void> | void;
 
 /**
+ * HTTP methods tuple.
+ */
+type HttpMethods = [
+  get?: 'GET',
+  post?: 'POST',
+  put?: 'PUT',
+  patch?: 'PATCH',
+  del?: 'DELETE',
+];
+
+
+/**
  * Function that must provide REST API ACL validation logic.
  *
  * @throw CubejsHandlerError

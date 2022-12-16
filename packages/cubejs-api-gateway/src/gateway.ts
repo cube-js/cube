@@ -1796,6 +1796,7 @@ class ApiGateway {
   /**
    * Returns REST API ACL validation function. Generate it if it wasn't
    * specified in the initial options.
+   *
    */
   protected createCheckRestAclFn(options: ApiGatewayOptions): CheckRestAclFn {
     let { checkRestAcl } = options;
@@ -1912,6 +1913,9 @@ class ApiGateway {
     }
   };
 
+  /**
+   *
+   */
   protected restAclMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.checkRestAcl(
