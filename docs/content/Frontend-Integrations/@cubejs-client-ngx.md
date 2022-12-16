@@ -6,8 +6,8 @@ subCategory: Reference
 menuOrder: 4
 ---
 
-`@cubejs-client/ngx` provides Angular Module for easy integration Cube.js
-into an Angular app.
+`@cubejs-client/ngx` provides Angular Module for easy integration Cube into
+an Angular app.
 
 ## Installation
 
@@ -44,36 +44,44 @@ const cubejsOptions = {
 export class AppModule { }
 ```
 
-The `options` object is passed directly to [@cubejs-client/core](/@cubejs-client-core).
+The `options` object is passed directly to
+[@cubejs-client/core](/@cubejs-client-core).
 
-`CubejsClientModule` provides `CubejsClient`, which you can inject into your components or services:
+`CubejsClientModule` provides `CubejsClient`, which you can inject into your
+components or services:
 
 ```typescript
 import { CubejsClient } from '@cubejs-client/ngx';
 
 export class AppComponent {
-  constructor(private cubejs:CubejsClient){}
+  constructor(private cubejs: CubejsClient) {}
 
-  ngOnInit(){
-    this.cubejs.load({
-      measures: ["some_measure"]
-    }).subscribe(
-      resultSet => {
-        this.data = resultSet.chartPivot();
-      },
-      err => console.log('HTTP Error', err)
-    );
+  ngOnInit() {
+    this.cubejs
+      .load({
+        measures: ['some_measure'],
+      })
+      .subscribe(
+        (resultSet) => {
+          this.data = resultSet.chartPivot();
+        },
+        (err) => console.log('HTTP Error', err)
+      );
   }
 }
 ```
 
 ## API
 
-`CubejsClient` provides the same API methods as [@cubejs-client/core](/@cubejs-client-core#cubejs-api).
-The difference is that instead of Promise it returns an [Observable](http://reactivex.io/rxjs/class/es6/Observable.js~Observable.html),
-which passes [resultSet](/@cubejs-client-core#result-set) into callback function.
+`CubejsClient` provides the same API methods as
+[@cubejs-client/core](/@cubejs-client-core#cubejs-api). The difference is that
+instead of Promise it returns an
+[Observable](http://reactivex.io/rxjs/class/es6/Observable.js~Observable.html),
+which passes [resultSet](/@cubejs-client-core#result-set) into callback
+function.
 
-Also you can use [RxJS Subject](https://rxjs-dev.firebaseapp.com/guide/subject) with a query using `watch` method:
+Also you can use [RxJS Subject](https://rxjs-dev.firebaseapp.com/guide/subject)
+with a query using `watch` method:
 
 ```typescript
 private query;
@@ -97,4 +105,3 @@ button2ClickHandler() {
   this.query.next({ query_2 });
 }
 ```
-

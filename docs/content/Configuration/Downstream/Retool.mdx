@@ -3,7 +3,10 @@ title: Connecting to Retool
 permalink: /config/downstream/retool
 ---
 
-[Retool](https://retool.com/) is the fast way to build internal tools. It lets you visually design apps that interface with any database or API. You can connect a Cube deployment to Retool using Cube’s [REST API](https://cube.dev/docs/rest-api).
+[Retool](https://retool.com/) is the fast way to build internal tools. It lets
+you visually design apps that interface with any database or API. You can
+connect a Cube deployment to Retool using Cube’s
+[REST API](https://cube.dev/docs/backend/rest/reference/api).
 
 Here's a short video guide on how to connect Retool to Cube.
 
@@ -11,11 +14,14 @@ Here's a short video guide on how to connect Retool to Cube.
 
 ## Use REST API in Cube
 
-> Don't have a Cube project yet? [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
+> Don't have a Cube project yet?
+> [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
 
 ### <--{"id" : "Use REST API in Cube"}--> Cube Cloud
 
-Click the "How to connect" link on the Overview page, navigate to the REST API tab. You will see your connection credentials, the REST API URL and the authorization token:
+Click the "How to connect" link on the Overview page, navigate to the REST API
+tab. You will see your connection credentials, the REST API URL and the
+authorization token:
 
 <div style="text-align: center">
   <img
@@ -27,11 +33,17 @@ Click the "How to connect" link on the Overview page, navigate to the REST API t
 
 ### <--{"id" : "Use REST API in Cube"}--> Self-hosted Cube
 
-For a Cube instance publicly available at a specific `HOST`, the REST API URL would be `HOST/cubejs-api/v1`. Please refer to the [REST API page](https://cube.dev/docs/rest-api) for details.
+For a Cube instance publicly available at a specific `HOST`, the REST API URL
+would be `HOST/cubejs-api/v1`. Please refer to the
+[REST API page](https://cube.dev/docs/backend/rest/reference/api) for details.
 
-You will also need to generate a JSON Web Token that would be used to authenticate requests to Cube.
+You will also need to generate a JSON Web Token that would be used to
+authenticate requests to Cube.
 
-Please check the [Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt) to learn how to generate a token. We suggest generating a long-lived JWT that won't expire soon.
+Please check the
+[Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt)
+to learn how to generate a token. We suggest generating a long-lived JWT that
+won't expire soon.
 
 ## Create a new resource in Retool
 
@@ -55,9 +67,11 @@ Next, copy and paste Cube's REST API URL and the Authorization token.
   />
 </div>
 
-## Create a POST request in Retool 
+## Create a POST request in Retool
 
-Get your Cube query in the JSON [query format](https://cube.dev/docs/query-format) ready. You can copy it from Cube’s Playground or compose manually:
+Get your Cube query in the JSON
+[query format](https://cube.dev/docs/backend/rest/reference/query-format) ready.
+You can copy it from Cube’s Playground or compose manually:
 
 <div style="text-align: center">
   <img
@@ -67,9 +81,11 @@ Get your Cube query in the JSON [query format](https://cube.dev/docs/query-forma
   />
 </div>
 
-Create a POST request, paste the JSON query in the **Body**. Make sure to add a `query` parameter for your JSON query.
+Create a POST request, paste the JSON query in the **Body**. Make sure to add a
+`query` parameter for your JSON query.
 
-Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget to add the `/load` endpoint to the end of the data source API.
+Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget
+to add the `/load` endpoint to the end of the data source API.
 
 Next, hit Run.
 
@@ -83,9 +99,12 @@ Next, hit Run.
 
 ## Display the data in Retool
 
-Retool has an amazing feature where you can drag and drop UI components into the dashboard. You can use this to add a tables, bar charts, and much more.
+Retool has an amazing feature where you can drag and drop UI components into the
+dashboard. You can use this to add a tables, bar charts, and much more.
 
-Because the name of the Retool query in the example is `OrdersByMonth`, using the data binding curly brackets will populate the charts with data from the REST API.
+Because the name of the Retool query in the example is `OrdersByMonth`, using
+the data binding curly brackets will populate the charts with data from the REST
+API.
 
 ```
 {{ OrdersByMonth.data.data }}

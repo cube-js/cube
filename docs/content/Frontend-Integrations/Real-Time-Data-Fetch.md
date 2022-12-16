@@ -5,16 +5,16 @@ category: Frontend Integrations
 menuOrder: 3
 ---
 
-Most of databases supported by Cube.js are retroactive. It means Cube.js should
+Most of databases supported by Cube are retroactive. It means Cube should
 continuously poll for changes rather than receive updates as a subscribed
-listener. Cube.js provides a convenient way to create such polling database
+listener. Cube provides a convenient way to create such polling database
 subscriptions on your behalf.
 
 ## Web Sockets
 
 To provide the best real-time experience it's recommended to use Web Sockets
-transport instead of the default http long polling. Web sockets on backend can be
-enabled using `CUBEJS_WEB_SOCKETS` environment variable:
+transport instead of the default http long polling. Web sockets on backend can
+be enabled using `CUBEJS_WEB_SOCKETS` environment variable:
 
 **.env:**
 
@@ -41,7 +41,7 @@ const cubejsApi = cubejs({
 
 Multiple APIs are provided to support data subscription scenarios.
 
-### <--{"id" : "Client Subscriptions"}-->  Vanilla JavaScript
+### <--{"id" : "Client Subscriptions"}--> Vanilla JavaScript
 
 ```javascript
 import cubejs from '@cubejs-client/core';
@@ -74,7 +74,7 @@ cubejsApi.subscribe(
 );
 ```
 
-### <--{"id" : "Client Subscriptions"}-->  React hooks
+### <--{"id" : "Client Subscriptions"}--> React hooks
 
 ```javascript
 import { useCubeQuery } from '@cubejs-client/react';
@@ -104,7 +104,7 @@ const Chart = ({ query }) => {
 
 As in the case of a regular data fetch, real-time data fetch obeys
 [refreshKey refresh rules](caching#refresh-keys). In order to provide a desired
-refresh rate `refreshKey` should reflect the rate of change of the underlying data set; the
-querying time should also be much less than the desired refresh rate.
-Please use the [refreshKey every](/schema/reference/cube#refresh-key)
+refresh rate `refreshKey` should reflect the rate of change of the underlying
+data set; the querying time should also be much less than the desired refresh
+rate. Please use the [refreshKey every](/schema/reference/cube#refresh-key)
 parameter to adjust the refresh interval.

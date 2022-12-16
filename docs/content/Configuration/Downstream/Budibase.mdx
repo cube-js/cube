@@ -3,7 +3,10 @@ title: Connecting to Budibase
 permalink: /config/downstream/budibase
 ---
 
-Budibase is a low-code app-building platform that helps developers create responsive web applications with access methods to databases, APIs, and much more. You can connect a Cube deployment to Budibase using Cube's [REST API](https://cube.dev/docs/rest-api).
+Budibase is a low-code app-building platform that helps developers create
+responsive web applications with access methods to databases, APIs, and much
+more. You can connect a Cube deployment to Budibase using Cube's
+[REST API](https://cube.dev/docs/backend/rest/reference/api).
 
 Here's a short video guide on how to connect Budibase to Cube.
 
@@ -11,11 +14,14 @@ Here's a short video guide on how to connect Budibase to Cube.
 
 ## Use REST API in Cube
 
-> Don't have a Cube project yet? [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
+> Don't have a Cube project yet?
+> [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
 
 ### <--{"id" : "Use REST API in Cube"}--> Cube Cloud
 
-Click the "How to connect" link on the Overview page, navigate to the REST API tab. You will see your connection credentials, the REST API URL and the authorization token:
+Click the "How to connect" link on the Overview page, navigate to the REST API
+tab. You will see your connection credentials, the REST API URL and the
+authorization token:
 
 <div style="text-align: center">
   <img
@@ -27,11 +33,17 @@ Click the "How to connect" link on the Overview page, navigate to the REST API t
 
 ### <--{"id" : "Use REST API in Cube"}--> Self-hosted Cube
 
-For a Cube instance publicly available at a specific `HOST`, the REST API URL would be `HOST/cubejs-api/v1`. Please refer to the [REST API page](https://cube.dev/docs/rest-api) for details.
+For a Cube instance publicly available at a specific `HOST`, the REST API URL
+would be `HOST/cubejs-api/v1`. Please refer to the
+[REST API page](https://cube.dev/docs/backend/rest/reference/api) for details.
 
-You will also need to generate a JSON Web Token that would be used to authenticate requests to Cube.
+You will also need to generate a JSON Web Token that would be used to
+authenticate requests to Cube.
 
-Please check the [Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt) to learn how to generate a token. We suggest generating a long-lived JWT that won't expire soon.
+Please check the
+[Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt)
+to learn how to generate a token. We suggest generating a long-lived JWT that
+won't expire soon.
 
 ## Create a new data source in Budibase
 
@@ -45,7 +57,8 @@ Create a new "REST API" data source in Budibase.
   />
 </div>
 
-Next, add a "Authorization" header for the REST API. Copy and paste Cube's Authorization token.
+Next, add a "Authorization" header for the REST API. Copy and paste Cube's
+Authorization token.
 
 <div style="text-align: center">
   <img
@@ -59,7 +72,8 @@ Next, add a "Authorization" header for the REST API. Copy and paste Cube's Autho
 
 Click "+ Add Query".
 
-Copy and paste the Cube REST API, including the `/load` path, in the API field. Make sure to select "POST" as the request.
+Copy and paste the Cube REST API, including the `/load` path, in the API field.
+Make sure to select "POST" as the request.
 
 <div style="text-align: center">
   <img
@@ -69,7 +83,9 @@ Copy and paste the Cube REST API, including the `/load` path, in the API field. 
   />
 </div>
 
-Get your Cube query in the JSON [query format](https://cube.dev/docs/query-format) ready. You can copy it from Cube's Playground or compose manually:
+Get your Cube query in the JSON
+[query format](https://cube.dev/docs/backend/rest/reference/query-format) ready.
+You can copy it from Cube's Playground or compose manually:
 
 <div style="text-align: center">
   <img
@@ -79,7 +95,8 @@ Get your Cube query in the JSON [query format](https://cube.dev/docs/query-forma
   />
 </div>
 
-Paste the JSON query in the **Body** as "raw(JSON)". Make sure to add a `query` parameter for your JSON query.
+Paste the JSON query in the **Body** as "raw(JSON)". Make sure to add a `query`
+parameter for your JSON query.
 
 <div style="text-align: center">
   <img
@@ -105,13 +122,15 @@ return data.data
 
 You can also give the query a name. In this sample it's called `OrdersByMonth`.
 
-Lastly, click the "save" button and hit "send" to test the API and get a response back.
+Lastly, click the "save" button and hit "send" to test the API and get a
+response back.
 
 ## Create a data provider in Budibase
 
 Move to the **Design** section and open the **Components**.
 
-First, add a Data Provider. Select the query from above. In this sample it's called `OrdersByMonth`.
+First, add a Data Provider. Select the query from above. In this sample it's
+called `OrdersByMonth`.
 
 <div style="text-align: center">
   <img
@@ -123,9 +142,11 @@ First, add a Data Provider. Select the query from above. In this sample it's cal
 
 ## Display the data in Budibase
 
-Add a chart into the data provider. Next, configure the data provider for the chart. Make sure it's set to the data provider you just created.
+Add a chart into the data provider. Next, configure the data provider for the
+chart. Make sure it's set to the data provider you just created.
 
-Then, you set the "label column" and "data columns". In this sample you can set `Orders.createdAt` as the label column and `Orders.count` as the data columns.
+Then, you set the "label column" and "data columns". In this sample you can set
+`Orders.createdAt` as the label column and `Orders.count` as the data columns.
 
 <div style="text-align: center">
   <img

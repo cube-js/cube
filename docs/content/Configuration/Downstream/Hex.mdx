@@ -3,8 +3,8 @@ title: Connecting to Hex
 permalink: /config/downstream/hex
 ---
 
-You can connect to Cube from Hex, a collaborative data platform, using the [Cube SQL
-API][ref-sql-api].
+You can connect to Cube from Hex, a collaborative data platform, using the [Cube
+SQL API][ref-sql-api].
 
 Here's a short video guide on how to connect Hex to Cube.
 
@@ -21,9 +21,9 @@ here][ref-getting-started].
 
 ### <--{"id" : "Enable Cube SQL API"}--> Cube Cloud
 
-Click **How to connect your BI tool** link on the Overview page, navigate to the SQL API tab
-and enable it. Once enabled, you should see the screen like the one below with
-your connection credentials:
+Click **How to connect your BI tool** link on the Overview page, navigate to the
+SQL API tab and enable it. Once enabled, you should see the screen like the one
+below with your connection credentials:
 
 <div style="text-align: center">
   <img
@@ -36,24 +36,25 @@ your connection credentials:
 ### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Hex
-later.
+These credentials will be required to connect to Cube from Hex later.
 
 ```bash
 CUBEJS_PG_SQL_PORT=5432
 CUBEJS_SQL_USER=myusername
 CUBEJS_SQL_PASSWORD=mypassword
 ```
+
 ## Connecting from Hex
 
 Hex connects to Cube as to a Postgres database.
 
 ## Querying data
 
-Your cubes will be exposed as tables, where both your measures and dimensions are columns.
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
 
-You can write SQL in Hex that will be executed in Cube. Learn more about Cube SQL
-syntax on the [reference page][ref-sql-api].
+You can write SQL in Hex that will be executed in Cube. Learn more about Cube
+SQL syntax on the [reference page][ref-sql-api].
 
 <div style="text-align: center">
   <img

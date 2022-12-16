@@ -3,6 +3,8 @@ title: Using the GraphQL API
 category: REST/GraphQL API
 permalink: /backend/graphql/getting-started
 menuOrder: 2
+redirect_from:
+  - /backend/graphql
 ---
 
 <WarningBox heading={`🐣  Preview`}>
@@ -230,7 +232,7 @@ query {
 | `limit`      | `Int`                                 | A row limit for your query. The default value is `10000`. The maximum allowed limit is `50000`                                                      |
 | `offset`     | `Int`                                 | The number of initial rows to be skipped for your query. The default value is `0`                                                                   |
 | `timezone`   | `String`                              | The timezone to use for the query. The default value is `UTC`                                                                                       |
-| `renewQuery` | `Boolean`                             | If `renewQuery` is set to `true`, Cube.js will renew all `refreshKey` for queries and query results in the foreground. The default value is `false` |
+| `renewQuery` | `Boolean`                             | If `renewQuery` is set to `true`, Cube will renew all `refreshKey` for queries and query results in the foreground. The default value is `false` |
 
 ### <--{"id" : "Reference"}--> RootWhereInput
 

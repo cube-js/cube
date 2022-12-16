@@ -4,7 +4,7 @@ permalink: /recipes
 category: Examples & Tutorials
 ---
 
-These recipes will show you the best practices of using Cube.js.
+These recipes will show you the best practices of using Cube.
 
 ### <--{"id" : "Recipes"}--> Analytics
 

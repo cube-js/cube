@@ -3,7 +3,8 @@ title: Connecting to Streamlit
 permalink: /config/downstream/streamlit
 ---
 
-You can connect to Cube from Streamlit using the [Cube SQL API][ref-sql-api]. Streamlit turns data scripts into shareable web apps in minutes.
+You can connect to Cube from Streamlit using the [Cube SQL API][ref-sql-api].
+Streamlit turns data scripts into shareable web apps in minutes.
 
 Here's a short video guide on how to connect Streamlit to Cube.
 
@@ -13,14 +14,16 @@ Here's a short video guide on how to connect Streamlit to Cube.
 
 <InfoBox>
 
-Don't have a Cube project yet? [Learn how to get started here][ref-getting-started].
+Don't have a Cube project yet? [Learn how to get started
+here][ref-getting-started].
 
 </InfoBox>
 
 ### <--{"id" : "Enable Cube SQL API"}--> Cube Cloud
 
-Click **Deploy SQL API** and then the **How to connect your BI tool** link on the Overview page of your Cube deployment.
-Navigate to the **BIs and Visualization Tools** tab. You should see the screen like the one below with
+Click **Deploy SQL API** and then the **How to connect your BI tool** link on
+the Overview page of your Cube deployment. Navigate to the **BIs and
+Visualization Tools** tab. You should see the screen like the one below with
 your connection credentials:
 
 <div style="text-align: center">
@@ -34,14 +37,14 @@ your connection credentials:
 ### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Streamlit
-later.
+These credentials will be required to connect to Cube from Streamlit later.
 
 ```bash
 CUBEJS_PG_SQL_PORT=5432
 CUBEJS_SQL_USER=myusername
 CUBEJS_SQL_PASSWORD=mypassword
 ```
+
 ## Connecting from Jupyter
 
 Jupyter connects to Cube as to a Postgres database.
@@ -80,10 +83,11 @@ connection = engine.connect()
 
 ## Querying data
 
-Your cubes will be exposed as tables, where both your measures and dimensions are columns.
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
 
-You can write SQL in Streamlit that will be executed in Cube. Learn more about Cube SQL
-syntax on the [reference page][ref-sql-api].
+You can write SQL in Streamlit that will be executed in Cube. Learn more about
+Cube SQL syntax on the [reference page][ref-sql-api].
 
 ```python
 # ...
@@ -94,7 +98,8 @@ df = pandas.read_sql_query(query, connection)
 streamlit.dataframe(df)
 ```
 
-In your Streamlit notebook it'll look like this. You can create a visualization of the executed SQL query by using `streamlit.dataframe(df)`.
+In your Streamlit notebook it'll look like this. You can create a visualization
+of the executed SQL query by using `streamlit.dataframe(df)`.
 
 <div style="text-align: center">
   <img

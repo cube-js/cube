@@ -3,7 +3,10 @@ title: Connecting to Observable
 permalink: /config/downstream/observable
 ---
 
-You can connect to Cube from Observable, a new kind of collaborative data notebook that's built to uncover new insights, answer more questions, and make better decisions, using the [Cube SQL API][ref-sql-api] or [Cube REST API][ref-rest-api].
+You can connect to Cube from Observable, a new kind of collaborative data
+notebook that's built to uncover new insights, answer more questions, and make
+better decisions, using the [Cube SQL API][ref-sql-api] or [Cube REST
+API][ref-rest-api].
 
 Here's a short video guide on how to connect Observable to Cube.
 
@@ -13,15 +16,16 @@ Here's a short video guide on how to connect Observable to Cube.
 
 <InfoBox>
 
-Don't have a Cube project yet? [Learn how to get started here][ref-getting-started].
+Don't have a Cube project yet? [Learn how to get started
+here][ref-getting-started].
 
 </InfoBox>
 
 ### <--{"id" : "Use SQL API in Cube"}--> Cube Cloud
 
-
-Click **Deploy SQL API** and then the **How to connect your BI tool** link on the Overview page of your Cube deployment.
-Navigate to the **BIs and Visualization Tools** tab. You should see the screen like the one below with
+Click **Deploy SQL API** and then the **How to connect your BI tool** link on
+the Overview page of your Cube deployment. Navigate to the **BIs and
+Visualization Tools** tab. You should see the screen like the one below with
 your connection credentials:
 
 <div style="text-align: center">
@@ -35,8 +39,7 @@ your connection credentials:
 ### <--{"id" : "Use SQL API in Cube"}--> Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Observable
-later.
+These credentials will be required to connect to Cube from Observable later.
 
 ```bash
 CUBEJS_PG_SQL_PORT=5432
@@ -58,9 +61,11 @@ Observable connects to Cube as to a Postgres database.
 
 ### <--{"id" : "Connecting Cube SQL API from Observable"}--> Querying data with SQL API
 
-Your cubes will be exposed as tables, where both your measures and dimensions are columns.
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
 
-Make sure to add a database to your notebook, and select **Database query** when adding a new block.
+Make sure to add a database to your notebook, and select **Database query** when
+adding a new block.
 
 <div style="text-align: center">
   <img
@@ -70,8 +75,8 @@ Make sure to add a database to your notebook, and select **Database query** when
   />
 </div>
 
-You can write SQL in Observable that will be executed in Cube. Learn more about Cube SQL
-syntax on the [reference page][ref-sql-api].
+You can write SQL in Observable that will be executed in Cube. Learn more about
+Cube SQL syntax on the [reference page][ref-sql-api].
 
 <div style="text-align: center">
   <img
@@ -93,11 +98,14 @@ You can also create a visualization of the executed SQL query.
 
 ## Use REST API in Cube
 
-> Don't have a Cube project yet? [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
+> Don't have a Cube project yet?
+> [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
 
 ### <--{"id" : "Use REST API in Cube"}--> Cube Cloud
 
-Click the "How to connect" link on the Overview page, navigate to the REST API tab. You will see your connection credentials, the REST API URL and the authorization token:
+Click the "How to connect" link on the Overview page, navigate to the REST API
+tab. You will see your connection credentials, the REST API URL and the
+authorization token:
 
 <div style="text-align: center">
   <img
@@ -109,11 +117,17 @@ Click the "How to connect" link on the Overview page, navigate to the REST API t
 
 ### <--{"id" : "Use REST API in Cube"}--> Self-hosted Cube
 
-For a Cube instance publicly available at a specific `HOST`, the REST API URL would be `HOST/cubejs-api/v1`. Please refer to the [REST API page](https://cube.dev/docs/rest-api) for details.
+For a Cube instance publicly available at a specific `HOST`, the REST API URL
+would be `HOST/cubejs-api/v1`. Please refer to the
+[REST API page](https://cube.dev/docs/backend/rest/reference/api) for details.
 
-You will also need to generate a JSON Web Token that would be used to authenticate requests to Cube.
+You will also need to generate a JSON Web Token that would be used to
+authenticate requests to Cube.
 
-Please check the [Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt) to learn how to generate a token. We suggest generating a long-lived JWT that won't expire soon.
+Please check the
+[Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt)
+to learn how to generate a token. We suggest generating a long-lived JWT that
+won't expire soon.
 
 ## Connecting Cube REST API from Observable
 
@@ -131,21 +145,28 @@ First, add two generic **JavaScript** cells:
   />
 </div>
 
-Next, copy Cube's REST API URL and the Authorization token and paste them into their respective cells.
+Next, copy Cube's REST API URL and the Authorization token and paste them into
+their respective cells.
 
 ```javascript
-cubeRestApi = 'https://thirsty-raccoon.aws-eu-central-1.cubecloudapp.dev/cubejs-api/v1/load'
+cubeRestApi =
+  'https://thirsty-raccoon.aws-eu-central-1.cubecloudapp.dev/cubejs-api/v1/load';
 ```
 
-Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget to add the `/load` endpoint to the end of the data source API.
+Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget
+to add the `/load` endpoint to the end of the data source API.
 
 ```javascript
-cubeRestApiJwtToken = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTgzMzM3OTZ9.gUOoDgo_RJka_ZANdwSw3v8GkM4ZzH9LjxrxKxkGAk0'
+cubeRestApiJwtToken =
+  'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTgzMzM3OTZ9.gUOoDgo_RJka_ZANdwSw3v8GkM4ZzH9LjxrxKxkGAk0';
 ```
 
-Also make sure to add the token next to the Bearer part of the Authorization header.
+Also make sure to add the token next to the Bearer part of the Authorization
+header.
 
-Get your Cube query in the JSON [query format](https://cube.dev/docs/query-format) ready. You can copy it from Cube's Playground or compose manually:
+Get your Cube query in the JSON
+[query format](https://cube.dev/docs/backend/rest/reference/query-format) ready.
+You can copy it from Cube's Playground or compose manually:
 
 <div style="text-align: center">
   <img
@@ -155,38 +176,42 @@ Get your Cube query in the JSON [query format](https://cube.dev/docs/query-forma
   />
 </div>
 
-Paste the JSON query in another JavaScript cell as an object literal and give it a name, I chose `jsonBody` for simplicity. Make sure to add a `query` parameter for your JSON query.
+Paste the JSON query in another JavaScript cell as an object literal and give it
+a name, I chose `jsonBody` for simplicity. Make sure to add a `query` parameter
+for your JSON query.
 
 ```javascript
-jsonQuery = ({
-  "query": {
-    "measures": [
-      "Orders.count"
-    ],
-    "timeDimensions": [
+jsonQuery = {
+  query: {
+    measures: ['Orders.count'],
+    timeDimensions: [
       {
-        "dimension": "Orders.createdAt",
-        "granularity": "month"
-      }
+        dimension: 'Orders.createdAt',
+        granularity: 'month',
+      },
     ],
-    "order": {
-      "Orders.createdAt": "asc"
-    }
-  }
-});
+    order: {
+      'Orders.createdAt': 'asc',
+    },
+  },
+};
 ```
 
-Next, create another JavaScript cell with a POST request. Paste this POST request in the cell. Don't forget to put the `jsonBody` object inside the `JSON.stringify` call.
+Next, create another JavaScript cell with a POST request. Paste this POST
+request in the cell. Don't forget to put the `jsonBody` object inside the
+`JSON.stringify` call.
 
 ```javascript
 orders_over_time = fetch(cubeRestApi, {
   method: 'POST',
   headers: {
-    'Authorization': cubeRestApiJwtToken,
-    'Content-Type': 'application/json'
+    Authorization: cubeRestApiJwtToken,
+    'Content-Type': 'application/json',
   },
   body: JSON.stringify(jsonQuery),
-}).then(response => response.json()).then(json => json.data)
+})
+  .then((response) => response.json())
+  .then((json) => json.data);
 ```
 
 Next, click the play button on the top right of the cell.
@@ -211,4 +236,4 @@ You can also create a visualization of the executed REST API request.
 
 [ref-getting-started]: /cloud/getting-started
 [ref-sql-api]: /backend/sql
-[ref-rest-api]: /backend/rest-api
+[ref-rest-api]: /backend/backend/rest/reference/api

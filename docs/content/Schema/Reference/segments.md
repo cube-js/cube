@@ -142,5 +142,5 @@ cube(`Users`, {
 });
 ```
 
-[ref-backend-query]: /query-format
+[ref-backend-query]: /backend/rest/reference/query-format
 [ref-schema-gen]: /recipes/schema-generation

@@ -6,7 +6,7 @@ subCategory: Reference
 menuOrder: 3
 ---
 
-Cube.js can be configured both via environment variables and by providing
+Cube can be configured both via environment variables and by providing
 configuration options in the `cube.js` file.
 
 Example of setting a custom logger in the `cube.js` file.
@@ -21,7 +21,7 @@ module.exports = {
 
 ## Options Reference
 
-You can provide the following configuration options to Cube.js.
+You can provide the following configuration options to Cube.
 
 ```typescript
 interface CubejsConfiguration {
@@ -139,7 +139,7 @@ Either `String` or `Function` could be passed. Providing a `Function` allows to
 dynamically select a database type depending on the user's context. It is
 usually used in [Multitenancy Setup][ref-multitenancy].
 
-If no option is passed, Cube.js will lookup for environment variable
+If no option is passed, Cube will lookup for environment variable
 `CUBEJS_DB_TYPE` to resolve `dbType`.
 
 Called only once per [`appId`][self-opts-ctx-to-appid].
@@ -150,7 +150,8 @@ Path to schema files. The default value is `/schema`.
 
 ### <--{"id" : "Options Reference"}--> basePath
 
-[REST API](/rest-api) base path. The default value is `/cubejs-api`.
+[REST API](/backend/rest/reference/api) base path. The default value is
+`/cubejs-api`.
 
 ### <--{"id" : "Options Reference"}--> webSocketsBasePath
 
@@ -161,7 +162,7 @@ run on the root path.
 
 A function to setup a custom logger. It accepts the following arguments:
 
-- `message`: Cube.js Backend event message
+- `message`: Cube Backend event message
 - `params`: Parameters of the call
 
 ```javascript
@@ -226,7 +227,7 @@ module.exports = {
 
 <WarningBox>
 
-In versions of Cube.js prior to v0.29, each tenant would have an individual
+In versions of Cube prior to v0.29, each tenant would have an individual
 instance of the Query Orchestrator.
 
 </WarningBox>
@@ -259,7 +260,7 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> repositoryFactory
 
-This option allows to customize the repository for Cube.js data schema files. It
+This option allows to customize the repository for Cube data schema files. It
 is a function, which accepts a context object and can dynamically select
 repositories with schema files based on
 [`SchemaFileRepository`][self-schemafilerepo] contract. Learn more about it in
@@ -371,7 +372,7 @@ module.exports = {
 
 <WarningBox>
 
-In previous versions of Cube.js, this was called `queryTransformer`.
+In previous versions of Cube, this was called `queryTransformer`.
 
 </WarningBox>
 
@@ -436,7 +437,7 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> schemaVersion
 
-Schema version can be used to tell Cube.js schema should be recompiled in case
+Schema version can be used to tell Cube schema should be recompiled in case
 schema code depends on dynamic definitions fetched from some external database
 or API. This method is called on each request however `RequestContext` parameter
 is reused per application ID as determined by
@@ -466,7 +467,7 @@ for pre-aggregations.
 
 </WarningBox>
 
-Cube.js enables background refresh by default using the `CUBEJS_REFRESH_WORKER`
+Cube enables background refresh by default using the `CUBEJS_REFRESH_WORKER`
 environment variable.
 
 ```javascript
@@ -477,7 +478,7 @@ module.exports = {
 
 Learn more about [scheduled refreshes here][ref-caching-up-to-date].
 
-Best practice is to run `scheduledRefreshTimer` in a separate worker Cube.js
+Best practice is to run `scheduledRefreshTimer` in a separate worker Cube
 instance. For Serverless deployments, [REST API][ref-rest-api-sched-refresh]
 should be used instead.
 
@@ -487,7 +488,7 @@ You may also need to configure
 
 ### <--{"id" : "Options Reference"}--> scheduledRefreshTimeZones
 
-All time-based calculations performed within Cube.js are timezone-aware. Using
+All time-based calculations performed within Cube are timezone-aware. Using
 this property you can specify multiple timezones in [TZ Database
 Name][link-wiki-tz] format e.g. `America/Los_Angeles`. The default value is
 `UTC`.
@@ -512,14 +513,14 @@ CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 
 When trying to configure scheduled refreshes for pre-aggregations that use the
 `securityContext` inside `contextToAppId` or `contextToOrchestratorId`, you must
-also set up `scheduledRefreshContexts`. This will allow Cube.js to generate the
+also set up `scheduledRefreshContexts`. This will allow Cube to generate the
 necessary security contexts prior to running the scheduled refreshes.
 
 <WarningBox>
 
 Leaving `scheduledRefreshContexts` unconfigured will lead to issues where the
 security context will be `undefined`. This is because there is no way for
-Cube.js to know how to generate a context without the required input.
+Cube to know how to generate a context without the required input.
 
 </WarningBox>
 
@@ -605,7 +606,7 @@ check for `ungrouped` queries.
 
 ### <--{"id" : "Options Reference"}--> telemetry
 
-Cube.js collects high-level anonymous usage statistics for servers started in
+Cube collects high-level anonymous usage statistics for servers started in
 development mode. It doesn't track any credentials, schema contents or queries
 issued. This statistics is used solely for the purpose of constant cube.js
 improvement.
@@ -623,7 +624,7 @@ module.exports = {
 
 #### cors
 
-CORS settings for the Cube.js REST API can be configured by providing an object
+CORS settings for the Cube REST API can be configured by providing an object
 with options [from here][link-express-cors-opts]:
 
 ```javascript
@@ -680,7 +681,7 @@ Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
 ### <--{"id" : "Options Reference"}--> cacheAndQueueDriver
 
-The cache and queue driver to use for the Cube.js deployment. Defaults to
+The cache and queue driver to use for the Cube deployment. Defaults to
 `memory` in development, `redis` in production.
 
 ### <--{"id" : "Options Reference"}--> orchestratorOptions
@@ -692,7 +693,7 @@ these values can result in application instability and/or downtime.
 
 </WarningBox>
 
-You can pass this object to set advanced options for Cube.js Query Orchestrator.
+You can pass this object to set advanced options for Cube Query Orchestrator.
 
 | Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                   | Default Value           |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
@@ -705,7 +706,7 @@ You can pass this object to set advanced options for Cube.js Query Orchestrator.
 | preAggregationsOptions                       | Query cache options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                      | `{}`                    |
 | preAggregationsOptions.maxPartitions         | The maximum number of partitions each pre-aggregation in a cube can use.                                                                                                                                                                                                                                                                                                                      | `10000`                 |
 | preAggregationsOptions.queueOptions          | Query queue options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                      | `{}`                    |
-| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube.js to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                    | `false`                 |
+| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                    | `false`                 |
 
 To set options for `queryCache` and `preAggregations`, set an object with key
 queueOptions. `queryCacheOptions` are used while querying database tables, while
@@ -840,9 +841,10 @@ module.exports = {
 [ref-caching-up-to-date]: /caching#keeping-cache-up-to-date
 [ref-development-mode]: /overview#development-mode
 [ref-multitenancy]: /multitenancy-setup
-[ref-rest-api]: /rest-api
+[ref-rest-api]: /backend/rest/reference/api
 [ref-sql-api]: /backend/sql
-[ref-rest-api-sched-refresh]: /rest-api#v-1-run-scheduled-refresh
+[ref-rest-api-sched-refresh]:
+  /backend/rest/reference/api#v-1-run-scheduled-refresh
 [ref-pre-aggregations-refresh-key]:
   /schema/reference/pre-aggregations#refresh-key
 [ref-schema-cube-ref-refresh-key]: /schema/reference/cube#refresh-key

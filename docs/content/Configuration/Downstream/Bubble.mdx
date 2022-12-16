@@ -3,8 +3,10 @@ title: Connecting to Bubble
 permalink: /config/downstream/bubble
 ---
 
-[Bubble](https://bubble.io/) is one of the oldest and most comprehensive low-code app-building platforms on the market.
-You can connect a Cube deployment to Bubble using Cube’s [REST API](https://cube.dev/docs/rest-api).
+[Bubble](https://bubble.io/) is one of the oldest and most comprehensive
+low-code app-building platforms on the market. You can connect a Cube deployment
+to Bubble using Cube’s
+[REST API](https://cube.dev/docs/backend/rest/reference/api).
 
 Here's a short video guide on how to connect Bubble to Cube.
 
@@ -12,11 +14,14 @@ Here's a short video guide on how to connect Bubble to Cube.
 
 ## Use REST API in Cube
 
-> Don't have a Cube project yet? [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
+> Don't have a Cube project yet?
+> [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
 
 ### <--{"id" : "Use REST API in Cube"}--> Cube Cloud
 
-Click the "How to connect" link on the Overview page, navigate to the REST API tab. You will see your connection credentials, the REST API URL and the authorization token:
+Click the "How to connect" link on the Overview page, navigate to the REST API
+tab. You will see your connection credentials, the REST API URL and the
+authorization token:
 
 <div style="text-align: center">
   <img
@@ -28,11 +33,17 @@ Click the "How to connect" link on the Overview page, navigate to the REST API t
 
 ### <--{"id" : "Use REST API in Cube"}--> Self-hosted Cube
 
-For a Cube instance publicly available at a specific `HOST`, the REST API URL would be `HOST/cubejs-api/v1`. Please refer to the [REST API page](https://cube.dev/docs/rest-api) for details.
+For a Cube instance publicly available at a specific `HOST`, the REST API URL
+would be `HOST/cubejs-api/v1`. Please refer to the
+[REST API page](https://cube.dev/docs/backend/rest/reference/api) for details.
 
-You will also need to generate a JSON Web Token that would be used to authenticate requests to Cube.
+You will also need to generate a JSON Web Token that would be used to
+authenticate requests to Cube.
 
-Please check the [Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt) to learn how to generate a token. We suggest generating a long-lived JWT that won't expire soon.
+Please check the
+[Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt)
+to learn how to generate a token. We suggest generating a long-lived JWT that
+won't expire soon.
 
 ## Add an API connector plugin to your Bubble app
 
@@ -50,8 +61,9 @@ Click "Add another API".
   />
 </div>
 
-Next, set the "Authentication" as "Private key in header", and copy and paste Cube's Authorization token.
-Additionally, make sure to add a shared header for all calls by setting `content-type` to `application/json`.
+Next, set the "Authentication" as "Private key in header", and copy and paste
+Cube's Authorization token. Additionally, make sure to add a shared header for
+all calls by setting `content-type` to `application/json`.
 
 <div style="text-align: center">
   <img
@@ -65,7 +77,9 @@ Additionally, make sure to add a shared header for all calls by setting `content
 
 Click "Add another call".
 
-Copy and paste the Cube REST API, including the `/load` path, in the API field. Make sure to select "Use as: Action", and use the `JSON` "data type" and "body type". 
+Copy and paste the Cube REST API, including the `/load` path, in the API field.
+Make sure to select "Use as: Action", and use the `JSON` "data type" and "body
+type".
 
 <div style="text-align: center">
   <img
@@ -75,7 +89,9 @@ Copy and paste the Cube REST API, including the `/load` path, in the API field. 
   />
 </div>
 
-Get your Cube query in the JSON [query format](https://cube.dev/docs/query-format) ready. You can copy it from Cube’s Playground or compose manually:
+Get your Cube query in the JSON
+[query format](https://cube.dev/docs/backend/rest/reference/query-format) ready.
+You can copy it from Cube’s Playground or compose manually:
 
 <div style="text-align: center">
   <img
@@ -85,7 +101,8 @@ Get your Cube query in the JSON [query format](https://cube.dev/docs/query-forma
   />
 </div>
 
-Paste the JSON query in the **Body**. Make sure to add a `query` parameter for your JSON query.
+Paste the JSON query in the **Body**. Make sure to add a `query` parameter for
+your JSON query.
 
 <div style="text-align: center">
   <img
@@ -99,7 +116,12 @@ Next, hit "Initialize / Reinitialize call".
 
 ## Create a workflow in Bubble
 
-First, add a "Page is loaded" event. Add an action that uses the API connector plugin. Next, add another action to set the state of an element. Select the index element, and create a new custom state. In this example I named the custom state `OrdersByMonth` and selected the `data` field of the API response. Make sure to toggle the "This state is a list" checkbox as well. While setting the state's value you will need to select "Result of step 1" and the `data` field.
+First, add a "Page is loaded" event. Add an action that uses the API connector
+plugin. Next, add another action to set the state of an element. Select the
+index element, and create a new custom state. In this example I named the custom
+state `OrdersByMonth` and selected the `data` field of the API response. Make
+sure to toggle the "This state is a list" checkbox as well. While setting the
+state's value you will need to select "Result of step 1" and the `data` field.
 
 <div style="text-align: center">
   <img
@@ -111,9 +133,13 @@ First, add a "Page is loaded" event. Add an action that uses the API connector p
 
 ## Display the data in Bubble
 
-Bubble has an amazing feature where you can drag and drop UI components into the design dashboard.
+Bubble has an amazing feature where you can drag and drop UI components into the
+design dashboard.
 
-Once you added a chart, you configure the data points. More specifically, the series categories and series data. For the series categories and series data you need to select the `index` and `OrdersByMonth` state followed by the data point you want to use in order to populate the chart.
+Once you added a chart, you configure the data points. More specifically, the
+series categories and series data. For the series categories and series data you
+need to select the `index` and `OrdersByMonth` state followed by the data point
+you want to use in order to populate the chart.
 
 <div style="text-align: center">
   <img

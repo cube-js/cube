@@ -3,7 +3,9 @@ title: Connecting to Deepnote
 permalink: /config/downstream/deepnote
 ---
 
-You can connect to Cube from Deepnote, a new kind of data notebook that's built for collaboration and is Jupyter compatible, using the [Cube SQL API][ref-sql-api].
+You can connect to Cube from Deepnote, a new kind of data notebook that's built
+for collaboration and is Jupyter compatible, using the [Cube SQL
+API][ref-sql-api].
 
 Here's a short video guide on how to connect Deepnote to Cube.
 
@@ -20,8 +22,9 @@ here][ref-getting-started].
 
 ### <--{"id" : "Enable Cube SQL API"}--> Cube Cloud
 
-Click **Deploy SQL API** and then the **How to connect your BI tool** link on the Overview page of your Cube deployment.
-Navigate to the **BIs and Visualization Tools** tab. You should see the screen like the one below with
+Click **Deploy SQL API** and then the **How to connect your BI tool** link on
+the Overview page of your Cube deployment. Navigate to the **BIs and
+Visualization Tools** tab. You should see the screen like the one below with
 your connection credentials:
 
 <div style="text-align: center">
@@ -35,14 +38,14 @@ your connection credentials:
 ### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Deepnote
-later.
+These credentials will be required to connect to Cube from Deepnote later.
 
 ```bash
 CUBEJS_PG_SQL_PORT=5432
 CUBEJS_SQL_USER=myusername
 CUBEJS_SQL_PASSWORD=mypassword
 ```
+
 ## Connecting from Deepnote
 
 Deepnote connects to Cube as to a Postgres database.
@@ -57,10 +60,11 @@ Deepnote connects to Cube as to a Postgres database.
 
 ## Querying data
 
-Your cubes will be exposed as tables, where both your measures and dimensions are columns.
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
 
-You can write SQL in Deepnote that will be executed in Cube. Learn more about Cube SQL
-syntax on the [reference page][ref-sql-api].
+You can write SQL in Deepnote that will be executed in Cube. Learn more about
+Cube SQL syntax on the [reference page][ref-sql-api].
 
 <div style="text-align: center">
   <img

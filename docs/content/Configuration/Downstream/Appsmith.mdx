@@ -3,7 +3,9 @@ title: Connecting to Appsmith
 permalink: /config/downstream/appsmith
 ---
 
-[Appsmith](https://www.appsmith.com) is an open-source framework for building internal tools. You can connect a Cube deployment to Appsmith using Cube’s [REST API](https://cube.dev/docs/rest-api).
+[Appsmith](https://www.appsmith.com) is an open-source framework for building
+internal tools. You can connect a Cube deployment to Appsmith using Cube’s
+[REST API](https://cube.dev/docs/backend/rest/reference/api).
 
 Here's a short video guide on how to connect Appsmith to Cube.
 
@@ -11,11 +13,14 @@ Here's a short video guide on how to connect Appsmith to Cube.
 
 ## Use REST API in Cube
 
-> Don't have a Cube project yet? [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
+> Don't have a Cube project yet?
+> [Learn how to get started here](https://cube.dev/docs/cloud/getting-started).
 
 ### <--{"id" : "Use REST API in Cube"}--> Cube Cloud
 
-Click the “How to connect” link on the Overview page, navigate to the REST API tab. You should see the screen below with your connection credentials (the REST API URL and the authorization token):
+Click the “How to connect” link on the Overview page, navigate to the REST API
+tab. You should see the screen below with your connection credentials (the REST
+API URL and the authorization token):
 
 <div style="text-align: center">
   <img
@@ -27,15 +32,22 @@ Click the “How to connect” link on the Overview page, navigate to the REST A
 
 ### <--{"id" : "Use REST API in Cube"}--> Self-hosted Cube
 
-For a Cube instance publicly available at a specific `HOST`, the REST API URL would be `HOST/cubejs-api/v1`. Please refer to the [REST API page](https://cube.dev/docs/rest-api) for details.
+For a Cube instance publicly available at a specific `HOST`, the REST API URL
+would be `HOST/cubejs-api/v1`. Please refer to the
+[REST API page](https://cube.dev/docs/backend/rest/reference/api) for details.
 
-You will also need to generate a JSON Web Token that would be used to authenticate requests to Cube.
+You will also need to generate a JSON Web Token that would be used to
+authenticate requests to Cube.
 
-Please check the [Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt) to learn how to generate a token. We suggest generating a long-lived JWT that won't expire soon.
+Please check the
+[Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt)
+to learn how to generate a token. We suggest generating a long-lived JWT that
+won't expire soon.
 
 ## Create a new Data Source in Appsmith
 
-Copy and paste the REST API URL and the Authorization token to create a new data source in Appsmith.
+Copy and paste the REST API URL and the Authorization token to create a new data
+source in Appsmith.
 
 <div style="text-align: center">
   <img
@@ -45,9 +57,11 @@ Copy and paste the REST API URL and the Authorization token to create a new data
   />
 </div>
 
-## Create a POST request in Appsmith 
+## Create a POST request in Appsmith
 
-Get your Cube query in the JSON [query format](https://cube.dev/docs/query-format) ready. You can copy it from Cube’s Playground or compose manually:
+Get your Cube query in the JSON
+[query format](https://cube.dev/docs/backend/rest/reference/query-format) ready.
+You can copy it from Cube’s Playground or compose manually:
 
 <div style="text-align: center">
   <img
@@ -57,9 +71,11 @@ Get your Cube query in the JSON [query format](https://cube.dev/docs/query-forma
   />
 </div>
 
-Create a POST request, paste the JSON query in the **Body**. Make sure to add a `query` parameter for your JSON query.
+Create a POST request, paste the JSON query in the **Body**. Make sure to add a
+`query` parameter for your JSON query.
 
-Because you saved the data source as `HOST/cubejs-api/v1`, don't forget to add a `/load` endpoint to the end of the data source API.
+Because you saved the data source as `HOST/cubejs-api/v1`, don't forget to add a
+`/load` endpoint to the end of the data source API.
 
 Next, hit Run.
 
@@ -73,7 +89,10 @@ Next, hit Run.
 
 ## Display the Data in Appsmith
 
-You have many options to display the data in Appsmith. For instance, you can display the data in a table widget. Also, you can create a chart widget and map the values to *x* and *y* coordinates accordingly, give a *title* and *names* to the *axis*.
+You have many options to display the data in Appsmith. For instance, you can
+display the data in a table widget. Also, you can create a chart widget and map
+the values to _x_ and _y_ coordinates accordingly, give a _title_ and _names_ to
+the _axis_.
 
 <div style="text-align: center">
   <img
