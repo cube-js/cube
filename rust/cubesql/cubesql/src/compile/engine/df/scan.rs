@@ -11,7 +11,7 @@ use datafusion::{
     arrow::{
         array::{ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder},
         datatypes::{DataType, SchemaRef},
-        error::Result as ArrowResult,
+        error::{ArrowError, Result as ArrowResult},
         record_batch::RecordBatch,
     },
     error::{DataFusionError, Result},
@@ -27,7 +27,7 @@ use log::warn;
 
 use crate::{
     sql::AuthContextRef,
-    transport::{LoadRequestMeta, TransportService},
+    transport::{CubeReadStream, LoadRequestMeta, TransportService},
 };
 use chrono::{TimeZone, Utc};
 use datafusion::{
@@ -173,11 +173,11 @@ struct CubeScanExecutionPlan {
 
 macro_rules! build_column {
     ($data_type:expr, $builder_ty:ty, $response:expr, $field_name:expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
-        let mut builder = <$builder_ty>::new($response.data.len());
+        let mut builder = <$builder_ty>::new($response.len());
 
         match $field_name {
             MemberField::Member(field_name) => {
-                for row in $response.data.iter() {
+                for row in $response.iter() {
                     let as_object = row.as_object().ok_or(
                         DataFusionError::Execution(
                             format!("Unexpected response from Cube.js, row is not an object, actual: {}", row)
@@ -202,7 +202,7 @@ macro_rules! build_column {
                 }
             }
             MemberField::Literal(value) => {
-                for _ in 0..$response.data.len() {
+                for _ in 0..$response.len() {
                     match (value, &mut builder) {
                         $($scalar_block)*
                         (v, _) => {
@@ -219,149 +219,6 @@ macro_rules! build_column {
 
         Arc::new(builder.finish()) as ArrayRef
     }}
-}
-
-impl CubeScanExecutionPlan {
-    // This methods transform response from Cube.js to RecordBatch which stores
-    // schema and array of columns.
-    fn transform_response(&self, response: V1LoadResult) -> Result<RecordBatch> {
-        let mut columns = vec![];
-
-        for (i, schema_field) in self.schema.fields().iter().enumerate() {
-            let field_name = &self.member_fields[i];
-            let column = match schema_field.data_type() {
-                DataType::Utf8 => {
-                    build_column!(
-                        DataType::Utf8,
-                        StringBuilder,
-                        response,
-                        field_name,
-                        {
-                            (serde_json::Value::String(v), builder) => builder.append_value(v)?,
-                            (serde_json::Value::Bool(v), builder) => builder.append_value(if *v { "true" } else { "false" })?,
-                            (serde_json::Value::Number(v), builder) => builder.append_value(v.to_string())?,
-                        },
-                        {
-                            (ScalarValue::Utf8(v), builder) => builder.append_option(v.as_ref())?,
-                        }
-                    )
-                }
-                DataType::Int64 => {
-                    build_column!(
-                        DataType::Int64,
-                        Int64Builder,
-                        response,
-                        field_name,
-                        {
-                            (serde_json::Value::Number(number), builder) => match number.as_i64() {
-                                Some(v) => builder.append_value(v)?,
-                                None => builder.append_null()?,
-                            },
-                            (serde_json::Value::String(s), builder) => match s.parse::<i64>() {
-                                Ok(v) => builder.append_value(v)?,
-                                Err(error) => {
-                                    warn!(
-                                        "Unable to parse value as i64: {}",
-                                        error.to_string()
-                                    );
-
-                                    builder.append_null()?
-                                }
-                            },
-                        },
-                        {
-                            (ScalarValue::Int64(v), builder) => builder.append_option(v.clone())?,
-                        }
-                    )
-                }
-                DataType::Float64 => {
-                    build_column!(
-                        DataType::Float64,
-                        Float64Builder,
-                        response,
-                        field_name,
-                        {
-                            (serde_json::Value::Number(number), builder) => match number.as_f64() {
-                                Some(v) => builder.append_value(v)?,
-                                None => builder.append_null()?,
-                            },
-                            (serde_json::Value::String(s), builder) => match s.parse::<f64>() {
-                                Ok(v) => builder.append_value(v)?,
-                                Err(error) => {
-                                    warn!(
-                                        "Unable to parse value as f64: {}",
-                                        error.to_string()
-                                    );
-
-                                    builder.append_null()?
-                                }
-                            },
-                        },
-                        {
-                            (ScalarValue::Float64(v), builder) => builder.append_option(v.clone())?,
-                        }
-                    )
-                }
-                DataType::Boolean => {
-                    build_column!(
-                        DataType::Boolean,
-                        BooleanBuilder,
-                        response,
-                        field_name,
-                        {
-                            (serde_json::Value::Bool(v), builder) => builder.append_value(*v)?,
-                            (serde_json::Value::String(v), builder) => match v.as_str() {
-                                "true" | "1" => builder.append_value(true)?,
-                                "false" | "0" => builder.append_value(false)?,
-                                _ => {
-                                    log::error!("Unable to map value {:?} to DataType::Boolean (returning null)", v);
-
-                                    builder.append_null()?
-                                }
-                            },
-                        },
-                        {
-                            (ScalarValue::Boolean(v), builder) => builder.append_option(v.clone())?,
-                        }
-                    )
-                }
-                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
-                    build_column!(
-                        DataType::Timestamp(TimeUnit::Nanosecond, None),
-                        TimestampNanosecondBuilder,
-                        response,
-                        field_name,
-                        {
-                            (serde_json::Value::String(s), builder) => {
-                                let timestamp = Utc
-                                    .datetime_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
-                                    .map_err(|e| {
-                                        DataFusionError::Execution(format!(
-                                            "Can't parse timestamp: '{}': {}",
-                                            s, e
-                                        ))
-                                    })?;
-                                builder.append_value(timestamp.timestamp_nanos())?;
-                            },
-                        },
-                        {
-                            (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(v.clone())?,
-                        }
-                    )
-                }
-                t => {
-                    return Err(DataFusionError::NotImplemented(format!(
-                        "Type {} is not supported in response transformation from Cube.js",
-                        t,
-                    )))
-                }
-            };
-
-            columns.push(column);
-        }
-
-        Ok(RecordBatch::try_new(self.schema.clone(), columns)?)
-    }
 }
 
 #[async_trait]
@@ -402,6 +259,27 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         _partition: usize,
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
+        // TODO:
+        let stream_mode = std::env::var("CUBESQL_STREAM_MODE")
+            .ok()
+            .map(|v| v.parse::<bool>().unwrap())
+            .unwrap_or(false);
+
+        if stream_mode {
+            let mut meta = self.meta.clone();
+            meta.set_change_user(self.options.change_user.clone());
+            let result =
+                self.transport
+                    .load_stream(self.request.clone(), self.auth_context.clone(), meta);
+            let stream = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
+
+            return Ok(Box::pin(CubeScanMemoryStream::new(
+                stream,
+                self.schema.clone(),
+                self.member_fields.clone(),
+            )));
+        }
+
         let no_members_query = self.request.measures.as_ref().map(|v| v.len()).unwrap_or(0) == 0
             && self
                 .request
@@ -452,9 +330,12 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             }
         };
 
-        Ok(Box::pin(CubeScanMemoryStream::new(
-            // @todo Pagination?)
-            vec![self.transform_response(result)?],
+        Ok(Box::pin(CubeScanOneShotStream::new(
+            vec![transform_response(
+                result.data,
+                self.schema.clone(),
+                &self.member_fields,
+            )?],
             self.schema.clone(),
         )))
     }
@@ -477,7 +358,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
     }
 }
 
-struct CubeScanMemoryStream {
+struct CubeScanOneShotStream {
     /// Vector of record batches
     data: Vec<RecordBatch>,
     /// Schema representing the data
@@ -486,7 +367,7 @@ struct CubeScanMemoryStream {
     index: usize,
 }
 
-impl CubeScanMemoryStream {
+impl CubeScanOneShotStream {
     pub fn new(data: Vec<RecordBatch>, schema: SchemaRef) -> Self {
         Self {
             data,
@@ -496,7 +377,7 @@ impl CubeScanMemoryStream {
     }
 }
 
-impl Stream for CubeScanMemoryStream {
+impl Stream for CubeScanOneShotStream {
     type Item = ArrowResult<RecordBatch>;
 
     fn poll_next(
@@ -518,11 +399,211 @@ impl Stream for CubeScanMemoryStream {
     }
 }
 
+impl RecordBatchStream for CubeScanOneShotStream {
+    /// Get the schema
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+}
+
+struct CubeScanMemoryStream {
+    stream: Arc<dyn CubeReadStream>,
+    /// Schema representing the data
+    schema: SchemaRef,
+
+    member_fields: Vec<MemberField>,
+}
+
+impl CubeScanMemoryStream {
+    pub fn new(
+        stream: Arc<dyn CubeReadStream>,
+        schema: SchemaRef,
+        member_fields: Vec<MemberField>,
+    ) -> Self {
+        Self {
+            stream,
+            schema,
+            member_fields,
+        }
+    }
+}
+
+impl Stream for CubeScanMemoryStream {
+    type Item = ArrowResult<RecordBatch>;
+
+    fn poll_next(self: std::pin::Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Poll::Ready(match self.stream.poll_next() {
+            Ok(chunk) => parse_chunk(chunk, self.schema.clone(), &self.member_fields),
+            Err(err) => Some(Err(ArrowError::ComputeError(err.to_string()))),
+        })
+    }
+}
+
 impl RecordBatchStream for CubeScanMemoryStream {
     /// Get the schema
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
+}
+
+fn parse_chunk(
+    chunk: Option<String>,
+    schema: SchemaRef,
+    member_fields: &Vec<MemberField>,
+) -> Option<ArrowResult<RecordBatch>> {
+    match chunk {
+        Some(chunk) => match serde_json::from_str::<Vec<serde_json::Value>>(&chunk) {
+            Ok(data) => match transform_response(data, schema, member_fields) {
+                Ok(batch) => Some(Ok(batch)),
+                Err(err) => Some(Err(err.into())),
+            },
+            Err(e) => Some(Err(e.into())),
+        },
+        None => None,
+    }
+}
+
+fn transform_response(
+    response: Vec<serde_json::Value>,
+    schema: SchemaRef,
+    member_fields: &Vec<MemberField>,
+) -> Result<RecordBatch> {
+    let mut columns = vec![];
+
+    for (i, schema_field) in schema.fields().iter().enumerate() {
+        let field_name = &member_fields[i];
+        let column = match schema_field.data_type() {
+            DataType::Utf8 => {
+                build_column!(
+                    DataType::Utf8,
+                    StringBuilder,
+                    response,
+                    field_name,
+                    {
+                        (serde_json::Value::String(v), builder) => builder.append_value(v)?,
+                        (serde_json::Value::Bool(v), builder) => builder.append_value(if *v { "true" } else { "false" })?,
+                        (serde_json::Value::Number(v), builder) => builder.append_value(v.to_string())?,
+                    },
+                    {
+                        (ScalarValue::Utf8(v), builder) => builder.append_option(v.as_ref())?,
+                    }
+                )
+            }
+            DataType::Int64 => {
+                build_column!(
+                    DataType::Int64,
+                    Int64Builder,
+                    response,
+                    field_name,
+                    {
+                        (serde_json::Value::Number(number), builder) => match number.as_i64() {
+                            Some(v) => builder.append_value(v)?,
+                            None => builder.append_null()?,
+                        },
+                        (serde_json::Value::String(s), builder) => match s.parse::<i64>() {
+                            Ok(v) => builder.append_value(v)?,
+                            Err(error) => {
+                                warn!(
+                                    "Unable to parse value as i64: {}",
+                                    error.to_string()
+                                );
+
+                                builder.append_null()?
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::Int64(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Float64 => {
+                build_column!(
+                    DataType::Float64,
+                    Float64Builder,
+                    response,
+                    field_name,
+                    {
+                        (serde_json::Value::Number(number), builder) => match number.as_f64() {
+                            Some(v) => builder.append_value(v)?,
+                            None => builder.append_null()?,
+                        },
+                        (serde_json::Value::String(s), builder) => match s.parse::<f64>() {
+                            Ok(v) => builder.append_value(v)?,
+                            Err(error) => {
+                                warn!(
+                                    "Unable to parse value as f64: {}",
+                                    error.to_string()
+                                );
+
+                                builder.append_null()?
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::Float64(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Boolean => {
+                build_column!(
+                    DataType::Boolean,
+                    BooleanBuilder,
+                    response,
+                    field_name,
+                    {
+                        (serde_json::Value::Bool(v), builder) => builder.append_value(*v)?,
+                        (serde_json::Value::String(v), builder) => match v.as_str() {
+                            "true" | "1" => builder.append_value(true)?,
+                            "false" | "0" => builder.append_value(false)?,
+                            _ => {
+                                log::error!("Unable to map value {:?} to DataType::Boolean (returning null)", v);
+
+                                builder.append_null()?
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::Boolean(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                build_column!(
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    TimestampNanosecondBuilder,
+                    response,
+                    field_name,
+                    {
+                        (serde_json::Value::String(s), builder) => {
+                            let timestamp = Utc
+                                .datetime_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
+                                .map_err(|e| {
+                                    DataFusionError::Execution(format!(
+                                        "Can't parse timestamp: '{}': {}",
+                                        s, e
+                                    ))
+                                })?;
+                            builder.append_value(timestamp.timestamp_nanos())?;
+                        },
+                    },
+                    {
+                        (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            t => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Type {} is not supported in response transformation from Cube.js",
+                    t,
+                )))
+            }
+        };
+
+        columns.push(column);
+    }
+
+    Ok(RecordBatch::try_new(schema.clone(), columns)?)
 }
 
 #[cfg(test)]
@@ -531,6 +612,7 @@ mod tests {
     use crate::{
         compile::MetaContext,
         sql::{session::DatabaseProtocol, HttpAuthContext},
+        transport::CubeReadStream,
         CubeError,
     };
     use cubeclient::models::V1LoadResponse;
@@ -600,6 +682,15 @@ mod tests {
                     query_type: None,
                     results: vec![result],
                 })
+            }
+
+            fn load_stream(
+                &self,
+                _query: V1LoadRequestQuery,
+                _ctx: AuthContextRef,
+                _meta_fields: LoadRequestMeta,
+            ) -> Result<Arc<dyn CubeReadStream>, CubeError> {
+                panic!("It's a fake transport");
             }
         }
 

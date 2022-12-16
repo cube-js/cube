@@ -1336,7 +1336,7 @@ class ApiGateway {
 
     const response = {
       types: [],
-      rowStream: new DataStream(),
+      rowStream: new DataStream({ writableHighWaterMark: 30000000 }),
       release: async () => {
         if (!response.rowStream.destroyed) {
           response.rowStream.destroy();
@@ -1364,6 +1364,7 @@ class ApiGateway {
             }>message;
 
             if (error) {
+              // TODO: push to stream and destroy
               throw new Error(error);
             } else {
               const cnt = results[0].data.length;
