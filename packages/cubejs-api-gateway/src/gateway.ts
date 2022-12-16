@@ -348,7 +348,7 @@ class ApiGateway {
 
       app.post(
         '/cubejs-system/v1/pre-aggregations/jobs',
-        userMiddlewares,
+        systemMiddlewares,
         this.preAggregationsJobs.bind(this),
       );
     }
