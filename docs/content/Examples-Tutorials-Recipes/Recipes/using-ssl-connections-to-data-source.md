@@ -6,7 +6,7 @@ subCategory: Data sources
 menuOrder: 3
 ---
 
-Cube.js supports SSL-encrypted connections for:
+Cube supports SSL-encrypted connections for:
 
 - [ClickHouse][ref-config-db-clickhouse]
 - [MongoDB][ref-config-db-mongodb]
@@ -14,8 +14,8 @@ Cube.js supports SSL-encrypted connections for:
 - [MySQL][ref-config-db-mysql]
 - [Postgres][ref-config-db-postgres]
 
-To enable it, set the `CUBEJS_DB_SSL` environment variable to `true`. Cube.js
-can also be configured to use custom connection settings. For example, to use a
+To enable it, set the `CUBEJS_DB_SSL` environment variable to `true`. Cube can
+also be configured to use custom connection settings. For example, to use a
 custom certificate authority and certificates, you could do the following:
 
 ```bash
@@ -49,12 +49,12 @@ KmZIuh7+XpXzJ1MN0SBZXgXH
 -----END CERTIFICATE-----"
 ```
 
-For a complete list of SSL-related environment variables, consult the [Database
-Connections section of the Environment Variables Reference][ref-env-var].
+For a complete list of SSL-related environment variables, consult the
+[Environment Variables Reference][ref-env-var].
 
 [ref-config-db-clickhouse]: /config/databases/clickhouse
 [ref-config-db-mongodb]: /config/databases/mongodb
 [ref-config-db-mssql]: /config/databases/mssql
 [ref-config-db-mysql]: /config/databases/mysql
 [ref-config-db-postgres]: /config/databases/postgres
-[ref-env-var]: /reference/environment-variables#database-connection
+[ref-env-var]: /reference/environment-variables
