@@ -249,11 +249,16 @@ class DocTemplate extends Component<Props, State> {
         let elementId = item.props.children[0];
         let elementTitle = item.props.children[0];
         // Handle code-block H2 headers
-        if (Array.isArray(item.props.children) && item.props.children.length === 1 && typeof item.props.children[0] !== 'string') {
+        if (item.type === 'h2' && Array.isArray(item.props.children) && item.props.children.length === 1 && typeof item.props.children[0] !== 'string') {
           elementId = item.props.children[0].props.children[0];
         }
+        // Handle mixed string and code-block H2 headers
+        if (item.type === 'h2' && Array.isArray(item.props.children) && item.props.children.length > 1) {
+          elementId = item.props.children[0] + item.props.children[1].props.children;
+          elementTitle = item.props.children;
+        }
         // Handle code-block H3 headers with custom ID prefix
-        if (Array.isArray(item.props.children) && item.props.children.length > 1) {
+        if (item.type === 'h3' && Array.isArray(item.props.children) && item.props.children.length > 1) {
           elementId = item.props.children[1].props.children[0];
         }
 
