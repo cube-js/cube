@@ -40,6 +40,7 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
                     || agg_type.eq(&"string".to_string())
                     || agg_type.eq(&"time".to_string())
                     || agg_type.eq(&"boolean".to_string())
+                    || agg_type.eq(expect_agg_type)
             } else {
                 self.agg_type.as_ref().unwrap().eq(expect_agg_type)
             }
