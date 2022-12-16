@@ -413,6 +413,10 @@ const CubeRefreshKeySchema = condition(
   )
 );
 
+const measureType = Joi.string().valid(
+  'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
+);
+
 const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(
   Joi.ref('.type'), [
     {
@@ -423,19 +427,13 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       })
     },
     {
-      is: Joi.string().valid(
-        'number', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
-      ),
+      is: measureType,
       then: inherit(BaseMeasure, {
         sql: Joi.func().required(),
-        type: Joi.any().valid(
-          'number', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
-        ).required()
+        type: measureType.required()
       }),
       otherwise: Joi.object().keys({
-        type: Joi.string().valid(
-          'count', 'number', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
-        ).required()
+        type: measureType.required()
       })
     }
   ]
