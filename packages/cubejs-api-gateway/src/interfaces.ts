@@ -25,10 +25,11 @@ import {
 import {
   JWTOptions,
   CheckAuthFn,
-  CheckRestAclFn,
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  PermissionsTuple,
+  FetchPermissionsFn,
 } from './types/auth';
 
 import {
@@ -53,7 +54,6 @@ export {
   NormalizedQuery,
   JWTOptions,
   CheckAuthFn,
-  CheckRestAclFn,
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
@@ -64,6 +64,8 @@ export {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
+  PermissionsTuple,
+  FetchPermissionsFn,
 };
 
 /**

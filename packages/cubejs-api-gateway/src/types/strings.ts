@@ -98,15 +98,14 @@ type QueryOrderType =
   'desc';
 
 /**
- * HTTP method name.
+ * Permission string.
  */
-type HttpMethod =
-  'GET' |
-  'POST' |
-  'PUT' |
-  'PATCH' |
-  'DELETE' |
-  'HEAD';
+type Permission =
+  'liveliness' |
+  'graphql' |
+  'meta' |
+  'data' |
+  'jobs';
 
 export {
   RequestType,
@@ -119,5 +118,5 @@ export {
   FilterOperator,
   QueryTimeDimensionGranularity,
   QueryOrderType,
-  HttpMethod,
+  Permission,
 };

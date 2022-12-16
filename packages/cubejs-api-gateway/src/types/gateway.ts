@@ -14,9 +14,9 @@ import {
   CheckAuthFn,
 } from './auth';
 import {
-  CheckRestAclFn,
   CheckAuthMiddlewareFn,
   RequestLoggerMiddlewareFn,
+  FetchPermissionsFn,
 } from '../interfaces';
 
 type UserBackgroundContext = {
@@ -65,7 +65,8 @@ interface ApiGatewayOptions {
    * @deprecated Use checkAuth property instead.
    */
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
-  checkRestAcl?: CheckRestAclFn;
+  defaultPermissions?: FetchPermissionsFn;
+  fetchPermissions?: FetchPermissionsFn;
 }
 
 export {

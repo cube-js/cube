@@ -42,7 +42,8 @@ import {
   CheckAuthInternalOptions,
   JWTOptions,
   CheckAuthFn,
-  CheckRestAclFn,
+  PermissionsTuple,
+  FetchPermissionsFn,
 } from './types/auth';
 import {
   Query,
@@ -84,7 +85,10 @@ import {
   transformJoins,
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
-import { DEFAULT_BLACK_LIST, DEFAULT_WHITE_LIST } from './RestAcl';
+import {
+  defaultSystemPermissions,
+  assertPermission
+} from './permissions';
 
 // const timeoutPromise = (timeout) => (
 //   new Promise((resolve) => (
@@ -121,7 +125,9 @@ class ApiGateway {
 
   public readonly checkAuthFn: CheckAuthFn;
 
-  public readonly checkRestAcl: CheckRestAclFn;
+  public readonly defaultPermissions: FetchPermissionsFn;
+
+  public readonly fetchPermissions: FetchPermissionsFn;
 
   public readonly checkAuthSystemFn: CheckAuthFn;
 
@@ -159,17 +165,17 @@ class ApiGateway {
     this.checkAuthSystemFn = this.createCheckAuthSystemFn();
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
-      : this.checkAuth;
-    this.checkRestAcl = this.createCheckRestAclFn(options);
+      : this.checkAuth;    
     this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
+    this.defaultPermissions = this.createDefaultPermissionsFn(options);
+    this.fetchPermissions = this.createFetchPermissionsFn(options);
   }
 
   public initApp(app: ExpressApplication) {
     const userMiddlewares: RequestHandler[] = [
       this.checkAuthMiddleware,
       this.requestContextMiddleware,
-      this.restAclMiddleware,
       this.logNetworkUsage,
       this.requestLoggerMiddleware
     ];
@@ -291,7 +297,6 @@ class ApiGateway {
       const systemMiddlewares: RequestHandler[] = [
         this.checkAuthSystemMiddleware,
         this.requestContextMiddleware,
-        this.restAclMiddleware,
         this.requestLoggerMiddleware
       ];
 
@@ -1794,55 +1799,28 @@ class ApiGateway {
   }
 
   /**
-   * Returns REST API ACL validation function. Generate it if it wasn't
-   * specified in the initial options.
-   *
+   * Creates if necessary and returns default permissions getter function.
    */
-  protected createCheckRestAclFn(options: ApiGatewayOptions): CheckRestAclFn {
-    let { checkRestAcl } = options;
-    if (!checkRestAcl && typeof checkRestAcl !== 'function') {
-      checkRestAcl = async (
-        req: Request,
-        whiteList: [url: string, methods: string[]][],
-        blackList: [url: string, methods: string[]][],
-      ) => {
-        let allowed = false;
-        let denied = false;
-        whiteList.forEach((white) => {
-          allowed = allowed || (
-            (
-              req.path === white[0] ||
-              req.path === `${this.basePath}${white[0]}` ||
-              req.path === `/cubejs-system${white[0]}`
-            ) &&
-            white[1].indexOf(req.method) >= 0
-          );
-        });
-        blackList.forEach((black) => {
-          denied = denied || (
-            (
-              req.path === black[0] ||
-              req.path === `${this.basePath}${black[0]}` ||
-              req.path === `/cubejs-system${black[0]}`
-            ) &&
-            black[1].indexOf(req.method) >= 0
-          );
-        });
-        if (!allowed && !denied) {
-          throw new CubejsHandlerError(
-            403,
-            'Forbidden', `Missing ACL config for the API endpoint: ${req.method} ${req.url}`
-          );
-        }
-        if (!allowed || denied) {
-          throw new CubejsHandlerError(
-            403,
-            'Forbidden', `Access denied for the API call: ${req.method} ${req.url}`
-          );
-        }
-      };
+  protected createDefaultPermissionsFn(options: ApiGatewayOptions): FetchPermissionsFn {
+    let { defaultPermissions } = options;
+    if (!defaultPermissions && typeof defaultPermissions !== 'function') {
+      defaultPermissions = async () => ({
+        allow: <PermissionsTuple>defaultSystemPermissions,
+        deny: <PermissionsTuple>[],
+      });
     }
-    return checkRestAcl;
+    return defaultPermissions;
+  }
+
+  /**
+   * Creates if necessary and returns fetch permissions function.
+   */
+  protected createFetchPermissionsFn(options: ApiGatewayOptions): FetchPermissionsFn {
+    let { fetchPermissions } = options;
+    if (!fetchPermissions && typeof fetchPermissions !== 'function') {
+      fetchPermissions = async () => this.defaultPermissions();
+    }
+    return fetchPermissions;
   }
 
   protected createCheckAuthSystemFn(): CheckAuthFn {
@@ -1910,33 +1888,6 @@ class ApiGateway {
     req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
     if (next) {
       next();
-    }
-  };
-
-  /**
-   *
-   */
-  protected restAclMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      await this.checkRestAcl(
-        req,
-        req?.context?.securityContext?.acl?.whiteAPIs || DEFAULT_WHITE_LIST,
-        req?.context?.securityContext?.acl?.blackAPIs || DEFAULT_BLACK_LIST,
-      );
-      if (next) next();
-    } catch (e: unknown) {
-      if (e instanceof CubejsHandlerError) {
-        res.status(e.status).json({ error: e.message });
-      } else if (e instanceof Error) {
-        this.log(
-          { type: 'REST ACL Error', error: e.stack || e.toString() },
-          <any>req,
-        );
-        res.status(500).json({
-          error: e.toString(),
-          stack: e.stack
-        });
-      }
     }
   };
 

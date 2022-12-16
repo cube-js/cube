@@ -5,7 +5,7 @@
  * Cube.js auth related data types definition.
  */
 
-import { Request } from './request';
+import { Permission } from './strings';
 
 /**
  * Internal auth logic options object data type.
@@ -45,29 +45,6 @@ type CheckAuthFn =
   (ctx: any, authorization?: string) => Promise<void> | void;
 
 /**
- * HTTP methods tuple.
- */
-type HttpMethods = [
-  get?: 'GET',
-  post?: 'POST',
-  put?: 'PUT',
-  patch?: 'PATCH',
-  del?: 'DELETE',
-];
-
-
-/**
- * Function that must provide REST API ACL validation logic.
- *
- * @throw CubejsHandlerError
- */
-type CheckRestAclFn = (
-  req: Request,
-  whiteList: [url: string, methods: string[]][],
-  blackList: [url: string, methods: string[]][],
-) => Promise<void>;
-
-/**
  * Result of the SQL auth workflow.
  */
 type CheckSQLAuthSuccessResponse = {
@@ -95,12 +72,26 @@ type CanSwitchSQLUserFn =
     Promise<boolean> |
     boolean;
 
+/**
+ * Permissions tuple.
+ */
+type PermissionsTuple = Permission[];
+
+/**
+ * Returns permissions list object.
+ */
+type FetchPermissionsFn = (securityContext?: any) => Promise<{
+  allow: PermissionsTuple,
+  deny: PermissionsTuple,
+}>;
+
 export {
   CheckAuthInternalOptions,
   JWTOptions,
   CheckAuthFn,
-  CheckRestAclFn,
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  PermissionsTuple,
+  FetchPermissionsFn,
 };

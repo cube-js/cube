@@ -1,7 +1,6 @@
 import { Required } from '@cubejs-backend/shared';
 import {
   CheckAuthFn,
-  CheckRestAclFn,
   CheckAuthMiddlewareFn,
   ExtendContextFn,
   JWTOptions,
@@ -9,6 +8,8 @@ import {
   QueryRewriteFn,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  PermissionsTuple,
+  FetchPermissionsFn,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
@@ -175,7 +176,8 @@ export interface CreateOptions {
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
-  checkRestAcl?: CheckRestAclFn;
+  defaultPermissions?: FetchPermissionsFn,
+  fetchPermissions?: FetchPermissionsFn,
   checkSqlAuth?: CheckSQLAuthFn;
   canSwitchSqlUser?: CanSwitchSQLUserFn;
   jwt?: JWTOptions;
