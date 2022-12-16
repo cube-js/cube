@@ -11,7 +11,13 @@ authorization. Authentication is the process of verifying a user's identity,
 while authorization is the process of verifying what a user is allowed to
 access.
 
-@TODO DIAGRAM_HERE
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/f364caf0-68fd-4312-8098-90308c2c6e46/"
+    style="border: none"
+    width="80%"
+  />
+</div>
 
 ## Authentication
 
@@ -21,7 +27,7 @@ Authentication in the REST and GraphQL APIs uses JSON Web Tokens (JWT). For
 these APIs, the initial steps of authentication should be handled by the client
 application, the client application should then send the JWT as the
 `Authorization` header in all its' requests to Cube. Cube can then verify the
-JWT using either `CUBEJS_API_SECRET`, or using JSON Web Key Sets (JWKS) if
+JWT using either [`CUBEJS_API_SECRET`][ref-conf-ref-env-api-secret], or using JSON Web Key Sets (JWKS) if
 configured.
 
 For more information on how to configure authentication for the REST and GraphQL
@@ -30,7 +36,7 @@ APIs, read the [Authentication & Authorization][ref-rest-graphql-sec] page.
 ### <--{"id" : "Authentication"}--> SQL
 
 Authentication in the SQL API uses standard Postgres authentication with a
-username and password. In Cube, the `checkSqlAuth()` configuration option is
+username and password. In Cube, the [`checkSqlAuth()`][ref-conf-ref-conf-check-sql-auth] configuration option is
 used to verify an incoming username and password combination.
 
 For more information on how to configure authentication for the SQL API, read
@@ -42,5 +48,7 @@ Cube has granular support for authorization, allowing access to be controlled at
 the cube-, column- and/or row-level. This allows for flexible access control
 that can be configured based on the needs of any downstream application.
 
+[ref-conf-ref-conf-check-sql-auth]: /config#check-sql-auth
+[ref-conf-ref-env-api-secret]: /reference/environment-variables#cubejs-api-secret
 [ref-rest-graphql-sec]: /backend/rest-graphql/security
 [ref-sql-sec]: /backend/sql/security

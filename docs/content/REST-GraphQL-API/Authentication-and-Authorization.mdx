@@ -5,11 +5,19 @@ category: REST/GraphQL API
 menuOrder: 1
 ---
 
+<div style="text-align: center">
+  <img
+    src="https://ucarecdn.com/571b0dd4-3fb1-4e26-a5a6-c26e309d0e31/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
 Authentication in the REST and GraphQL APIs uses JSON Web Tokens (JWT). For
 these APIs, the initial steps of authentication should be handled by the client
 application, the client application should then send the JWT as the
 `Authorization` header in all its' requests to Cube. Cube can then verify the
-JWT using either `CUBEJS_API_SECRET`, or using JSON Web Key Sets (JWKS) if
+JWT using either [`CUBEJS_API_SECRET`][ref-conf-ref-env-api-secret], or using JSON Web Key Sets (JWKS) if
 configured.
 
 <div style="text-align: center">
@@ -32,13 +40,13 @@ Authentication is handled outside of Cube. A typical use case would be:
    calls to the Cube API.
 4. The token is received by Cube, and verified using any available JWKS (if
    configured)
-5. Once decoded, the token claims are injected into the [security
-   context][ref-sec-ctx].
+5. Once decoded, the token claims are injected into the [Security
+   Context][ref-sec-ctx].
 
 ## Using `CUBEJS_API_SECRET`
 
 When you scaffold a new project via the Cube CLI, an API Secret is automatically
-created and saved in the `.env` file as `CUBEJS_API_SECRET`. This secret key
+created and saved in the `.env` file as [`CUBEJS_API_SECRET`][ref-conf-ref-env-api-secret]. This secret key
 must then be used to sign the JWTs that are sent to Cube. To see an example of
 how this is done, check out the [Generating JWTs for Web
 Apps][ref-recipe-gen-jwt-for-web-apps] recipe.
@@ -137,7 +145,7 @@ module.exports = {
 ### <--{"id" : "Using JSON Web Key Sets (JWKS)"}--> Caching
 
 Cube caches JWKS by default when
-[`CUBEJS_JWK_URL` or `jwt.jwkUrl` is specified](#configuration).
+[`CUBEJS_JWK_URL`][ref-conf-ref-env-jwk-url] or [`jwt.jwkUrl` is specified][ref-conf-ref-conf-jwt].
 
 - If the response contains a `Cache-Control` header, then Cube uses it to
   determine cache expiry.
@@ -149,7 +157,7 @@ Cube caches JWKS by default when
 ## Custom authentication
 
 Cube also allows you to provide your own JWT verification logic by setting a
-[`checkAuth()`][ref-config-check-auth] function in the `cube.js` configuration
+[`checkAuth()`][ref-conf-ref-conf-check-auth] function in the `cube.js` configuration
 file. This function is expected to verify a JWT and assigns its' claims to the
 security context.
 
@@ -170,7 +178,10 @@ module.exports = {
 ```
 
 [link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
-[ref-config-check-auth]: /config#check-auth
+[ref-conf-ref-conf-check-auth]: /config#check-auth
+[ref-conf-ref-conf-jwt]: /config#options-reference-jwt
+[ref-conf-ref-env-api-secret]: /reference/environment-variables#cubejs-api-secret
+[ref-conf-ref-env-jwk-url]: /reference/environment-variables#cubejs-jwk-url
 [ref-config-migrate-cubejs]:
   /configuration/overview#migration-from-express-to-docker-template
 [ref-recipe-gen-jwt-for-web-apps]: /recipes/generating-jwts-for-web-apps
