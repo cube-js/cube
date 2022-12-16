@@ -53,6 +53,7 @@ export type SQLInterfaceOptions = {
     checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
     load: (payload: LoadPayload) => unknown | Promise<unknown>,
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
+    stream: (payload: LoadPayload) => unknown | Promise<unknown>,
 };
 
 function loadNative() {
@@ -106,6 +107,38 @@ function wrapNativeFunctionWithChannelCallback(
     };
 };
 
+function wrapNativeFunctionWithStream(
+    fn: (extra: any) => unknown | Promise<unknown>
+) {
+    return async (extra: any, writer: any) => {
+        try {
+            const streamResponse: any = await fn(JSON.parse(extra));
+            streamResponse.rowStream.on('data', (chunk: any) => {
+                if (!writer.chunk(chunk.toString())) {
+                    streamResponse.release();
+                }
+            });
+            streamResponse.rowStream.on('close', () => {
+                streamResponse.release();
+                writer.end("");
+            });
+
+            // TODO: on reject
+
+          } catch (e: any) {
+            if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+                console.debug("[js] channel.reject", {
+                    e
+                });
+            }
+
+            writer.reject("");
+
+            // throw e;
+          }
+    };
+};
+
 type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
 export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel): void => {
@@ -132,12 +165,17 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
         throw new Error('options.meta must be a function');
     }
 
+    if (typeof options.stream != 'function') {
+        throw new Error('options.stream must be a function');
+    }
+
     const native = loadNative();
     return native.registerInterface({
         ...options,
         checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
         load: wrapNativeFunctionWithChannelCallback(options.load),
         meta: wrapNativeFunctionWithChannelCallback(options.meta),
+        stream: wrapNativeFunctionWithStream(options.stream),
     });
 };
 

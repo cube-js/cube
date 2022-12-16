@@ -58,6 +58,19 @@ pub trait TransportService: Send + Sync + Debug {
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError>;
+
+    fn load_stream(
+        &self,
+        query: V1LoadRequestQuery,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+    ) -> Result<Arc<dyn CubeReadStream>, CubeError>;
+}
+
+pub trait CubeReadStream: Send + Sync + Debug {
+    fn poll_next(&self) -> Result<Option<String>, CubeError>;
+
+    fn reject(&self);
 }
 
 #[derive(Debug)]
@@ -153,5 +166,14 @@ impl TransportService for HttpTransport {
             cube_api::load_v1(&self.get_client_config_for_ctx(ctx), Some(request)).await?;
 
         Ok(response)
+    }
+
+    fn load_stream(
+        &self,
+        _query: V1LoadRequestQuery,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+    ) -> Result<Arc<dyn CubeReadStream>, CubeError> {
+        panic!("Does not work for standalone mode yet");
     }
 }

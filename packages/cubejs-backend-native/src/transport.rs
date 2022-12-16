@@ -6,7 +6,7 @@ use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResp
 use cubesql::{
     di_service,
     sql::AuthContextRef,
-    transport::{LoadRequestMeta, MetaContext, TransportService},
+    transport::{CubeReadStream, LoadRequestMeta, MetaContext, TransportService},
     CubeError,
 };
 use serde_derive::Serialize;
@@ -14,21 +14,31 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::NativeAuthContext;
-use crate::{auth::TransportRequest, channel::call_js_with_channel_as_callback};
+use crate::{
+    auth::TransportRequest, channel::call_js_with_channel_as_callback,
+    stream::call_js_with_stream_as_callback,
+};
 
 #[derive(Debug)]
 pub struct NodeBridgeTransport {
     channel: Arc<Channel>,
     on_load: Arc<Root<JsFunction>>,
     on_meta: Arc<Root<JsFunction>>,
+    on_load_stream: Arc<Root<JsFunction>>,
 }
 
 impl NodeBridgeTransport {
-    pub fn new(channel: Channel, on_load: Root<JsFunction>, on_meta: Root<JsFunction>) -> Self {
+    pub fn new(
+        channel: Channel,
+        on_load: Root<JsFunction>,
+        on_meta: Root<JsFunction>,
+        on_load_stream: Root<JsFunction>,
+    ) -> Self {
         Self {
             channel: Arc::new(channel),
             on_load: Arc::new(on_load),
             on_meta: Arc::new(on_meta),
+            on_load_stream: Arc::new(on_load_stream),
         }
     }
 }
@@ -151,6 +161,44 @@ impl TransportService for NodeBridgeTransport {
             };
 
             return Err(CubeError::user(load_err.to_string()));
+        }
+    }
+
+    fn load_stream(
+        &self,
+        query: V1LoadRequestQuery,
+        ctx: AuthContextRef,
+        meta: LoadRequestMeta,
+    ) -> Result<Arc<dyn CubeReadStream>, CubeError> {
+        trace!("[transport] Request ->");
+
+        let native_auth = ctx
+            .as_any()
+            .downcast_ref::<NativeAuthContext>()
+            .expect("Unable to cast AuthContext to NativeAuthContext");
+
+        let request_id = Uuid::new_v4().to_string();
+
+        loop {
+            let extra = serde_json::to_string(&LoadRequest {
+                request: TransportRequest {
+                    id: format!("{}-span-{}", request_id, 1),
+                    meta: Some(meta.clone()),
+                },
+                query: query.clone(),
+                session: SessionContext {
+                    user: native_auth.user.clone(),
+                    superuser: native_auth.superuser,
+                },
+            })?;
+
+            let response = call_js_with_stream_as_callback(
+                self.channel.clone(),
+                self.on_load_stream.clone(),
+                Some(extra.clone()),
+            );
+
+            return response;
         }
     }
 }
