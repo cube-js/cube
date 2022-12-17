@@ -67,6 +67,19 @@ The port of the Cube Store deployment.
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | `3030`                 | `3030`                |
 
+## `CUBEJS_DATASOURCES`
+
+A comma-separated list of data source names. Data sources defined here
+can be used to [decorate `CUBEJS_DB_*`][ref-config-multiple-ds-decorating-env] environment variables.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A comma-separated list of strings | N/A                 | N/A                |
+
+```bash
+CUBEJS_DATASOURCES=default,datasource1
+```
+
 ## `CUBEJS_DB_EXPORT_BUCKET`
 
 The name of a bucket in cloud storage to store the database export snapshots.
