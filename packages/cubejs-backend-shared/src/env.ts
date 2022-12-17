@@ -1315,6 +1315,9 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
     .asString(),
+  cubeStoreMaxConnectRetries: () => get('CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES')
+    .default('5')
+    .asInt(),
 
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
