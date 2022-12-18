@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.29](https://github.com/cube-js/cube.js/compare/v0.31.28...v0.31.29) (2022-12-18)
+
+
+### Bug Fixes
+
+* Error: WebSocket is not open: readyState 2 (CLOSING) ([#5846](https://github.com/cube-js/cube.js/issues/5846)) ([a5be099](https://github.com/cube-js/cube.js/commit/a5be099f1d339ceb17c89439d6195c5718c726bb))
+
+
+
+
+
 ## [0.31.28](https://github.com/cube-js/cube.js/compare/v0.31.27...v0.31.28) (2022-12-16)
 
 
