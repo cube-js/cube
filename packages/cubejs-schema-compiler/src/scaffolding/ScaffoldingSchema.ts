@@ -11,7 +11,7 @@ enum ColumnType {
 export enum MemberType {
   Measure = 'measure',
   Dimension = 'dimension',
-  None = 'none'
+  None = 'none',
 }
 
 export type Dimension = {
@@ -46,9 +46,9 @@ type Join = {
 };
 
 export type CubeDescriptor = {
-  cube: string,
-  tableName: TableName,
-  table: string
+  cube: string;
+  tableName: TableName;
+  table: string;
   schema: string;
   members: CubeDescriptorMember[];
   joins: Join[];
@@ -62,7 +62,7 @@ export type TableSchema = {
   measures: any[];
   dimensions: Dimension[];
   drillMembers?: Dimension[];
-  joins: any[];
+  joins: Join[];
 };
 
 const MEASURE_DICTIONARY = [
@@ -76,7 +76,7 @@ const MEASURE_DICTIONARY = [
   'qty',
   'quantity',
   'duration',
-  'value'
+  'value',
 ];
 
 const DRILL_MEMBERS_DICTIONARY = [
@@ -93,7 +93,7 @@ const DRILL_MEMBERS_DICTIONARY = [
   'timestamp',
   'city',
   'country',
-  'date'
+  'date',
 ];
 
 const idRegex = '_id$|id$';
@@ -110,7 +110,38 @@ export class ScaffoldingSchema {
   public constructor(
     private readonly dbSchema: DatabaseSchema,
     private readonly options: ScaffoldingSchemaOptions = {}
-  ) {
+  ) {}
+
+  public resolveTableName(tableName: TableName) {
+    let tableParts;
+    if (Array.isArray(tableName)) {
+      tableParts = tableName;
+    } else {
+      tableParts = tableName.match(/(["`].*?["`]|[^`".]+)+(?=\s*|\s*$)/g);
+    }
+
+    if (tableParts.length === 2) {
+      this.resolveTableDefinition(tableName);
+      return tableName;
+    } else if (tableParts.length === 1 && typeof tableName === 'string') {
+      const schema = Object.keys(this.dbSchema).find(
+        (tableSchema) => this.dbSchema[tableSchema][tableName] ||
+          this.dbSchema[tableSchema][inflection.tableize(tableName)]
+      );
+      if (!schema) {
+        throw new UserError(`Can't find any table with '${tableName}' name`);
+      }
+      if (this.dbSchema[schema][tableName]) {
+        return `${schema}.${tableName}`;
+      }
+      if (this.dbSchema[schema][inflection.tableize(tableName)]) {
+        return `${schema}.${inflection.tableize(tableName)}`;
+      }
+    }
+
+    throw new UserError(
+      'Table names should be in <table> or <schema>.<table> format'
+    );
   }
 
   public cubeDescriptors(tableNames: TableName[]): CubeDescriptor[] {

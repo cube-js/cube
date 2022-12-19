@@ -3,6 +3,88 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.29](https://github.com/cube-js/cube.js/compare/v0.31.28...v0.31.29) (2022-12-18)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.31.28](https://github.com/cube-js/cube.js/compare/v0.31.27...v0.31.28) (2022-12-16)
+
+
+### Features
+
+* Support `string`, `time` and `boolean` measures ([#5842](https://github.com/cube-js/cube.js/issues/5842)) ([4543ede](https://github.com/cube-js/cube.js/commit/4543edefe5b2432c90bb8530bc6a3c24c5548de3))
+
+
+
+
+
+## [0.31.26](https://github.com/cube-js/cube.js/compare/v0.31.25...v0.31.26) (2022-12-13)
+
+
+### Bug Fixes
+
+* **trino-driver:** Timezone issue fix ([#5731](https://github.com/cube-js/cube.js/issues/5731)) Thanks [@yuraborue](https://github.com/yuraborue) ! ([70df903](https://github.com/cube-js/cube.js/commit/70df9034f4246be06956cbf1dc69de709d4d3df8))
+
+
+
+
+
+## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
+
+
+### Features
+
+* query limits ([#5763](https://github.com/cube-js/cube.js/issues/5763)) ([4ec172b](https://github.com/cube-js/cube.js/commit/4ec172b3dd27193d145afcdb8d9bf7ef1bd7505d))
+
+
+
+
+
+## [0.31.21](https://github.com/cube-js/cube.js/compare/v0.31.20...v0.31.21) (2022-12-06)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
+
+
+### Bug Fixes
+
+* packages/cubejs-schema-compiler/package.json to reduce vulnerabilities ([#5359](https://github.com/cube-js/cube.js/issues/5359)) ([cd81554](https://github.com/cube-js/cube.js/commit/cd81554079533eae2c35ce142b26ad862b6e250d))
+
+
+
+
+
+## [0.31.18](https://github.com/cube-js/cube.js/compare/v0.31.17...v0.31.18) (2022-11-28)
+
+
+### Features
+
+* yaml schema generation ([#5676](https://github.com/cube-js/cube.js/issues/5676)) ([fc0b810](https://github.com/cube-js/cube.js/commit/fc0b81016e5c66156d06f6834187d3323e9e8ca8))
+
+
+
+
+
+## [0.31.16](https://github.com/cube-js/cube.js/compare/v0.31.15...v0.31.16) (2022-11-23)
+
+
+### Features
+
+* **ksql-driver:** Support offset earliest, replays and per partition streaming ([#5663](https://github.com/cube-js/cube.js/issues/5663)) ([3a79d02](https://github.com/cube-js/cube.js/commit/3a79d02c9794b5e437a52f9f0be72eb82a92805a))
+
+
+
+
+
 ## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
 
 

@@ -173,6 +173,7 @@ pub struct ClusterImpl {
     server_name: String,
     server_addresses: Vec<String>,
     job_notify: Arc<Notify>,
+    long_running_job_notify: Arc<Notify>,
     meta_store_sender: Sender<MetaStoreEvent>,
     #[cfg(not(target_os = "windows"))]
     select_process_pool: RwLock<
@@ -266,6 +267,7 @@ struct JobRunner {
     server_name: String,
     notify: Arc<Notify>,
     stop_token: CancellationToken,
+    is_long_term: bool,
 }
 
 lazy_static! {
@@ -277,7 +279,9 @@ lazy_static! {
 impl Cluster for ClusterImpl {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError> {
         if self.server_name == node_name || is_self_reference(&node_name) {
-            self.job_notify.notify_waiters();
+            // TODO `notify_one()` was replaced by `notify_waiters()` here. Revisit in case of delays in job processing.
+            self.job_notify.notify_one();
+            self.long_running_job_notify.notify_one();
         } else {
             self.send_to_worker(&node_name, NetworkMessage::NotifyJobListeners)
                 .await?;
@@ -544,7 +548,9 @@ impl Cluster for ClusterImpl {
                 panic!("MetaStoreCall sent to worker");
             }
             NetworkMessage::NotifyJobListeners => {
-                self.job_notify.notify_waiters();
+                // TODO `notify_one()` was replaced by `notify_waiters()` here. Revisit in case of delays in job processing.
+                self.job_notify.notify_one();
+                self.long_running_job_notify.notify_one();
                 NetworkMessage::NotifyJobListenersSuccess
             }
             NetworkMessage::NotifyJobListenersSuccess => {
@@ -690,9 +696,6 @@ impl JobRunner {
                 _ = self.notify.notified() => {
                     self.fetch_and_process().await
                 }
-                _ = Delay::new(Duration::from_secs(5)) => {
-                    self.fetch_and_process().await
-                }
             };
             if let Err(e) = res {
                 error!("Error in processing loop: {}", e);
@@ -703,7 +706,7 @@ impl JobRunner {
     async fn fetch_and_process(&self) -> Result<(), CubeError> {
         let job = self
             .meta_store
-            .start_processing_job(self.server_name.to_string())
+            .start_processing_job(self.server_name.to_string(), self.is_long_term)
             .await?;
         if let Some(to_process) = job {
             self.run_local(to_process).await?;
@@ -775,7 +778,8 @@ impl JobRunner {
                 "Running job {} ({:?}): {:?}",
                 e.message,
                 start.elapsed()?,
-                self.meta_store.get_job(job_id).await?
+                // Job can be removed by the time of fetch
+                self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else if let Ok(Err(cube_err)) = res {
             self.meta_store
@@ -784,7 +788,8 @@ impl JobRunner {
             error!(
                 "Running job join error ({:?}): {:?}",
                 start.elapsed()?,
-                self.meta_store.get_job(job_id).await?
+                // Job can be removed by the time of fetch
+                self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else if let Ok(Ok(Err(cube_err))) = res {
             self.meta_store
@@ -798,7 +803,8 @@ impl JobRunner {
             error!(
                 "Running job error ({:?}): {:?}",
                 start.elapsed()?,
-                self.meta_store.get_job(job_id).await?
+                // Job can be removed by the time of fetch
+                self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else {
             let job = self
@@ -963,6 +969,7 @@ impl ClusterImpl {
             meta_store,
             cluster_transport,
             job_notify: Arc::new(Notify::new()),
+            long_running_job_notify: Arc::new(Notify::new()),
             meta_store_sender,
             #[cfg(not(target_os = "windows"))]
             select_process_pool: RwLock::new(None),
@@ -1008,8 +1015,11 @@ impl ClusterImpl {
             ));
         }
 
-        for _ in 0..self.config_obj.job_runners_count() {
+        for i in
+            0..self.config_obj.job_runners_count() + self.config_obj.long_term_job_runners_count()
+        {
             // TODO number of job event loops
+            let is_long_running = i >= self.config_obj.job_runners_count();
             let job_runner = JobRunner {
                 config_obj: self.config_obj.clone(),
                 meta_store: self.meta_store.clone(),
@@ -1017,13 +1027,37 @@ impl ClusterImpl {
                 compaction_service: self.injector.upgrade().unwrap().get_service_typed().await,
                 import_service: self.injector.upgrade().unwrap().get_service_typed().await,
                 server_name: self.server_name.clone(),
-                notify: self.job_notify.clone(),
+                notify: if is_long_running {
+                    self.long_running_job_notify.clone()
+                } else {
+                    self.job_notify.clone()
+                },
                 stop_token: self.stop_token.clone(),
+                is_long_term: is_long_running,
             };
             futures.push(cube_ext::spawn(async move {
                 job_runner.processing_loop().await;
             }));
         }
+
+        let stop_token = self.stop_token.clone();
+        let long_running_job_notify = self.long_running_job_notify.clone();
+        let job_notify = self.job_notify.clone();
+
+        futures.push(cube_ext::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = stop_token.cancelled() => {
+                        return;
+                    }
+                    _ = Delay::new(Duration::from_secs(5)) => {
+                        job_notify.notify_one();
+                        long_running_job_notify.notify_one();
+                    }
+                };
+            }
+        }));
+
         join_all(futures)
             .await
             .into_iter()

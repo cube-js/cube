@@ -18,7 +18,7 @@ enabled using `CUBEJS_WEB_SOCKETS` environment variable:
 
 **.env:**
 
-```dotenv
+```bash
 CUBEJS_WEB_SOCKETS=true
 ```
 

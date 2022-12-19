@@ -421,6 +421,8 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
 pub trait ImportService: DIService + Send + Sync {
     async fn import_table(&self, table_id: u64) -> Result<(), CubeError>;
     async fn import_table_part(&self, table_id: u64, location: &str) -> Result<(), CubeError>;
+    async fn validate_table_location(&self, table_id: u64, location: &str)
+        -> Result<(), CubeError>;
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError>;
 }
 
@@ -672,6 +674,20 @@ impl ImportService for ImportServiceImpl {
         Ok(())
     }
 
+    async fn validate_table_location(
+        &self,
+        table_id: u64,
+        location: &str,
+    ) -> Result<(), CubeError> {
+        let table = self.meta_store.get_table_by_id(table_id).await?;
+        if Table::is_stream_location(location) {
+            self.streaming_service
+                .validate_table_location(table, location)
+                .await?;
+        }
+        Ok(())
+    }
+
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError> {
         if location.starts_with("http") {
             let client = reqwest::Client::new();
@@ -749,7 +765,9 @@ impl Ingestion {
                     Ok((c.get_id(), file_size))
                 })
                 .collect();
-            meta_store.activate_chunks(table_id, new_chunk_ids?).await
+            meta_store
+                .activate_chunks(table_id, new_chunk_ids?, None)
+                .await
         }));
 
         Ok(())

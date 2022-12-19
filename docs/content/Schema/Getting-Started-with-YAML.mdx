@@ -26,11 +26,11 @@ with a few key differences:
    `preAggregations` can be written as `pre_aggregations` etc. We recommend
    using snake-case in YAML models.
 
-2. References to cubes, views and context variables should be wrapped in `{}` i.e.
-   `{FILTER_PARAMS.Orders.created_at.filter('created_at')}`.
+2. References to cubes, views and context variables should be wrapped in `{}`
+   i.e. `{FILTER_PARAMS.Orders.created_at.filter('created_at')}`.
 
-3. String values only need to have quotes around them if they contain special values:
-   `"{CUBE}.user_id = {Users.id}"`
+3. String values only need to have quotes around them if they contain special
+   values: `"{CUBE}.user_id = {Users.id}"`
 
 ### <--{"id" : "Syntax"}--> Defining cubes
 
@@ -67,6 +67,11 @@ cubes:
         type: count
         filters:
           - sql: "{CUBE}.status = 'completed'"
+      - name: rollingCount
+        sql: id
+        type: count
+        rolling_window:
+          trailing: 1 month
       - name: distinct_user_count
         type: count_distinct
         sql: user_id
@@ -93,6 +98,16 @@ cubes:
       - name: status
         sql: status
         type: string
+      - name: simple_status
+        type: string
+        case:
+          when:
+            - sql: "{CUBE}.status = 'completed'"
+              label: done
+            - sql: "{CUBE}.status = 'shipped'"
+              label: done
+          else:
+            label: not done
       - name: created_at
         sql: created_at
         type: time
@@ -143,6 +158,34 @@ cubes:
               - status
 ```
 
+### <--{"id" : "Syntax"}--> Extending cubes
+
+Cubes can also [be extended][ref-schema-advanced-extends] with the `extends`
+property:
+
+```yaml
+cubes:
+  - name: BaseOrders
+    sql: SELECT * FROM public.orders
+  - name: ExtendedOrders
+    extends: BaseOrders
+    pre_aggregations:
+      - name: orders_by_status
+        measures:
+          - CUBE.count
+        dimensions:
+          - CUBE.status
+        time_dimension: CUBE.created_at
+        granularity: week
+        partition_granularity: month
+        indexes:
+          status_index:
+            columns:
+              - status
+```
+
+[ref-schema-advanced-extends]: /schema/advanced/extending-cubes
+
 ## Using context variables
 
 ### <--{"id" : "Using context variables"}--> COMPILE_CONTEXT
@@ -154,11 +197,11 @@ Use dot-notation to specify the property from [`COMPILE_CONTEXT`
 cubes:
   - name: Orders
     sql: SELECT * FROM public.orders
-    shown: COMPILE_CONTEXT.securityContext.property
+    shown: COMPILE_CONTEXT.securityContext.<PROPERTY_NAME>
 ```
 
-If referencing the security context, ensure that you use camel-case (i.e.
-`securityContext`).
+If referencing the [security context][ref-security-ctx], ensure that you use
+camel-case (i.e. `securityContext`).
 
 ### <--{"id" : "Using context variables"}--> FILTER_PARAMS
 
@@ -205,3 +248,4 @@ please post an issue on GitHub.
 [ref-schema-ref-measure-types]:
   /schema/reference/types-and-formats#measures-types
 [ref-schema-ref-preaggs]: schema/reference/pre-aggregations
+[ref-security-ctx]: /security/context

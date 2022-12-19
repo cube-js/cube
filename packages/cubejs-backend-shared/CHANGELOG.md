@@ -3,6 +3,50 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.29](https://github.com/cube-js/cube.js/compare/v0.31.28...v0.31.29) (2022-12-18)
+
+
+### Bug Fixes
+
+* Error: WebSocket is not open: readyState 2 (CLOSING) ([#5846](https://github.com/cube-js/cube.js/issues/5846)) ([a5be099](https://github.com/cube-js/cube.js/commit/a5be099f1d339ceb17c89439d6195c5718c726bb))
+
+
+
+
+
+## [0.31.26](https://github.com/cube-js/cube.js/compare/v0.31.25...v0.31.26) (2022-12-13)
+
+
+### Features
+
+* **cubestore:** Introduce pre-aggregation table touch and allow to drop tables without touch using `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` env ([#5794](https://github.com/cube-js/cube.js/issues/5794)) ([ad6c1e8](https://github.com/cube-js/cube.js/commit/ad6c1e8d09c228c28bb957755339a1146f54d6c9))
+
+
+
+
+
+## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
+
+
+### Features
+
+* query limits ([#5763](https://github.com/cube-js/cube.js/issues/5763)) ([4ec172b](https://github.com/cube-js/cube.js/commit/4ec172b3dd27193d145afcdb8d9bf7ef1bd7505d))
+
+
+
+
+
+## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
+
+
+### Features
+
+* catalog support for the Databricks driver ([#5666](https://github.com/cube-js/cube.js/issues/5666)) ([de5ba9a](https://github.com/cube-js/cube.js/commit/de5ba9a247543b432ea82b4371ddb052f1c91227))
+
+
+
+
+
 ## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
 
 

@@ -49,6 +49,13 @@ export class LocalQueueDriverConnection {
     return res;
   }
 
+  /**
+   * Returns promise wich will be resolved with the specified by the
+   * queryKey query result or null if query was not added to the
+   * processing.
+   * @param {*} queryKey
+   * @returns {Promise<null | *>}
+   */
   async getResult(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
     if (this.resultPromises[resultListKey] && this.resultPromises[resultListKey].resolved) {
@@ -66,6 +73,21 @@ export class LocalQueueDriverConnection {
     )(queueObj);
   }
 
+  /**
+   * Adds specified by the queryKey query to the queue, returns tuple
+   * with the operation result.
+   *
+   * @typedef {[added: number, _b: null, _c: null, toProcessLength: number, addedTime: number]} AddedTuple
+   *
+   * @param {number} keyScore
+   * @param {*} queryKey
+   * @param {number} orphanedTime
+   * @param {string} queryHandler (for the regular query is eq to 'query')
+   * @param {*} query
+   * @param {number} priority
+   * @param {*} options
+   * @returns {AddedTuple}
+   */
   addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
     const queryQueueObj = {
       queryHandler,
@@ -185,6 +207,11 @@ export class LocalQueueDriverConnection {
     return this.queryDef[this.redisHash(queryKey)];
   }
 
+  /**
+   * Updates heart beat for the processing query by its `queryKey`.
+   *
+   * @param {string} queryKey
+   */
   updateHeartBeat(queryKey) {
     const key = this.redisHash(queryKey);
     if (this.heartBeat[key]) {
@@ -245,14 +272,31 @@ export class LocalQueueDriverConnection {
   release() {
   }
 
+  /**
+   * Returns cache key to the specified by the queryKey query and the
+   * specified by the suffix query state.
+   * @param {*} queryKey
+   * @param {string} suffix
+   * @returns {string}
+   */
   queryRedisKey(queryKey, suffix) {
     return `${this.redisQueuePrefix}_${this.redisHash(queryKey)}_${suffix}`;
   }
 
+  /**
+   * Returns cache key to the cached query result.
+   * @param {*} queryKey
+   * @returns {string}
+   */
   resultListKey(queryKey) {
     return this.queryRedisKey(queryKey, 'RESULT');
   }
 
+  /**
+   * Returns hash sum of the query specified by the queryKey.
+   * @param {*} queryKey
+   * @returns {string}
+   */
   redisHash(queryKey) {
     return this.driver.redisHash(queryKey);
   }

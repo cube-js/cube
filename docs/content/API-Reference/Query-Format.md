@@ -67,7 +67,7 @@ A Query has the following properties:
   measures without aggregation and time dimensions will be truncated as usual
   however not grouped by.
 
-```js
+```javascript
 {
   measures: ['Stories.count'],
   dimensions: ['Stories.category'],
@@ -106,7 +106,7 @@ default using the following rules:
 Also you can control the ordering of the `order` specification, Cube support
 alternative order format - array of tuples:
 
-```js
+```javascript
 {
   ...,
   order: [
@@ -153,7 +153,7 @@ Use it when you need an exact match. It supports multiple values.
 - Applied to measures.
 - Dimension types: `string`, `number`, `time`.
 
-```js
+```javascript
 {
   member: "Users.country",
   operator: "equals",
@@ -168,7 +168,7 @@ The opposite operator of `equals`. It supports multiple values.
 - Applied to measures.
 - Dimension types: `string`, `number`, `time`.
 
-```js
+```javascript
 {
   member: "Users.country",
   operator: "notEquals",
@@ -198,7 +198,7 @@ The opposite operator of `contains`. It supports multiple values.
 
 - Dimension types: `string`.
 
-```js
+```javascript
 {
   member: "Posts.title",
   operator: "notContains",
@@ -214,7 +214,7 @@ operator with `%` at the start of each value. It supports multiple values.
 
 - Dimension types: `string`.
 
-```js
+```javascript
 {
   member: "Posts.title",
   operator: "startsWith",
@@ -230,7 +230,7 @@ at the end. In the majority of SQL backends, it uses the `ILIKE` operator with
 
 - Dimension types: `string`.
 
-```js
+```javascript
 {
   member: "Posts.title",
   operator: "endsWith",
@@ -246,7 +246,7 @@ of type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```js
+```javascript
 {
   member: "Posts.upvotesCount",
   operator: "gt",
@@ -262,7 +262,7 @@ or dimensions of type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```js
+```javascript
 {
   member: "Posts.upvotesCount",
   operator: "gte",
@@ -278,7 +278,7 @@ type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```js
+```javascript
 {
   member: "Posts.upvotesCount",
   operator: "lt",
@@ -294,7 +294,7 @@ dimensions of type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```js
+```javascript
 {
   member: "Posts.upvotesCount",
   operator: "lte",
@@ -310,7 +310,7 @@ don't need to pass `values` for this operator.
 - Applied to measures.
 - Dimension types: `number`, `string`, `time`.
 
-```js
+```javascript
 {
   member: "Posts.authorName",
   operator: "set"
@@ -325,7 +325,7 @@ An opposite to the `set` operator. It checks whether the value of the member
 - Applied to measures.
 - Dimension types: `number`, `string`, `time`.
 
-```js
+```javascript
 {
   member: "Posts.authorName",
   operator: "notSet"
@@ -356,7 +356,7 @@ There is a convient way to use date filters with grouping -
 
 - Dimension types: `time`.
 
-```js
+```javascript
 {
   member: "Posts.time",
   operator: "inDateRange",
@@ -381,7 +381,7 @@ dates. The values format is the same as for `inDateRange`.
 
 - Dimension types: `time`.
 
-```js
+```javascript
 {
   member: "Posts.time",
   operator: "notInDateRange",
@@ -406,7 +406,7 @@ values should be an array of one element in `YYYY-MM-DD` format.
 
 - Dimension types: `time`.
 
-```js
+```javascript
 {
   member: "Posts.time",
   operator: "beforeDate",
@@ -430,7 +430,7 @@ The same as `beforeDate`, but is used to get all results after a specific date.
 
 - Dimension types: `time`.
 
-```js
+```javascript
 {
   member: "Posts.time",
   operator: "afterDate",
@@ -446,7 +446,7 @@ only one of the following properties:
 - `or` An array with one or more filters or other logical operators
 - `and` An array with one or more filters or other logical operators
 
-```js
+```javascript
 {
   or: [
     {
@@ -497,7 +497,7 @@ provides a convenient shortcut to pass a dimension and a filter as a
   `null` to the granularity, Cube will only perform filtering by a specified
   time dimension, without grouping.
 
-```js
+```javascript
 {
   measures: ['Stories.count'],
   timeDimensions: [{
@@ -513,7 +513,7 @@ metric performed over a period in the past and how it performs now. You can pass
 two or more date ranges where each of them is in the same format as a
 `dateRange`
 
-```js
+```javascript
 // ...
 const resultSet = cubejsApi.load({
   measures: ['Stories.count'],
@@ -531,7 +531,7 @@ const resultSet = cubejsApi.load({
 You can also set a relative `dateRange`, e.g. `today`, `yesterday`, `tomorrow`,
 `last year`, `next month`, or `last 6 months`.
 
-```js
+```javascript
 {
   measures: ['Stories.count'],
   timeDimensions: [{
@@ -546,7 +546,7 @@ Be aware that e.g. `Last 7 days` or `Next 2 weeks` do not include the current
 date. If you need the current date also you can use `from N days ago to now` or
 `from now to N days from now`.
 
-```js
+```javascript
 {
   measures: ['Stories.count'],
   timeDimensions: [{

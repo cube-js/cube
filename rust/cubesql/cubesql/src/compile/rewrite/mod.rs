@@ -23,9 +23,32 @@ use egg::{
     rewrite, Applier, EGraph, Id, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
     Symbol, Var,
 };
-use std::{fmt::Display, ops::Index, slice::Iter, str::FromStr};
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Index,
+    slice::Iter,
+    str::FromStr,
+};
 
 // trace_macros!(true);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+pub enum LikeType {
+    Like,
+    ILike,
+    SimilarTo,
+}
+
+impl Display for LikeType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let join_type = match self {
+            LikeType::Like => "Like",
+            LikeType::ILike => "ILike",
+            LikeType::SimilarTo => "SimilarTo",
+        };
+        write!(f, "{}", join_type)
+    }
+}
 
 crate::plan_to_language! {
     pub enum LogicalPlanLanguage {
@@ -138,6 +161,13 @@ crate::plan_to_language! {
             left: Box<Expr>,
             op: Operator,
             right: Box<Expr>,
+        },
+        LikeExpr {
+            like_type: LikeType,
+            negated: bool,
+            expr: Box<Expr>,
+            pattern: Box<Expr>,
+            escape_char: Option<char>,
         },
         NotExpr { expr: Box<Expr>, },
         IsNotNullExpr { expr: Box<Expr>, },
@@ -314,7 +344,7 @@ crate::plan_to_language! {
         },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
-            column_name_to_member: Vec<(String, String)>,
+            column_name_to_member: Vec<(String, Option<String>)>,
         },
         InnerAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
@@ -333,6 +363,11 @@ crate::plan_to_language! {
             alias_to_cube: Vec<(String, String)>,
         },
         GroupAggregateSplitReplacer {
+            members: Vec<LogicalPlan>,
+            alias_to_cube: Vec<(String, String)>,
+        },
+        // NOTE: converting this to a list might provide rewrite improvements
+        CaseExprReplacer {
             members: Vec<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
         },
@@ -391,17 +426,29 @@ impl ExprRewriter for WithColumnRelation {
     }
 }
 
-fn column_name_to_member_vec(member_name_to_expr: Vec<(String, Expr)>) -> Vec<(String, String)> {
+fn column_name_to_member_vec(
+    member_name_to_expr: Vec<(Option<String>, Expr)>,
+) -> Vec<(String, Option<String>)> {
     let mut relation = WithColumnRelation(None);
     member_name_to_expr
         .into_iter()
         .map(|(member, expr)| {
             vec![
-                (expr_column_name(expr.clone(), &None), member.to_string()),
+                (expr_column_name(expr.clone(), &None), member.clone()),
                 (expr_column_name_with_relation(expr, &mut relation), member),
             ]
         })
         .flatten()
+        .collect::<Vec<_>>()
+}
+
+fn column_name_to_member_to_aliases(
+    column_name_to_member: Vec<(String, Option<String>)>,
+) -> Vec<(String, String)> {
+    column_name_to_member
+        .into_iter()
+        .filter(|(_, member)| member.is_some())
+        .map(|(column_name, member)| (column_name, member.unwrap()))
         .collect::<Vec<_>>()
 }
 
@@ -416,6 +463,7 @@ fn member_name_by_alias(
             .into_iter()
             .find(|(cn, _)| cn == alias)
             .map(|(_, member)| member)
+            .flatten()
     } else {
         None
     }
@@ -578,8 +626,14 @@ fn scalar_fun_expr_args_empty_tail() -> String {
 }
 
 fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl Display) -> String {
+    let prefix = if fun_name.to_string().starts_with("?") {
+        ""
+    } else {
+        "AggregateFunctionExprFun:"
+    };
     format!(
-        "(AggregateFunctionExpr {} {} {})",
+        "(AggregateFunctionExpr {}{} {} {})",
+        prefix,
         fun_name,
         list_expr("AggregateFunctionExprArgs", args),
         distinct
@@ -664,6 +718,19 @@ fn between_expr(
     format!("(BetweenExpr {} {} {} {})", expr, negated, low, high)
 }
 
+fn like_expr(
+    like_type: impl Display,
+    negated: impl Display,
+    expr: impl Display,
+    pattern: impl Display,
+    escape_char: impl Display,
+) -> String {
+    format!(
+        "(LikeExpr {} {} {} {} {})",
+        like_type, negated, expr, pattern, escape_char
+    )
+}
+
 fn negative_expr(expr: impl Display) -> String {
     format!("(NegativeExpr {})", expr)
 }
@@ -708,9 +775,13 @@ fn case_expr_var_arg(
     format!("(CaseExpr {} {} {})", expr, when_then, else_expr)
 }
 
-fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> String {
+fn case_expr<D: Display>(
+    expr: Option<String>,
+    when_then: Vec<(D, D)>,
+    else_expr: Option<String>,
+) -> String {
     case_expr_var_arg(
-        "CaseExprExpr",
+        case_expr_expr(expr),
         list_expr(
             "CaseExprWhenThenExpr",
             when_then
@@ -719,7 +790,35 @@ fn case_expr<D: Display>(when_then: Vec<(D, D)>, else_expr: impl Display) -> Str
                 .flatten()
                 .collect(),
         ),
-        list_expr("CaseExprElseExpr", vec![else_expr]),
+        case_expr_else_expr(else_expr),
+    )
+}
+
+fn case_expr_expr(expr: Option<String>) -> String {
+    list_expr(
+        "CaseExprExpr",
+        match expr {
+            Some(expr) => vec![expr],
+            None => vec![],
+        },
+    )
+}
+
+fn case_expr_when_then_expr(left: impl Display, right: impl Display) -> String {
+    format!("(CaseExprWhenThenExpr {} {})", left, right)
+}
+
+fn case_expr_when_then_expr_empty_tail() -> String {
+    format!("CaseExprWhenThenExpr")
+}
+
+fn case_expr_else_expr(else_expr: Option<String>) -> String {
+    list_expr(
+        "CaseExprElseExpr",
+        match else_expr {
+            Some(else_expr) => vec![else_expr],
+            None => vec![],
+        },
     )
 }
 
@@ -874,6 +973,10 @@ fn group_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Dis
         "(GroupAggregateSplitReplacer {} {})",
         members, alias_to_cube
     )
+}
+
+fn case_expr_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
+    format!("(CaseExprReplacer {} {})", members, alias_to_cube)
 }
 
 fn event_notification(name: impl Display, members: impl Display, meta: impl Display) -> String {

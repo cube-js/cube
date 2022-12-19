@@ -508,6 +508,35 @@ const variables: Record<string, (...args: any) => any> = {
     return convertTimeStrToMs(value, key);
   },
 
+  /**
+   * Max limit which can be specified in the incoming query.
+   */
+  dbQueryLimit: (): number => get('CUBEJS_DB_QUERY_LIMIT')
+    .default(50000)
+    .asInt(),
+
+  /**
+   * Query limit wich will be used in the query to the data source if
+   * limit property was not specified in the query.
+   */
+  dbQueryDefaultLimit: (): number => get('CUBEJS_DB_QUERY_DEFAULT_LIMIT')
+    .default(10000)
+    .asInt(),
+
+  /**
+   * Expire time for touch records
+   */
+  touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
+    .default(60 * 60 * 24)
+    .asInt(),
+
+  /**
+   * Expire time for touch records
+   */
+  dropPreAggregationsWithoutTouch: (): boolean => get('CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH')
+    .default('false')
+    .asBoolStrict(),
+
   /** ****************************************************************
    * JDBC options                                                    *
    ***************************************************************** */
@@ -690,6 +719,14 @@ const variables: Record<string, (...args: any) => any> = {
    ***************************************************************** */
 
   /**
+   * Accept Databricks policy flag. This environment variable doesn't
+   * need to be split by the data source.
+   */
+  databrickAcceptPolicy: () => (
+    get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict()
+  ),
+
+  /**
    * Databricks jdbc-connection url.
    */
   databrickUrl: ({
@@ -714,7 +751,7 @@ const variables: Record<string, (...args: any) => any> = {
    * Databricks jdbc-connection token.
    */
   databrickToken: ({
-    dataSource
+    dataSource,
   }: {
     dataSource: string,
   }) => (
@@ -724,12 +761,16 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Accept Databricks policy flag. This environment variable doesn't
-   * need to be split by the data source.
+   * Databricks catalog name.
+   * https://www.databricks.com/product/unity-catalog
    */
-  databrickAcceptPolicy: () => (
-    get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict()
-  ),
+  databricksCatalog: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => process.env[
+    keyByDataSource('CUBEJS_DB_DATABRICKS_CATALOG', dataSource)
+  ],
 
   /** ****************************************************************
    * Athena Driver                                                   *
@@ -1274,6 +1315,9 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
     .asString(),
+  cubeStoreMaxConnectRetries: () => get('CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES')
+    .default('5')
+    .asInt(),
 
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')

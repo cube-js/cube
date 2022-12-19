@@ -22,9 +22,7 @@ module.exports = {
   extendContext: (req) => {
     const { department } = jwtDecode(req.headers['authorization']);
     return {
-      permissions: {
-        finance: department === 'finance',
-      },
+      isFinance: department === 'finance',
     };
   },
 };
@@ -51,13 +49,13 @@ cube(`Users`, {
 
 // TotalRevenuePerCustomer.js
 view('TotalRevenuePerCustomer', {
-	description: `Total revenue per customer`,
-  shown: COMPILE_CONTEXT.permissions['finance'],
+  description: `Total revenue per customer`,
+  shown: COMPILE_CONTEXT.permissions.isFinance,
 
-	includes: [
-		Orders.totalRevenue,
-		Users.company,
-	],
+  includes: [
+    Orders.totalRevenue,
+    Users.company,
+  ],
 });
 ```
 

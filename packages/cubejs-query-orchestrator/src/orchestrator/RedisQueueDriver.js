@@ -31,6 +31,21 @@ export class RedisQueueDriverConnection {
     return result && JSON.parse(result);
   }
 
+  /**
+   * Adds specified by the queryKey query to the queue, returns tuple
+   * with the operation result.
+   *
+   * @typedef {[added: number, _b: *, _c: *, toProcessLength: number, addedTime: number]} AddedTuple
+   *
+   * @param {number} keyScore
+   * @param {*} queryKey
+   * @param {number} orphanedTime
+   * @param {string} queryHandler (for the regular query is eq to 'query')
+   * @param {*} query
+   * @param {number} priority
+   * @param {*} options
+   * @returns {AddedTuple}
+   */
   addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
     const data = {
       queryHandler,
@@ -166,6 +181,11 @@ export class RedisQueueDriverConnection {
     return JSON.parse(query);
   }
 
+  /**
+   * Updates heart beat for the processing query by its `queryKey`.
+   *
+   * @param {string} queryKey
+   */
   updateHeartBeat(queryKey) {
     return this.redisClient.zaddAsync([this.heartBeatRedisKey(), new Date().getTime(), this.redisHash(queryKey)]);
   }

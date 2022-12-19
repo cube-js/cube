@@ -50,6 +50,17 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                 }),
             ),
             (
+                Field::new("replay_handle_id", DataType::UInt64, false),
+                Box::new(|chunks| {
+                    Arc::new(UInt64Array::from(
+                        chunks
+                            .iter()
+                            .map(|row| row.get_row().replay_handle_id().clone())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
                 Field::new("row_count", DataType::UInt64, true),
                 Box::new(|chunks| {
                     Arc::new(UInt64Array::from(

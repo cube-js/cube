@@ -692,6 +692,23 @@ describe('Single datasources', () => {
     expect(getEnv('databrickToken', { dataSource: 'wrong' })).toBeUndefined();
   });
 
+  test('getEnv("databricksCatalog")', () => {
+    process.env.CUBEJS_DB_DATABRICKS_CATALOG = 'default1';
+    expect(getEnv('databricksCatalog', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('databricksCatalog', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('databricksCatalog', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_DATABRICKS_CATALOG = 'default2';
+    expect(getEnv('databricksCatalog', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('databricksCatalog', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('databricksCatalog', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_DATABRICKS_CATALOG;
+    expect(getEnv('databricksCatalog', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('databricksCatalog', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('databricksCatalog', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
   test('getEnv("databrickAcceptPolicy")', () => {
     process.env.CUBEJS_DB_DATABRICKS_ACCEPT_POLICY = 'true';
     expect(getEnv('databrickAcceptPolicy', { dataSource: 'default' })).toEqual(true);

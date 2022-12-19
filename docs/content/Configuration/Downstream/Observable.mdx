@@ -38,7 +38,7 @@ You need to set the following environment variables to enable the Cube SQL API.
 These credentials will be required to connect to Cube from Observable
 later.
 
-```dotenv
+```bash
 CUBEJS_PG_SQL_PORT=5432
 CUBEJS_SQL_USER=myusername
 CUBEJS_SQL_PASSWORD=mypassword
@@ -133,13 +133,13 @@ First, add two generic **JavaScript** cells:
 
 Next, copy Cube's REST API URL and the Authorization token and paste them into their respective cells.
 
-```js
+```javascript
 cubeRestApi = 'https://thirsty-raccoon.aws-eu-central-1.cubecloudapp.dev/cubejs-api/v1/load'
 ```
 
 Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget to add the `/load` endpoint to the end of the data source API.
 
-```js
+```javascript
 cubeRestApiJwtToken = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTgzMzM3OTZ9.gUOoDgo_RJka_ZANdwSw3v8GkM4ZzH9LjxrxKxkGAk0'
 ```
 
@@ -157,7 +157,7 @@ Get your Cube query in the JSON [query format](https://cube.dev/docs/query-forma
 
 Paste the JSON query in another JavaScript cell as an object literal and give it a name, I chose `jsonBody` for simplicity. Make sure to add a `query` parameter for your JSON query.
 
-```js
+```javascript
 jsonQuery = ({
   "query": {
     "measures": [
@@ -178,7 +178,7 @@ jsonQuery = ({
 
 Next, create another JavaScript cell with a POST request. Paste this POST request in the cell. Don't forget to put the `jsonBody` object inside the `JSON.stringify` call.
 
-```js
+```javascript
 orders_over_time = fetch(cubeRestApi, {
   method: 'POST',
   headers: {

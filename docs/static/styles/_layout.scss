@@ -97,7 +97,9 @@ a {
 
 .searchBoxWrapper {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
+  padding: 12px 20px;
+  width: 100%;
 }
 
 .searchBox {

@@ -45,6 +45,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("float_decimal_scale", float_decimal_scale),
         t("float_merge", float_merge),
         t("join", join),
+        t("filtered_join", filtered_join),
         t("three_tables_join", three_tables_join),
         t(
             "three_tables_join_with_filter",
@@ -219,6 +220,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("inline_tables", inline_tables),
         t("inline_tables_2x", inline_tables_2x),
         t("build_range_end", build_range_end),
+        t("cache_incr", cache_incr),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -663,6 +665,48 @@ async fn join(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&result), rows(&[("a", "a"), ("b", "b")]));
+}
+
+async fn filtered_join(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.employee (name varchar) INDEX employee_name (name)")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query("CREATE TABLE foo.employee_department_bridge (employee_name text, department_name text) INDEX employee_department_bridge_name (employee_name)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO foo.employee (name) VALUES ('John'), ('Jim')")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO foo.employee_department_bridge (employee_name, department_name) VALUES ('John','Marketing'), ('Jim','Marketing')")
+        .await
+        .unwrap();
+
+    let result = service.exec_query("select * from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name = e.name where b.department_name = 'Non existing'").await.unwrap();
+
+    assert_eq!(result.len(), 0);
+
+    println!("{:?}", service
+        .exec_query(
+            "EXPLAIN ANALYZE select e.name from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name=e.name where b.department_name = 'Marketing' GROUP BY 1 LIMIT 10000",
+        )
+        .await
+        .unwrap());
+
+    let result = service
+        .exec_query(
+            "select e.name from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name=e.name where b.department_name = 'Marketing' GROUP BY 1 ORDER BY 1 LIMIT 10000",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&result), rows(&[("Jim"), ("John")]));
 }
 
 async fn three_tables_join(service: Box<dyn SqlClient>) {
@@ -6163,6 +6207,24 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
                 TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
             ]),
         ]
+    );
+}
+
+async fn cache_incr(service: Box<dyn SqlClient>) {
+    let query = r#"CACHE INCR "prefix:key""#;
+
+    let r = service.exec_query(query.clone()).await.unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+    );
+
+    let r = service.exec_query(query).await.unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![Row::new(vec![TableValue::String("2".to_string()),]),]
     );
 }
 

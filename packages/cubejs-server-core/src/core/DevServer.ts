@@ -154,7 +154,7 @@ export class DevServer {
       if (!Object.values(SchemaFormat).includes(req.body.format)) {
         throw new Error(`Unknown schema format. Must be one of ${Object.values(SchemaFormat)}`);
       }
-
+      
       const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver, req.body.format);
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables, { dataSource });
 

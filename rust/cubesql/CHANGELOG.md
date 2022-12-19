@@ -3,6 +3,95 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.28](https://github.com/cube-js/cube.js/compare/v0.31.27...v0.31.28) (2022-12-16)
+
+
+### Features
+
+* Support `string`, `time` and `boolean` measures ([#5842](https://github.com/cube-js/cube.js/issues/5842)) ([4543ede](https://github.com/cube-js/cube.js/commit/4543edefe5b2432c90bb8530bc6a3c24c5548de3))
+
+
+
+
+
+## [0.31.25](https://github.com/cube-js/cube.js/compare/v0.31.24...v0.31.25) (2022-12-10)
+
+
+### Bug Fixes
+
+* **cubesql:** normalize column names in filter node ([#5788](https://github.com/cube-js/cube.js/issues/5788)) ([28aa008](https://github.com/cube-js/cube.js/commit/28aa008d8060173b2af2052577afdc26cc32c36d))
+
+
+
+
+
+## [0.31.24](https://github.com/cube-js/cube.js/compare/v0.31.23...v0.31.24) (2022-12-09)
+
+
+### Bug Fixes
+
+* **cubesql:** Support `CAST` in `HAVING` clause ([17ba3e2](https://github.com/cube-js/cube.js/commit/17ba3e212fb801fbffec99ef043b443f6f2a698f))
+
+
+
+
+
+## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
+
+
+### Features
+
+* **cubesql:** Support `CASE` statements in cube projection ([e7ae68c](https://github.com/cube-js/cube.js/commit/e7ae68c1afcb1152c0248f61ee355f0b30cc9b73))
+
+
+
+
+
+## [0.31.22](https://github.com/cube-js/cube.js/compare/v0.31.21...v0.31.22) (2022-12-07)
+
+
+### Bug Fixes
+
+* **cubesql:** Metabase - auto-generated charts for cubes containing string dimensions ([#5728](https://github.com/cube-js/cube.js/issues/5728)) ([72be686](https://github.com/cube-js/cube.js/commit/72be68671faaa4c938374f95cb8cb81578ef4fdb))
+
+
+
+
+
+## [0.31.20](https://github.com/cube-js/cube.js/compare/v0.31.19...v0.31.20) (2022-12-02)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix escape symbols in `LIKE` expressions ([5f3cd50](https://github.com/cube-js/cube.js/commit/5f3cd50ea311900adc27ba2b30c72a05a3453a1d))
+
+
+### Features
+
+* **cubesql:** Support Thoughtspot include filter search ([745fe5d](https://github.com/cube-js/cube.js/commit/745fe5d2806b4c6c9e76d6061aa038892ec7438f))
+* **cubesql:** Support ThoughtSpot search filters ([ee0fde4](https://github.com/cube-js/cube.js/commit/ee0fde4798894c619f63cfd87cfc118c7ff1fc78))
+
+
+
+
+
+## [0.31.18](https://github.com/cube-js/cube.js/compare/v0.31.17...v0.31.18) (2022-11-28)
+
+
+### Bug Fixes
+
+* **cubesql:** Prevent infinite limit push down ([f26d40a](https://github.com/cube-js/cube.js/commit/f26d40a3b91a2651811cfa622424c6ed2e44dfef))
+* **cubesql:** Push down projection to CubeScan with literals ([207616d](https://github.com/cube-js/cube.js/commit/207616d8e51649a78b854b02fc83611472aea715))
+
+
+### Features
+
+* **cubesql:** Sigma Computing date filters ([404e3f4](https://github.com/cube-js/cube.js/commit/404e3f42ac02be8c0c9eaacb6cf81bb516616001))
+
+
+
+
+
 ## [0.31.14](https://github.com/cube-js/cube.js/compare/v0.31.13...v0.31.14) (2022-11-14)
 
 

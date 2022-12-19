@@ -1,5 +1,6 @@
 /* globals describe, test, expect, afterAll */
 import { QueryQueue } from '../../src/orchestrator/QueryQueue';
+import { processUidRE } from '../../src/orchestrator/utils';
 
 export const QueryQueueTest = (name: string, options?: any) => {
   describe(`QueryQueue${name}`, () => {
@@ -66,7 +67,7 @@ export const QueryQueueTest = (name: string, options?: any) => {
           await queue.executeInQueue('delay', query, { delay: 3000, result: '1' });
           console.log(`Delay ${i}`);
         } catch (e) {
-          if (e.message === 'Continue wait') {
+          if ((<Error>e).message === 'Continue wait') {
             // eslint-disable-next-line no-continue
             continue;
           }
@@ -136,10 +137,30 @@ export const QueryQueueTest = (name: string, options?: any) => {
       await queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0);
     });
 
+    test('queue hash process persistent flag properly', () => {
+      const query = ['select * from table'];
+      const key1 = queue.redisHash(query);
+      // @ts-ignore
+      query.persistent = false;
+      const key2 = queue.redisHash(query);
+      // @ts-ignore
+      query.persistent = true;
+      const key3 = queue.redisHash(query);
+      const key4 = queue.redisHash(query);
+
+      expect(key1).toEqual(key2);
+      expect(key1.split('::').length).toBe(1);
+      expect(key3).toEqual(key4);
+      expect(key3.split('::').length).toBe(2);
+      expect(processUidRE.test(key3.split('::')[1])).toBeTruthy();
+      expect(queue.redisHash('string')).toBe('string');
+    });
+
     test('removed before reconciled', async () => {
       const query = ['select * from'];
-      await queue.processQuery(query);
-      const result = await queue.executeInQueue('foo', query, query);
+      const key = queue.redisHash(query);
+      await queue.processQuery(key);
+      const result = await queue.executeInQueue('foo', key, query);
       expect(result).toBe('select * from bar');
     });
 

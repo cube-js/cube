@@ -94,5 +94,59 @@ export const QueryCacheTest = (name: string, options?: any) => {
       expect(statusOfResolve).toEqual(true);
       expect(callbackWasExecuted).toEqual(true);
     });
+
+    it('queryCacheKey format', () => {
+      const key1 = QueryCache.queryCacheKey({
+        query: 'select data',
+        values: ['value'],
+        preAggregations: [],
+        invalidate: [],
+        persistent: true,
+      });
+      expect(key1[0]).toEqual('select data');
+      expect(key1[1]).toEqual(['value']);
+      expect(key1[2]).toEqual([]);
+      expect(key1[3]).toEqual([]);
+      // @ts-ignore
+      expect(key1.persistent).toEqual(true);
+
+      const key2 = QueryCache.queryCacheKey({
+        query: 'select data',
+        values: ['value'],
+        preAggregations: [],
+        invalidate: [],
+        persistent: false,
+      });
+      expect(key2[0]).toEqual('select data');
+      expect(key2[1]).toEqual(['value']);
+      expect(key2[2]).toEqual([]);
+      expect(key2[3]).toEqual([]);
+      // @ts-ignore
+      expect(key2.persistent).toEqual(false);
+
+      const key3 = QueryCache.queryCacheKey({
+        query: 'select data',
+        values: ['value'],
+        persistent: true,
+      });
+      expect(key3[0]).toEqual('select data');
+      expect(key3[1]).toEqual(['value']);
+      expect(key3[2]).toEqual([]);
+      expect(key3[3]).toBeUndefined();
+      // @ts-ignore
+      expect(key3.persistent).toEqual(true);
+
+      const key4 = QueryCache.queryCacheKey({
+        query: 'select data',
+        values: ['value'],
+        persistent: false,
+      });
+      expect(key4[0]).toEqual('select data');
+      expect(key4[1]).toEqual(['value']);
+      expect(key4[2]).toEqual([]);
+      expect(key4[3]).toBeUndefined();
+      // @ts-ignore
+      expect(key4.persistent).toEqual(false);
+    });
   });
 };

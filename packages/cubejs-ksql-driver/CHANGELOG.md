@@ -3,6 +3,73 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.29](https://github.com/cube-js/cube.js/compare/v0.31.28...v0.31.29) (2022-12-18)
+
+**Note:** Version bump only for package @cubejs-backend/ksql-driver
+
+
+
+
+
+## [0.31.28](https://github.com/cube-js/cube.js/compare/v0.31.27...v0.31.28) (2022-12-16)
+
+**Note:** Version bump only for package @cubejs-backend/ksql-driver
+
+
+
+
+
+## [0.31.26](https://github.com/cube-js/cube.js/compare/v0.31.25...v0.31.26) (2022-12-13)
+
+**Note:** Version bump only for package @cubejs-backend/ksql-driver
+
+
+
+
+
+## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
+
+**Note:** Version bump only for package @cubejs-backend/ksql-driver
+
+
+
+
+
+## [0.31.21](https://github.com/cube-js/cube.js/compare/v0.31.20...v0.31.21) (2022-12-06)
+
+**Note:** Version bump only for package @cubejs-backend/ksql-driver
+
+
+
+
+
+## [0.31.19](https://github.com/cube-js/cube.js/compare/v0.31.18...v0.31.19) (2022-11-29)
+
+**Note:** Version bump only for package @cubejs-backend/ksql-driver
+
+
+
+
+
+## [0.31.18](https://github.com/cube-js/cube.js/compare/v0.31.17...v0.31.18) (2022-11-28)
+
+**Note:** Version bump only for package @cubejs-backend/ksql-driver
+
+
+
+
+
+## [0.31.16](https://github.com/cube-js/cube.js/compare/v0.31.15...v0.31.16) (2022-11-23)
+
+
+### Features
+
+* **ksql-driver:** Support offset earliest, replays and per partition streaming ([#5663](https://github.com/cube-js/cube.js/issues/5663)) ([3a79d02](https://github.com/cube-js/cube.js/commit/3a79d02c9794b5e437a52f9f0be72eb82a92805a))
+
+
+
+
+
 ## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
 
 **Note:** Version bump only for package @cubejs-backend/ksql-driver

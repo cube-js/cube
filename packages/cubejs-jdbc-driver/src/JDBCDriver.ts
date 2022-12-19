@@ -36,6 +36,7 @@ const initMvn = (customClassPath: any) => {
         } else {
           if (!jinst.isJvmCreated()) {
             jinst.addOption('-Xrs');
+            jinst.addOption('-Dfile.encoding=UTF8');
             const classPath = (mvnResults && mvnResults.classpath || []).concat(customClassPath || []);
             jinst.setupClasspath(classPath);
           }

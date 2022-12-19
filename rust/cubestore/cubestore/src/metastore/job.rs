@@ -1,10 +1,11 @@
-use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, TableId};
+use super::{IndexId, RocksSecondaryIndex, TableId};
 use crate::base_rocks_secondary_index;
-use crate::metastore::{IdRow, MetaStoreEvent, RowKey};
+use crate::metastore::table::Table;
+use crate::metastore::RowKey;
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::{Cursor, Write};
 
@@ -97,6 +98,13 @@ impl Job {
 
     pub fn completed(&self) -> Job {
         self.update_status(JobStatus::Completed)
+    }
+
+    pub fn is_long_term(&self) -> bool {
+        match &self.job_type {
+            JobType::TableImportCSV(location) if Table::is_stream_location(location) => true,
+            _ => false,
+        }
     }
 }
 

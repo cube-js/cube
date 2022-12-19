@@ -95,6 +95,10 @@ describe('SQL Generation', () => {
           type: 'avg',
           sql: \`\${doubledCheckings}\`
         },
+        strCase: {
+          sql: \`CASE WHEN \${visitor_count} > 1 THEN 'More than 1' ELSE (\${visitor_revenue})::text END\`,
+          type: \`string\`
+        },
         ...(['foo', 'bar'].map(m => ({ [m]: { type: 'count' } })).reduce((a, b) => ({ ...a, ...b })))
       },
 
@@ -482,6 +486,20 @@ describe('SQL Generation', () => {
     visitors__visitor_count: '5',
     visitor_checkins__visitor_checkins_count: '6',
     visitors__per_visitor_revenue: '60'
+  }]));
+
+  it('string measure', async () => runQueryTest({
+    measures: [
+      'visitors.strCase',
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      dateRange: ['2017-01-01', '2017-01-30']
+    }],
+    timezone: 'America/Los_Angeles',
+    order: []
+  }, [{
+    visitors__str_case: 'More than 1'
   }]));
 
   it('running total', async () => {

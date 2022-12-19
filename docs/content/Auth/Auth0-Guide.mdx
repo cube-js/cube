@@ -116,7 +116,7 @@ In your application code, configure your API identifier as the audience when
 initializing Auth0. If you're using the `@auth0/auth-react` package for your
 application front-end, this might look something like this:
 
-```typescript jsx
+```tsx
 <Auth0Provider
   domain={process.env.AUTH_DOMAIN}
   client_id={process.env.AUTH_CLIENT_ID}
@@ -135,7 +135,7 @@ Now we're ready to configure Cube.js to use Auth0. Go to your Cube.js project
 and open the `.env` file and add the following, replacing the values wrapped in
 `<>`.
 
-```dotenv
+```bash
 CUBEJS_JWK_URL=https://<AUTH0-SUBDOMAIN>.auth0.com/.well-known/jwks.json
 CUBEJS_JWT_AUDIENCE=<APPLICATION_URL>
 CUBEJS_JWT_ISSUER=https://<AUTH0-SUBDOMAIN>.auth0.com/

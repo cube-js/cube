@@ -45,7 +45,7 @@ pub async fn cube_context() -> CubeContext {
 }
 
 pub fn query_to_logical_plan(query: String, context: &CubeContext) -> LogicalPlan {
-    let stmt = parse_sql_to_statement(&query, DatabaseProtocol::PostgreSQL).unwrap();
+    let stmt = parse_sql_to_statement(&query, DatabaseProtocol::PostgreSQL, &mut None).unwrap();
     let stmt = rewrite_statement(&stmt);
     let df_query_planner = SqlToRel::new_with_options(context, true);
 

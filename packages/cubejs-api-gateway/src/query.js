@@ -96,7 +96,7 @@ const querySchema = Joi.object().keys({
   ),
   segments: Joi.array().items(id),
   timezone: Joi.string(),
-  limit: Joi.number().integer().min(1).max(50000),
+  limit: Joi.number().integer().min(1),
   offset: Joi.number().integer().min(0),
   total: Joi.boolean(),
   renewQuery: Joi.boolean(),
