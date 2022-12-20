@@ -73,17 +73,29 @@ earlier:
   type = "loki"
   inputs = [ "cubejs-server", "redis", "refresh-scheduler", "ext-db" ]
   endpoint = "https://logs-prod-us-central1.grafana.net"
-  auth = { strategy = "basic", user = "$CUBE_CLOUD_LOG_EXPORT_LOKI_USER", password = "$CUBE_CLOUD_LOG_EXPORT_LOKI_PASS" }
-  encoding = { codec = "json" }
-  labels = { app = "cube-cloud", env = "production" }
+[sinks.loki.encoding]
+  codec = "json"
+[sinks.loki.labels]
+  app = "cube-cloud"
+  env = "production"
+[sinks.loki.auth]
+  strategy = "basic"
+  user = "$CUBE_CLOUD_LOG_EXPORT_LOKI_USER"
+  password = "$CUBE_CLOUD_LOG_EXPORT_LOKI_PASS"
 
 [sinks.loki_cubestore]
   type = "loki"
   inputs = [ "cubestore" ]
   endpoint = "https://logs-prod-us-central1.grafana.net"
-  auth = { strategy = "basic", user = "$CUBE_CLOUD_LOG_EXPORT_LOKI_USER", password = "$CUBE_CLOUD_LOG_EXPORT_LOKI_PASS" }
-  encoding = { codec = "json" }
-  labels = { app = "cube-store", env = "production" }
+[sinks.loki_cubestore.encoding]
+  codec = "json"
+[sinks.loki_cubestore.labels]
+  app = "cube-store"
+  env = "production"
+[sinks.loki_cubestore.auth]
+  strategy = "basic"
+  user = "$CUBE_CLOUD_LOG_EXPORT_LOKI_USER"
+  password = "$CUBE_CLOUD_LOG_EXPORT_LOKI_PASS"
 [sinks.loki_cubestore.cubestore]
   levels = [ "trace", "info", "debug", "error" ]
 ```
