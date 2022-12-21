@@ -130,8 +130,12 @@ macro_rules! data_frame_from {
 macro_rules! base_rocks_secondary_index {
     ($table: ty, $index: ty) => {
         impl crate::metastore::BaseRocksSecondaryIndex<$table> for $index {
+            fn index_value(&self, row: &$table) -> Vec<u8> {
+                RocksSecondaryIndex::index_value(self, row)
+            }
+
             fn index_key_by(&self, row: &$table) -> Vec<u8> {
-                self.key_to_bytes(&self.typed_key_by(row))
+                RocksSecondaryIndex::index_key_by(self, row)
             }
 
             fn get_id(&self) -> u32 {
@@ -148,6 +152,14 @@ macro_rules! base_rocks_secondary_index {
 
             fn is_unique(&self) -> bool {
                 crate::metastore::RocksSecondaryIndex::is_unique(self)
+            }
+
+            fn is_ttl(&self) -> bool {
+                RocksSecondaryIndex::is_ttl(self)
+            }
+
+            fn get_expire<'a>(&self, row: &'a $table) -> &'a Option<chrono::DateTime<chrono::Utc>> {
+                RocksSecondaryIndex::get_expire(self, row)
             }
         }
     };
@@ -999,6 +1011,8 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError>;
 
     async fn debug_dump(&self, out_path: String) -> Result<(), CubeError>;
+    // Force compaction for the whole RocksDB
+    async fn compaction(&self) -> Result<(), CubeError>;
 }
 
 crate::di_service!(RocksMetaStore, [MetaStore]);
@@ -3597,6 +3611,20 @@ impl MetaStore for RocksMetaStore {
             Ok(e.create_new_backup_flush(db.db, true)?)
         })
         .await
+    }
+
+    async fn compaction(&self) -> Result<(), CubeError> {
+        self.write_operation(move |db_ref, _batch_pipe| {
+            let start: Option<&[u8]> = None;
+            let end: Option<&[u8]> = None;
+
+            db_ref.db.compact_range(start, end);
+
+            Ok(())
+        })
+        .await?;
+
+        Ok(())
     }
 
     #[tracing::instrument(level = "trace", skip(self))]

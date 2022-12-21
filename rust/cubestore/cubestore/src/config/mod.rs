@@ -623,6 +623,20 @@ lazy_static! {
         tokio::sync::RwLock::new(false);
 }
 
+pub async fn init_test_logger() {
+    if !*TEST_LOGGING_INITIALIZED.read().await {
+        let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
+        if !*initialized {
+            SimpleLogger::new()
+                .with_level(Level::Error.to_level_filter())
+                .with_module_level("cubestore", Level::Trace.to_level_filter())
+                .init()
+                .unwrap();
+        }
+        *initialized = true;
+    }
+}
+
 fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
@@ -932,17 +946,7 @@ impl Config {
         I: FnOnce(Arc<Injector>) -> T1,
         F: FnOnce(CubeServices) -> T2,
     {
-        if !*TEST_LOGGING_INITIALIZED.read().await {
-            let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
-            if !*initialized {
-                SimpleLogger::new()
-                    .with_level(Level::Error.to_level_filter())
-                    .with_module_level("cubestore", Level::Trace.to_level_filter())
-                    .init()
-                    .unwrap();
-            }
-            *initialized = true;
-        }
+        init_test_logger().await;
 
         let store_path = self.local_dir().clone();
         let remote_fs = self.remote_fs().await.unwrap();
@@ -1299,7 +1303,11 @@ impl Config {
 
         self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
-                QueryPlannerImpl::new(i.get_service_typed().await, i.get_service_typed().await)
+                QueryPlannerImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
             })
             .await;
 

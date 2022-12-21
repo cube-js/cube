@@ -1,6 +1,6 @@
 use crate::metastore::partition::partition_file_name;
-use crate::metastore::{IdRow, MetaStore, MetaStoreTable, Partition};
-use crate::queryplanner::InfoSchemaTableDef;
+use crate::metastore::{IdRow, MetaStoreTable, Partition};
+use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use arrow::array::{ArrayRef, BooleanArray, StringArray, UInt64Array};
 use arrow::datatypes::{DataType, Field};
@@ -13,8 +13,8 @@ pub struct SystemPartitionsTableDef;
 impl InfoSchemaTableDef for SystemPartitionsTableDef {
     type T = IdRow<Partition>;
 
-    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(meta_store.partition_table().all_rows().await?))
+    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        Ok(Arc::new(ctx.meta_store.partition_table().all_rows().await?))
     }
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {

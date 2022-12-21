@@ -54,6 +54,22 @@ pub enum Statement {
         credentials: Vec<SqlOption>,
         or_update: bool,
     },
+    CacheSet {
+        key: Ident,
+        value: String,
+        ttl: Option<u32>,
+        nx: bool,
+    },
+    CacheGet {
+        key: Ident,
+    },
+    CacheKeys {
+        prefix: Ident,
+    },
+    CacheRemove {
+        key: Ident,
+    },
+    CacheTruncate {},
     CacheIncr {
         path: Ident,
     },
@@ -62,7 +78,14 @@ pub enum Statement {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum RocksStoreName {
+    Meta,
+    Cache,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum SystemCommand {
+    Compaction { store: Option<RocksStoreName> },
     KillAllJobs,
     Repartition { partition_id: u64 },
     PanicWorker,
@@ -135,15 +158,58 @@ impl<'a> CubeStoreParser<'a> {
             Token::Word(w) => w.value.to_ascii_lowercase(),
             _ => {
                 return Err(ParserError::ParserError(
-                    "Unknown cache command, available: INCR".to_string(),
+                    "Unknown cache command, available: SET|GET|KEYS|INC|REMOVE|TRUNCATE"
+                        .to_string(),
                 ))
             }
         };
 
         match command.as_str() {
+            "set" => {
+                let nx = self.parse_custom_token(&"nx");
+                let ttl = if self.parse_custom_token(&"ttl") {
+                    match self.parser.parse_number_value()? {
+                        Value::Number(ttl, false) => {
+                            let r = ttl.parse::<u32>().map_err(|err| {
+                                ParserError::ParserError(format!(
+                                    "TTL must be a positive integer, error: {}",
+                                    err
+                                ))
+                            })?;
+
+                            Some(r)
+                        }
+                        x => {
+                            return Err(ParserError::ParserError(format!(
+                                "TTL must be a positive integer, actual: {:?}",
+                                x
+                            )))
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                Ok(Statement::CacheSet {
+                    key: self.parser.parse_identifier()?,
+                    value: self.parser.parse_literal_string()?,
+                    ttl,
+                    nx,
+                })
+            }
+            "get" => Ok(Statement::CacheGet {
+                key: self.parser.parse_identifier()?,
+            }),
+            "keys" => Ok(Statement::CacheKeys {
+                prefix: self.parser.parse_identifier()?,
+            }),
             "incr" => Ok(Statement::CacheIncr {
                 path: self.parser.parse_identifier()?,
             }),
+            "remove" => Ok(Statement::CacheRemove {
+                key: self.parser.parse_identifier()?,
+            }),
+            "truncate" => Ok(Statement::CacheTruncate {}),
             command => Err(ParserError::ParserError(format!(
                 "Unknown cache command: {}",
                 command
@@ -171,6 +237,25 @@ impl<'a> CubeStoreParser<'a> {
             }
         } else if self.parse_custom_token("panic") && self.parse_custom_token("worker") {
             Ok(Statement::System(SystemCommand::PanicWorker))
+        } else if self.parse_custom_token("compaction") {
+            let store = if let Token::Word(w) = self.parser.peek_token() {
+                if w.value.eq_ignore_ascii_case("cache") {
+                    self.parser.next_token();
+                    Some(RocksStoreName::Cache)
+                } else if w.value.eq_ignore_ascii_case("meta") {
+                    self.parser.next_token();
+                    Some(RocksStoreName::Meta)
+                } else {
+                    return Err(ParserError::ParserError(format!(
+                        "Unknown store name, expected CACHE or META, found: {}",
+                        w
+                    )));
+                }
+            } else {
+                None
+            };
+
+            Ok(Statement::System(SystemCommand::Compaction { store }))
         } else {
             Err(ParserError::ParserError(
                 "Unknown system command".to_string(),
