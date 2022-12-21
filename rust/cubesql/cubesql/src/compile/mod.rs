@@ -39,10 +39,10 @@ use self::{
             create_array_lower_udf, create_array_upper_udf, create_connection_id_udf,
             create_convert_tz_udf, create_cube_regclass_cast_udf, create_current_schema_udf,
             create_current_schemas_udf, create_current_timestamp_udf, create_current_user_udf,
-            create_date_add_udf, create_date_sub_udf, create_date_udf, create_dateadd_udf,
-            create_datediff_udf, create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf,
-            create_db_udf, create_ends_with_udf, create_format_type_udf,
-            create_generate_series_udtf, create_generate_subscripts_udtf,
+            create_date_add_udf, create_date_sub_udf, create_date_to_timestamp_udf,
+            create_date_udf, create_dateadd_udf, create_datediff_udf, create_dayofmonth_udf,
+            create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_ends_with_udf,
+            create_format_type_udf, create_generate_series_udtf, create_generate_subscripts_udtf,
             create_has_schema_privilege_udf, create_hour_udf, create_if_udf, create_instr_udf,
             create_interval_mul_udf, create_isnull_udf, create_json_build_object_udf,
             create_least_udf, create_locate_udf, create_makedate_udf, create_measure_udaf,
@@ -1162,6 +1162,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_interval_mul_udf());
         ctx.register_udf(create_ends_with_udf());
         ctx.register_udf(create_position_udf());
+        ctx.register_udf(create_date_to_timestamp_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -9932,6 +9933,29 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_thoughtspot_dateadd_literal_date32() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "thoughtspot_dateadd_literal_date32",
+            execute_query(
+                "
+                SELECT 
+                    DATE_TRUNC('month', DATEADD(day, CAST(50 AS int), DATE '2014-01-01')) \"ca_1\", 
+                    CASE
+                        WHEN sum(3) IS NOT NULL THEN sum(3)
+                        ELSE 0
+                    END \"ca_2\"
+                ORDER BY \"ca_2\" ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_quicksight_to_timestamp_format() -> Result<(), CubeError> {
         let query_plan = convert_select_to_query_plan(
             r#"
@@ -11089,6 +11113,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.notes".to_string(),
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                    "Logs.id".to_string(),
                     "Logs.read".to_string(),
                     "Logs.content".to_string(),
                 ]),
@@ -13535,6 +13560,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.notes".to_string(),
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                    "Logs.id".to_string(),
                     "Logs.read".to_string(),
                     "Logs.content".to_string(),
                 ]),
@@ -15230,6 +15256,440 @@ ORDER BY \"COUNT(count)\" DESC"
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("year".to_string()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_day_in_quarter() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                (DATEDIFF(day, DATEADD(month, CAST((((((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) % 3) + 1) - 1) * -1) AS int), CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."order_date") * 100) + EXTRACT(MONTH FROM "ta_1"."order_date")) * 100) + 1) AS varchar) AS date)), "ta_1"."order_date") + 1) "ca_1",
+                CASE
+                    WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
+                    ELSE 0
+                END "ca_2"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY
+                "ca_1" ASC,
+                "ca_2" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_date_trunc_offset() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                DATE_TRUNC('qtr', DATEADD(day, CAST(2 AS int), "ta_1"."order_date")) "ca_1",
+                CASE
+                    WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
+                    ELSE 0
+                END "ca_2"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY
+                "ca_1" ASC,
+                "ca_2" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                DATE_TRUNC('qtr', DATEADD(week, CAST(5 AS int), "ta_1"."order_date")) "ca_1",
+                CASE
+                    WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
+                    ELSE 0
+                END "ca_2"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY
+                "ca_1" ASC,
+                "ca_2" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    // Intentional; Cube DateTrunc by week + post-processing DATEADD
+                    // + post-processing DateTrunc will yield incorrect results
+                    granularity: Some("day".to_string()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_date_offset_with_filter() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            WITH "qt_0" AS (
+                SELECT
+                    "ta_1"."customer_gender" "ca_1",
+                    CAST(DATEADD(day, CAST(2 AS int), "ta_1"."order_date") AS date) "ca_2",
+                    DATEADD(second, CAST(2000 AS int), "ta_1"."order_date") "ca_3"
+                FROM KibanaSampleDataEcommerce "ta_1"
+                WHERE DATEADD(day, CAST(2 AS int), "ta_1"."order_date") < DATE '2014-06-02'
+                GROUP BY
+                    "ca_1",
+                    "ca_2",
+                    "ca_3"
+            )
+            SELECT
+                min("ta_2"."ca_2") "ca_3",
+                max("ta_2"."ca_2") "ca_4"
+            FROM "qt_0" "ta_2"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("beforeDate".to_string()),
+                    values: Some(vec!["2014-05-30T23:59:59.999Z".to_string()]),
+                    or: None,
+                    and: None
+                }]),
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_min_max_date_offset() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                min(DATEADD(day, CAST(2 AS int), "ta_1"."order_date")) "ca_1",
+                max(DATEADD(day, CAST(2 AS int), "ta_1"."order_date")) "ca_2"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            ORDER BY
+                "ca_1" ASC,
+                "ca_2" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_week_num_in_month() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                FLOOR(((EXTRACT(DAY FROM DATEADD(day, CAST((4 - (((DATEDIFF(day, DATE '1970-01-01', "ta_1"."order_date") + 3) % 7) + 1)) AS int), "ta_1"."order_date")) + 6) / NULLIF(CAST(7 AS FLOAT8),0.0))) "ca_1",
+                CASE
+                    WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
+                    ELSE 0
+                END "ca_2"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY
+                "ca_1" ASC,
+                "ca_2" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("week".to_string()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_binary_sum_columns() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            WITH "qt_0" AS (
+                SELECT
+                    ("ta_2"."taxful_total_price" + "ta_1"."id") "ca_1",
+                    CASE
+                        WHEN sum("ta_2"."count") IS NOT NULL THEN sum("ta_2"."count")
+                        ELSE 0
+                    END "ca_2"
+                FROM KibanaSampleDataEcommerce "ta_2"
+                JOIN Logs "ta_1"
+                    ON "ta_2"."__cubeJoinField" = "ta_1"."__cubeJoinField"
+                GROUP BY "ca_1"
+            )
+            SELECT count(DISTINCT "ta_3"."ca_1") "ca_3"
+            FROM "qt_0" "ta_3"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    "Logs.id".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_date_trunc_qtr_with_post_processing() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                DATE_TRUNC('qtr', DATEADD(minute, CAST(2 AS int), "ta_1"."order_date")) "ca_1",
+                DATE_TRUNC('qtr', "ta_1"."order_date") "ca_2"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            GROUP BY
+                "ca_1",
+                "ca_2"
+            ORDER BY
+                "ca_1" ASC,
+                "ca_2" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("minute".to_string()),
+                        date_range: None
+                    },
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("quarter".to_string()),
+                        date_range: None
+                    },
+                ]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_split_date_trunc_qtr() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+             SELECT 
+                 TO_CHAR("ta_1"."order_date", 'Mon') "ca_1",
+                 DATE_TRUNC('qtr', "ta_1"."order_date") "ca_2"
+             FROM KibanaSampleDataEcommerce "ta_1"
+             GROUP BY 
+                 "ca_1", 
+                 "ca_2"
+             "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("quarter".to_owned()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_extract_quarter() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            WITH "qt_0" AS (
+                SELECT
+                    CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0,0.0))) "ca_1", 
+                    CASE
+                        WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
+                        ELSE 0
+                    END "ca_2"
+                FROM KibanaSampleDataEcommerce "ta_1"
+                GROUP BY "ca_1"
+            )
+            SELECT count(DISTINCT "ta_2"."ca_1") "ca_3"
+            FROM "qt_0" "ta_2"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("quarter".to_string()),
                     date_range: None
                 }]),
                 order: None,

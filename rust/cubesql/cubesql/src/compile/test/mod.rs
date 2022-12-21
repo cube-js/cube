@@ -104,6 +104,10 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
             title: None,
             dimensions: vec![
                 V1CubeMetaDimension {
+                    name: "Logs.id".to_string(),
+                    _type: "number".to_string(),
+                },
+                V1CubeMetaDimension {
                     name: "Logs.read".to_string(),
                     _type: "boolean".to_string(),
                 },

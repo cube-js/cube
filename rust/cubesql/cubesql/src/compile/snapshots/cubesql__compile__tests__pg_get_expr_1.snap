@@ -25,8 +25,9 @@ expression: "execute_query(\"\n                SELECT\n                    attre
 | 18018    | agentCount         | NULL    |
 | 18018    | agentCountApprox   | NULL    |
 | 18018    | content            | NULL    |
+| 18018    | id                 | NULL    |
 | 18018    | read               | NULL    |
-| 18027    | __cubeJoinField    | NULL    |
-| 18027    | __user             | NULL    |
-| 18027    | someNumber         | NULL    |
+| 18028    | __cubeJoinField    | NULL    |
+| 18028    | __user             | NULL    |
+| 18028    | someNumber         | NULL    |
 +----------+--------------------+---------+

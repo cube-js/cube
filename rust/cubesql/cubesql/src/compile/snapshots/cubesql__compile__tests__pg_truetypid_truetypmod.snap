@@ -22,11 +22,12 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | 18000    | __cubeJoinField    | text      | 25    | -1     | NULL   |
 | 18018    | agentCount         | int8      | 20    | -1     | 64     |
 | 18018    | agentCountApprox   | int8      | 20    | -1     | 64     |
+| 18018    | id                 | numeric   | 1700  | -1     | NULL   |
 | 18018    | read               | bool      | 16    | -1     | NULL   |
 | 18018    | content            | text      | 25    | -1     | NULL   |
 | 18018    | __user             | text      | 25    | -1     | NULL   |
 | 18018    | __cubeJoinField    | text      | 25    | -1     | NULL   |
-| 18027    | someNumber         | numeric   | 1700  | -1     | NULL   |
-| 18027    | __user             | text      | 25    | -1     | NULL   |
-| 18027    | __cubeJoinField    | text      | 25    | -1     | NULL   |
+| 18028    | someNumber         | numeric   | 1700  | -1     | NULL   |
+| 18028    | __user             | text      | 25    | -1     | NULL   |
+| 18028    | __cubeJoinField    | text      | 25    | -1     | NULL   |
 +----------+--------------------+-----------+-------+--------+--------+
