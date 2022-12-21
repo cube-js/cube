@@ -1,4 +1,5 @@
 /* eslint-disable no-restricted-syntax */
+import * as stream from 'stream';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import bodyParser from 'body-parser';
@@ -214,17 +215,16 @@ class ApiGateway {
     }));
 
     app.post(`${this.basePath}/v1/stream`, jsonParser, userMiddlewares, (async (req, res) => {
-      const streamResponse = await this.stream(req.context, req.body.query);
-      let data = [];
-      streamResponse.rowStream.on('data', (chunk) => {
-        data = data.concat(JSON.parse(chunk.toString()));
+      const _stream = <stream.Transform>(await this.stream(req.context, req.body.query));
+      _stream.on('data', (chunk) => {
+        console.log(`stream chunk: ${JSON.stringify(chunk, undefined, 2)}`);
       });
-      streamResponse.rowStream.on('end', () => {
-        console.log('Data length: ', data.length);
-        console.log(JSON.stringify(data, undefined, 2));
+      _stream.on('end', () => {
+        console.log('stream end');
       });
-      streamResponse.rowStream.on('close', () => {
-        streamResponse.release();
+      _stream.on('close', () => {
+        _stream.removeAllListeners();
+        console.log('stream close');
       });
       this.resToResultFn(res)(true);
     }));
@@ -1385,91 +1385,119 @@ class ApiGateway {
     };
   }
 
+  public async stream(context: RequestContext, query: Query): Promise<null | stream.Transform> {
+    try {
+      this.log({ type: 'Streaming Query', query }, context);
+
+      let metaConfigResult = await this.getCompilerApi(context).metaConfig({
+        requestId: context.requestId,
+      });
+      metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+      const [, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      const normalizedQuery = normalizedQueries[0];
+      const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
+      const q = {
+        ...sqlQuery,
+        query: sqlQuery.sql[0],
+        values: sqlQuery.sql[1],
+        continueWait: true,
+        renewQuery: normalizedQuery.renewQuery,
+        requestId: context.requestId,
+        context,
+        persistent: true,
+        forceNoCache: true,
+      };
+      return this.getAdapterApi(context).streamQuery(q);
+    } catch (e) {
+      return null;
+    }
+  }
+
   /**
    * Returns stream object to fetch data.
    */
-  public async stream(context: RequestContext, query: Query): Promise<StreamResponse> {
-    // const CUBEJS_DB_QUERY_LIMIT = getEnv('dbQueryLimit'); // 50000
-    // const CUBEJS_DB_QUERY_DEFAULT_LIMIT = getEnv('dbQueryDefaultLimit'); // 10000
-    const CUBEJS_DB_QUERY_STREAM_OFFSET = getEnv('dbQueryStreamOffset'); // 5000
+  // public async streamVanila(context: RequestContext, query: Query): Promise<StreamResponse> {
+  //   // const CUBEJS_DB_QUERY_LIMIT = getEnv('dbQueryLimit'); // 50000
+  //   // const CUBEJS_DB_QUERY_DEFAULT_LIMIT = getEnv('dbQueryDefaultLimit'); // 10000
+  //   const CUBEJS_DB_QUERY_STREAM_OFFSET = getEnv('dbQueryStreamOffset'); // 5000
 
-    const { limit, offset } = query;
+  //   const { limit, offset } = query;
 
-    const response = {
-      types: [],
-      rowStream: new DataStream(),
-      release: async () => {
-        if (!response.rowStream.destroyed) {
-          response.rowStream.destroy();
-        }
-        return response.rowStream;
-      }
-    };
+  //   const response = {
+  //     types: [],
+  //     rowStream: new DataStream(),
+  //     release: async () => {
+  //       if (!response.rowStream.destroyed) {
+  //         response.rowStream.destroy();
+  //       }
+  //       return response.rowStream;
+  //     }
+  //   };
 
-    const chunk = async (lim: number, ofs: number) => {
-      try {
-        await this.load({
-          apiType: 'stream',
-          queryType: 'multi',
-          query: {
-            ...query,
-            limit: lim,
-            offset: ofs,
-          },
-          res: (message: Record<string, any> | Record<string, any>[]) => {
-            const { results, error } = <{
-              queryType?: any,
-              results?: any,
-              error?: string,
-              requestId?: string,
-            }>message;
+  //   const chunk = async (lim: number, ofs: number) => {
+  //     try {
+  //       await this.load({
+  //         apiType: 'stream',
+  //         queryType: 'multi',
+  //         query: {
+  //           ...query,
+  //           limit: lim,
+  //           offset: ofs,
+  //         },
+  //         res: (message: Record<string, any> | Record<string, any>[]) => {
+  //           const { results, error } = <{
+  //             queryType?: any,
+  //             results?: any,
+  //             error?: string,
+  //             requestId?: string,
+  //           }>message;
 
-            if (error) {
-              throw new Error(error);
-            } else {
-              const cnt = results[0].data.length;
-              const data = cnt > 0 && JSON.stringify(results[0].data);
-              const added = cnt > 0 && response.rowStream.write(data, 'utf8');
+  //           if (error) {
+  //             throw new Error(error);
+  //           } else {
+  //             const cnt = results[0].data.length;
+  //             const data = cnt > 0 && JSON.stringify(results[0].data);
+  //             const added = cnt > 0 && response.rowStream.write(data, 'utf8');
 
-              // The stream is blocked:
-              if (cnt > 0 && !added) {
-                response.rowStream.once('drain', () => chunk(lim, ofs));
-              }
+  //             // The stream is blocked:
+  //             if (cnt > 0 && !added) {
+  //               response.rowStream.once('drain', () => chunk(lim, ofs));
+  //             }
 
-              // No more data:
-              if (cnt === 0 || (cnt > 0 && cnt < CUBEJS_DB_QUERY_STREAM_OFFSET)) {
-                response.rowStream.destroy();
-              }
+  //             // No more data:
+  //             if (cnt === 0 || (cnt > 0 && cnt < CUBEJS_DB_QUERY_STREAM_OFFSET)) {
+  //               response.rowStream.destroy();
+  //             }
               
-              // Next chunk:
-              if (added && cnt === CUBEJS_DB_QUERY_STREAM_OFFSET) {
-                chunk(
-                  limit && ((ofs + 2 * lim) > limit)
-                    ? limit - (ofs + lim)
-                    : lim,
-                  ofs + lim,
-                );
-              }
-            }
-          },
-          context,
-        });
-      } catch (e) {
-        if ((<any>e).error === 'Continue wait') {
-          chunk(lim, ofs);
-        }
-      }
-    };
+  //             // Next chunk:
+  //             if (added && cnt === CUBEJS_DB_QUERY_STREAM_OFFSET) {
+  //               chunk(
+  //                 limit && ((ofs + 2 * lim) > limit)
+  //                   ? limit - (ofs + lim)
+  //                   : lim,
+  //                 ofs + lim,
+  //               );
+  //             }
+  //           }
+  //         },
+  //         context,
+  //       });
+  //     } catch (e) {
+  //       if ((<any>e).error === 'Continue wait') {
+  //         chunk(lim, ofs);
+  //       }
+  //     }
+  //   };
 
-    chunk(
-      limit && limit < CUBEJS_DB_QUERY_STREAM_OFFSET
-        ? limit
-        : CUBEJS_DB_QUERY_STREAM_OFFSET,
-      offset || 0
-    );
+  //   chunk(
+  //     limit && limit < CUBEJS_DB_QUERY_STREAM_OFFSET
+  //       ? limit
+  //       : CUBEJS_DB_QUERY_STREAM_OFFSET,
+  //     offset || 0
+  //   );
 
-    return response;
-  }
+  //   return response;
+  // }
 
   /**
    * Data queries APIs (`/load`, `/subscribe`) entry point. Used by

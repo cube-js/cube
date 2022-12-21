@@ -1,3 +1,4 @@
+import * as stream from 'stream';
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 
@@ -152,6 +153,19 @@ export class QueryOrchestrator {
       key,
       token,
     );
+  }
+
+  public async streamQuery(query: QueryBody): Promise<stream.Transform> {
+    const {
+      preAggregationsTablesToTempTables,
+      values,
+    } = await this.preAggregations.loadAllPreAggregationsIfNeeded(query);
+    query.values = values || query.values;
+    const _stream = await this.queryCache.cachedQueryResult(
+      query,
+      preAggregationsTablesToTempTables,
+    );
+    return <stream.Transform>_stream;
   }
 
   /**

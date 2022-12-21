@@ -1,3 +1,4 @@
+import * as stream from 'stream';
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 
@@ -6,6 +7,49 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
 import { getProcessUid } from './utils';
+
+class DataStream extends stream.Writable {
+  constructor({
+    key,
+    highWaterMark,
+    maps,
+  }) {
+    super({
+      objectMode: true,
+      highWaterMark,
+    });
+    this.queryKey = key;
+    this.buffer = [];
+    /** @type {{ queued: Map<string, DataStream>, processing: Map<string, DataStream> }} */
+    this.maps = maps;
+    this.highWaterMark = highWaterMark;
+  }
+
+  _write(chunk, encoding, callback) {
+    if (this.maps.queued.has(this.queryKey)) {
+      this.maps.queued.delete(this.queryKey);
+      this.maps.processing.set(this.queryKey, this);
+    }
+    
+    this.buffer.push(chunk);
+    callback();
+    if (this.buffer.length === this.highWaterMark) {
+      this.emit('data', this.buffer.splice(0, this.buffer.length));
+    }
+  }
+
+  _destroy(error, callback) {
+    if (this.buffer.length > 0) {
+      this.emit('data', this.buffer.splice(0, this.buffer.length));
+    }
+    this.emit('end');
+    this.maps.processing.delete(this.queryKey);
+    delete this.queryKey;
+    delete this.buffer;
+    delete this.maps;
+    super._destroy(error, callback);
+  }
+}
 
 /**
  * QueryQueue class.
@@ -110,6 +154,29 @@ export class QueryQueue {
      * @type {boolean}
      */
     this.skipQueue = options.skipQueue;
+
+    this.streams = {
+      queued: new Map(),
+      processing: new Map(),
+    };
+  }
+
+  /**
+   * Returns stream object which will be used to pipe data from data source.
+   *
+   * @param {*} queryKey
+   */
+  getQueryStream(queryKey) {
+    const key = this.redisHash(queryKey);
+    if (!this.streams.queued.has(key)) {
+      const _stream = new DataStream({
+        key,
+        highWaterMark: 100,
+        maps: this.streams,
+      });
+      this.streams.queued.set(key, _stream);
+    }
+    return this.streams.queued.get(key);
   }
 
   /**
@@ -127,6 +194,108 @@ export class QueryQueue {
    * @throw {ContinueWaitError}
    */
   async executeInQueue(
+    queryHandler,
+    queryKey,
+    query,
+    priority,
+    options,
+  ) {
+    switch (queryHandler) {
+      case 'stream':
+        return this.executeStreamInQueue(
+          queryHandler,
+          queryKey,
+          query,
+          priority,
+          options,
+        );
+      case 'query':
+        return this.executeQueryInQueue(
+          queryHandler,
+          queryKey,
+          query,
+          priority,
+          options,
+        );
+      default:
+        return this.executeQueryInQueue(
+          queryHandler,
+          queryKey,
+          query,
+          priority,
+          options,
+        );
+    }
+  }
+
+  /**
+   * @param {string} queryHandler
+   * @param {*} queryKey
+   * @param {*} query
+   * @param {number=} priority
+   * @param {*=} options
+   * @returns {*}
+   */
+  async executeStreamInQueue(
+    queryHandler,
+    queryKey,
+    query,
+    priority,
+    options,
+  ) {
+    options = options || {};
+    const redisClient = await this.queueDriver.createConnection();
+    try {
+      priority = priority || 0;
+      if (!(priority >= -10000 && priority <= 10000)) {
+        throw new Error('Priority should be between -10000 and 10000');
+      }
+      const time = new Date().getTime();
+      const keyScore = time + (10000 - priority) * 1E14;
+      const orphanedTimeout = 'orphanedTimeout' in query
+        ? query.orphanedTimeout
+        : this.orphanedTimeout;
+      const orphanedTime = time + (orphanedTimeout * 1000);
+      const [added, _b, _c, queueSize, addedToQueueTime] = await redisClient.addToQueue(
+        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
+      );
+      if (added > 0) {
+        this.logger('Added to queue (persistent)', {
+          priority,
+          queueSize,
+          queryKey,
+          queuePrefix: this.redisQueuePrefix,
+          requestId: options.requestId,
+          metadata: query.metadata,
+          preAggregationId: query.preAggregation?.preAggregationId,
+          newVersionEntry: query.newVersionEntry,
+          forceBuild: query.forceBuild,
+          preAggregation: query.preAggregation,
+          addedToQueueTime,
+          persistent: !!queryKey.persistent,
+        });
+      }
+      this.reconcileQueue();
+    } finally {
+      this.queueDriver.release(redisClient);
+    }
+  }
+
+  /**
+   * Push query to the queue and call `QueryQueue.reconcileQueue()` method if
+   * `options.skipQueue` is set to `false`, execute query skipping queue
+   * otherwise.
+   *
+   * @param {string} queryHandler
+   * @param {*} queryKey
+   * @param {*} query
+   * @param {number=} priority
+   * @param {*=} options
+   * @returns {*}
+   *
+   * @throw {ContinueWaitError}
+   */
+  async executeQueryInQueue(
     queryHandler,
     queryKey,
     query,
@@ -198,7 +367,8 @@ export class QueryQueue {
           newVersionEntry: query.newVersionEntry,
           forceBuild: query.forceBuild,
           preAggregation: query.preAggregation,
-          addedToQueueTime
+          addedToQueueTime,
+          persistent: !!queryKey.persistent,
         });
       }
 
@@ -595,6 +765,12 @@ export class QueryQueue {
       if (retrieveResult) {
         [insertedCount, _removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
       }
+
+      let _stream = null;
+      if (query && query?.queryHandler === 'stream') {
+        _stream = this.getQueryStream(activeKeys[0]);
+      }
+
       const activated = activeKeys && activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
       if (!query) {
         query = await redisClient.getQueryDef(this.redisHash(queryKey));
@@ -644,7 +820,8 @@ export class QueryQueue {
                     });
                   }
                   return null;
-                }
+                },
+                _stream,
               )
             )
           };

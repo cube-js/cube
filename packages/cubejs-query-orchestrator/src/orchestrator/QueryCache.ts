@@ -1,3 +1,4 @@
+import * as stream from 'stream';
 import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
 import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
@@ -244,6 +245,7 @@ export class QueryCache {
             external: queryBody.external,
             requestId: queryBody.requestId,
             dataSource: queryBody.dataSource,
+            persistent: queryBody.persistent,
             inlineTables,
           }
         ),
@@ -251,6 +253,18 @@ export class QueryCache {
     }
 
     const cacheKey = QueryCache.queryCacheKey(queryBody);
+
+    if (queryBody.persistent) {
+      return this.queryWithRetryAndRelease(query, values, {
+        cacheKey,
+        priority: queuePriority,
+        external: queryBody.external,
+        requestId: queryBody.requestId,
+        persistent: queryBody.persistent,
+        dataSource: queryBody.dataSource,
+        useCsvQuery: queryBody.useCsvQuery,
+      });
+    }
 
     if (queryBody.renewQuery) {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
@@ -265,6 +279,7 @@ export class QueryCache {
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
+          persistent: queryBody.persistent,
         }
       );
     }
@@ -281,7 +296,8 @@ export class QueryCache {
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
-          skipRefreshKeyWaitForRenew: true
+          persistent: queryBody.persistent,
+          skipRefreshKeyWaitForRenew: true,
         }
       );
 
@@ -296,6 +312,7 @@ export class QueryCache {
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
+          persistent: queryBody.persistent,
         }
       );
 
@@ -315,6 +332,7 @@ export class QueryCache {
         external: queryBody.external,
         requestId: queryBody.requestId,
         dataSource: queryBody.dataSource,
+        persistent: queryBody.persistent,
       }
     );
 
@@ -330,6 +348,7 @@ export class QueryCache {
           external: queryBody.external,
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
+          persistent: queryBody.persistent,
         }
       );
     }
@@ -401,6 +420,7 @@ export class QueryCache {
       requestId,
       inlineTables,
       useCsvQuery,
+      persistent,
     }: {
       cacheKey: CacheKey,
       dataSource: string,
@@ -409,28 +429,41 @@ export class QueryCache {
       requestId?: string,
       inlineTables?: InlineTables,
       useCsvQuery?: boolean,
+      persistent?: boolean,
     }
   ) {
     const queue = external
       ? this.getExternalQueue()
       : await this.getQueue(dataSource);
-    return queue.executeInQueue(
-      'query',
-      cacheKey,
-      {
-        queryKey: cacheKey,
-        query,
-        values,
-        requestId,
-        inlineTables,
-        useCsvQuery,
-      },
-      priority,
-      {
-        stageQueryKey: cacheKey,
-        requestId,
-      }
-    );
+
+    // TODO (buntarb): This called twice if persistent. Why?
+
+    const q = {
+      queryKey: cacheKey,
+      query,
+      values,
+      requestId,
+      inlineTables,
+      useCsvQuery,
+    };
+
+    const o = {
+      stageQueryKey: cacheKey,
+      requestId,
+    };
+
+    if (!persistent) {
+      return queue.executeInQueue('query', cacheKey, q, priority, o);
+    } else {
+      const _stream = queue.getQueryStream(cacheKey);
+      queue
+        .executeInQueue('stream', cacheKey, q, priority, o)
+        .catch((e) => {
+          // TODO (buntarb): Error handling.
+          console.error(e);
+        });
+      return _stream;
+    }
   }
 
   public async getQueue(dataSource = 'default') {
@@ -438,11 +471,14 @@ export class QueryCache {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
         () => this.driverFactory(dataSource),
-        (client, q) => {
+        (client, q, s) => {
           this.logger('Executing SQL', {
             ...q
           });
-          if (q.useCsvQuery) {
+          if (q.queryKey.persistent) {
+            client.streamQuery(q.query, q.values, s);
+            return null;
+          } else if (q.useCsvQuery) {
             return this.csvQuery(client, q);
           } else {
             return client.query(q.query, q.values, q);
@@ -513,7 +549,7 @@ export class QueryCache {
   public static createQueue(
     redisPrefix: string,
     clientFactory: DriverFactory,
-    executeFn: (client: BaseDriver, q: any) => any,
+    executeFn: (client: BaseDriver, q: any, s?: stream.Writable) => any,
     options: Record<string, any> = {}
   ): QueryQueue {
     const queue: any = new QueryQueue(redisPrefix, {
@@ -534,7 +570,11 @@ export class QueryCache {
             delete queue.handles[handle];
           }
           return result;
-        }
+        },
+        stream: async (q, c, s) => {
+          const client = await clientFactory();
+          executeFn(client, q, s);
+        },
       },
       cancelHandlers: {
         query: async (q) => {
@@ -571,6 +611,7 @@ export class QueryCache {
       skipRefreshKeyWaitForRenew?: boolean,
       external?: boolean,
       dataSource: string,
+      persistent?: boolean,
     }
   ) {
     this.renewQuery(
@@ -603,6 +644,7 @@ export class QueryCache {
       external?: boolean,
       dataSource: string,
       useCsvQuery?: boolean,
+      persistent?: boolean,
     }
   ) {
     options = options || { dataSource: 'default' };
@@ -635,6 +677,7 @@ export class QueryCache {
               requestId: options.requestId,
               dataSource: options.dataSource,
               useCsvQuery: options.useCsvQuery,
+              persistent: options.persistent,
             }
           ),
           refreshKeyValues: cacheKeyQueryResults,
@@ -708,6 +751,7 @@ export class QueryCache {
       forceNoCache?: boolean,
       useInMemory?: boolean,
       useCsvQuery?: boolean,
+      persistent?: boolean,
     }
   ) {
     options = options || { dataSource: 'default' };
@@ -720,6 +764,7 @@ export class QueryCache {
         priority: options.priority,
         external: options.external,
         requestId: options.requestId,
+        persistent: options.persistent,
         dataSource: options.dataSource,
         useCsvQuery: options.useCsvQuery,
       }).then(res => {
@@ -728,17 +773,22 @@ export class QueryCache {
           result: res,
           renewalKey
         };
-        return this.cacheDriver.set(redisKey, result, expiration)
-          .then(({ bytes }) => {
-            this.logger('Renewed', { cacheKey, requestId: options.requestId });
-            this.logger('Outgoing network usage', {
-              service: 'cache',
-              requestId: options.requestId,
-              bytes,
-              cacheKey,
+        if (!options.persistent) {
+          return this
+            .cacheDriver
+            .set(redisKey, result, expiration)
+            .then(({ bytes }) => {
+              this.logger('Renewed', { cacheKey, requestId: options.requestId });
+              this.logger('Outgoing network usage', {
+                service: 'cache',
+                requestId: options.requestId,
+                bytes,
+                cacheKey,
+              });
+              return res;
             });
-            return res;
-          });
+        }
+        return res;
       }).catch(e => {
         if (!(e instanceof ContinueWaitError)) {
           this.logger('Dropping Cache', { cacheKey, error: e.stack || e, requestId: options.requestId });
@@ -753,7 +803,7 @@ export class QueryCache {
       })
     );
 
-    if (options.forceNoCache) {
+    if (options.forceNoCache || options.persistent) {
       this.logger('Force no cache for', { cacheKey, requestId: options.requestId });
       return fetchNew();
     }
