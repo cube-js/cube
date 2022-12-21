@@ -1,3 +1,5 @@
+use std::cmp::{max, min};
+
 use datafusion::scalar::ScalarValue;
 
 pub fn parse_granularity_string(granularity: &str, to_normalize: bool) -> Option<String> {
@@ -42,4 +44,65 @@ pub fn granularity_to_interval(granularity: &ScalarValue) -> Option<ScalarValue>
     }
 
     None
+}
+
+pub fn min_max_granularity(
+    left: &ScalarValue,
+    right: &ScalarValue,
+    is_max: bool,
+    week_as_day: Option<bool>,
+) -> Option<String> {
+    let left = parse_granularity(left, false)?;
+    let right = parse_granularity(right, false)?;
+
+    let left = granularity_str_to_int_order(&left, week_as_day)?;
+    let right = granularity_str_to_int_order(&right, week_as_day)?;
+
+    let result = if is_max {
+        max(left, right)
+    } else {
+        min(left, right)
+    };
+    granularity_int_order_to_str(result, week_as_day)
+}
+
+fn granularity_str_to_int_order(granularity: &str, week_as_day: Option<bool>) -> Option<i32> {
+    match granularity.to_lowercase().as_str() {
+        "second" => Some(0),
+        "minute" => Some(1),
+        "hour" => Some(2),
+        "day" => Some(3),
+        // Week-month offsets may lead to incorrect results. `week_as_day` controls
+        // the result of week granularity conversion.
+        "week" => match week_as_day {
+            Some(true) => Some(3),
+            Some(false) => Some(4),
+            None => None,
+        },
+        "month" => Some(5),
+        "quarter" => Some(6),
+        "year" => Some(7),
+        _ => None,
+    }
+}
+
+fn granularity_int_order_to_str(granularity: i32, week_as_day: Option<bool>) -> Option<String> {
+    match granularity {
+        0 => Some("second"),
+        1 => Some("minute"),
+        2 => Some("hour"),
+        3 => Some("day"),
+        // Week-month offsets may lead to incorrect results. `week_as_day` controls
+        // the result of week granularity conversion.
+        4 => match week_as_day {
+            Some(true) => Some("day"),
+            Some(false) => Some("week"),
+            None => None,
+        },
+        5 => Some("month"),
+        6 => Some("quarter"),
+        7 => Some("year"),
+        _ => None,
+    }
+    .map(|g| g.to_string())
 }

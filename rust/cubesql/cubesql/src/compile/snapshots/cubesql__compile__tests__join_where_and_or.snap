@@ -22,11 +22,12 @@ expression: "execute_query(\"\n                SELECT\n                    att.a
 | __cubeJoinField    | 15     | 18000 |
 | agentCount         | 1      | 18018 |
 | agentCountApprox   | 2      | 18018 |
-| read               | 3      | 18018 |
-| content            | 4      | 18018 |
-| __user             | 5      | 18018 |
-| __cubeJoinField    | 6      | 18018 |
-| someNumber         | 1      | 18027 |
-| __user             | 2      | 18027 |
-| __cubeJoinField    | 3      | 18027 |
+| id                 | 3      | 18018 |
+| read               | 4      | 18018 |
+| content            | 5      | 18018 |
+| __user             | 6      | 18018 |
+| __cubeJoinField    | 7      | 18018 |
+| someNumber         | 1      | 18028 |
+| __user             | 2      | 18028 |
+| __cubeJoinField    | 3      | 18028 |
 +--------------------+--------+-------+

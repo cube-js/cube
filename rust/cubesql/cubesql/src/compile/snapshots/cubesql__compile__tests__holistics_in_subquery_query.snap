@@ -25,6 +25,7 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.Logs                      | agentCount         | bigint                      |
 | public.Logs                      | agentCountApprox   | bigint                      |
 | public.Logs                      | content            | text                        |
+| public.Logs                      | id                 | numeric                     |
 | public.Logs                      | read               | boolean                     |
 | public.NumberCube                | __cubeJoinField    | text                        |
 | public.NumberCube                | __user             | text                        |

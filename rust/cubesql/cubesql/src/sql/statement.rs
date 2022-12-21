@@ -883,34 +883,37 @@ impl RedshiftDatePartReplacer {
 
 impl<'ast> Visitor<'ast, ConnectionError> for RedshiftDatePartReplacer {
     fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
-        let fn_name = fun.name.to_string().to_lowercase();
-        if !((fn_name == "datediff" || fn_name == "dateadd") && fun.args.len() == 3) {
-            return Ok(());
+        for res in fun.name.0.iter_mut() {
+            self.visit_identifier(res)?;
         }
-
-        match &mut fun.args[0] {
-            ast::FunctionArg::Unnamed(arg) => match arg {
-                FunctionArgExpr::Expr(arg) => {
-                    let granularity_in_identifier = match arg {
-                        Expr::Identifier(ident) => ident.value.to_lowercase(),
-                        _ => return Ok(()),
-                    };
-
-                    match granularity_in_identifier.as_str() {
-                        "second" | "minute" | "hour" | "day" | "qtr" | "week" | "month"
-                        | "year" => {
-                            *arg =
-                                Expr::Value(Value::SingleQuotedString(granularity_in_identifier));
+        let fn_name = fun.name.to_string().to_lowercase();
+        if (fn_name == "datediff" || fn_name == "dateadd") && fun.args.len() == 3 {
+            if let ast::FunctionArg::Unnamed(arg) = &mut fun.args[0] {
+                if let FunctionArgExpr::Expr(arg) = arg {
+                    if let Expr::Identifier(ident) = arg {
+                        let granularity_in_identifier = ident.value.to_lowercase();
+                        match granularity_in_identifier.as_str() {
+                            "second" | "minute" | "hour" | "day" | "qtr" | "week" | "month"
+                            | "year" => {
+                                *arg = Expr::Value(Value::SingleQuotedString(
+                                    granularity_in_identifier,
+                                ));
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
-                _ => {}
-            },
-            _ => {}
-        };
-
+            }
+        }
         self.visit_function_args(&mut fun.args)?;
+        if let Some(over) = &mut fun.over {
+            for res in over.partition_by.iter_mut() {
+                self.visit_expr(res)?;
+            }
+            for order_expr in over.order_by.iter_mut() {
+                self.visit_expr(&mut order_expr.expr)?;
+            }
+        }
 
         Ok(())
     }
