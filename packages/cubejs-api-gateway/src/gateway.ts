@@ -381,6 +381,14 @@ class ApiGateway {
           });
         }
       );
+      
+      app.post('/cubejs-system/v1/db-schema', jsonParser, systemMiddlewares, (async (req: Request, res: Response) => {
+        await this.dbSchema({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -1147,6 +1155,107 @@ class ApiGateway {
         e, context, query, res, requestStarted
       });
     }
+  }
+
+  protected async dbSchema({ query, context, res }: {
+    query: {
+      dataSource: string;
+      levelChain?: string[],
+      search?: string,
+      limit?: number,
+      offset?: number,
+      renew?: boolean,
+    };
+    context?: RequestContext;
+    res: ResponseResultFn;
+  }) {
+    const requestStarted = new Date();
+    try {
+      if (!query) {
+        throw new UserError(
+          'A user\'s query must contain a body'
+        );
+      }
+
+      if (!query.dataSource) {
+        throw new UserError(
+          'A user\'s query must contain dataSource.'
+        );
+      }
+
+      const orchestratorApi = await this.getAdapterApi(context);
+      const schema = await orchestratorApi.fetchSchema(query.dataSource, context?.securityContext, query.renew);
+
+      res({
+        data: this.getSchemaDataByLevel(
+          schema,
+          query.levelChain,
+          query.limit,
+          query.offset,
+          query.search
+        ),
+      });
+    } catch (e) {
+      this.handleError({ e,
+        context,
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  protected getSchemaDataByLevel(
+    data: { [key: string]: any },
+    levelChain?: string[],
+    limit?: number,
+    offset?: number,
+    search?: string
+  ) {
+    const currentData =
+      levelChain?.reduce((obj, key) => {
+        if (!obj[key]) {
+          throw new UserError(`levelChain item: ${key} is empty`);
+        }
+        return obj[key];
+      }, data) || data;
+
+    let result = currentData;
+    if (!Array.isArray(currentData)) {
+      result = Object.keys(currentData);
+    }
+
+    if (search) {
+      if (Array.isArray(currentData)) {
+        result = result.filter((item: { name: string }) => item.name.includes(search));
+      } else {
+        // replacing column array to columnName for unnecessary search text
+        const clear = (d: {}) => {
+          Object.keys(d).forEach((key) => {
+            if (Array.isArray(d?.[key])) {
+              d[key] = d[key].map(
+                (item: { name: string }) => item.name
+              );
+            } else {
+              clear(d[key]);
+            }
+          });
+
+          return d;
+        };
+
+        const clearData = clear(currentData);
+        result = result.filter(
+          (item: string) => item.includes(search) ||
+            JSON.stringify(clearData[item]).includes(search)
+        );
+      }
+    }
+
+    if (limit) {
+      result = result.slice(offset, (offset || 0) + limit);
+    }
+
+    return result;
   }
 
   /**

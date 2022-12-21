@@ -614,7 +614,79 @@ describe('API Gateway', () => {
           }
         }]
       },
-      { route: 'data-sources', scope: ['sql-runner'], successResult: { dataSources: [{ dataSource: 'default', dbType: 'postgres' }] } },
+      { route: 'data-sources', scope: ['sql-runner'], successResult: { dataSources: ['default'] } },
+      {
+        route: 'db-schema',
+        method: 'post',
+        scope: ['sql-runner'],
+        successBody: {
+          query: {
+            dataSource: 'default',
+            limit: 1,
+            offset: 1,
+          }
+        },
+        successResult: {
+          schemas: ['other'],
+        },
+        wrongPayloads: [
+          {
+            result: {
+              status: 400,
+              error: 'A user\'s query must contain a body'
+            },
+            body: {}
+          },
+          {
+            result: {
+              status: 400,
+              error: 'A user\'s query must contain dataSource.'
+            },
+            body: { query: {} }
+          },
+          {
+            result: {
+              status: 400,
+              error: 'schemaName query param is wrong.'
+            },
+            body: {
+              query: {
+                dataSource: 'default',
+                schemaName: 'wrongSchemaName',
+              }
+            }
+          }
+        ]
+      },
+      {
+        route: 'db-schema',
+        method: 'post',
+        scope: ['sql-runner'],
+        successBody: {
+          query: {
+            dataSource: 'default',
+            schemaName: 'public',
+            limit: 1,
+            offset: 1,
+          }
+        },
+        successResult: {
+          tables: {
+            line_items_count_by_states: [
+              {
+                name: 'users_state',
+                type: 'character varying',
+                attributes: [],
+              },
+              {
+                name: 'line_items_count',
+                type: 'bigint',
+                attributes: [],
+              },
+            ]
+          },
+        },
+      },
     ];
 
     testConfigs.forEach((config) => {
