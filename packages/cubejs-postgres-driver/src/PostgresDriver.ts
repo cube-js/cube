@@ -4,6 +4,7 @@
  * @fileoverview The `PostgresDriver` and related types declaration.
  */
 
+import * as stream from 'stream';
 import {
   getEnv,
   assertDataSource,
@@ -239,6 +240,24 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         type: this.toGenericType(postgresType)
       });
     });
+  }
+
+  public async streamQuery(sql: string, values: string[], dataStream: stream.Writable): Promise<void> {
+    const conn = await this.pool.connect();
+    try {
+      await this.prepareConnection(conn);
+      const highWaterMark = 100;
+      const query = new QueryStream(sql, values, {
+        types: { getTypeParser: this.getTypeParser },
+        highWaterMark,
+      });
+      const pgStream: QueryStream = await conn.query(query);
+      pgStream.once('end', conn.release);
+      pgStream.pipe(dataStream);
+    } catch (e) {
+      await conn.release();
+      throw e;
+    }
   }
 
   public async stream(

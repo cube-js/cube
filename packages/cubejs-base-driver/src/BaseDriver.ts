@@ -4,6 +4,7 @@
  * @fileoverview The `BaseDriver` and related types declaration.
  */
 
+import * as stream from 'stream';
 import {
   getEnv,
   keyByDataSource,
@@ -227,6 +228,10 @@ export abstract class BaseDriver implements DriverInterface {
   abstract testConnection(): Promise<void>;
 
   abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
+
+  public async streamQuery(sql: string, values: string[], s: stream.Writable): Promise<void> {
+    throw new Error('The BaseDriver.streamQuery() method is not implemented yet.');
+  }
 
   public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
     const rows = await this.query<Row>(query, values);
