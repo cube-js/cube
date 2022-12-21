@@ -126,6 +126,7 @@ class OracleDriver extends BaseDriver {
     const conn = await this.getConnectionFromPool();
     try {
       const res = await conn.execute(query, values || {});
+      conn.close();
       return res && res.rows;
     } catch (e) {
       throw (e);
