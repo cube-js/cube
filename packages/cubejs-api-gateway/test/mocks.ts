@@ -204,6 +204,101 @@ export class AdapterApiMock {
     };
   }
 
+  public async fetchSchema() {
+    return {
+      public: {
+        orders: [
+          {
+            name: 'id',
+            type: 'integer',
+            attributes: [],
+          },
+          {
+            name: 'user_id',
+            type: 'integer',
+            attributes: [],
+          },
+          {
+            name: 'number',
+            type: 'integer',
+            attributes: [],
+          },
+          {
+            name: 'status',
+            type: 'text',
+            attributes: [],
+          },
+          {
+            name: 'completed_at',
+            type: 'timestamp without time zone',
+            attributes: [],
+          },
+          {
+            name: 'created_at',
+            type: 'timestamp without time zone',
+            attributes: [],
+          },
+          {
+            name: 'product_id',
+            type: 'integer',
+            attributes: [],
+          },
+        ],
+        line_items_count_by_states: [
+          {
+            name: 'users_state',
+            type: 'character varying',
+            attributes: [],
+          },
+          {
+            name: 'line_items_count',
+            type: 'bigint',
+            attributes: [],
+          },
+        ],
+      },
+      other: {
+        orders: [
+          {
+            name: 'id',
+            type: 'integer',
+            attributes: [],
+          },
+          {
+            name: 'user_id',
+            type: 'integer',
+            attributes: [],
+          },
+          {
+            name: 'number',
+            type: 'integer',
+            attributes: [],
+          },
+          {
+            name: 'status',
+            type: 'text',
+            attributes: [],
+          },
+          {
+            name: 'completed_at',
+            type: 'timestamp without time zone',
+            attributes: [],
+          },
+          {
+            name: 'created_at',
+            type: 'timestamp without time zone',
+            attributes: [],
+          },
+          {
+            name: 'product_id',
+            type: 'integer',
+            attributes: [],
+          },
+        ],
+      },
+    };
+  }
+
   public addDataSeenSource() {
     return undefined;
   }

@@ -683,6 +683,34 @@ describe('OptsHandler class', () => {
       delete process.env.CUBEJS_CONCURRENCY;
     }
   );
+  
+  test('should fetchSchema method exist and call driverFactory', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.CUBEJS_DEV_MODE = 'true';
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      apiSecret: '44b87d4309471e5d9d18738450db0e49',
+      driverFactory: () => ({
+        type: 'postgres',
+        user: 'user',
+        password: 'password',
+        database: 'database',
+      }),
+    });
+
+    const oapi = <any>core.getOrchestratorApi(<RequestContext>{});
+    const testFetchSchemaSpy = jest.spyOn(oapi, 'fetchSchema');
+    const testDriverFactorySpy = jest.spyOn(oapi, 'driverFactory');
+
+    await expect(async () => {
+      await oapi.fetchSchema();
+    }).rejects.toThrow();
+
+    expect(testFetchSchemaSpy.mock.calls.length).toEqual(1);
+    expect(testDriverFactorySpy.mock.calls.length).toEqual(1);
+
+    testFetchSchemaSpy.mockRestore();
+  });
 
   test('must configure driver pool', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
