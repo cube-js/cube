@@ -9,7 +9,7 @@ use crate::{
             cube_scan_members, dimension_expr, expr_column_name, filter,
             filter_cast_unwrap_replacer, filter_member, filter_op, filter_op_filters,
             filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
-            is_null_expr, like_expr, limit, literal_bool, literal_expr, literal_int,
+            is_null_expr, like_expr, limit, list_expr, literal_bool, literal_expr, literal_int,
             literal_string, measure_expr, member_name_by_alias, negative_expr, not_expr,
             projection, rewrite,
             rewriter::RewriteRules,
@@ -399,6 +399,21 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 self.transform_negate_inlist("?negated", "?new_negated"),
+            ),
+            rewrite(
+                "filter-replacer-not-or-to-not-and",
+                filter_replacer(
+                    not_expr(binary_expr("?left", "OR", "?right")),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(not_expr("?left"), "AND", not_expr("?right")),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
             ),
             transforming_rewrite(
                 "filter-replacer-is-null",
@@ -1459,6 +1474,56 @@ impl RewriteRules for FilterRules {
                                 negative_expr(literal_expr("?interval")),
                             ],
                         ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            rewrite(
+                "filter-thoughtspot-lower-in-true-false",
+                filter_replacer(
+                    inlist_expr(
+                        binary_expr(
+                            binary_expr(
+                                fun_expr("Lower", vec![column_expr("?column")]),
+                                "=",
+                                literal_expr("?left_literal"),
+                            ),
+                            "OR",
+                            binary_expr(
+                                fun_expr("Lower", vec![column_expr("?column")]),
+                                "=",
+                                literal_expr("?right_literal"),
+                            ),
+                        ),
+                        list_expr(
+                            "InListExprList",
+                            vec![literal_bool(true), literal_bool(false)],
+                        ),
+                        "InListExprNegated:false",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            binary_expr(
+                                fun_expr("Lower", vec![column_expr("?column")]),
+                                "=",
+                                literal_expr("?left_literal"),
+                            ),
+                            "OR",
+                            binary_expr(
+                                fun_expr("Lower", vec![column_expr("?column")]),
+                                "=",
+                                literal_expr("?right_literal"),
+                            ),
+                        ),
+                        "AND",
+                        is_not_null_expr(column_expr("?column")),
                     ),
                     "?alias_to_cube",
                     "?members",
