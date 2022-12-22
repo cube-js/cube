@@ -15869,4 +15869,45 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_thoughtspot_left_right() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                "ta_1"."customer_gender" "ca_1",
+                LEFT("ta_1"."customer_gender", 2) "ca_2",
+                RIGHT("ta_1"."customer_gender", 2) "ca_3"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            GROUP BY
+                "ca_1",
+                "ca_2",
+                "ca_3"
+            ORDER BY
+                "ca_1" ASC,
+                "ca_2" ASC,
+                "ca_3" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
 }

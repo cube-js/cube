@@ -2141,6 +2141,30 @@ impl RewriteRules for SplitRules {
                 inner_aggregate_split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube"),
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
+            // Left
+            rewrite(
+                "split-push-down-left-inner-replacer",
+                inner_aggregate_split_replacer(
+                    fun_expr(
+                        "Left",
+                        vec!["?expr".to_string(), literal_expr("?length")],
+                    ),
+                    "?cube",
+                ),
+                inner_aggregate_split_replacer("?expr", "?cube"),
+            ),
+            // Right
+            rewrite(
+                "split-push-down-right-inner-replacer",
+                inner_aggregate_split_replacer(
+                    fun_expr(
+                        "Right",
+                        vec!["?expr".to_string(), literal_expr("?length")],
+                    ),
+                    "?cube",
+                ),
+                inner_aggregate_split_replacer("?expr", "?cube"),
+            ),
             // IS NULL, IS NOT NULL
             rewrite(
                 "split-push-down-is-null-inner-replacer",
@@ -3660,6 +3684,62 @@ impl RewriteRules for SplitRules {
                     fun_expr(
                         "CharacterLength",
                         vec![split_replacer("?expr".to_string(), "?cube")],
+                    )
+                },
+                |_, _| true,
+                false,
+                false,
+                true,
+                Some(vec![("?expr", column_expr("?column"))]),
+            )
+            .into_iter(),
+        );
+        // Left
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-left-replacer",
+                |split_replacer| {
+                    split_replacer(
+                        fun_expr("Left", vec!["?expr".to_string(), literal_expr("?length")]),
+                        "?cube",
+                    )
+                },
+                |_| vec![],
+                |split_replacer| {
+                    fun_expr(
+                        "Left",
+                        vec![
+                            split_replacer("?expr".to_string(), "?cube"),
+                            literal_expr("?length"),
+                        ],
+                    )
+                },
+                |_, _| true,
+                false,
+                false,
+                true,
+                Some(vec![("?expr", column_expr("?column"))]),
+            )
+            .into_iter(),
+        );
+        // Right
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-right-replacer",
+                |split_replacer| {
+                    split_replacer(
+                        fun_expr("Right", vec!["?expr".to_string(), literal_expr("?length")]),
+                        "?cube",
+                    )
+                },
+                |_| vec![],
+                |split_replacer| {
+                    fun_expr(
+                        "Right",
+                        vec![
+                            split_replacer("?expr".to_string(), "?cube"),
+                            literal_expr("?length"),
+                        ],
                     )
                 },
                 |_, _| true,
