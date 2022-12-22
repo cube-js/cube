@@ -71,7 +71,9 @@ export class WebSocketConnection {
           }
         });
         webSocket.on('pong', () => {
-          this.currentConnectionTry = 0;
+          if (webSocket === this.webSocket) {
+            this.currentConnectionTry = 0;
+          }
           webSocket.lastHeartBeat = new Date();
         });
         webSocket.on('close', () => {
@@ -155,7 +157,7 @@ export class WebSocketConnection {
   }
 
   private retryWaitTime() {
-    return 1000 * this.currentConnectionTry;
+    return 1000 * (this.currentConnectionTry + 1);
   }
 
   private async sendMessage(messageId: number, buffer: Uint8Array): Promise<any> {
