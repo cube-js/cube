@@ -562,10 +562,9 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   /**
-   * Query limit wich will be used in the query to the data source if
-   * limit property was not specified in the query.
+   * Query stream `highWaterMark` value.
    */
-  dbQueryStreamOffset: (): number => get('CUBEJS_DB_QUERY_STREAM_OFFSET')
+  dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
     .default(5000)
     .asInt(),
 

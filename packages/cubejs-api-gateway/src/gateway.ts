@@ -215,17 +215,29 @@ class ApiGateway {
     }));
 
     app.post(`${this.basePath}/v1/stream`, jsonParser, userMiddlewares, (async (req, res) => {
-      const _stream = <stream.Transform>(await this.stream(req.context, req.body.query));
-      _stream.on('data', (chunk) => {
-        console.log(`stream chunk: ${JSON.stringify(chunk, undefined, 2)}`);
-      });
-      _stream.on('end', () => {
-        console.log('stream end');
-      });
-      _stream.on('close', () => {
-        _stream.removeAllListeners();
-        console.log('stream close');
-      });
+      const run = async (n) => {
+        const _stream = await this.stream(req.context, req.body.query);
+        console.log(JSON.stringify(_stream, undefined, 2));
+        _stream?.stream.on('fields', (fields) => {
+          console.log(`stream#${n} fields: ${JSON.stringify(fields, undefined, 2)}`);
+        });
+        _stream?.stream.on('data', (chunk) => {
+          console.log(`stream#${n} chunk: ${JSON.stringify(chunk, undefined, 2)}`);
+        });
+        _stream?.stream.on('end', () => {
+          console.log(`stream#${n} end ${JSON.stringify(_stream.stream, undefined, 2)}`);
+        });
+        _stream?.stream.on('close', () => {
+          _stream?.stream.removeAllListeners();
+          console.log(`stream#${n} close ${JSON.stringify(_stream.stream, undefined, 2)}`);
+        });
+      };
+
+      run(0);
+      // for (let i = 1; i <= 10; i++) {
+      //   run(i);
+      // }
+      
       this.resToResultFn(res)(true);
     }));
 
@@ -1286,7 +1298,7 @@ class ApiGateway {
       renewQuery: normalizedQuery.renewQuery,
       requestId: context.requestId,
       context,
-      persistent: apiType === 'stream',
+      persistent: false,
     }];
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
@@ -1385,30 +1397,46 @@ class ApiGateway {
     };
   }
 
-  public async stream(context: RequestContext, query: Query): Promise<null | stream.Transform> {
+  /**
+   * Returns stream object which will be used to stream results from
+   * the data source if applicable, returns `null` otherwise.
+   */
+  public async stream(context: RequestContext, query: Query): Promise<null | {
+    originalQuery: Query;
+    normalizedQuery: NormalizedQuery;
+    streamingQuery: unknown;
+    stream: stream.Writable;
+  }> {
+    const requestStarted = new Date();
     try {
       this.log({ type: 'Streaming Query', query }, context);
-
-      let metaConfigResult = await this.getCompilerApi(context).metaConfig({
-        requestId: context.requestId,
-      });
-      metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
       const [, normalizedQueries] = await this.getNormalizedQueries(query, context);
-      const normalizedQuery = normalizedQueries[0];
       const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
       const q = {
         ...sqlQuery,
         query: sqlQuery.sql[0],
         values: sqlQuery.sql[1],
         continueWait: true,
-        renewQuery: normalizedQuery.renewQuery,
+        renewQuery: false,
         requestId: context.requestId,
         context,
         persistent: true,
         forceNoCache: true,
       };
-      return this.getAdapterApi(context).streamQuery(q);
+      const _stream = {
+        originalQuery: query,
+        normalizedQuery: normalizedQueries[0],
+        streamingQuery: q,
+        stream: await this.getAdapterApi(context).streamQuery(q),
+      };
+      return _stream;
     } catch (e) {
+      this.log({
+        type: 'Streaming Error',
+        query,
+        error: (<Error>e).message,
+        duration: this.duration(requestStarted),
+      }, context);
       return null;
     }
   }
