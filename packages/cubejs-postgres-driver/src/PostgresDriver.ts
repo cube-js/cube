@@ -4,7 +4,6 @@
  * @fileoverview The `PostgresDriver` and related types declaration.
  */
 
-import * as stream from 'stream';
 import {
   getEnv,
   assertDataSource,
