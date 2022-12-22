@@ -15699,4 +15699,174 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_thoughtspot_where_not_or() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            WITH "qt_0" AS (
+                SELECT "ta_1"."customer_gender" "ca_1"
+                FROM KibanaSampleDataEcommerce "ta_1"
+                WHERE NOT((
+                    "ta_1"."customer_gender" IS NULL
+                    OR LOWER("ta_1"."customer_gender") IN ('unknown')
+                ))
+                GROUP BY "ca_1"
+            )
+            SELECT count(DISTINCT "ta_2"."ca_1") "ca_2"
+            FROM "qt_0" "ta_2"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("notEquals".to_string()),
+                        values: Some(vec!["unknown".to_string()]),
+                        or: None,
+                        and: None,
+                    },
+                ])
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_where_binary_in_true_false() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                ((
+                    LOWER("ta_1"."customer_gender") = 'female'
+                    OR LOWER("ta_1"."customer_gender") = 'male'
+                )) "ca_1",
+                CASE
+                    WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
+                    ELSE 0
+                END "ca_2"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            WHERE ((
+                LOWER("ta_1"."customer_gender") = 'female'
+                OR LOWER("ta_1"."customer_gender") = 'male'
+            )) IN (
+                TRUE, FALSE
+            )
+            GROUP BY "ca_1"
+            ORDER BY
+                "ca_1" ASC,
+                "ca_2" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: None,
+                        operator: None,
+                        values: None,
+                        or: Some(vec![
+                            json!(V1LoadRequestQueryFilterItem {
+                                member: None,
+                                operator: None,
+                                values: None,
+                                or: None,
+                                and: Some(vec![
+                                    json!(V1LoadRequestQueryFilterItem {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("startsWith".to_string()),
+                                        values: Some(vec!["female".to_string()]),
+                                        or: None,
+                                        and: None,
+                                    }),
+                                    json!(V1LoadRequestQueryFilterItem {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("endsWith".to_string()),
+                                        values: Some(vec!["female".to_string()]),
+                                        or: None,
+                                        and: None,
+                                    }),
+                                ]),
+                            }),
+                            json!(V1LoadRequestQueryFilterItem {
+                                member: None,
+                                operator: None,
+                                values: None,
+                                or: None,
+                                and: Some(vec![
+                                    json!(V1LoadRequestQueryFilterItem {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("startsWith".to_string()),
+                                        values: Some(vec!["male".to_string()]),
+                                        or: None,
+                                        and: None,
+                                    }),
+                                    json!(V1LoadRequestQueryFilterItem {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("endsWith".to_string()),
+                                        values: Some(vec!["male".to_string()]),
+                                        or: None,
+                                        and: None,
+                                    }),
+                                ]),
+                            }),
+                        ]),
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None,
+                    },
+                ])
+            }
+        )
+    }
 }
