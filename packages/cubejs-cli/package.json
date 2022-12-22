@@ -38,7 +38,7 @@
     "cross-spawn": "^7.0.1",
     "fs-extra": "^8.1.0",
     "inquirer": "^7.1.0",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "request": "^2.88.2",
     "request-promise": "^4.2.5",
     "semver": "^7.3.2",
