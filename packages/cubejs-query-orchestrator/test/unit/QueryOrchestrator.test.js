@@ -171,6 +171,7 @@ describe('QueryOrchestrator', () => {
   let externalMockDriver = null;
   let queryOrchestrator = null;
   let queryOrchestratorExternalRefresh = null;
+  let queryOrchestratorDropWithoutTouch = null;
   let testCount = 1;
 
   beforeEach(() => {
@@ -227,6 +228,14 @@ describe('QueryOrchestrator', () => {
           externalRefresh: true,
         },
       });
+    queryOrchestratorDropWithoutTouch =
+      new QueryOrchestrator(redisPrefix, driverFactory, logger, {
+        ...options,
+        preAggregationsOptions: {
+          ...options.preAggregationsOptions,
+          dropPreAggregationsWithoutTouch: true,
+        },
+      });
     mockDriver = mockDriverLocal;
     fooMockDriver = fooMockDriverLocal;
     barMockDriver = barMockDriverLocal;
@@ -238,6 +247,7 @@ describe('QueryOrchestrator', () => {
   afterEach(async () => {
     await queryOrchestrator.cleanup();
     await queryOrchestratorExternalRefresh.cleanup();
+    await queryOrchestratorDropWithoutTouch.cleanup();
   });
 
   test('basic', async () => {
@@ -1299,5 +1309,43 @@ describe('QueryOrchestrator', () => {
     await queryOrchestrator.fetchQuery(query);
 
     expect(streamingSourceMockDriver.downloadTableStreamOffset).toBe('earliest');
+  });
+
+  test('drop without touch does not affect tables in progress', async () => {
+    const firstQuery = queryOrchestratorDropWithoutTouch.fetchQuery({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_delay_d20181102',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_delay_d20181102',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20181102 AS SELECT * FROM public.orders_delay', []],
+        invalidateKeyQueries: [['SELECT 2', []]]
+      }],
+      requestId: 'drop without touch does not affect tables in progress'
+    });
+    const promises = [firstQuery];
+    for (let i = 0; i < 10; i++) {
+      promises.push(queryOrchestratorDropWithoutTouch.fetchQuery({
+        query: `SELECT * FROM stb_pre_aggregations.orders_d201811${i}`,
+        values: [],
+        cacheKeyQueries: {
+          renewalThreshold: 21600,
+          queries: []
+        },
+        preAggregations: [{
+          preAggregationsSchema: 'stb_pre_aggregations',
+          tableName: `stb_pre_aggregations.orders_d201811${i}`,
+          loadSql: [`CREATE TABLE stb_pre_aggregations.orders_d201811${i} AS SELECT * FROM public.orders`, []],
+          invalidateKeyQueries: [['SELECT 2', []]]
+        }],
+        requestId: 'drop without touch does not affect tables in progress'
+      }));
+    }
+    await Promise.all(promises);
+    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
   });
 });
