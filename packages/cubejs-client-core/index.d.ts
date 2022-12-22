@@ -261,6 +261,7 @@ declare module '@cubejs-client/core' {
   export type Series<T> = {
     key: string;
     title: string;
+    shortTitle: string;
     series: T[];
   };
 
