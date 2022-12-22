@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.30](https://github.com/cube-js/cube.js/compare/v0.31.29...v0.31.30) (2022-12-22)
+
+
+### Bug Fixes
+
+* Pre-aggregation table is not found after it was successfully created for `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` strategy ([#5858](https://github.com/cube-js/cube.js/issues/5858)) ([f602fee](https://github.com/cube-js/cube.js/commit/f602feea9c2a25a0de8604e1297484f71ac8437a))
+
+
+
+
+
 ## [0.31.29](https://github.com/cube-js/cube.js/compare/v0.31.28...v0.31.29) (2022-12-18)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

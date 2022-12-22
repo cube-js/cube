@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.30](https://github.com/cube-js/cube.js/compare/v0.31.29...v0.31.30) (2022-12-22)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve Thoughtspot compatibility ([4d6511a](https://github.com/cube-js/cube.js/commit/4d6511a3d18ea877f06775c1aae154b5665feda0))
+
+
+
+
+
 ## [0.31.28](https://github.com/cube-js/cube.js/compare/v0.31.27...v0.31.28) (2022-12-16)
 
 

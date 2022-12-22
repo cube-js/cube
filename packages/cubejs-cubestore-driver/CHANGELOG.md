@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.30](https://github.com/cube-js/cube.js/compare/v0.31.29...v0.31.30) (2022-12-22)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Increase retry timeout to avoid endless loop connection retries ([8bd19fa](https://github.com/cube-js/cube.js/commit/8bd19fafb36da6d97000da20417e98f23d92a424))
+
+
+
+
+
 ## [0.31.29](https://github.com/cube-js/cube.js/compare/v0.31.28...v0.31.29) (2022-12-18)
 
 
