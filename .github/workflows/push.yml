@@ -424,6 +424,12 @@ jobs:
           args: --manifest-path rust/cubestore/Cargo.toml -j 4
       - name: Run Integration smoke tests
         timeout-minutes: 30
+        env:
+          CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
+          CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
+          CUBEJS_AWS_REGION: us-east-1
+          CUBEJS_AWS_S3_OUTPUT_LOCATION: s3://cubejs-opensource/testing/output
+          CUBEJS_DB_EXPORT_BUCKET: s3://cubejs-opensource/testing/export
         run: |
           mkdir -p rust/cubestore/downloaded/latest/bin
           cp rust/cubestore/target/debug/cubestored rust/cubestore/downloaded/latest/bin/cubestored
