@@ -162,6 +162,12 @@ export class QueryOrchestrator {
     );
   }
 
+  /**
+   * Returns stream object which will be used to stream results from
+   * the data source if applicable. Throw otherwise.
+   *
+   * @throw Error
+   */
   public async streamQuery(query: QueryBody): Promise<stream.Transform> {
     const {
       preAggregationsTablesToTempTables,

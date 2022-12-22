@@ -1,8 +1,9 @@
 import Stream from 'pg-query-stream';
 import type { FieldDef } from 'pg';
+import { TableStructure } from '@cubejs-backend/base-driver';
 
 export class QueryStream extends Stream {
-  public fields(): Promise<FieldDef[]> {
+  public fields(mapFieldsFn: (def: FieldDef[]) => TableStructure): Promise<TableStructure> {
     return new Promise((resolve, reject) => {
       const errorListener = (e: Error) => {
         reject(e);
@@ -33,7 +34,7 @@ export class QueryStream extends Stream {
 
           this.removeListener('error', errorListener);
 
-          resolve(result.fields);
+          resolve(mapFieldsFn(result.fields));
         }
       });
     });
