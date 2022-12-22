@@ -229,6 +229,7 @@ export abstract class BaseDriver implements DriverInterface {
 
   abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async streamQuery(sql: string, values: string[]): Promise<stream.Readable> {
     throw new TypeError('The BaseDriver.streamQuery() method is not implemented yet.');
   }
@@ -371,6 +372,7 @@ export abstract class BaseDriver implements DriverInterface {
     return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async queryColumnTypes(sql: string, params?: unknown[]): Promise<{ name: any; type: string; }[]> {
     return [];
   }
