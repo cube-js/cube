@@ -624,7 +624,7 @@ describe('API Gateway', () => {
           }
         },
         successResult: {
-          schemas: ['other'],
+          data: ['other'],
         },
         wrongPayloads: [
           {
@@ -644,12 +644,12 @@ describe('API Gateway', () => {
           {
             result: {
               status: 400,
-              error: 'schemaName query param is wrong.'
+              error: 'levelChain item: wrongLevelChain is empty'
             },
             body: {
               query: {
                 dataSource: 'default',
-                schemaName: 'wrongSchemaName',
+                levelChain: ['wrongLevelChain'],
               }
             }
           }
@@ -661,26 +661,52 @@ describe('API Gateway', () => {
         successBody: {
           query: {
             dataSource: 'default',
-            schemaName: 'public',
+            levelChain: ['public'],
             limit: 1,
             offset: 1,
           }
         },
         successResult: {
-          tables: {
-            line_items_count_by_states: [
-              {
-                name: 'users_state',
-                type: 'character varying',
-                attributes: [],
-              },
-              {
-                name: 'line_items_count',
-                type: 'bigint',
-                attributes: [],
-              },
-            ]
-          },
+          data: [
+            'line_items_count_by_states'
+          ],
+        },
+      },
+      {
+        route: 'db-schema',
+        method: 'post',
+        successBody: {
+          query: {
+            dataSource: 'default',
+            limit: 10,
+            offset: 0,
+            search: 'test_id',
+          }
+        },
+        successResult: {
+          data: [
+            'other',
+          ],
+        },
+      },
+      {
+        route: 'db-schema',
+        method: 'post',
+        successBody: {
+          query: {
+            dataSource: 'default',
+            levelChain: ['public', 'orders'],
+            limit: 10,
+            offset: 0,
+            search: 'user_id',
+          }
+        },
+        successResult: {
+          data: [{
+            name: 'user_id',
+            type: 'integer',
+            attributes: [],
+          }],
         },
       },
     ];
