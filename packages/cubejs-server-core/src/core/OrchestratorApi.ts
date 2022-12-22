@@ -231,7 +231,7 @@ export class OrchestratorApi {
     }
   }
 
-  public async fetchSchema(dataSource: string, securityContext?: { [key: string]: any; }) {
+  public async fetchSchema(dataSource: string, securityContext?: { [key: string]: any; }, renew?: boolean) {
     const cacheDriver = this.orchestrator
       .getQueryCache()
       .getCacheDriver();
@@ -245,14 +245,16 @@ export class OrchestratorApi {
       ]))
       .digest('hex');
 
-    const cachedData = await cacheDriver.get(cacheHash);
-    if (cachedData) {
-      return cachedData;
+    if (!renew) {
+      const cachedData = await cacheDriver.get(cacheHash);
+      if (cachedData) {
+        return cachedData;
+      }
     }
 
     const driver = await this.driverFactory(dataSource);
     const tablesSchema = await driver.tablesSchema();
-    cacheDriver.set(cacheHash, tablesSchema, 60 * 60); // cache for 1 hour
+    cacheDriver.set(cacheHash, tablesSchema, 86400); // cache for 1 day
     return tablesSchema;
   }
 

@@ -277,7 +277,7 @@ export class AdapterApiMock {
             attributes: [],
           },
           {
-            name: 'user_id',
+            name: 'test_id',
             type: 'integer',
             attributes: [],
           },
