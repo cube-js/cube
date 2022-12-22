@@ -102,15 +102,32 @@ impl MemorySequence {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum RowKey {
-    Table(TableId, u64),
+    Table(TableId, /** row_id */ u64),
     Sequence(TableId),
-    SecondaryIndex(IndexId, SecondaryKey, u64),
+    SecondaryIndex(IndexId, SecondaryKey, /** row_id */ u64),
     SecondaryIndexInfo { index_id: IndexId },
+    TableInfo { table_id: TableId },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct SecondaryIndexInfo {
+    // user specific version
     pub version: u32,
+    #[serde(default = "secondary_index_info_default_value_version")]
+    // serialization/deserialization version
+    pub value_version: u32,
+}
+
+fn secondary_index_info_default_value_version() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct TableInfo {
+    // user specific version
+    pub version: u32,
+    // serialization/deserialization version, reserved, not used
+    pub value_version: u32,
 }
 
 impl RowKey {
@@ -138,6 +155,11 @@ impl RowKey {
                 let index_id = IndexId::from(reader.read_u32::<BigEndian>().unwrap());
 
                 RowKey::SecondaryIndexInfo { index_id }
+            }
+            5 => {
+                let table_id = TableId::from(reader.read_u32::<BigEndian>().unwrap());
+
+                RowKey::TableInfo { table_id }
             }
             v => panic!("Unknown key prefix: {}", v),
         }
@@ -167,6 +189,10 @@ impl RowKey {
             RowKey::SecondaryIndexInfo { index_id } => {
                 wtr.write_u8(4).unwrap();
                 wtr.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+            }
+            RowKey::TableInfo { table_id } => {
+                wtr.write_u8(5).unwrap();
+                wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
             }
         }
         wtr

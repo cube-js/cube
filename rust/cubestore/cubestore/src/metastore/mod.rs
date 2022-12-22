@@ -138,6 +138,10 @@ macro_rules! base_rocks_secondary_index {
                 crate::metastore::RocksSecondaryIndex::get_id(self)
             }
 
+            fn value_version(&self) -> u32 {
+                crate::metastore::RocksSecondaryIndex::value_version(self)
+            }
+
             fn version(&self) -> u32 {
                 crate::metastore::RocksSecondaryIndex::version(self)
             }
@@ -1067,16 +1071,16 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
     }
 
     fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError> {
-        SchemaRocksTable::new(table_ref.clone()).check_indexes()?;
-        TableRocksTable::new(table_ref.clone()).check_indexes()?;
-        IndexRocksTable::new(table_ref.clone()).check_indexes()?;
-        PartitionRocksTable::new(table_ref.clone()).check_indexes()?;
-        ChunkRocksTable::new(table_ref.clone()).check_indexes()?;
-        WALRocksTable::new(table_ref.clone()).check_indexes()?;
-        JobRocksTable::new(table_ref.clone()).check_indexes()?;
-        SourceRocksTable::new(table_ref.clone()).check_indexes()?;
-        MultiIndexRocksTable::new(table_ref.clone()).check_indexes()?;
-        MultiPartitionRocksTable::new(table_ref.clone()).check_indexes()?;
+        SchemaRocksTable::new(table_ref.clone()).migrate()?;
+        TableRocksTable::new(table_ref.clone()).migrate()?;
+        IndexRocksTable::new(table_ref.clone()).migrate()?;
+        PartitionRocksTable::new(table_ref.clone()).migrate()?;
+        ChunkRocksTable::new(table_ref.clone()).migrate()?;
+        WALRocksTable::new(table_ref.clone()).migrate()?;
+        JobRocksTable::new(table_ref.clone()).migrate()?;
+        SourceRocksTable::new(table_ref.clone()).migrate()?;
+        MultiIndexRocksTable::new(table_ref.clone()).migrate()?;
+        MultiPartitionRocksTable::new(table_ref.clone()).migrate()?;
 
         Ok(())
     }
