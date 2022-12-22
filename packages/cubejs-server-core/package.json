@@ -43,7 +43,7 @@
     "cross-spawn": "^7.0.1",
     "fs-extra": "^8.1.0",
     "is-docker": "^2.1.1",
-    "jsonwebtoken": "^8.4.0",
+    "jsonwebtoken": "^9.0.0",
     "lodash.clonedeep": "^4.5.0",
     "lru-cache": "^5.1.1",
     "moment": "^2.29.1",
