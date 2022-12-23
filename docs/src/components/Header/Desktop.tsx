@@ -79,15 +79,6 @@ const Header: React.FC<Props> = (props) => (
           </Button>
 
           <Button
-            href="https://forum.cube.dev/"
-            target="_blank"
-            className={styles.headerButton}
-          >
-            <Icon style={{ fontSize: '22px' }} component={DiscourseIcon} />
-            Discourse
-          </Button>
-
-          <Button
             href="https://github.com/cube-js/cube.js"
             target="_blank"
             className={styles.headerButton}
