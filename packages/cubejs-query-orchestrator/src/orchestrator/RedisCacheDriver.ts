@@ -52,6 +52,10 @@ export class RedisCacheDriver implements CacheDriverInterface {
       );
 
       if (response === 'OK') {
+        if (tkn.isCanceled()) {
+          return false;
+        }
+
         try {
           await tkn.with(cb());
         } finally {

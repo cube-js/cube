@@ -8,7 +8,7 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 
-export type CacheAndQueryDriverType = 'redis' | 'memory';
+export type CacheAndQueryDriverType = 'redis' | 'memory' | 'cubestore';
 
 export enum DriverType {
   External = 'external',
