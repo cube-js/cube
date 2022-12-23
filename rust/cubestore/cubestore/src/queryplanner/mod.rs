@@ -15,19 +15,17 @@ pub mod info_schema;
 pub mod now;
 pub mod udfs;
 
+use crate::cachestore::CacheStore;
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{IdRow, MetaStore};
-use crate::queryplanner::info_schema::info_schema_schemata::SchemataInfoSchemaTableDef;
-use crate::queryplanner::info_schema::info_schema_tables::TablesInfoSchemaTableDef;
-use crate::queryplanner::info_schema::system_chunks::SystemChunksTableDef;
-use crate::queryplanner::info_schema::system_indexes::SystemIndexesTableDef;
-use crate::queryplanner::info_schema::system_jobs::SystemJobsTableDef;
-use crate::queryplanner::info_schema::system_partitions::SystemPartitionsTableDef;
-use crate::queryplanner::info_schema::system_replay_handles::SystemReplayHandlesTableDef;
-use crate::queryplanner::info_schema::system_tables::SystemTablesTableDef;
+use crate::queryplanner::info_schema::{
+    SchemataInfoSchemaTableDef, SystemCacheTableDef, SystemChunksTableDef, SystemIndexesTableDef,
+    SystemJobsTableDef, SystemPartitionsTableDef, SystemReplayHandlesTableDef,
+    SystemTablesTableDef, TablesInfoSchemaTableDef,
+};
 use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
 use crate::queryplanner::query_executor::{
@@ -37,6 +35,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
+
 use crate::sql::InlineTables;
 use crate::store::DataFrame;
 use crate::{app_metrics, metastore, CubeError};
@@ -83,6 +82,7 @@ crate::di_service!(MockQueryPlanner, [QueryPlanner]);
 
 pub struct QueryPlannerImpl {
     meta_store: Arc<dyn MetaStore>,
+    cache_store: Arc<dyn CacheStore>,
     config: Arc<dyn ConfigObj>,
 }
 
@@ -105,6 +105,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let schema_provider = MetaStoreSchemaProvider::new(
             self.meta_store.get_tables_with_path(false).await?,
             self.meta_store.clone(),
+            self.cache_store.clone(),
             inline_tables,
         );
 
@@ -156,9 +157,14 @@ impl QueryPlanner for QueryPlannerImpl {
 impl QueryPlannerImpl {
     pub fn new(
         meta_store: Arc<dyn MetaStore>,
+        cache_store: Arc<dyn CacheStore>,
         config: Arc<dyn ConfigObj>,
     ) -> Arc<QueryPlannerImpl> {
-        Arc::new(QueryPlannerImpl { meta_store, config })
+        Arc::new(QueryPlannerImpl {
+            meta_store,
+            cache_store,
+            config,
+        })
     }
 }
 
@@ -175,6 +181,7 @@ struct MetaStoreSchemaProvider {
     _data: Arc<Vec<TablePath>>,
     by_name: HashSet<TableKey>,
     meta_store: Arc<dyn MetaStore>,
+    cache_store: Arc<dyn CacheStore>,
     inline_tables: InlineTables,
 }
 
@@ -209,6 +216,7 @@ impl MetaStoreSchemaProvider {
     pub fn new(
         tables: Arc<Vec<TablePath>>,
         meta_store: Arc<dyn MetaStore>,
+        cache_store: Arc<dyn CacheStore>,
         inline_tables: &InlineTables,
     ) -> Self {
         let by_name = tables.iter().map(|t| TableKey(t)).collect();
@@ -216,6 +224,7 @@ impl MetaStoreSchemaProvider {
             _data: tables,
             by_name,
             meta_store,
+            cache_store,
             inline_tables: (*inline_tables).clone(),
         }
     }
@@ -285,34 +294,47 @@ impl ContextProvider for MetaStoreSchemaProvider {
         res.or_else(|| match (schema, table) {
             ("information_schema", "tables") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
+                self.cache_store.clone(),
                 InfoSchemaTable::Tables,
             ))),
             ("information_schema", "schemata") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
+                self.cache_store.clone(),
                 InfoSchemaTable::Schemata,
+            ))),
+            ("system", "cache") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                self.cache_store.clone(),
+                InfoSchemaTable::SystemCache,
             ))),
             ("system", "tables") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
+                self.cache_store.clone(),
                 InfoSchemaTable::SystemTables,
             ))),
             ("system", "indexes") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
+                self.cache_store.clone(),
                 InfoSchemaTable::SystemIndexes,
             ))),
             ("system", "partitions") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
+                self.cache_store.clone(),
                 InfoSchemaTable::SystemPartitions,
             ))),
             ("system", "chunks") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
+                self.cache_store.clone(),
                 InfoSchemaTable::SystemChunks,
             ))),
             ("system", "replay_handles") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
+                self.cache_store.clone(),
                 InfoSchemaTable::SystemReplayHandles,
             ))),
             ("system", "jobs") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
+                self.cache_store.clone(),
                 InfoSchemaTable::SystemJobs,
             ))),
             _ => None,
@@ -353,13 +375,19 @@ pub enum InfoSchemaTable {
     SystemPartitions,
     SystemChunks,
     SystemReplayHandles,
+    SystemCache,
+}
+
+pub struct InfoSchemaTableDefContext {
+    meta_store: Arc<dyn MetaStore>,
+    cache_store: Arc<dyn CacheStore>,
 }
 
 #[async_trait]
 pub trait InfoSchemaTableDef {
     type T: Send + Sync;
 
-    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError>;
+    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError>;
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)>;
 }
@@ -368,7 +396,7 @@ pub trait InfoSchemaTableDef {
 pub trait BaseInfoSchemaTableDef {
     fn schema(&self) -> SchemaRef;
 
-    async fn scan(&self, meta_store: Arc<dyn MetaStore>) -> Result<RecordBatch, CubeError>;
+    async fn scan(&self, ctx: InfoSchemaTableDefContext) -> Result<RecordBatch, CubeError>;
 }
 
 #[macro_export]
@@ -387,9 +415,9 @@ macro_rules! base_info_schema_table_def {
 
             async fn scan(
                 &self,
-                meta_store: Arc<dyn crate::metastore::MetaStore>,
+                ctx: crate::queryplanner::InfoSchemaTableDefContext,
             ) -> Result<arrow::record_batch::RecordBatch, crate::CubeError> {
-                let rows = self.rows(meta_store).await?;
+                let rows = self.rows(ctx).await?;
                 let schema = self.schema();
                 let columns = self.columns();
                 let columns = columns
@@ -413,6 +441,7 @@ impl InfoSchemaTable {
             InfoSchemaTable::SystemReplayHandles => Box::new(SystemReplayHandlesTableDef),
             InfoSchemaTable::SystemPartitions => Box::new(SystemPartitionsTableDef),
             InfoSchemaTable::SystemJobs => Box::new(SystemJobsTableDef),
+            InfoSchemaTable::SystemCache => Box::new(SystemCacheTableDef),
         }
     }
 
@@ -420,19 +449,28 @@ impl InfoSchemaTable {
         self.table_def().schema()
     }
 
-    async fn scan(&self, meta_store: Arc<dyn MetaStore>) -> Result<RecordBatch, CubeError> {
-        self.table_def().scan(meta_store).await
+    async fn scan(&self, ctx: InfoSchemaTableDefContext) -> Result<RecordBatch, CubeError> {
+        self.table_def().scan(ctx).await
     }
 }
 
 pub struct InfoSchemaTableProvider {
     meta_store: Arc<dyn MetaStore>,
+    cache_store: Arc<dyn CacheStore>,
     table: InfoSchemaTable,
 }
 
 impl InfoSchemaTableProvider {
-    fn new(meta_store: Arc<dyn MetaStore>, table: InfoSchemaTable) -> InfoSchemaTableProvider {
-        InfoSchemaTableProvider { meta_store, table }
+    fn new(
+        meta_store: Arc<dyn MetaStore>,
+        cache_store: Arc<dyn CacheStore>,
+        table: InfoSchemaTable,
+    ) -> InfoSchemaTableProvider {
+        InfoSchemaTableProvider {
+            meta_store,
+            cache_store,
+            table,
+        }
     }
 }
 
@@ -454,6 +492,7 @@ impl TableProvider for InfoSchemaTableProvider {
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let exec = InfoSchemaTableExec {
             meta_store: self.meta_store.clone(),
+            cache_store: self.cache_store.clone(),
             table: self.table.clone(),
             projection: projection.clone(),
             projected_schema: project_schema(&self.schema(), projection.as_deref()),
@@ -485,6 +524,7 @@ fn project_schema(s: &Schema, projection: Option<&[usize]>) -> SchemaRef {
 #[derive(Clone)]
 pub struct InfoSchemaTableExec {
     meta_store: Arc<dyn MetaStore>,
+    cache_store: Arc<dyn CacheStore>,
     table: InfoSchemaTable,
     projected_schema: SchemaRef,
     projection: Option<Vec<usize>>,
@@ -525,7 +565,13 @@ impl ExecutionPlan for InfoSchemaTableExec {
         &self,
         partition: usize,
     ) -> Result<SendableRecordBatchStream, DataFusionError> {
-        let batch = self.table.scan(self.meta_store.clone()).await?;
+        let batch = self
+            .table
+            .scan(InfoSchemaTableDefContext {
+                meta_store: self.meta_store.clone(),
+                cache_store: self.cache_store.clone(),
+            })
+            .await?;
         let mem_exec =
             MemoryExec::try_new(&vec![vec![batch]], self.schema(), self.projection.clone())?;
         mem_exec.execute(partition).await

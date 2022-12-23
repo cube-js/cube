@@ -35,7 +35,7 @@ use tracing_futures::WithSubscriber;
 use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
-use crate::cachestore::CacheStore;
+use crate::cachestore::{CacheItem, CacheStore};
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -56,7 +56,7 @@ use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
+use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, RocksStoreName, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
@@ -791,6 +791,20 @@ impl SqlService for SqlServiceImpl {
                 }
             }
             CubeStoreStatement::System(command) => match command {
+                SystemCommand::Compaction { store } => {
+                    match store {
+                        None => {
+                            self.db.compaction().await?;
+                            self.cachestore.compaction().await?;
+                        }
+                        Some(store_name) => match store_name {
+                            RocksStoreName::Meta => self.db.compaction().await?,
+                            RocksStoreName::Cache => self.cachestore.compaction().await?,
+                        },
+                    }
+
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
                 SystemCommand::KillAllJobs => {
                     self.db.delete_all_jobs().await?;
                     Ok(Arc::new(DataFrame::new(vec![], vec![])))
@@ -1199,6 +1213,59 @@ impl SqlService for SqlServiceImpl {
 
             CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
 
+            CubeStoreStatement::CacheSet {
+                key,
+                value,
+                ttl,
+                nx,
+            } => {
+                let key = key.value;
+
+                let success = self
+                    .cachestore
+                    .cache_set(CacheItem::new(key, ttl, value), nx)
+                    .await?;
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
+                    vec![Row::new(vec![TableValue::Boolean(success)])],
+                )))
+            }
+            CubeStoreStatement::CacheGet { key } => {
+                let row = self.cachestore.cache_get(key.value).await?;
+                if let Some(r) = row {
+                    Ok(Arc::new(DataFrame::new(
+                        vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                        vec![Row::new(vec![TableValue::String(
+                            r.get_row().get_value().clone(),
+                        )])],
+                    )))
+                } else {
+                    Ok(Arc::new(DataFrame::new(
+                        vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                        vec![Row::new(vec![TableValue::Null])],
+                    )))
+                }
+            }
+            CubeStoreStatement::CacheKeys { prefix } => {
+                let rows = self.cachestore.cache_keys(prefix.value).await?;
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("key".to_string(), ColumnType::String, 0)],
+                    rows.iter()
+                        .map(|i| Row::new(vec![TableValue::String(i.get_row().get_path())]))
+                        .collect(),
+                )))
+            }
+            CubeStoreStatement::CacheRemove { key } => {
+                self.cachestore.cache_delete(key.value).await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::CacheTruncate {} => {
+                self.cachestore.cache_truncate().await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
             CubeStoreStatement::CacheIncr { path } => {
                 let row = self.cachestore.cache_incr(path.value).await?;
 
