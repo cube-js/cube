@@ -327,7 +327,10 @@ impl QueryPlanner {
                     query.request,
                     // @todo Remove after split!
                     self.state.auth_context().unwrap(),
-                    CubeScanOptions { change_user: None },
+                    CubeScanOptions {
+                        change_user: None,
+                        max_records: None,
+                    },
                 )),
             });
             let logical_plan = LogicalPlan::Projection(Projection {
@@ -13973,24 +13976,114 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
-    async fn test_join_cubes_with_postprocessing_error() {
+    async fn test_join_cubes_with_postprocessing() {
         init_logger();
 
-        let query = convert_sql_to_cube_query(
-            &r#"
+        let logical_plan = convert_select_to_query_plan(
+            r#"
             SELECT *
             FROM (SELECT count(count), __cubeJoinField, extract(MONTH from order_date) FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
             LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
             "#
             .to_string(),
-            get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL).await,
+            DatabaseProtocol::PostgreSQL,
         )
-        .await;
+        .await
+        .as_logical_plan();
+
+        let cube_scans = logical_plan
+            .find_cube_scans()
+            .iter()
+            .map(|cube| cube.request.clone())
+            .collect::<Vec<V1LoadRequestQuery>>();
 
         assert_eq!(
-            query.unwrap_err().message(),
-            "Error during rewrite: Can not join Cubes. Looks like one of the subqueries includes post-processing operations. Please check logs for additional information.".to_string()
+            cube_scans.contains(&V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }),
+            true
+        );
+
+        assert_eq!(
+            cube_scans.contains(&V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["Logs.read".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }),
+            true
+        )
+    }
+
+    #[tokio::test]
+    async fn test_join_cubes_with_postprocessing_and_no_cubejoinfield() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT *
+            FROM (SELECT count(count), extract(MONTH from order_date), taxful_total_price FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
+            LEFT JOIN (SELECT id, read FROM Logs) Logs ON (KibanaSampleDataEcommerce.taxful_total_price = Logs.id) 
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scans = logical_plan
+            .find_cube_scans()
+            .iter()
+            .map(|cube| cube.request.clone())
+            .collect::<Vec<V1LoadRequestQuery>>();
+
+        assert_eq!(
+            cube_scans.contains(&V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }),
+            true
+        );
+
+        assert_eq!(
+            cube_scans.contains(&V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["Logs.id".to_string(), "Logs.read".to_string(),]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }),
+            true
         )
     }
 

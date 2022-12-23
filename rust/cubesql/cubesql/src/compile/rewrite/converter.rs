@@ -4,7 +4,6 @@ use crate::{
             df::scan::{CubeScanNode, CubeScanOptions, MemberField},
             provider::CubeContext,
         },
-        is_olap_query,
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
@@ -45,7 +44,7 @@ use datafusion::{
 use egg::{EGraph, Id, RecExpr};
 use itertools::Itertools;
 use serde_json::json;
-use std::{collections::HashMap, ops::Index, sync::Arc};
+use std::{collections::HashMap, env, ops::Index, sync::Arc};
 
 pub use super::rewriter::CubeRunner;
 
@@ -986,29 +985,6 @@ impl LanguageToLogicalPlanConverter {
                             "Use __cubeJoinField to join Cubes".to_string(),
                         ));
                     }
-                } else {
-                    let mut is_olap = left_on.iter().any(|c| c.name == "__cubeJoinField")
-                        || right_on.iter().any(|c| c.name == "__cubeJoinField");
-                    if !is_olap {
-                        if let Ok(left_plan) = &left {
-                            match is_olap_query(left_plan) {
-                                Ok(res) if res => is_olap = true,
-                                _ => (),
-                            }
-                        }
-                        if let Ok(right_plan) = &right {
-                            match is_olap_query(right_plan) {
-                                Ok(res) if res => is_olap = true,
-                                _ => (),
-                            }
-                        }
-                    }
-
-                    if is_olap {
-                        return Err(CubeError::internal(
-                            "Can not join Cubes. Looks like one of the subqueries includes post-processing operations".to_string(),
-                        ));
-                    }
                 }
 
                 let left = Arc::new(left?);
@@ -1549,9 +1525,42 @@ impl LanguageToLogicalPlanConverter {
                         } else {
                             None
                         };
-                        query.limit =
-                            match_data_node!(node_by_id, cube_scan_params[4], CubeScanLimit)
-                                .map(|n| if n > 50000 { 50000 } else { n as i32 });
+                        let cube_scan_query_limit = env::var("CUBEJS_DB_QUERY_LIMIT")
+                            .map(|v| v.parse::<usize>().unwrap())
+                            .unwrap_or(50000);
+                        let fail_on_max_limit_hit = env::var("CUBESQL_FAIL_ON_MAX_LIMIT_HIT")
+                            .map(|v| v.to_lowercase() == "true")
+                            .unwrap_or(false);
+                        let mut limit_was_changed = false;
+                        query.limit = match match_data_node!(
+                            node_by_id,
+                            cube_scan_params[4],
+                            CubeScanLimit
+                        ) {
+                            Some(n) => {
+                                if n > cube_scan_query_limit {
+                                    limit_was_changed = true;
+                                    Some(cube_scan_query_limit)
+                                } else {
+                                    Some(n)
+                                }
+                            }
+                            None => {
+                                if fail_on_max_limit_hit {
+                                    limit_was_changed = true;
+                                    Some(cube_scan_query_limit)
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+                        .map(|n| n as i32);
+
+                        let max_records = if fail_on_max_limit_hit && limit_was_changed {
+                            Some(cube_scan_query_limit)
+                        } else {
+                            None
+                        };
 
                         let offset =
                             match_data_node!(node_by_id, cube_scan_params[5], CubeScanOffset)
@@ -1575,7 +1584,10 @@ impl LanguageToLogicalPlanConverter {
                             member_fields,
                             query,
                             self.auth_context.clone(),
-                            CubeScanOptions { change_user },
+                            CubeScanOptions {
+                                change_user,
+                                max_records,
+                            },
                         ))
                     }
                     x => panic!("Unexpected extension node: {:?}", x),
