@@ -16,6 +16,8 @@ export class WebSocketConnection {
 
   protected maxConnectRetries: number;
 
+  protected noHeartBeatTimeout: number;
+
   protected currentConnectionTry: number;
 
   protected webSocket: any;
@@ -26,6 +28,7 @@ export class WebSocketConnection {
     this.url = url;
     this.messageCounter = 1;
     this.maxConnectRetries = getEnv('cubeStoreMaxConnectRetries');
+    this.noHeartBeatTimeout = getEnv('cubeStoreNoHeartBeatTimeout');
     this.currentConnectionTry = 0;
   }
 
@@ -39,7 +42,7 @@ export class WebSocketConnection {
             webSocket.ping();
           }
 
-          if (new Date().getTime() - webSocket.lastHeartBeat.getTime() > 30000) {
+          if (new Date().getTime() - webSocket.lastHeartBeat.getTime() > this.noHeartBeatTimeout * 1000) {
             webSocket.close();
           }
         }, 5000);

@@ -1318,6 +1318,9 @@ const variables: Record<string, (...args: any) => any> = {
   cubeStoreMaxConnectRetries: () => get('CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES')
     .default('5')
     .asInt(),
+  cubeStoreNoHeartBeatTimeout: () => get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
+    .default('30')
+    .asInt(),
 
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
