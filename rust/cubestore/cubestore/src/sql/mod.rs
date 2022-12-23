@@ -791,13 +791,6 @@ impl SqlService for SqlServiceImpl {
                 }
             }
             CubeStoreStatement::System(command) => match command {
-                #[cfg(not(debug_assertions))]
-                SystemCommand::Compaction { .. } => {
-                    return Err(CubeError::user(
-                        "Forcing compaction is not allowed in release mode".to_string(),
-                    ));
-                }
-                #[cfg(debug_assertions)]
                 SystemCommand::Compaction { store } => {
                     match store {
                         None => {
