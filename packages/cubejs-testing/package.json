@@ -47,7 +47,7 @@
     "driver:databricks": "jest --verbose -i dist/test/driver-databricks.test.js",
     "driver:databricks:snap": "jest --verbose --updateSnapshot -i dist/test/driver-databricks.test.js",
     "rest:postgres": "yarn tsc && clear && jest --verbose -i dist/test/rest-postgres.test.js",
-    "smoke": "jest --verbose -i 'dist/test/smoke-(?!.*?(redshift|athena|bigquery|firebolt))'",
+    "smoke": "jest --verbose -i 'dist/test/smoke-(?!.*?(redshift|bigquery|firebolt))'",
     "smoke:athena": "jest --verbose -i dist/test/smoke-athena.test.js",
     "smoke:athena:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-athena.test.js",
     "smoke:bigquery": "jest --verbose -i dist/test/smoke-bigquery.test.js",
