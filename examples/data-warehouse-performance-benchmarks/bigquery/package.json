@@ -13,6 +13,6 @@
   "dependencies": {
     "@cubejs-client/core": "^0.28.10",
     "@google-cloud/bigquery": "^5.7.0",
-    "jsonwebtoken": "^8.5.1"
+    "jsonwebtoken": "^9.0.0"
   }
 }
