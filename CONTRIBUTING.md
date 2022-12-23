@@ -111,6 +111,18 @@ Cube.js is written in a mixture of plain JavaScript and TypeScript. TypeScript i
 3. Create a new configuration, using `./node_modules/.bin/cubejs-server` for Node Parameters and the directory of your test project for Working directory.
 4. Run/Debug dev cube.js servers using the new configuration.
 
+## Contributing Database Drivers
+
+To enhance the adoption of community-contributed drivers, we decided to split the database driver contribution process into multiple stages.
+
+1. Each driver which is planned to be contributed to the main Cube repository should be published first as an npm package. Please see (Publishing Driver npm package)[#publishing-driver-npm-package] on how to do that.
+2. This NPM package should be contributed to the list of (Third-party community drivers)[https://cube.dev/docs/config/databases#third-party-community-drivers].
+3. Please make sure each npm package has a README with instructions on how to install it to the official docker image and how to connect it to the database.
+4. Posting a backlink to an open-source repository would be a good idea here so people can provide feedback on it by posting issues.
+5. Before creating PR for the main repository, please make sure it's tested with the standard Cube E2E testing suite. An example of an E2E testing suite can be found here: https://github.com/cube-js/cube.js/blob/master/packages/cubejs-testing/test/driver-postgres.test.ts
+6. If you're creating PR for the main repo, please be prepared to become a maintainer for this driver and dedicate some time to it. There're no specific time requirements. As a rule of thumb, you should expect to spend time on a weekly basis.
+7. Due to limited resources Core team will review and merge driver PRs based on popularity and development activity.
+
 ### Implementing a Driver
 
 1. Copy existing driver package structure and name it in `@cubejs-backend/<db-name>-driver` format.
@@ -155,6 +167,8 @@ If driver class contains `static dialectClass()` method it'll be used to lookup 
 
 Cube.js looks up `cubejs-{dbType}-driver` package among installed modules to fullfil driver dependency if there's no corresponding default driver for the specified database type.
 For example one can publish `cubejs-foo-driver` npm package to fullfil driver dependency for the `foo` database type.
+
+## Other Packages
 
 ### Testing Schema Compiler
 
