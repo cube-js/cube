@@ -37,7 +37,7 @@ jobs:
           working-directory: ./rust/cubestore
           key: ubuntu-20.04
       - name: Install SASL
-        run: apt update && apt install -y libsasl2-dev
+        run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
@@ -173,7 +173,7 @@ jobs:
         run: vcpkg integrate install; vcpkg install openssl:x64-windows
       - name: Install SASL for Ubuntu
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
-        run: apt update && apt install -y libsasl2-dev
+        run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - name: Instal LLVM for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: choco install -y --force llvm --version 9.0.1
