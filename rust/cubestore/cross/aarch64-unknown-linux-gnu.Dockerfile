@@ -9,7 +9,7 @@ RUN apt-get update \
     && add-apt-repository "deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-12 main"  \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y gcc-multilib g++-multilib \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make libsasl2-dev \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make libssl-dev libsasl2-dev \
         libc6 libc6-dev libc6-arm64-cross libc6-dev-arm64-cross \
         gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
     && rm -rf /var/lib/apt/lists/*;

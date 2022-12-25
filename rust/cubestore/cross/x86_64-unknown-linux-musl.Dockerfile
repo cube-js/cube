@@ -8,7 +8,7 @@ RUN apt-get update \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
     && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-12 main"  \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make libsasl2-dev \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make libssl-dev libsasl2-dev \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
