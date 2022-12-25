@@ -10,7 +10,7 @@ on:
 
 jobs:
   docker-dev:
-    name: Build cross image for ${{ matrix.name }} target
+    name: Build cross image for ${{ matrix.target }} target
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     strategy:
@@ -34,7 +34,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: ./
-          file: ./rust/cubestore/cross/${{ matrix.name }}.Dockerfile
+          file: ./rust/cubestore/cross/${{ matrix.target }}.Dockerfile
           platforms: linux/amd64
           push: true
-          tags: cubejs/rust-cross:${{ matrix.name }}
+          tags: cubejs/rust-cross:${{ matrix.target }}
