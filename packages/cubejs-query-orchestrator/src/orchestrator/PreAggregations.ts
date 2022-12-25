@@ -30,6 +30,7 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryQueue } from './QueryQueue';
 import { LargeStreamWarning } from './StreamObjectsCounter';
+import { CacheAndQueryDriverType } from './QueryOrchestrator';
 
 /// Name of the inline table containing the lambda rows.
 export const LAMBDA_TABLE_PREFIX = 'lambda';
@@ -1832,7 +1833,7 @@ type PreAggregationsOptions = {
   }>;
   redisPool?: any;
   continueWaitTimeout?: number;
-  cacheAndQueueDriver?: 'redis' | 'memory';
+  cacheAndQueueDriver?: CacheAndQueryDriverType;
   skipExternalCacheAndQueue?: boolean;
 };
 

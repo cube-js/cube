@@ -1,7 +1,7 @@
 import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
 import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
-import { CubeStoreCacheDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import { BaseDriver, InlineTables, CacheDriverInterface } from '@cubejs-backend/base-driver';
 
 import { QueryQueue } from './QueryQueue';
@@ -11,6 +11,7 @@ import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
+import { CacheAndQueryDriverType } from './QueryOrchestrator';
 
 type QueryOptions = {
   external?: boolean;
@@ -102,6 +103,26 @@ type CacheEntry = {
   renewalKey: string;
 };
 
+export interface QueryCacheOptions {
+  refreshKeyRenewalThreshold?: number;
+  externalQueueOptions?: any;
+  externalDriverFactory?: DriverFactory;
+  backgroundRenew?: Boolean;
+  queueOptions?: (dataSource: string) => Promise<{
+    concurrency: number;
+    continueWaitTimeout?: number;
+    executionTimeout?: number;
+    orphanedTimeout?: number;
+    heartBeatInterval?: number;
+  }>;
+  redisPool?: any;
+  cubeStoreDriver?: CubeStoreDriver,
+  continueWaitTimeout?: number;
+  cacheAndQueueDriver?: CacheAndQueryDriverType;
+  maxInMemoryCacheEntries?: number;
+  skipExternalCacheAndQueue?: boolean;
+}
+
 export class QueryCache {
   protected readonly cacheDriver: CacheDriverInterface;
 
@@ -115,24 +136,7 @@ export class QueryCache {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    public readonly options: {
-      refreshKeyRenewalThreshold?: number;
-      externalQueueOptions?: any;
-      externalDriverFactory?: DriverFactory;
-      backgroundRenew?: Boolean;
-      queueOptions?: (dataSource: string) => Promise<{
-        concurrency: number;
-        continueWaitTimeout?: number;
-        executionTimeout?: number;
-        orphanedTimeout?: number;
-        heartBeatInterval?: number;
-      }>;
-      redisPool?: any;
-      continueWaitTimeout?: number;
-      cacheAndQueueDriver?: 'redis' | 'memory' | 'cubestore';
-      maxInMemoryCacheEntries?: number;
-      skipExternalCacheAndQueue?: boolean;
-    } = {}
+    public readonly options: QueryCacheOptions = {}
   ) {
     switch (options.cacheAndQueueDriver || 'memory') {
       case 'redis':
@@ -142,7 +146,9 @@ export class QueryCache {
         this.cacheDriver = new LocalCacheDriver();
         break;
       case 'cubestore':
-        this.cacheDriver = new CubeStoreCacheDriver({});
+        this.cacheDriver = new CubeStoreCacheDriver(
+          options.cubeStoreDriver || new CubeStoreDriver({})
+        );
         break;
       default:
         throw new Error(`Unknown cache driver: ${options.cacheAndQueueDriver}`);

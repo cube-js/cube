@@ -3,14 +3,10 @@ import { CacheDriverInterface } from '@cubejs-backend/base-driver';
 
 import { CubeStoreDriver } from './CubeStoreDriver';
 
-interface CubeStoreCacheDriverOptions {}
-
 export class CubeStoreCacheDriver implements CacheDriverInterface {
-  protected readonly connection: CubeStoreDriver;
-
-  public constructor(options: CubeStoreCacheDriverOptions) {
-    this.connection = new CubeStoreDriver({});
-  }
+  public constructor(
+    protected readonly connection: CubeStoreDriver
+  ) {}
 
   public withLock = (
     key: string,
@@ -22,7 +18,7 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
       return false;
     }
 
-    const rows = await this.connection.query(`CACHE SET NX TTL ${expiration} ? ?`, [key, '1']);
+    const rows = await this.connection.query('CACHE SET NX TTL ? ? ?', [expiration, key, '1']);
     if (rows && rows.length === 1 && rows[0]?.success === 'true') {
       if (tkn.isCanceled()) {
         return false;

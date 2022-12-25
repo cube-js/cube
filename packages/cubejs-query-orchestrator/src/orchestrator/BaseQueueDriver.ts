@@ -1,5 +1,5 @@
-import { getCacheHash } from './utils';
 import { LocalQueueDriverConnectionInterface, QueueDriverInterface } from '@cubejs-backend/base-driver';
+import { getCacheHash } from './utils';
 
 export abstract class BaseQueueDriver implements QueueDriverInterface {
   public redisHash(queryKey) {

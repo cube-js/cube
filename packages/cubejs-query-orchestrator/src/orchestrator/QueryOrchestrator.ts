@@ -61,6 +61,10 @@ export class QueryOrchestrator {
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     this.redisPool = redisPool;
+
+    // TODO: Re-use connection from external database
+    const cubeStoreDriver = undefined;
+
     const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
 
     this.queryCache = new QueryCache(
@@ -71,6 +75,7 @@ export class QueryOrchestrator {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
+        cubeStoreDriver,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.queryCacheOptions,
