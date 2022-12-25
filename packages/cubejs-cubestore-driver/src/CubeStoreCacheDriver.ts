@@ -21,6 +21,10 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
     const rows = await this.connection.query('CACHE SET NX TTL ? ? ?', [expiration, key, '1']);
     if (rows && rows.length === 1 && rows[0]?.success === 'true') {
       if (tkn.isCanceled()) {
+        if (freeAfter) {
+          await this.connection.query(`CACHE REMOVE "${key}"`, []);
+        }
+
         return false;
       }
 

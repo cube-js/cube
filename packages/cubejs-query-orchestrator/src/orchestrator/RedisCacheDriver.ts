@@ -50,9 +50,12 @@ export class RedisCacheDriver implements CacheDriverInterface {
         'EX',
         expiration
       );
-
       if (response === 'OK') {
         if (tkn.isCanceled()) {
+          if (freeAfter) {
+            await client.delAsync(key);
+          }
+
           return false;
         }
 
