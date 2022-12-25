@@ -292,6 +292,44 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Kafka host for direct downloads from ksqlDb
+   */
+  dbKafkaHost: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_KAFKA_HOST', dataSource)]
+  ),
+
+  /**
+   * Kafka user for direct downloads from ksqlDb
+   */
+  dbKafkaUser: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_KAFKA_USER', dataSource)]
+  ),
+
+  /**
+   * Kafka password for direct downloads from ksqlDb
+   */
+  dbKafkaPass: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_KAFKA_PASS', dataSource)]
+  ),
+
+  /**
+   * `true` if Kafka should use SASL_SSL for direct downloads from ksqlDb
+   */
+  dbKafkaUseSsl: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    get(keyByDataSource('CUBEJS_DB_KAFKA_USE_SSL', dataSource))
+      .default('false')
+      .asBool()
+  ),
+
+  /**
    * Database domain.
    */
   dbDomain: ({
