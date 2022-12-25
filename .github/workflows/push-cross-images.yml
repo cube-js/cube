@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  push:
+    paths:
+      - '.github/workflows/push-cross-images.yml'
+      - 'rust/cubestore/cross/**'
+    branches:
+      - 'master'
+
+jobs:
+  docker-dev:
+    name: Build cross image for ${{ matrix.name }} target
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-gnu
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+        with:
+          version: v0.6.3
+          driver-opts: network=host
+      - name: Push to Docker Hub
+        uses: docker/build-push-action@v2
+        with:
+          context: ./
+          file: ./rust/cubestore/cross/${{ matrix.name }}.Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: cubejs/rust-cross:${{ matrix.name }}
