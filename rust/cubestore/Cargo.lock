@@ -1205,6 +1205,7 @@ dependencies = [
  "reqwest 0.11.10",
  "rocksdb",
  "rust-s3",
+ "sasl2-sys",
  "scopeguard",
  "serde",
  "serde_bytes",
@@ -2275,15 +2276,6 @@ checksum = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 dependencies = [
  "winapi 0.2.8",
  "winapi-build",
-]
-
-[[package]]
-name = "krb5-src"
-version = "0.3.2+1.19.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44cd3b7e7735d48bc3793837041294f2eb747bd0f63bbc081e89972abb9e48fb"
-dependencies = [
- "duct",
 ]
 
 [[package]]
@@ -4140,7 +4132,6 @@ checksum = "9e645bd98535fc8fd251c43ba7c7c1f9be1e0369c99b6a5ea719052a773e655c"
 dependencies = [
  "cc",
  "duct",
- "krb5-src",
  "libc",
  "pkg-config",
 ]
