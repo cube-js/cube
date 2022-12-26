@@ -187,7 +187,7 @@ jobs:
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: |
           cd C:/vcpkg/packages/openssl_x64-windows/lib
-          mklink libcrypto.lib
+          cmd /c mklink libcrypto.lib
       - name: Build with Cross
         if: ${{ matrix.cross }}
         run: |
