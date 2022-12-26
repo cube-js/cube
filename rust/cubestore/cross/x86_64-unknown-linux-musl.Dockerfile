@@ -4,11 +4,11 @@ FROM rustembedded/cross:x86_64-unknown-linux-musl
 
 RUN apt-get update \
     && apt-get -y upgrade \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget musl-tools libc6-dev libc6-dev-i386 apt-transport-https ca-certificates \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget musl-tools libc6-dev apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
     && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-12 main"  \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make libssl-dev libsasl2-dev \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make cmake \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
