@@ -27,6 +27,7 @@ use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::streaming::{KsqlClient, KsqlClientImpl, StreamingService, StreamingServiceImpl};
 use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
+use crate::telemetry::tracing::{TracingHelper, TracingHelperImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
@@ -1317,6 +1318,12 @@ impl Config {
             })
             .await;
 
+        self.injector
+            .register_typed_with_default::<dyn TracingHelper, _, _, _>(async move |_| {
+                TracingHelperImpl::new()
+            })
+            .await;
+
         let cluster_meta_store_sender = event_sender_to_move.clone();
 
         self.injector
@@ -1334,6 +1341,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     cluster_meta_store_sender,
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                 )
             })
