@@ -183,6 +183,11 @@ jobs:
           OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
           OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
           LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
+      - name: Make links for OpenSSL
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: |
+          cd C:/vcpkg/packages/openssl_x64-windows/lib
+          mklink libcrypto.lib
       - name: Build with Cross
         if: ${{ matrix.cross }}
         run: |
