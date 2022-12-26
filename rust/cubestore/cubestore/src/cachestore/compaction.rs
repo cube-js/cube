@@ -122,8 +122,23 @@ impl MetaStoreCacheCompactionFilter {
         };
 
         match RocksSecondaryIndexValue::from_bytes(value, index_info.value_version) {
-            RocksSecondaryIndexValue::Hash(_) => CompactionDecision::Keep,
-            RocksSecondaryIndexValue::HashAndTTL(_, expire) => {
+            Err(err) => {
+                // Index was migrated from old format to the new version, but compaction didnt remove it
+                if index_info.value_version == 2
+                    && RocksSecondaryIndexValue::from_bytes(value, 1).is_ok()
+                {
+                    CompactionDecision::Remove
+                } else {
+                    error!(
+                        "Unable to read index value on compaction with error: {}",
+                        err.message
+                    );
+
+                    CompactionDecision::Keep
+                }
+            }
+            Ok(RocksSecondaryIndexValue::Hash(_)) => CompactionDecision::Keep,
+            Ok(RocksSecondaryIndexValue::HashAndTTL(_, expire)) => {
                 if let Some(expire) = expire {
                     if expire <= self.current {
                         self.removed += 1;
@@ -144,8 +159,8 @@ impl CompactionFilter for MetaStoreCacheCompactionFilter {
     fn filter(&mut self, _level: u32, key: &[u8], value: &[u8]) -> CompactionDecision {
         self.scanned += 1;
 
-        if let Ok(row_key) = RowKey::try_from_bytes(key) {
-            return match row_key {
+        match RowKey::try_from_bytes(key) {
+            Ok(row_key) => match row_key {
                 RowKey::Table(table_id, _) => self.filter_table_row_key(table_id, value),
                 RowKey::SecondaryIndex(index_id, _, _) => {
                     self.filter_secondary_row_key(index_id, value)
@@ -153,11 +168,12 @@ impl CompactionFilter for MetaStoreCacheCompactionFilter {
                 RowKey::Sequence(_) => CompactionDecision::Keep,
                 RowKey::SecondaryIndexInfo { .. } => CompactionDecision::Keep,
                 RowKey::TableInfo { .. } => CompactionDecision::Keep,
-            };
-        } else {
-            error!("Unable to read key on metastore cache compaction");
+            },
+            Err(err) => {
+                error!("Unable to read key on compaction, error: {}", err.message);
 
-            CompactionDecision::Keep
+                CompactionDecision::Keep
+            }
         }
     }
 
@@ -348,6 +364,34 @@ mod tests {
         match filter.filter(1, &key.to_bytes(), &index.index_value(&row)) {
             Decision::Keep => (),
             _ => panic!("must be keep"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_compaction_index_old_format() {
+        init_test_logger().await;
+
+        let mut filter = MetaStoreCacheCompactionFilter::new(
+            Some(RocksCacheStoreDetails::get_compaction_state()),
+            get_test_filter_context(),
+        );
+
+        let row = CacheItem::new("key1".to_string(), Some(10), "value".to_string());
+
+        let index = CacheItemRocksIndex::ByPath;
+        let key = RowKey::SecondaryIndex(
+            CacheItemRocksTable::index_id(index.get_id()),
+            index.key_hash(&row).to_be_bytes().to_vec(),
+            1,
+        );
+
+        // Indexes with TTL use new format (v2) for indexes, but index migration doesnt skip
+        // compaction for old rows
+        let index_value = RocksSecondaryIndexValue::Hash("kek".as_bytes()).to_bytes(1);
+
+        match filter.filter(1, &key.to_bytes(), &index_value) {
+            Decision::Remove => (),
+            _ => panic!("must be remove"),
         }
     }
 }

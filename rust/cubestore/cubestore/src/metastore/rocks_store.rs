@@ -126,11 +126,14 @@ pub enum RocksSecondaryIndexValue<'a> {
 }
 
 impl<'a> RocksSecondaryIndexValue<'a> {
-    pub fn from_bytes(bytes: &'a [u8], value_version: u32) -> RocksSecondaryIndexValue<'a> {
+    pub fn from_bytes(
+        bytes: &'a [u8],
+        value_version: u32,
+    ) -> Result<RocksSecondaryIndexValue<'a>, CubeError> {
         match value_version {
-            1 => RocksSecondaryIndexValue::Hash(bytes),
+            1 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
             2 => match bytes[0] {
-                0 => RocksSecondaryIndexValue::Hash(bytes),
+                0 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
                 1 => {
                     let (hash, mut expire_buf) =
                         (&bytes[1..bytes.len() - 8], &bytes[bytes.len() - 8..]);
@@ -145,11 +148,17 @@ impl<'a> RocksSecondaryIndexValue<'a> {
                         ))
                     };
 
-                    RocksSecondaryIndexValue::HashAndTTL(&hash, expire)
+                    Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))
                 }
-                version => panic!("Unsupported type of value for index {}", version),
+                tid => Err(CubeError::internal(format!(
+                    "Unsupported type \"{}\" of value for index",
+                    tid
+                ))),
             },
-            version => panic!("Unsupported value_version {}", version),
+            version => Err(CubeError::internal(format!(
+                "Unsupported value_version {}",
+                version
+            ))),
         }
     }
 
