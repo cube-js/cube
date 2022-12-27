@@ -88,10 +88,10 @@ deflate = "1.0.0"
 indoc = "1.0"
 rdkafka = { version = "0.29.0", features = ["cmake-build"] }
 
-[target.'cfg((target_env = "musl"))'.dependencies]
+[target.'cfg(target_env = "musl")'.dependencies]
 rdkafka = { version = "0.29.0", features = ["ssl", "gssapi", "cmake-build"] }
 
-[target.'cfg((target_os = "windows"))'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
 rdkafka = { version = "0.29.0", features = ["ssl", "gssapi", "cmake-build"] }
 
 [target.'cfg(all(not(target_env = "musl"), not(target_os = "windows")))'.dependencies]
