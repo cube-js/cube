@@ -21,9 +21,7 @@ pub fn init_cube_logger(enable_telemetry: bool) {
 
     let logger = SimpleLogger::new()
         .with_level(Level::Error.to_level_filter())
-        .with_module_level("cubestore", log_level.to_level_filter())
-        .with_module_level("rdkafka::client", log_level.to_level_filter())
-        .with_module_level("librdkafka", log_level.to_level_filter());
+        .with_module_level("cubestore", log_level.to_level_filter());
 
     let mut ctx = format!("pid:{}", std::process::id());
     if let Ok(extra) = env::var("CUBESTORE_LOG_CONTEXT") {
