@@ -158,11 +158,20 @@ impl CompactionServiceImpl {
         let mut old_chunk_ids = Vec::new();
         let mut new_chunk_ids = Vec::new();
 
+        let chunks_with_meta = chunks
+            .iter()
+            .map(|c| (c.clone(), partition.clone(), index.clone()))
+            .collect::<Vec<_>>();
+
         for group in compact_groups.iter() {
             let group_chunks = &chunks[group.0..group.1];
-            let in_memory_columns =
-                prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, group_chunks)
-                    .await?;
+            let in_memory_columns = prepare_in_memory_columns(
+                &self.chunk_store,
+                num_columns,
+                key_size,
+                &chunks_with_meta[group.0..group.1],
+            )
+            .await?;
 
             // Get merged RecordBatch
             let batches_stream = merge_chunks(
@@ -274,9 +283,18 @@ impl CompactionServiceImpl {
             })
             .min();
 
-        let in_memory_columns =
-            prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, &chunks[..])
-                .await?;
+        let chunks_with_meta = chunks
+            .iter()
+            .map(|c| (c.clone(), partition.clone(), index.clone()))
+            .collect::<Vec<_>>();
+
+        let in_memory_columns = prepare_in_memory_columns(
+            &self.chunk_store,
+            num_columns,
+            key_size,
+            &chunks_with_meta[..],
+        )
+        .await?;
         let batches_stream = merge_chunks(
             key_size,
             main_table.clone(),
@@ -433,7 +451,15 @@ impl CompactionService for CompactionServiceImpl {
         let mut data = Vec::new();
         let num_columns = index.get_row().columns().len();
         for chunk in chunks.iter() {
-            for b in self.chunk_store.get_chunk_columns(chunk.clone()).await? {
+            for b in self
+                .chunk_store
+                .get_chunk_columns_with_preloaded_meta(
+                    chunk.clone(),
+                    partition.clone(),
+                    index.clone(),
+                )
+                .await?
+            {
                 assert_eq!(
                     num_columns,
                     b.num_columns(),
@@ -848,11 +874,15 @@ pub async fn prepare_in_memory_columns(
     chunk_store: &Arc<dyn ChunkDataStore>,
     num_columns: usize,
     key_size: usize,
-    chunks: &[IdRow<Chunk>],
+    chunks_with_meta: &[(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)],
 ) -> Result<Vec<ArrayRef>, CubeError> {
     let mut data: Vec<RecordBatch> = Vec::new();
-    for chunk in chunks.iter() {
-        for b in chunk_store.get_chunk_columns(chunk.clone()).await? {
+
+    for (chunk, partition, index) in chunks_with_meta.iter() {
+        for b in chunk_store
+            .get_chunk_columns_with_preloaded_meta(chunk.clone(), partition.clone(), index.clone())
+            .await?
+        {
             data.push(b)
         }
     }
@@ -1357,6 +1387,7 @@ mod tests {
             .unwrap();
         metastore.chunk_uploaded(3).await.unwrap();
 
+        let cols_to_move = cols.clone();
         chunk_store.expect_get_chunk_columns().returning(move |i| {
             let limit = match i.get_id() {
                 1 => 10,
@@ -1370,12 +1401,33 @@ mod tests {
             for i in 0..limit {
                 strings.push(format!("foo{}", i));
             }
-            let schema = Arc::new(Schema::new(vec![(&cols[0]).into()]));
+            let schema = Arc::new(Schema::new(vec![(&cols_to_move[0]).into()]));
             Ok(vec![RecordBatch::try_new(
                 schema,
                 vec![Arc::new(StringArray::from(strings))],
             )?])
         });
+        let cols_to_move = cols.clone();
+        chunk_store
+            .expect_get_chunk_columns_with_preloaded_meta()
+            .returning(move |c, _i, _p| {
+                let limit = match c.get_id() {
+                    1 => 10,
+                    2 => 16,
+                    3 => 20,
+                    4 => 2,
+                    _ => unimplemented!(),
+                };
+                let mut strings = Vec::with_capacity(limit);
+                for i in 0..limit {
+                    strings.push(format!("foo{}", i));
+                }
+                let schema = Arc::new(Schema::new(vec![(&cols_to_move[0]).into()]));
+                Ok(vec![RecordBatch::try_new(
+                    schema,
+                    vec![Arc::new(StringArray::from(strings))],
+                )?])
+            });
 
         config.expect_partition_split_threshold().returning(|| 20);
 

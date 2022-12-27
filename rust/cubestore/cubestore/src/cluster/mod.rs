@@ -1290,13 +1290,21 @@ impl ClusterImpl {
         let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
         let in_memory_chunks_futures = in_memory_chunks_to_load
             .iter()
-            .map(|c| chunk_store.get_chunk_columns(c.clone()))
+            .map(|(c, p, i)| {
+                chunk_store
+                    .get_chunk_columns_with_preloaded_meta(c.clone(), p.clone(), i.clone())
+                    .instrument(tracing::span!(
+                        tracing::Level::TRACE,
+                        "get in memory chunk columns",
+                        row_count = c.get_row().get_row_count()
+                    ))
+            })
             .collect::<Vec<_>>();
 
         let chunk_id_to_record_batches = in_memory_chunks_to_load
             .clone()
             .into_iter()
-            .map(|c| c.get_id())
+            .map(|(c, _, _)| c.get_id())
             .zip(
                 join_all(in_memory_chunks_futures)
                     .await
@@ -1367,7 +1375,7 @@ impl ClusterImpl {
         let chunk_id_to_record_batches = in_memory_chunks_to_load
             .clone()
             .into_iter()
-            .map(|c| (c.get_id(), Vec::new()))
+            .map(|(c, _, _)| (c.get_id(), Vec::new()))
             .collect();
 
         let res = self
