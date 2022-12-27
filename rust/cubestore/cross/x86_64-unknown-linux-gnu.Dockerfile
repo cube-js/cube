@@ -28,5 +28,7 @@ RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - |
 ENV PKG_CONFIG_ALLOW_CROSS=1
 ENV OPENSSL_STATIC=true
 ENV OPENSSL_DIR=/openssl
+ENV OPENSSL_ROOT_DIR=/openssl
+ENV OPENSSL_LIBRARIES=/openssl/lib
 
 ENV PATH="/cargo/bin:$PATH"

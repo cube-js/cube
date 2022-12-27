@@ -36,6 +36,8 @@ ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 ENV OPENSSL_STATIC=true
 ENV OPENSSL_DIR=/musl
+ENV OPENSSL_ROOT_DIR=/musl
+ENV OPENSSL_LIBRARIES=/musl/lib
 
 
 ENV PATH="/cargo/bin:$PATH"

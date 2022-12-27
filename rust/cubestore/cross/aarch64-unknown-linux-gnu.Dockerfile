@@ -43,4 +43,7 @@ ENV OPENSSL_DIR=/openssl \
     OPENSSL_INCLUDE_DIR=/openssl/include \
     OPENSSL_LIB_DIR=/openssl/lib
 
+ENV OPENSSL_ROOT_DIR=/openssl
+ENV OPENSSL_LIBRARIES=/openssl/lib
+
 ENV PATH="/cargo/bin:$PATH"
