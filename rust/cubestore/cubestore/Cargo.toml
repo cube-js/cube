@@ -93,9 +93,8 @@ rdkafka = { version = "0.29.0", features = ["ssl", "gssapi", "cmake-build"] }
 sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 
 # TODO support ssl for windows
-#[target.'cfg(target_os = "windows")'.dependencies]
-#rdkafka = { version = "0.29.0", features = ["ssl", "gssapi"] }
-#sasl2-sys = { version = "0.1.6", features = ["vendored", "openssl-sys"] }
+[target.'cfg(target_os = "windows")'.dependencies]
+rdkafka = { version = "0.29.0", features = ["cmake-build"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 rdkafka = { version = "0.29.0", features = ["ssl", "gssapi"] }
