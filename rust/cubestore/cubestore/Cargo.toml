@@ -94,7 +94,7 @@ sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 rdkafka = { version = "0.29.0", features = ["ssl", "gssapi"] }
-sasl2-sys = { version = "0.1.6", features = ["vendored"] }
+sasl2-sys = { version = "0.1.6", features = ["vendored", "openssl-sys"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 rdkafka = { version = "0.29.0", features = ["ssl", "gssapi"] }
