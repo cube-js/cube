@@ -30,6 +30,7 @@
     "@cubejs-backend/shared": "^0.31.31",
     "async-mutex": "0.3.2",
     "axios": "^0.21.1",
+    "kafkajs": "^2.2.3",
     "sqlstring": "^2.3.1"
   },
   "license": "Apache-2.0",

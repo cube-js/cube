@@ -714,6 +714,32 @@ impl SqlServiceImpl {
     }
 }
 
+pub fn string_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<String> {
+    credentials
+        .iter()
+        .find(|o| o.name.value == prop_name)
+        .and_then(|x| {
+            if let Value::SingleQuotedString(v) = &x.value {
+                Some(v.to_string())
+            } else {
+                None
+            }
+        })
+}
+
+pub fn boolean_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<bool> {
+    credentials
+        .iter()
+        .find(|o| o.name.value == prop_name)
+        .and_then(|x| {
+            if let Value::Boolean(v) = &x.value {
+                Some(*v)
+            } else {
+                None
+            }
+        })
+}
+
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
 
@@ -1015,44 +1041,29 @@ impl SqlService for SqlServiceImpl {
                 if or_update {
                     let creds = match source_type.as_str() {
                         "ksql" => {
-                            let user = credentials
-                                .iter()
-                                .find(|o| o.name.value == "user")
-                                .and_then(|x| {
-                                    if let Value::SingleQuotedString(v) = &x.value {
-                                        Some(v.to_string())
-                                    } else {
-                                        None
-                                    }
-                                });
-                            let password = credentials
-                                .iter()
-                                .find(|o| o.name.value == "password")
-                                .and_then(|x| {
-                                    if let Value::SingleQuotedString(v) = &x.value {
-                                        Some(v.to_string())
-                                    } else {
-                                        None
-                                    }
-                                });
-                            let url =
-                                credentials
-                                    .iter()
-                                    .find(|o| o.name.value == "url")
-                                    .and_then(|x| {
-                                        if let Value::SingleQuotedString(v) = &x.value {
-                                            Some(v.to_string())
-                                        } else {
-                                            None
-                                        }
-                                    });
+                            let user = string_prop(&credentials, "user");
+                            let password = string_prop(&credentials, "password");
+                            let url = string_prop(&credentials, "url");
                             Ok(SourceCredentials::KSql {
                                 user,
                                 password,
                                 url: url.ok_or(CubeError::user(
-                                    "url is required as credential for select_statement source"
-                                        .to_string(),
+                                    "url is required as credential for ksql source".to_string(),
                                 ))?,
+                            })
+                        }
+                        "kafka" => {
+                            let user = string_prop(&credentials, "user");
+                            let password = string_prop(&credentials, "password");
+                            let host = string_prop(&credentials, "host");
+                            let use_ssl = boolean_prop(&credentials, "use_ssl");
+                            Ok(SourceCredentials::Kafka {
+                                user,
+                                password,
+                                host: host.ok_or(CubeError::user(
+                                    "host is required as credential for kafka source".to_string(),
+                                ))?,
+                                use_ssl: use_ssl.unwrap_or(false),
                             })
                         }
                         x => Err(CubeError::user(format!("Not supported stream type: {}", x))),
