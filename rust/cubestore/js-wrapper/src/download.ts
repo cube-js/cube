@@ -33,30 +33,6 @@ async function fetchRelease(version: string) {
   return data;
 }
 
-function parseInfoFromAssetName(assetName: string): { target: string, type: string, format: string } | null {
-  if (assetName.startsWith('cubestored-')) {
-    const fileName = assetName.slice('cubestored-'.length);
-    const targetAndType = fileName.slice(0, fileName.indexOf('.'));
-    const format = fileName.slice(fileName.indexOf('.') + 1);
-
-    if (targetAndType.endsWith('-shared')) {
-      return {
-        target: targetAndType.slice(0, -'-shared'.length),
-        format,
-        type: 'shared'
-      };
-    }
-
-    return {
-      target: targetAndType,
-      format,
-      type: 'static'
-    };
-  }
-
-  return null;
-}
-
 export async function downloadBinaryFromRelease() {
   // eslint-disable-next-line global-require
   const { version } = require('../../package.json');
@@ -81,7 +57,7 @@ export async function downloadBinaryFromRelease() {
         }
 
         throw new Error(
-          `Cube Store v${version} Artifact for ${process.platform} is not found. Most probably it is still building. Please try again later.`
+          `Cube Store v${version} Artifact for ${currentTarget} doesn't exist. Most probably it is still building. Please try again later.`
         );
       } else {
         throw new Error(
