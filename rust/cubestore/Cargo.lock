@@ -1202,6 +1202,7 @@ dependencies = [
  "mysql_common 0.26.0",
  "nanoid",
  "num 0.3.1",
+ "openssl",
  "openssl-src",
  "parquet",
  "parquet-format",
