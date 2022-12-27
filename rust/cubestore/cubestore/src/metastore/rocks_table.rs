@@ -808,7 +808,7 @@ pub trait RocksTable: Debug + Send + Sync {
                 }
 
                 let (hash, expire) =
-                    match RocksSecondaryIndexValue::from_bytes(&*value, index.value_version()) {
+                    match RocksSecondaryIndexValue::from_bytes(&*value, index.value_version())? {
                         RocksSecondaryIndexValue::Hash(h) => (h, None),
                         RocksSecondaryIndexValue::HashAndTTL(h, expire) => (h, expire),
                     };
