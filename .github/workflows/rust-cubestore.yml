@@ -170,7 +170,7 @@ jobs:
         if: ${{ startsWith(matrix.os, 'windows') }}
       - name: Install OpenSSL for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
-        run: vcpkg integrate install; vcpkg install openssl:x64-windows
+        run: vcpkg integrate install; vcpkg install openssl:x64-windows; vcpkg install openssl:x64-windows-static
       - name: Instal LLVM for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: choco install -y --force llvm --version 9.0.1
@@ -184,6 +184,7 @@ jobs:
           OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
           OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
           LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
+          VCPKGRS_DYNAMIC: 1
       - name: Make links for OpenSSL
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: |
