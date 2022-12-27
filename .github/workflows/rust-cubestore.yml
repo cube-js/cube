@@ -180,6 +180,7 @@ jobs:
         with:
           OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
           # This paths are required to work with static linking
+          OPENSSL_ROOT_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
           OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
           OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
           LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
