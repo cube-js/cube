@@ -23,10 +23,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "lint": "eslint src/*.ts",
-    "lint:fix": "eslint --fix src/*.ts",
-    "test": "yarn integration",
-    "integration": "jest",
-    "integration:cubestore": "jest"
+    "lint:fix": "eslint --fix src/*.ts"
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.31.32",
