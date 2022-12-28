@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.32](https://github.com/cube-js/cube.js/compare/v0.31.31...v0.31.32) (2022-12-28)
+
+**Note:** Version bump only for package @cubejs-backend/maven
+
+
+
+
+
 ## [0.31.31](https://github.com/cube-js/cube.js/compare/v0.31.30...v0.31.31) (2022-12-23)
 
 **Note:** Version bump only for package @cubejs-backend/maven

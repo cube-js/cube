@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.32](https://github.com/cube-js/cube.js/compare/v0.31.31...v0.31.32) (2022-12-28)
+
+
+### Features
+
+* **cubestore:** Direct kafka download support for ksql streams and t… ([#5880](https://github.com/cube-js/cube.js/issues/5880)) ([fcb5c5e](https://github.com/cube-js/cube.js/commit/fcb5c5e7825df32249a8021580b582821761c7b1))
+* **cubestore:** Installer - download binary without GH API ([#5885](https://github.com/cube-js/cube.js/issues/5885)) ([51a0f39](https://github.com/cube-js/cube.js/commit/51a0f3951caf62fdf8e88d80faf16d11a2b9158b))
+
+
+
+
+
 ## [0.31.31](https://github.com/cube-js/cube.js/compare/v0.31.30...v0.31.31) (2022-12-23)
 
 
