@@ -45,5 +45,6 @@ ENV OPENSSL_DIR=/openssl \
 
 ENV OPENSSL_ROOT_DIR=/openssl
 ENV OPENSSL_LIBRARIES=/openssl/lib
+ENV LIBZ_SYS_STATIC=1
 
 ENV PATH="/cargo/bin:$PATH"
