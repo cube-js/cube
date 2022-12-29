@@ -5,8 +5,8 @@ category: Caching
 menuOrder: 3
 ---
 
-Pre-aggregations is a powerful way to speed up your Cube.js queries. There are
-many configuration options to consider. Please make sure to also check [the
+Pre-aggregations is a powerful way to speed up your Cube queries. There are many
+configuration options to consider. Please make sure to also check [the
 Pre-Aggregations reference in the data schema section][ref-schema-ref-preaggs].
 
 ## Refresh Strategy
@@ -81,15 +81,15 @@ cube(`Orders`, {
 });
 ```
 
-When `every` and `sql` are used together, Cube.js will run the query from the
-`sql` property on an interval defined by the `every` property. If the query
-returns new results, then the pre-aggregation will be refreshed.
+When `every` and `sql` are used together, Cube will run the query from the `sql`
+property on an interval defined by the `every` property. If the query returns
+new results, then the pre-aggregation will be refreshed.
 
 ## Rollup Only Mode
 
-To make Cube.js _only_ serve requests from pre-aggregations, the
-[`CUBEJS_ROLLUP_ONLY` environment variable][ref-config-env-general] can be set
-to `true` on an API instance. This will prevent serving data on API requests
+To make Cube _only_ serve requests from pre-aggregations, the
+[`CUBEJS_ROLLUP_ONLY`][ref-config-env-rolluponly] environment variable can be
+set to `true` on an API instance. This will prevent serving data on API requests
 from the source database.
 
 <WarningBox>
@@ -435,8 +435,8 @@ or [Export Bucket][self-export-bucket] strategies instead.
 
 ### <--{"id" : "Pre-Aggregation Build Strategies"}--> Batching
 
-Batching is a more performant strategy where Cube.js sends compressed CSVs for
-Cube Store to ingest.
+Batching is a more performant strategy where Cube sends compressed CSVs for Cube
+Store to ingest.
 
 <div style="text-align: center">
   <img
@@ -447,9 +447,8 @@ Cube Store to ingest.
   />
 </div>
 
-The performance scales to the amount of memory available on the Cube.js
-instance. Batching is automatically enabled for any databases that can support
-it.
+The performance scales to the amount of memory available on the Cube instance.
+Batching is automatically enabled for any databases that can support it.
 
 ### <--{"id" : "Pre-Aggregation Build Strategies"}--> Export bucket
 
@@ -483,30 +482,40 @@ refer to the database-specific documentation for more details:
 - [Snowflake][ref-connect-db-snowflake]
 
 When using cloud storage, it is important to correctly configure any data
-retention policies to clean up the data in the export bucket as Cube.js does not
+retention policies to clean up the data in the export bucket as Cube does not
 currently manage this. For most use-cases, 1 day is sufficient.
 
 ## Streaming pre-aggregations
 
-Streaming pre-aggregations are different from traditional pre-aggregations in the way they are being updated. Traditional pre-aggregations follow the “pull” model — Cube **pulls updates** from the data source based on some cadence and/or condition. Streaming pre-aggregations follow the “push” model — Cube **subscribes to the updates** from the data source and always keeps pre-aggregation up to date. 
+Streaming pre-aggregations are different from traditional pre-aggregations in
+the way they are being updated. Traditional pre-aggregations follow the “pull”
+model — Cube **pulls updates** from the data source based on some cadence and/or
+condition. Streaming pre-aggregations follow the “push” model — Cube
+**subscribes to the updates** from the data source and always keeps
+pre-aggregation up to date.
 
-You don’t need to define `refreshKey` for streaming pre-aggregations. Whether pre-aggregation is streaming or not is defined by the data source. 
+You don’t need to define `refreshKey` for streaming pre-aggregations. Whether
+pre-aggregation is streaming or not is defined by the data source.
 
-Currently, Cube supports only one streaming data source - [ksqlDB](/config/databases/ksqldb). All pre-aggregations where data source is ksqlDB are streaming. 
+Currently, Cube supports only one streaming data source -
+[ksqlDB](/config/databases/ksqldb). All pre-aggregations where data source is
+ksqlDB are streaming.
 
-We’re working on supporting streaming pre-aggregations for the following data sources -
+We’re working on supporting streaming pre-aggregations for the following data
+sources -
 
 - Materialize
 - Flink SQL
 - Spark Streaming
 
-Please [let us know](https://cube.dev/contact) if you are interested in early access to any of these drivers or would like Cube to support any other SQL streaming engine.
+Please [let us know](https://cube.dev/contact) if you are interested in early
+access to any of these drivers or would like Cube to support any other SQL
+streaming engine.
 
 [ref-caching-in-mem-default-refresh-key]: /caching#default-refresh-keys
 [ref-config-db]: /config/databases
 [ref-config-driverfactory]: /config#driver-factory
-[ref-config-env]: /reference/environment-variables#cube-store
-[ref-config-env-general]: /config#general
+[ref-config-env-rolluponly]: /reference/environment-variables#cubejs-rollup-only
 [ref-config-extdriverfactory]: /config#external-driver-factory
 [ref-connect-db-athena]: /config/databases/aws-athena
 [ref-connect-db-redshift]: /config/databases/aws-redshift

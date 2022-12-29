@@ -30,6 +30,10 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     _type: "time".to_string(),
                 },
                 V1CubeMetaDimension {
+                    name: "KibanaSampleDataEcommerce.last_mod".to_string(),
+                    _type: "time".to_string(),
+                },
+                V1CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     _type: "string".to_string(),
                 },
@@ -98,10 +102,20 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
         V1CubeMeta {
             name: "Logs".to_string(),
             title: None,
-            dimensions: vec![V1CubeMetaDimension {
-                name: "Logs.read".to_string(),
-                _type: "boolean".to_string(),
-            }],
+            dimensions: vec![
+                V1CubeMetaDimension {
+                    name: "Logs.id".to_string(),
+                    _type: "number".to_string(),
+                },
+                V1CubeMetaDimension {
+                    name: "Logs.read".to_string(),
+                    _type: "boolean".to_string(),
+                },
+                V1CubeMetaDimension {
+                    name: "Logs.content".to_string(),
+                    _type: "string".to_string(),
+                },
+            ],
             measures: vec![
                 V1CubeMetaMeasure {
                     name: "Logs.agentCount".to_string(),
@@ -138,8 +152,28 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
     ]
 }
 
+pub fn get_string_cube_meta() -> Vec<V1CubeMeta> {
+    vec![V1CubeMeta {
+        name: "StringCube".to_string(),
+        title: None,
+        dimensions: vec![],
+        measures: vec![V1CubeMetaMeasure {
+            name: "StringCube.someString".to_string(),
+            title: None,
+            _type: "string".to_string(),
+            agg_type: Some("string".to_string()),
+        }],
+        segments: vec![],
+        joins: None,
+    }]
+}
+
 pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
     Arc::new(MetaContext::new(get_test_meta()))
+}
+
+pub fn get_test_tenant_ctx_with_meta(meta: Vec<V1CubeMeta>) -> Arc<MetaContext> {
+    Arc::new(MetaContext::new(meta))
 }
 
 pub async fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {

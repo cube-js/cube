@@ -1991,10 +1991,14 @@ class BaseQuery {
         return this.primaryKeyCount(cubeName, true);
       }
     }
-    if (symbol.type === 'number') {
+    if (BaseQuery.isCalculatedMeasureType(symbol.type)) {
       return evaluateSql;
     }
     return `${symbol.type}(${evaluateSql})`;
+  }
+
+  static isCalculatedMeasureType(type) {
+    return type === 'number' || type === 'string' || type === 'time' || type === 'boolean';
   }
 
   aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge, measurePath) {

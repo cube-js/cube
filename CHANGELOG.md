@@ -3,6 +3,90 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.32](https://github.com/cube-js/cube.js/compare/v0.31.31...v0.31.32) (2022-12-28)
+
+
+### Features
+
+* **cubesql:** Allow postprocessing with JOIN below Cube query limit ([56f5399](https://github.com/cube-js/cube.js/commit/56f5399fb37dbb7b388951b1db0be21dda2a94d4))
+* **cubesql:** Support `LEFT`, `RIGHT` in projection ([282ad3a](https://github.com/cube-js/cube.js/commit/282ad3ab3106d81a1361f94a499cfc7dc716f3e6))
+* **cubestore:** Direct kafka download support for ksql streams and t… ([#5880](https://github.com/cube-js/cube.js/issues/5880)) ([fcb5c5e](https://github.com/cube-js/cube.js/commit/fcb5c5e7825df32249a8021580b582821761c7b1))
+* **cubestore:** Installer - download binary without GH API ([#5885](https://github.com/cube-js/cube.js/issues/5885)) ([51a0f39](https://github.com/cube-js/cube.js/commit/51a0f3951caf62fdf8e88d80faf16d11a2b9158b))
+
+
+
+
+
+## [0.31.31](https://github.com/cube-js/cube.js/compare/v0.31.30...v0.31.31) (2022-12-23)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve Thoughtspot `WHERE IN` support ([6212efe](https://github.com/cube-js/cube.js/commit/6212efe428e504cd8c06797dfaa2b81783b80777))
+* **cubesql:** Support Thoughtspot DATEADD queries ([58b5669](https://github.com/cube-js/cube.js/commit/58b566903685ac3d14e78d61dc38c38c43aa5c3c))
+
+
+### Features
+
+* **cubestore-driver:** Introduce `CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT` env ([e67e800](https://github.com/cube-js/cube.js/commit/e67e800119e4efe0456eef347a573fa9feaf10e7))
+* **cubestore:** Initial support for KV cache ([#5861](https://github.com/cube-js/cube.js/issues/5861)) ([498d4b5](https://github.com/cube-js/cube.js/commit/498d4b5c5dae2ddf1ff1336566580cff1a656a92))
+* **playground:** allow for query renaming ([#5862](https://github.com/cube-js/cube.js/issues/5862)) ([681a2d8](https://github.com/cube-js/cube.js/commit/681a2d804880b17254e37a132008086c7c3fe81f))
+
+
+
+
+
+## [0.31.30](https://github.com/cube-js/cube.js/compare/v0.31.29...v0.31.30) (2022-12-22)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve Thoughtspot compatibility ([4d6511a](https://github.com/cube-js/cube.js/commit/4d6511a3d18ea877f06775c1aae154b5665feda0))
+* **cubestore-driver:** Increase retry timeout to avoid endless loop connection retries ([8bd19fa](https://github.com/cube-js/cube.js/commit/8bd19fafb36da6d97000da20417e98f23d92a424))
+* Pre-aggregation table is not found after it was successfully created for `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` strategy ([#5858](https://github.com/cube-js/cube.js/issues/5858)) ([f602fee](https://github.com/cube-js/cube.js/commit/f602feea9c2a25a0de8604e1297484f71ac8437a))
+
+
+### Features
+
+* **@cubejs-client/core:** expose shortTitle in seriesNames ([#5836](https://github.com/cube-js/cube.js/issues/5836)) Thanks [@euljr](https://github.com/euljr) ! ([1058d5a](https://github.com/cube-js/cube.js/commit/1058d5afd2784302b23215d73c679d35ceb785a8))
+
+
+
+
+
+## [0.31.29](https://github.com/cube-js/cube.js/compare/v0.31.28...v0.31.29) (2022-12-18)
+
+
+### Bug Fixes
+
+* Error: WebSocket is not open: readyState 2 (CLOSING) ([#5846](https://github.com/cube-js/cube.js/issues/5846)) ([a5be099](https://github.com/cube-js/cube.js/commit/a5be099f1d339ceb17c89439d6195c5718c726bb))
+
+
+
+
+
+## [0.31.28](https://github.com/cube-js/cube.js/compare/v0.31.27...v0.31.28) (2022-12-16)
+
+
+### Features
+
+* Support `string`, `time` and `boolean` measures ([#5842](https://github.com/cube-js/cube.js/issues/5842)) ([4543ede](https://github.com/cube-js/cube.js/commit/4543edefe5b2432c90bb8530bc6a3c24c5548de3))
+
+
+
+
+
+## [0.31.27](https://github.com/cube-js/cube.js/compare/v0.31.26...v0.31.27) (2022-12-16)
+
+
+### Bug Fixes
+
+* **api-gateway:** pre-aggregations/jobs auth middleware ([#5840](https://github.com/cube-js/cube.js/issues/5840)) ([b527cd9](https://github.com/cube-js/cube.js/commit/b527cd9fab348b404b6ed83fbbdb963c23928b07))
+
+
+
+
+
 ## [0.31.26](https://github.com/cube-js/cube.js/compare/v0.31.25...v0.31.26) (2022-12-13)
 
 

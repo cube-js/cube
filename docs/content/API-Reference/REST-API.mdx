@@ -364,20 +364,12 @@ job.
 
 Example request:
 
-```json
-{
-  "action": "post",
-  "selector": {
-    "contexts": [
-      { "securityContext": { "tenant": "tenant_1" } },
-      { "securityContext": { "tenant": "tenant_2" } }
-    ],
-    "timezones": ["UTC", "America/Los_Angeles"],
-    "datasources": ["default"],
-    "cubes": ["Orders"],
-    "preAggregations": ["Orders.ordersByStatus"]
-  }
-}
+```bash
+curl \
+ -d '{"action": "post", "selector": { "preAggregations": ["Orders.ordersByStatus"]}}' \
+ -H "Authorization: EXAMPLE-API-TOKEN" \
+ -X POST \
+ https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
 ```
 
 Example response:
@@ -404,16 +396,12 @@ a `tokens` property.
 
 Example request:
 
-```json
-{
-  "action": "get",
-  "tokens": [
-    "e9a6a0c55885cea5371348500ce7d7dc",
-    "d1329b6c8d152e734fc4dcf7307b1b58",
-    "6f4ea38373663fffc4334a576574845b",
-    "ea903b10634b2f3141b35a2529870e89"
-  ]
-}
+```bash
+curl \
+ -d '{"action": "get", "tokens": ["e9a6a0c55885cea5371348500ce7d7dc","d1329b6c8d152e734fc4dcf7307b1b58","6f4ea38373663fffc4334a576574845b","ea903b10634b2f3141b35a2529870e89"]}' \
+ -H "Authorization: EXAMPLE-API-TOKEN" \
+ -X POST \
+ https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
 ```
 
 Example response:
@@ -497,17 +485,12 @@ Example response:
 
 Example request with `resType: object`:
 
-```json
-{
-  "action": "get",
-  "resType": "object",
-  "tokens": [
-    "e9a6a0c55885cea5371348500ce7d7dc",
-    "d1329b6c8d152e734fc4dcf7307b1b58",
-    "6f4ea38373663fffc4334a576574845b",
-    "ea903b10634b2f3141b35a2529870e89"
-  ]
-}
+```bash
+curl \
+ -d '{"action": "get", "resType": "object", "tokens": ["e9a6a0c55885cea5371348500ce7d7dc","d1329b6c8d152e734fc4dcf7307b1b58","6f4ea38373663fffc4334a576574845b","ea903b10634b2f3141b35a2529870e89"]}' \
+ -H "Authorization: EXAMPLE-API-TOKEN" \
+ -X POST \
+ https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
 ```
 
 Example response with `resType: object`:

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::process::{exit, Child};
 
 use ipc_channel::ipc::{IpcOneShotServer, IpcSender};
@@ -42,6 +42,14 @@ pub fn respawn<Args: Serialize + DeserializeOwned>(
     cmd.env(HANDLER_ENV, handler);
     cmd.env(PARENT_PID_ENV, std::process::id().to_string());
     cmd.env(IPC_ENV, ipc_name);
+    {
+        let pushdownable_envs = PUSHDOWNABLE_ENVS.read().unwrap();
+        for e in pushdownable_envs.iter() {
+            if let Some(v) = std::env::var(e).ok() {
+                cmd.env(e, v);
+            }
+        }
+    }
 
     let c = cmd.spawn()?;
     let (_, tx) = server.accept()?;
@@ -61,6 +69,13 @@ pub fn register_handler<Args: Serialize + DeserializeOwned + 'static>(f: fn(Args
         )
         .is_some();
     assert!(!had_duplicate, "duplicate handler registered for {}", key);
+}
+
+pub fn register_pushdownable_envs(envs: &'static [&'static str]) {
+    let mut envs_hash = PUSHDOWNABLE_ENVS.write().unwrap();
+    for e in envs.iter() {
+        envs_hash.insert(e);
+    }
 }
 
 pub fn init() {
@@ -109,6 +124,10 @@ static ref HANDLERS: RwLock<
     >,
 > = RwLock::new(HashMap::new());
 );
+
+lazy_static! {
+    static ref PUSHDOWNABLE_ENVS: RwLock<HashSet<&'static str>> = RwLock::new(HashSet::new());
+}
 
 fn deserialize_and_run<Args: Serialize + DeserializeOwned>(
     ipc_sender: String,

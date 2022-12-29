@@ -1,3 +1,5 @@
+pub mod kafka;
+
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::replay_handle::{ReplayHandle, SeqPointer, SeqPointerForLocation};
@@ -6,8 +8,9 @@ use crate::metastore::table::{StreamOffset, Table};
 use crate::metastore::{Column, ColumnType, IdRow, MetaStore};
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
+use crate::streaming::kafka::{KafkaClientService, KafkaStreamingSource};
 use crate::table::data::{append_row, create_array_builders};
-use crate::table::{Row, TableValue};
+use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::decimal::Decimal;
 use crate::CubeError;
 use arrow::array::ArrayBuilder;
@@ -47,6 +50,7 @@ pub struct StreamingServiceImpl {
     meta_store: Arc<dyn MetaStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
     ksql_client: Arc<dyn KsqlClient>,
+    kafka_client: Arc<dyn KafkaClientService>,
 }
 
 crate::di_service!(StreamingServiceImpl, [StreamingService]);
@@ -57,12 +61,14 @@ impl StreamingServiceImpl {
         meta_store: Arc<dyn MetaStore>,
         chunk_store: Arc<dyn ChunkDataStore>,
         ksql_client: Arc<dyn KsqlClient>,
+        kafka_client: Arc<dyn KafkaClientService>,
     ) -> Arc<Self> {
         Arc::new(Self {
             config_obj,
             meta_store,
             chunk_store,
             ksql_client,
+            kafka_client,
         })
     }
 
@@ -117,6 +123,28 @@ impl StreamingServiceImpl {
                 ksql_client: self.ksql_client.clone(),
                 offset: table.get_row().stream_offset().clone(),
             })),
+            SourceCredentials::Kafka {
+                user,
+                password,
+                host,
+                use_ssl,
+            } => Ok(Arc::new(KafkaStreamingSource::new(
+                table.get_id(),
+                table.get_row().unique_key_columns()
+                    .ok_or_else(|| CubeError::internal(format!("Streaming table without unique key columns: {:?}", table)))?
+                    .into_iter().cloned().collect(),
+                user.clone(),
+                password.clone(),
+                table_name,
+                host.clone(),
+                table.get_row().select_statement().clone(),
+                table.get_row().stream_offset().clone(),
+                partition.ok_or_else(||
+                    CubeError::internal(format!("Loading kafka streams without partition is not supported. Partition is expected to be present in location url but found '{}'", location_url))
+                )?,
+                self.kafka_client.clone(),
+                *use_ssl,
+            ))),
         }
     }
 
@@ -369,6 +397,136 @@ pub struct KSqlQuerySchema {
     pub column_types: Vec<String>,
 }
 
+pub fn parse_json_column_values(
+    columns: &Vec<Column>,
+    res: JsonValue,
+) -> Result<Vec<TableValue>, CubeError> {
+    match res {
+        JsonValue::Array(values) => values
+            .into_iter()
+            .zip_eq(columns.iter())
+            .map(|(value, col)| parse_json_value(&col, &value))
+            .collect::<Result<Vec<TableValue>, CubeError>>(),
+        x => Err(CubeError::internal(format!(
+            "ksql source returned {:?} but array was expected",
+            x
+        ))),
+    }
+}
+
+pub fn parse_json_payload_and_key(
+    columns: &Vec<Column>,
+    unique_key_columns: &Vec<Column>,
+    payload: JsonValue,
+    key: JsonValue,
+) -> Result<Vec<TableValue>, CubeError> {
+    match payload {
+        JsonValue::Object(obj) => columns
+            .iter()
+            .map(|col| {
+                let mut field_value = obj.get(col.get_name());
+                if field_value.is_none() {
+                    if unique_key_columns.iter().any(|c| c.get_name() == col.get_name()) {
+                        field_value = match &key {
+                            JsonValue::Object(obj) => obj.get(col.get_name()),
+                            x if unique_key_columns.len() == 1 => Some(x),
+                            x => return Err(CubeError::internal(format!(
+                                "kafka key contains {:?} but object was expected due to unique key has multiple columns: {:?}",
+                                x, unique_key_columns
+                            )))
+                        }
+                    }
+                }
+                let value = field_value.unwrap_or(&JsonValue::Null);
+                parse_json_value(&col, value)
+            })
+            .collect::<Result<Vec<TableValue>, CubeError>>(),
+        x => Err(CubeError::internal(format!(
+            "kafka payload contains {:?} but object was expected",
+            x
+        ))),
+    }
+}
+
+pub fn parse_json_value(column: &Column, value: &JsonValue) -> Result<TableValue, CubeError> {
+    match column.get_column_type() {
+        ColumnType::String => match value {
+            JsonValue::Short(v) => Ok(TableValue::String(v.to_string())),
+            JsonValue::String(v) => Ok(TableValue::String(v.to_string())),
+            JsonValue::Number(v) => Ok(TableValue::String(v.to_string())),
+            JsonValue::Boolean(v) => Ok(TableValue::String(v.to_string())),
+            JsonValue::Null => Ok(TableValue::Null),
+            x => Err(CubeError::internal(format!(
+                "ksql source returned {:?} as row value but only primitive values are supported",
+                x
+            ))),
+        },
+        ColumnType::Int => match value {
+            JsonValue::Number(v) => Ok(TableValue::Int(
+                v.as_fixed_point_i64(0)
+                    .ok_or(CubeError::user(format!("Can't convert {:?} to int", v)))?,
+            )),
+            JsonValue::Null => Ok(TableValue::Null),
+            x => Err(CubeError::internal(format!(
+                "ksql source returned {:?} as row value but int expected",
+                x
+            ))),
+        },
+        ColumnType::Bytes => match value {
+            _ => Err(CubeError::internal(format!(
+                "ksql source bytes import isn't supported"
+            ))),
+        },
+        ColumnType::HyperLogLog(_) => match value {
+            _ => Err(CubeError::internal(format!(
+                "ksql source HLL import isn't supported"
+            ))),
+        },
+        ColumnType::Timestamp => match value {
+            JsonValue::Short(v) => Ok(TableValue::Timestamp(timestamp_from_string(v.as_str())?)),
+            JsonValue::String(v) => Ok(TableValue::Timestamp(timestamp_from_string(v.as_str())?)),
+            JsonValue::Number(v) => Ok(TableValue::Timestamp(TimestampValue::new(
+                v.as_fixed_point_i64(0).ok_or(CubeError::user(format!(
+                    "Can't convert {:?} to timestamp",
+                    v
+                )))? * 1000000,
+            ))),
+            JsonValue::Null => Ok(TableValue::Null),
+            x => Err(CubeError::internal(format!(
+                "ksql source returned {:?} as row value but only primitive values are supported",
+                x
+            ))),
+        },
+        ColumnType::Decimal { scale, .. } => match value {
+            JsonValue::Number(v) => Ok(TableValue::Decimal(Decimal::new(
+                v.as_fixed_point_i64(*scale as u16)
+                    .ok_or(CubeError::user(format!("Can't convert {:?} to decimal", v)))?,
+            ))),
+            JsonValue::Null => Ok(TableValue::Null),
+            x => Err(CubeError::internal(format!(
+                "ksql source returned {:?} as row value but only number values are supported",
+                x
+            ))),
+        },
+        ColumnType::Float => match value {
+            JsonValue::Number(v) => Ok(TableValue::Float(OrdF64(v.clone().into()))),
+            JsonValue::Null => Ok(TableValue::Null),
+            x => Err(CubeError::internal(format!(
+                "ksql source returned {:?} as row value but only number values are supported",
+                x
+            ))),
+        },
+        ColumnType::Boolean => match value {
+            JsonValue::Boolean(v) => Ok(TableValue::Boolean(*v)),
+            JsonValue::Null => Ok(TableValue::Null),
+            x => Err(CubeError::internal(format!(
+                "ksql source returned {:?} as row value but only boolean values are supported",
+                x
+            ))),
+        },
+    }
+}
+
 impl KSqlStreamingSource {
     fn query(&self, seq_value: Option<i64>) -> Result<String, CubeError> {
         let mut sql = self.select_statement.as_ref().map_or(
@@ -478,99 +636,7 @@ impl KSqlStreamingSource {
                 }
                 continue;
             }
-            let row_values = match res {
-                JsonValue::Array(values) => values
-                    .into_iter()
-                    .zip_eq(columns.iter())
-                    .map(|(value, col)| {
-                        match col.get_column_type() {
-                            ColumnType::String => {
-                                match value {
-                                    JsonValue::Short(v) => Ok(TableValue::String(v.to_string())),
-                                    JsonValue::String(v) => Ok(TableValue::String(v.to_string())),
-                                    JsonValue::Number(v) => Ok(TableValue::String(v.to_string())),
-                                    JsonValue::Boolean(v) => Ok(TableValue::String(v.to_string())),
-                                    JsonValue::Null => Ok(TableValue::Null),
-                                    x => Err(CubeError::internal(format!(
-                                        "ksql source returned {:?} as row value but only primitive values are supported",
-                                        x
-                                    ))),
-                                }
-                            }
-                            ColumnType::Int => {
-                                match value {
-                                    JsonValue::Number(v) => Ok(TableValue::Int(v.as_fixed_point_i64(0).ok_or(CubeError::user(format!("Can't convert {:?} to int", v)))?)),
-                                    JsonValue::Null => Ok(TableValue::Null),
-                                    x => Err(CubeError::internal(format!(
-                                        "ksql source returned {:?} as row value but int expected",
-                                        x
-                                    ))),
-                                }
-                            }
-                            ColumnType::Bytes => {
-                                match value {
-                                    _ => Err(CubeError::internal(format!(
-                                        "ksql source bytes import isn't supported"
-                                    ))),
-                                }
-                            }
-                            ColumnType::HyperLogLog(_) => {
-                                match value {
-                                    _ => Err(CubeError::internal(format!(
-                                        "ksql source HLL import isn't supported"
-                                    ))),
-                                }
-                            }
-                            ColumnType::Timestamp => {
-                                match value {
-                                    JsonValue::Short(v) => Ok(TableValue::Timestamp(timestamp_from_string(v.as_str())?)),
-                                    JsonValue::String(v) => Ok(TableValue::Timestamp(timestamp_from_string(v.as_str())?)),
-                                    JsonValue::Null => Ok(TableValue::Null),
-                                    x => Err(CubeError::internal(format!(
-                                        "ksql source returned {:?} as row value but only primitive values are supported",
-                                        x
-                                    ))),
-                                }
-                            }
-                            ColumnType::Decimal { scale, .. } => {
-                                match value {
-                                    JsonValue::Number(v) => Ok(TableValue::Decimal(Decimal::new(v.as_fixed_point_i64(*scale as u16).ok_or(CubeError::user(format!("Can't convert {:?} to decimal", v)))?))),
-                                    JsonValue::Null => Ok(TableValue::Null),
-                                    x => Err(CubeError::internal(format!(
-                                        "ksql source returned {:?} as row value but only number values are supported",
-                                        x
-                                    ))),
-                                }
-                            }
-                            ColumnType::Float => {
-                                match value {
-                                    JsonValue::Number(v) => Ok(TableValue::Float(OrdF64(v.into()))),
-                                    JsonValue::Null => Ok(TableValue::Null),
-                                    x => Err(CubeError::internal(format!(
-                                        "ksql source returned {:?} as row value but only number values are supported",
-                                        x
-                                    ))),
-                                }
-                            }
-                            ColumnType::Boolean => {
-                                match value {
-                                    JsonValue::Boolean(v) => Ok(TableValue::Boolean(v)),
-                                    JsonValue::Null => Ok(TableValue::Null),
-                                    x => Err(CubeError::internal(format!(
-                                        "ksql source returned {:?} as row value but only boolean values are supported",
-                                        x
-                                    ))),
-                                }
-                            }
-                        }
-                    })
-                    .collect::<Result<Vec<TableValue>, CubeError>>(),
-                x => Err(CubeError::internal(format!(
-                    "ksql source returned {:?} but array was expected",
-                    x
-                ))),
-            };
-            rows.push(Row::new(row_values?));
+            rows.push(Row::new(parse_json_column_values(&columns, res)?));
         }
 
         Ok(rows)

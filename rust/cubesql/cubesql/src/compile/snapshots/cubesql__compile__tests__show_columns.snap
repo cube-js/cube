@@ -11,6 +11,7 @@ expression: "execute_query(\"show columns from KibanaSampleDataEcommerce;\".to_s
 | avgPrice           | numeric      | NO   |     | NULL    |       |
 | countDistinct      | int          | NO   |     | NULL    |       |
 | order_date         | datetime     | YES  |     | NULL    |       |
+| last_mod           | datetime     | YES  |     | NULL    |       |
 | customer_gender    | varchar(255) | YES  |     | NULL    |       |
 | notes              | varchar(255) | YES  |     | NULL    |       |
 | taxful_total_price | numeric      | YES  |     | NULL    |       |

@@ -16,8 +16,9 @@ use rocksdb::{Snapshot, WriteBatch, WriteBatchIterator, DB};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 
+use chrono::{DateTime, NaiveDateTime, Utc};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
@@ -74,6 +75,25 @@ enum_from_primitive! {
     }
 }
 
+impl TableId {
+    pub fn has_ttl(&self) -> bool {
+        match self {
+            TableId::Schemas => false,
+            TableId::Tables => false,
+            TableId::Indexes => false,
+            TableId::Partitions => false,
+            TableId::Chunks => false,
+            TableId::WALs => false,
+            TableId::Jobs => false,
+            TableId::Sources => false,
+            TableId::MultiIndexes => false,
+            TableId::MultiPartitions => false,
+            TableId::ReplayHandles => false,
+            TableId::CacheItems => true,
+        }
+    }
+}
+
 pub fn get_fixed_prefix() -> usize {
     13
 }
@@ -100,47 +120,157 @@ impl MemorySequence {
     }
 }
 
+pub enum RocksSecondaryIndexValue<'a> {
+    Hash(&'a [u8]),
+    HashAndTTL(&'a [u8], Option<DateTime<Utc>>),
+}
+
+impl<'a> RocksSecondaryIndexValue<'a> {
+    pub fn from_bytes(
+        bytes: &'a [u8],
+        value_version: u32,
+    ) -> Result<RocksSecondaryIndexValue<'a>, CubeError> {
+        match value_version {
+            1 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
+            2 => match bytes[0] {
+                0 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
+                1 => {
+                    let (hash, mut expire_buf) =
+                        (&bytes[1..bytes.len() - 8], &bytes[bytes.len() - 8..]);
+                    let expire_timestamp = expire_buf.read_i64::<BigEndian>().unwrap();
+
+                    let expire = if expire_timestamp == 0 {
+                        None
+                    } else {
+                        Some(DateTime::<Utc>::from_utc(
+                            NaiveDateTime::from_timestamp(expire_timestamp, 0),
+                            Utc,
+                        ))
+                    };
+
+                    Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))
+                }
+                tid => Err(CubeError::internal(format!(
+                    "Unsupported type \"{}\" of value for index",
+                    tid
+                ))),
+            },
+            version => Err(CubeError::internal(format!(
+                "Unsupported value_version {}",
+                version
+            ))),
+        }
+    }
+
+    pub fn to_bytes(&self, value_version: u32) -> Vec<u8> {
+        match value_version {
+            1 => match *self {
+                RocksSecondaryIndexValue::Hash(hash) => hash.to_vec(),
+                RocksSecondaryIndexValue::HashAndTTL(_, _) => panic!(
+                    "RocksSecondaryIndexValue::HashAndTTL is not supported for value_version = 1"
+                ),
+            },
+            2 => match self {
+                RocksSecondaryIndexValue::Hash(hash) => {
+                    let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1));
+
+                    buf.write_u8(0).unwrap();
+                    buf.write_all(&hash).unwrap();
+
+                    buf.into_inner()
+                }
+                RocksSecondaryIndexValue::HashAndTTL(hash, expire) => {
+                    let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1 + 8));
+
+                    buf.write_u8(1).unwrap();
+                    buf.write_all(&hash).unwrap();
+
+                    if let Some(ex) = expire {
+                        buf.write_i64::<BigEndian>(ex.timestamp()).unwrap()
+                    } else {
+                        buf.write_i64::<BigEndian>(0).unwrap()
+                    }
+
+                    buf.into_inner()
+                }
+            },
+            version => panic!("Unsupported value_version {}", version),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum RowKey {
-    Table(TableId, u64),
+    Table(TableId, /** row_id */ u64),
     Sequence(TableId),
-    SecondaryIndex(IndexId, SecondaryKey, u64),
+    SecondaryIndex(IndexId, SecondaryKey, /** row_id */ u64),
     SecondaryIndexInfo { index_id: IndexId },
+    TableInfo { table_id: TableId },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct SecondaryIndexInfo {
+    // user specific version
     pub version: u32,
+    #[serde(default = "secondary_index_info_default_value_version")]
+    // serialization/deserialization version
+    pub value_version: u32,
+}
+
+fn secondary_index_info_default_value_version() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct TableInfo {
+    // user specific version
+    pub version: u32,
+    // serialization/deserialization version, reserved, not used
+    pub value_version: u32,
 }
 
 impl RowKey {
-    pub fn from_bytes(bytes: &[u8]) -> RowKey {
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<RowKey, CubeError> {
         let mut reader = Cursor::new(bytes);
-        match reader.read_u8().unwrap() {
-            1 => RowKey::Table(TableId::from(reader.read_u32::<BigEndian>().unwrap()), {
-                // skip zero for fixed key padding
-                reader.read_u64::<BigEndian>().unwrap();
-                reader.read_u64::<BigEndian>().unwrap()
-            }),
-            2 => RowKey::Sequence(TableId::from(reader.read_u32::<BigEndian>().unwrap())),
+        match reader.read_u8()? {
+            1 => Ok(RowKey::Table(
+                TableId::from(reader.read_u32::<BigEndian>()?),
+                {
+                    // skip zero for fixed key padding
+                    reader.read_u64::<BigEndian>()?;
+                    reader.read_u64::<BigEndian>()?
+                },
+            )),
+            2 => Ok(RowKey::Sequence(TableId::from(
+                reader.read_u32::<BigEndian>()?,
+            ))),
             3 => {
-                let table_id = IndexId::from(reader.read_u32::<BigEndian>().unwrap());
+                let table_id = IndexId::from(reader.read_u32::<BigEndian>()?);
                 let mut secondary_key: SecondaryKey = SecondaryKey::new();
                 let sc_length = bytes.len() - 13;
                 for _i in 0..sc_length {
-                    secondary_key.push(reader.read_u8().unwrap());
+                    secondary_key.push(reader.read_u8()?);
                 }
-                let row_id = reader.read_u64::<BigEndian>().unwrap();
+                let row_id = reader.read_u64::<BigEndian>()?;
 
-                RowKey::SecondaryIndex(table_id, secondary_key, row_id)
+                Ok(RowKey::SecondaryIndex(table_id, secondary_key, row_id))
             }
             4 => {
-                let index_id = IndexId::from(reader.read_u32::<BigEndian>().unwrap());
+                let index_id = IndexId::from(reader.read_u32::<BigEndian>()?);
 
-                RowKey::SecondaryIndexInfo { index_id }
+                Ok(RowKey::SecondaryIndexInfo { index_id })
             }
-            v => panic!("Unknown key prefix: {}", v),
+            5 => {
+                let table_id = TableId::from(reader.read_u32::<BigEndian>()?);
+
+                Ok(RowKey::TableInfo { table_id })
+            }
+            v => Err(CubeError::internal(format!("Unknown key prefix: {}", v))),
         }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> RowKey {
+        RowKey::try_from_bytes(bytes).unwrap()
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -167,6 +297,10 @@ impl RowKey {
             RowKey::SecondaryIndexInfo { index_id } => {
                 wtr.write_u8(4).unwrap();
                 wtr.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+            }
+            RowKey::TableInfo { table_id } => {
+                wtr.write_u8(5).unwrap();
+                wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
             }
         }
         wtr
@@ -298,6 +432,7 @@ pub struct DbTableRef<'a> {
     pub db: &'a DB,
     pub snapshot: &'a Snapshot<'a>,
     pub mem_seq: MemorySequence,
+    pub start_time: DateTime<Utc>,
 }
 
 #[async_trait]
@@ -498,6 +633,7 @@ impl RocksStore {
                 db: &meta_store_to_move.db,
                 snapshot: &meta_store_to_move.db.snapshot(),
                 mem_seq: MemorySequence::new(meta_store_to_move.seq_store.clone()),
+                start_time: Utc::now(),
             };
 
             if let Err(e) = meta_store_to_move.details.migrate(table_ref) {
@@ -543,6 +679,7 @@ impl RocksStore {
                         db: db_to_send.as_ref(),
                         snapshot: &snapshot,
                         mem_seq,
+                        start_time: Utc::now(),
                     },
                     &mut batch,
                 );
@@ -733,6 +870,7 @@ impl RocksStore {
                     db: db_to_send.as_ref(),
                     snapshot: &snapshot,
                     mem_seq,
+                    start_time: Utc::now(),
                 });
 
                 tx.send(res).map_err(|_| {
@@ -777,6 +915,7 @@ impl RocksStore {
                 db: db_to_send.as_ref(),
                 snapshot: &snapshot,
                 mem_seq,
+                start_time: Utc::now(),
             });
 
             mem::drop(span_holder);

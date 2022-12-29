@@ -25,8 +25,10 @@ use crate::scheduler::SchedulerImpl;
 use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
+use crate::streaming::kafka::{KafkaClientService, KafkaClientServiceImpl};
 use crate::streaming::{KsqlClient, KsqlClientImpl, StreamingService, StreamingServiceImpl};
 use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
+use crate::telemetry::tracing::{TracingHelper, TracingHelperImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
@@ -623,6 +625,20 @@ lazy_static! {
         tokio::sync::RwLock::new(false);
 }
 
+pub async fn init_test_logger() {
+    if !*TEST_LOGGING_INITIALIZED.read().await {
+        let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
+        if !*initialized {
+            SimpleLogger::new()
+                .with_level(Level::Error.to_level_filter())
+                .with_module_level("cubestore", Level::Trace.to_level_filter())
+                .init()
+                .unwrap();
+        }
+        *initialized = true;
+    }
+}
+
 fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
@@ -932,17 +948,7 @@ impl Config {
         I: FnOnce(Arc<Injector>) -> T1,
         F: FnOnce(CubeServices) -> T2,
     {
-        if !*TEST_LOGGING_INITIALIZED.read().await {
-            let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
-            if !*initialized {
-                SimpleLogger::new()
-                    .with_level(Level::Error.to_level_filter())
-                    .with_module_level("cubestore", Level::Trace.to_level_filter())
-                    .init()
-                    .unwrap();
-            }
-            *initialized = true;
-        }
+        init_test_logger().await;
 
         let store_path = self.local_dir().clone();
         let remote_fs = self.remote_fs().await.unwrap();
@@ -1289,6 +1295,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
             .await;
@@ -1298,14 +1305,30 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
+                KafkaClientServiceImpl::new()
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
-                QueryPlannerImpl::new(i.get_service_typed().await, i.get_service_typed().await)
+                QueryPlannerImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
             })
             .await;
 
         self.injector
             .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
                 QueryExecutorImpl::new(i.get_service_typed().await)
+            })
+            .await;
+
+        self.injector
+            .register_typed_with_default::<dyn TracingHelper, _, _, _>(async move |_| {
+                TracingHelperImpl::new()
             })
             .await;
 
@@ -1326,6 +1349,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     cluster_meta_store_sender,
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                 )
             })

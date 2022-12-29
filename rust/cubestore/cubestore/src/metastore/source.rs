@@ -14,6 +14,12 @@ pub enum SourceCredentials {
         password: Option<String>,
         url: String,
     },
+    Kafka {
+        user: Option<String>,
+        password: Option<String>,
+        host: String,
+        use_ssl: bool,
+    },
 }
 
 impl DataFrameValue<String> for SourceCredentials {

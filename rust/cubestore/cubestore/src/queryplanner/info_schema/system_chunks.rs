@@ -1,6 +1,6 @@
 use crate::metastore::chunks::chunk_file_name;
-use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreTable};
-use crate::queryplanner::InfoSchemaTableDef;
+use crate::metastore::{Chunk, IdRow, MetaStoreTable};
+use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use arrow::array::{ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array};
 use arrow::datatypes::{DataType, Field, TimeUnit};
@@ -13,8 +13,8 @@ pub struct SystemChunksTableDef;
 impl InfoSchemaTableDef for SystemChunksTableDef {
     type T = IdRow<Chunk>;
 
-    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(meta_store.chunks_table().all_rows().await?))
+    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        Ok(Arc::new(ctx.meta_store.chunks_table().all_rows().await?))
     }
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {

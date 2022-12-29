@@ -1,6 +1,6 @@
 use crate::metastore::replay_handle::{ReplayHandle, SeqPointerForLocation};
-use crate::metastore::{IdRow, MetaStore};
-use crate::queryplanner::InfoSchemaTableDef;
+use crate::metastore::IdRow;
+use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use arrow::array::{ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array};
 use arrow::datatypes::{DataType, Field, TimeUnit};
@@ -13,8 +13,8 @@ pub struct SystemReplayHandlesTableDef;
 impl InfoSchemaTableDef for SystemReplayHandlesTableDef {
     type T = IdRow<ReplayHandle>;
 
-    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(meta_store.all_replay_handles().await?))
+    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        Ok(Arc::new(ctx.meta_store.all_replay_handles().await?))
     }
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {

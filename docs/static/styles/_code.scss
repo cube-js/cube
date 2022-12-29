@@ -1,5 +1,13 @@
 @import 'variables';
 
+h2, h3 {
+  code {
+    font-size: inherit;
+    line-height: inherit;
+    margin-bottom: inherit;
+  }
+}
+
 pre, code, tt {
 	font-family: $code-font;
 	font-size: 16px;

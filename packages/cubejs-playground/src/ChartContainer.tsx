@@ -402,14 +402,14 @@ class ChartContainer extends Component<
               data-testid="sql-btn"
               icon={<QuestionCircleOutlined />}
               size="small"
-              type={activeTab === 'sql' ? 'primary' : 'default'}
+              type={activeTab === 'generated-sql' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show SQL');
-                this.setState({ activeTab: 'sql' });
+                this.setState({ activeTab: 'generated-sql' });
               }}
             >
-              SQL
+              Generated SQL
             </Button>
 
             <Button
@@ -503,7 +503,7 @@ class ChartContainer extends Component<
         return <PrismCode code={codeExample} />;
       } else if (activeTab === 'query') {
         return <PrismCode code={queryText} />;
-      } else if (activeTab === 'sql') {
+      } else if (activeTab === 'generated-sql') {
         return (
           <Suspense
             fallback={
@@ -598,7 +598,7 @@ class ChartContainer extends Component<
           </Button>
         </SectionRow>
       );
-    } else if (activeTab === 'sql') {
+    } else if (activeTab === 'generated-sql') {
       title = (
         <SectionRow>
           <div>SQL</div>

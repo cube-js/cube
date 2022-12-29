@@ -1,3 +1,4 @@
+pub mod tracing;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{SecondsFormat, Utc};

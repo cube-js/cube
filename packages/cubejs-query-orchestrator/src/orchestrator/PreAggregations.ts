@@ -2,32 +2,30 @@ import crypto from 'crypto';
 import R from 'ramda';
 import {
   addSecondsToLocalTimestamp,
+  BUILD_RANGE_END_LOCAL,
+  BUILD_RANGE_START_LOCAL,
   extractDate,
   FROM_PARTITION_RANGE,
   getEnv,
   inDbTimeZone,
-  timeSeries,
   MAX_SOURCE_ROW_LIMIT,
+  timeSeries,
   TO_PARTITION_RANGE,
-  BUILD_RANGE_START_LOCAL,
-  BUILD_RANGE_END_LOCAL,
   utcToLocalTimeZone,
 } from '@cubejs-backend/shared';
 
-import { cancelCombinator, SaveCancelFn, DriverInterface, BaseDriver,
+import {
+  BaseDriver,
+  cancelCombinator,
   DownloadTableData,
+  DriverCapabilities,
+  DriverInterface,
   InlineTable,
+  SaveCancelFn,
   StreamOptions,
   UnloadOptions,
-  DriverCapabilities } from '@cubejs-backend/base-driver';
-import {
-  Query,
-  QueryCache,
-  QueryTuple,
-  QueryWithParams,
-  QueryBody,
-  PreAggTableToTempTable,
-} from './QueryCache';
+} from '@cubejs-backend/base-driver';
+import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryQueue } from './QueryQueue';
@@ -866,6 +864,7 @@ export class PreAggregationLoader {
   }
 
   public refresh(newVersionEntry: VersionEntry, invalidationKeys: InvalidationKeys, client) {
+    this.updateLastTouch(this.targetTableName(newVersionEntry));
     let refreshStrategy = this.refreshStoreInSourceStrategy;
     if (this.preAggregation.external) {
       const readOnly =
