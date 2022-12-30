@@ -166,6 +166,14 @@ export class QueryCache {
     return this.cacheDriver;
   }
 
+  public getKey(catalog: string, key: string): string {
+    if (this.cacheDriver instanceof CubeStoreCacheDriver) {
+      return `${this.redisPrefix}#${catalog}:${key}`;
+    } else {
+      return `${catalog}_${this.redisPrefix}_${key}`;
+    }
+  }
+
   /**
    * Force reconcile queue logic to be executed.
    */
@@ -857,8 +865,8 @@ export class QueryCache {
     return null;
   }
 
-  public queryRedisKey(cacheKey) {
-    return `SQL_QUERY_RESULT_${this.redisPrefix}_${getCacheHash(cacheKey)}`;
+  public queryRedisKey(cacheKey): string {
+    return this.getKey('SQL_QUERY_RESULT', getCacheHash(cacheKey));
   }
 
   public async cleanup() {

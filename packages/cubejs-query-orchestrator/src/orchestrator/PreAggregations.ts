@@ -327,7 +327,7 @@ class PreAggregationLoadCache {
   }
 
   public tablesRedisKey(preAggregation: PreAggregationDescription) {
-    return `SQL_PRE_AGGREGATIONS_TABLES_${this.redisPrefix}_${preAggregation.dataSource}${preAggregation.preAggregationsSchema}${preAggregation.external ? '_EXT' : ''}`;
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES', `${preAggregation.dataSource}${preAggregation.preAggregationsSchema}${preAggregation.external ? '_EXT' : ''}`);
   }
 
   protected async getTablesQuery(preAggregation) {
@@ -1884,12 +1884,12 @@ export class PreAggregations {
 
   protected tablesUsedRedisKey(tableName) {
     // TODO add dataSource?
-    return `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_TABLES_USED_${tableName}`;
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_USED', tableName);
   }
 
   protected tablesTouchRedisKey(tableName) {
     // TODO add dataSource?
-    return `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_TABLES_TOUCH_${tableName}`;
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_TOUCH', tableName);
   }
 
   public async addTableUsed(tableName) {
