@@ -1,4 +1,5 @@
 use crate::config::injection::DIService;
+use crate::config::ConfigObj;
 use crate::metastore::table::StreamOffset;
 use crate::metastore::Column;
 use crate::streaming::{parse_json_payload_and_key, StreamingSource};
@@ -79,7 +80,9 @@ pub trait KafkaClientService: DIService + Send + Sync {
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError>;
 }
 
-pub struct KafkaClientServiceImpl {}
+pub struct KafkaClientServiceImpl {
+    config_obj: Arc<dyn ConfigObj>,
+}
 
 pub enum KafkaMessage<'a> {
     BorrowedMessage(BorrowedMessage<'a>),
@@ -164,9 +167,11 @@ impl KafkaClientService for KafkaClientServiceImpl {
         })?;
 
         let stream_consumer = Arc::new(stream_consumer);
+        let config_obj = self.config_obj.clone();
         Ok(Box::pin(stream::from_fn(move || {
             let stream_consumer = stream_consumer.clone();
             let to_row = to_row.clone();
+            let config_obj = config_obj.clone();
             async move {
                 loop {
                     let message = stream_consumer.recv().await;
@@ -174,7 +179,19 @@ impl KafkaClientService for KafkaClientServiceImpl {
                         .map_err(|e| {
                             CubeError::user(format!("Error during fetching kafka message: {}", e))
                         })
-                        .and_then(|m| to_row(KafkaMessage::BorrowedMessage(m)));
+                        .and_then(|m| {
+                            let res = to_row(KafkaMessage::BorrowedMessage(m));
+                            if config_obj.skip_kafka_parsing_errors() {
+                                if let Err(e) = res {
+                                    log::error!(
+                                        "Skipping parsing kafka message due to error: {}",
+                                        e
+                                    );
+                                    return Ok(None);
+                                }
+                            }
+                            res
+                        });
                     match row {
                         Ok(None) => continue,
                         Ok(Some(row)) => break Some(Ok(row)),
@@ -187,8 +204,8 @@ impl KafkaClientService for KafkaClientServiceImpl {
 }
 
 impl KafkaClientServiceImpl {
-    pub fn new() -> Arc<Self> {
-        Arc::new(KafkaClientServiceImpl {})
+    pub fn new(config_obj: Arc<dyn ConfigObj>) -> Arc<Self> {
+        Arc::new(KafkaClientServiceImpl { config_obj })
     }
 }
 
@@ -225,19 +242,29 @@ impl StreamingSource for KafkaStreamingSource {
                 &self.password,
                 self.use_ssl,
                 Arc::new(move |m| -> Result<_, _> {
-                    if let Some((payload, key)) = m
+                    if let Some((payload_str, key_str)) = m
                         .payload()
                         .map(|p| String::from_utf8_lossy(p))
                         .zip(m.key().map(|p| String::from_utf8_lossy(p)))
                     {
-                        let payload = json::parse(payload.as_ref())?;
-                        let key = json::parse(key.as_ref())?;
+                        let payload = json::parse(payload_str.as_ref()).map_err(|e| {
+                            CubeError::user(format!("Can't parse '{}' payload: {}", payload_str, e))
+                        })?;
+                        let key = json::parse(key_str.as_ref()).map_err(|e| {
+                            CubeError::user(format!("Can't parse '{}' key: {}", key_str, e))
+                        })?;
                         let mut values = parse_json_payload_and_key(
                             &column_to_move,
                             &unique_key_columns,
                             payload,
                             key,
-                        )?;
+                        )
+                        .map_err(|e| {
+                            CubeError::user(format!(
+                                "Can't parse kafka row with '{}' key and '{}' payload: {}",
+                                key_str, payload_str, e
+                            ))
+                        })?;
                         values[seq_column_to_move.get_index()] = TableValue::Int(m.offset());
                         Ok(Some(Row::new(values)))
                     } else {

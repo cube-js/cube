@@ -386,6 +386,8 @@ pub trait ConfigObj: DIService {
 
     fn stream_replay_check_interval_secs(&self) -> u64;
 
+    fn skip_kafka_parsing_errors(&self) -> bool;
+
     fn dump_dir(&self) -> &Option<PathBuf>;
 }
 
@@ -438,6 +440,7 @@ pub struct ConfigObjImpl {
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
+    pub skip_kafka_parsing_errors: bool,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -613,6 +616,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn stream_replay_check_interval_secs(&self) -> u64 {
         self.stream_replay_check_interval_secs
+    }
+    fn skip_kafka_parsing_errors(&self) -> bool {
+        self.skip_kafka_parsing_errors
     }
 
     fn dump_dir(&self) -> &Option<PathBuf> {
@@ -811,6 +817,7 @@ impl Config {
                     "CUBESTORE_STREAM_REPLAY_CHECK_INTERVAL",
                     0,
                 ),
+                skip_kafka_parsing_errors: env_parse("CUBESTORE_SKIP_KAFKA_PARSING_ERRORS", false),
             }),
         }
     }
@@ -874,6 +881,7 @@ impl Config {
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
                 stream_replay_check_interval_secs: 60,
+                skip_kafka_parsing_errors: false,
             }),
         }
     }
@@ -1305,8 +1313,8 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
-                KafkaClientServiceImpl::new()
+            .register_typed::<dyn KafkaClientService, _, _, _>(async move |i| {
+                KafkaClientServiceImpl::new(i.get_service_typed().await)
             })
             .await;
 
