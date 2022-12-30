@@ -42,7 +42,6 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.31.0",
-    "@cubejs-backend/testing-shared": "^0.31.32",
     "@types/flatbuffers": "^1.10.0",
     "@types/generic-pool": "^3.1.9",
     "@types/mysql": "^2.15.17",
