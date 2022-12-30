@@ -1,4 +1,4 @@
-export interface LocalQueueDriverConnectionInterface {
+export interface QueueDriverConnectionInterface {
   getResultBlocking(queryKey: string): Promise<unknown>;
   getResult(queryKey: string): Promise<unknown>;
   addToQueue(queryKey: string): Promise<unknown>;
@@ -18,6 +18,6 @@ export interface LocalQueueDriverConnectionInterface {
 }
 
 export interface QueueDriverInterface {
-  createConnection(): Promise<LocalQueueDriverConnectionInterface>;
-  release(connection: LocalQueueDriverConnectionInterface): Promise<void>;
+  createConnection(): Promise<QueueDriverConnectionInterface>;
+  release(connection: QueueDriverConnectionInterface): Promise<void>;
 }

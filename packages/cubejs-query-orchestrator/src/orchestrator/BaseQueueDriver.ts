@@ -1,4 +1,4 @@
-import { LocalQueueDriverConnectionInterface, QueueDriverInterface } from '@cubejs-backend/base-driver';
+import { QueueDriverConnectionInterface, QueueDriverInterface } from '@cubejs-backend/base-driver';
 import { getCacheHash } from './utils';
 
 export abstract class BaseQueueDriver implements QueueDriverInterface {
@@ -6,7 +6,7 @@ export abstract class BaseQueueDriver implements QueueDriverInterface {
     return getCacheHash(queryKey);
   }
 
-  abstract createConnection(): Promise<LocalQueueDriverConnectionInterface>;
+  abstract createConnection(): Promise<QueueDriverConnectionInterface>;
 
-  abstract release(connection: LocalQueueDriverConnectionInterface): Promise<void>;
+  abstract release(connection: QueueDriverConnectionInterface): Promise<void>;
 }
