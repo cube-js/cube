@@ -250,9 +250,11 @@ impl StreamingSource for KafkaStreamingSource {
                         let payload = json::parse(payload_str.as_ref()).map_err(|e| {
                             CubeError::user(format!("Can't parse '{}' payload: {}", payload_str, e))
                         })?;
-                        let key = json::parse(key_str.as_ref()).map_err(|e| {
-                            CubeError::user(format!("Can't parse '{}' key: {}", key_str, e))
-                        })?;
+                        // TODO Handle properly meta in a key added by ksql after \0
+                        let key = json::parse(key_str.as_ref().split("\0").next().unwrap())
+                            .map_err(|e| {
+                                CubeError::user(format!("Can't parse '{}' key: {}", key_str, e))
+                            })?;
                         let mut values = parse_json_payload_and_key(
                             &column_to_move,
                             &unique_key_columns,
