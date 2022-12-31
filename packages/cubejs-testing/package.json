@@ -61,6 +61,8 @@
     "smoke:lambda:snapshot": "jest --updateSnapshot --verbose -i dist/test/smoke-lambda.test.js",
     "smoke:materialize": "jest --verbose -i dist/test/smoke-materialize.test.js",
     "smoke:materialize:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-materialize.test.js",
+    "smoke:oracle": "jest --verbose -i dist/test/smoke-oracle.test.js",
+    "smoke:oracle:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-oracle.test.js",
     "smoke:questdb": "jest --verbose -i dist/test/smoke-questdb.test.js",
     "smoke:questdb:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-questdb.test.js",
     "smoke:multidb": "jest --verbose -i dist/test/smoke-multidb.test.js",
