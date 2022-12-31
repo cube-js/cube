@@ -22,7 +22,9 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
     if (rows && rows.length === 1 && rows[0]?.success === 'true') {
       if (tkn.isCanceled()) {
         if (freeAfter) {
-          await this.connection.query(`CACHE REMOVE "${key}"`, []);
+          await this.connection.query('CACHE REMOVE ?', [
+            key
+          ]);
         }
 
         return false;
@@ -32,7 +34,9 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
         await tkn.with(cb());
       } finally {
         if (freeAfter) {
-          await this.connection.query(`CACHE REMOVE "${key}"`, []);
+          await this.connection.query('CACHE REMOVE ?', [
+            key
+          ]);
         }
       }
 
@@ -43,7 +47,9 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
   });
 
   public async get(key: string) {
-    const rows = await this.connection.query(`CACHE GET "${key}"`, []);
+    const rows = await this.connection.query('CACHE GET ?', [
+      key
+    ]);
     if (rows && rows.length === 1) {
       return JSON.parse(rows[0].value);
     }
@@ -53,7 +59,7 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
 
   public async set(key: string, value, expiration) {
     const strValue = JSON.stringify(value);
-    await this.connection.query(`CACHE SET TTL ${expiration} ? ?`, [key, strValue]);
+    await this.connection.query('CACHE SET TTL ? ? ?', [expiration, key, strValue]);
 
     return {
       key,
@@ -62,11 +68,15 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
   }
 
   public async remove(key: string) {
-    await this.connection.query(`CACHE REMOVE "${key}"`, []);
+    await this.connection.query('CACHE REMOVE ?', [
+      key
+    ]);
   }
 
   public async keysStartingWith(prefix: string) {
-    const rows = await this.connection.query(`CACHE KEYS "${prefix}"`, []);
+    const rows = await this.connection.query('CACHE KEYS ?', [
+      prefix
+    ]);
     return rows.map((row) => row.key);
   }
 
