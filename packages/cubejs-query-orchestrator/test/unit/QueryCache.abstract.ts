@@ -1,9 +1,14 @@
 import crypto from 'crypto';
 import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 
-import { QueryCache } from '../../src';
+import { QueryCache, QueryCacheOptions } from '../../src';
 
-export const QueryCacheTest = (name: string, options?: any) => {
+export type QueryCacheTestOptions = QueryCacheOptions & {
+  beforeAll?: () => Promise<void>,
+  afterAll?: () => Promise<void>,
+};
+
+export const QueryCacheTest = (name: string, options?: QueryCacheTestOptions) => {
   describe(`QueryQueue${name}`, () => {
     const cache = new QueryCache(
       crypto.randomBytes(16).toString('hex'),
@@ -14,8 +19,18 @@ export const QueryCacheTest = (name: string, options?: any) => {
       options,
     );
 
+    beforeAll(async () => {
+      if (options?.beforeAll) {
+        await options?.beforeAll();
+      }
+    });
+
     afterAll(async () => {
       await cache.cleanup();
+
+      if (options?.afterAll) {
+        await options?.afterAll();
+      }
     });
 
     it('withLock', async () => {

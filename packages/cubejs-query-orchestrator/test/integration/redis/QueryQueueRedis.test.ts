@@ -1,6 +1,6 @@
 import { getEnv } from '@cubejs-backend/shared';
-import { QueryQueueTest } from '../unit/QueryQueue.abstract';
-import { RedisPool } from '../../src/orchestrator/RedisPool';
+import { QueryQueueTest } from '../../unit/QueryQueue.abstract';
+import { RedisPool } from '../../../src/orchestrator/RedisPool';
 
 function doRedisTest(useIORedis: boolean) {
   process.env.CUBEJS_REDIS_USE_IOREDIS = <any>useIORedis;

@@ -299,6 +299,63 @@ jobs:
           CUBEJS_REDIS_USE_IOREDIS: true
           CUBEJS_REDIS_SENTINEL: "redis+sentinel://localhost:5000,localhost:5001,localhost:5002/mymaster/0"
 
+  integration-cubestore:
+    needs: [unit, lint, latest-tag-sha]
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+
+    strategy:
+      matrix:
+        node-version: [14.x]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-03-08
+          override: true
+          components: rustfmt
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            node_modules
+            rust/cubestore/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.5
+      - name: Yarn install
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Run Cubestore Integration
+        timeout-minutes: 10
+        run: |
+          yarn lerna run --concurrency 1 --stream --no-prefix integration:cubestore
+
   integration:
     needs: [unit, lint, latest-tag-sha]
     runs-on: ubuntu-20.04

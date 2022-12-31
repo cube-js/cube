@@ -1,8 +1,9 @@
 import { createQueryTestCase, CubeStoreDBRunner, QueryTestAbstract } from '@cubejs-backend/testing-shared';
-import { CubeStoreDriver, CubeStoreQuery } from '../src';
+import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreQuery } from '@cubejs-backend/schema-compiler';
 
 class CubeStoreQueryTest extends QueryTestAbstract<CubeStoreDriver> {
-  public getQueryClass() {
+  public getQueryClass(): any {
     return CubeStoreQuery;
   }
 }

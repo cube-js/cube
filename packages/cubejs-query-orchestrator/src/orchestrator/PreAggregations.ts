@@ -23,13 +23,14 @@ import {
   InlineTable,
   SaveCancelFn,
   StreamOptions,
-  UnloadOptions,
+  UnloadOptions
 } from '@cubejs-backend/base-driver';
 import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryQueue } from './QueryQueue';
 import { LargeStreamWarning } from './StreamObjectsCounter';
+import { CacheAndQueryDriverType } from './QueryOrchestrator';
 
 /// Name of the inline table containing the lambda rows.
 export const LAMBDA_TABLE_PREFIX = 'lambda';
@@ -326,7 +327,7 @@ class PreAggregationLoadCache {
   }
 
   public tablesRedisKey(preAggregation: PreAggregationDescription) {
-    return `SQL_PRE_AGGREGATIONS_TABLES_${this.redisPrefix}_${preAggregation.dataSource}${preAggregation.preAggregationsSchema}${preAggregation.external ? '_EXT' : ''}`;
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES', `${preAggregation.dataSource}${preAggregation.preAggregationsSchema}${preAggregation.external ? '_EXT' : ''}`);
   }
 
   protected async getTablesQuery(preAggregation) {
@@ -1832,7 +1833,7 @@ type PreAggregationsOptions = {
   }>;
   redisPool?: any;
   continueWaitTimeout?: number;
-  cacheAndQueueDriver?: 'redis' | 'memory';
+  cacheAndQueueDriver?: CacheAndQueryDriverType;
   skipExternalCacheAndQueue?: boolean;
 };
 
@@ -1883,12 +1884,12 @@ export class PreAggregations {
 
   protected tablesUsedRedisKey(tableName) {
     // TODO add dataSource?
-    return `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_TABLES_USED_${tableName}`;
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_USED', tableName);
   }
 
   protected tablesTouchRedisKey(tableName) {
     // TODO add dataSource?
-    return `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_TABLES_TOUCH_${tableName}`;
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_TOUCH', tableName);
   }
 
   public async addTableUsed(tableName) {

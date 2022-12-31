@@ -83,12 +83,28 @@ export class QueryQueue {
       getQueueEventsBus: options.getQueueEventsBus
     };
 
-    /**
-     * @type {LocalQueueDriver | RedisQueueDriver}
-     */
-    this.queueDriver = options.cacheAndQueueDriver === 'redis' ?
-      new RedisQueueDriver(queueDriverOptions) :
-      new LocalQueueDriver(queueDriverOptions);
+    switch (options.cacheAndQueueDriver || 'memory') {
+      case 'redis':
+        /**
+         * @type {LocalQueueDriver | RedisQueueDriver}
+         */
+        this.queueDriver = new RedisQueueDriver(queueDriverOptions);
+        break;
+      case 'memory':
+        /**
+         * @type {LocalQueueDriver | RedisQueueDriver}
+         */
+        this.queueDriver = new LocalQueueDriver(queueDriverOptions);
+        break;
+      case 'cubestore':
+        /**
+         * @type {LocalQueueDriver | RedisQueueDriver}
+         */
+        this.queueDriver = new LocalQueueDriver(queueDriverOptions);
+        break;
+      default:
+        throw new Error(`Unknown queue driver: ${options.cacheAndQueueDriver}`);
+    }
 
     /**
      * @type {boolean}
@@ -151,7 +167,7 @@ export class QueryQueue {
       // query (initialized by the /cubejs-system/v1/pre-aggregations/jobs
       // endpoint).
       let result = !query.forceBuild && await redisClient.getResult(queryKey);
-      
+
       if (result) {
         return this.parseResult(result);
       }
@@ -208,7 +224,7 @@ export class QueryQueue {
       // Result here won't be fetched for a jobed build query (initialized by
       // the /cubejs-system/v1/pre-aggregations/jobs endpoint).
       result = !query.isJob && await redisClient.getResultBlocking(queryKey);
-      
+
       // We don't want to throw the ContinueWaitError for  a jobed build query.
       if (!query.isJob && !result) {
         throw new ContinueWaitError();
@@ -312,7 +328,7 @@ export class QueryQueue {
               status: []
             };
           }
-  
+
           obj[query.queryKey].status.push(status);
         });
         return obj;

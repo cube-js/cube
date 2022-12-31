@@ -1,16 +1,17 @@
 import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
 import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
+import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
+import { BaseDriver, InlineTables, CacheDriverInterface } from '@cubejs-backend/base-driver';
 
-import { BaseDriver, InlineTables } from '@cubejs-backend/base-driver';
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
-import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
+import { CacheAndQueryDriverType } from './QueryOrchestrator';
 
 type QueryOptions = {
   external?: boolean;
@@ -102,6 +103,26 @@ type CacheEntry = {
   renewalKey: string;
 };
 
+export interface QueryCacheOptions {
+  refreshKeyRenewalThreshold?: number;
+  externalQueueOptions?: any;
+  externalDriverFactory?: DriverFactory;
+  backgroundRenew?: Boolean;
+  queueOptions?: (dataSource: string) => Promise<{
+    concurrency: number;
+    continueWaitTimeout?: number;
+    executionTimeout?: number;
+    orphanedTimeout?: number;
+    heartBeatInterval?: number;
+  }>;
+  redisPool?: any;
+  cubeStoreDriver?: CubeStoreDriver,
+  continueWaitTimeout?: number;
+  cacheAndQueueDriver?: CacheAndQueryDriverType;
+  maxInMemoryCacheEntries?: number;
+  skipExternalCacheAndQueue?: boolean;
+}
+
 export class QueryCache {
   protected readonly cacheDriver: CacheDriverInterface;
 
@@ -115,28 +136,24 @@ export class QueryCache {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    public readonly options: {
-      refreshKeyRenewalThreshold?: number;
-      externalQueueOptions?: any;
-      externalDriverFactory?: DriverFactory;
-      backgroundRenew?: Boolean;
-      queueOptions?: (dataSource: string) => Promise<{
-        concurrency: number;
-        continueWaitTimeout?: number;
-        executionTimeout?: number;
-        orphanedTimeout?: number;
-        heartBeatInterval?: number;
-      }>;
-      redisPool?: any;
-      continueWaitTimeout?: number;
-      cacheAndQueueDriver?: 'redis' | 'memory';
-      maxInMemoryCacheEntries?: number;
-      skipExternalCacheAndQueue?: boolean;
-    } = {}
+    public readonly options: QueryCacheOptions = {}
   ) {
-    this.cacheDriver = options.cacheAndQueueDriver === 'redis' ?
-      new RedisCacheDriver({ pool: options.redisPool }) :
-      new LocalCacheDriver();
+    switch (options.cacheAndQueueDriver || 'memory') {
+      case 'redis':
+        this.cacheDriver = new RedisCacheDriver({ pool: options.redisPool });
+        break;
+      case 'memory':
+        this.cacheDriver = new LocalCacheDriver();
+        break;
+      case 'cubestore':
+        this.cacheDriver = new CubeStoreCacheDriver(
+          options.cubeStoreDriver || new CubeStoreDriver({})
+        );
+        break;
+      default:
+        throw new Error(`Unknown cache driver: ${options.cacheAndQueueDriver}`);
+    }
+
     this.memoryCache = new LRUCache<string, CacheEntry>({
       max: options.maxInMemoryCacheEntries || 10000
     });
@@ -147,6 +164,14 @@ export class QueryCache {
    */
   public getCacheDriver(): CacheDriverInterface {
     return this.cacheDriver;
+  }
+
+  public getKey(catalog: string, key: string): string {
+    if (this.cacheDriver instanceof CubeStoreCacheDriver) {
+      return `${this.redisPrefix}#${catalog}:${key}`;
+    } else {
+      return `${catalog}_${this.redisPrefix}_${key}`;
+    }
   }
 
   /**
@@ -840,8 +865,8 @@ export class QueryCache {
     return null;
   }
 
-  public queryRedisKey(cacheKey) {
-    return `SQL_QUERY_RESULT_${this.redisPrefix}_${getCacheHash(cacheKey)}`;
+  public queryRedisKey(cacheKey): string {
+    return this.getKey('SQL_QUERY_RESULT', getCacheHash(cacheKey));
   }
 
   public async cleanup() {
