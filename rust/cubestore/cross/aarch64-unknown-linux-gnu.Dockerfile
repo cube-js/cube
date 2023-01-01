@@ -1,12 +1,13 @@
-# Based on top of ubuntu 16.04
+# Based on top of ubuntu 20.04
+# TODO: Migrate to https://github.com/cross-rs/cross/pkgs/container/aarch64-unknown-linux-gnu, when it will be released!
 # https://github.com/rust-embedded/cross/blob/master/docker/Dockerfile.aarch64-unknown-linux-gnu
-FROM rustembedded/cross:aarch64-unknown-linux-gnu
+FROM cubejs/cross-aarch64-unknown-linux-gnu:31122022
 
 RUN apt-get update \
     && apt-get -y upgrade \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-    && add-apt-repository "deb https://apt.llvm.org/xenial/ llvm-toolchain-xenial-12 main"  \
+    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-12 main"  \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y gcc-multilib g++-multilib \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make libssl-dev libsasl2-dev \

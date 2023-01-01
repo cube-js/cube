@@ -11,13 +11,13 @@ image = "cubejs/rust-cross:x86_64-pc-windows-gnu-10012022"
 xargo = false
 
 [target.x86_64-unknown-linux-gnu]
-image = "cubejs/rust-cross:x86_64-unknown-linux-gnu"
+image = "cubejs/rust-cross:x86_64-unknown-linux-gnu-02012023"
 xargo = false
 
 [target.x86_64-unknown-linux-musl]
-image = "cubejs/rust-cross:x86_64-unknown-linux-musl"
+image = "cubejs/rust-cross:x86_64-unknown-linux-musl-02012023"
 xargo = false
 
 [target.aarch64-unknown-linux-gnu]
-image = "cubejs/rust-cross:aarch64-unknown-linux-gnu"
+image = "cubejs/rust-cross:aarch64-unknown-linux-gnu-02012023"
 xargo = false
