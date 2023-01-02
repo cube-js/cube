@@ -1,12 +1,10 @@
-name: Build
+name: Cross Images
 
 on:
   push:
     paths:
       - '.github/workflows/push-cross-images.yml'
       - 'rust/cubestore/cross/**'
-    branches:
-      - 'master'
 
 jobs:
   docker-dev:
@@ -41,5 +39,5 @@ jobs:
           context: ./
           file: ./rust/cubestore/cross/${{ matrix.target }}.Dockerfile
           platforms: linux/amd64
-          push: true
+          push: ${{ github.ref == 'refs/heads/master' }}
           tags: cubejs/rust-cross:${{ matrix.target }}
