@@ -77,7 +77,7 @@ flatbuffers = "0.7.0"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
 tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
-lru = "0.6.5"
+lru = "0.7.1"
 ctor = "0.1.20"
 json = "0.12.4"
 futures-util = "0.3.17"
