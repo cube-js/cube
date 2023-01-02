@@ -126,7 +126,7 @@ jobs:
     name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }}
     strategy:
       matrix:
-        node-version: [12, 14, 16, 18]
+        node-version: [14, 16, 18]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
       fail-fast: false
     container:
