@@ -3,6 +3,57 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.32](https://github.com/cube-js/cube.js/compare/v0.31.31...v0.31.32) (2022-12-28)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.31.31](https://github.com/cube-js/cube.js/compare/v0.31.30...v0.31.31) (2022-12-23)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.31.30](https://github.com/cube-js/cube.js/compare/v0.31.29...v0.31.30) (2022-12-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.31.29](https://github.com/cube-js/cube.js/compare/v0.31.28...v0.31.29) (2022-12-18)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.31.28](https://github.com/cube-js/cube.js/compare/v0.31.27...v0.31.28) (2022-12-16)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.31.26](https://github.com/cube-js/cube.js/compare/v0.31.25...v0.31.26) (2022-12-13)
+
+
+### Bug Fixes
+
+* **trino-driver:** Timezone issue fix ([#5731](https://github.com/cube-js/cube.js/issues/5731)) Thanks [@yuraborue](https://github.com/yuraborue) ! ([70df903](https://github.com/cube-js/cube.js/commit/70df9034f4246be06956cbf1dc69de709d4d3df8))
+
+
+
+
+
 ## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
 
 **Note:** Version bump only for package @cubejs-backend/testing

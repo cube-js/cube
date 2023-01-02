@@ -2329,7 +2329,11 @@ impl MemberRules {
                 .as_ref()
                 .unwrap_or(&"unknown".to_string())
                 .to_uppercase();
-            if agg_type == "NUMBER" {
+            if agg_type == "NUMBER"
+                || agg_type == "STRING"
+                || agg_type == "TIME"
+                || agg_type == "BOOLEAN"
+            {
                 agg_type = "MEASURE".to_string();
             }
             subst.insert(

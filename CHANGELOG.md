@@ -3,6 +3,141 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.32](https://github.com/cube-js/cube.js/compare/v0.31.31...v0.31.32) (2022-12-28)
+
+
+### Features
+
+* **cubesql:** Allow postprocessing with JOIN below Cube query limit ([56f5399](https://github.com/cube-js/cube.js/commit/56f5399fb37dbb7b388951b1db0be21dda2a94d4))
+* **cubesql:** Support `LEFT`, `RIGHT` in projection ([282ad3a](https://github.com/cube-js/cube.js/commit/282ad3ab3106d81a1361f94a499cfc7dc716f3e6))
+* **cubestore:** Direct kafka download support for ksql streams and t… ([#5880](https://github.com/cube-js/cube.js/issues/5880)) ([fcb5c5e](https://github.com/cube-js/cube.js/commit/fcb5c5e7825df32249a8021580b582821761c7b1))
+* **cubestore:** Installer - download binary without GH API ([#5885](https://github.com/cube-js/cube.js/issues/5885)) ([51a0f39](https://github.com/cube-js/cube.js/commit/51a0f3951caf62fdf8e88d80faf16d11a2b9158b))
+
+
+
+
+
+## [0.31.31](https://github.com/cube-js/cube.js/compare/v0.31.30...v0.31.31) (2022-12-23)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve Thoughtspot `WHERE IN` support ([6212efe](https://github.com/cube-js/cube.js/commit/6212efe428e504cd8c06797dfaa2b81783b80777))
+* **cubesql:** Support Thoughtspot DATEADD queries ([58b5669](https://github.com/cube-js/cube.js/commit/58b566903685ac3d14e78d61dc38c38c43aa5c3c))
+
+
+### Features
+
+* **cubestore-driver:** Introduce `CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT` env ([e67e800](https://github.com/cube-js/cube.js/commit/e67e800119e4efe0456eef347a573fa9feaf10e7))
+* **cubestore:** Initial support for KV cache ([#5861](https://github.com/cube-js/cube.js/issues/5861)) ([498d4b5](https://github.com/cube-js/cube.js/commit/498d4b5c5dae2ddf1ff1336566580cff1a656a92))
+* **playground:** allow for query renaming ([#5862](https://github.com/cube-js/cube.js/issues/5862)) ([681a2d8](https://github.com/cube-js/cube.js/commit/681a2d804880b17254e37a132008086c7c3fe81f))
+
+
+
+
+
+## [0.31.30](https://github.com/cube-js/cube.js/compare/v0.31.29...v0.31.30) (2022-12-22)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve Thoughtspot compatibility ([4d6511a](https://github.com/cube-js/cube.js/commit/4d6511a3d18ea877f06775c1aae154b5665feda0))
+* **cubestore-driver:** Increase retry timeout to avoid endless loop connection retries ([8bd19fa](https://github.com/cube-js/cube.js/commit/8bd19fafb36da6d97000da20417e98f23d92a424))
+* Pre-aggregation table is not found after it was successfully created for `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` strategy ([#5858](https://github.com/cube-js/cube.js/issues/5858)) ([f602fee](https://github.com/cube-js/cube.js/commit/f602feea9c2a25a0de8604e1297484f71ac8437a))
+
+
+### Features
+
+* **@cubejs-client/core:** expose shortTitle in seriesNames ([#5836](https://github.com/cube-js/cube.js/issues/5836)) Thanks [@euljr](https://github.com/euljr) ! ([1058d5a](https://github.com/cube-js/cube.js/commit/1058d5afd2784302b23215d73c679d35ceb785a8))
+
+
+
+
+
+## [0.31.29](https://github.com/cube-js/cube.js/compare/v0.31.28...v0.31.29) (2022-12-18)
+
+
+### Bug Fixes
+
+* Error: WebSocket is not open: readyState 2 (CLOSING) ([#5846](https://github.com/cube-js/cube.js/issues/5846)) ([a5be099](https://github.com/cube-js/cube.js/commit/a5be099f1d339ceb17c89439d6195c5718c726bb))
+
+
+
+
+
+## [0.31.28](https://github.com/cube-js/cube.js/compare/v0.31.27...v0.31.28) (2022-12-16)
+
+
+### Features
+
+* Support `string`, `time` and `boolean` measures ([#5842](https://github.com/cube-js/cube.js/issues/5842)) ([4543ede](https://github.com/cube-js/cube.js/commit/4543edefe5b2432c90bb8530bc6a3c24c5548de3))
+
+
+
+
+
+## [0.31.27](https://github.com/cube-js/cube.js/compare/v0.31.26...v0.31.27) (2022-12-16)
+
+
+### Bug Fixes
+
+* **api-gateway:** pre-aggregations/jobs auth middleware ([#5840](https://github.com/cube-js/cube.js/issues/5840)) ([b527cd9](https://github.com/cube-js/cube.js/commit/b527cd9fab348b404b6ed83fbbdb963c23928b07))
+
+
+
+
+
+## [0.31.26](https://github.com/cube-js/cube.js/compare/v0.31.25...v0.31.26) (2022-12-13)
+
+
+### Bug Fixes
+
+* **cubestore:** Temporary disable compression to check if it fixes running on Mac OS X Ventura ([8e89427](https://github.com/cube-js/cube.js/commit/8e8942776f28a4a35a5dc3ad22360691da43682f)), closes [#5712](https://github.com/cube-js/cube.js/issues/5712)
+* **trino-driver:** Timezone issue fix ([#5731](https://github.com/cube-js/cube.js/issues/5731)) Thanks [@yuraborue](https://github.com/yuraborue) ! ([70df903](https://github.com/cube-js/cube.js/commit/70df9034f4246be06956cbf1dc69de709d4d3df8))
+
+
+### Features
+
+* **cubestore:** Introduce pre-aggregation table touch and allow to drop tables without touch using `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` env ([#5794](https://github.com/cube-js/cube.js/issues/5794)) ([ad6c1e8](https://github.com/cube-js/cube.js/commit/ad6c1e8d09c228c28bb957755339a1146f54d6c9))
+* persistent queue ([#5793](https://github.com/cube-js/cube.js/issues/5793)) ([02a8e02](https://github.com/cube-js/cube.js/commit/02a8e027c1f414c50cb49f257ce68c01425400ec))
+
+
+
+
+
+## [0.31.25](https://github.com/cube-js/cube.js/compare/v0.31.24...v0.31.25) (2022-12-10)
+
+
+### Bug Fixes
+
+* **cubesql:** normalize column names in filter node ([#5788](https://github.com/cube-js/cube.js/issues/5788)) ([28aa008](https://github.com/cube-js/cube.js/commit/28aa008d8060173b2af2052577afdc26cc32c36d))
+
+
+
+
+
+## [0.31.24](https://github.com/cube-js/cube.js/compare/v0.31.23...v0.31.24) (2022-12-09)
+
+
+### Bug Fixes
+
+* **cubesql:** Support `CAST` in `HAVING` clause ([17ba3e2](https://github.com/cube-js/cube.js/commit/17ba3e212fb801fbffec99ef043b443f6f2a698f))
+
+
+### Features
+
+* **api-gateway, server-core:** Added dataSources list to extended meta ([#5743](https://github.com/cube-js/cube.js/issues/5743)) ([2c5db32](https://github.com/cube-js/cube.js/commit/2c5db32f2ded074ebe5e83668eee8c024101240b))
+
+
+### Reverts
+
+* Revert "feat(api-gateway, server-core): Added dataSources list to extended meta (#5743)" (#5785) ([3c61467](https://github.com/cube-js/cube.js/commit/3c614674fed6ca17df08bbba8c835ef110167570)), closes [#5743](https://github.com/cube-js/cube.js/issues/5743) [#5785](https://github.com/cube-js/cube.js/issues/5785)
+* Revert "chore(cubejs-api-gateway): added endpoint to run sql query directly (#5723)" (#5784) ([f1140de](https://github.com/cube-js/cube.js/commit/f1140de508e359970ac82b50bae1c4bf152f6041)), closes [#5723](https://github.com/cube-js/cube.js/issues/5723) [#5784](https://github.com/cube-js/cube.js/issues/5784)
+
+
+
+
+
 ## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
 
 

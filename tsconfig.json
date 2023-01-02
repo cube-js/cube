@@ -23,6 +23,12 @@
       "path": "packages/cubejs-base-driver"
     },
     {
+      "path": "rust/cubestore"
+    },
+    {
+      "path": "packages/cubejs-cubestore-driver"
+    },
+    {
       "path": "packages/cubejs-query-orchestrator"
     },
     {
@@ -87,12 +93,6 @@
     },
     {
       "path": "packages/cubejs-trino-driver"
-    },
-    {
-      "path": "rust/cubestore"
-    },
-    {
-      "path": "packages/cubejs-cubestore-driver"
     },
     {
       "path": "packages/cubejs-server-core"

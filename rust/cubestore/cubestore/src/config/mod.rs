@@ -25,8 +25,10 @@ use crate::scheduler::SchedulerImpl;
 use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
+use crate::streaming::kafka::{KafkaClientService, KafkaClientServiceImpl};
 use crate::streaming::{KsqlClient, KsqlClientImpl, StreamingService, StreamingServiceImpl};
 use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
+use crate::telemetry::tracing::{TracingHelper, TracingHelperImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
@@ -384,6 +386,8 @@ pub trait ConfigObj: DIService {
 
     fn stream_replay_check_interval_secs(&self) -> u64;
 
+    fn skip_kafka_parsing_errors(&self) -> bool;
+
     fn dump_dir(&self) -> &Option<PathBuf>;
 }
 
@@ -436,6 +440,7 @@ pub struct ConfigObjImpl {
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
+    pub skip_kafka_parsing_errors: bool,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -612,6 +617,9 @@ impl ConfigObj for ConfigObjImpl {
     fn stream_replay_check_interval_secs(&self) -> u64 {
         self.stream_replay_check_interval_secs
     }
+    fn skip_kafka_parsing_errors(&self) -> bool {
+        self.skip_kafka_parsing_errors
+    }
 
     fn dump_dir(&self) -> &Option<PathBuf> {
         &self.dump_dir
@@ -621,6 +629,20 @@ impl ConfigObj for ConfigObjImpl {
 lazy_static! {
     pub static ref TEST_LOGGING_INITIALIZED: tokio::sync::RwLock<bool> =
         tokio::sync::RwLock::new(false);
+}
+
+pub async fn init_test_logger() {
+    if !*TEST_LOGGING_INITIALIZED.read().await {
+        let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
+        if !*initialized {
+            SimpleLogger::new()
+                .with_level(Level::Error.to_level_filter())
+                .with_module_level("cubestore", Level::Trace.to_level_filter())
+                .init()
+                .unwrap();
+        }
+        *initialized = true;
+    }
 }
 
 fn env_bool(name: &str, default: bool) -> bool {
@@ -795,6 +817,7 @@ impl Config {
                     "CUBESTORE_STREAM_REPLAY_CHECK_INTERVAL",
                     0,
                 ),
+                skip_kafka_parsing_errors: env_parse("CUBESTORE_SKIP_KAFKA_PARSING_ERRORS", false),
             }),
         }
     }
@@ -858,6 +881,7 @@ impl Config {
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
                 stream_replay_check_interval_secs: 60,
+                skip_kafka_parsing_errors: false,
             }),
         }
     }
@@ -932,17 +956,7 @@ impl Config {
         I: FnOnce(Arc<Injector>) -> T1,
         F: FnOnce(CubeServices) -> T2,
     {
-        if !*TEST_LOGGING_INITIALIZED.read().await {
-            let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
-            if !*initialized {
-                SimpleLogger::new()
-                    .with_level(Level::Error.to_level_filter())
-                    .with_module_level("cubestore", Level::Trace.to_level_filter())
-                    .init()
-                    .unwrap();
-            }
-            *initialized = true;
-        }
+        init_test_logger().await;
 
         let store_path = self.local_dir().clone();
         let remote_fs = self.remote_fs().await.unwrap();
@@ -1289,6 +1303,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
             .await;
@@ -1298,14 +1313,30 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn KafkaClientService, _, _, _>(async move |i| {
+                KafkaClientServiceImpl::new(i.get_service_typed().await)
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
-                QueryPlannerImpl::new(i.get_service_typed().await, i.get_service_typed().await)
+                QueryPlannerImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
             })
             .await;
 
         self.injector
             .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
                 QueryExecutorImpl::new(i.get_service_typed().await)
+            })
+            .await;
+
+        self.injector
+            .register_typed_with_default::<dyn TracingHelper, _, _, _>(async move |_| {
+                TracingHelperImpl::new()
             })
             .await;
 
@@ -1326,6 +1357,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     cluster_meta_store_sender,
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                 )
             })

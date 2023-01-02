@@ -88,7 +88,7 @@ writes to the export bucket in S3.
 
 </InfoBox>
 
-```dotenv
+```bash
 CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
 CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
 CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
@@ -111,7 +111,7 @@ Snowflake][snowflake-docs-gcs-integration]. Take note of the integration name
 
 Once the Snowflake integration is set up, configure Cube using the following:
 
-```dotenv
+```bash
 CUBEJS_DB_EXPORT_BUCKET=snowflake-export-bucket
 CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>
@@ -127,7 +127,6 @@ connections are made over HTTPS.
 [google-cloud-storage]: https://cloud.google.com/storage
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
-[ref-env-var]: /reference/environment-variables#database-connection
 [ref-schema-ref-types-formats-countdistinctapprox]:
   /schema/reference/types-and-formats#count-distinct-approx
 [self-preaggs-batching]: #batching

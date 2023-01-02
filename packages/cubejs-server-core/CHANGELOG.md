@@ -3,6 +3,89 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.32](https://github.com/cube-js/cube.js/compare/v0.31.31...v0.31.32) (2022-12-28)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.31.31](https://github.com/cube-js/cube.js/compare/v0.31.30...v0.31.31) (2022-12-23)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.31.30](https://github.com/cube-js/cube.js/compare/v0.31.29...v0.31.30) (2022-12-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.31.29](https://github.com/cube-js/cube.js/compare/v0.31.28...v0.31.29) (2022-12-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.31.28](https://github.com/cube-js/cube.js/compare/v0.31.27...v0.31.28) (2022-12-16)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.31.27](https://github.com/cube-js/cube.js/compare/v0.31.26...v0.31.27) (2022-12-16)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.31.26](https://github.com/cube-js/cube.js/compare/v0.31.25...v0.31.26) (2022-12-13)
+
+
+### Features
+
+* **cubestore:** Introduce pre-aggregation table touch and allow to drop tables without touch using `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` env ([#5794](https://github.com/cube-js/cube.js/issues/5794)) ([ad6c1e8](https://github.com/cube-js/cube.js/commit/ad6c1e8d09c228c28bb957755339a1146f54d6c9))
+
+
+
+
+
+## [0.31.25](https://github.com/cube-js/cube.js/compare/v0.31.24...v0.31.25) (2022-12-10)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.31.24](https://github.com/cube-js/cube.js/compare/v0.31.23...v0.31.24) (2022-12-09)
+
+
+### Features
+
+* **api-gateway, server-core:** Added dataSources list to extended meta ([#5743](https://github.com/cube-js/cube.js/issues/5743)) ([2c5db32](https://github.com/cube-js/cube.js/commit/2c5db32f2ded074ebe5e83668eee8c024101240b))
+
+
+### Reverts
+
+* Revert "feat(api-gateway, server-core): Added dataSources list to extended meta (#5743)" (#5785) ([3c61467](https://github.com/cube-js/cube.js/commit/3c614674fed6ca17df08bbba8c835ef110167570)), closes [#5743](https://github.com/cube-js/cube.js/issues/5743) [#5785](https://github.com/cube-js/cube.js/issues/5785)
+
+
+
+
+
 ## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
 
 

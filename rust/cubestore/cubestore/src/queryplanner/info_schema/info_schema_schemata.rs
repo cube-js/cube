@@ -1,5 +1,5 @@
-use crate::metastore::{IdRow, MetaStore, MetaStoreTable, Schema};
-use crate::queryplanner::InfoSchemaTableDef;
+use crate::metastore::{IdRow, MetaStoreTable, Schema};
+use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use arrow::array::{ArrayRef, StringArray};
 use arrow::datatypes::{DataType, Field};
@@ -12,8 +12,8 @@ pub struct SchemataInfoSchemaTableDef;
 impl InfoSchemaTableDef for SchemataInfoSchemaTableDef {
     type T = IdRow<Schema>;
 
-    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(meta_store.schemas_table().all_rows().await?))
+    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        Ok(Arc::new(ctx.meta_store.schemas_table().all_rows().await?))
     }
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {

@@ -35,7 +35,7 @@ use tracing_futures::WithSubscriber;
 use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
-use crate::cachestore::CacheStore;
+use crate::cachestore::{CacheItem, CacheStore};
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -56,7 +56,7 @@ use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
+use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, RocksStoreName, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
@@ -714,6 +714,32 @@ impl SqlServiceImpl {
     }
 }
 
+pub fn string_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<String> {
+    credentials
+        .iter()
+        .find(|o| o.name.value == prop_name)
+        .and_then(|x| {
+            if let Value::SingleQuotedString(v) = &x.value {
+                Some(v.to_string())
+            } else {
+                None
+            }
+        })
+}
+
+pub fn boolean_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<bool> {
+    credentials
+        .iter()
+        .find(|o| o.name.value == prop_name)
+        .and_then(|x| {
+            if let Value::Boolean(v) = &x.value {
+                Some(*v)
+            } else {
+                None
+            }
+        })
+}
+
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
 
@@ -791,6 +817,20 @@ impl SqlService for SqlServiceImpl {
                 }
             }
             CubeStoreStatement::System(command) => match command {
+                SystemCommand::Compaction { store } => {
+                    match store {
+                        None => {
+                            self.db.compaction().await?;
+                            self.cachestore.compaction().await?;
+                        }
+                        Some(store_name) => match store_name {
+                            RocksStoreName::Meta => self.db.compaction().await?,
+                            RocksStoreName::Cache => self.cachestore.compaction().await?,
+                        },
+                    }
+
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
                 SystemCommand::KillAllJobs => {
                     self.db.delete_all_jobs().await?;
                     Ok(Arc::new(DataFrame::new(vec![], vec![])))
@@ -1001,44 +1041,29 @@ impl SqlService for SqlServiceImpl {
                 if or_update {
                     let creds = match source_type.as_str() {
                         "ksql" => {
-                            let user = credentials
-                                .iter()
-                                .find(|o| o.name.value == "user")
-                                .and_then(|x| {
-                                    if let Value::SingleQuotedString(v) = &x.value {
-                                        Some(v.to_string())
-                                    } else {
-                                        None
-                                    }
-                                });
-                            let password = credentials
-                                .iter()
-                                .find(|o| o.name.value == "password")
-                                .and_then(|x| {
-                                    if let Value::SingleQuotedString(v) = &x.value {
-                                        Some(v.to_string())
-                                    } else {
-                                        None
-                                    }
-                                });
-                            let url =
-                                credentials
-                                    .iter()
-                                    .find(|o| o.name.value == "url")
-                                    .and_then(|x| {
-                                        if let Value::SingleQuotedString(v) = &x.value {
-                                            Some(v.to_string())
-                                        } else {
-                                            None
-                                        }
-                                    });
+                            let user = string_prop(&credentials, "user");
+                            let password = string_prop(&credentials, "password");
+                            let url = string_prop(&credentials, "url");
                             Ok(SourceCredentials::KSql {
                                 user,
                                 password,
                                 url: url.ok_or(CubeError::user(
-                                    "url is required as credential for select_statement source"
-                                        .to_string(),
+                                    "url is required as credential for ksql source".to_string(),
                                 ))?,
+                            })
+                        }
+                        "kafka" => {
+                            let user = string_prop(&credentials, "user");
+                            let password = string_prop(&credentials, "password");
+                            let host = string_prop(&credentials, "host");
+                            let use_ssl = boolean_prop(&credentials, "use_ssl");
+                            Ok(SourceCredentials::Kafka {
+                                user,
+                                password,
+                                host: host.ok_or(CubeError::user(
+                                    "host is required as credential for kafka source".to_string(),
+                                ))?,
+                                use_ssl: use_ssl.unwrap_or(false),
                             })
                         }
                         x => Err(CubeError::user(format!("Not supported stream type: {}", x))),
@@ -1199,6 +1224,59 @@ impl SqlService for SqlServiceImpl {
 
             CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
 
+            CubeStoreStatement::CacheSet {
+                key,
+                value,
+                ttl,
+                nx,
+            } => {
+                let key = key.value;
+
+                let success = self
+                    .cachestore
+                    .cache_set(CacheItem::new(key, ttl, value), nx)
+                    .await?;
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
+                    vec![Row::new(vec![TableValue::Boolean(success)])],
+                )))
+            }
+            CubeStoreStatement::CacheGet { key } => {
+                let row = self.cachestore.cache_get(key.value).await?;
+                if let Some(r) = row {
+                    Ok(Arc::new(DataFrame::new(
+                        vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                        vec![Row::new(vec![TableValue::String(
+                            r.get_row().get_value().clone(),
+                        )])],
+                    )))
+                } else {
+                    Ok(Arc::new(DataFrame::new(
+                        vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                        vec![Row::new(vec![TableValue::Null])],
+                    )))
+                }
+            }
+            CubeStoreStatement::CacheKeys { prefix } => {
+                let rows = self.cachestore.cache_keys(prefix.value).await?;
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("key".to_string(), ColumnType::String, 0)],
+                    rows.iter()
+                        .map(|i| Row::new(vec![TableValue::String(i.get_row().get_path())]))
+                        .collect(),
+                )))
+            }
+            CubeStoreStatement::CacheRemove { key } => {
+                self.cachestore.cache_delete(key.value).await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::CacheTruncate {} => {
+                self.cachestore.cache_truncate().await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
             CubeStoreStatement::CacheIncr { path } => {
                 let row = self.cachestore.cache_incr(path.value).await?;
 
@@ -1261,7 +1339,7 @@ impl SqlService for SqlServiceImpl {
                         let chunk_ids_to_batches = worker_plan
                             .in_memory_chunks_to_load()
                             .into_iter()
-                            .map(|c| (c.get_id(), Vec::new()))
+                            .map(|(c, _, _)| (c.get_id(), Vec::new()))
                             .collect();
                         return Ok(QueryPlans {
                             router: self

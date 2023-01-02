@@ -12,6 +12,7 @@ import {
   BaseDriver, DriverCapabilities,
   DriverInterface,
 } from '@cubejs-backend/base-driver';
+import { Kafka } from 'kafkajs';
 import sqlstring, { format as formatSql } from 'sqlstring';
 import axios, { AxiosResponse } from 'axios';
 import { Mutex } from 'async-mutex';
@@ -21,6 +22,10 @@ type KsqlDriverOptions = {
   url: string,
   username: string,
   password: string,
+  kafkaHost?: string,
+  kafkaUser?: string,
+  kafkaPassword?: string,
+  kafkaUseSsl?: boolean,
   streamingSourceName?: string,
 };
 
@@ -55,6 +60,7 @@ type KsqlDescribeResponse = {
     type: 'STREAM' | 'TABLE';
     windowType: 'SESSION' | 'HOPPING' | 'TUMBLING',
     partitions: number;
+    topic: string;
   }
 };
 
@@ -72,6 +78,8 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   protected readonly config: KsqlDriverOptions;
 
   protected readonly dropTableMutex: Mutex = new Mutex();
+
+  private readonly kafkaClient?: Kafka;
 
   /**
    * Class constructor.
@@ -92,8 +100,27 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
       url: getEnv('dbUrl', { dataSource }),
       username: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
+      kafkaHost: getEnv('dbKafkaHost', { dataSource }),
+      kafkaUser: getEnv('dbKafkaUser', { dataSource }),
+      kafkaPassword: getEnv('dbKafkaPass', { dataSource }),
+      kafkaUseSsl: getEnv('dbKafkaUseSsl', { dataSource }),
       ...config,
     };
+
+    if (this.config.kafkaHost) {
+      this.kafkaClient = new Kafka({
+        clientId: 'Cube',
+        brokers: [this.config.kafkaHost],
+        // authenticationTimeout: 10000,
+        // reauthenticationThreshold: 10000,
+        ssl: this.config.kafkaUseSsl,
+        sasl: this.config.kafkaUser ? {
+          mechanism: 'plain',
+          username: this.config.kafkaUser,
+          password: this.config.kafkaPassword || ''
+        } : undefined,
+      });
+    }
   }
 
   private async apiQuery(path: string, body: any): Promise<AxiosResponse> {
@@ -137,6 +164,10 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public async testConnection() {
     await this.query('SHOW VARIABLES');
+    if (this.kafkaClient) {
+      await this.kafkaClient.admin().connect();
+      await this.kafkaClient.admin().disconnect();
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -238,21 +269,33 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   private async getStreamingTableData(streamingTable: string, options: { selectStatement?: string, streamOffset?: string } = {}) {
     const { selectStatement, streamOffset } = options;
     const describe = await this.describeTable(streamingTable);
+    const name = this.config.streamingSourceName || 'default';
+    const kafkaDirectDownload = !!this.config.kafkaHost;
+    const streamingSource = kafkaDirectDownload ? {
+      name: `${name}-kafka`,
+      type: 'kafka',
+      credentials: {
+        user: this.config.kafkaUser,
+        password: this.config.kafkaPassword,
+        host: this.config.kafkaHost,
+        use_ssl: this.config.kafkaUseSsl,
+      }
+    } : {
+      name,
+      type: 'ksql',
+      credentials: {
+        user: this.config.username,
+        password: this.config.password,
+        url: this.config.url
+      }
+    };
     return {
       types: await this.tableColumnTypes(streamingTable, describe),
       partitions: describe.sourceDescription?.partitions,
-      streamingTable,
+      streamingTable: kafkaDirectDownload ? describe.sourceDescription?.topic : streamingTable,
       streamOffset,
       selectStatement,
-      streamingSource: {
-        name: this.config.streamingSourceName || 'default',
-        type: 'ksql',
-        credentials: {
-          user: this.config.username,
-          password: this.config.password,
-          url: this.config.url
-        }
-      }
+      streamingSource
     };
   }
 

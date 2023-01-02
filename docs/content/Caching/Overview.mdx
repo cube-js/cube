@@ -55,7 +55,7 @@ more about read-only support and pre-aggregation build strategies.
 Pre-aggregations are defined in the data schema. You can learn more about
 defining pre-aggregations in [schema reference][ref-schema-ref-preaggs].
 
-```js
+```javascript
 cube(`Orders`, {
   measures: {
     totalAmount: {
@@ -108,7 +108,7 @@ To aid with this, Cube defines a `refreshKey` for each cube. [Refresh
 keys][ref-schema-ref-cube-refresh-key] are evaluated by Cube to assess if the
 data needs to be refreshed.
 
-```js
+```javascript
 cube(`Orders`, {
   // This refreshKey tells Cube to refresh data every 5 minutes
   refreshKey: {

@@ -1,6 +1,5 @@
 use crate::metastore::table::TablePath;
-use crate::metastore::MetaStore;
-use crate::queryplanner::InfoSchemaTableDef;
+use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use arrow::array::{ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array};
 use arrow::datatypes::{DataType, Field, TimeUnit};
@@ -13,8 +12,8 @@ pub struct SystemTablesTableDef;
 impl InfoSchemaTableDef for SystemTablesTableDef {
     type T = TablePath;
 
-    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        meta_store.get_tables_with_path(true).await
+    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        ctx.meta_store.get_tables_with_path(true).await
     }
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {

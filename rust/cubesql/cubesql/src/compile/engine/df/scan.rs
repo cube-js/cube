@@ -46,6 +46,7 @@ pub enum MemberField {
 #[derive(Debug, Clone)]
 pub struct CubeScanOptions {
     pub change_user: Option<String>,
+    pub max_records: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -444,6 +445,12 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             let mut response = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
 
             if let Some(data) = response.results.pop() {
+                if let Some(max_records) = self.options.max_records {
+                    if data.data.len() >= max_records {
+                        return Err(DataFusionError::Execution(format!("One of the Cube queries exceeded the maximum row limit ({}). JOIN/UNION is not possible as it will produce incorrect results. Try filtering the results more precisely or moving post-processing functions to an outer query.", max_records)));
+                    }
+                }
+
                 data
             } else {
                 return Err(DataFusionError::Execution(format!(
@@ -653,7 +660,10 @@ mod tests {
                 access_token: "access_token".to_string(),
                 base_path: "base_path".to_string(),
             }),
-            options: CubeScanOptions { change_user: None },
+            options: CubeScanOptions {
+                change_user: None,
+                max_records: None,
+            },
             transport: get_test_transport(),
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),
         };

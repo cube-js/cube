@@ -562,6 +562,9 @@ macro_rules! variant_field_struct {
                     } else if let Some(value) = typed_str.strip_prefix("i:") {
                         let n: i64 = value.parse().map_err(|err| CubeError::internal(format!("Can't parse i64 scalar value from '{}' with error: {}", typed_str, err)))?;
                         Ok([<$variant $var_field:camel>](ScalarValue::Int64(Some(n))))
+                    } else if let Some(value) = typed_str.strip_prefix("f:") {
+                        let n: f64 = value.parse().map_err(|err| CubeError::internal(format!("Can't parse f64 scalar value from '{}' with error: {}", typed_str, err)))?;
+                        Ok([<$variant $var_field:camel>](ScalarValue::Float64(Some(n))))
                     } else {
                         Err(CubeError::internal(format!("Can't convert {}. Should contains type type, actual: {}", s, typed_str)))
                     }

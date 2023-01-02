@@ -3,6 +3,74 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.32](https://github.com/cube-js/cube.js/compare/v0.31.31...v0.31.32) (2022-12-28)
+
+
+### Features
+
+* **cubesql:** Allow postprocessing with JOIN below Cube query limit ([56f5399](https://github.com/cube-js/cube.js/commit/56f5399fb37dbb7b388951b1db0be21dda2a94d4))
+* **cubesql:** Support `LEFT`, `RIGHT` in projection ([282ad3a](https://github.com/cube-js/cube.js/commit/282ad3ab3106d81a1361f94a499cfc7dc716f3e6))
+
+
+
+
+
+## [0.31.31](https://github.com/cube-js/cube.js/compare/v0.31.30...v0.31.31) (2022-12-23)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve Thoughtspot `WHERE IN` support ([6212efe](https://github.com/cube-js/cube.js/commit/6212efe428e504cd8c06797dfaa2b81783b80777))
+* **cubesql:** Support Thoughtspot DATEADD queries ([58b5669](https://github.com/cube-js/cube.js/commit/58b566903685ac3d14e78d61dc38c38c43aa5c3c))
+
+
+
+
+
+## [0.31.30](https://github.com/cube-js/cube.js/compare/v0.31.29...v0.31.30) (2022-12-22)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve Thoughtspot compatibility ([4d6511a](https://github.com/cube-js/cube.js/commit/4d6511a3d18ea877f06775c1aae154b5665feda0))
+
+
+
+
+
+## [0.31.28](https://github.com/cube-js/cube.js/compare/v0.31.27...v0.31.28) (2022-12-16)
+
+
+### Features
+
+* Support `string`, `time` and `boolean` measures ([#5842](https://github.com/cube-js/cube.js/issues/5842)) ([4543ede](https://github.com/cube-js/cube.js/commit/4543edefe5b2432c90bb8530bc6a3c24c5548de3))
+
+
+
+
+
+## [0.31.25](https://github.com/cube-js/cube.js/compare/v0.31.24...v0.31.25) (2022-12-10)
+
+
+### Bug Fixes
+
+* **cubesql:** normalize column names in filter node ([#5788](https://github.com/cube-js/cube.js/issues/5788)) ([28aa008](https://github.com/cube-js/cube.js/commit/28aa008d8060173b2af2052577afdc26cc32c36d))
+
+
+
+
+
+## [0.31.24](https://github.com/cube-js/cube.js/compare/v0.31.23...v0.31.24) (2022-12-09)
+
+
+### Bug Fixes
+
+* **cubesql:** Support `CAST` in `HAVING` clause ([17ba3e2](https://github.com/cube-js/cube.js/commit/17ba3e212fb801fbffec99ef043b443f6f2a698f))
+
+
+
+
+
 ## [0.31.23](https://github.com/cube-js/cube.js/compare/v0.31.22...v0.31.23) (2022-12-09)
 
 

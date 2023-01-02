@@ -45,5 +45,6 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
     'CUBEJS_DB_EXPORT_BUCKET_AWS_REGION',
   ],
   prestodb: [],
+  trino: [],
   mssql: [],
 };

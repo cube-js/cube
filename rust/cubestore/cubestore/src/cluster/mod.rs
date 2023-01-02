@@ -31,6 +31,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
+use crate::telemetry::tracing::TracingHelper;
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::CubeError;
 use arrow::datatypes::SchemaRef;
@@ -192,6 +193,7 @@ pub struct ClusterImpl {
     stop_token: CancellationToken,
     close_worker_socket_tx: watch::Sender<bool>,
     close_worker_socket_rx: RwLock<watch::Receiver<bool>>,
+    tracing_helper: Arc<dyn TracingHelper>,
 }
 
 crate::di_service!(ClusterImpl, [Cluster]);
@@ -202,6 +204,7 @@ pub enum WorkerMessage {
         SerializedPlan,
         HashMap<String, String>,
         HashMap<u64, Vec<SerializedRecordBatchStream>>,
+        Option<(u64, u64)>,
     ),
 }
 #[cfg(not(target_os = "windows"))]
@@ -217,34 +220,57 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
         args: WorkerMessage,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         match args {
-            WorkerMessage::Select(plan_node, remote_to_local_names, chunk_id_to_record_batches) => {
-                let time = SystemTime::now();
-                debug!("Running select in worker started");
-                let plan_node_to_send = plan_node.clone();
-                let result = chunk_id_to_record_batches
-                    .into_iter()
-                    .map(|(id, batches)| -> Result<_, CubeError> {
-                        Ok((
-                            id,
-                            batches
+            WorkerMessage::Select(
+                plan_node,
+                remote_to_local_names,
+                chunk_id_to_record_batches,
+                trace_id_and_span_id,
+            ) => {
+                let future = async move {
+                    let time = SystemTime::now();
+                    debug!("Running select in worker started");
+                    let plan_node_to_send = plan_node.clone();
+                    let result = tracing::trace_span!("Deserialize in_memory chunks").in_scope(
+                        move || {
+                            chunk_id_to_record_batches
                                 .into_iter()
-                                .map(|b| b.read())
-                                .collect::<Result<Vec<_>, _>>()?,
-                        ))
-                    })
-                    .collect::<Result<HashMap<_, _>, _>>()?;
-                let res = services
-                    .query_executor
-                    .clone()
-                    .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
-                    .await;
-                debug!(
-                    "Running select in worker completed ({:?})",
-                    time.elapsed().unwrap()
-                );
-                let (schema, records) = res?;
-                let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
-                Ok((schema, records))
+                                .map(|(id, batches)| -> Result<_, CubeError> {
+                                    Ok((
+                                        id,
+                                        batches
+                                            .into_iter()
+                                            .map(|b| b.read())
+                                            .collect::<Result<Vec<_>, _>>()?,
+                                    ))
+                                })
+                                .collect::<Result<HashMap<_, _>, _>>()
+                        },
+                    )?;
+                    let res = services
+                        .query_executor
+                        .clone()
+                        .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
+                        .await;
+                    debug!(
+                        "Running select in worker completed ({:?})",
+                        time.elapsed().unwrap()
+                    );
+                    let (schema, records) = res?;
+                    let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
+                    Ok((schema, records))
+                };
+                let span = trace_id_and_span_id.map(|(t, s)| {
+                    tracing::info_span!(
+                        "Process on selec worker",
+                        cube_dd_trace_id = t,
+                        cube_dd_parent_span_id = s
+                    )
+                });
+                if let Some(span) = span {
+                    future.instrument(span).await
+                } else {
+                    future.await
+                }
             }
         }
     }
@@ -957,6 +983,7 @@ impl ClusterImpl {
         query_executor: Arc<dyn QueryExecutor>,
         meta_store_sender: Sender<MetaStoreEvent>,
         cluster_transport: Arc<dyn ClusterTransport>,
+        tracing_helper: Arc<dyn TracingHelper>,
     ) -> Arc<ClusterImpl> {
         let (close_worker_socket_tx, close_worker_socket_rx) = watch::channel(false);
         Arc::new_cyclic(|this| ClusterImpl {
@@ -978,6 +1005,7 @@ impl ClusterImpl {
             stop_token: CancellationToken::new(),
             close_worker_socket_tx,
             close_worker_socket_rx: RwLock::new(close_worker_socket_rx),
+            tracing_helper,
         })
     }
 
@@ -1262,13 +1290,21 @@ impl ClusterImpl {
         let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
         let in_memory_chunks_futures = in_memory_chunks_to_load
             .iter()
-            .map(|c| chunk_store.get_chunk_columns(c.clone()))
+            .map(|(c, p, i)| {
+                chunk_store
+                    .get_chunk_columns_with_preloaded_meta(c.clone(), p.clone(), i.clone())
+                    .instrument(tracing::span!(
+                        tracing::Level::TRACE,
+                        "get in memory chunk columns",
+                        row_count = c.get_row().get_row_count()
+                    ))
+            })
             .collect::<Vec<_>>();
 
         let chunk_id_to_record_batches = in_memory_chunks_to_load
             .clone()
             .into_iter()
-            .map(|c| c.get_id())
+            .map(|(c, _, _)| c.get_id())
             .zip(
                 join_all(in_memory_chunks_futures)
                     .await
@@ -1301,6 +1337,7 @@ impl ClusterImpl {
                         plan_node.clone(),
                         remote_to_local_names.clone(),
                         chunk_id_to_record_batches,
+                        self.tracing_helper.trace_and_span_id(),
                     ))
                     .instrument(tracing::span!(
                         tracing::Level::TRACE,
@@ -1338,7 +1375,7 @@ impl ClusterImpl {
         let chunk_id_to_record_batches = in_memory_chunks_to_load
             .clone()
             .into_iter()
-            .map(|c| (c.get_id(), Vec::new()))
+            .map(|(c, _, _)| (c.get_id(), Vec::new()))
             .collect();
 
         let res = self

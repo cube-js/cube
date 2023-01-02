@@ -1,5 +1,7 @@
 import moment from 'moment-timezone';
-import { BaseFilter, BaseQuery, BaseMeasure } from '@cubejs-backend/schema-compiler';
+import { BaseQuery } from './BaseQuery';
+import { BaseFilter } from './BaseFilter';
+import { BaseMeasure } from './BaseMeasure';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',

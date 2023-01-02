@@ -826,8 +826,12 @@ fn literal_string(literal_str: impl Display) -> String {
     format!("(LiteralExpr LiteralExprValue:s:{})", literal_str)
 }
 
-fn literal_number(literal_number: i64) -> String {
+fn literal_int(literal_number: i64) -> String {
     format!("(LiteralExpr LiteralExprValue:i:{})", literal_number)
+}
+
+fn literal_float(literal_float: f64) -> String {
+    format!("(LiteralExpr LiteralExprValue:f:{})", literal_float)
 }
 
 fn literal_bool(literal_bool: bool) -> String {

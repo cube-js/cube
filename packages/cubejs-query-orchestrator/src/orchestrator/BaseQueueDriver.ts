@@ -1,9 +1,12 @@
-import crypto from 'crypto';
+import { QueueDriverConnectionInterface, QueueDriverInterface } from '@cubejs-backend/base-driver';
+import { getCacheHash } from './utils';
 
-export abstract class BaseQueueDriver {
+export abstract class BaseQueueDriver implements QueueDriverInterface {
   public redisHash(queryKey) {
-    return typeof queryKey === 'string' && queryKey.length < 256 ?
-      queryKey :
-      crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
+    return getCacheHash(queryKey);
   }
+
+  abstract createConnection(): Promise<QueueDriverConnectionInterface>;
+
+  abstract release(connection: QueueDriverConnectionInterface): Promise<void>;
 }

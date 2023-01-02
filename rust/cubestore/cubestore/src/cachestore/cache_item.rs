@@ -121,6 +121,14 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
         }
     }
 
+    fn is_ttl(&self) -> bool {
+        true
+    }
+
+    fn get_expire<'a>(&self, row: &'a CacheItem) -> &'a Option<DateTime<Utc>> {
+        row.get_expire()
+    }
+
     fn version(&self) -> u32 {
         match self {
             CacheItemRocksIndex::ByPath => 1,

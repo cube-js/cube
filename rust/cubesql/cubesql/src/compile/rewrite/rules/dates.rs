@@ -1,18 +1,20 @@
+use super::utils::parse_granularity;
 use crate::{
     compile::{
         engine::provider::CubeContext,
         rewrite::{
-            agg_fun_expr, analysis::LogicalPlanAnalysis, binary_expr, cast_expr, column_expr,
-            fun_expr, literal_expr, literal_number, literal_string, negative_expr, rewrite,
-            rewriter::RewriteRules, to_day_interval_expr, transforming_rewrite, udf_expr,
-            CastExprDataType, LiteralExprValue, LogicalPlanLanguage,
+            agg_fun_expr, analysis::LogicalPlanAnalysis, binary_expr, cast_expr,
+            cast_expr_explicit, column_expr, fun_expr, literal_expr, literal_int, literal_string,
+            negative_expr, rewrite, rewriter::RewriteRules, to_day_interval_expr,
+            transforming_rewrite, udf_expr, CastExprDataType, LiteralExprValue,
+            LogicalPlanLanguage,
         },
     },
     var, var_iter,
 };
 use datafusion::{arrow::datatypes::DataType, scalar::ScalarValue};
 use egg::{EGraph, Rewrite, Subst};
-use std::sync::Arc;
+use std::{convert::TryFrom, sync::Arc};
 
 pub struct DateRules {
     _cube_context: Arc<CubeContext>,
@@ -30,7 +32,7 @@ impl RewriteRules for DateRules {
                             "makedate",
                             vec![
                                 udf_expr("year", vec![column_expr("?column")]),
-                                literal_number(1),
+                                literal_int(1),
                             ],
                         ),
                         "+",
@@ -69,7 +71,7 @@ impl RewriteRules for DateRules {
                                         )],
                                     ),
                                     "-",
-                                    literal_number(1),
+                                    literal_int(1),
                                 ),
                                 literal_string("day"),
                             ),
@@ -93,7 +95,7 @@ impl RewriteRules for DateRules {
                                 binary_expr(
                                     udf_expr("dayofmonth", vec![column_expr("?column")]),
                                     "-",
-                                    literal_number(1),
+                                    literal_int(1),
                                 ),
                                 literal_string("day"),
                             ),
@@ -117,7 +119,7 @@ impl RewriteRules for DateRules {
                                 binary_expr(
                                     udf_expr("dayofyear", vec![column_expr("?column")]),
                                     "-",
-                                    literal_number(1),
+                                    literal_int(1),
                                 ),
                                 literal_string("day"),
                             ),
@@ -157,7 +159,7 @@ impl RewriteRules for DateRules {
                                 binary_expr(
                                     udf_expr("hour", vec![column_expr("?column")]),
                                     "*",
-                                    literal_number(60),
+                                    literal_int(60),
                                 ),
                                 "+",
                                 udf_expr("minute", vec![column_expr("?column")]),
@@ -183,17 +185,17 @@ impl RewriteRules for DateRules {
                                     binary_expr(
                                         udf_expr("hour", vec![column_expr("?column")]),
                                         "*",
-                                        literal_number(60),
+                                        literal_int(60),
                                     ),
                                     "*",
-                                    literal_number(60),
+                                    literal_int(60),
                                 ),
                                 "+",
                                 binary_expr(
                                     binary_expr(
                                         udf_expr("minute", vec![column_expr("?column")]),
                                         "*",
-                                        literal_number(60),
+                                        literal_int(60),
                                     ),
                                     "+",
                                     udf_expr("second", vec![column_expr("?column")]),
@@ -329,9 +331,71 @@ impl RewriteRules for DateRules {
                 negative_expr(literal_expr("?interval")),
                 udf_expr(
                     "interval_mul",
-                    vec![literal_expr("?interval"), literal_number(-1)],
+                    vec![literal_expr("?interval"), literal_int(-1)],
                 ),
                 self.transform_interval_binary_expr("?interval"),
+            ),
+            rewrite(
+                "redshift-dateadd-to-interval-cast-unwrap",
+                udf_expr(
+                    "dateadd",
+                    vec![
+                        literal_expr("?datepart"),
+                        cast_expr_explicit(literal_expr("?interval_int"), DataType::Int32),
+                        "?expr".to_string(),
+                    ],
+                ),
+                udf_expr(
+                    "dateadd",
+                    vec![
+                        literal_expr("?datepart"),
+                        literal_expr("?interval_int"),
+                        "?expr".to_string(),
+                    ],
+                ),
+            ),
+            transforming_rewrite(
+                "redshift-dateadd-to-interval",
+                udf_expr(
+                    "dateadd",
+                    vec![
+                        literal_expr("?datepart"),
+                        literal_expr("?interval_int"),
+                        "?expr".to_string(),
+                    ],
+                ),
+                udf_expr(
+                    "date_add",
+                    vec!["?expr".to_string(), literal_expr("?interval")],
+                ),
+                self.transform_interval_parts_to_interval(
+                    "?datepart",
+                    "?interval_int",
+                    "?interval",
+                ),
+            ),
+            transforming_rewrite(
+                "redshift-dateadd-literal-date32-to-interval",
+                udf_expr(
+                    "dateadd",
+                    vec![
+                        literal_expr("?datepart"),
+                        literal_expr("?interval_int"),
+                        cast_expr_explicit(literal_expr("?date_string"), DataType::Date32),
+                    ],
+                ),
+                udf_expr(
+                    "date_add",
+                    vec![
+                        udf_expr("date_to_timestamp", vec![literal_expr("?date_string")]),
+                        literal_expr("?interval"),
+                    ],
+                ),
+                self.transform_interval_parts_to_interval(
+                    "?datepart",
+                    "?interval_int",
+                    "?interval",
+                ),
             ),
             rewrite(
                 "datastudio-dates",
@@ -383,6 +447,67 @@ impl DateRules {
                     | ScalarValue::IntervalDayTime(_)
                     | ScalarValue::IntervalMonthDayNano(_) => return true,
                     _ => (),
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_interval_parts_to_interval(
+        &self,
+        datepart_var: &'static str,
+        interval_int_var: &'static str,
+        interval_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let datepart_var = var!(datepart_var);
+        let interval_int_var = var!(interval_int_var);
+        let interval_var = var!(interval_var);
+        move |egraph, subst| {
+            for interval_int in var_iter!(egraph[subst[interval_int_var]], LiteralExprValue) {
+                let interval_int = match interval_int {
+                    ScalarValue::Int32(Some(interval_int)) => *interval_int,
+                    ScalarValue::Int64(Some(interval_int)) => match i32::try_from(*interval_int) {
+                        Ok(interval_int) => interval_int,
+                        _ => continue,
+                    },
+                    _ => continue,
+                };
+
+                for datepart in var_iter!(egraph[subst[datepart_var]], LiteralExprValue) {
+                    let interval = match parse_granularity(datepart, false).as_deref() {
+                        Some("millisecond") => {
+                            ScalarValue::IntervalDayTime(Some(i64::from(interval_int)))
+                        }
+                        Some("second") => {
+                            ScalarValue::IntervalDayTime(Some(1000 * i64::from(interval_int)))
+                        }
+                        Some("minute") => {
+                            ScalarValue::IntervalDayTime(Some(60_000 * i64::from(interval_int)))
+                        }
+                        Some("hour") => {
+                            ScalarValue::IntervalDayTime(Some(3_600_000 * i64::from(interval_int)))
+                        }
+                        Some("day") => ScalarValue::IntervalDayTime(Some(
+                            4_294_967_296 * i64::from(interval_int),
+                        )),
+                        Some("week") => ScalarValue::IntervalDayTime(Some(
+                            30_064_771_072 * i64::from(interval_int),
+                        )),
+                        Some("month") => ScalarValue::IntervalYearMonth(Some(interval_int)),
+                        Some("quarter") => ScalarValue::IntervalYearMonth(Some(3 * interval_int)),
+                        Some("year") => ScalarValue::IntervalYearMonth(Some(12 * interval_int)),
+                        _ => continue,
+                    };
+
+                    subst.insert(
+                        interval_var,
+                        egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                            interval,
+                        ))),
+                    );
+
+                    return true;
                 }
             }
 

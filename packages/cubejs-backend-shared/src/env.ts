@@ -292,6 +292,44 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Kafka host for direct downloads from ksqlDb
+   */
+  dbKafkaHost: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_KAFKA_HOST', dataSource)]
+  ),
+
+  /**
+   * Kafka user for direct downloads from ksqlDb
+   */
+  dbKafkaUser: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_KAFKA_USER', dataSource)]
+  ),
+
+  /**
+   * Kafka password for direct downloads from ksqlDb
+   */
+  dbKafkaPass: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_KAFKA_PASS', dataSource)]
+  ),
+
+  /**
+   * `true` if Kafka should use SASL_SSL for direct downloads from ksqlDb
+   */
+  dbKafkaUseSsl: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    get(keyByDataSource('CUBEJS_DB_KAFKA_USE_SSL', dataSource))
+      .default('false')
+      .asBool()
+  ),
+
+  /**
    * Database domain.
    */
   dbDomain: ({
@@ -522,6 +560,20 @@ const variables: Record<string, (...args: any) => any> = {
   dbQueryDefaultLimit: (): number => get('CUBEJS_DB_QUERY_DEFAULT_LIMIT')
     .default(10000)
     .asInt(),
+
+  /**
+   * Expire time for touch records
+   */
+  touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
+    .default(60 * 60 * 24)
+    .asInt(),
+
+  /**
+   * Expire time for touch records
+   */
+  dropPreAggregationsWithoutTouch: (): boolean => get('CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH')
+    .default('false')
+    .asBoolStrict(),
 
   /** ****************************************************************
    * JDBC options                                                    *
@@ -1301,6 +1353,12 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
     .asString(),
+  cubeStoreMaxConnectRetries: () => get('CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES')
+    .default('5')
+    .asInt(),
+  cubeStoreNoHeartBeatTimeout: () => get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
+    .default('30')
+    .asInt(),
 
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')

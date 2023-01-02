@@ -339,58 +339,6 @@ describe('API Gateway', () => {
     expect(res.body.query.measures).toStrictEqual(['Foo.bar']);
   });
 
-  test('post http method for sql-runner route required params', async () => {
-    const { app } = createApiGateway();
-
-    const res = await request(app)
-      .post('/cubejs-api/v1/sql-runner')
-      .set('Content-type', 'application/json')
-      .set(
-        'Authorization',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M'
-      )
-      .send({})
-      .expect(400);
-
-    expect(res.body && res.body.error).toStrictEqual('A user\'s query must contain a body');
-
-    const res2 = await request(app)
-      .post('/cubejs-api/v1/sql-runner')
-      .set('Content-type', 'application/json')
-      .set(
-        'Authorization',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M'
-      )
-      .send({ query: { query: '' } })
-      .expect(400);
-
-    expect(res2.body && res2.body.error).toStrictEqual(
-      'A user\'s query must contain at least one query param.'
-    );
-  });
-
-  test('post http method for sql-runner route', async () => {
-    const { app } = createApiGateway();
-
-    const query = {
-      query: 'SELECT * FROM Foo',
-    };
-
-    const res = await request(app)
-      .post('/cubejs-api/v1/sql-runner')
-      .set('Content-type', 'application/json')
-      .set(
-        'Authorization',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M'
-      )
-      .send({ query })
-      .expect(200);
-
-    expect(res.body.data).toStrictEqual([
-      { foo__bar: 42 },
-    ]);
-  });
-
   test('meta endpoint to get schema information', async () => {
     const { app } = createApiGateway();
 

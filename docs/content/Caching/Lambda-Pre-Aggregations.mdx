@@ -59,7 +59,7 @@ source data as a real-time layer.
 Please make sure that the lambda pre-aggregation definition comes first when
 defining your pre-aggregations.
 
-```js
+```javascript
 cube('Users', {
   ...,
 
@@ -103,7 +103,7 @@ You can use lambda pre-aggregations to combine data from multiple
 pre-aggregation, where one pre-aggregation can have batch data and another
 streaming.
 
-```js
+```javascript
 // This cube uses a streaming SQL data source such as ksqlDB
 cube('StreamingUsers', {
   ...,

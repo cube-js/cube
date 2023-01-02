@@ -15,7 +15,7 @@ permalink: /config/databases/databricks/jdbc
 
 Add the following to a `.env` file in your Cube project:
 
-```dotenv
+```bash
 CUBEJS_DB_TYPE=databricks-jdbc
 # CUBEJS_DB_NAME is optional
 CUBEJS_DB_NAME=default
@@ -84,7 +84,7 @@ writes to the export bucket in S3.
 
 </InfoBox>
 
-```dotenv
+```bash
 CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
 CUBEJS_DB_EXPORT_BUCKET=s3://my.bucket.on.s3
 CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
@@ -100,7 +100,7 @@ mounting Azure Blob Storage to Databricks DBFS][databricks-docs-dbfs-azure].
 [Retrieve the storage account access key][azure-bs-docs-get-key] from your Azure
 account and use as follows:
 
-```dotenv
+```bash
 CUBEJS_DB_EXPORT_BUCKET_TYPE=azure
 CUBEJS_DB_EXPORT_BUCKET=wasbs://my-bucket@my-account.blob.core.windows.net
 CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY=<AZURE_STORAGE_ACCOUNT_ACCESS_KEY>
