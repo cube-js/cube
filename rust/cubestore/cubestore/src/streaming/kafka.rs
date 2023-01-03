@@ -9,6 +9,8 @@ use async_std::stream;
 use async_trait::async_trait;
 use datafusion::cube_ext;
 use futures::Stream;
+use json::object::Object;
+use json::JsonValue;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::BorrowedMessage;
@@ -86,24 +88,32 @@ pub struct KafkaClientServiceImpl {
 
 pub enum KafkaMessage<'a> {
     BorrowedMessage(BorrowedMessage<'a>),
+    MockMessage {
+        key: Option<String>,
+        payload: Option<String>,
+        offset: i64,
+    },
 }
 
 impl<'a> KafkaMessage<'a> {
     pub fn key(&self) -> Option<&[u8]> {
         match self {
             KafkaMessage::BorrowedMessage(m) => m.key(),
+            KafkaMessage::MockMessage { key, .. } => key.as_ref().map(|k| k.as_bytes()),
         }
     }
 
     pub fn payload(&self) -> Option<&[u8]> {
         match self {
             KafkaMessage::BorrowedMessage(m) => m.payload(),
+            KafkaMessage::MockMessage { payload, .. } => payload.as_ref().map(|k| k.as_bytes()),
         }
     }
 
     pub fn offset(&self) -> i64 {
         match self {
             KafkaMessage::BorrowedMessage(m) => m.offset(),
+            KafkaMessage::MockMessage { offset, .. } => *offset,
         }
     }
 }
@@ -242,29 +252,37 @@ impl StreamingSource for KafkaStreamingSource {
                 &self.password,
                 self.use_ssl,
                 Arc::new(move |m| -> Result<_, _> {
-                    if let Some((payload_str, key_str)) = m
-                        .payload()
-                        .map(|p| String::from_utf8_lossy(p))
-                        .zip(m.key().map(|p| String::from_utf8_lossy(p)))
-                    {
+                    if let Some(payload_str) = m.payload().map(|p| String::from_utf8_lossy(p)) {
                         let payload = json::parse(payload_str.as_ref()).map_err(|e| {
                             CubeError::user(format!("Can't parse '{}' payload: {}", payload_str, e))
                         })?;
-                        // TODO Handle properly meta in a key added by ksql after \0
-                        let key = json::parse(key_str.as_ref().split("\0").next().unwrap())
-                            .map_err(|e| {
-                                CubeError::user(format!("Can't parse '{}' key: {}", key_str, e))
-                            })?;
+                        // Kafka can store additional metadata in suffix that contains information about window size for example
+                        // Another use case is streams would usually don't have any keys
+                        let mut key = JsonValue::Object(Object::new());
+                        if let Some(key_str) = m.key().map(|p| String::from_utf8_lossy(p)) {
+                            if key_str.starts_with("{") {
+                                if let Some(last_brace) = key_str.find("}") {
+                                    key = json::parse(&key_str.as_ref()[0..last_brace + 1])
+                                        .map_err(|e| {
+                                            CubeError::user(format!(
+                                                "Can't parse '{}' key: {}",
+                                                key_str, e
+                                            ))
+                                        })?;
+                                }
+                            }
+                        }
+
                         let mut values = parse_json_payload_and_key(
                             &column_to_move,
                             &unique_key_columns,
                             payload,
-                            key,
+                            &key,
                         )
                         .map_err(|e| {
                             CubeError::user(format!(
                                 "Can't parse kafka row with '{}' key and '{}' payload: {}",
-                                key_str, payload_str, e
+                                key, payload_str, e
                             ))
                         })?;
                         values[seq_column_to_move.get_index()] = TableValue::Int(m.offset());

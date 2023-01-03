@@ -418,7 +418,7 @@ pub fn parse_json_payload_and_key(
     columns: &Vec<Column>,
     unique_key_columns: &Vec<Column>,
     payload: JsonValue,
-    key: JsonValue,
+    key: &JsonValue,
 ) -> Result<Vec<TableValue>, CubeError> {
     match payload {
         JsonValue::Object(obj) => columns
@@ -427,7 +427,7 @@ pub fn parse_json_payload_and_key(
                 let mut field_value = obj.get(col.get_name());
                 if field_value.is_none() {
                     if unique_key_columns.iter().any(|c| c.get_name() == col.get_name()) {
-                        field_value = match &key {
+                        field_value = match key {
                             JsonValue::Object(obj) => obj.get(col.get_name()),
                             x if unique_key_columns.len() == 1 => Some(x),
                             x => return Err(CubeError::internal(format!(
@@ -889,6 +889,7 @@ mod tests {
     use std::time::Duration;
 
     use pretty_assertions::assert_eq;
+    use rdkafka::Offset;
 
     use crate::cluster::Cluster;
     use crate::config::Config;
@@ -898,6 +899,7 @@ mod tests {
     use crate::metastore::job::JobType;
     use crate::scheduler::SchedulerImpl;
     use crate::sql::MySqlDialectWithBackTicks;
+    use crate::streaming::kafka::KafkaMessage;
     use crate::streaming::{KSqlQuery, KSqlQuerySchema, KsqlClient, KsqlResponse};
     use crate::TableId;
     use sqlparser::ast::{BinaryOperator, Expr, SetExpr, Statement, Value};
@@ -1022,6 +1024,69 @@ mod tests {
         }
     }
 
+    pub struct MockKafkaClient;
+
+    crate::di_service!(MockKafkaClient, [KafkaClientService]);
+
+    #[async_trait::async_trait]
+    impl KafkaClientService for MockKafkaClient {
+        async fn create_message_stream(
+            &self,
+            _table_id: u64,
+            _topic: String,
+            partition: i32,
+            offset: Offset,
+            _hosts: Vec<String>,
+            _user: &Option<String>,
+            _password: &Option<String>,
+            _use_ssl: bool,
+            to_row: Arc<dyn Fn(KafkaMessage) -> Result<Option<Row>, CubeError> + Send + Sync>,
+        ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError> {
+            let max_offset = 50000;
+            let offset = match offset {
+                Offset::Beginning => 0,
+                Offset::End => max_offset,
+                Offset::Stored => 0,
+                Offset::Invalid => 0,
+                Offset::Offset(offset) => offset,
+                Offset::OffsetTail(offset) => max_offset - offset,
+            };
+
+            let mut messages = Vec::new();
+
+            for i in offset..max_offset {
+                for j in 0..2 {
+                    if partition != j {
+                        continue;
+                    }
+
+                    messages.push(KafkaMessage::MockMessage {
+                        // Keys in kafka can have suffixes which contain arbitrary metadata like window size
+                        key: Some(format!(
+                            "{}foo",
+                            serde_json::json!({ "MESSAGEID": i.to_string() }).to_string()
+                        )),
+                        payload: Some(
+                            serde_json::json!({ "ANONYMOUSID": j.to_string() }).to_string(),
+                        ),
+                        offset: i,
+                    });
+                }
+            }
+
+            let rows = messages
+                .into_iter()
+                .map(|m| to_row(m))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
+                .map(|m| Ok(m))
+                .collect::<Vec<_>>();
+
+            Ok(Box::pin(stream::iter(rows)))
+        }
+    }
+
     #[tokio::test]
     async fn streaming_replay() {
         Config::test("streaming_replay").update_config(|mut c| {
@@ -1119,6 +1184,147 @@ mod tests {
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://ksql/EVENTS_BY_TYPE/0".to_string())),
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://ksql/EVENTS_BY_TYPE/1".to_string())),
+            ]);
+            timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
+            Delay::new(Duration::from_millis(10000)).await;
+
+            let result = service
+                .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+
+            println!("replay handles pre merge: {:#?}", service
+                .exec_query("SELECT * FROM system.replay_handles")
+                .await
+                .unwrap()
+            );
+
+            scheduler.merge_replay_handles().await.unwrap();
+
+            let result = service
+                .exec_query("SELECT * FROM system.replay_handles WHERE has_failed_to_persist_chunks = true")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows().len(), 0);
+
+            println!("replay handles after merge: {:#?}", service
+                .exec_query("SELECT * FROM system.replay_handles")
+                .await
+                .unwrap()
+            );
+
+            service
+                .exec_query("DROP TABLE test.events_by_type_1")
+                .await
+                .unwrap();
+
+            let result = service
+                .exec_query("SELECT * FROM system.replay_handles")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows().len(), 0);
+        })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn streaming_replay_kafka() {
+        Config::test("streaming_replay_kafka").update_config(|mut c| {
+            c.stream_replay_check_interval_secs = 1;
+            c.compaction_in_memory_chunks_max_lifetime_threshold = 8;
+            c.partition_split_threshold = 1000000;
+            c.max_partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 100;
+            c.compaction_chunks_total_size_threshold = 100000;
+            c.stale_stream_timeout = 1;
+            c.wal_split_threshold = 16384;
+            c
+        }).start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
+                Arc::new(MockKafkaClient)
+            })
+                .await
+        }, async move |services| {
+            let chunk_store = services.injector.get_service_typed::<dyn ChunkDataStore>().await;
+            let scheduler = services.injector.get_service_typed::<SchedulerImpl>().await;
+            let service = services.sql_service;
+            let meta_store = services.meta_store;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
+                .await
+                .unwrap();
+
+            let listener = services.cluster.job_result_listener();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text) WITH (stream_offset = 'earliest') unique key (`ANONYMOUSID`, `MESSAGEID`) INDEX by_anonymous(`ANONYMOUSID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            let wait = listener.wait_for_job_results(vec![
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/1".to_string())),
+            ]);
+            timeout(Duration::from_secs(15), wait).await.unwrap().unwrap();
+
+            let result = service
+                .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+
+            let listener = services.cluster.job_result_listener();
+            let chunks = meta_store.chunks_table().all_rows().await.unwrap();
+            let replay_handles = meta_store.get_replay_handles_by_ids(chunks.iter().filter_map(|c| c.get_row().replay_handle_id().clone()).collect()).await.unwrap();
+            let mut middle_chunk = None;
+            for chunk in chunks.iter() {
+                if let Some(handle_id) = chunk.get_row().replay_handle_id() {
+                    let handle = replay_handles.iter().find(|h| h.get_id() == *handle_id).unwrap();
+                    if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
+                        if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 32768).unwrap_or(false)).unwrap_or(false)) {
+                            chunk_store.free_memory_chunk(chunk.get_id()).await.unwrap();
+                            middle_chunk = Some(chunk.clone());
+                            break;
+                        }
+                    }
+                }
+            }
+            Delay::new(Duration::from_millis(10000)).await;
+            scheduler.schedule_compaction_in_memory_chunks_if_needed(&meta_store.get_partition(middle_chunk.unwrap().get_row().get_partition_id()).await.unwrap()).await.unwrap();
+
+            let wait = listener.wait_for_job_results(vec![
+                (RowKey::Table(TableId::Partitions, 1), JobType::InMemoryChunksCompaction),
+            ]);
+            timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
+
+            println!("chunks: {:#?}", service
+                .exec_query("SELECT * FROM system.chunks")
+                .await
+                .unwrap()
+            );
+            println!("replay handles: {:#?}", service
+                .exec_query("SELECT * FROM system.replay_handles")
+                .await
+                .unwrap()
+            );
+
+            let result = service
+                .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000 - 16384)])]);
+
+            let listener = services.cluster.job_result_listener();
+
+            scheduler.reconcile_table_imports().await.unwrap();
+
+            let wait = listener.wait_for_job_results(vec![
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/1".to_string())),
             ]);
             timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
             Delay::new(Duration::from_millis(10000)).await;
