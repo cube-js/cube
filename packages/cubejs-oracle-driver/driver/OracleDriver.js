@@ -69,7 +69,7 @@ class OracleDriver extends BaseDriver {
     this.db.partRows = 100000;
     this.db.maxRows = 100000;
     this.db.prefetchRows = 500;
-    this.config = config || {
+    this.config = {
       user: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       db: getEnv('dbName', { dataSource }),
