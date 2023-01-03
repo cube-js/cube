@@ -714,9 +714,14 @@ describe('index.test', () => {
       2 * 1000,
     );
 
+    let counter = 0;
     const refreshSchedulerMock = {
       runScheduledRefresh: jest.fn(async () => {
-        await timeoutKiller.cancel();
+        counter += 1;
+        if (counter === 3) {
+          // Kill the timer after processing all 3 test contexts
+          await timeoutKiller.cancel();
+        }
         return {
           finished: true,
         };

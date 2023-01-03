@@ -2,7 +2,6 @@ import dotenv from '@cubejs-backend/dotenv';
 
 import CubeCore, {
   CreateOptions as CoreCreateOptions,
-  CubejsServerCore,
   DatabaseType,
   DriverContext,
   DriverOptions,
@@ -49,9 +48,12 @@ type RequireOne<T, K extends keyof T> = {
 };
 
 export class CubejsServer {
-  protected readonly core: CubejsServerCore;
+  protected readonly core: CubeCore;
 
-  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort'>;
+  protected readonly config: RequireOne<
+    CreateOptions,
+    'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort'
+  >;
 
   protected server: GracefulHttpServer | null = null;
 
@@ -61,7 +63,10 @@ export class CubejsServer {
 
   protected readonly status: ServerStatusHandler = new ServerStatusHandler();
 
-  public constructor(config: CreateOptions = {}, systemOptions?: SystemOptions) {
+  public constructor(
+    config: CreateOptions = {},
+    systemOptions?: SystemOptions
+  ) {
     this.config = {
       ...config,
       webSockets: config.webSockets || getEnv('webSockets'),
@@ -72,13 +77,17 @@ export class CubejsServer {
         ...config.http,
         cors: {
           allowedHeaders: 'authorization,content-type,x-request-id',
-          ...config.http?.cors
-        }
+          ...config.http?.cors,
+        },
       },
     };
 
-    this.core = CubeCore.create(config, systemOptions);
+    this.core = this.createCoreInstance(config, systemOptions);
     this.server = null;
+  }
+
+  protected createCoreInstance(config: CreateOptions, systemOptions?: SystemOptions): CubeCore {
+    return new CubeCore(config, systemOptions);
   }
 
   public async listen(options: http.ServerOptions = {}) {
@@ -125,12 +134,12 @@ export class CubejsServer {
         app,
         port: PORT,
         server: this.server,
-        version
+        version,
       };
     } catch (e: any) {
       if (this.core.event) {
         await this.core.event('Dev Server Fatal Error', {
-          error: (e.stack || e.message || e).toString()
+          error: (e.stack || e.message || e).toString(),
         });
       }
 
@@ -178,7 +187,7 @@ export class CubejsServer {
     } catch (e: any) {
       if (this.core.event) {
         await this.core.event('Dev Server Fatal Error', {
-          error: (e.stack || e.message || e).toString()
+          error: (e.stack || e.message || e).toString(),
         });
       }
 
@@ -218,26 +227,20 @@ export class CubejsServer {
           process.exit(1);
         },
         // this.server.stop can be closed in this.config.gracefulShutdown, let's add 1s before kill
-        ((this.config.gracefulShutdown || 2) + 1) * 1000,
+        ((this.config.gracefulShutdown || 2) + 1) * 1000
       );
 
       this.status.shutdown();
 
-      const locks: Promise<any>[] = [
-        this.core.beforeShutdown()
-      ];
+      const locks: Promise<any>[] = [this.core.beforeShutdown()];
 
       if (this.socketServer) {
-        locks.push(
-          this.socketServer.close()
-        );
+        locks.push(this.socketServer.close());
       }
 
       if (this.server) {
         locks.push(
-          this.server.stop(
-            (this.config.gracefulShutdown || 2) * 1000
-          )
+          this.server.stop((this.config.gracefulShutdown || 2) * 1000)
         );
       }
 

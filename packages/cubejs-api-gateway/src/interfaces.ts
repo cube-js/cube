@@ -76,6 +76,16 @@ export type CheckAuthMiddlewareFn =
  ) => void;
 
 /**
+ * Context rejection middleware.
+ */
+export type ContextRejectionMiddlewareFn =
+ (
+   req: Request,
+   res: ExpressResponse,
+   next: ExpressNextFunction,
+ ) => void;
+
+/**
  * Logger middleware.
  * @deprecated
  */

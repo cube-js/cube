@@ -464,6 +464,8 @@ export class OptsHandler {
       dashboardAppPort: 3000,
       scheduledRefreshConcurrency:
         parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_CONCURRENCY, 10),
+      scheduledRefreshBatchSize:
+        parseInt(process.env.CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE, 10) || 1,
       preAggregationsSchema:
         getEnv('preAggregationsSchema') ||
         (this.isDevMode()
