@@ -1,1 +1,1 @@
-FROM multiarch/crossbuild:x86_64-apple-darwin
+FROM joseluisq/rust-linux-darwin-builder:1.60.0
