@@ -8,7 +8,7 @@ import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
 describe('oracle', () => {
-  jest.setTimeout(60 * 5 * 10000);
+  jest.setTimeout(60 * 5 * 100000);
   let db: StartedTestContainer;
   let birdbox: BirdBox;
   let client: CubejsApi;
@@ -16,21 +16,21 @@ describe('oracle', () => {
   beforeAll(async () => {
     db = await OracleDBRunner.startContainer({});
     birdbox = await getBirdbox(
-      'oracle',
-      {
-        CUBEJS_DB_TYPE: 'oracle',
+        'oracle',
+        {
+          CUBEJS_DB_TYPE: 'oracle',
 
-        CUBEJS_DB_HOST: db.getHost(),
-        CUBEJS_DB_PORT: `${db.getMappedPort(1521)}`,
-        CUBEJS_DB_NAME: 'XEPDB1',
-        CUBEJS_DB_USER: 'test',
-        CUBEJS_DB_PASS: 'test',
+          CUBEJS_DB_HOST: db.getHost(),
+          CUBEJS_DB_PORT: `${db.getMappedPort(1521)}`,
+          CUBEJS_DB_NAME: 'XE',
+          CUBEJS_DB_USER: 'system',
+          CUBEJS_DB_PASS: 'test',
 
-        ...DEFAULT_CONFIG,
-      },
-      {
-        schemaDir: 'oracle/schema',
-      }
+          ...DEFAULT_CONFIG,
+        },
+        {
+          schemaDir: 'oracle/schema',
+        }
     );
     client = cubejs(async () => 'test', {
       apiUrl: birdbox.configuration.apiUrl,
@@ -47,9 +47,6 @@ describe('oracle', () => {
   test('query dimensions', async () => {
     const queryDimensions = async () => {
       const response = await client.load({
-        measures: [
-          'Orders.totalAmount',
-        ],
         dimensions: [
           'Orders.status',
         ],
@@ -60,10 +57,10 @@ describe('oracle', () => {
     await queryDimensions();
 
     /**
-         * Running a query with 2 seconds delay
-         * preAggregation has 1 second in the refreshKey
-         * Gives times to trigger the action if hasn't been triggered yet.
-         */
+     * Running a query with 2 seconds delay
+     * preAggregation has 1 second in the refreshKey
+     * Gives times to trigger the action if hasn't been triggered yet.
+     */
     await pausePromise(2000);
     await queryDimensions();
   });

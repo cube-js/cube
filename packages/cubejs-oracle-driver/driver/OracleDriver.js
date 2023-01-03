@@ -83,7 +83,7 @@ class OracleDriver extends BaseDriver {
     };
 
     if (!this.config.connectionString) {
-      this.config.connectionString = `${this.config.host}/${this.config.db}`
+      this.config.connectionString = `${this.config.host}:${this.config.port}/${this.config.db}`
     }
   }
 
