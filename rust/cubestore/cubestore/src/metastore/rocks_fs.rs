@@ -103,27 +103,40 @@ impl BaseRocksStoreFs {
     }
     pub async fn delete_old_snapshots(&self) -> Result<Vec<String>, CubeError> {
         let existing_metastore_files = self.remote_fs.list(&format!("{}-", self.name)).await?;
-        let to_delete = existing_metastore_files
+        let mut to_delete_candidates = existing_metastore_files
             .into_iter()
             .filter_map(|existing| {
                 let path = existing.split("/").nth(0).map(|p| {
                     u128::from_str(
                         &p.replace(&format!("{}-", self.name), "")
+                            .replace("-index-logs", "")
                             .replace("-logs", ""),
                     )
                 });
                 if let Some(Ok(millis)) = path {
-                    if SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis()
-                        - millis
-                        > 15 * 60 * 1000
-                    {
-                        return Some(existing);
-                    }
+                    Some((existing, millis))
+                } else {
+                    None
                 }
-                None
+            })
+            .collect::<Vec<_>>();
+        to_delete_candidates
+            .sort_unstable_by(|(_, a_millis), (_, b_millis)| b_millis.cmp(a_millis));
+        let to_delete = to_delete_candidates
+            .into_iter()
+            .skip(3)
+            .filter_map(|(f, ms)| {
+                if SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis()
+                    - ms
+                    > 24 * 60 * 60 * 1000
+                {
+                    Some(f)
+                } else {
+                    None
+                }
             })
             .collect::<Vec<_>>();
         for v in join_all(
