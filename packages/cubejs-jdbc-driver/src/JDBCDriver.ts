@@ -238,6 +238,7 @@ export class JDBCDriver extends BaseDriver {
         const createStatement = promisify(conn.createStatement.bind(conn));
         const statement = await createStatement();
 
+        // TODO (buntarb): check whether this have sense or not?
         statement.setFetchSize(
           getEnv('dbQueryStreamHighWaterMark'),
           (err: unknown) => { if (err) console.error(err); }
@@ -245,6 +246,8 @@ export class JDBCDriver extends BaseDriver {
         if (cancelObj) {
           cancelObj.cancel = promisify(statement.cancel.bind(statement));
         }
+
+        // TODO (buntarb): timeout decision needs.
         // const setQueryTimeout = promisify(statement.setQueryTimeout.bind(statement));
         // await setQueryTimeout(600);
         const executeQuery = promisify(statement.execute.bind(statement));
@@ -260,16 +263,16 @@ export class JDBCDriver extends BaseDriver {
               },
             ) => {
               if (err) reject(err);
-              const rows = new DataStream(res.rows.next);
+              const rowsStream = new DataStream(res.rows.next);
               const cleanup = (e?: Error) => {
-                if (!rows.destroyed) {
-                  rows.destroy(e);
+                if (!rowsStream.destroyed) {
+                  rowsStream.destroy(e);
                 }
               };
-              rows.once('end', cleanup);
-              rows.once('error', cleanup);
-              rows.once('close', cleanup);
-              resolve(rows);
+              rowsStream.once('end', cleanup);
+              rowsStream.once('error', cleanup);
+              rowsStream.once('close', cleanup);
+              resolve(rowsStream);
             }
           );
         });
