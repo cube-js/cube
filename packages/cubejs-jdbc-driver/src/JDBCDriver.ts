@@ -5,6 +5,7 @@
  */
 
 /* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
+import { Readable } from 'stream';
 import {
   getEnv,
   assertDataSource,
@@ -18,6 +19,7 @@ import genericPool, { Factory, Pool } from 'generic-pool';
 import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { JDBCDriverConfiguration } from './types';
+import { DataStream, nextFn, Row } from './DataStream';
 
 const DriverManager = require('jdbc/lib/drivermanager');
 const Connection = require('jdbc/lib/connection');
@@ -185,7 +187,8 @@ export class JDBCDriver extends BaseDriver {
     const cancelObj: {cancel?: Function} = {};
     const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
     (promise as CancelablePromise<any>).cancel =
-      () => cancelObj.cancel && cancelObj.cancel() || Promise.reject(new Error('Statement is not ready'));
+      () => cancelObj.cancel && cancelObj.cancel() ||
+      Promise.reject(new Error('Statement is not ready'));
     return promise;
   }
 
@@ -221,9 +224,71 @@ export class JDBCDriver extends BaseDriver {
     }
   }
 
+  public async streamQuery(sql: string, values: string[]): Promise<Readable> {
+    const query = applyParams(sql, values);
+    const cancelObj: {cancel?: Function} = {};
+    const prepareQueries = this.prepareConnectionQueries() || [];
+    try {
+      const conn = await this.pool.acquire();
+      try {
+        for (let i = 0; i < prepareQueries.length; i++) {
+          await this.executeStatement(conn, prepareQueries[i]);
+        }
+        
+        const createStatement = promisify(conn.createStatement.bind(conn));
+        const statement = await createStatement();
+
+        statement.setFetchSize(
+          getEnv('dbQueryStreamHighWaterMark'),
+          (err: unknown) => { if (err) console.error(err); }
+        );
+        if (cancelObj) {
+          cancelObj.cancel = promisify(statement.cancel.bind(statement));
+        }
+        // const setQueryTimeout = promisify(statement.setQueryTimeout.bind(statement));
+        // await setQueryTimeout(600);
+        const executeQuery = promisify(statement.execute.bind(statement));
+        const resultSet = await executeQuery(query);
+        return new Promise((resolve, reject) => {
+          resultSet.toObjectIter(
+            (
+              err: unknown,
+              res: {
+                labels: string[],
+                types: number[],
+                rows: { next: nextFn },
+              },
+            ) => {
+              if (err) reject(err);
+              const rows = new DataStream(res.rows.next);
+              const cleanup = (e?: Error) => {
+                if (!rows.destroyed) {
+                  rows.destroy(e);
+                }
+              };
+              rows.once('end', cleanup);
+              rows.once('error', cleanup);
+              rows.once('close', cleanup);
+              resolve(rows);
+            }
+          );
+        });
+      } finally {
+        await this.pool.release(conn);
+      }
+    } catch (ex: any) {
+      if (ex.cause) {
+        throw new Error(ex.cause.getMessageSync());
+      } else {
+        throw ex;
+      }
+    }
+  }
+
   protected async executeStatement(conn: any, query: any, cancelObj?: any) {
     const createStatementAsync = promisify(conn.createStatement.bind(conn));
     const statement = await createStatementAsync();
+    // statement.setFetchSize(1);
     if (cancelObj) {
       cancelObj.cancel = promisify(statement.cancel.bind(statement));
     }
