@@ -1,0 +1,78 @@
+---
+title: Multiple Data Sources
+permalink: /config/multiple-data-sources
+category: Configuration
+subCategory: Advanced
+menuOrder: 2
+---
+
+Cube supports using multiple data sources, allowing the use of different
+databases for different cubes.
+
+## Schema
+
+To configure multiple data sources, first explicitly declare a data source in
+some cubes by adding a `dataSource` property:
+
+```javascript
+cube('Orders', {
+  ...,
+
+  dataSource: 'default',
+});
+
+cube('OrdersFromOtherDataSource', {
+  ...,
+
+  dataSource: 'datasource1',
+});
+```
+
+## Configuring data sources with environment variables
+
+Next, Cube must be configured so that it knows which database to use for each
+data source; first declare the data sources using the `CUBEJS_DATASOURCES`
+environment variable, then use
+[decorated environment variables](#environment-variables-decorated-environment-variables)
+to configure each data source:
+
+```bash
+CUBEJS_DATASOURCES=default,datasource1
+CUBEJS_DS_default_DB_TYPE=postgres
+CUBEJS_DS_default_DB_NAME=ecom
+CUBEJS_DS_default_DB_HOST=localhost
+CUBEJS_DS_datasource1_DB_TYPE=postgres
+CUBEJS_DS_datasource1_DB_NAME=ecom
+CUBEJS_DS_datasource1_DB_HOST=remotehost
+```
+
+### Decorated environment variables
+
+Cube allows database-specific environment variables to be decorated with a data
+source name:
+
+```bash
+CUBEJS_[DS_<DATASOURCE>_]<ENV_VAR>
+```
+
+For example, using the `default` data source, `CUBEJS_DB_TYPE` could be
+decorated as:
+
+```bash
+CUBEJS_DS_default_DB_TYPE=postgres
+```
+
+For more information on environment variables that support decoration, check the
+[Environment Variables reference][ref-config-ref-env], or [a database-specific
+page if required][ref-config-db].
+
+## Dynamic data sources
+
+For more complex scenarios involving multitenancy, Cube can also be configured
+to dynamically lookup data sources. For more information, see [the Multitenancy
+page][ref-config-multitenancy].
+
+[ref-config-ref-env]: /reference/environment-variables
+[ref-config-db]: /config/databases
+[ref-config-multitenancy]:
+  /config/multitenancy#multitenancy-multitenancy-vs-multiple-data-sources

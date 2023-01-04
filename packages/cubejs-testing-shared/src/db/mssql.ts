@@ -14,7 +14,7 @@ export class MssqlDbRunner extends DbRunnerAbstract {
       .withEnv('ACCEPT_EULA', 'Y')
       .withEnv('MSSQL_SA_PASSWORD', process.env.TEST_DB_PASSWORD || 'Test1test')
       .withExposedPorts(1433)
-      .withWaitStrategy(Wait.forLogMessage("Service Broker manager has started"))
+      .withWaitStrategy(Wait.forLogMessage('Service Broker manager has started'))
       .withStartupTimeout(30 * 1000);
 
     if (options.volumes) {

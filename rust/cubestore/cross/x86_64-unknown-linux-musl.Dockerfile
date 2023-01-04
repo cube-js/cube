@@ -8,7 +8,7 @@ RUN apt-get update \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
     && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-12 main"  \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make cmake \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
@@ -36,6 +36,8 @@ ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 ENV OPENSSL_STATIC=true
 ENV OPENSSL_DIR=/musl
+ENV OPENSSL_ROOT_DIR=/musl
+ENV OPENSSL_LIBRARIES=/musl/lib
 
 
 ENV PATH="/cargo/bin:$PATH"

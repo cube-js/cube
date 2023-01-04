@@ -1,14 +1,32 @@
-use crate::metastore::MetaStoreEvent;
+use crate::config::ConfigObj;
+use crate::metastore::table::TablePath;
+use crate::metastore::{MetaStoreEvent, MetaStoreFs};
+use crate::util::aborting_join_handle::AbortingJoinHandle;
+use crate::util::time_span::warn_long;
+
 use crate::CubeError;
 use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use datafusion::cube_ext;
+
+use log::{info, trace};
+use rocksdb::backup::BackupEngineOptions;
+use rocksdb::checkpoint::Checkpoint;
 use rocksdb::{Snapshot, WriteBatch, WriteBatchIterator, DB};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::Cursor;
+use std::io::{Cursor, Write};
+
+use chrono::{DateTime, NaiveDateTime, Utc};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime};
+use std::{env, mem, time};
+use tokio::fs;
 use tokio::fs::File;
+use tokio::sync::broadcast::Sender;
+use tokio::sync::{oneshot, Notify, RwLock};
 
 macro_rules! enum_from_primitive_impl {
     ($name:ident, $( $variant:ident )*) => {
@@ -51,7 +69,28 @@ enum_from_primitive! {
         Jobs = 0x0700,
         Sources = 0x0800,
         MultiIndexes = 0x0900,
-        MultiPartitions = 0x0A00
+        MultiPartitions = 0x0A00,
+        ReplayHandles = 0x0B00,
+        CacheItems = 0x0C00
+    }
+}
+
+impl TableId {
+    pub fn has_ttl(&self) -> bool {
+        match self {
+            TableId::Schemas => false,
+            TableId::Tables => false,
+            TableId::Indexes => false,
+            TableId::Partitions => false,
+            TableId::Chunks => false,
+            TableId::WALs => false,
+            TableId::Jobs => false,
+            TableId::Sources => false,
+            TableId::MultiIndexes => false,
+            TableId::MultiPartitions => false,
+            TableId::ReplayHandles => false,
+            TableId::CacheItems => true,
+        }
     }
 }
 
@@ -81,47 +120,157 @@ impl MemorySequence {
     }
 }
 
+pub enum RocksSecondaryIndexValue<'a> {
+    Hash(&'a [u8]),
+    HashAndTTL(&'a [u8], Option<DateTime<Utc>>),
+}
+
+impl<'a> RocksSecondaryIndexValue<'a> {
+    pub fn from_bytes(
+        bytes: &'a [u8],
+        value_version: u32,
+    ) -> Result<RocksSecondaryIndexValue<'a>, CubeError> {
+        match value_version {
+            1 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
+            2 => match bytes[0] {
+                0 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
+                1 => {
+                    let (hash, mut expire_buf) =
+                        (&bytes[1..bytes.len() - 8], &bytes[bytes.len() - 8..]);
+                    let expire_timestamp = expire_buf.read_i64::<BigEndian>().unwrap();
+
+                    let expire = if expire_timestamp == 0 {
+                        None
+                    } else {
+                        Some(DateTime::<Utc>::from_utc(
+                            NaiveDateTime::from_timestamp(expire_timestamp, 0),
+                            Utc,
+                        ))
+                    };
+
+                    Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))
+                }
+                tid => Err(CubeError::internal(format!(
+                    "Unsupported type \"{}\" of value for index",
+                    tid
+                ))),
+            },
+            version => Err(CubeError::internal(format!(
+                "Unsupported value_version {}",
+                version
+            ))),
+        }
+    }
+
+    pub fn to_bytes(&self, value_version: u32) -> Vec<u8> {
+        match value_version {
+            1 => match *self {
+                RocksSecondaryIndexValue::Hash(hash) => hash.to_vec(),
+                RocksSecondaryIndexValue::HashAndTTL(_, _) => panic!(
+                    "RocksSecondaryIndexValue::HashAndTTL is not supported for value_version = 1"
+                ),
+            },
+            2 => match self {
+                RocksSecondaryIndexValue::Hash(hash) => {
+                    let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1));
+
+                    buf.write_u8(0).unwrap();
+                    buf.write_all(&hash).unwrap();
+
+                    buf.into_inner()
+                }
+                RocksSecondaryIndexValue::HashAndTTL(hash, expire) => {
+                    let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1 + 8));
+
+                    buf.write_u8(1).unwrap();
+                    buf.write_all(&hash).unwrap();
+
+                    if let Some(ex) = expire {
+                        buf.write_i64::<BigEndian>(ex.timestamp()).unwrap()
+                    } else {
+                        buf.write_i64::<BigEndian>(0).unwrap()
+                    }
+
+                    buf.into_inner()
+                }
+            },
+            version => panic!("Unsupported value_version {}", version),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum RowKey {
-    Table(TableId, u64),
+    Table(TableId, /** row_id */ u64),
     Sequence(TableId),
-    SecondaryIndex(IndexId, SecondaryKey, u64),
+    SecondaryIndex(IndexId, SecondaryKey, /** row_id */ u64),
     SecondaryIndexInfo { index_id: IndexId },
+    TableInfo { table_id: TableId },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub struct SecondaryIndexInfo {
+    // user specific version
     pub version: u32,
+    #[serde(default = "secondary_index_info_default_value_version")]
+    // serialization/deserialization version
+    pub value_version: u32,
+}
+
+fn secondary_index_info_default_value_version() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub struct TableInfo {
+    // user specific version
+    pub version: u32,
+    // serialization/deserialization version, reserved, not used
+    pub value_version: u32,
 }
 
 impl RowKey {
-    pub fn from_bytes(bytes: &[u8]) -> RowKey {
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<RowKey, CubeError> {
         let mut reader = Cursor::new(bytes);
-        match reader.read_u8().unwrap() {
-            1 => RowKey::Table(TableId::from(reader.read_u32::<BigEndian>().unwrap()), {
-                // skip zero for fixed key padding
-                reader.read_u64::<BigEndian>().unwrap();
-                reader.read_u64::<BigEndian>().unwrap()
-            }),
-            2 => RowKey::Sequence(TableId::from(reader.read_u32::<BigEndian>().unwrap())),
+        match reader.read_u8()? {
+            1 => Ok(RowKey::Table(
+                TableId::from(reader.read_u32::<BigEndian>()?),
+                {
+                    // skip zero for fixed key padding
+                    reader.read_u64::<BigEndian>()?;
+                    reader.read_u64::<BigEndian>()?
+                },
+            )),
+            2 => Ok(RowKey::Sequence(TableId::from(
+                reader.read_u32::<BigEndian>()?,
+            ))),
             3 => {
-                let table_id = IndexId::from(reader.read_u32::<BigEndian>().unwrap());
+                let table_id = IndexId::from(reader.read_u32::<BigEndian>()?);
                 let mut secondary_key: SecondaryKey = SecondaryKey::new();
                 let sc_length = bytes.len() - 13;
                 for _i in 0..sc_length {
-                    secondary_key.push(reader.read_u8().unwrap());
+                    secondary_key.push(reader.read_u8()?);
                 }
-                let row_id = reader.read_u64::<BigEndian>().unwrap();
+                let row_id = reader.read_u64::<BigEndian>()?;
 
-                RowKey::SecondaryIndex(table_id, secondary_key, row_id)
+                Ok(RowKey::SecondaryIndex(table_id, secondary_key, row_id))
             }
             4 => {
-                let index_id = IndexId::from(reader.read_u32::<BigEndian>().unwrap());
+                let index_id = IndexId::from(reader.read_u32::<BigEndian>()?);
 
-                RowKey::SecondaryIndexInfo { index_id }
+                Ok(RowKey::SecondaryIndexInfo { index_id })
             }
-            v => panic!("Unknown key prefix: {}", v),
+            5 => {
+                let table_id = TableId::from(reader.read_u32::<BigEndian>()?);
+
+                Ok(RowKey::TableInfo { table_id })
+            }
+            v => Err(CubeError::internal(format!("Unknown key prefix: {}", v))),
         }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> RowKey {
+        RowKey::try_from_bytes(bytes).unwrap()
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -148,6 +297,10 @@ impl RowKey {
             RowKey::SecondaryIndexInfo { index_id } => {
                 wtr.write_u8(4).unwrap();
                 wtr.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+            }
+            RowKey::TableInfo { table_id } => {
+                wtr.write_u8(5).unwrap();
+                wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
             }
         }
         wtr
@@ -279,6 +432,7 @@ pub struct DbTableRef<'a> {
     pub db: &'a DB,
     pub snapshot: &'a Snapshot<'a>,
     pub mem_seq: MemorySequence,
+    pub start_time: DateTime<Utc>,
 }
 
 #[async_trait]
@@ -296,7 +450,7 @@ pub trait MetaStoreTable: Send + Sync {
 macro_rules! meta_store_table_impl {
     ($name: ident, $table: ty, $rocks_table: ident) => {
         pub struct $name {
-            rocks_meta_store: RocksMetaStore,
+            rocks_meta_store: Arc<RocksStore>,
         }
 
         impl $name {
@@ -330,4 +484,464 @@ macro_rules! meta_store_table_impl {
             }
         }
     };
+}
+
+pub trait RocksStoreDetails: Send + Sync {
+    fn open_db(&self, path: &Path) -> Result<DB, CubeError>;
+
+    fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError>;
+
+    fn get_name(&self) -> &'static str;
+}
+
+#[derive(Clone)]
+pub struct RocksStore {
+    pub db: Arc<DB>,
+    pub config: Arc<dyn ConfigObj>,
+    seq_store: Arc<Mutex<HashMap<TableId, u64>>>,
+    listeners: Arc<RwLock<Vec<Sender<MetaStoreEvent>>>>,
+    metastore_fs: Arc<dyn MetaStoreFs>,
+    last_checkpoint_time: Arc<RwLock<SystemTime>>,
+    write_notify: Arc<Notify>,
+    pub(crate) write_completed_notify: Arc<Notify>,
+    last_upload_seq: Arc<RwLock<u64>>,
+    last_check_seq: Arc<RwLock<u64>>,
+    pub(crate) cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
+    rw_loop_tx: std::sync::mpsc::SyncSender<
+        Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
+    >,
+    _rw_loop_join_handle: Arc<AbortingJoinHandle<()>>,
+    details: Arc<dyn RocksStoreDetails>,
+}
+
+pub fn check_if_exists(name: &String, existing_keys_len: usize) -> Result<(), CubeError> {
+    if existing_keys_len > 1 {
+        let e = CubeError::user(format!(
+            "Schema with name '{}' has more than one id. Something went wrong.",
+            name
+        ));
+        return Err(e);
+    } else if existing_keys_len == 0 {
+        let e = CubeError::user(format!("Schema with name '{}' does not exist.", name));
+        return Err(e);
+    }
+    Ok(())
+}
+
+impl RocksStore {
+    pub fn with_listener(
+        path: &Path,
+        listeners: Vec<Sender<MetaStoreEvent>>,
+        metastore_fs: Arc<dyn MetaStoreFs>,
+        config: Arc<dyn ConfigObj>,
+        details: Arc<dyn RocksStoreDetails>,
+    ) -> Result<Arc<Self>, CubeError> {
+        let meta_store = Self::with_listener_impl(path, listeners, metastore_fs, config, details)?;
+        Ok(Arc::new(meta_store))
+    }
+
+    pub fn with_listener_impl(
+        path: &Path,
+        listeners: Vec<Sender<MetaStoreEvent>>,
+        metastore_fs: Arc<dyn MetaStoreFs>,
+        config: Arc<dyn ConfigObj>,
+        details: Arc<dyn RocksStoreDetails>,
+    ) -> Result<Self, CubeError> {
+        let db = details.open_db(path)?;
+        let db_arc = Arc::new(db);
+
+        let (rw_loop_tx, rw_loop_rx) = std::sync::mpsc::sync_channel::<
+            Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
+        >(32_768);
+
+        let join_handle = cube_ext::spawn_blocking(move || loop {
+            match rw_loop_rx.recv() {
+                Ok(fun) => {
+                    if let Err(e) = fun() {
+                        log::error!("Error during read write loop execution: {}", e);
+                    }
+                }
+                Err(_) => {
+                    return;
+                }
+            }
+        });
+
+        let meta_store = RocksStore {
+            db: db_arc.clone(),
+            seq_store: Arc::new(Mutex::new(HashMap::new())),
+            listeners: Arc::new(RwLock::new(listeners)),
+            metastore_fs,
+            last_checkpoint_time: Arc::new(RwLock::new(SystemTime::now())),
+            write_notify: Arc::new(Notify::new()),
+            write_completed_notify: Arc::new(Notify::new()),
+            last_upload_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
+            last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
+            config,
+            cached_tables: Arc::new(Mutex::new(None)),
+            rw_loop_tx,
+            _rw_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
+            details,
+        };
+
+        Ok(meta_store)
+    }
+
+    pub fn new(
+        path: &Path,
+        metastore_fs: Arc<dyn MetaStoreFs>,
+        config: Arc<dyn ConfigObj>,
+        details: Arc<dyn RocksStoreDetails>,
+    ) -> Result<Arc<Self>, CubeError> {
+        Self::with_listener(path, vec![], metastore_fs, config, details)
+    }
+
+    pub async fn load_from_dump(
+        path: &Path,
+        dump_path: &Path,
+        metastore_fs: Arc<dyn MetaStoreFs>,
+        config: Arc<dyn ConfigObj>,
+        details: Arc<dyn RocksStoreDetails>,
+    ) -> Result<Arc<Self>, CubeError> {
+        if !fs::metadata(path).await.is_ok() {
+            let mut backup =
+                rocksdb::backup::BackupEngine::open(&BackupEngineOptions::default(), dump_path)?;
+            backup.restore_from_latest_backup(
+                &path,
+                &path,
+                &rocksdb::backup::RestoreOptions::default(),
+            )?;
+        } else {
+            info!(
+                "Using existing {} in {}",
+                details.get_name(),
+                path.as_os_str().to_string_lossy()
+            );
+        }
+
+        let meta_store = Self::new(path, metastore_fs, config, details)?;
+        Self::check_all_indexes(&meta_store).await?;
+
+        Ok(meta_store)
+    }
+
+    pub async fn check_all_indexes(meta_store: &Arc<Self>) -> Result<(), CubeError> {
+        let meta_store_to_move = meta_store.clone();
+
+        cube_ext::spawn_blocking(move || {
+            let table_ref = DbTableRef {
+                db: &meta_store_to_move.db,
+                snapshot: &meta_store_to_move.db.snapshot(),
+                mem_seq: MemorySequence::new(meta_store_to_move.seq_store.clone()),
+                start_time: Utc::now(),
+            };
+
+            if let Err(e) = meta_store_to_move.details.migrate(table_ref) {
+                log::error!("Error during checking indexes: {}", e);
+            }
+        })
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn add_listener(&self, listener: Sender<MetaStoreEvent>) {
+        self.listeners.write().await.push(listener);
+    }
+
+    pub async fn write_operation<F, R>(&self, f: F) -> Result<R, CubeError>
+    where
+        F: for<'a> FnOnce(DbTableRef<'a>, &'a mut BatchPipe) -> Result<R, CubeError>
+            + Send
+            + Sync
+            + 'static,
+        R: Send + Sync + 'static,
+    {
+        let db = self.db.clone();
+        let mem_seq = MemorySequence::new(self.seq_store.clone());
+        let db_to_send = db.clone();
+        let cached_tables = self.cached_tables.clone();
+        let store_name = self.details.get_name();
+
+        let rw_loop_sender = self.rw_loop_tx.clone();
+        let (tx, rx) = oneshot::channel::<Result<(R, Vec<MetaStoreEvent>), CubeError>>();
+
+        cube_ext::spawn_blocking(move || {
+            let res = rw_loop_sender.send(Box::new(move || {
+                let db_span = warn_long("store write operation", Duration::from_millis(100));
+                let span = tracing::trace_span!("metastore write operation");
+                let span_holder = span.enter();
+
+                let mut batch = BatchPipe::new(db_to_send.as_ref());
+                let snapshot = db_to_send.snapshot();
+                let res = f(
+                    DbTableRef {
+                        db: db_to_send.as_ref(),
+                        snapshot: &snapshot,
+                        mem_seq,
+                        start_time: Utc::now(),
+                    },
+                    &mut batch,
+                );
+                match res {
+                    Ok(res) => {
+                        if batch.invalidate_tables_cache {
+                            *cached_tables.lock().unwrap() = None;
+                        }
+                        let write_result = batch.batch_write_rows()?;
+                        tx.send(Ok((res, write_result))).map_err(|_| {
+                            CubeError::internal(format!(
+                                "[{}] Write operation result receiver has been dropped",
+                                store_name
+                            ))
+                        })?;
+                    }
+                    Err(e) => {
+                        tx.send(Err(e)).map_err(|_| {
+                            CubeError::internal(format!(
+                                "[{}] Write operation result receiver has been dropped",
+                                store_name
+                            ))
+                        })?;
+                    }
+                }
+
+                mem::drop(span_holder);
+                mem::drop(db_span);
+
+                Ok(())
+            }));
+            if let Err(e) = res {
+                log::error!("[{}] Error during read write loop send: {}", store_name, e);
+            }
+        })
+        .await?;
+        let (spawn_res, events) = rx.await??;
+
+        self.write_notify.notify_waiters();
+
+        for listener in self.listeners.read().await.clone().iter_mut() {
+            for event in events.iter() {
+                listener.send(event.clone())?;
+            }
+        }
+        Ok(spawn_res)
+    }
+
+    pub async fn run_upload(&self) -> Result<(), CubeError> {
+        let time = SystemTime::now();
+        trace!("Persisting {} snapshot", self.details.get_name());
+
+        let last_check_seq = self.last_check_seq().await;
+        let last_db_seq = self.db.latest_sequence_number();
+        if last_check_seq == last_db_seq {
+            trace!(
+                "Persisting {} snapshot: nothing to update",
+                self.details.get_name()
+            );
+            return Ok(());
+        }
+
+        let last_upload_seq = self.last_upload_seq().await;
+        let (serializer, min, max) = {
+            let updates = self.db.get_updates_since(last_upload_seq)?;
+            let mut serializer = WriteBatchContainer::new();
+
+            let mut seq_numbers = Vec::new();
+
+            updates.into_iter().for_each(|(n, write_batch)| {
+                seq_numbers.push(n);
+                write_batch.iterate(&mut serializer);
+            });
+            (
+                serializer,
+                seq_numbers.iter().min().map(|v| *v),
+                seq_numbers.iter().max().map(|v| *v),
+            )
+        };
+
+        if max.is_some() {
+            let checkpoint_time = self.last_checkpoint_time.read().await;
+            let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
+            self.metastore_fs
+                .upload_log(&dir_name, min.unwrap(), &serializer)
+                .await?;
+            let mut seq = self.last_upload_seq.write().await;
+            *seq = max.unwrap();
+            self.write_completed_notify.notify_waiters();
+        }
+
+        let last_checkpoint_time: SystemTime = self.last_checkpoint_time.read().await.clone();
+        if last_checkpoint_time
+            + time::Duration::from_secs(self.config.meta_store_snapshot_interval())
+            < SystemTime::now()
+        {
+            info!("Uploading {} check point", self.details.get_name());
+            self.upload_check_point().await?;
+        }
+
+        let mut check_seq = self.last_check_seq.write().await;
+        *check_seq = last_db_seq;
+
+        info!(
+            "Persisting {} snapshot: done ({:?})",
+            self.details.get_name(),
+            time.elapsed()?
+        );
+
+        Ok(())
+    }
+
+    pub async fn upload_check_point(&self) -> Result<(), CubeError> {
+        let mut check_point_time = self.last_checkpoint_time.write().await;
+
+        let (remote_path, checkpoint_path) = {
+            let _db = self.db.clone();
+            *check_point_time = SystemTime::now();
+            self.prepare_checkpoint(&check_point_time).await?
+        };
+
+        self.metastore_fs
+            .upload_checkpoint(remote_path, checkpoint_path)
+            .await?;
+        self.write_completed_notify.notify_waiters();
+        Ok(())
+    }
+
+    async fn last_upload_seq(&self) -> u64 {
+        *self.last_upload_seq.read().await
+    }
+
+    async fn last_check_seq(&self) -> u64 {
+        *self.last_check_seq.read().await
+    }
+
+    fn get_store_path(&self, checkpoint_time: &SystemTime) -> String {
+        format!(
+            "{}-{}",
+            self.details.get_name(),
+            checkpoint_time
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        )
+    }
+
+    async fn prepare_checkpoint(
+        &self,
+        checkpoint_time: &SystemTime,
+    ) -> Result<(String, PathBuf), CubeError> {
+        let remote_path = self.get_store_path(checkpoint_time);
+        let checkpoint_path = self.db.path().join("..").join(remote_path.clone());
+
+        let path_to_move = checkpoint_path.clone();
+        let db_to_move = self.db.clone();
+
+        cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
+            let checkpoint = Checkpoint::new(db_to_move.as_ref())?;
+            checkpoint.create_checkpoint(path_to_move.as_path())?;
+            Ok(())
+        })
+        .await??;
+
+        Ok((remote_path, checkpoint_path))
+    }
+
+    pub async fn read_operation<F, R>(&self, f: F) -> Result<R, CubeError>
+    where
+        F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
+        R: Send + Sync + 'static,
+    {
+        let mem_seq = MemorySequence::new(self.seq_store.clone());
+        let db_to_send = self.db.clone();
+        let store_name = self.details.get_name();
+
+        let rw_loop_sender = self.rw_loop_tx.clone();
+        let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
+
+        cube_ext::spawn_blocking(move || {
+            let res = rw_loop_sender.send(Box::new(move || {
+                let db_span = warn_long("metastore read operation", Duration::from_millis(100));
+                let span = tracing::trace_span!("metastore read operation");
+                let span_holder = span.enter();
+
+                let snapshot = db_to_send.snapshot();
+                let res = f(DbTableRef {
+                    db: db_to_send.as_ref(),
+                    snapshot: &snapshot,
+                    mem_seq,
+                    start_time: Utc::now(),
+                });
+
+                tx.send(res).map_err(|_| {
+                    CubeError::internal(format!(
+                        "[{}] Read operation result receiver has been dropped",
+                        store_name
+                    ))
+                })?;
+
+                mem::drop(span_holder);
+                mem::drop(db_span);
+
+                Ok(())
+            }));
+            if let Err(e) = res {
+                log::error!("Error during read write loop send: {}", e);
+            }
+        })
+        .await?;
+
+        rx.await?
+    }
+
+    pub async fn read_operation_out_of_queue<F, R>(&self, f: F) -> Result<R, CubeError>
+    where
+        F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
+        R: Send + Sync + 'static,
+    {
+        let mem_seq = MemorySequence::new(self.seq_store.clone());
+        let db_to_send = self.db.clone();
+
+        cube_ext::spawn_blocking(move || {
+            let db_span = warn_long(
+                "metastore read operation out of queue",
+                Duration::from_millis(100),
+            );
+            let span = tracing::trace_span!("metastore read operation out of queue");
+            let span_holder = span.enter();
+
+            let snapshot = db_to_send.snapshot();
+            let res = f(DbTableRef {
+                db: db_to_send.as_ref(),
+                snapshot: &snapshot,
+                mem_seq,
+                start_time: Utc::now(),
+            });
+
+            mem::drop(span_holder);
+            mem::drop(db_span);
+
+            res
+        })
+        .await?
+    }
+
+    pub fn cleanup_test_store(test_name: &str) {
+        let store_path = env::current_dir()
+            .unwrap()
+            .join(format!("test-{}-local", test_name));
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join(format!("test-{}-remote", test_name));
+        let _ = std::fs::remove_dir_all(store_path.clone());
+        let _ = std::fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    pub async fn has_pending_changes(&self) -> Result<bool, CubeError> {
+        let db = self.db.clone();
+        Ok(db
+            .get_updates_since(self.last_upload_seq().await)?
+            .next()
+            .is_some())
+    }
 }

@@ -119,7 +119,7 @@ jobs:
             executable_name: cubestored
             cross: true
             strip: true
-            compress: true
+            compress: false
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-musl
             executable_name: cubestored
@@ -166,6 +166,8 @@ jobs:
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: ${{ startsWith(matrix.os, 'windows') }}
       - name: Install OpenSSL for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: vcpkg integrate install; vcpkg install openssl:x64-windows

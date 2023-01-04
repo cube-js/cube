@@ -169,7 +169,10 @@ jobs:
 
   cross:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
+    env:
+      RUSTFLAGS: '-Ctarget-feature=+crt-static'
+      OPENSSL_STATIC: 1
     strategy:
       matrix:
         target:
@@ -183,7 +186,7 @@ jobs:
             executable_name: cubestored
             cross: true
             strip: true
-            compress: true
+            compress: false
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-musl
             executable_name: cubestored

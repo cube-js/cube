@@ -1,9 +1,9 @@
 module.exports = {
     queryRewrite: (query, { securityContext }) => {
         const cubeNames = [
-            ...(Array.from(query.measures, (e) => e.split('.')[0])),
-            ...(Array.from(query.dimensions, (e) => e.split('.')[0])),
-        ];
+          ...query.dimensions || [],
+          ...query.measures || [],
+        ].map((e) => e.split('.')[0]);
 
         if (cubeNames.includes('Products')) {
             if (!securityContext.email) {

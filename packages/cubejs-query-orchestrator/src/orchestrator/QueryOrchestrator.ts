@@ -1,14 +1,14 @@
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 
-import { QueryCache } from './QueryCache';
+import { QueryCache, QueryBody, TempTable } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 
-export type CacheAndQueryDriverType = 'redis' | 'memory';
+export type CacheAndQueryDriverType = 'redis' | 'memory' | 'cubestore';
 
 export enum DriverType {
   External = 'external',
@@ -55,12 +55,16 @@ export class QueryOrchestrator {
     );
     this.cacheAndQueueDriver = cacheAndQueueDriver;
 
-    if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
-      throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
+    if (!['redis', 'memory', 'cubestore'].includes(cacheAndQueueDriver)) {
+      throw new Error('Only \'redis\', \'memory\' or \'cubestore\' are supported for cacheAndQueueDriver option');
     }
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     this.redisPool = redisPool;
+
+    // TODO: Re-use connection from external database
+    const cubeStoreDriver = undefined;
+
     const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
 
     this.queryCache = new QueryCache(
@@ -71,6 +75,7 @@ export class QueryOrchestrator {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
+        cubeStoreDriver,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.queryCacheOptions,
@@ -153,9 +158,14 @@ export class QueryOrchestrator {
    * Push query to the queue, fetch and return result if query takes
    * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
    * error otherwise.
+   *
+   * @throw ContinueWaitError
    */
-  public async fetchQuery(queryBody: any): Promise<any> {
-    const { preAggregationsTablesToTempTables, values } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
+  public async fetchQuery(queryBody: QueryBody): Promise<any> {
+    const {
+      preAggregationsTablesToTempTables,
+      values,
+    } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
 
     if (values) {
       queryBody = {
@@ -166,17 +176,37 @@ export class QueryOrchestrator {
 
     const usedPreAggregations = R.pipe(
       R.fromPairs,
-      R.map((pa: any) => ({
+      R.map((pa: TempTable) => ({
         targetTableName: pa.targetTableName,
         refreshKeyValues: pa.refreshKeyValues,
         lastUpdatedAt: pa.lastUpdatedAt,
       })),
-    )(preAggregationsTablesToTempTables);
+    )(
+      preAggregationsTablesToTempTables as unknown as [
+        number, // TODO: we actually have a string here
+        {
+          buildRangeEnd: string,
+          lastUpdatedAt: number,
+          queryKey: unknown,
+          refreshKeyValues: [{
+            'refresh_key': string,
+          }][],
+          targetTableName: string,
+          type: string,
+        },
+      ][]
+    );
+
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
-      throw new Error('No pre-aggregation table has been built for this query yet. Please check your refresh worker configuration if it persists.');
+      throw new Error(
+        'No pre-aggregation table has been built for this query yet. ' +
+        'Please check your refresh worker configuration if it persists.'
+      );
     }
 
-    let lastRefreshTimestamp = getLastUpdatedAtTimestamp(preAggregationsTablesToTempTables.map(pa => new Date(pa[1].lastUpdatedAt)));
+    let lastRefreshTimestamp = getLastUpdatedAtTimestamp(
+      preAggregationsTablesToTempTables.map(pa => pa[1].lastUpdatedAt)
+    );
 
     if (!queryBody.query) {
       // We want to return a more convenient and filled object for the following
@@ -201,7 +231,10 @@ export class QueryOrchestrator {
       preAggregationsTablesToTempTables
     );
 
-    lastRefreshTimestamp = getLastUpdatedAtTimestamp([lastRefreshTimestamp, result.lastRefreshTime?.getTime()]);
+    lastRefreshTimestamp = getLastUpdatedAtTimestamp([
+      lastRefreshTimestamp,
+      result.lastRefreshTime?.getTime()
+    ]);
 
     return {
       ...result,

@@ -2,6 +2,7 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::partition::partition_file_name;
+use crate::metastore::replay_handle::{union_seq_pointer_by_location, SeqPointerForLocation};
 use crate::metastore::table::AggregateColumn;
 use crate::metastore::{
     deactivate_table_on_corrupt_data, table::Table, Chunk, IdRow, Index, IndexType, MetaStore,
@@ -36,6 +37,7 @@ use datafusion::physical_plan::{
 };
 use datafusion::scalar::ScalarValue;
 use futures::StreamExt;
+use futures_util::future::join_all;
 use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
 use parquet::arrow::ArrowWriter;
@@ -156,11 +158,20 @@ impl CompactionServiceImpl {
         let mut old_chunk_ids = Vec::new();
         let mut new_chunk_ids = Vec::new();
 
+        let chunks_with_meta = chunks
+            .iter()
+            .map(|c| (c.clone(), partition.clone(), index.clone()))
+            .collect::<Vec<_>>();
+
         for group in compact_groups.iter() {
             let group_chunks = &chunks[group.0..group.1];
-            let in_memory_columns =
-                prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, group_chunks)
-                    .await?;
+            let in_memory_columns = prepare_in_memory_columns(
+                &self.chunk_store,
+                num_columns,
+                key_size,
+                &chunks_with_meta[group.0..group.1],
+            )
+            .await?;
 
             // Get merged RecordBatch
             let batches_stream = merge_chunks(
@@ -203,8 +214,34 @@ impl CompactionServiceImpl {
             new_chunk_ids.push((chunk.get_id(), None));
         }
 
+        let handles = self
+            .meta_store
+            .get_replay_handles_by_ids(
+                chunks
+                    .iter()
+                    .filter_map(|c| c.get_row().replay_handle_id().clone())
+                    .collect(),
+            )
+            .await?;
+        let mut seq_pointer_by_location = None;
+        for handle in handles.iter() {
+            union_seq_pointer_by_location(
+                &mut seq_pointer_by_location,
+                handle.get_row().seq_pointers_by_location(),
+            )?;
+        }
+        let replay_handle_id = if let Some(_) = seq_pointer_by_location {
+            let replay_handle = self
+                .meta_store
+                .create_replay_handle_from_seq_pointers(table.get_id(), seq_pointer_by_location)
+                .await?;
+
+            Some(replay_handle.get_id())
+        } else {
+            None
+        };
         self.meta_store
-            .swap_chunks_without_check(old_chunk_ids, new_chunk_ids)
+            .swap_chunks_without_check(old_chunk_ids, new_chunk_ids, replay_handle_id)
             .await?;
 
         Ok(())
@@ -246,9 +283,18 @@ impl CompactionServiceImpl {
             })
             .min();
 
-        let in_memory_columns =
-            prepare_in_memory_columns(&self.chunk_store, num_columns, key_size, &chunks[..])
-                .await?;
+        let chunks_with_meta = chunks
+            .iter()
+            .map(|c| (c.clone(), partition.clone(), index.clone()))
+            .collect::<Vec<_>>();
+
+        let in_memory_columns = prepare_in_memory_columns(
+            &self.chunk_store,
+            num_columns,
+            key_size,
+            &chunks_with_meta[..],
+        )
+        .await?;
         let batches_stream = merge_chunks(
             key_size,
             main_table.clone(),
@@ -275,7 +321,30 @@ impl CompactionServiceImpl {
             .await?;
 
         self.meta_store
-            .swap_chunks_without_check(old_chunk_ids, vec![(chunk.get_id(), file_size)])
+            .swap_chunks_without_check(old_chunk_ids, vec![(chunk.get_id(), file_size)], None)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn deactivate_and_mark_failed_chunks_for_replay(
+        &self,
+        failed: Vec<(IdRow<Chunk>, bool)>,
+    ) -> Result<(), CubeError> {
+        if failed.is_empty() {
+            return Ok(());
+        }
+        let mut deactivate_failed_chunk_ids = Vec::new();
+        for (failed_chunk, _) in failed {
+            if let Some(handle_id) = failed_chunk.get_row().replay_handle_id() {
+                self.meta_store
+                    .update_replay_handle_failed(*handle_id, true)
+                    .await?;
+                deactivate_failed_chunk_ids.push(failed_chunk.get_id());
+            }
+        }
+        self.meta_store
+            .deactivate_chunks_without_check(deactivate_failed_chunk_ids)
             .await?;
 
         Ok(())
@@ -382,7 +451,15 @@ impl CompactionService for CompactionServiceImpl {
         let mut data = Vec::new();
         let num_columns = index.get_row().columns().len();
         for chunk in chunks.iter() {
-            for b in self.chunk_store.get_chunk_columns(chunk.clone()).await? {
+            for b in self
+                .chunk_store
+                .get_chunk_columns_with_preloaded_meta(
+                    chunk.clone(),
+                    partition.clone(),
+                    index.clone(),
+                )
+                .await?
+            {
                 assert_eq!(
                     num_columns,
                     b.num_columns(),
@@ -494,6 +571,7 @@ impl CompactionService for CompactionServiceImpl {
                 .upload_file(&new_local_files[0], &remote)
                 .await?;
             let chunk_ids = chunks.iter().map(|c| c.get_id()).collect_vec();
+            // In memory chunks shouldn't ever get here. Otherwise replay handle should be defined.
             let swapped = self
                 .meta_store
                 .swap_compacted_chunks(partition_id, chunk_ids, c.get_id(), file_size)
@@ -625,13 +703,37 @@ impl CompactionService for CompactionServiceImpl {
             self.config.compaction_in_memory_chunks_size_limit();
 
         // Get all in_memory and active chunks
-        let (mem_chunks, persistent_chunks) = self
+        let active_in_memory = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?
             .into_iter()
             .filter(|c| c.get_row().in_memory() && c.get_row().active())
-            .partition(|c| {
+            .collect::<Vec<_>>();
+        let chunk_and_inmemory = active_in_memory
+            .into_iter()
+            .map(|c| {
+                let chunk_store = self.chunk_store.clone();
+                let partition = partition.clone();
+                cube_ext::spawn(async move {
+                    let has_in_memory_chunk = chunk_store
+                        .has_in_memory_chunk(c.clone(), partition)
+                        .await?;
+                    Result::<_, CubeError>::Ok((c, has_in_memory_chunk))
+                })
+            })
+            .collect::<Vec<_>>();
+        let chunk_and_inmemory = join_all(chunk_and_inmemory)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+        let (in_memory, failed) = chunk_and_inmemory
+            .into_iter()
+            .partition::<Vec<_>, _>(|(_, has_in_memory_chunk)| *has_in_memory_chunk);
+        let (mem_chunks, persistent_chunks) =
+            in_memory.into_iter().map(|(c, _)| c).partition(|c| {
                 c.get_row().get_row_count() <= compaction_in_memory_chunks_size_limit
                     && c.get_row()
                         .oldest_insert_at()
@@ -644,10 +746,14 @@ impl CompactionService for CompactionServiceImpl {
                         })
                         .unwrap_or(true)
             });
+
         self.compact_chunks_to_memory(mem_chunks, &partition, &index, &table)
             .await?;
         self.compact_chunks_to_persistent(persistent_chunks, &partition, &index, &table)
             .await?;
+        self.deactivate_and_mark_failed_chunks_for_replay(failed)
+            .await?;
+
         Ok(())
     }
 
@@ -768,11 +874,15 @@ pub async fn prepare_in_memory_columns(
     chunk_store: &Arc<dyn ChunkDataStore>,
     num_columns: usize,
     key_size: usize,
-    chunks: &[IdRow<Chunk>],
+    chunks_with_meta: &[(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)],
 ) -> Result<Vec<ArrayRef>, CubeError> {
     let mut data: Vec<RecordBatch> = Vec::new();
-    for chunk in chunks.iter() {
-        for b in chunk_store.get_chunk_columns(chunk.clone()).await? {
+
+    for (chunk, partition, index) in chunks_with_meta.iter() {
+        for b in chunk_store
+            .get_chunk_columns_with_preloaded_meta(chunk.clone(), partition.clone(), index.clone())
+            .await?
+        {
             data.push(b)
         }
     }
@@ -1215,8 +1325,9 @@ mod tests {
     use crate::cluster::MockCluster;
     use crate::config::Config;
     use crate::config::MockConfigObj;
-    use crate::metastore::metastore_fs::RocksMetaStoreFs;
-    use crate::metastore::{Column, ColumnType, IndexDef, IndexType, RocksMetaStore};
+    use crate::metastore::{
+        BaseRocksStoreFs, Column, ColumnType, IndexDef, IndexType, RocksMetaStore,
+    };
     use crate::remotefs::LocalDirRemoteFs;
     use crate::store::MockChunkDataStore;
     use crate::table::data::rows_to_columns;
@@ -1227,7 +1338,7 @@ mod tests {
     use datafusion::physical_plan::collect;
     use rocksdb::{Options, DB};
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[tokio::test]
     async fn compaction() {
@@ -1248,6 +1359,7 @@ mod tests {
                 None,
                 vec![],
                 true,
+                None,
                 None,
                 None,
                 None,
@@ -1275,6 +1387,7 @@ mod tests {
             .unwrap();
         metastore.chunk_uploaded(3).await.unwrap();
 
+        let cols_to_move = cols.clone();
         chunk_store.expect_get_chunk_columns().returning(move |i| {
             let limit = match i.get_id() {
                 1 => 10,
@@ -1288,12 +1401,33 @@ mod tests {
             for i in 0..limit {
                 strings.push(format!("foo{}", i));
             }
-            let schema = Arc::new(Schema::new(vec![(&cols[0]).into()]));
+            let schema = Arc::new(Schema::new(vec![(&cols_to_move[0]).into()]));
             Ok(vec![RecordBatch::try_new(
                 schema,
                 vec![Arc::new(StringArray::from(strings))],
             )?])
         });
+        let cols_to_move = cols.clone();
+        chunk_store
+            .expect_get_chunk_columns_with_preloaded_meta()
+            .returning(move |c, _i, _p| {
+                let limit = match c.get_id() {
+                    1 => 10,
+                    2 => 16,
+                    3 => 20,
+                    4 => 2,
+                    _ => unimplemented!(),
+                };
+                let mut strings = Vec::with_capacity(limit);
+                for i in 0..limit {
+                    strings.push(format!("foo{}", i));
+                }
+                let schema = Arc::new(Schema::new(vec![(&cols_to_move[0]).into()]));
+                Ok(vec![RecordBatch::try_new(
+                    schema,
+                    vec![Arc::new(StringArray::from(strings))],
+                )?])
+            });
 
         config.expect_partition_split_threshold().returning(|| 20);
 
@@ -1461,6 +1595,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -1579,10 +1714,11 @@ mod tests {
             PathBuf::from(chunk_store_path.clone()),
         );
         let metastore = RocksMetaStore::new(
-            path,
-            RocksMetaStoreFs::new(remote_fs.clone()),
+            Path::new(path),
+            BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
             config.config_obj(),
-        );
+        )
+        .unwrap();
         let chunk_store = ChunkStore::new(
             metastore.clone(),
             remote_fs.clone(),
@@ -1616,6 +1752,7 @@ mod tests {
                 None,
                 vec![ind],
                 true,
+                None,
                 None,
                 None,
                 None,

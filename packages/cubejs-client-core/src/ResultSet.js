@@ -203,8 +203,9 @@ class ResultSet {
   }
 
   series(pivotConfig) {
-    return this.seriesNames(pivotConfig).map(({ title, key }) => ({
+    return this.seriesNames(pivotConfig).map(({ title, shortTitle, key }) => ({
       title,
+      shortTitle,
       key,
       series: this.chartPivot(pivotConfig).map(({ x, ...obj }) => ({ value: obj[key], x }))
     }));
@@ -658,6 +659,15 @@ class ResultSet {
               measures[
                 ResultSet.measureFromAxis(axisValues)
               ].title
+            ) :
+            aliasedAxis, ', '
+        ),
+        shortTitle: this.axisValuesString(
+          pivotConfig.y.find(d => d === 'measures') ?
+            dropLast(1, aliasedAxis).concat(
+              measures[
+                ResultSet.measureFromAxis(axisValues)
+              ].shortTitle
             ) :
             aliasedAxis, ', '
         ),

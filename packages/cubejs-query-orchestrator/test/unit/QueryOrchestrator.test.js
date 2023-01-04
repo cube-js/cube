@@ -1,6 +1,4 @@
 /* globals jest, describe, beforeEach, afterEach, test, expect */
-
-import { BaseDriver } from '@cubejs-backend/base-driver';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
@@ -136,11 +134,30 @@ class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
   capabilities() {
     return { unloadWithoutTempTable: true };
   }
+  
+  queryColumnTypes() {
+    return [];
+  }
 }
 
 class StreamingSourceMockDriver extends MockDriver {
   capabilities() {
     return { streamingSource: true };
+  }
+
+  loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options) {
+    this.loadPreAggregationIntoTableStreamOffset = options.streamOffset;
+    return super.loadPreAggregationIntoTable(preAggregationTableName, loadSql, options);
+  }
+
+  async downloadTable(table, { csvImport, streamOffset } = {}) {
+    this.downloadTableStreamOffset = streamOffset;
+    return super.downloadTable(table, { csvImport });
+  }
+
+  async downloadQueryResults(query, params, options) {
+    this.downloadTableStreamOffset = options.streamOffset;
+    return super.downloadTable(query);
   }
 }
 
@@ -154,6 +171,7 @@ describe('QueryOrchestrator', () => {
   let externalMockDriver = null;
   let queryOrchestrator = null;
   let queryOrchestratorExternalRefresh = null;
+  let queryOrchestratorDropWithoutTouch = null;
   let testCount = 1;
 
   beforeEach(() => {
@@ -210,6 +228,14 @@ describe('QueryOrchestrator', () => {
           externalRefresh: true,
         },
       });
+    queryOrchestratorDropWithoutTouch =
+      new QueryOrchestrator(redisPrefix, driverFactory, logger, {
+        ...options,
+        preAggregationsOptions: {
+          ...options.preAggregationsOptions,
+          dropPreAggregationsWithoutTouch: true,
+        },
+      });
     mockDriver = mockDriverLocal;
     fooMockDriver = fooMockDriverLocal;
     barMockDriver = barMockDriverLocal;
@@ -221,6 +247,7 @@ describe('QueryOrchestrator', () => {
   afterEach(async () => {
     await queryOrchestrator.cleanup();
     await queryOrchestratorExternalRefresh.cleanup();
+    await queryOrchestratorDropWithoutTouch.cleanup();
   });
 
   test('basic', async () => {
@@ -1150,6 +1177,8 @@ describe('QueryOrchestrator', () => {
         query: 'SELECT refreshKey in source database',
         values: [],
         requestId: preAggregationExternalRefreshKey.requestId,
+        useCsvQuery: undefined,
+        inlineTables: undefined,
       }
     ]);
 
@@ -1165,6 +1194,8 @@ describe('QueryOrchestrator', () => {
         query: 'SELECT refreshKey in external database',
         values: [],
         requestId: preAggregationExternalRefreshKey.requestId,
+        useCsvQuery: undefined,
+        inlineTables: undefined,
       }
     ]);
   });
@@ -1220,5 +1251,101 @@ describe('QueryOrchestrator', () => {
     };
     await queryOrchestrator.fetchQuery(query);
     expect(streamingSourceMockDriver.tables[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
+  });
+
+  test('streaming receives stream offset', async () => {
+    streamingSourceMockDriver.now = 12345000;
+    const query = {
+      query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
+      values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_number_and_count20191101',
+        sql: ['SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+        dataSource: 'streaming',
+        external: true,
+        streamOffset: 'earliest'
+      }],
+      renewQuery: true,
+
+      requestId: 'basic'
+    };
+    await queryOrchestrator.fetchQuery(query);
+
+    expect(streamingSourceMockDriver.loadPreAggregationIntoTableStreamOffset).toBe('earliest');
+    expect(streamingSourceMockDriver.downloadTableStreamOffset).toBe('earliest');
+  });
+
+  test('streaming receives stream offset readOnly', async () => {
+    streamingSourceMockDriver.now = 12345000;
+    const query = {
+      query: 'SELECT "orders__created_at_week" "orders__created_at_week", sum("orders__count") "orders__count" FROM (SELECT * FROM stb_pre_aggregations.orders_number_and_count20191101) as partition_union  WHERE ("orders__created_at_week" >= ($1::timestamptz::timestamptz AT TIME ZONE \'UTC\') AND "orders__created_at_week" <= ($2::timestamptz::timestamptz AT TIME ZONE \'UTC\')) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000',
+      values: ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z'],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_number_and_count20191101',
+        sql: ['SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_number_and_count20191101 AS SELECT\n      date_trunc(\'week\', ("orders".created_at::timestamptz AT TIME ZONE \'UTC\')) "orders__created_at_week", count("orders".id) "orders__count", sum("orders".number) "orders__number"\n    FROM\n      public.orders AS "orders"\n  WHERE ("orders".created_at >= $1::timestamptz AND "orders".created_at <= $2::timestamptz) GROUP BY 1', ['2019-11-01T00:00:00Z', '2019-11-30T23:59:59Z']],
+        invalidateKeyQueries: [['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\')) as current_hour', []]],
+        dataSource: 'streaming',
+        external: true,
+        streamOffset: 'earliest',
+        readOnly: true
+      }],
+      renewQuery: true,
+
+      requestId: 'basic'
+    };
+    await queryOrchestrator.fetchQuery(query);
+
+    expect(streamingSourceMockDriver.downloadTableStreamOffset).toBe('earliest');
+  });
+
+  test('drop without touch does not affect tables in progress', async () => {
+    const firstQuery = queryOrchestratorDropWithoutTouch.fetchQuery({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_delay_d20181102',
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_delay_d20181102',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20181102 AS SELECT * FROM public.orders_delay', []],
+        invalidateKeyQueries: [['SELECT 2', []]]
+      }],
+      requestId: 'drop without touch does not affect tables in progress'
+    });
+    const promises = [firstQuery];
+    for (let i = 0; i < 10; i++) {
+      promises.push(queryOrchestratorDropWithoutTouch.fetchQuery({
+        query: `SELECT * FROM stb_pre_aggregations.orders_d201811${i}`,
+        values: [],
+        cacheKeyQueries: {
+          renewalThreshold: 21600,
+          queries: []
+        },
+        preAggregations: [{
+          preAggregationsSchema: 'stb_pre_aggregations',
+          tableName: `stb_pre_aggregations.orders_d201811${i}`,
+          loadSql: [`CREATE TABLE stb_pre_aggregations.orders_d201811${i} AS SELECT * FROM public.orders`, []],
+          invalidateKeyQueries: [['SELECT 2', []]]
+        }],
+        requestId: 'drop without touch does not affect tables in progress'
+      }));
+    }
+    await Promise.all(promises);
+    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
   });
 });

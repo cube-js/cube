@@ -40,6 +40,8 @@ const menuOrder = [
   'Deployment',
   'Developer Tools',
   'Examples & Tutorials',
+  'FAQs',
+  'Release Notes',
 ];
 
 const nameRules: Record<string, string> = {
@@ -138,7 +140,9 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
                       }
                     );
 
-                    return subItems.map(nodeParser);
+                    return item === 'Release Notes'
+                      ? subItems.reverse().map(nodeParser)
+                      : subItems.map(nodeParser);
                   }
                   return (
                     <Menu.ItemGroup key={subCategory} title={subCategory}>

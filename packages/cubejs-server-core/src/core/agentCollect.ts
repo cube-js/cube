@@ -151,14 +151,12 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
   });
   lastEvent = new Date();
 
-  const flush = async (toFlush?: any[], retries?: number) => {
+  const flush = async (toFlush: any[], retries?: number) => {
     if (!transport) {
       transport = /^http/.test(endpointUrl) ?
         new HttpTransport(endpointUrl) :
         new WebSocketTransport(endpointUrl, logger, clearTransport);
     }
-
-    if (!toFlush) toFlush = trackEvents.splice(0, getEnv('agentFrameSize'));
     if (!toFlush.length) return false;
     if (retries == null) retries = 3;
 
@@ -175,10 +173,20 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
 
     return true;
   };
+
+  const flushAllByChunks = async () => {
+    const agentFrameSize: number = getEnv('agentFrameSize');
+    const toFlushArray = [];
+    while (trackEvents.length > 0) {
+      toFlushArray.push(trackEvents.splice(0, agentFrameSize));
+    }
+    await Promise.all(toFlushArray.map(toFlush => flush(toFlush)));
+  };
+
   if (!agentInterval) {
     agentInterval = setInterval(async () => {
       if (trackEvents.length) {
-        await flush();
+        await flushAllByChunks();
       } else if (new Date().getTime() - lastEvent.getTime() > 3000) {
         clearInterval(agentInterval);
         agentInterval = null;

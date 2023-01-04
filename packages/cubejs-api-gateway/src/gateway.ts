@@ -348,7 +348,7 @@ class ApiGateway {
 
       app.post(
         '/cubejs-system/v1/pre-aggregations/jobs',
-        userMiddlewares,
+        systemMiddlewares,
         this.preAggregationsJobs.bind(this),
       );
     }
@@ -438,6 +438,8 @@ class ApiGateway {
   public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
 
+    // TODO: test and remove this function.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     function visibilityFilter(item) {
       return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
@@ -1196,6 +1198,7 @@ class ApiGateway {
     context: RequestContext,
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
+    apiType: string,
   ) {
     const queries = [{
       ...sqlQuery,
@@ -1204,7 +1207,8 @@ class ApiGateway {
       continueWait: true,
       renewQuery: normalizedQuery.renewQuery,
       requestId: context.requestId,
-      context
+      context,
+      persistent: false, // apiType === 'sql',
     }];
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
@@ -1359,6 +1363,7 @@ class ApiGateway {
             context,
             normalizedQuery,
             sqlQueries[index],
+            apiType,
           );
 
           return this.getResultInternal(
@@ -1542,7 +1547,7 @@ class ApiGateway {
   public handleError({
     e, context, query, res, requestStarted
   }: any) {
-    const { requestId } = context ?? {};
+    const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
     
     const plainError = e.plainMessages;
     
@@ -1559,9 +1564,9 @@ class ApiGateway {
         type: 'Continue wait',
         query,
         error: e.message,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
       }, context);
-      res(e, { status: 200 });
+      res({ error: e.message || e.error.message || e.error.toString(), requestId }, { status: 200 });
     } else if (e.error) {
       this.log({
         type: 'Orchestrator error',
@@ -1569,7 +1574,7 @@ class ApiGateway {
         error: e.error,
         duration: this.duration(requestStarted),
       }, context);
-      res(e, { status: 400 });
+      res({ error: e.message || e.error.message || e.error.toString(), requestId }, { status: 400 });
     } else if (e.type === 'UserError') {
       this.log({
         type: e.type,

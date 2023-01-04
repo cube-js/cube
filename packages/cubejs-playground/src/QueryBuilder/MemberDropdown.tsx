@@ -105,7 +105,7 @@ export default function MemberMenu({
       if (currentSearch !== search) {
         return;
       }
-      
+
       setFilteredKeys(results as string[]);
     })();
 
@@ -121,6 +121,11 @@ export default function MemberMenu({
   return (
     <ButtonDropdown
       {...buttonProps}
+      onOverlayClose={() => {
+        setFilteredKeys([]);
+        setSearch('');
+        searchInputRef.current?.setValue('');
+      }}
       onClick={() => {
         // we need to delay focusing since React needs to render <Menu /> first :)
         setTimeout(() => {
@@ -158,6 +163,7 @@ export default function MemberMenu({
             setSearch('');
             setFilteredKeys([]);
             onClick(indexedMembers[event.key]);
+            searchInputRef.current?.setValue('');
           }}
         >
           {hasMembers ? (

@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import { flatbuffers } from 'flatbuffers';
 import { InlineTable } from '@cubejs-backend/base-driver';
+import { getEnv } from '@cubejs-backend/shared';
 import {
   HttpCommand,
   HttpError,
@@ -13,6 +14,12 @@ import {
 export class WebSocketConnection {
   protected messageCounter: number;
 
+  protected maxConnectRetries: number;
+
+  protected noHeartBeatTimeout: number;
+
+  protected currentConnectionTry: number;
+
   protected webSocket: any;
 
   private url: string;
@@ -20,6 +27,9 @@ export class WebSocketConnection {
   public constructor(url: string) {
     this.url = url;
     this.messageCounter = 1;
+    this.maxConnectRetries = getEnv('cubeStoreMaxConnectRetries');
+    this.noHeartBeatTimeout = getEnv('cubeStoreNoHeartBeatTimeout');
+    this.currentConnectionTry = 0;
   }
 
   protected async initWebSocket() {
@@ -32,28 +42,41 @@ export class WebSocketConnection {
             webSocket.ping();
           }
 
-          if (new Date().getTime() - webSocket.lastHeartBeat.getTime() > 30000) {
+          if (new Date().getTime() - webSocket.lastHeartBeat.getTime() > this.noHeartBeatTimeout * 1000) {
             webSocket.close();
           }
         }, 5000);
 
         webSocket.sendAsync = async (message) => new Promise<void>((resolveSend, rejectSend) => {
-          webSocket.send(message, (err) => {
-            if (err) {
-              rejectSend(err);
-            } else {
-              resolveSend();
-            }
-          });
+          // If socket is closing this message should be resent
+          if (webSocket.readyState === WebSocket.OPEN) {
+            webSocket.send(message, (err) => {
+              if (err) {
+                rejectSend(err);
+              } else {
+                resolveSend();
+              }
+            });
+          }
         });
         webSocket.on('open', () => resolve(webSocket));
         webSocket.on('error', (err) => {
-          reject(err);
+          this.currentConnectionTry += 1;
+          if (this.currentConnectionTry < this.maxConnectRetries) {
+            setTimeout(async () => {
+              resolve(this.initWebSocket());
+            }, this.retryWaitTime());
+          } else {
+            reject(err);
+          }
           if (webSocket === this.webSocket) {
             this.webSocket = undefined;
           }
         });
         webSocket.on('pong', () => {
+          if (webSocket === this.webSocket) {
+            this.currentConnectionTry = 0;
+          }
           webSocket.lastHeartBeat = new Date();
         });
         webSocket.on('close', () => {
@@ -74,7 +97,7 @@ export class WebSocketConnection {
                   webSocket.sentMessages[key].reject(e);
                 }
               }
-            }, 1000);
+            }, this.retryWaitTime());
           }
 
           if (webSocket === this.webSocket) {
@@ -136,20 +159,28 @@ export class WebSocketConnection {
     return this.webSocket.readyPromise;
   }
 
+  private retryWaitTime() {
+    return 1000 * (this.currentConnectionTry + 1);
+  }
+
   private async sendMessage(messageId: number, buffer: Uint8Array): Promise<any> {
     const socket = await this.initWebSocket();
     return new Promise((resolve, reject) => {
-      socket.send(buffer, (err) => {
-        if (err) {
-          delete socket.sentMessages[messageId];
-          reject(err);
-        }
-      });
-      socket.sentMessages[messageId] = {
-        resolve,
-        reject,
-        buffer
-      };
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(buffer, (err) => {
+          if (err) {
+            delete socket.sentMessages[messageId];
+            reject(err);
+          }
+        });
+        socket.sentMessages[messageId] = {
+          resolve,
+          reject,
+          buffer
+        };
+      } else {
+        resolve(this.sendMessage(messageId, buffer));
+      }
     });
   }
 

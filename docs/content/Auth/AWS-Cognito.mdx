@@ -74,7 +74,7 @@ Now we're ready to configure Cube.js to use AWS Cognito. Go to your Cube.js
 project and open the `.env` file and add the following, replacing the values
 wrapped in `<>`.
 
-```dotenv
+```bash
 CUBEJS_JWK_URL=https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>/.well-known/jwks.json
 CUBEJS_JWT_AUDIENCE=<APPLICATION_URL>
 CUBEJS_JWT_ISSUER=https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>

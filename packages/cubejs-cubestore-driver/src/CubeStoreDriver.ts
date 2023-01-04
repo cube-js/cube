@@ -10,15 +10,14 @@ import {
   ExternalCreateTableOptions,
   DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
   StreamTableData,
-  DriverCapabilities,
   StreamingSourceTableData,
   QueryOptions,
+  ExternalDriverCompatibilities,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { format as formatSql, escape } from 'sqlstring';
 import fetch from 'node-fetch';
 
-import { CubeStoreQuery } from './CubeStoreQuery';
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
 
@@ -34,6 +33,7 @@ type Column = {
 };
 
 type CreateTableOptions = {
+  streamOffset?: string;
   inputFormat?: string
   buildRangeEnd?: string
   uniqueKey?: string
@@ -100,6 +100,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
     if (options.selectStatement) {
       withEntries.push(`select_statement = ${escape(options.selectStatement)}`);
+    }
+    if (options.streamOffset) {
+      withEntries.push(`stream_offset = '${options.streamOffset}'`);
     }
     if (withEntries.length > 0) {
       sql = `${sql} WITH (${withEntries.join(', ')})`;
@@ -364,23 +367,29 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
         ),
       queryTracingObj
     );
+
+    let locations = [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`];
+
+    if (tableData.partitions) {
+      locations = [];
+      for (let i = 0; i < tableData.partitions; i++) {
+        locations.push(`stream://${tableData.streamingSource.name}/${tableData.streamingTable}/${i}`);
+      }
+    }
     
     const options: CreateTableOptions = {
       buildRangeEnd: queryTracingObj?.buildRangeEnd,
       uniqueKey: uniqueKeyColumns.join(','),
       indexes,
-      files: [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`],
+      files: locations,
       selectStatement: tableData.selectStatement,
+      streamOffset: tableData.streamOffset,
       sealAt
     };
     return this.createTableWithOptions(table, columns, options, queryTracingObj);
   }
 
-  public static dialectClass() {
-    return CubeStoreQuery;
-  }
-
-  public capabilities(): DriverCapabilities {
+  public capabilities(): ExternalDriverCompatibilities {
     return {
       csvImport: true,
       streamImport: true,

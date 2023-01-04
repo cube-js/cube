@@ -13,7 +13,7 @@ permalink: /config/databases/clickhouse
 
 ### <--{"id" : "Setup"}--> Manual
 
-Add the following to a `.env` file in your Cube.js project:
+Add the following to a `.env` file in your Cube project:
 
 ```bash
 CUBEJS_DB_TYPE=clickhouse
@@ -25,16 +25,16 @@ CUBEJS_DB_PASS=**********
 
 ## Environment Variables
 
-| Environment Variable            | Description                                                                         | Possible Values           | Required |
-| ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
-| `CUBEJS_DB_HOST`                | The host URL for a database                                                         | A valid database host URL |    ✅    |
-| `CUBEJS_DB_PORT`                | The port for the database connection                                                | A valid port number       |    ❌    |
-| `CUBEJS_DB_NAME`                | The name of the database to connect to                                              | A valid database name     |    ✅    |
-| `CUBEJS_DB_USER`                | The username used to connect to the database                                        | A valid database username |    ✅    |
-| `CUBEJS_DB_PASS`                | The password used to connect to the database                                        | A valid database password |    ✅    |
-| `CUBEJS_DB_CLICKHOUSE_READONLY` | Whether the ClickHouse user has read-only access or not                             | `true`, `false`           |    ❌    |
-| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5` | A valid number            |    ❌    |
-| `CUBEJS_DB_MAX_POOL`            | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number            |    ❌    |
+| Environment Variable            | Description                                                                         | Possible Values           | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_DB_HOST`                | The host URL for a database                                                         | A valid database host URL |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PORT`                | The port for the database connection                                                | A valid port number       |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_NAME`                | The name of the database to connect to                                              | A valid database name     |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_USER`                | The username used to connect to the database                                        | A valid database username |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PASS`                | The password used to connect to the database                                        | A valid database password |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_CLICKHOUSE_READONLY` | Whether the ClickHouse user has read-only access or not                             | `true`, `false`           |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5` | A valid number            |    ❌    |                                    ❌                                    |
+| `CUBEJS_DB_MAX_POOL`            | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number            |    ❌    |                                    ✅                                    |
 
 ## Pre-Aggregation Feature Support
 
@@ -71,7 +71,7 @@ ClickHouse does not support export buckets.
 
 ## SSL
 
-To enable SSL-encrypted connections between Cube.js and ClickHouse, set the
+To enable SSL-encrypted connections between Cube and ClickHouse, set the
 `CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
@@ -89,6 +89,8 @@ You can connect to a ClickHouse database when your user's permissions are
   https://clickhouse.tech/docs/en/operations/settings/permissions-for-queries/#settings_readonly
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-config-multiple-ds-decorating-env]:
+  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
 [ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
 [ref-schema-ref-types-formats-countdistinctapprox]:
   /schema/reference/types-and-formats#count-distinct-approx

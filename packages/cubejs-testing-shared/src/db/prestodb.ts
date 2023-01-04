@@ -12,7 +12,7 @@ export class PrestoDbRunner extends DbRunnerAbstract {
 
     const container = new GenericContainer(`ahanaio/prestodb-sandbox:${version}`)
       .withExposedPorts(8080)
-      .withWaitStrategy(Wait.forLogMessage("======== SERVER STARTED ========"))
+      .withWaitStrategy(Wait.forLogMessage('======== SERVER STARTED ========'))
       .withStartupTimeout(30 * 1000);
 
     if (options.volumes) {

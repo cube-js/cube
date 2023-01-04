@@ -135,6 +135,10 @@ class OracleDriver extends BaseDriver {
   release() {
     return this.pool && this.pool.close();
   }
+
+  readOnly() {
+    return true;
+  }
 }
 
 module.exports = OracleDriver;

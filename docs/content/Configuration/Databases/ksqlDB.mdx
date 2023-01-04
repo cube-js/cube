@@ -4,7 +4,9 @@ permalink: /config/databases/ksqldb
 ---
 
 <WarningBox>
-ksqlDB driver is in preview. Please <a href="https://cube.dev/contact">contact us</a> if you need help running it in production.
+  ksqlDB driver is in preview. Please{' '}
+  <a href="https://cube.dev/contact">contact us</a> if you need help running it
+  in production.
 </WarningBox>
 
 ## Prerequisites
@@ -12,13 +14,14 @@ ksqlDB driver is in preview. Please <a href="https://cube.dev/contact">contact u
 - Hostname for the ksqlDB server
 - Username and password to connect to ksqlDB server
 
-If you are using Confluent Cloud, you need to generate API key and use **key as username** and **secret as password**.
+If you are using Confluent Cloud, you need to generate API key and use **key as
+username** and **secret as password**.
 
 ## Setup
 
 ### <--{"id" : "Setup"}--> Manual
 
-Add the following to a `.env` file in your Cube.js project:
+Add the following to a `.env` file in your Cube project:
 
 ```bash
 CUBEJS_DB_TYPE=ksql
@@ -29,12 +32,16 @@ CUBEJS_DB_PASS=password
 
 ## Environment Variables
 
-| Environment Variable | Description                                                                         | Possible Values           | Required |
-| -------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
-| `CUBEJS_DB_URL`      | The host URL for ksqlDB with port                                                   | A valid database host URL |    ✅    |
-| `CUBEJS_DB_USER`     | The username used to connect to the ksqlDB. API key for Confluent Cloud.            | A valid port number       |    ✅    |
-| `CUBEJS_DB_PASS`     | The password used to connect to the ksqlDB. API secret for Confluent Cloud.         | A valid database name     |    ✅    |
+| Environment Variable | Description                                                                 | Possible Values           | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| -------------------- | --------------------------------------------------------------------------- | ------------------------- | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_DB_URL`      | The host URL for ksqlDB with port                                           | A valid database host URL |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_USER`     | The username used to connect to the ksqlDB. API key for Confluent Cloud.    | A valid port number       |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PASS`     | The password used to connect to the ksqlDB. API secret for Confluent Cloud. | A valid database name     |    ✅    |                                    ✅                                    |
 
 ## Pre-Aggregations Support
 
-ksqlDB supports only [streaming pre-aggregations](/caching/using-pre-aggregations#streaming-pre-aggregations).
+ksqlDB supports only
+[streaming pre-aggregations](/caching/using-pre-aggregations#streaming-pre-aggregations).
+
+[ref-config-multiple-ds-decorating-env]:
+  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables

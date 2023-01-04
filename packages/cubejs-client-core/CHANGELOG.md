@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.33](https://github.com/cube-js/cube.js/compare/v0.31.32...v0.31.33) (2023-01-03)
+
+
+### Bug Fixes
+
+* **@cubejs-client/core:** add missing Series.shortTitle typing ([#5860](https://github.com/cube-js/cube.js/issues/5860)) ([5dd78b9](https://github.com/cube-js/cube.js/commit/5dd78b9544965304757c72d8f305741f78bfc935))
+
+
+
+
+
+## [0.31.30](https://github.com/cube-js/cube.js/compare/v0.31.29...v0.31.30) (2022-12-22)
+
+
+### Features
+
+* **@cubejs-client/core:** expose shortTitle in seriesNames ([#5836](https://github.com/cube-js/cube.js/issues/5836)) Thanks [@euljr](https://github.com/euljr) ! ([1058d5a](https://github.com/cube-js/cube.js/commit/1058d5afd2784302b23215d73c679d35ceb785a8))
+
+
+
+
+
+## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
+
+
+### Bug Fixes
+
+* packages/cubejs-client-core/package.json to reduce vulnerabilities ([#5415](https://github.com/cube-js/cube.js/issues/5415)) ([fb2de68](https://github.com/cube-js/cube.js/commit/fb2de682670bd28b2879d0460fac990d9b653dce))
+
+
+
+
+
 ## [0.31.13](https://github.com/cube-js/cube.js/compare/v0.31.12...v0.31.13) (2022-11-08)
 
 
