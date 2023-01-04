@@ -18,7 +18,7 @@ Keep in mind:
 
 ```sh
 # dmY
-export CROSS_VERSION=02012023
+export $(cat .env | xargs)
 
 # docker build -t cubejs/rust-cross:x86_64-apple-darwin-$CROSS_VERSION -f x86_64-apple-darwin.Dockerfile .
 # docker buildx build --platform linux/amd64 -t cubejs/rust-cross:x86_64-pc-windows-gnu-$CROSS_VERSION -f x86_64-pc-windows-gnu.Dockerfile .
