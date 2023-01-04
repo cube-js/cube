@@ -1392,7 +1392,7 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             transforming_rewrite(
-                "filter-thoughtspot-search-includes-excludes",
+                "filter-thoughtspot-like-escape-contains",
                 filter_replacer(
                     like_expr(
                         "LikeExprLikeType:Like",
@@ -1436,6 +1436,115 @@ impl RewriteRules for FilterRules {
                 ),
                 filter_member("?filter_member", "?filter_op", "?filter_values"),
                 self.transform_like_escape(
+                    "contains",
+                    "?negated",
+                    "?column",
+                    "?literal",
+                    "?escape_char",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-thoughtspot-like-escape-starts-with",
+                filter_replacer(
+                    like_expr(
+                        "LikeExprLikeType:Like",
+                        "?negated",
+                        fun_expr("Lower", vec![column_expr("?column")]),
+                        binary_expr(
+                            fun_expr(
+                                "Replace",
+                                vec![
+                                    fun_expr(
+                                        "Replace",
+                                        vec![
+                                            fun_expr(
+                                                "Replace",
+                                                vec![
+                                                    literal_expr("?literal"),
+                                                    literal_string("!"),
+                                                    literal_string("!!"),
+                                                ],
+                                            ),
+                                            literal_string("%"),
+                                            literal_string("!%"),
+                                        ],
+                                    ),
+                                    literal_string("_"),
+                                    literal_string("!_"),
+                                ],
+                            ),
+                            "||",
+                            literal_string("%"),
+                        ),
+                        "?escape_char",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_like_escape(
+                    "startsWith",
+                    "?negated",
+                    "?column",
+                    "?literal",
+                    "?escape_char",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                    "?filter_member",
+                    "?filter_op",
+                    "?filter_values",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-thoughtspot-like-escape-ends-with",
+                filter_replacer(
+                    like_expr(
+                        "LikeExprLikeType:Like",
+                        "?negated",
+                        fun_expr("Lower", vec![column_expr("?column")]),
+                        binary_expr(
+                            literal_string("%"),
+                            "||",
+                            fun_expr(
+                                "Replace",
+                                vec![
+                                    fun_expr(
+                                        "Replace",
+                                        vec![
+                                            fun_expr(
+                                                "Replace",
+                                                vec![
+                                                    literal_expr("?literal"),
+                                                    literal_string("!"),
+                                                    literal_string("!!"),
+                                                ],
+                                            ),
+                                            literal_string("%"),
+                                            literal_string("!%"),
+                                        ],
+                                    ),
+                                    literal_string("_"),
+                                    literal_string("!_"),
+                                ],
+                            ),
+                        ),
+                        "?escape_char",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_member("?filter_member", "?filter_op", "?filter_values"),
+                self.transform_like_escape(
+                    "endsWith",
                     "?negated",
                     "?column",
                     "?literal",
@@ -1693,14 +1802,32 @@ impl RewriteRules for FilterRules {
                 self.unwrap_datetrunc("?granularity", "second"),
             ),
             rewrite(
-                "not-expt-ilike-to-expr-not-ilike",
+                "not-expr-ilike-to-expr-not-ilike",
                 not_expr(binary_expr("?left", "ILIKE", "?right")),
                 binary_expr("?left", "NOT_ILIKE", "?right"),
             ),
             rewrite(
-                "not-expt-like-to-expr-not-like",
+                "not-expr-like-to-expr-not-like",
                 not_expr(binary_expr("?left", "LIKE", "?right")),
                 binary_expr("?left", "NOT_LIKE", "?right"),
+            ),
+            transforming_rewrite(
+                "not-like-expr-to-like-negated-expr",
+                not_expr(like_expr(
+                    "?like_type",
+                    "?negated",
+                    "?expr",
+                    "?pattern",
+                    "?escape_char",
+                )),
+                like_expr(
+                    "?like_type",
+                    "?new_negated",
+                    "?expr",
+                    "?pattern",
+                    "?escape_char",
+                ),
+                self.transform_negate_like_expr("?negated", "?new_negated"),
             ),
             rewrite(
                 "plus-value-minus-value",
@@ -3028,6 +3155,29 @@ impl FilterRules {
         }
     }
 
+    fn transform_negate_like_expr(
+        &self,
+        negated_var: &'static str,
+        new_negated_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let negated_var = var!(negated_var);
+        let new_negated_var = var!(new_negated_var);
+        move |egraph, subst| {
+            for negated in var_iter!(egraph[subst[negated_var]], LikeExprNegated).cloned() {
+                subst.insert(
+                    new_negated_var,
+                    egraph.add(LogicalPlanLanguage::LikeExprNegated(LikeExprNegated(
+                        !negated,
+                    ))),
+                );
+
+                return true;
+            }
+
+            false
+        }
+    }
+
     fn filter_member_name(
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         subst: &Subst,
@@ -3455,6 +3605,7 @@ impl FilterRules {
 
     fn transform_like_escape(
         &self,
+        filter_op: &'static str,
         negated_var: &'static str,
         column_var: &'static str,
         literal_var: &'static str,
@@ -3508,8 +3659,11 @@ impl FilterRules {
                                     var_iter!(egraph[subst[negated_var]], LikeExprNegated)
                                 {
                                     let filter_member_op = match &negated {
-                                        true => "notContains",
-                                        false => "contains",
+                                        true => match utils::negated_cube_filter_op(filter_op) {
+                                            Some(op) => op,
+                                            None => continue,
+                                        },
+                                        false => filter_op,
                                     };
 
                                     subst.insert(

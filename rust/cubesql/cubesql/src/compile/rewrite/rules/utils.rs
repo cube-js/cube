@@ -106,3 +106,30 @@ fn granularity_int_order_to_str(granularity: i32, week_as_day: Option<bool>) -> 
     }
     .map(|g| g.to_string())
 }
+
+pub fn negated_cube_filter_op(op: &str) -> Option<&'static str> {
+    macro_rules! define_op_eq {
+        ($($EXPR:expr => $NEG:expr,)*) => {
+            match op {
+                $(
+                    $EXPR => $NEG,
+                    $NEG => $EXPR,
+                )*
+                _ => return None,
+            }
+        }
+    }
+
+    let negated = define_op_eq![
+        "equals" => "notEquals",
+        "contains" => "notContains",
+        "startsWith" => "notStartsWith",
+        "endsWith" => "notEndsWith",
+        "gt" => "lte",
+        "lt" => "gte",
+        "set" => "notSet",
+        "inDateRange" => "notInDateRange",
+    ];
+
+    Some(negated)
+}
