@@ -50,12 +50,12 @@ from local storage to your own or hosted GraphQL backend.
 dashboard app. There a lot of options to deploy your static applications. You
 can serve it with your favorite HTTP server ot just select one of the popular
 cloud providers. Below you can find quick guides for
-[Netlify](https://www.netlify.com/) and [ZEIT Now](https://zeit.co/). Also, you
+[Netlify](https://www.netlify.com/) and [Vercel](https://vercel.com/). Also, you
 can refer to the
 [create-react-app deployment](https://create-react-app.dev/docs/deployment)
 guide for additional deployment options.
 
-### <--{"id" : "Deployment"}-->  Netlify
+### <--{"id" : "Deployment"}--> Netlify
 
 Install Netlify CLI:
 
@@ -74,17 +74,17 @@ $ netlify deploy
 Next follow command line prompts and choose yes for new project and `build` as
 your deploy folder.
 
-### <--{"id" : "Deployment"}-->  ZEIT
+### <--{"id" : "Deployment"}--> Vercel
 
-Install ZEIT Now CLI:
+Install Vercel CLI:
 
 ```bash
-$ npm install now -g
+$ npm install vercel -g
 ```
 
-Run `now` command in the root directory of the app.
+Run `vercel` command in the root directory of the app.
 
 ```bash
 $ cd my-cubejs-app/dashboard-app
-$ now
+$ vercel
 ```

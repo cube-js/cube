@@ -5,15 +5,12 @@
 //! and guarantees that ordinary partitions that store the data have the same key range.
 //! Multi-partitioned are compacted and repartitioned by applying the same operation to ordinary
 //! partitions they own.
-use super::RocksTable;
 use crate::data_frame_from;
-use crate::metastore::{
-    BaseRocksSecondaryIndex, Column, IdRow, IndexId, MetaStoreEvent, RocksSecondaryIndex, TableId,
-};
+use crate::metastore::{Column, IdRow, IndexId, RocksSecondaryIndex, TableId};
 use crate::rocks_table_impl;
 use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Cursor;
 use std::io::Write;

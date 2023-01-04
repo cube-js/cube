@@ -11,8 +11,8 @@ redirect_from:
 <InfoBox>
 
 This content is being moved to the
-[Cube.js community forum](https://forum.cube.dev/). We encourage you to follow
-the content and discussions
+[Cube community forum](https://forum.cube.dev/). We encourage you to follow the
+content and discussions
 [in the new forum post](https://forum.cube.dev/t/funnels-a-series-of-events-that-lead-users-towards-a-defined-goal).
 
 </InfoBox>
@@ -29,8 +29,8 @@ Regardless of the domain, every funnel has the following traits:
 - The time to convert between steps
 
 Since funnels have a pretty standard structure, they are good candidates for
-being extracted into reusable packages. Cube.js comes pre-packaged with a
-standard funnel package.
+being extracted into reusable packages. Cube comes pre-packaged with a standard
+funnel package.
 
 ```javascript
 // First step is to require the Funnel package
@@ -63,9 +63,9 @@ cube(`PurchaseFunnel`, {
 });
 ```
 
-Cube.js will generate an SQL query for this funnel. Since funnel analysis in SQL
-is not straight forward, the SQL code itself is quite complicated, even for such
-a small funnel.
+Cube will generate an SQL query for this funnel. Since funnel analysis in SQL is
+not straight forward, the SQL code itself is quite complicated, even for such a
+small funnel.
 
 <a href="#" class="accordion-trigger" id="show-sql-accordion">
   {' '}
@@ -277,7 +277,7 @@ cube(`PurchaseFunnel`, {
   joins: {
     Users: {
       relationship: `belongsTo`,
-      sql: `${CUBE}.first_step_user_id = ${Users}.id`,
+      sql: `${CUBE}.first_step_user_id = ${Users.id}`,
     },
   },
 
@@ -289,7 +289,7 @@ cube(`PurchaseFunnel`, {
 
 ## Using funnels
 
-Cube.js is based on
+Cube is based on
 [multidimensional analysis](https://en.wikipedia.org/wiki/Multidimensional_analysis)
 
 Funnel-based cubes have the following structure:

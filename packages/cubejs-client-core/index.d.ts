@@ -261,6 +261,7 @@ declare module '@cubejs-client/core' {
   export type Series<T> = {
     key: string;
     title: string;
+    shortTitle: string;
     series: T[];
   };
 
@@ -273,6 +274,7 @@ declare module '@cubejs-client/core' {
   export type SeriesNamesColumn = {
     key: string;
     title: string;
+    shortTitle: string;
     yValues: string[];
   };
 
@@ -425,6 +427,7 @@ declare module '@cubejs-client/core' {
      *   {
      *     key: 'Stories.count',
      *     title: 'Stories Count',
+     *     shortTitle: 'Count',
      *     series: [
      *       { x: '2015-01-01T00:00:00', value: 27120 },
      *       { x: '2015-02-01T00:00:00', value: 25861 },
@@ -455,6 +458,7 @@ declare module '@cubejs-client/core' {
      *   {
      *     key: 'Stories.count',
      *     title: 'Stories Count',
+     *     shortTitle: 'Count',
      *     yValues: ['Stories.count'],
      *   },
      * ]

@@ -7,7 +7,7 @@ redirect_from:
   - /cloud/configuration/connecting-to-databases
 ---
 
-You can connect all Cube.js supported databases to your Cube Cloud deployment.
+You can connect all Cube supported databases to your Cube Cloud deployment.
 
 <div style="text-align: center">
   <img
@@ -32,12 +32,12 @@ vendors.
 
 The following fields are required when creating an AWS Athena connection:
 
-| Field                     | Description                                                       | Examples                                   |
-| ------------------------- | ----------------------------------------------------------------- | ------------------------------------------ |
-| **AWS Access Key ID**     | The AWS Access Key ID to use for database connections             | `AKIAXXXXXXXXXXXXXXXX`                     |
-| **AWS Secret Access Key** | The AWS Secret Access Key to use for database connections         | `asd+/Ead123456asc23ASD2Acsf23/1A3fAc56af` |
-| **AWS Region**            | The AWS region of the Cube.js deployment                          | `us-east-1`                                |
-| **S3 Output Location**    | The S3 path to store query results made by the Cube.js deployment | `s3://my-output-bucket/outputs/`           |
+| Field                     | Description                                                    | Examples                                   |
+| ------------------------- | -------------------------------------------------------------- | ------------------------------------------ |
+| **AWS Access Key ID**     | The AWS Access Key ID to use for database connections          | `AKIAXXXXXXXXXXXXXXXX`                     |
+| **AWS Secret Access Key** | The AWS Secret Access Key to use for database connections      | `asd+/Ead123456asc23ASD2Acsf23/1A3fAc56af` |
+| **AWS Region**            | The AWS region of the Cube deployment                          | `us-east-1`                                |
+| **S3 Output Location**    | The S3 path to store query results made by the Cube deployment | `s3://my-output-bucket/outputs/`           |
 
 <div style="text-align: center">
   <img
@@ -167,7 +167,7 @@ Add the following environment variables:
 
 | Environment Variable | Description                                                                                                                                                                                                 | Example                                  |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube.js                                                                                                                                     | `true`, `false`                          |
+| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                                                                                                                                        | `true`, `false`                          |
 | `CUBEJS_DB_SSL_CA`   | The contents of a CA bundle in PEM format, or a path to one. For more information, check the `options.ca` property for TLS Secure Contexts [in the Node.js documentation][link-nodejs-tls-options]          | A valid CA bundle or a path to one       |
 | `CUBEJS_DB_SSL_CERT` | The contents of an SSL certificate in PEM format, or a path to one. For more information, check the `options.cert` property for TLS Secure Contexts [in the Node.js documentation][link-nodejs-tls-options] | A valid SSL certificate or a path to one |
 | `CUBEJS_DB_SSL_KEY`  | The contents of a private key in PEM format, or a path to one. For more information, check the `options.key` property for TLS Secure Contexts [in the Node.js documentation][link-nodejs-tls-options]       | A valid SSL private key or a path to one |
@@ -191,4 +191,4 @@ Settings page.
   https://docs.getdbt.com/reference/warehouse-profiles/snowflake-profile#account
 [link-snowflake-regions]:
   https://docs.snowflake.com/en/user-guide/intro-regions.html
-[ref-config-env-vars]: /reference/environment-variables#database-connection
+[ref-config-env-vars]: /reference/environment-variables

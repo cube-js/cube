@@ -12,6 +12,7 @@ import {
   BaseDriver, DriverCapabilities,
   DriverInterface,
 } from '@cubejs-backend/base-driver';
+import { Kafka } from 'kafkajs';
 import sqlstring, { format as formatSql } from 'sqlstring';
 import axios, { AxiosResponse } from 'axios';
 import { Mutex } from 'async-mutex';
@@ -21,6 +22,10 @@ type KsqlDriverOptions = {
   url: string,
   username: string,
   password: string,
+  kafkaHost?: string,
+  kafkaUser?: string,
+  kafkaPassword?: string,
+  kafkaUseSsl?: boolean,
   streamingSourceName?: string,
 };
 
@@ -53,7 +58,9 @@ type KsqlDescribeResponse = {
     name: string;
     fields: KsqlField[];
     type: 'STREAM' | 'TABLE';
-    windowType: 'SESSION' | 'HOPPING' | 'TUMBLING'
+    windowType: 'SESSION' | 'HOPPING' | 'TUMBLING',
+    partitions: number;
+    topic: string;
   }
 };
 
@@ -71,6 +78,8 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   protected readonly config: KsqlDriverOptions;
 
   protected readonly dropTableMutex: Mutex = new Mutex();
+
+  private readonly kafkaClient?: Kafka;
 
   /**
    * Class constructor.
@@ -91,8 +100,27 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
       url: getEnv('dbUrl', { dataSource }),
       username: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
+      kafkaHost: getEnv('dbKafkaHost', { dataSource }),
+      kafkaUser: getEnv('dbKafkaUser', { dataSource }),
+      kafkaPassword: getEnv('dbKafkaPass', { dataSource }),
+      kafkaUseSsl: getEnv('dbKafkaUseSsl', { dataSource }),
       ...config,
     };
+
+    if (this.config.kafkaHost) {
+      this.kafkaClient = new Kafka({
+        clientId: 'Cube',
+        brokers: [this.config.kafkaHost],
+        // authenticationTimeout: 10000,
+        // reauthenticationThreshold: 10000,
+        ssl: this.config.kafkaUseSsl,
+        sasl: this.config.kafkaUser ? {
+          mechanism: 'plain',
+          username: this.config.kafkaUser,
+          password: this.config.kafkaPassword || ''
+        } : undefined,
+      });
+    }
   }
 
   private async apiQuery(path: string, body: any): Promise<AxiosResponse> {
@@ -118,12 +146,17 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async query<R = unknown>(query: string, values?: unknown[]): Promise<R> {
+  public async query<R = unknown>(query: string, values?: unknown[], options: { streamOffset?: string } = {}): Promise<R> {
     if (query.toLowerCase().startsWith('select')) {
       throw new Error('Select queries for ksql allowed only from Cube Store. In order to query ksql create pre-aggregation first.');
     }
     const { data } = await this.apiQuery('/ksql', {
       ksql: `${formatSql(query, values)};`,
+      ...(options.streamOffset ? {
+        streamsProperties: {
+          'ksql.streams.auto.offset.reset': options.streamOffset
+        }
+      } : {})
     });
     
     return data[0];
@@ -131,6 +164,10 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public async testConnection() {
     await this.query('SHOW VARIABLES');
+    if (this.kafkaClient) {
+      await this.kafkaClient.admin().connect();
+      await this.kafkaClient.admin().disconnect();
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -188,8 +225,8 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     return table.replace('.', '-');
   }
 
-  public async tableColumnTypes(table: string) {
-    const describe = await this.query<KsqlDescribeResponse>(`DESCRIBE ${this.quoteIdentifier(this.tableDashName(table))}`);
+  public async tableColumnTypes(table: string, describe?: KsqlDescribeResponse) {
+    describe = describe || await this.describeTable(table);
 
     let { fields } = describe.sourceDescription;
     if (describe.sourceDescription.windowType) {
@@ -210,12 +247,12 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
-    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params);
+    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params, { streamOffset: options?.streamOffset });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async downloadTable(table: string, options: any): Promise<any> {
-    return this.getStreamingTableData(this.tableDashName(table));
+    return this.getStreamingTableData(this.tableDashName(table), { streamOffset: options?.streamOffset });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -226,24 +263,44 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     }
 
     const selectStatement = sqlstring.format(query, params);
-    return this.getStreamingTableData(table, selectStatement);
+    return this.getStreamingTableData(table, { selectStatement, streamOffset: options?.streamOffset });
   }
 
-  private async getStreamingTableData(streamingTable: string, selectStatement?: string) {
-    return {
-      types: await this.tableColumnTypes(streamingTable),
-      streamingTable,
-      selectStatement,
-      streamingSource: {
-        name: this.config.streamingSourceName || 'default',
-        type: 'ksql',
-        credentials: {
-          user: this.config.username,
-          password: this.config.password,
-          url: this.config.url
-        }
+  private async getStreamingTableData(streamingTable: string, options: { selectStatement?: string, streamOffset?: string } = {}) {
+    const { selectStatement, streamOffset } = options;
+    const describe = await this.describeTable(streamingTable);
+    const name = this.config.streamingSourceName || 'default';
+    const kafkaDirectDownload = !!this.config.kafkaHost;
+    const streamingSource = kafkaDirectDownload ? {
+      name: `${name}-kafka`,
+      type: 'kafka',
+      credentials: {
+        user: this.config.kafkaUser,
+        password: this.config.kafkaPassword,
+        host: this.config.kafkaHost,
+        use_ssl: this.config.kafkaUseSsl,
+      }
+    } : {
+      name,
+      type: 'ksql',
+      credentials: {
+        user: this.config.username,
+        password: this.config.password,
+        url: this.config.url
       }
     };
+    return {
+      types: await this.tableColumnTypes(streamingTable, describe),
+      partitions: describe.sourceDescription?.partitions,
+      streamingTable: kafkaDirectDownload ? describe.sourceDescription?.topic : streamingTable,
+      streamOffset,
+      selectStatement,
+      streamingSource
+    };
+  }
+
+  private describeTable(streamingTable: string): Promise<KsqlDescribeResponse> {
+    return this.query<KsqlDescribeResponse>(`DESCRIBE ${this.quoteIdentifier(this.tableDashName(streamingTable))}`);
   }
 
   public dropTable(tableName: string, options: any): Promise<any> {

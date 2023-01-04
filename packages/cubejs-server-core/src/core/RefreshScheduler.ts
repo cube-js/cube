@@ -626,7 +626,7 @@ export class RefreshScheduler {
             timezone: partition.timezone,
             scheduledRefresh: false,
             preAggregationsLoadCacheByDataSource,
-            metadata: queryingOptions.metadata
+            metadata: queryingOptions.metadata,
           });
         }))
       )));

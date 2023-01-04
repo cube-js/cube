@@ -3,6 +3,34 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.33](https://github.com/cube-js/cube.js/compare/v0.31.32...v0.31.33) (2023-01-03)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.31.30](https://github.com/cube-js/cube.js/compare/v0.31.29...v0.31.30) (2022-12-22)
+
+**Note:** Version bump only for package @cubejs-client/react
+
+
+
+
+
+## [0.31.15](https://github.com/cube-js/cube.js/compare/v0.31.14...v0.31.15) (2022-11-17)
+
+
+### Bug Fixes
+
+* **client-react:** check meta changes ([4c44551](https://github.com/cube-js/cube.js/commit/4c44551b880bd4ff34d443241c1c0c28cae0d5f8))
+* packages/cubejs-client-react/package.json to reduce vulnerabilities ([#5390](https://github.com/cube-js/cube.js/issues/5390)) ([0ab9c30](https://github.com/cube-js/cube.js/commit/0ab9c30692c70d3776a8429197915090fef61d4f))
+
+
+
+
+
 ## [0.31.14](https://github.com/cube-js/cube.js/compare/v0.31.13...v0.31.14) (2022-11-14)
 
 

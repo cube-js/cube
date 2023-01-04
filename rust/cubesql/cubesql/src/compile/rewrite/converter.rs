@@ -4,7 +4,6 @@ use crate::{
             df::scan::{CubeScanNode, CubeScanOptions, MemberField},
             provider::CubeContext,
         },
-        is_olap_query,
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
@@ -12,13 +11,14 @@ use crate::{
             ColumnExprColumn, CubeScanLimit, CubeScanOffset, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
-            JoinRightOn, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
-            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
-            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
-            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
-            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
-            TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
-            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType,
+            LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
+            LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc, OrderMember,
+            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun,
+            ScalarUDFExprFun, ScalarVariableExprDataType, ScalarVariableExprVariable,
+            SegmentMemberMember, SortExprAsc, SortExprNullsFirst, TableScanFetch,
+            TableScanProjection, TableScanSourceTableName, TableScanTableName, TableUDFExprFun,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
             TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
@@ -34,7 +34,7 @@ use datafusion::{
     logical_plan::{
         build_join_schema, build_table_udf_schema, exprlist_to_fields, normalize_cols,
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
-        CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct, EmptyRelation, Expr, Limit,
+        CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct, EmptyRelation, Expr, Like, Limit,
         LogicalPlan, LogicalPlanBuilder, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
@@ -44,7 +44,7 @@ use datafusion::{
 use egg::{EGraph, Id, RecExpr};
 use itertools::Itertools;
 use serde_json::json;
-use std::{collections::HashMap, ops::Index, sync::Arc};
+use std::{collections::HashMap, env, ops::Index, sync::Arc};
 
 pub use super::rewriter::CubeRunner;
 
@@ -154,6 +154,46 @@ impl LogicalPlanToLanguageConverter {
                 let right = self.add_expr(right)?;
                 self.graph
                     .add(LogicalPlanLanguage::BinaryExpr([left, op, right]))
+            }
+            ast @ Expr::Like(Like {
+                negated,
+                expr,
+                pattern,
+                escape_char,
+            })
+            | ast @ Expr::ILike(Like {
+                negated,
+                expr,
+                pattern,
+                escape_char,
+            })
+            | ast @ Expr::SimilarTo(Like {
+                negated,
+                expr,
+                pattern,
+                escape_char,
+            }) => {
+                let like_type = add_data_node!(
+                    self,
+                    match ast {
+                        Expr::Like(_) => LikeType::Like,
+                        Expr::ILike(_) => LikeType::ILike,
+                        Expr::SimilarTo(_) => LikeType::SimilarTo,
+                        _ => panic!("Expected LIKE, ILIKE, SIMILAR TO, got: {}", ast),
+                    },
+                    LikeExprLikeType
+                );
+                let negated = add_data_node!(self, negated, LikeExprNegated);
+                let expr = self.add_expr(expr)?;
+                let pattern = self.add_expr(pattern)?;
+                let escape_char = add_data_node!(self, escape_char, LikeExprEscapeChar);
+                self.graph.add(LogicalPlanLanguage::LikeExpr([
+                    like_type,
+                    negated,
+                    expr,
+                    pattern,
+                    escape_char,
+                ]))
             }
             Expr::Not(expr) => {
                 let expr = self.add_expr(expr)?;
@@ -654,6 +694,24 @@ pub fn node_to_expr(
             let right = Box::new(to_expr(params[2].clone())?);
             Expr::BinaryExpr { left, op, right }
         }
+        LogicalPlanLanguage::LikeExpr(params) => {
+            let like_type = match_data_node!(node_by_id, params[0], LikeExprLikeType);
+            let negated = match_data_node!(node_by_id, params[1], LikeExprNegated);
+            let expr = Box::new(to_expr(params[2].clone())?);
+            let pattern = Box::new(to_expr(params[3].clone())?);
+            let escape_char = match_data_node!(node_by_id, params[4], LikeExprEscapeChar);
+            let like_expr = Like {
+                negated,
+                expr,
+                pattern,
+                escape_char,
+            };
+            match like_type {
+                LikeType::Like => Expr::Like(like_expr),
+                LikeType::ILike => Expr::ILike(like_expr),
+                LikeType::SimilarTo => Expr::SimilarTo(like_expr),
+            }
+        }
         LogicalPlanLanguage::NotExpr(params) => {
             let expr = Box::new(to_expr(params[0].clone())?);
             Expr::Not(expr)
@@ -925,29 +983,6 @@ impl LanguageToLogicalPlanConverter {
                     } else {
                         return Err(CubeError::internal(
                             "Use __cubeJoinField to join Cubes".to_string(),
-                        ));
-                    }
-                } else {
-                    let mut is_olap = left_on.iter().any(|c| c.name == "__cubeJoinField")
-                        || right_on.iter().any(|c| c.name == "__cubeJoinField");
-                    if !is_olap {
-                        if let Ok(left_plan) = &left {
-                            match is_olap_query(left_plan) {
-                                Ok(res) if res => is_olap = true,
-                                _ => (),
-                            }
-                        }
-                        if let Ok(right_plan) = &right {
-                            match is_olap_query(right_plan) {
-                                Ok(res) if res => is_olap = true,
-                                _ => (),
-                            }
-                        }
-                    }
-
-                    if is_olap {
-                        return Err(CubeError::internal(
-                            "Can not join Cubes. Looks like one of the subqueries includes post-processing operations".to_string(),
                         ));
                     }
                 }
@@ -1490,9 +1525,42 @@ impl LanguageToLogicalPlanConverter {
                         } else {
                             None
                         };
-                        query.limit =
-                            match_data_node!(node_by_id, cube_scan_params[4], CubeScanLimit)
-                                .map(|n| if n > 50000 { 50000 } else { n as i32 });
+                        let cube_scan_query_limit = env::var("CUBEJS_DB_QUERY_LIMIT")
+                            .map(|v| v.parse::<usize>().unwrap())
+                            .unwrap_or(50000);
+                        let fail_on_max_limit_hit = env::var("CUBESQL_FAIL_ON_MAX_LIMIT_HIT")
+                            .map(|v| v.to_lowercase() == "true")
+                            .unwrap_or(false);
+                        let mut limit_was_changed = false;
+                        query.limit = match match_data_node!(
+                            node_by_id,
+                            cube_scan_params[4],
+                            CubeScanLimit
+                        ) {
+                            Some(n) => {
+                                if n > cube_scan_query_limit {
+                                    limit_was_changed = true;
+                                    Some(cube_scan_query_limit)
+                                } else {
+                                    Some(n)
+                                }
+                            }
+                            None => {
+                                if fail_on_max_limit_hit {
+                                    limit_was_changed = true;
+                                    Some(cube_scan_query_limit)
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+                        .map(|n| n as i32);
+
+                        let max_records = if fail_on_max_limit_hit && limit_was_changed {
+                            Some(cube_scan_query_limit)
+                        } else {
+                            None
+                        };
 
                         let offset =
                             match_data_node!(node_by_id, cube_scan_params[5], CubeScanOffset)
@@ -1516,7 +1584,10 @@ impl LanguageToLogicalPlanConverter {
                             member_fields,
                             query,
                             self.auth_context.clone(),
-                            CubeScanOptions { change_user },
+                            CubeScanOptions {
+                                change_user,
+                                max_records,
+                            },
                         ))
                     }
                     x => panic!("Unexpected extension node: {:?}", x),

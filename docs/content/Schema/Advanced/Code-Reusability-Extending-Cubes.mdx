@@ -9,13 +9,13 @@ redirect_from:
   - /recipes/extending-cubes
 ---
 
-Cube.js supports the [`extends` feature][ref-schema-ref-cube-extends], which
-allows you to reuse all declared members of a cube. This is a foundation for
-building reusable data schemas.
+Cube supports the [`extends` feature][ref-schema-ref-cube-extends], which allows
+you to reuse all declared members of a cube. This is a foundation for building
+reusable data schemas.
 
 [Cubes][self-schema-concepts-cubes] are represented as [JavaScript
 objects][mdn-js-objects] with such properties as measures, dimensions, and
-segments. Extending in Cube.js works similarly to JavaScript’s prototype
+segments. Extending in Cube works similarly to JavaScript’s prototype
 inheritance. Measures, dimensions, and segments are merged as separate objects.
 So if the base cube defines measure `A` and the extending cube defines measure
 `B`, the resulting cube will have both measures `A` and `B`.
@@ -31,9 +31,9 @@ dimensions, and a join to the `Users` cube:
 
 <InfoBox>
 
-It’s important to use the `${CUBE}` reference when referencing properties on
-the cube. Not specifying the cube name or using `${BaseEvents}` does not work
-when the cube is extended.
+It’s important to use the `${CUBE}` reference when referencing properties on the
+cube. Not specifying the cube name or using `${BaseEvents}` does not work when
+the cube is extended.
 
 </InfoBox>
 
@@ -44,7 +44,7 @@ cube(`BaseEvents`, {
   joins: {
     Users: {
       relationship: `belongsTo`,
-      sql: `${CUBE}.user_id = ${Users}.id`,
+      sql: `${CUBE}.user_id = ${Users.id}`,
     },
   },
 

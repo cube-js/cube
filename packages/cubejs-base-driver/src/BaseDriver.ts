@@ -366,6 +366,10 @@ export abstract class BaseDriver implements DriverInterface {
     return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
+  public async queryColumnTypes(sql: string, params?: unknown[]): Promise<{ name: any; type: string; }[]> {
+    return [];
+  }
+
   public createTable(quotedTableName: string, columns: TableColumn[]) {
     const createTableSql = this.createTableSql(quotedTableName, columns);
     return this.query(createTableSql, []).catch(e => {

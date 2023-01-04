@@ -13,7 +13,7 @@ into the containers.
 
 <WarningBox>
 
-This is an example of a production-ready deployment, but real-world deployments
+This is an example of a deployment, but real-world production deployments
 can vary significantly depending on desired performance and scale. For an
 example of deploying with [Helm][helm-k8s] or plain [Kubernetes][k8s], check out
 the respective examples [here][gh-cubejs-examples-k8s-helm] and
@@ -75,6 +75,16 @@ Refresh Worker in `cube-refresh-worker-deployment.yaml`:
 />
 
 ### <--{"id" : "Configuration"}--> Create Cube Store Router and Worker nodes
+
+<WarningBox>
+
+This example uses `CUBESTORE_REMOTE_DIR` and requires `ReadWriteMany` PVCs.
+It also requires a strong read-after-write guarantee from underlying persistent volume.
+This is the simplest Kubernetes setup however, it isn't optimal for production use.
+For best performance and reliability, please use distributed file systems like S3, GCS, Azure Blog Storage, etc.
+Please see [running in production docs][ref-running-in-production-storage] for additional information.
+
+</WarningBox>
 
 With our Cube.js API and Refresh Worker set up, we can now begin setting up Cube
 Store. We will make two [`StatefulSet`][k8s-docs-statefulset]s with
@@ -266,3 +276,4 @@ spec:
 [ref-config-db]: /config/databases
 [ref-config-queryrewrite]: /config#query-rewrite
 [ref-config-sched-ref-ctx]: /config#options-reference-scheduled-refresh-contexts
+[ref-running-in-production-storage]: /caching/running-in-production#storage

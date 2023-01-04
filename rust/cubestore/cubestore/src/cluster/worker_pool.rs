@@ -13,7 +13,7 @@ use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tokio::runtime::Builder;
+use tokio::runtime::{Builder, Runtime};
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tracing::{instrument, Instrument};
@@ -332,6 +332,7 @@ where
         tokio_builder.worker_threads(var.parse().unwrap());
     }
     let runtime = tokio_builder.build().unwrap();
+    worker_setup(&runtime);
     runtime.block_on(async move {
         let config = Config::default();
         config.configure_injector().await;
@@ -359,6 +360,24 @@ where
             }
         }
     })
+}
+
+fn worker_setup(runtime: &Runtime) {
+    let startup = SELECT_WORKER_SETUP.read().unwrap();
+    if startup.is_some() {
+        startup.as_ref().unwrap()(runtime);
+    }
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_SETUP: std::sync::RwLock<Option<Box<dyn Fn(&Runtime) + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+pub fn register_select_worker_setup(f: fn(&Runtime)) {
+    let mut startup = SELECT_WORKER_SETUP.write().unwrap();
+    assert!(startup.is_none(), "select worker setup already registered");
+    *startup = Some(Box::new(f));
 }
 
 #[cfg(test)]

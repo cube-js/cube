@@ -45,6 +45,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("float_decimal_scale", float_decimal_scale),
         t("float_merge", float_merge),
         t("join", join),
+        t("filtered_join", filtered_join),
         t("three_tables_join", three_tables_join),
         t(
             "three_tables_join_with_filter",
@@ -219,6 +220,12 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("inline_tables", inline_tables),
         t("inline_tables_2x", inline_tables_2x),
         t("build_range_end", build_range_end),
+        t("cache_incr", cache_incr),
+        t("cache_set_get_rm", cache_set_get_rm),
+        t("cache_set_get_set_get", cache_set_get_set_get),
+        t("cache_compaction", cache_compaction),
+        t("cache_set_nx", cache_set_nx),
+        t("cache_prefix_keys", cache_prefix_keys),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -663,6 +670,48 @@ async fn join(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&result), rows(&[("a", "a"), ("b", "b")]));
+}
+
+async fn filtered_join(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.employee (name varchar) INDEX employee_name (name)")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query("CREATE TABLE foo.employee_department_bridge (employee_name text, department_name text) INDEX employee_department_bridge_name (employee_name)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO foo.employee (name) VALUES ('John'), ('Jim')")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO foo.employee_department_bridge (employee_name, department_name) VALUES ('John','Marketing'), ('Jim','Marketing')")
+        .await
+        .unwrap();
+
+    let result = service.exec_query("select * from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name = e.name where b.department_name = 'Non existing'").await.unwrap();
+
+    assert_eq!(result.len(), 0);
+
+    println!("{:?}", service
+        .exec_query(
+            "EXPLAIN ANALYZE select e.name from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name=e.name where b.department_name = 'Marketing' GROUP BY 1 LIMIT 10000",
+        )
+        .await
+        .unwrap());
+
+    let result = service
+        .exec_query(
+            "select e.name from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name=e.name where b.department_name = 'Marketing' GROUP BY 1 ORDER BY 1 LIMIT 10000",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&result), rows(&[("Jim"), ("John")]));
 }
 
 async fn three_tables_join(service: Box<dyn SqlClient>) {
@@ -6162,6 +6211,202 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
                 TableValue::String("t1".to_string()),
                 TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
             ]),
+        ]
+    );
+}
+
+async fn cache_incr(service: Box<dyn SqlClient>) {
+    let query = r#"CACHE INCR "prefix:key""#;
+
+    let r = service.exec_query(query.clone()).await.unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+    );
+
+    let r = service.exec_query(query).await.unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![Row::new(vec![TableValue::String("2".to_string()),]),]
+    );
+}
+
+async fn cache_set_get_rm(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("CACHE SET 'key_to_rm' 'myvalue';")
+        .await
+        .unwrap();
+
+    let get_response = service.exec_query("CACHE GET 'key_to_rm'").await.unwrap();
+
+    assert_eq!(
+        get_response.get_columns(),
+        &vec![Column::new("value".to_string(), ColumnType::String, 0),]
+    );
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::String("myvalue".to_string()),]),]
+    );
+
+    service
+        .exec_query("CACHE REMOVE 'key_to_rm' 'myvalue';")
+        .await
+        .unwrap();
+
+    let get_response = service
+        .exec_query("CACHE GET 'key_compaction'")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Null,]),]
+    );
+}
+
+async fn cache_set_get_set_get(service: Box<dyn SqlClient>) {
+    // Initial set
+    {
+        service
+            .exec_query("CACHE SET 'key_for_update' '1';")
+            .await
+            .unwrap();
+
+        let get_response = service
+            .exec_query("CACHE GET 'key_for_update'")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+        );
+    }
+
+    // update
+    {
+        service
+            .exec_query("CACHE SET 'key_for_update' '2';")
+            .await
+            .unwrap();
+
+        let get_response = service
+            .exec_query("CACHE GET 'key_for_update'")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![TableValue::String("2".to_string()),]),]
+        );
+    }
+}
+
+async fn cache_compaction(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("CACHE SET NX TTL 4 'my_prefix:my_key' 'myvalue';")
+        .await
+        .unwrap();
+
+    let get_response = service
+        .exec_query("CACHE GET 'my_prefix:my_key'")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::String("myvalue".to_string()),]),]
+    );
+
+    tokio::time::sleep(Duration::new(5, 0)).await;
+    service.exec_query("SYS COMPACTION 'cache';").await.unwrap();
+
+    let get_response = service
+        .exec_query("CACHE GET 'my_prefix:my_key'")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Null,]),]
+    );
+
+    // system.cache table doesn't check expire
+    let cache_resp = service
+        .exec_query(
+            "select count(*) from system.cache where id = 'my_key' and prefix = 'my_prefix'",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        cache_resp.get_rows(),
+        &vec![Row::new(vec![TableValue::Int(0)]),]
+    );
+}
+
+async fn cache_set_nx(service: Box<dyn SqlClient>) {
+    let set_nx_key_sql = "CACHE SET NX TTL 4 'mykey' 'myvalue';";
+
+    let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
+
+    assert_eq!(
+        set_response.get_columns(),
+        &vec![Column::new("success".to_string(), ColumnType::Boolean, 0),]
+    );
+
+    assert_eq!(
+        set_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true),]),]
+    );
+
+    // key was already defined
+    let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
+
+    assert_eq!(
+        set_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(false),]),]
+    );
+
+    tokio::time::sleep(Duration::new(5, 0)).await;
+
+    // key was expired
+    let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
+
+    assert_eq!(
+        set_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true),]),]
+    );
+}
+
+async fn cache_prefix_keys(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("CACHE SET 'locks:key1' '1';")
+        .await
+        .unwrap();
+    service
+        .exec_query("CACHE SET 'locks:key2' '2';")
+        .await
+        .unwrap();
+    service
+        .exec_query("CACHE SET 'locks:key3' '3';")
+        .await
+        .unwrap();
+
+    let keys_response = service.exec_query("CACHE KEYS 'locks'").await.unwrap();
+    assert_eq!(
+        keys_response.get_columns(),
+        &vec![Column::new("key".to_string(), ColumnType::String, 0),]
+    );
+    assert_eq!(
+        keys_response.get_rows(),
+        &vec![
+            Row::new(vec![TableValue::String("locks:key1".to_string())]),
+            Row::new(vec![TableValue::String("locks:key2".to_string())]),
+            Row::new(vec![TableValue::String("locks:key3".to_string())]),
         ]
     );
 }

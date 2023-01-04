@@ -42,12 +42,9 @@ cube(`Orders`, {
 
 ## Parameters
 
-### <--{"id" : "Parameters"}--> type
+### <--{"id" : "Parameters"}--> description
 
-`type` is a required parameter. There are various types that can be assigned to
-a measure. Please refer to the [Measure Types
-Guide][ref-schema-ref-types-formats-measures-types] for the full list of measure
-types.
+You can add details to a measure’s definition via the `description` parameter:
 
 ```javascript
 cube(`Orders`, {
@@ -55,24 +52,45 @@ cube(`Orders`, {
     ordersCount: {
       sql: `id`,
       type: `count`,
+      description: `count of all orders`,
     },
   },
 });
 ```
 
-### <--{"id" : "Parameters"}--> sql
+### <--{"id" : "Parameters"}--> drillMembers
 
-`sql` is a required parameter. It can take any valid SQL expression depending on
-the `type` of the measure. Please refer to the [Measure Types
-Guide][ref-schema-ref-types-formats-measures-types] for detailed information on
-the corresponding sql parameter.
+Using the `drillMembers` parameter, you can define a set of [drill
+down][ref-drilldowns] fields for the measure. `drillMembers` is defined as an
+array of dimensions. Cube.js automatically injects dimensions’ names and other
+cubes’ names with dimensions in the context, so you can reference these
+variables in the `drillMembers` array. [Learn more about how to define and use
+drill downs][ref-drilldowns].
+
+```javascript
+cube('Orders', {
+  measures: {
+    revenue: {
+      type: `sum`,
+      sql: `price`,
+      drillMembers: [id, price, status, Products.name, Products.id],
+    },
+  },
+});
+```
+
+### <--{"id" : "Parameters"}--> filters
+
+If you want to add some conditions for a metric's calculation, you should use
+the `filters` parameter. The syntax looks like the following:
 
 ```javascript
 cube(`Orders`, {
   measures: {
-    usersCount: {
-      sql: `count(*)`,
-      type: `number`,
+    ordersCompletedCount: {
+      sql: `id`,
+      type: `count`,
+      filters: [{ sql: `${CUBE}.status = 'completed'` }],
     },
   },
 });
@@ -97,69 +115,20 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> title
+### <--{"id" : "Parameters"}--> meta
 
-You can use the `title` parameter to change a measure’s displayed name. By
-default, Cube.js will humanize your measure key to create a display name. In
-order to override default behavior, please use the `title` parameter.
+Custom metadata. Can be used to pass any information to the frontend.
 
 ```javascript
 cube(`Orders`, {
   measures: {
-    ordersCount: {
-      sql: `id`,
-      type: `count`,
-      title: `Number of Orders Placed`,
-    },
-  },
-});
-```
-
-### <--{"id" : "Parameters"}--> description
-
-You can add details to a measure’s definition via the `description` parameter:
-
-```javascript
-cube(`Orders`, {
-  measures: {
-    ordersCount: {
-      sql: `id`,
-      type: `count`,
-      description: `count of all orders`,
-    },
-  },
-});
-```
-
-### <--{"id" : "Parameters"}--> shown
-
-You can manage the visibility of the measure using the `shown` parameter. The
-default value of `shown` is `true`.
-
-```javascript
-cube(`Orders`, {
-  measures: {
-    ordersCount: {
-      sql: `id`,
-      type: `count`,
-      shown: false,
-    },
-  },
-});
-```
-
-### <--{"id" : "Parameters"}--> filters
-
-If you want to add some conditions for a metric's calculation, you should use
-the `filters` parameter. The syntax looks like the following:
-
-```javascript
-cube(`Orders`, {
-  measures: {
-    ordersCompletedCount: {
-      sql: `id`,
-      type: `count`,
-      filters: [{ sql: `${CUBE}.status = 'completed'` }],
+    revenue: {
+      type: `sum`,
+      sql: `price`,
+      //...
+      meta: {
+        any: 'value',
+      },
     },
   },
 });
@@ -219,37 +188,72 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> drillMembers
+### <--{"id" : "Parameters"}--> shown
 
-Using the `drillMembers` parameter, you can define a set of [drill
-down][ref-drilldowns] fields for the measure. `drillMembers` is defined as an
-array of dimensions. Cube.js automatically injects dimensions’ names and other
-cubes’ names with dimensions in the context, so you can reference these
-variables in the `drillMembers` array. [Learn more about how to define and use
-drill downs][ref-drilldowns].
-
-```javascript
-revenue: {
-  type: `sum`,
-  sql: `price`,
-  drillMembers: [id, price, status, Products.name, Products.id]
-}
-```
-
-### <--{"id" : "Parameters"}--> meta
-
-Custom metadata. Can be used to pass any information to the frontend.
+You can manage the visibility of the measure using the `shown` parameter. The
+default value of `shown` is `true`.
 
 ```javascript
 cube(`Orders`, {
   measures: {
-    revenue: {
-      type: `sum`,
-      sql: `price`,
-      //...
-      meta: {
-        any: 'value',
-      },
+    ordersCount: {
+      sql: `id`,
+      type: `count`,
+      shown: false,
+    },
+  },
+});
+```
+
+### <--{"id" : "Parameters"}--> sql
+
+`sql` is a required parameter. It can take any valid SQL expression depending on
+the `type` of the measure. Please refer to the [Measure Types
+Guide][ref-schema-ref-types-formats-measures-types] for detailed information on
+the corresponding sql parameter.
+
+```javascript
+cube(`Orders`, {
+  measures: {
+    usersCount: {
+      sql: `count(*)`,
+      type: `number`,
+    },
+  },
+});
+```
+
+### <--{"id" : "Parameters"}--> title
+
+You can use the `title` parameter to change a measure’s displayed name. By
+default, Cube.js will humanize your measure key to create a display name. In
+order to override default behavior, please use the `title` parameter.
+
+```javascript
+cube(`Orders`, {
+  measures: {
+    ordersCount: {
+      sql: `id`,
+      type: `count`,
+      title: `Number of Orders Placed`,
+    },
+  },
+});
+```
+
+### <--{"id" : "Parameters"}--> type
+
+`type` is a required parameter. There are various types that can be assigned to
+a measure. Please refer to the [Measure Types
+Guide][ref-schema-ref-types-formats-measures-types] for the full list of measure
+types.
+
+```javascript
+cube(`Orders`, {
+  measures: {
+    ordersCount: {
+      sql: `id`,
+      type: `count`,
     },
   },
 });

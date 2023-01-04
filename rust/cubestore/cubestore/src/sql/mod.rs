@@ -35,6 +35,7 @@ use tracing_futures::WithSubscriber;
 use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
+use crate::cachestore::{CacheItem, CacheStore};
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -43,6 +44,7 @@ use crate::import::{parse_space_separated_binstring, ImportService, Ingestion};
 use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
+use crate::metastore::table::StreamOffset;
 use crate::metastore::{
     is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
     IndexType, MetaStoreTable, RowKey, Schema, TableId,
@@ -54,7 +56,7 @@ use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, SystemCommand};
+use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, RocksStoreName, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
@@ -152,6 +154,7 @@ impl SqlQueryContext {
 
 pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,
+    cachestore: Arc<dyn CacheStore>,
     chunk_store: Arc<dyn ChunkDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     limits: Arc<ConcurrencyLimits>,
@@ -171,6 +174,7 @@ crate::di_service!(SqlServiceImpl, [SqlService]);
 impl SqlServiceImpl {
     pub fn new(
         db: Arc<dyn MetaStore>,
+        cachestore: Arc<dyn CacheStore>,
         chunk_store: Arc<dyn ChunkDataStore>,
         limits: Arc<ConcurrencyLimits>,
         query_planner: Arc<dyn QueryPlanner>,
@@ -186,6 +190,7 @@ impl SqlServiceImpl {
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             db,
+            cachestore,
             chunk_store,
             limits,
             query_planner,
@@ -220,6 +225,7 @@ impl SqlServiceImpl {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        stream_offset: Option<String>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
         aggregates: Option<Vec<(Ident, Ident)>>,
@@ -291,6 +297,20 @@ impl SqlServiceImpl {
             }
         }
 
+        let stream_offset = if let Some(s) = &stream_offset {
+            Some(match s.as_str() {
+                "earliest" => StreamOffset::Earliest,
+                "latest" => StreamOffset::Latest,
+                x => {
+                    return Err(CubeError::user(format!(
+                        "Unexpected stream offset: {}. Only earliest and latest are allowed.",
+                        x
+                    )))
+                }
+            })
+        } else {
+            None
+        };
         if !external {
             return self
                 .db
@@ -305,6 +325,7 @@ impl SqlServiceImpl {
                     build_range_end,
                     seal_at,
                     select_statement,
+                    stream_offset,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                     aggregates.map(|keys| {
                         keys.iter()
@@ -363,6 +384,7 @@ impl SqlServiceImpl {
                 build_range_end,
                 seal_at,
                 select_statement,
+                stream_offset,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 aggregates.map(|keys| {
                     keys.iter()
@@ -430,6 +452,17 @@ impl SqlServiceImpl {
                 )
             })
             .collect();
+        for stream_location in table
+            .get_row()
+            .locations()
+            .unwrap()
+            .iter()
+            .filter(|&l| Table::is_stream_location(l))
+        {
+            self.import_service
+                .validate_table_location(table.get_id(), stream_location)
+                .await?;
+        }
         let imports = listener.wait_for_job_results(wait_for).await?;
         for r in imports {
             if let JobEvent::Error(_, _, e) = r {
@@ -681,6 +714,32 @@ impl SqlServiceImpl {
     }
 }
 
+pub fn string_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<String> {
+    credentials
+        .iter()
+        .find(|o| o.name.value == prop_name)
+        .and_then(|x| {
+            if let Value::SingleQuotedString(v) = &x.value {
+                Some(v.to_string())
+            } else {
+                None
+            }
+        })
+}
+
+pub fn boolean_prop(credentials: &Vec<SqlOption>, prop_name: &str) -> Option<bool> {
+    credentials
+        .iter()
+        .find(|o| o.name.value == prop_name)
+        .and_then(|x| {
+            if let Value::Boolean(v) = &x.value {
+                Some(*v)
+            } else {
+                None
+            }
+        })
+}
+
 #[derive(Debug)]
 pub struct MySqlDialectWithBackTicks {}
 
@@ -758,6 +817,20 @@ impl SqlService for SqlServiceImpl {
                 }
             }
             CubeStoreStatement::System(command) => match command {
+                SystemCommand::Compaction { store } => {
+                    match store {
+                        None => {
+                            self.db.compaction().await?;
+                            self.cachestore.compaction().await?;
+                        }
+                        Some(store_name) => match store_name {
+                            RocksStoreName::Meta => self.db.compaction().await?,
+                            RocksStoreName::Cache => self.cachestore.compaction().await?,
+                        },
+                    }
+
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
                 SystemCommand::KillAllJobs => {
                     self.db.delete_all_jobs().await?;
                     Ok(Arc::new(DataFrame::new(vec![], vec![])))
@@ -889,6 +962,18 @@ impl SqlService for SqlServiceImpl {
                             option.value
                         ))),
                     })?;
+                let stream_offset = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "stream_offset")
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(select_statement) => {
+                            Result::Ok(Some(select_statement.clone()))
+                        }
+                        _ => Result::Err(CubeError::user(format!(
+                            "Bad stream_offset {}. Expected string.",
+                            option.value
+                        ))),
+                    })?;
 
                 let res = self
                     .create_table(
@@ -901,6 +986,7 @@ impl SqlService for SqlServiceImpl {
                         build_range_end,
                         seal_at,
                         select_statement,
+                        stream_offset,
                         indexes,
                         unique_key,
                         aggregates,
@@ -955,44 +1041,29 @@ impl SqlService for SqlServiceImpl {
                 if or_update {
                     let creds = match source_type.as_str() {
                         "ksql" => {
-                            let user = credentials
-                                .iter()
-                                .find(|o| o.name.value == "user")
-                                .and_then(|x| {
-                                    if let Value::SingleQuotedString(v) = &x.value {
-                                        Some(v.to_string())
-                                    } else {
-                                        None
-                                    }
-                                });
-                            let password = credentials
-                                .iter()
-                                .find(|o| o.name.value == "password")
-                                .and_then(|x| {
-                                    if let Value::SingleQuotedString(v) = &x.value {
-                                        Some(v.to_string())
-                                    } else {
-                                        None
-                                    }
-                                });
-                            let url =
-                                credentials
-                                    .iter()
-                                    .find(|o| o.name.value == "url")
-                                    .and_then(|x| {
-                                        if let Value::SingleQuotedString(v) = &x.value {
-                                            Some(v.to_string())
-                                        } else {
-                                            None
-                                        }
-                                    });
+                            let user = string_prop(&credentials, "user");
+                            let password = string_prop(&credentials, "password");
+                            let url = string_prop(&credentials, "url");
                             Ok(SourceCredentials::KSql {
                                 user,
                                 password,
                                 url: url.ok_or(CubeError::user(
-                                    "url is required as credential for select_statement source"
-                                        .to_string(),
+                                    "url is required as credential for ksql source".to_string(),
                                 ))?,
+                            })
+                        }
+                        "kafka" => {
+                            let user = string_prop(&credentials, "user");
+                            let password = string_prop(&credentials, "password");
+                            let host = string_prop(&credentials, "host");
+                            let use_ssl = boolean_prop(&credentials, "use_ssl");
+                            Ok(SourceCredentials::Kafka {
+                                user,
+                                password,
+                                host: host.ok_or(CubeError::user(
+                                    "host is required as credential for kafka source".to_string(),
+                                ))?,
+                                use_ssl: use_ssl.unwrap_or(false),
                             })
                         }
                         x => Err(CubeError::user(format!("Not supported stream type: {}", x))),
@@ -1152,6 +1223,71 @@ impl SqlService for SqlServiceImpl {
             },
 
             CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
+
+            CubeStoreStatement::CacheSet {
+                key,
+                value,
+                ttl,
+                nx,
+            } => {
+                let key = key.value;
+
+                let success = self
+                    .cachestore
+                    .cache_set(CacheItem::new(key, ttl, value), nx)
+                    .await?;
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
+                    vec![Row::new(vec![TableValue::Boolean(success)])],
+                )))
+            }
+            CubeStoreStatement::CacheGet { key } => {
+                let row = self.cachestore.cache_get(key.value).await?;
+                if let Some(r) = row {
+                    Ok(Arc::new(DataFrame::new(
+                        vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                        vec![Row::new(vec![TableValue::String(
+                            r.get_row().get_value().clone(),
+                        )])],
+                    )))
+                } else {
+                    Ok(Arc::new(DataFrame::new(
+                        vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                        vec![Row::new(vec![TableValue::Null])],
+                    )))
+                }
+            }
+            CubeStoreStatement::CacheKeys { prefix } => {
+                let rows = self.cachestore.cache_keys(prefix.value).await?;
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("key".to_string(), ColumnType::String, 0)],
+                    rows.iter()
+                        .map(|i| Row::new(vec![TableValue::String(i.get_row().get_path())]))
+                        .collect(),
+                )))
+            }
+            CubeStoreStatement::CacheRemove { key } => {
+                self.cachestore.cache_delete(key.value).await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::CacheTruncate {} => {
+                self.cachestore.cache_truncate().await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::CacheIncr { path } => {
+                let row = self.cachestore.cache_incr(path.value).await?;
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                    vec![Row::new(vec![TableValue::String(
+                        row.get_row().get_value().clone(),
+                    )])],
+                )))
+            }
+
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }
@@ -1203,7 +1339,7 @@ impl SqlService for SqlServiceImpl {
                         let chunk_ids_to_batches = worker_plan
                             .in_memory_chunks_to_load()
                             .into_iter()
-                            .map(|c| (c.get_id(), Vec::new()))
+                            .map(|(c, _, _)| (c.get_id(), Vec::new()))
                             .collect();
                         return Ok(QueryPlans {
                             router: self
@@ -1690,14 +1826,14 @@ mod tests {
     use crate::cluster::MockCluster;
     use crate::config::{Config, FileStoreProvider};
     use crate::import::MockImportService;
-    use crate::metastore::metastore_fs::RocksMetaStoreFs;
-    use crate::metastore::RocksMetaStore;
+    use crate::metastore::{BaseRocksStoreFs, RocksMetaStore};
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
     use crate::store::ChunkStore;
 
     use super::*;
+    use crate::cachestore::RocksCacheStore;
     use crate::queryplanner::pretty_printers::pp_phys_plan;
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
@@ -1708,9 +1844,11 @@ mod tests {
     async fn create_schema_test() {
         let config = Config::test("create_schema_test");
         let path = "/tmp/test_create_schema";
-        let _ = DB::destroy(&Options::default(), path);
+
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
+
+        let _ = fs::remove_dir_all(path.clone());
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -1720,10 +1858,17 @@ mod tests {
                 PathBuf::from(store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                path,
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                &Path::new(path).join("metastore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
+            let cache_store = RocksCacheStore::new(
+                &Path::new(path).join("cachestore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
+                config.config_obj(),
+            )
+            .unwrap();
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let store = ChunkStore::new(
@@ -1736,6 +1881,7 @@ mod tests {
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store,
+                cache_store,
                 store,
                 limits,
                 Arc::new(MockQueryPlanner::new()),
@@ -1758,7 +1904,10 @@ mod tests {
                 ])
             );
         }
-        let _ = DB::destroy(&Options::default(), path);
+
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("metastore"));
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("cachestore"));
+
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
@@ -1767,21 +1916,31 @@ mod tests {
     async fn create_table_test() {
         let config = Config::test("create_table_test");
         let path = "/tmp/test_create_table";
-        let _ = DB::destroy(&Options::default(), path);
+
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
+
+        let _ = fs::remove_dir_all(path.clone());
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
         {
             let remote_fs = LocalDirRemoteFs::new(
                 Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                path,
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                &Path::new(path).join("metastore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
+            let cache_store = RocksCacheStore::new(
+                &Path::new(path).join("cachestore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
+                config.config_obj(),
+            )
+            .unwrap();
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let chunk_store = ChunkStore::new(
@@ -1794,6 +1953,7 @@ mod tests {
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store.clone(),
+                cache_store,
                 chunk_store,
                 limits,
                 Arc::new(MockQueryPlanner::new()),
@@ -1838,13 +1998,17 @@ mod tests {
                 TableValue::String("false".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
             ]));
         }
-        let _ = DB::destroy(&Options::default(), path);
+
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("metastore"));
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("cachestore"));
+
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
@@ -1853,21 +2017,31 @@ mod tests {
     async fn create_table_test_seal_at() {
         let config = Config::test("create_table_test_seal_at");
         let path = "/tmp/test_create_table_seal_at";
-        let _ = DB::destroy(&Options::default(), path);
+
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
+
+        let _ = fs::remove_dir_all(path.clone());
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
+
         {
             let remote_fs = LocalDirRemoteFs::new(
                 Some(PathBuf::from(remote_store_path.clone())),
                 PathBuf::from(store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                path,
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                &Path::new(path).join("metastore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
+            let cache_store = RocksCacheStore::new(
+                &Path::new(path).join("cachestore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
+                config.config_obj(),
+            )
+            .unwrap();
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let chunk_store = ChunkStore::new(
@@ -1880,6 +2054,7 @@ mod tests {
             let limits = Arc::new(ConcurrencyLimits::new(4));
             let service = SqlServiceImpl::new(
                 meta_store.clone(),
+                cache_store,
                 chunk_store,
                 limits,
                 Arc::new(MockQueryPlanner::new()),
@@ -1924,13 +2099,17 @@ mod tests {
                 TableValue::String("false".to_string()),
                 TableValue::String("SELECT * FROM test WHERE created_at > '2022-05-01 00:00:00'".to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
             ]));
         }
-        let _ = DB::destroy(&Options::default(), path);
+
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("metastore"));
+        let _ = DB::destroy(&Options::default(), Path::new(path).join("cachestore"));
+
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
@@ -3330,6 +3509,49 @@ mod tests {
                 let worker_plan = pp_phys_plan(p.worker.as_ref());
                 assert!(worker_plan.find("aggr_index").is_some());
             })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn validate_ksql_location() {
+        Config::test("validate_ksql_location").update_config(|mut c| {
+            c.partition_split_threshold = 2;
+            c
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = 'foo', password = 'bar', url = 'http://foo.com')")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_1 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\'') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM EVENTS_BY_TYPE') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_3 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_fail_1 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\'') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .expect_err("Validation should fail");
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_fail_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM (SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\')') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .expect_err("Validation should fail");
+        })
             .await;
     }
 }

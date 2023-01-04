@@ -218,6 +218,17 @@ pub trait ChunkDataStore: DIService + Send + Sync {
     async fn repartition(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn repartition_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError>;
+    async fn has_in_memory_chunk(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+    ) -> Result<bool, CubeError>;
+    async fn get_chunk_columns_with_preloaded_meta(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+        index: IdRow<Index>,
+    ) -> Result<Vec<RecordBatch>, CubeError>;
     async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
     async fn add_persistent_chunk(
@@ -357,6 +368,10 @@ impl ChunkDataStore for ChunkStore {
                 partition
             )));
         }
+        let index = self
+            .meta_store
+            .get_index(partition.get_row().get_index_id())
+            .await?;
         let chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
@@ -369,10 +384,17 @@ impl ChunkDataStore for ChunkStore {
         }
         let mut new_chunks = Vec::new();
         let mut old_chunks = Vec::new();
-        for chunk in chunks.into_iter() {
+
+        for chunk in chunks.iter() {
             let chunk_id = chunk.get_id();
             old_chunks.push(chunk_id);
-            let batches = self.get_chunk_columns(chunk).await?;
+            let batches = self
+                .get_chunk_columns_with_preloaded_meta(
+                    chunk.clone(),
+                    partition.clone(),
+                    index.clone(),
+                )
+                .await?;
             let mut columns = Vec::new();
             for i in 0..batches[0].num_columns() {
                 columns.push(arrow::compute::concat(
@@ -404,7 +426,8 @@ impl ChunkDataStore for ChunkStore {
             .collect();
 
         self.meta_store
-            .swap_chunks(old_chunks, new_chunk_ids?)
+            // TODO replay_handle_id shouldn't be None but method isn't used
+            .swap_chunks(old_chunks, new_chunk_ids?, None)
             .await?;
 
         Ok(())
@@ -432,7 +455,8 @@ impl ChunkDataStore for ChunkStore {
         let chunk_id = chunk.get_id();
         let oldest_insert_at = chunk.get_row().oldest_insert_at().clone();
         old_chunks.push(chunk_id);
-        let batches = self.get_chunk_columns(chunk).await?;
+        let replay_handle_id = chunk.get_row().replay_handle_id();
+        let batches = self.get_chunk_columns(chunk.clone()).await?;
         if batches.is_empty() {
             self.meta_store.deactivate_chunk(chunk_id).await?;
             return Ok(());
@@ -473,27 +497,36 @@ impl ChunkDataStore for ChunkStore {
             .await?;
 
         self.meta_store
-            .swap_chunks(old_chunks, new_chunk_ids)
+            .swap_chunks(old_chunks, new_chunk_ids, replay_handle_id.clone())
             .await?;
 
         Ok(())
     }
 
     async fn get_chunk_columns(&self, chunk: IdRow<Chunk>) -> Result<Vec<RecordBatch>, CubeError> {
+        let partition = self
+            .meta_store
+            .get_partition(chunk.get_row().get_partition_id())
+            .await?;
+        let index = self
+            .meta_store
+            .get_index(partition.get_row().get_index_id())
+            .await?;
+        self.get_chunk_columns_with_preloaded_meta(chunk, partition, index)
+            .await
+    }
+    async fn get_chunk_columns_with_preloaded_meta(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+        index: IdRow<Index>,
+    ) -> Result<Vec<RecordBatch>, CubeError> {
         if chunk.get_row().in_memory() {
-            let partition = self
-                .meta_store
-                .get_partition(chunk.get_row().get_partition_id())
-                .await?;
             let node_name = self.cluster.node_name_by_partition(&partition);
             let server_name = self.cluster.server_name();
             if node_name != server_name {
                 return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
             }
-            let index = self
-                .meta_store
-                .get_index(partition.get_row().get_index_id())
-                .await?;
             let memory_chunks = self.memory_chunks.read().await;
             Ok(vec![memory_chunks
                 .get(&chunk.get_id())
@@ -502,12 +535,33 @@ impl ChunkDataStore for ChunkStore {
                     arrow_schema(&index.get_row()),
                 )))])
         } else {
-            let (local_file, index) = self.download_chunk(chunk).await?;
+            let (local_file, index) = self.download_chunk(chunk, partition, index).await?;
             Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
                 let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE);
                 Ok(parquet.read_columns(&local_file)?)
             })
             .await??)
+        }
+    }
+
+    async fn has_in_memory_chunk(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+    ) -> Result<bool, CubeError> {
+        if chunk.get_row().in_memory() {
+            let node_name = self.cluster.node_name_by_partition(&partition);
+            let server_name = self.cluster.server_name();
+            if node_name != server_name {
+                return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
+            }
+            let memory_chunks = self.memory_chunks.read().await;
+            Ok(memory_chunks.contains_key(&chunk.get_id()))
+        } else {
+            return Err(CubeError::internal(format!(
+                "Chunk {:?} is not in memory",
+                chunk
+            )));
         }
     }
 
@@ -540,21 +594,18 @@ impl ChunkDataStore for ChunkStore {
 }
 
 impl ChunkStore {
-    async fn download_chunk(&self, chunk: IdRow<Chunk>) -> Result<(String, Index), CubeError> {
+    async fn download_chunk(
+        &self,
+        chunk: IdRow<Chunk>,
+        partition: IdRow<Partition>,
+        index: IdRow<Index>,
+    ) -> Result<(String, Index), CubeError> {
         if !chunk.get_row().uploaded() {
             return Err(CubeError::internal(format!(
                 "Trying to get not uploaded chunk: {:?}",
                 chunk
             )));
         }
-        let partition = self
-            .meta_store
-            .get_partition(chunk.get_row().get_partition_id())
-            .await?;
-        let index = self
-            .meta_store
-            .get_index(partition.get_row().get_index_id())
-            .await?;
         let file_size = chunk.get_row().file_size();
         let remote_path = ChunkStore::chunk_file_name(chunk);
         let result = self.remote_fs.download_file(&remote_path, file_size).await;
@@ -574,15 +625,14 @@ mod tests {
     use crate::assert_eq_columns;
     use crate::cluster::MockCluster;
     use crate::config::Config;
-    use crate::metastore::metastore_fs::RocksMetaStoreFs;
-    use crate::metastore::{IndexDef, IndexType, RocksMetaStore};
+    use crate::metastore::{BaseRocksStoreFs, IndexDef, IndexType, RocksMetaStore};
     use crate::remotefs::LocalDirRemoteFs;
     use crate::table::data::{concat_record_batches, rows_to_columns};
     use crate::{metastore::ColumnType, table::TableValue};
     use arrow::array::{Int64Array, StringArray};
     use rocksdb::{Options, DB};
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[tokio::test]
     async fn create_wal_test() {
@@ -601,10 +651,11 @@ mod tests {
             );
             let store = WALStore::new(
                 RocksMetaStore::new(
-                    path,
-                    RocksMetaStoreFs::new(remote_fs.clone()),
+                    Path::new(path),
+                    BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                     config.config_obj(),
-                ),
+                )
+                .unwrap(),
                 remote_fs.clone(),
                 10,
             );
@@ -641,6 +692,7 @@ mod tests {
                     None,
                     Vec::new(),
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -691,10 +743,11 @@ mod tests {
                 PathBuf::from(chunk_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                path,
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                Path::new(path),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
                 remote_fs.clone(),
@@ -738,6 +791,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -758,7 +812,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             meta_store
-                .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)])
+                .swap_chunks(Vec::new(), vec![(chunk.get_id(), file_size)], None)
                 .await
                 .unwrap();
             let chunk = meta_store.get_chunk(1).await.unwrap();
@@ -788,10 +842,11 @@ mod tests {
                 PathBuf::from(chunk_store_path.clone()),
             );
             let meta_store = RocksMetaStore::new(
-                path,
-                RocksMetaStoreFs::new(remote_fs.clone()),
+                Path::new(path),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
                 config.config_obj(),
-            );
+            )
+            .unwrap();
             let chunk_store = ChunkStore::new(
                 meta_store.clone(),
                 remote_fs.clone(),
@@ -837,6 +892,7 @@ mod tests {
                     None,
                     vec![ind],
                     true,
+                    None,
                     None,
                     None,
                     None,

@@ -42,7 +42,7 @@ You need to set the following environment variables to enable the Cube SQL API.
 These credentials will be required to connect to Cube from PowerBI
 later.
 
-```dotenv
+```bash
 CUBEJS_PG_SQL_PORT=5432
 CUBEJS_SQL_USER=myusername
 CUBEJS_SQL_PASSWORD=mypassword

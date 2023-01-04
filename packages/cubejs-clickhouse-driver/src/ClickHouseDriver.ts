@@ -179,7 +179,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public readOnly() {
-    return !!this.config.readOnly || this.readOnlyMode;
+    return (this.config.readOnly != null || this.readOnlyMode) ?
+      (!!this.config.readOnly || this.readOnlyMode) :
+      true;
   }
 
   public async query(query: string, values: unknown[]) {
@@ -340,7 +342,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
      * Nullable(DateTime('UTC'))
      */
     if (columnType.includes('(')) {
-      const types = columnType.toLowerCase().match(/([a-z']+)/g);
+      const types = columnType.toLowerCase().match(/([a-z0-9']+)/g);
       if (types) {
         for (const type of types) {
           if (type in ClickhouseTypeToGeneric) {

@@ -8,8 +8,9 @@ menuOrder: 2
 
 ## Use case
 
-We want to provide different data schemas to different tenants. In the recipe below, we'll
-learn how to switch between multiple data schemas based on the tenant.
+We want to provide different data schemas to different tenants. In the recipe
+below, we'll learn how to switch between multiple data schemas based on the
+tenant.
 
 ## Configuration
 
@@ -24,13 +25,17 @@ schema
 ```
 
 Let's configure Cube to use a specific data schema path for each tenant. We'll
-pass the tenant name as a part of [`securityContext`](https://cube.dev/docs/security/context#top)
-into the [`repositoryFactory`](https://cube.dev/docs/config#repository-factory) function.
+pass the tenant name as a part of
+[`securityContext`](https://cube.dev/docs/security/context#top) into the
+[`repositoryFactory`](https://cube.dev/docs/config#repository-factory) function.
 
-We'll also need to override the [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id)
-function to control how the schema compilation result is cached and provide the tenant names via the
-[`scheduledRefreshContexts`](https://cube.dev/docs/config#scheduled-refresh-contexts) function
-so a refresh worker can find all existing schemas and build pre-aggregations for them, if needed.
+We'll also need to override the
+[`contextToAppId`](https://cube.dev/docs/config#context-to-app-id) function to
+control how the schema compilation result is cached and provide the tenant names
+via the
+[`scheduledRefreshContexts`](https://cube.dev/docs/config#scheduled-refresh-contexts)
+function so a refresh worker can find all existing schemas and build
+pre-aggregations for them, if needed.
 
 Our `cube.js` file will look like this:
 
@@ -47,14 +52,14 @@ module.exports = {
   scheduledRefreshContexts: () => [
     { securityContext: { tenant: 'avocado' } },
     { securityContext: { tenant: 'mango' } },
-  ]
+  ],
 };
 ```
 
 ## Data schema
 
-In this example, we'd like to get products with odd `id` values for the `avocado` tenant and
-with even `id` values the `mango` tenant:
+In this example, we'd like to get products with odd `id` values for the
+`avocado` tenant and with even `id` values the `mango` tenant:
 
 ```javascript
 // schema/avocado

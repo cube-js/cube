@@ -389,6 +389,12 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations }: { reposit
 describe('Refresh Scheduler', () => {
   jest.setTimeout(60000);
 
+  beforeEach(async () => {
+    delete process.env.CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH;
+    delete process.env.CUBEJS_TOUCH_PRE_AGG_TIMEOUT;
+    delete process.env.CUBEJS_DB_QUERY_TIMEOUT;
+  });
+
   test('Round robin pre-aggregation refresh by history priority', async () => {
     process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
     process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
@@ -505,6 +511,73 @@ describe('Refresh Scheduler', () => {
         },
       ],
     );
+  });
+
+  test('Drop without touch', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
+    process.env.CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH = 'true';
+    process.env.CUBEJS_TOUCH_PRE_AGG_TIMEOUT = '3';
+    process.env.CUBEJS_DB_QUERY_TIMEOUT = '3';
+    const {
+      refreshScheduler, mockDriver,
+    } = setupScheduler({
+      repository: repositoryWithPreAggregations
+    });
+
+    const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+
+    for (let i = 0; i < 100; i++) {
+      try {
+        await refreshScheduler.buildPreAggregations(ctx, {
+          timezones: ['UTC'],
+          preAggregations: [{
+            id: 'Foo.first',
+            partitions: ['stb_pre_aggregations.foo_first20201230'],
+          }],
+          forceBuildPreAggregations: false,
+          throwErrors: true,
+        });
+      } catch (e) {
+        if ((<{ error: string }>e).error !== 'Continue wait') {
+          throw e;
+        } else {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+      }
+      break;
+    }
+
+    expect(mockDriver.tables).toHaveLength(1);
+    expect(mockDriver.tables[0]).toMatch(/^stb_pre_aggregations\.foo_first20201230/);
+
+    await mockDriver.delay(3000);
+
+    for (let i = 0; i < 100; i++) {
+      try {
+        await refreshScheduler.buildPreAggregations(ctx, {
+          timezones: ['UTC'],
+          preAggregations: [{
+            id: 'Foo.first',
+            partitions: ['stb_pre_aggregations.foo_first20201229'],
+          }],
+          forceBuildPreAggregations: false,
+          throwErrors: true,
+        });
+      } catch (e) {
+        if ((<{ error: string }>e).error !== 'Continue wait') {
+          throw e;
+        } else {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+      }
+      break;
+    }
+
+    expect(mockDriver.tables).toHaveLength(1);
+    expect(mockDriver.tables[0]).toMatch(/^stb_pre_aggregations\.foo_first20201229/);
   });
 
   test('Cache only pre-aggregation partitions', async () => {

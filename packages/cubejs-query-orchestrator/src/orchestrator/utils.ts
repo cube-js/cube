@@ -1,5 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import * as querystring from 'querystring';
+import { v1, v5 } from 'uuid';
+import crypto from 'crypto';
 
 function parseHostPort(addr: string): { host: string, port: number } {
   if (addr.includes(':')) {
@@ -174,4 +176,39 @@ export function parseRedisUrl(url: Readonly<string>): RedisParsedResult {
   }
 
   return parseUrl(url, result, parseHostPartBasic);
+}
+
+/**
+ * Unique process ID (aka 00000000-0000-0000-0000-000000000000).
+ */
+const processUid = v5(v1(), v1()).toString();
+
+/**
+ * Returns unique process ID.
+ */
+export function getProcessUid(): string {
+  return processUid;
+}
+
+/**
+ * Unique process ID regexp.
+ */
+export const processUidRE = /^[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}$/;
+
+/**
+ * Returns query hash by specified `queryKey`.
+ */
+export function getCacheHash(queryKey) {
+  return typeof queryKey === 'string' && queryKey.length < 256
+    ? queryKey
+    : `${
+      crypto
+        .createHash('md5')
+        .update(JSON.stringify(queryKey))
+        .digest('hex')
+    }${
+      typeof queryKey === 'object' && queryKey.persistent
+        ? `::${getProcessUid()}`
+        : ''
+    }`;
 }

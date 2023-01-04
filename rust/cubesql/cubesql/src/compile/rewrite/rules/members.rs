@@ -5,10 +5,11 @@ use crate::{
             agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
             aggr_group_expr_empty_tail, aggregate, alias_expr,
             analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_vec,
-            cross_join, cube_scan, cube_scan_filters_empty_tail, cube_scan_members,
-            cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr,
-            expr_column_name, expr_column_name_with_relation, fun_expr, join, limit,
+            binary_expr, cast_expr, change_user_expr, column_expr,
+            column_name_to_member_to_aliases, column_name_to_member_vec, cross_join, cube_scan,
+            cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
+            cube_scan_order_empty_tail, dimension_expr, expr_column_name,
+            expr_column_name_with_relation, fun_expr, join, like_expr, limit,
             list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
             literal_member, measure_expr, member_pushdown_replacer, member_replacer,
             merged_members_replacer, original_expr_name, projection, projection_expr,
@@ -17,9 +18,10 @@ use crate::{
             rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules, utils},
             segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
             transforming_rewrite, udaf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AliasExprAlias, CastExprDataType, ChangeUserCube,
-            ColumnExprColumn, CubeScanAliasToCube, CubeScanAliases, CubeScanLimit, CubeScanOffset,
-            DimensionName, JoinLeftOn, JoinRightOn, LimitFetch, LimitSkip, LiteralExprValue,
+            AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, CastExprDataType,
+            ChangeUserCube, ColumnExprColumn, CubeScanAliasToCube, CubeScanAliases, CubeScanLimit,
+            CubeScanOffset, DimensionName, JoinLeftOn, JoinRightOn, LikeExprEscapeChar,
+            LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, LiteralExprValue,
             LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
             MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
             MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, MemberReplacerAliases,
@@ -34,7 +36,7 @@ use crate::{
 use cubeclient::models::V1CubeMetaMeasure;
 use datafusion::{
     arrow::datatypes::DataType,
-    logical_plan::{Column, DFSchema, Expr},
+    logical_plan::{Column, DFSchema, Expr, Operator},
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
 };
@@ -658,6 +660,19 @@ impl RewriteRules for MemberRules {
                 binary_expr(binary_expr("?a", "*", "?b"), "*", "?c"),
                 binary_expr("?a", "*", binary_expr("?b", "*", "?c")),
             ),
+            // LIKE expr to binary expr
+            transforming_rewrite(
+                "like-expr-to-binary-expr",
+                like_expr(
+                    "?like_type",
+                    "?negated",
+                    "?expr",
+                    "?pattern",
+                    "?escape_char",
+                ),
+                binary_expr("?expr", "?op", "?pattern"),
+                self.transform_like_expr("?like_type", "?negated", "?escape_char", "?op"),
+            ),
             // Join
             transforming_rewrite(
                 "push-down-cross-join-to-empty-scan",
@@ -961,10 +976,37 @@ impl MemberRules {
             |column| time_dimension_expr("?name", "?granularity", "?date_range", column),
             None,
         ));
-        rules.extend(self.member_column_pushdown(
-            "literal",
-            |column| literal_member("?value", column, "?relation"),
-            Some("?relation"),
+        rules.push(transforming_rewrite(
+            "member-pushdown-replacer-column-literal-member",
+            member_pushdown_replacer(
+                column_expr("?column"),
+                literal_member("?value", alias_expr("?expr", "?alias"), "?relation"),
+                "?alias_to_cube",
+            ),
+            literal_member("?value", alias_expr("?expr", "?new_alias"), "?new_relation"),
+            self.transform_literal_member_alias(
+                "?alias_to_cube",
+                "?column",
+                "?new_alias",
+                "?new_relation",
+                false,
+            ),
+        ));
+        rules.push(transforming_rewrite(
+            "member-pushdown-replacer-column-literal-member-alias",
+            member_pushdown_replacer(
+                alias_expr("?outer_expr", "?outer_alias"),
+                literal_member("?value", alias_expr("?expr", "?alias"), "?relation"),
+                "?alias_to_cube",
+            ),
+            literal_member("?value", alias_expr("?expr", "?new_alias"), "?new_relation"),
+            self.transform_literal_member_alias(
+                "?alias_to_cube",
+                "?outer_alias",
+                "?new_alias",
+                "?new_relation",
+                true,
+            ),
         ));
 
         fn list_concat_terminal(
@@ -1010,6 +1052,10 @@ impl MemberRules {
         rules.push(list_concat_terminal(
             "time-dimension",
             time_dimension_expr("?name", "?granularity", "?date_range", "?expr"),
+        ));
+        rules.push(list_concat_terminal(
+            "literal-member",
+            literal_member("?value", "?expr", "?relation"),
         ));
         rules.push(list_concat_terminal(
             "empty-tail",
@@ -1282,7 +1328,9 @@ impl MemberRules {
                             }) {
                                 let cube_aliases =
                                     egraph.add(LogicalPlanLanguage::CubeScanAliases(
-                                        CubeScanAliases(Some(column_name_to_member_name)),
+                                        CubeScanAliases(Some(column_name_to_member_to_aliases(
+                                            column_name_to_member_name,
+                                        ))),
                                     ));
                                 subst.insert(cube_aliases_var, cube_aliases);
 
@@ -2021,10 +2069,31 @@ impl MemberRules {
                             .iter()
                             .find_position(|(member_alias, _)| member_alias == &alias_name)
                         {
-                            let filtered_alias_to_cube = alias_to_cube
-                                .into_iter()
-                                .filter(|(_, cube)| cube == member.1.split(".").next().unwrap())
-                                .collect();
+                            let cube_to_filter = if member.1.is_some() {
+                                Some(
+                                    member
+                                        .1
+                                        .as_ref()
+                                        .unwrap()
+                                        .split(".")
+                                        .next()
+                                        .unwrap()
+                                        .to_string(),
+                                )
+                            } else {
+                                alias_to_cube
+                                    .iter()
+                                    .find(|((alias, _), _)| alias == &member.0)
+                                    .map(|(_, cube)| cube.to_string())
+                            };
+                            let filtered_alias_to_cube = if cube_to_filter.is_some() {
+                                alias_to_cube
+                                    .into_iter()
+                                    .filter(|(_, cube)| cube == cube_to_filter.as_ref().unwrap())
+                                    .collect()
+                            } else {
+                                alias_to_cube.clone()
+                            };
                             // Members are represented in pairs: fully qualified name and unqualified name
                             let index = index / 2;
                             for old_members in
@@ -2260,7 +2329,11 @@ impl MemberRules {
                 .as_ref()
                 .unwrap_or(&"unknown".to_string())
                 .to_uppercase();
-            if agg_type == "NUMBER" {
+            if agg_type == "NUMBER"
+                || agg_type == "STRING"
+                || agg_type == "TIME"
+                || agg_type == "BOOLEAN"
+            {
                 agg_type = "MEASURE".to_string();
             }
             subst.insert(
@@ -2329,6 +2402,66 @@ impl MemberRules {
         }
     }
 
+    fn transform_literal_member_alias(
+        &self,
+        alias_to_cube_var: &'static str,
+        column_var: &'static str,
+        new_alias_var: &'static str,
+        new_relation_var: &'static str,
+        is_alias: bool,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let column_var = var!(column_var);
+        let new_alias_var = var!(new_alias_var);
+        let new_relation_var = var!(new_relation_var);
+        move |egraph, subst| {
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                MemberPushdownReplacerAliasToCube
+            )
+            .cloned()
+            {
+                // alias_to_cube at this point is already filtered to a single cube
+                let ((_, alias), _) = &alias_to_cube[0];
+                if is_alias {
+                    for outer_alias in var_iter!(egraph[subst[column_var]], AliasExprAlias).cloned()
+                    {
+                        subst.insert(
+                            new_alias_var,
+                            egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                                outer_alias,
+                            ))),
+                        );
+                        subst.insert(
+                            new_relation_var,
+                            egraph.add(LogicalPlanLanguage::LiteralMemberRelation(
+                                LiteralMemberRelation(Some(alias.clone())),
+                            )),
+                        );
+                        return true;
+                    }
+                } else {
+                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                        subst.insert(
+                            new_alias_var,
+                            egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                                column.name,
+                            ))),
+                        );
+                        subst.insert(
+                            new_relation_var,
+                            egraph.add(LogicalPlanLanguage::LiteralMemberRelation(
+                                LiteralMemberRelation(Some(alias.clone())),
+                            )),
+                        );
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+    }
+
     fn transform_alias(
         &self,
         member_pushdown_replacer_alias_to_cube_var: &'static str,
@@ -2364,6 +2497,47 @@ impl MemberRules {
                     }
 
                     return true;
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_like_expr(
+        &self,
+        like_type_var: &'static str,
+        negated_var: &'static str,
+        escape_char_var: &'static str,
+        op_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let like_type_var = var!(like_type_var);
+        let negated_var = var!(negated_var);
+        let escape_char_var = var!(escape_char_var);
+        let op_var = var!(op_var);
+        move |egraph, subst| {
+            for escape_char in var_iter!(egraph[subst[escape_char_var]], LikeExprEscapeChar) {
+                if escape_char.is_some() {
+                    continue;
+                }
+
+                for like_type in var_iter!(egraph[subst[like_type_var]], LikeExprLikeType) {
+                    for negated in var_iter!(egraph[subst[negated_var]], LikeExprNegated) {
+                        let operator = match (like_type, negated) {
+                            (LikeType::Like, false) => Operator::Like,
+                            (LikeType::Like, true) => Operator::NotLike,
+                            (LikeType::ILike, false) => Operator::ILike,
+                            (LikeType::ILike, true) => Operator::NotILike,
+                            _ => continue,
+                        };
+
+                        subst.insert(
+                            op_var,
+                            egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(operator))),
+                        );
+
+                        return true;
+                    }
                 }
             }
 

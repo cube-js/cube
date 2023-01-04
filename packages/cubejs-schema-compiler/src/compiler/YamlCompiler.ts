@@ -1,4 +1,4 @@
-import YAML from 'yaml';
+import YAML from 'js-yaml';
 import { camelize } from 'inflection';
 import * as t from '@babel/types';
 import { parse } from '@babel/parser';
@@ -9,6 +9,7 @@ import { PythonParser } from '../parser/PythonParser';
 import { CubeSymbols } from './CubeSymbols';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
 import { nonStringFields } from './CubeValidator';
+import { CubeDictionary } from './CubeDictionary';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -20,11 +21,11 @@ type EscapeStateStack = {
 export class YamlCompiler {
   public dataSchemaCompiler: DataSchemaCompiler | null = null;
 
-  public constructor(private cubeSymbols: CubeSymbols) {
+  public constructor(private cubeSymbols: CubeSymbols, private cubeDictionary: CubeDictionary) {
   }
 
   public compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
-    const yamlObj = YAML.parse(file.content);
+    const yamlObj = YAML.load(file.content);
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
         yamlObj.cubes.forEach(({ name, ...cube }) => {
@@ -102,6 +103,9 @@ export class YamlCompiler {
           }
         }
       }
+    } else if (propertyPath[propertyPath.length - 1] === 'extends') {
+      const ast = this.parsePythonAndTranspileToJs(obj, errorsReport);
+      return this.astIntoArrowFunction(ast, obj, cubeName, name => this.cubeDictionary.resolveCube(name));
     } else if (typeof obj === 'string') {
       let code = obj;
       if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
@@ -187,7 +191,7 @@ export class YamlCompiler {
     return t.nullLiteral();
   }
 
-  private astIntoArrowFunction(ast, codeString, cubeName) {
+  private astIntoArrowFunction(ast, codeString, cubeName, resolveSymbol?: (string) => any) {
     const initialJs = babelGenerator(ast, {}, codeString).code;
 
     // Re-parse generated JS to set all necessary parent paths
@@ -199,11 +203,11 @@ export class YamlCompiler {
       },
     );
 
-    const resolveSymbol = n => this.cubeSymbols.resolveSymbol(cubeName, n) || this.cubeSymbols.isCurrentCube(n);
+    resolveSymbol = resolveSymbol || (n => this.cubeSymbols.resolveSymbol(cubeName, n) || this.cubeSymbols.isCurrentCube(n));
 
     const traverseObj = {
       Program: (babelPath) => {
-        CubePropContextTranspiler.replaceValueWithArrowFunction(resolveSymbol, babelPath.get('body')[0].get('expression'));
+        CubePropContextTranspiler.replaceValueWithArrowFunction(<(string) => any>resolveSymbol, babelPath.get('body')[0].get('expression'));
       },
     };
 

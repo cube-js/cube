@@ -27,7 +27,7 @@ export const prepareCompiler = (repo, options) => {
   const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
-  const yamlCompiler = new YamlCompiler(cubeSymbols);
+  const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary);
 
   const transpilers: TranspilerInterface[] = [
     new ValidationTranspiler(),

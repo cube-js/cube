@@ -35,6 +35,7 @@ pub fn cubestore_benches() -> Vec<Arc<dyn Bench>> {
     return vec![
         Arc::new(SimpleBench {}),
         Arc::new(ParquetMetadataCacheBench {}),
+        Arc::new(CacheSetGetBench {}),
     ];
 }
 
@@ -140,6 +141,42 @@ impl Bench for ParquetMetadataCacheBench {
             .await?;
         let rows = to_rows(&r);
         assert_eq!(rows, vec![vec![TableValue::Int(6)]]);
+        Ok(())
+    }
+}
+
+pub struct CacheSetGetBench;
+#[async_trait]
+impl Bench for CacheSetGetBench {
+    fn config(self: &Self, prefix: &str) -> (String, Config) {
+        let name = config_name(prefix, "cache_set_get");
+        let config = Config::test(name.as_str()).update_config(|c| c);
+        (name, config)
+    }
+
+    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+        services
+            .sql_service
+            .exec_query("CACHE SET TTL 600 'my_key' 'my_value'")
+            .await?;
+
+        let state = Arc::new(());
+        Ok(state)
+    }
+
+    async fn bench(
+        self: &Self,
+        services: &CubeServices,
+        _state: Arc<BenchState>,
+    ) -> Result<(), CubeError> {
+        let r = services
+            .sql_service
+            .exec_query("CACHE GET 'my_key'")
+            .await?;
+
+        let rows = to_rows(&r);
+        assert_eq!(rows, vec![vec![TableValue::String("my_value".to_string())]]);
+
         Ok(())
     }
 }

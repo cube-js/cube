@@ -86,6 +86,19 @@ pin-project = "1.0.8"
 tokio-tungstenite = { version = "0.16.0", features = ["native-tls"] }
 deflate = "1.0.0"
 indoc = "1.0"
+rdkafka = { version = "0.29.0" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rdkafka = { version = "0.29.0", features = ["ssl", "gssapi", "cmake-build"] }
+sasl2-sys = { version = "0.1.6", features = ["vendored"] }
+
+# TODO support ssl for windows
+[target.'cfg(target_os = "windows")'.dependencies]
+rdkafka = { version = "0.29.0", features = ["cmake-build"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rdkafka = { version = "0.29.0", features = ["ssl", "gssapi"] }
+sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"

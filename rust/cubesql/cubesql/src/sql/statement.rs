@@ -77,6 +77,12 @@ trait Visitor<'ast, E: Error> {
                 self.visit_expr(&mut *left)?;
                 self.visit_expr(&mut *right)?;
             }
+            Expr::Like { expr, pattern, .. }
+            | Expr::ILike { expr, pattern, .. }
+            | Expr::SimilarTo { expr, pattern, .. } => {
+                self.visit_expr(&mut *expr)?;
+                self.visit_expr(&mut *pattern)?;
+            }
             Expr::InList { expr, list, .. } => {
                 self.visit_expr(&mut *expr)?;
 
@@ -307,6 +313,10 @@ trait Visitor<'ast, E: Error> {
 
         for from in &mut select.from {
             self.visit_table_with_joins(from)?;
+        }
+
+        if let Some(having) = &mut select.having {
+            self.visit_expr(having)?;
         }
 
         Ok(())
@@ -842,6 +852,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                             over: None,
                             distinct: false,
                             special: false,
+                            approximate: false,
                         })
                     }
                 },
@@ -872,34 +883,37 @@ impl RedshiftDatePartReplacer {
 
 impl<'ast> Visitor<'ast, ConnectionError> for RedshiftDatePartReplacer {
     fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
-        let fn_name = fun.name.to_string().to_lowercase();
-        if !((fn_name == "datediff" || fn_name == "dateadd") && fun.args.len() == 3) {
-            return Ok(());
+        for res in fun.name.0.iter_mut() {
+            self.visit_identifier(res)?;
         }
-
-        match &mut fun.args[0] {
-            ast::FunctionArg::Unnamed(arg) => match arg {
-                FunctionArgExpr::Expr(arg) => {
-                    let granularity_in_identifier = match arg {
-                        Expr::Identifier(ident) => ident.value.to_lowercase(),
-                        _ => return Ok(()),
-                    };
-
-                    match granularity_in_identifier.as_str() {
-                        "second" | "minute" | "hour" | "day" | "qtr" | "week" | "month"
-                        | "year" => {
-                            *arg =
-                                Expr::Value(Value::SingleQuotedString(granularity_in_identifier));
+        let fn_name = fun.name.to_string().to_lowercase();
+        if (fn_name == "datediff" || fn_name == "dateadd") && fun.args.len() == 3 {
+            if let ast::FunctionArg::Unnamed(arg) = &mut fun.args[0] {
+                if let FunctionArgExpr::Expr(arg) = arg {
+                    if let Expr::Identifier(ident) = arg {
+                        let granularity_in_identifier = ident.value.to_lowercase();
+                        match granularity_in_identifier.as_str() {
+                            "second" | "minute" | "hour" | "day" | "qtr" | "week" | "month"
+                            | "year" => {
+                                *arg = Expr::Value(Value::SingleQuotedString(
+                                    granularity_in_identifier,
+                                ));
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
-                _ => {}
-            },
-            _ => {}
-        };
-
+            }
+        }
         self.visit_function_args(&mut fun.args)?;
+        if let Some(over) = &mut fun.over {
+            for res in over.partition_by.iter_mut() {
+                self.visit_expr(res)?;
+            }
+            for order_expr in over.order_by.iter_mut() {
+                self.visit_expr(&mut order_expr.expr)?;
+            }
+        }
 
         Ok(())
     }
@@ -1017,6 +1031,34 @@ impl<'a> Visitor<'a, ConnectionError> for UdfWildcardArgReplacer {
             for order_expr in over.order_by.iter_mut() {
                 self.visit_expr(&mut order_expr.expr)?;
             }
+        }
+
+        Ok(())
+    }
+}
+
+pub struct ApproximateCountDistinctVisitor {}
+
+impl ApproximateCountDistinctVisitor {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result).unwrap();
+
+        result
+    }
+}
+
+impl<'a> Visitor<'a, ConnectionError> for ApproximateCountDistinctVisitor {
+    fn visit_function(&mut self, fun: &mut ast::Function) -> Result<(), ConnectionError> {
+        if fun.approximate && fun.distinct && &fun.name.to_string().to_uppercase() == "COUNT" {
+            fun.name = ast::ObjectName(vec![ast::Ident::new("APPROX_DISTINCT")]);
+            fun.approximate = false;
+            fun.distinct = false;
         }
 
         Ok(())

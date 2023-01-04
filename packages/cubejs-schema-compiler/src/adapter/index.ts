@@ -10,6 +10,7 @@ export * from './PreAggregations';
 export * from './QueryBuilder';
 export * from './QueryCache';
 export * from './QueryFactory';
+export * from './CubeStoreQuery';
 
 // Base queries that can be re-used across different drivers
 export * from './MysqlQuery';
