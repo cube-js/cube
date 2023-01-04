@@ -31,11 +31,15 @@ Add the following to a `.env` file in your Cube project:
 
 ```bash
 CUBEJS_DB_TYPE=mongobi
-CUBEJS_DB_HOST=my.mongobi.host # mongo BI connector host, if using from local, should be either `localhost` or `127.0.0.1`
-CUBEJS_DB_PORT=3307 # default port of mongo BI connector service
+# The MongoBI connector host. If using on local machine, it should be either `localhost` or `127.0.0.1`:
+CUBEJS_DB_HOST=my.mongobi.host
+# The default port of the MongoBI connector service
+CUBEJS_DB_PORT=3307
 CUBEJS_DB_NAME=my_mongodb_database
 CUBEJS_DB_USER=mongodb_server_user
 CUBEJS_DB_PASS=mongodb_server_password
+# MongoBI requires SSL connections, so set the following to `true`:
+CUBEJS_DB_SSL=true
 ```
 
 If you are connecting to a local MongoBI Connector, which is pointing to a local
@@ -53,7 +57,7 @@ file][mongobi-with-remote-db].
 | `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name     |    ✅    |                                    ✅                                    |
 | `CUBEJS_DB_USER`     | The username used to connect to the database                                        | A valid database username |    ✅    |                                    ✅                                    |
 | `CUBEJS_DB_PASS`     | The password used to connect to the database                                        | A valid database password |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ✅    |                                    ✅                                    |
 | `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the database. Default is `2` | A valid number            |    ❌    |                                    ❌                                    |
 | `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |                                    ✅                                    |
 
@@ -96,13 +100,6 @@ To enable SSL-encrypted connections between Cube and MongoDB, set the
 `CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
-
-## Additional Configuration
-
-### <--{"id" : "Additional Configuratio"}--> MongoDB Atlas
-
-Use `CUBEJS_DB_SSL=true` to enable SSL as MongoDB Atlas requires it. All other
-SSL-related environment variables can be left unset.
 
 [mongodb]: https://www.mongodb.com/
 [mongobi-with-remote-db]:
