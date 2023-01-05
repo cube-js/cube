@@ -54,6 +54,9 @@ export type QueryBody = {
   forceNoCache?: boolean;
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
+  aliasNameToMember?: {
+    [alias: string]: string;
+  };
   preAggregationsLoadCacheByDataSource?: {
     [key: string]: any;
   };
@@ -256,6 +259,7 @@ export class QueryCache {
           persistent: queryBody.persistent,
           dataSource: queryBody.dataSource,
           useCsvQuery: queryBody.useCsvQuery,
+          aliasNameToMember: queryBody.aliasNameToMember,
         });
       } else {
         return {
@@ -436,6 +440,7 @@ export class QueryCache {
       inlineTables,
       useCsvQuery,
       persistent,
+      aliasNameToMember,
     }: {
       cacheKey: CacheKey,
       dataSource: string,
@@ -445,6 +450,7 @@ export class QueryCache {
       inlineTables?: InlineTables,
       useCsvQuery?: boolean,
       persistent?: boolean,
+      aliasNameToMember?: { [alias: string]: string },
     }
   ) {
     const queue = external
@@ -468,7 +474,7 @@ export class QueryCache {
     if (!persistent) {
       return queue.executeInQueue('query', cacheKey, _query, priority, opt);
     } else {
-      const _stream = queue.getQueryStream(cacheKey);
+      const _stream = queue.getQueryStream(cacheKey, aliasNameToMember);
       // we don't want to handle error here as we want it to bubble up
       // to the api gateway
       queue.executeInQueue('stream', cacheKey, _query, priority, opt);

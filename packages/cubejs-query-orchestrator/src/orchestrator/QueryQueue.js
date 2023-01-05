@@ -17,6 +17,7 @@ class DataStream extends stream.Writable {
   constructor({
     key,
     maps,
+    aliasNameToMember,
   }) {
     super({
       objectMode: true,
@@ -32,6 +33,11 @@ class DataStream extends stream.Writable {
      * @type {{ queued: Map<string, DataStream>, processing: Map<string, DataStream> }}
      */
     this.maps = maps;
+
+    /**
+     * @type {{ [alias: string]: string }}
+     */
+    this.aliasNameToMember = aliasNameToMember;
   }
 
   _write(chunk, encoding, callback) {
@@ -39,8 +45,12 @@ class DataStream extends stream.Writable {
       this.maps.queued.delete(this.queryKey);
       this.maps.processing.set(this.queryKey, this);
     }
+    const row = {};
+    Object.keys(chunk).forEach((alias) => {
+      row[this.aliasNameToMember[alias]] = chunk[alias];
+    });
     callback();
-    this.emit('data', chunk);
+    this.emit('data', row);
   }
 
   _destroy(error, callback) {
@@ -169,13 +179,15 @@ export class QueryQueue {
    * Returns stream object which will be used to pipe data from data source.
    *
    * @param {*} queryKey
+   * @param {{ [alias: string]: string }} aliasNameToMember
    */
-  getQueryStream(queryKey) {
+  getQueryStream(queryKey, aliasNameToMember) {
     const key = this.redisHash(queryKey);
     if (!this.streams.queued.has(key)) {
       const _stream = new DataStream({
         key,
         maps: this.streams,
+        aliasNameToMember,
       });
       this.streams.queued.set(key, _stream);
     }

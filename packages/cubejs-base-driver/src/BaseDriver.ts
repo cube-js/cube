@@ -231,7 +231,7 @@ export abstract class BaseDriver implements DriverInterface {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async streamQuery(sql: string, values: string[]): Promise<stream.Readable> {
-    throw new TypeError('The BaseDriver.streamQuery() method is not implemented yet.');
+    throw new TypeError('Driver\'s .streamQuery() method is not implemented yet.');
   }
 
   public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
