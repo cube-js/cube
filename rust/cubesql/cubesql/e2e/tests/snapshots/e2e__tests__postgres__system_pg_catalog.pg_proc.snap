@@ -1,6 +1,6 @@
 ---
 source: cubesql/e2e/tests/postgres.rs
-assertion_line: 285
+assertion_line: 316
 expression: "self.print_query_result(res, true, false).await"
 ---
 oid type: 23 (int4)
