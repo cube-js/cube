@@ -4,11 +4,10 @@
   --white: #FFFFFF;
 
   position: relative;
-  max-width: 99%;
   background-color: var(--code_bg);
-  border-radius: 8px;
+  border-radius: 4px;
   overflow: hidden;
-  margin: 14px 0 29px;
+  margin: 24px 0;
 }
 
 .CodeBlock > pre {
@@ -34,8 +33,6 @@
   margin: 0;
   padding: 0;
   list-style-type: none;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
   overflow: hidden;
   box-shadow: inset 0px -1px 0px var(--gray_02);
 }
