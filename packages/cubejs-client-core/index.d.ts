@@ -821,8 +821,8 @@ declare module '@cubejs-client/core' {
 
   type QueryArrayRecordType<T extends DeeplyReadonly<Query[]>> =
     T extends readonly [infer First, ...infer Rest]
-      ? SingleQueryRecordType<First> | QueryArrayRecordType<Rest & DeeplyReadonly<Query[]>>
-      : never;
+    ? SingleQueryRecordType<First> | QueryArrayRecordType<Rest & DeeplyReadonly<Query[]>>
+    : never;
 
   // If we can't infer any members at all, then return any.
   type SingleQueryRecordType<T extends DeeplyReadonly<Query>> = ExtractMembers<T> extends never
@@ -830,19 +830,19 @@ declare module '@cubejs-client/core' {
     : { [K in string & ExtractMembers<T>]: string | number | boolean | null };
 
   type ExtractMembers<T extends DeeplyReadonly<Query>> =
-    | ( T extends { dimensions: readonly (infer Names)[]; } ? Names : never )
-    | ( T extends { measures: readonly (infer Names)[]; } ? Names : never )
-    | ( T extends { timeDimensions: (infer U); } ? ExtractTimeMembers<U> : never );
+    | (T extends { dimensions: readonly (infer Names)[]; } ? Names : never)
+    | (T extends { measures: readonly (infer Names)[]; } ? Names : never)
+    | (T extends { timeDimensions: (infer U); } ? ExtractTimeMembers<U> : never);
 
   type ExtractTimeMembers<T> =
     T extends readonly [infer First, ...infer Rest]
-      ? ExtractTimeMember<First> | ExtractTimeMembers<Rest>
-      : never;
+    ? ExtractTimeMember<First> | ExtractTimeMembers<Rest>
+    : never;
 
   type ExtractTimeMember<T> =
     T extends { dimension: infer Dimension, granularity: infer Granularity }
-      ? Dimension | `${Dimension & string}.${Granularity & string}`
-      : never;
+    ? Dimension | `${Dimension & string}.${Granularity & string}`
+    : never;
 
   export class ProgressResult {
     stage(): string;
@@ -958,6 +958,18 @@ declare module '@cubejs-client/core' {
     segments: TCubeSegment[];
   };
 
+
+  export type CubeMap = {
+    measures: Record<string, TCubeMeasure>;
+    dimensions: Record<string, TCubeDimension>;
+    segments: Record<string, TCubeSegment>;
+  };
+
+  export type CubesMap = Record<
+    string,
+    CubeMap
+  >;
+
   export type MetaResponse = {
     cubes: Cube[];
   };
@@ -972,6 +984,9 @@ declare module '@cubejs-client/core' {
    * @order 4
    */
   export class Meta {
+    
+    constructor(metaResponse: MetaResponse);
+
     /**
      * Raw meta response
      */
@@ -985,7 +1000,7 @@ declare module '@cubejs-client/core' {
     /**
      * A map of all cubes where the key is a cube name
      */
-    cubesMap: Record<string, Pick<Cube, 'dimensions' | 'measures' | 'segments'>>;
+    cubesMap: CubesMap;
 
     /**
      * Get all members of a specific type for a given query.
@@ -1227,7 +1242,7 @@ declare module '@cubejs-client/core' {
   export function getQueryMembers(query: DeeplyReadonly<Query>): string[];
 
   export function areQueriesEqual(query1: DeeplyReadonly<Query> | null, query2: DeeplyReadonly<Query> | null): boolean;
-  
+
   export function validateQuery(query: DeeplyReadonly<Query> | null | undefined): Query;
 
   export type ProgressResponse = {
