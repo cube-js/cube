@@ -49,11 +49,20 @@ pub trait MetaStoreFs: Send + Sync {
 pub struct BaseRocksStoreFs {
     remote_fs: Arc<dyn RemoteFs>,
     name: &'static str,
+    config: Arc<dyn ConfigObj>,
 }
 
 impl BaseRocksStoreFs {
-    pub fn new(remote_fs: Arc<dyn RemoteFs>, name: &'static str) -> Arc<Self> {
-        Arc::new(Self { remote_fs, name })
+    pub fn new(
+        remote_fs: Arc<dyn RemoteFs>,
+        name: &'static str,
+        config: Arc<dyn ConfigObj>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            remote_fs,
+            name,
+            config,
+        })
     }
 
     pub fn get_name(&self) -> &'static str {
@@ -122,16 +131,18 @@ impl BaseRocksStoreFs {
             .collect::<Vec<_>>();
         to_delete_candidates
             .sort_unstable_by(|(_, a_millis), (_, b_millis)| b_millis.cmp(a_millis));
+        let lifetime_ms = (self.config.metastore_snapshots_lifetime() as u128) * 1000;
+        let min_snapshots_count = self.config.minimum_metastore_snapshots_count() as usize;
         let to_delete = to_delete_candidates
             .into_iter()
-            .skip(3)
+            .skip(min_snapshots_count)
             .filter_map(|(f, ms)| {
                 if SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .unwrap()
                     .as_millis()
                     - ms
-                    > 24 * 60 * 60 * 1000
+                    > lifetime_ms
                 {
                     Some(f)
                 } else {

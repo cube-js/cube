@@ -182,7 +182,7 @@ impl RocksCacheStore {
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
         let store = RocksStore::new(
             store_path.clone().join(details.get_name()).as_path(),
-            BaseRocksStoreFs::new(remote_fs.clone(), "cachestore"),
+            BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
             config.config_obj(),
             details,
         )
