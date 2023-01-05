@@ -834,7 +834,7 @@ impl Config {
                 skip_kafka_parsing_errors: env_parse("CUBESTORE_SKIP_KAFKA_PARSING_ERRORS", false),
                 minimum_metastore_snapshots_count: env_parse(
                     "CUBESTORE_MINIMUM_METASTORE_SNAPSHOTS_COUNT",
-                    3,
+                    5,
                 ),
                 metastore_snapshots_lifetime: env_parse(
                     "CUBESTORE_METASTORE_SNAPSHOTS_LIFETIME",
