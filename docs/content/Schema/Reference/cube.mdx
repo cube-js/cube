@@ -15,14 +15,16 @@ separate files with one cube per file. Within each cube are definitions of
 measures, dimensions, and joins between cubes. A cube should always be declared
 with a capital letter.
 
+<CodeTabs>
+
 ```javascript
 cube(`Users`, {
-  sql: `select * from users`,
+  sql: `SELECT * FROM users`,
 
   joins: {
     Organizations: {
       relationship: `belongsTo`,
-      sql: `${Users.organizationId} = ${Organizations.id}`,
+      sql: `${Users.organization_id} = ${Organizations.id}`,
     },
   },
 
@@ -34,7 +36,13 @@ cube(`Users`, {
   },
 
   dimensions: {
-    createdAt: {
+    organization_id: {
+      sql: `organization_id`,
+      type: `number`,
+      primaryKey: true,
+    },
+
+    created_at: {
       type: `time`,
       sql: `created_at`,
     },
@@ -46,6 +54,33 @@ cube(`Users`, {
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: Users
+    sql: SELECT * FROM USERS
+    joins:
+      - name: Organizations
+        relationship: belongs_to
+        sql: "{CUBE.organization_id} = {Organizations.id}"
+    measures:
+      - name: count
+        type: count
+        sql: id
+    dimensions:
+      - name: organization_id
+        sql: organization_id
+        type: number
+        primary_key: true
+      - name: created_at
+        type: time
+        sql: created_at
+      - name: country
+        type: string
+        sql: country
+```
+
+</CodeTabs>
 
 ## Naming
 
@@ -74,9 +109,11 @@ example, to avoid ambiguity in the `name` dimension in the following example, we
 use the `CUBE` context variable to explicitly reference the `name` property from
 the `Users` cube:
 
+<CodeTabs>
+
 ```javascript
 cube(`Users`, {
-  sql: `select * from users`,
+  sql: `SELECT * FROM users`,
 
   joins: {
     Contacts: {
@@ -98,10 +135,46 @@ cube(`Users`, {
 cube(`Contacts`, {
   sql: `select * from contacts`,
 
-  // primary key
-  ...
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primaryKey: true
+    },
+    name: {
+      sql: `name`,
+      type: `string`
+    }
+  }
 });
 ```
+
+```yaml
+cubes:
+  - name: Users
+    sql: SELECT * FROM USERS
+    joins:
+      - name: Contacts
+        sql: "{CUBE.contact_id} = {Contacts.id}"
+        relationship: has_one
+    dimensions:
+      - name: name
+        sql: "COALESCE({CUBE.name}, {Contacts.name})"
+        type: string
+
+  - name: Contacts
+    sql: SELECT * FROM CONTACTS
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: name
+        sql: name
+        type: string
+```
+
+</CodeTabs>
 
 Referencing a foreign cube in the `sql` parameter instructs Cube to build an
 implicit join to this cube. Using the schema above, we'll use a query as an
@@ -122,6 +195,12 @@ LEFT JOIN contacts "contacts" ON "users".contact_id = "contacts".id
 ```
 
 ## Abstract cubes
+
+<WarningBox>
+
+This feature is only available for Cube models authored in JavaScript.
+
+</WarningBox>
 
 Abstract cubes can be defined by simply omitting the first parameter to the
 `cube()` function. Cubes defined in this way can still be extended, but will be
@@ -158,6 +237,8 @@ where data should be fetched from multiple databases. The value of the
 parameter. By default, each cube has a `default` value for its `dataSource`; to
 override it you can use:
 
+<CodeTabs>
+
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
@@ -166,11 +247,22 @@ cube(`OrderFacts`, {
 });
 ```
 
+```yaml
+cubes:
+  - name: OrderFacts
+    sql: SELECT * FROM orders
+    data_source: prod_db
+```
+
+</CodeTabs>
+
 ### <--{"id" : "Parameters"}--> description
 
 Use a description in your cubes to allow your team to better understand what
 this cube is about. It is a very simple and yet useful tool that gives a hint to
 everyone and makes sure data is interpreted correctly by users.
+
+<CodeTabs>
 
 ```javascript
 cube(`Orders`, {
@@ -181,11 +273,23 @@ cube(`Orders`, {
 });
 ```
 
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM orders
+    title: Product Orders
+    description: All orders related information
+```
+
+</CodeTabs>
+
 ### <--{"id" : "Parameters"}--> extends
 
 You can extend cubes in order to reuse all declared members of a cube. In the
 example below, `ExtendedOrderFacts` will reuse the `sql` and `count` measures
 from `OrderFacts`:
+
+<CodeTabs>
 
 ```javascript
 cube(`OrderFacts`, {
@@ -203,7 +307,7 @@ cube(`ExtendedOrderFacts`, {
   extends: OrderFacts,
 
   measures: {
-    doubleCount: {
+    double_count: {
       type: `number`,
       sql: `${count} * 2`,
     },
@@ -211,8 +315,27 @@ cube(`ExtendedOrderFacts`, {
 });
 ```
 
-You can also omit the cube name while defining it. This way, Cube doesn't
-register this cube globally but instead it returns reference to it which you can
+```yaml
+  cubes:
+  - name: OrderFacts
+    sql: SELECT * FROM orders
+    measures:
+      - name: count
+        type: count
+        sql: id
+
+  - name: ExtendedOrderFacts
+    extends: OrderFacts
+    measures:
+      - name: double_count
+        type: number
+        sql: "{count} * 2"
+```
+
+</CodeTabs>
+
+You can also omit the cube name while defining a cube in JavaScript. This way, Cube doesn't
+register this cube globally; instead it returns a reference which you can
 use while combining cubes. It makes sense to use it for dynamic schema
 generation and reusing with `extends`. Previous example without defining
 `OrderFacts` cube globally:
@@ -233,7 +356,7 @@ cube(`ExtendedOrderFacts`, {
   extends: OrderFacts,
 
   measures: {
-    doubleCount: {
+    double_count: {
       type: `number`,
       sql: `${count} * 2`,
     },
@@ -260,6 +383,8 @@ Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option, or
 examining a metadata table for whatever system is managing the data to see when
 it last ran. timestamp in that case.
 
+<CodeTabs>
+
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
@@ -273,7 +398,19 @@ cube(`OrderFacts`, {
 });
 ```
 
+```yaml
+cubes:
+  - name: OrderFacts
+    sql: SELECT * FROM orders
+    refresh_key:
+      sql: SELECT MAX(updated_at_timestamp) FROM orders
+```
+
+</CodeTabs>
+
 You can use interval based `refreshKey`. For example:
+
+<CodeTabs>
 
 ```javascript
 cube(`OrderFacts`, {
@@ -285,11 +422,23 @@ cube(`OrderFacts`, {
 });
 ```
 
+```yaml
+cubes:
+  - name: OrderFacts
+    sql: SELECT * FROM orders
+    refresh_key:
+      every: 1 hour
+```
+
+</CodeTabs>
+
 `every` - can be set as an interval with granularities `second`, `minute`,
 `hour`, `day`, and `week` or accept CRON string with some limitations. If you
 set `every` as CRON string, you can use the `timezone` property.
 
 For example:
+
+<CodeTabs>
 
 ```javascript
 cube(`OrderFacts`, {
@@ -300,6 +449,17 @@ cube(`OrderFacts`, {
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: OrderFacts
+    sql: SELECT * FROM orders
+    refresh_key:
+      every: 30 5 * * 5
+      timezone: America/Los_Angeles
+```
+
+</CodeTabs>
 
 `every` can accept only equal time intervals - so "Day of month" and "month"
 intervals in CRON expressions are not supported.
@@ -366,25 +526,44 @@ Set this flag to true if you want Cube to rewrite your queries after final SQL
 has been generated. This may be helpful to apply filter pushdown optimizations
 or reduce unnecessary query nesting. For example:
 
+<CodeTabs>
+
 ```javascript
 cube(`Tickets`, {
   rewriteQueries: true,
-
-  // ...
 });
 ```
+
+```yaml
+cubes:
+  - name: Tickets
+    rewrite_queries: true
+```
+
+</CodeTabs>
 
 ### <--{"id" : "Parameters"}--> shown
 
 The `shown` property is used to manage the visibility of a cube. Valid values
 for `shown` are `true` and `false`.
 
-```typescript
+<CodeTabs>
+
+```javascript
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
   shown: false,
 });
 ```
+
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM orders
+    shown: false
+```
+
+</CodeTabs>
 
 To learn more about using `shown` to control visibility based on security
 context, read the [Controlling access to cubes and views
@@ -398,13 +577,23 @@ the form of a `select * from my_table` query. Please note that you don't need to
 use `GROUP BY` in a SQL query on the cube level. This query should return a
 plain table, without aggregations.
 
+<CodeTabs>
+
 ```javascript
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 });
 ```
 
-You can reference others’ cubes SQL statement for code reuse.
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM orders
+```
+
+</CodeTabs>
+
+With JavaScript models, you can also reference other cubes' SQL statements for code reuse:
 
 ```javascript
 cube(`Companies`, {
@@ -417,6 +606,8 @@ cube(`Companies`, {
 Use `sqlAlias` when auto-generated cube alias prefix is too long and truncated
 by DB such as Postgres:
 
+<CodeTabs>
+
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
@@ -426,6 +617,15 @@ cube(`OrderFacts`, {
   // ...
 });
 ```
+
+```yaml
+cubes:
+  - name: OrderFacts
+    sql: SELECT * FROM orders
+    sql_alias: ofacts
+```
+
+</CodeTabs>
 
 It'll generate aliases for members such as `ofacts__count`. `sqlAlias` affects
 all member names including pre-aggregation table names.
@@ -439,6 +639,8 @@ title parameter. It is highly recommended to give human readable names to your
 cubes. It will help everyone on a team better understand the data structure and
 will help maintain a consistent set of definitions across an organization.
 
+<CodeTabs>
+
 ```javascript
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
@@ -446,6 +648,15 @@ cube(`Orders`, {
   title: `Product Orders`,
 });
 ```
+
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM orders
+    title: Product Orders
+```
+
+</CodeTabs>
 
 ## Context Variables
 
@@ -463,8 +674,10 @@ It has the following structure:
 FILTER_PARAMS.<CUBE_NAME>.<FILTER_NAME>.filter(expression)
 ```
 
-The `filter` function accepts the expression, which could be either `String` or
+The `filter()` function accepts the expression, which could be either `String` or
 `Function`. See the examples below.
+
+<CodeTabs>
 
 ```javascript
 cube(`OrderFacts`, {
@@ -487,6 +700,23 @@ cube(`OrderFacts`, {
 });
 ```
 
+```yaml
+cubes:
+  - name: OrderFacts
+    sql: >
+      SELECT * FROM orders
+      WHERE {FILTER_PARAMS.OrderFacts.date.filter('date')}
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: date
+        sql: date
+        type: time
+```
+
+</CodeTabs>
+
 This will generate the following SQL:
 
 ```sql
@@ -496,13 +726,13 @@ SELECT * FROM orders WHERE date >= '2018-01-01 00:00:00' and date <= '2018-12-31
 for the `['2018-01-01', '2018-12-31']` date range passed for the
 `OrderFacts.date` dimension as in following query:
 
-```javascript
+```json
 {
-  measures: ['OrderFacts.count'],
-  timeDimensions: [{
-    dimension: 'OrderFacts.date',
-    granularity: 'day',
-    dateRange: ['2018-01-01', '2018-12-31']
+  "measures": ["OrderFacts.count"],
+  "timeDimensions": [{
+    "dimension": "OrderFacts.date",
+    "granularity": "day",
+    "dateRange": ["2018-01-01", "2018-12-31"]
   }]
 }
 ```
@@ -514,6 +744,8 @@ will reduce your billing cost.
 > **NOTE:** When you're passing function to the `filter()` function, params are
 > passed as string parameters from driver and it's your responsibility to handle
 > type conversions in this case.
+
+<CodeTabs>
 
 ```javascript
 cube(`Events`, {
@@ -534,6 +766,23 @@ cube(`Events`, {
 });
 ```
 
+```yaml
+cubes:
+  - name: Events
+    sql: >
+      SELECT * FROM schema.`events*`
+      WHERE {FILTER_PARAMS.Events.date.filter(
+        (from, to) =>
+          `_TABLE_SUFFIX >= FORMAT_TIMESTAMP('%Y%m%d', TIMESTAMP(${from})) AND _TABLE_SUFFIX <= FORMAT_TIMESTAMP('%Y%m%d', TIMESTAMP(${to}))`
+      )}
+    dimensions:
+      - name: date
+        sql: date
+        type: time
+```
+
+</CodeTabs>
+
 ### <--{"id" : "Context Variables"}--> Security Context
 
 `SECURITY_CONTEXT` is a user security object that is passed by the Cube Client.
@@ -553,6 +802,8 @@ example, if you have an `orders` table that contains an `email` field you can
 restrict all queries to render results that belong only to the current user as
 follows:
 
+<CodeTabs>
+
 ```javascript
 cube(`Orders`, {
   sql: `SELECT * FROM orders WHERE ${SECURITY_CONTEXT.email.filter('email')}`,
@@ -566,7 +817,23 @@ cube(`Orders`, {
 });
 ```
 
+```yaml
+cubes:
+  - name: Orders
+    sql: >
+      SELECT * FROM orders
+      WHERE {SECURITY_CONTEXT.email.filter('email')}
+    dimensions:
+      - name: date
+        sql: date
+        type: time
+```
+
+</CodeTabs>
+
 To ensure filter value presents for all requests `requiredFilter` can be used:
+
+<CodeTabs>
 
 ```javascript
 cube(`Orders`, {
@@ -583,6 +850,20 @@ cube(`Orders`, {
 });
 ```
 
+```yaml
+cubes:
+  - name: Orders
+    sql: >
+      SELECT * FROM orders
+      WHERE {SECURITY_CONTEXT.email.requiredFilter('email')}
+    dimensions:
+      - name: date
+        sql: date
+        type: time
+```
+
+</CodeTabs>
+
 ### <--{"id" : "Context Variables"}--> Unsafe Value
 
 <WarningBox>
@@ -593,6 +874,8 @@ Use of this feature entails SQL injection security risk. Use it with caution.
 
 You can access values of context variables directly in javascript in order to
 use it during your SQL generation. For example:
+
+<CodeTabs>
 
 ```javascript
 cube(`Orders`, {
@@ -608,6 +891,20 @@ cube(`Orders`, {
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: Orders
+    sql: >
+      SELECT * FROM
+      {SECURITY_CONTEXT.type.unsafeValue() === 'employee' ? 'employee' : 'public'}.orders
+    dimensions:
+      - name: date
+        sql: date
+        type: time
+```
+
+</CodeTabs>
 
 ### <--{"id" : "Context Variables"}--> SQL Utils
 
@@ -630,17 +927,19 @@ In case the same database field needs to be queried in `dimensions` and
 `timeDimensions`, create dedicated dimensions in the cube definition for the
 respective use:
 
+<CodeTabs>
+
 ```javascript
 cube(`visitors`, {
   // ...
 
   dimensions: {
-    createdAtConverted: {
+    created_at_converted: {
       // do not use in timeDimensions query property
       type: 'time',
       sql: SQL_UTILS.convertTz(`created_at`),
     },
-    createdAt: {
+    created_at: {
       // use in timeDimensions query property
       type: 'time',
       sql: `created_at`,
@@ -648,6 +947,23 @@ cube(`visitors`, {
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: visitors
+    # ...
+    dimensions:
+      - name: createdAtConverted
+        # do not use in timeDimensions query property
+        type: time
+        sql: "{SQL_UTILS.convertTz(`created_at`)}"
+      - name: created_at
+        # use in timeDimensions query property
+        type: time
+        sql: created_at
+```
+
+</CodeTabs>
 
 ### <--{"id" : "Context Variables"}--> Compile context
 
@@ -663,6 +979,8 @@ value for different users. It may change however for different tenants.
 
 </WarningBox>
 
+<CodeTabs>
+
 ```javascript
 const {
   securityContext: { deploymentId },
@@ -671,11 +989,19 @@ const {
 const schemaName = `user_${deploymentId}`;
 
 cube(`Users`, {
-  sql: `select * from ${schemaName}.users`,
-
-  // ...
+  sql: `SELECT * FROM ${schemaName}.users`,
 });
 ```
+
+```yaml
+cubes:
+  - name: Users
+    sql: >
+      SELECT * FROM
+      {COMPILE_CONTEXT.securityContext.deploymentId}
+```
+
+</CodeTabs>
 
 [ref-config-driverfactory]: /config#driver-factory
 [ref-config-ext-ctx]: /config#extend-context

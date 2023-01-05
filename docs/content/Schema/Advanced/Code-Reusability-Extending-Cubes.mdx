@@ -13,14 +13,12 @@ Cube supports the [`extends` feature][ref-schema-ref-cube-extends], which allows
 you to reuse all declared members of a cube. This is a foundation for building
 reusable data schemas.
 
-[Cubes][self-schema-concepts-cubes] are represented as [JavaScript
+[Cubes][ref-schema-concepts-cubes] are represented as [JavaScript
 objects][mdn-js-objects] with such properties as measures, dimensions, and
 segments. Extending in Cube works similarly to JavaScript’s prototype
 inheritance. Measures, dimensions, and segments are merged as separate objects.
 So if the base cube defines measure `A` and the extending cube defines measure
 `B`, the resulting cube will have both measures `A` and `B`.
-
-[self-schema-concepts-cubes]: /schema/fundamentals/concepts#cubes
 
 The usual pattern is to **extract common measures, dimensions, and joins into
 the base cube** and then **extend from the base cube**. This helps to prevent
@@ -31,7 +29,7 @@ dimensions, and a join to the `Users` cube:
 
 <InfoBox>
 
-It’s important to use the `${CUBE}` reference when referencing properties on the
+It’s important to use the `CUBE` reference when referencing properties on the
 cube. Not specifying the cube name or using `${BaseEvents}` does not work when
 the cube is extended.
 
@@ -105,5 +103,6 @@ in any `sql` property, then extending cubes can do one of two things:
 
 [mdn-js-objects]:
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
+[ref-schema-concepts-cubes]: /schema/fundamentals/concepts#cubes
 [ref-schema-ref-cube-extends]: /schema/reference/cube#extends
 [ref-schema-ref-cube-filter-params]: /schema/reference/cube#filter-params

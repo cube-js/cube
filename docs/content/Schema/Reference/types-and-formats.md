@@ -9,22 +9,24 @@ redirect_from:
   - /types-and-formats
 ---
 
-## Measures Types
+## Measure Types
 
 This section describes the various types that can be assigned to a **measure**.
 A measure can only have one type.
 
-### <--{"id" : "Measures Types"}--> number
+### <--{"id" : "Measure Types"}--> number
 
 The `sql` parameter is required and can take any valid SQL expression that
 results in a number or integer. Type `number` is usually used, when performing
 arithmetic operations on measures. [Learn more about Calculated
 Measures][ref-schema-ref-calc-measures].
 
+<CodeTabs>
+
 ```javascript
 cube('Orders', {
   measures: {
-    purchasesRatio: {
+    purchases_ratio: {
       sql: `${purchases} / ${count} * 100.0`,
       type: `number`,
       format: `percent`,
@@ -33,8 +35,22 @@ cube('Orders', {
 });
 ```
 
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: purchases_ratio
+        sql: ${purchases} / ${count} * 100.0
+        type: number
+        format: percent
+```
+
+</CodeTabs>
+
 You can put any sql into `number` measure as long as it's an aggregate
 expression:
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -47,7 +63,18 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> count
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: ratio
+        sql: 'SUM({CUBE}.amount) / count(*)'
+        type: number
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Types"}--> count
 
 Performs a table count, similar to SQL’s `COUNT` function. However, unlike
 writing raw SQL, Cube.js will properly calculate counts even if your query’s
@@ -57,6 +84,8 @@ parameter for this type.
 `drillMembers` parameter is commonly used with type `count`. It allows users to
 click on the measure in the UI and inspect individual records that make up a
 count. [Learn more about Drill Downs][ref-drilldowns].
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -70,13 +99,30 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> countDistinct
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: numberOfUsers
+        type: count
+        drill_members:
+          - id
+          - name
+          - email
+          - company
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Types"}--> countDistinct
 
 Calculates the number of distinct values in a given field. It makes use of SQL’s
 `COUNT DISTINCT` function.
 
 The `sql` parameter is required and can take any valid SQL expression that
 results in a table column, or interpolated JavaScript expression.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -89,7 +135,18 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> countDistinctApprox
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: uniqueUserCount
+        sql: user_id
+        type: countDistinct
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Types"}--> countDistinctApprox
 
 Calculates approximate number of distinct values in a given field. Unlike
 `countDistinct` measure type, `countDistinctApprox` is decomposable aggregate
@@ -102,6 +159,8 @@ calculation of distinct counts at scale.
 
 The `sql` parameter is required and can take any valid SQL expression.
 
+<CodeTabs>
+
 ```javascript
 cube('Orders', {
   measures: {
@@ -113,7 +172,18 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> sum
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: uniqueUserCount
+        sql: user_id
+        type: countDistinctApprox
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Types"}--> sum
 
 Adds up the values in a given field. It is similar to SQL’s `SUM` function.
 However, unlike writing raw SQL, Cube.js will properly calculate sums even if
@@ -123,6 +193,8 @@ The `sql` parameter is required and can take any valid SQL expression that
 results in a numeric table column, or interpolated JavaScript expression. `sql`
 parameter should contain only expression to sum without actual aggregate
 function.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -135,6 +207,19 @@ cube('Orders', {
 });
 ```
 
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: revenue
+        sql: '{chargesAmount}'
+        type: sum
+```
+
+</CodeTabs>
+
+<CodeTabs>
+
 ```javascript
 cube('Orders', {
   measures: {
@@ -145,6 +230,19 @@ cube('Orders', {
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: revenue
+        sql: amount
+        type: sum
+```
+
+</CodeTabs>
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -157,7 +255,18 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> avg
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: revenue
+        sql: fee * 0.1
+        type: sum
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Types"}--> avg
 
 Averages the values in a given field. It is similar to SQL’s AVG function.
 However, unlike writing raw SQL, Cube.js will properly calculate averages even
@@ -166,25 +275,40 @@ if your query’s joins will result in row duplication.
 The sql parameter for type: average measures can take any valid SQL expression
 that results in a numeric table column, or interpolated JavaScript expression.
 
+<CodeTabs>
+
 ```javascript
 cube('Orders', {
   measures: {
-    averageTransaction: {
-      sql: `${transactionAmount}`,
+    avg_transaction: {
+      sql: `${transaction_amount}`,
       type: `avg`,
     },
   },
 });
 ```
 
-### <--{"id" : "Measures Types"}--> min
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: avg_transaction
+        sql: ${transaction_amount}
+        type: avg
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Types"}--> min
 
 Type of measure `min` is calculated as a minimum of values defined in `sql`.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
   measures: {
-    dateFirstPurchase: {
+    date_first_purchase: {
       sql: `date_purchase`,
       type: `min`,
     },
@@ -192,14 +316,27 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> max
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: date_first_purchase
+        sql: date_purchase
+        type: min
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Types"}--> max
 
 Type of measure `max` is calculated as a maximum of values defined in `sql`.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
   measures: {
-    dateLastPurchase: {
+    date_last_purchase: {
       sql: `date_purchase`,
       type: `max`,
     },
@@ -207,15 +344,28 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Types"}--> runningTotal
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: date_last_purchase
+        sql: date_purchase
+        type: max
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Types"}--> runningTotal
 
 Type of measure `runningTotal` is calculated as summation of values defined in
 `sql`. Use it to calculate cumulative measures.
 
+<CodeTabs>
+
 ```javascript
 cube('Orders', {
   measures: {
-    totalSubscriptions: {
+    total_subscriptions: {
       sql: `subscription_amount`,
       type: `runningTotal`,
     },
@@ -223,19 +373,32 @@ cube('Orders', {
 });
 ```
 
-## Measures Formats
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: total_subscriptions
+        sql: subscription_amount
+        type: runningTotal
+```
+
+</CodeTabs>
+
+## Measure Formats
 
 When creating a **measure** you can explicitly define the format you’d like to
 see as output.
 
-### <--{"id" : "Measures Formats"}--> percent
+### <--{"id" : "Measure Formats"}--> percent
 
 `percent` is used for formatting numbers with a percent symbol.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
   measures: {
-    purchaseConversion: {
+    purchase_conversion: {
       sql: `${purchase}/${checkout}*100.0`,
       type: `number`,
       format: `percent`,
@@ -244,14 +407,28 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Measures Formats"}--> currency
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: purchase_conversion
+        sql: ${purchase}/${checkout}*100.0
+        type: number
+        format: percent
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Formats"}--> currency
 
 `currency` is used for monetary values.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
   measures: {
-    totalAmount: {
+    total_amount: {
       sql: `amount`,
       type: `runningTotal`,
       format: `currency`,
@@ -260,12 +437,24 @@ cube('Orders', {
 });
 ```
 
-## Dimensions Types
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: total_amount
+        sql: amount
+        type: runningTotal
+        format: currency
+```
+
+</CodeTabs>
+
+## Dimension Types
 
 This section describes the various types that can be assigned to a
 **dimension**. A dimension can only have one type.
 
-### <--{"id" : "Dimensions Types"}--> time
+### <--{"id" : "Dimension Types"}--> time
 
 In order to be able to create time series charts, Cube.js needs to identify time
 dimension which is a timestamp column in your database.
@@ -274,10 +463,12 @@ You can define several time dimensions in schemas and apply each when creating
 charts. Note that type of target column should be `TIMESTAMP`. Please use [this
 guide][ref-string-time-dims] if your datetime information is stored as a string.
 
+<CodeTabs>
+
 ```javascript
 cube('Orders', {
   dimensions: {
-    completedAt: {
+    completed_at: {
       sql: `completed_at`,
       type: `time`,
     },
@@ -285,29 +476,55 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Types"}--> string
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: completed_at
+        sql: completed_at
+        type: time
+```
+
+</CodeTabs>
+
+### <--{"id" : "Dimension Types"}--> string
 
 `string` is typically used with fields that contain letters or special
 characters. The `sql` parameter is required and can take any valid SQL
 expression.
 
-The following JS code creates a field `fullName` by combining 2 fields:
-`firstName` and `lastName`:
+The following model creates a field `full_name` by combining 2 fields:
+`first_name` and `last_name`:
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
   dimensions: {
-    fullName: {
-      sql: `CONCAT(${firstName}, ' ', ${lastName})`,
+    full_name: {
+      sql: `CONCAT(${first_name}, ' ', ${last_name})`,
       type: `string`,
     },
   },
 });
 ```
 
-### <--{"id" : "Dimensions Types"}--> number
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: fullName
+        sql: "CONCAT({firstName}, ' ', {lastName})"
+        type: string
+```
+
+</CodeTabs>
+
+### <--{"id" : "Dimension Types"}--> number
 
 `number` is typically used with fields that contain number or integer.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -320,15 +537,28 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Types"}--> boolean
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: amount
+        sql: amount
+        type: number
+```
+
+</CodeTabs>
+
+### <--{"id" : "Dimension Types"}--> boolean
 
 `boolean` is used with fields that contain boolean data or data coercible to
 boolean. For example:
 
+<CodeTabs>
+
 ```javascript
 cube('Orders', {
   dimensions: {
-    isEnabled: {
+    is_enabled: {
       sql: `is_enabled`,
       type: `boolean`,
     },
@@ -336,10 +566,23 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Types"}--> geo
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: is_enabled
+        sql: is_enabled
+        type: boolean
+```
+
+</CodeTabs>
+
+### <--{"id" : "Dimension Types"}--> geo
 
 `geo` dimension is used to display data on the map. Unlike other dimension types
 it requires to set two fields: latitude and longitude.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -357,12 +600,28 @@ cube('Orders', {
 });
 ```
 
-## Dimensions Formats
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: location
+        type: geo
+        latitude:
+          sql: '{CUBE}.latitude'
+        longitude:
+          sql: '{CUBE}.longitude'
+```
 
-### <--{"id" : "Dimensions Formats"}--> imageUrl
+</CodeTabs>
+
+## Dimension Formats
+
+### <--{"id" : "Dimension Formats"}--> imageUrl
 
 `imageUrl` is used for displaying images in table visualization. In this case
 `sql` parameter should contain full path to the image.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -376,11 +635,25 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Formats"}--> id
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: image
+        sql: "CONCAT('https://img.example.com/id/', {id})"
+        type: string
+        format: imageUrl
+```
+
+</CodeTabs>
+
+### <--{"id" : "Dimension Formats"}--> id
 
 `id` is used for IDs. It allows to eliminate applying of comma for 5+ digit
 numbers which is default for type `number`. The `sql` parameter is required and
 can take any valid SQL expression.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -394,13 +667,27 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Formats"}--> link
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: image
+        sql: id
+        type: number
+        format: id
+```
+
+</CodeTabs>
+
+### <--{"id" : "Dimension Formats"}--> link
 
 `link` is used for creating hyperlinks. `link` parameter could be either String
 or Object. Use Object, when you want to give a specific label to link. See
 examples below for details.
 
 The `sql` parameter is required and can take any valid SQL expression.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -423,9 +710,29 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Formats"}--> currency
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: orderLink
+        sql: "'http://myswebsite.com/orders/' || id"
+        type: string
+        format: link
+      - name: crmLink
+        sql: "'https://na1.salesforce.com/' || id"
+        type: string
+        format:
+          label: View in Salesforce
+          type: link
+```
+
+</CodeTabs>
+
+### <--{"id" : "Dimension Formats"}--> currency
 
 `currency` is used for monetary values.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -439,21 +746,48 @@ cube('Orders', {
 });
 ```
 
-### <--{"id" : "Dimensions Formats"}--> percent
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: amount
+        sql: amount
+        type: number
+        format: currency
+```
+
+</CodeTabs>
+
+### <--{"id" : "Dimension Formats"}--> percent
 
 `percent` is used for formatting numbers with a percent symbol.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
   dimensions: {
-    openRate: {
-      sql: `COALESCE(100.0 * ${uniqOpenCount} / NULLIF(${deliveredCount}, 0), 0)`,
+    open_rate: {
+      sql: `COALESCE(100.0 * ${uniq_open_count} / NULLIF(${delivered_count}, 0), 0)`,
       type: `number`,
       format: `percent`,
     },
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: open_rate
+        sql:
+          'COALESCE(100.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)'
+        type: number
+        format: percent
+```
+
+</CodeTabs>
 
 [ref-string-time-dims]:
   /schema/fundamentals/additional-concepts#string-time-dimensions

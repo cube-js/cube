@@ -26,18 +26,20 @@ Let’s consider the following example of our imaginary e-commerce store. We hav
 an Orders cube, which describes orders in our store. It’s connected to Users and
 Products.
 
+<CodeTabs>
+
 ```javascript
 cube(`Orders`, {
-  sql: `select * from orders`,
+  sql: `SELECT * FROM orders`,
 
   joins: {
     Users: {
-      type: `belongsTo`,
+      relationship: `belongsTo`,
       sql: `${CUBE}.user_id = ${Users.id}`,
     },
 
     Products: {
-      type: `belongsTo`,
+      relationship: `belongsTo`,
       sql: `${CUBE}.product_id = ${Products.id}`,
     },
   },
@@ -47,7 +49,7 @@ cube(`Orders`, {
       type: `count`,
       // Here we define all possible properties we might want
       // to "drill down" on from our front-end
-      drillMembers: [id, status, Products.name, Users.email],
+      drillMembers: [id, status, Products.name, Users.city],
     },
   },
 
@@ -66,6 +68,43 @@ cube(`Orders`, {
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: Orders
+    sql: "SELECT * FROM orders"
+
+    joins:
+      - name: Users
+        relationship: belongs_to
+        sql: "{CUBE}.user_id = {Users}.id"
+      - name: Products
+        relationship: belongs_to
+        sql: "{CUBE}.product_id = {Products}.id"
+
+    measures:
+      - name: count
+        type: count
+        # Here we define all possible properties we might want
+        # to "drill down" on from our front-end
+        drillMembers:
+          - id
+          - status
+          - Products.name
+          - Users.city
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        shown: true
+      - name: status
+        sql: status
+        type: string
+```
+
+</CodeTabs>
 
 You can follow [this tutorial][blog-drilldown-api] to learn more about building
 a UI for drilldowns.
@@ -110,6 +149,8 @@ GROUP BY 1
 Cube makes subqueries easy and efficient. Subqueries are defined as regular
 dimensions with the parameter `subQuery` set to true.
 
+<CodeTabs>
+
 ```javascript
 cube(`Deals`, {
   sql: `SELECT * FROM deals`,
@@ -122,7 +163,7 @@ cube(`Deals`, {
   },
 
   dimensions: {
-    salesManagerId: {
+    sales_manager_id: {
       sql: `sales_manager_id`,
       type: `string`,
     },
@@ -140,8 +181,8 @@ cube(`SalesManagers`, {
   },
 
   measures: {
-    averageDealAmount: {
-      sql: `${dealsAmount}`,
+    average_deal_amount: {
+      sql: `${deals_amount}`,
       type: `avg`,
     },
   },
@@ -153,7 +194,7 @@ cube(`SalesManagers`, {
       primaryKey: true,
     },
 
-    dealsAmount: {
+    deals_amount: {
       sql: `${Deals.amount}`,
       type: `number`,
       subQuery: true,
@@ -162,6 +203,42 @@ cube(`SalesManagers`, {
 });
 ```
 
+```yaml
+cubes:
+  - name: Deals
+    sql: SELECT * FROM deals
+
+    measures:
+      - name: amount
+        sql: amount
+        type: sum
+
+  - name: SalesManagers
+    sql: SELECT * FROM sales_managers
+
+    joins:
+      - name: Deals
+        relationship: has_many
+        sql: "{SalesManagers}.id = {Deals}.sales_manager_id"
+
+    measures:
+      - name: average_deal_amount
+        sql: "{CUBE.deals_amount}"
+        type: avg
+
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+      - name: deals_amount
+        sql: "{Deals.amount}"
+        type: number
+        sub_query: true
+```
+
+</CodeTabs>
+
 A subquery requires referencing at least one [measure][ref-schema-ref-measures]
 in its definition. Generally speaking, all the columns used to define a subquery
 dimension should first be defined as [measures][ref-schema-ref-measures] on
@@ -169,9 +246,11 @@ their respective cubes and then referenced from a subquery dimension over a
 [join][ref-schema-ref-joins]. For example the following schema will **not**
 work:
 
+<CodeTabs>
+
 ```javascript
 cube(`Deals`, {
-  sql: `select * from deals`,
+  sql: `SELECT * FROM deals`,
 
   measures: {
     count: {
@@ -184,7 +263,7 @@ cube(`SalesManagers`, {
   // ...
   dimensions: {
     // ...
-    dealsAmount: {
+    deals_amount: {
       sql: `SUM(${Deals.amount})`, // Doesn't work, because `amount` is not a measure on `Deals`
       type: `number`,
       subQuery: true,
@@ -193,15 +272,36 @@ cube(`SalesManagers`, {
 });
 ```
 
+```yaml
+cubes:
+  - name: Deals
+    sql: SELECT * FROM DEALS
+
+    measures:
+      - name: count
+        type: count
+
+  - name: SalesManagers
+    dimensions:
+      - name: deals_amount
+        sql: "SUM({Deals}.amount)" # Doesn't work, because `amount` is not a measure on `Deals`
+        type: number
+        subQuery: true
+```
+
+</CodeTabs>
+
 You can reference subquery dimensions in measures as usual
 [dimensions][ref-schema-ref-dimensions]. The example below shows the definition
 of an average deal amount per sales manager:
 
+<CodeTabs>
+
 ```javascript
 cube(`SalesManagers`, {
   measures: {
-    averageDealsAmount: {
-      sql: `${dealsAmount}`,
+    average_deals_amount: {
+      sql: `${deals_amount}`,
       type: `avg`,
     },
   },
@@ -212,7 +312,7 @@ cube(`SalesManagers`, {
       type: `string`,
       primaryKey: true,
     },
-    dealsAmount: {
+    deals_amount: {
       sql: `${Deals.amount}`,
       type: `number`,
       subQuery: true,
@@ -220,6 +320,26 @@ cube(`SalesManagers`, {
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: SalesManagers
+    measures:
+      - name: average_deals_amount
+        sql: "{CUBE.deals_amount}"
+        type: avg
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+      - name: deals_amount
+        sql: "{Deals.amount}"
+        type: number
+        sub_query: true
+```
+
+</CodeTabs>
 
 ### <--{"id" : "Subquery"}--> Under the hood
 
@@ -229,17 +349,17 @@ include the primary key dimension of the main cube and all
 included in the SQL definition of the subquery dimension.
 
 This query will be joined as a `LEFT JOIN` onto the main SQL query. For example,
-when using the `SalesManagers.dealsAmount` subquery dimension, the following
+when using the `SalesManagers.deals_amount` subquery dimension, the following
 query will be generated:
 
 ```json
 {
-  "measures": ["SalesManagers.dealsAmount"],
+  "measures": ["SalesManagers.deals_amount"],
   "dimensions": ["SalesManagers.id"]
 }
 ```
 
-If a query includes the `SalesManagers.averageDealAmount` measure, the following
+If a query includes the `SalesManagers.average_deal_amount` measure, the following
 SQL will be generated:
 
 ```sql
@@ -266,11 +386,11 @@ table's datetime information is stored as a string. Most SQL databases support
 datetime parsing which allows converting strings to timestamps. Let's consider
 an example cube for BigQuery:
 
+<CodeTabs>
+
 ```javascript
 cube(`Events`, {
   sql: `SELECT * FROM schema.events`,
-
-  // ...
 
   dimensions: {
     date: {
@@ -280,6 +400,19 @@ cube(`Events`, {
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: Events
+    sql: SELECT * FROM schema.events
+
+    dimensions:
+      - name: date
+        sql: PARSE_TIMESTAMP('%Y-%m-%d', date)
+        type: time
+```
+
+</CodeTabs>
 
 In this particular cube, the `date` column will be parsed using the `%Y-%m-%d`
 format. Please note that as we do not pass timezone parameter to

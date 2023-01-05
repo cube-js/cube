@@ -9,16 +9,22 @@ redirect_from:
   - /recipes/export-import
 ---
 
-In Cube.js, your data schema is code, and code is much easier to manage when it
+<InfoBox>
+
+This functionality only works with schemas written in JavaScript, not YAML.
+
+</InfoBox>
+
+In Cube, your data schema is code, and code is much easier to manage when it
 is in small, digestible chunks. It is best practice to keep files small and
 containing only relevant and non-duplicated code. As your data schema grows,
 maintaining and debugging is much easier with a well-organized codebase.
 
-Cube.js supports ES6 style [`export`][mdn-js-es6-export] and
+Cube schemas in JavaScript supports ES6-style [`export`][mdn-js-es6-export] and
 [`import`][mdn-js-es6-import] statements, which allow writing code in one file
 and sharing it, so it can be used by another file or files.
 
-There are several typical use cases in Cube.js where it is considered best
+There are several typical use cases in Cube where it is considered best
 practice to extract some variables or functions and then import it when needed.
 
 ## Managing constants
