@@ -8,7 +8,6 @@ import { useMediaQuery } from 'react-responsive';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 
-import { DiscourseIcon } from '../../shared/icons/DiscourseIcon';
 import { StyledMenu, StyledMenuButton, StyledMenuItem } from './Menu';
 import { RunOnCubeCloud } from './RunOnCubeCloud';
 
@@ -62,16 +61,6 @@ export default function Header({ selectedKeys }) {
           >
             <SlackOutlined />
             Slack
-          </StyledMenuButton>
-
-          <StyledMenuButton
-            noMargin
-            key="discourse"
-            href="https://forum.cube.dev/"
-            target="_blank"
-          >
-            <Icon component={() => <DiscourseIcon />} />
-            Discourse
           </StyledMenuButton>
 
           <StyledMenuButton
