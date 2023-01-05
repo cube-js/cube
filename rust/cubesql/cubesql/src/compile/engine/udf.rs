@@ -788,6 +788,31 @@ pub fn create_dateadd_udf() -> ScalarUDF {
     )
 }
 
+pub fn create_to_date_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2 || args.len() == 3);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "to_date is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Date32)));
+
+    ScalarUDF::new(
+        "to_date",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Boolean]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_time_format_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2);
