@@ -55,8 +55,8 @@ use self::{
             create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
             create_position_udf, create_quarter_udf, create_regexp_substr_udf, create_second_udf,
             create_session_user_udf, create_str_to_date_udf, create_time_format_udf,
-            create_timediff_udf, create_to_char_udf, create_ucase_udf, create_unnest_udtf,
-            create_user_udf, create_version_udf, create_year_udf,
+            create_timediff_udf, create_to_char_udf, create_to_date_udf, create_ucase_udf,
+            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -1166,6 +1166,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_ends_with_udf());
         ctx.register_udf(create_position_udf());
         ctx.register_udf(create_date_to_timestamp_udf());
+        ctx.register_udf(create_to_date_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -2620,7 +2621,7 @@ mod tests {
                 dimensions: Some(vec![]),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("month".to_string()),
+                    granularity: Some("day".to_string()),
                     date_range: None,
                 }]),
                 order: None,
@@ -11044,7 +11045,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
-                    granularity: Some("month".to_owned()),
+                    granularity: Some("day".to_owned()),
                     date_range: None
                 }]),
                 order: None,
@@ -16136,6 +16137,47 @@ ORDER BY \"COUNT(count)\" DESC"
                 ]),
                 segments: Some(vec![]),
                 time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_datediff_to_date() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            WITH "qt_0" AS (
+                SELECT 
+                    DATEDIFF(day, min("ta_1"."order_date"), TO_DATE('2020-02-20','YYYY-MM-DD')) "ca_1", 
+                    min("ta_1"."order_date") "ca_2"
+                FROM KibanaSampleDataEcommerce "ta_1"
+                HAVING DATEDIFF(day, min("ta_1"."order_date"), TO_DATE('2020-02-20','YYYY-MM-DD')) > 4
+            )
+            SELECT DATEDIFF(day, min("ta_2"."ca_2"), TO_DATE('2020-02-20','YYYY-MM-DD')) "ca_3"
+            FROM "qt_0" "ta_2"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("day".to_owned()),
+                    date_range: None
+                }]),
                 order: None,
                 limit: None,
                 offset: None,

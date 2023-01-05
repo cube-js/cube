@@ -398,6 +398,14 @@ impl RewriteRules for DateRules {
                 ),
             ),
             rewrite(
+                "thoughtspot-to-date-to-timestamp",
+                udf_expr(
+                    "to_date",
+                    vec![literal_expr("?date"), literal_string("YYYY-MM-DD")],
+                ),
+                udf_expr("date_to_timestamp", vec![literal_expr("?date")]),
+            ),
+            rewrite(
                 "datastudio-dates",
                 fun_expr(
                     "DateTrunc",

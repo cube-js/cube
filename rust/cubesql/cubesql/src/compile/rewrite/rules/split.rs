@@ -1823,7 +1823,7 @@ impl RewriteRules for SplitRules {
                 alias_expr(
                     fun_expr(
                         "DateTrunc",
-                        vec![literal_string("month"), column_expr("?column")],
+                        vec![literal_string("day"), column_expr("?column")],
                     ),
                     "?alias",
                 ),
