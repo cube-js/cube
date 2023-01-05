@@ -38,14 +38,17 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
         {children
           .filter((tab) => !!tab.props['data-language'])
           .map((tab, i) => {
-            const lang = tab.props['data-language'];
+            let lang = tab.props['data-language'];
+            if (lang === 'js') {
+              lang = 'javascript';
+            }
             return (
               <div
                 className={cn('CodeBlocks__tab', {
                   [classes.SelectedTab]: i === selectedTab,
                 })}
                 onClick={() => {
-                  if (lang === 'javascript' || lang === 'yaml') {
+                  if (lang === 'javascript' ||  lang === 'yaml') {
                     localStorage.setItem(STORAGE_KEY, lang);
                   }
                   setSelectedTab(i);

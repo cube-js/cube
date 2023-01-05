@@ -1,4 +1,5 @@
 export const langs: Record<string, string> = {
+  js: 'JS',
   javascript: 'JS',
   actionscript: 'ActionScript',
   bash: 'Bash',
