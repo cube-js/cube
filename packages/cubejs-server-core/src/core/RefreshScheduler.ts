@@ -461,7 +461,7 @@ export class RefreshScheduler {
     }));
   }
 
-  protected async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi: CompilerApi, queryingOptions) {
+  protected async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi: CompilerApi, queryingOptions, queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> }) {
     const { timezones, preAggregationsWarmup } = queryingOptions;
     const scheduledPreAggregations = await compilerApi.scheduledPreAggregations();
 
@@ -470,7 +470,6 @@ export class RefreshScheduler {
     let partitionCursor = 0;
     let partitionCounter = 0;
 
-    const queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> } = {};
     const finishedPartitions = {};
     scheduledPreAggregations.forEach((p, pi) => {
       timezones.forEach((t, ti) => {
@@ -579,13 +578,14 @@ export class RefreshScheduler {
     const { queryIteratorState, concurrency, workerIndices } = queryingOptions;
 
     const preAggregationsLoadCacheByDataSource = {};
+    const queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> } = {};
     return Promise.all(R.range(0, concurrency)
       .filter(workerIndex => workerIndices.indexOf(workerIndex) !== -1)
       .map(async workerIndex => {
         const queryIteratorStateKey = JSON.stringify({ ...securityContext, workerIndex });
         const queryIterator = queryIteratorState && queryIteratorState[queryIteratorStateKey] ||
           (await this.roundRobinRefreshPreAggregationsQueryIterator(
-            context, compilerApi, queryingOptions
+            context, compilerApi, queryingOptions, queriesCache
           ));
         if (queryIteratorState) {
           queryIteratorState[queryIteratorStateKey] = queryIterator;
