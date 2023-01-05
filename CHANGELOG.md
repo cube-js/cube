@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.34](https://github.com/cube-js/cube.js/compare/v0.31.33...v0.31.34) (2023-01-05)
+
+
+### Bug Fixes
+
+* **client-core:** move @babel/runtime to dependencies ([#5917](https://github.com/cube-js/cube.js/issues/5917)) ([67221af](https://github.com/cube-js/cube.js/commit/67221afa040bb71381369306b3cc9b5067094589))
+* Reuse queries cache in refresh worker pre-aggregation iterator to reduce memory usage in high concurrency environment ([4ae21fa](https://github.com/cube-js/cube.js/commit/4ae21fa54d08b25420694caec5ffd6658c8e96f6))
+
+
+
+
+
 ## [0.31.33](https://github.com/cube-js/cube.js/compare/v0.31.32...v0.31.33) (2023-01-03)
 
 
