@@ -240,6 +240,10 @@ class ApiGateway {
           _stream?.stream.removeAllListeners();
           console.log(`stream#${n} close ${JSON.stringify(_stream.stream, undefined, 2)}`);
         });
+        _stream?.stream.on('error', (err) => {
+          _stream?.stream.removeAllListeners();
+          console.error(`stream#${n} error ${err}`);
+        });
       };
 
       run(0);
