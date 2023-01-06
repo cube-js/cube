@@ -395,6 +395,10 @@ pub trait ConfigObj: DIService {
     fn skip_kafka_parsing_errors(&self) -> bool;
 
     fn dump_dir(&self) -> &Option<PathBuf>;
+
+    fn minimum_metastore_snapshots_count(&self) -> u64;
+
+    fn metastore_snapshots_lifetime(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -450,6 +454,8 @@ pub struct ConfigObjImpl {
     pub drop_ws_processing_messages_after_secs: u64,
     pub drop_ws_complete_messages_after_secs: u64,
     pub skip_kafka_parsing_errors: bool,
+    pub minimum_metastore_snapshots_count: u64,
+    pub metastore_snapshots_lifetime: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -644,6 +650,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn dump_dir(&self) -> &Option<PathBuf> {
         &self.dump_dir
+    }
+
+    fn minimum_metastore_snapshots_count(&self) -> u64 {
+        self.minimum_metastore_snapshots_count
+    }
+
+    fn metastore_snapshots_lifetime(&self) -> u64 {
+        self.metastore_snapshots_lifetime
     }
 }
 
@@ -851,6 +865,14 @@ impl Config {
                     10 * 60,
                 ),
                 skip_kafka_parsing_errors: env_parse("CUBESTORE_SKIP_KAFKA_PARSING_ERRORS", false),
+                minimum_metastore_snapshots_count: env_parse(
+                    "CUBESTORE_MINIMUM_METASTORE_SNAPSHOTS_COUNT",
+                    5,
+                ),
+                metastore_snapshots_lifetime: env_parse(
+                    "CUBESTORE_METASTORE_SNAPSHOTS_LIFETIME",
+                    24 * 60 * 60,
+                ),
             }),
         }
     }
@@ -918,6 +940,8 @@ impl Config {
                 drop_ws_processing_messages_after_secs: 60,
                 drop_ws_complete_messages_after_secs: 10,
                 skip_kafka_parsing_errors: false,
+                minimum_metastore_snapshots_count: 3,
+                metastore_snapshots_lifetime: 24 * 3600,
             }),
         }
     }
@@ -1180,8 +1204,11 @@ impl Config {
                 .register("metastore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
                     let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> =
-                        BaseRocksStoreFs::new(original_remote_fs, "metastore");
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new(
+                        original_remote_fs,
+                        "metastore",
+                        i.get_service_typed().await,
+                    );
 
                     arc
                 })
@@ -1224,8 +1251,11 @@ impl Config {
                 .register("cachestore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
                     let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> =
-                        BaseRocksStoreFs::new(original_remote_fs, "cachestore");
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new(
+                        original_remote_fs,
+                        "cachestore",
+                        i.get_service_typed().await,
+                    );
 
                     arc
                 })

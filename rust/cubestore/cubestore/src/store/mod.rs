@@ -652,7 +652,7 @@ mod tests {
             let store = WALStore::new(
                 RocksMetaStore::new(
                     Path::new(path),
-                    BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
+                    BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
                     config.config_obj(),
                 )
                 .unwrap(),
@@ -744,7 +744,7 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 Path::new(path),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -843,7 +843,7 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 Path::new(path),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore"),
+                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
