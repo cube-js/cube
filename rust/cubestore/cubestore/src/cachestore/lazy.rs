@@ -15,7 +15,6 @@ pub enum LazyRocksCacheStoreState {
         config: Arc<dyn ConfigObj>,
         init_flag: Sender<bool>,
     },
-    Initializing {},
     Initialized {
         store: Arc<RocksCacheStore>,
     },
@@ -68,21 +67,21 @@ impl LazyRocksCacheStore {
         }
 
         let mut guard = self.state.write().await;
-        let state = std::mem::replace(&mut *guard, LazyRocksCacheStoreState::Initializing {});
-        match state {
+        match &*guard {
             LazyRocksCacheStoreState::FromRemote {
                 path,
                 metastore_fs,
                 config,
-                init_flag,
+                // receiver will be closed on drop
+                init_flag: _,
             } => {
-                let store = RocksCacheStore::load_from_remote(&path, metastore_fs, config).await?;
+                let store =
+                    RocksCacheStore::load_from_remote(&path, metastore_fs.clone(), config.clone())
+                        .await?;
 
                 *guard = LazyRocksCacheStoreState::Initialized {
                     store: store.clone(),
                 };
-
-                init_flag.send(true)?;
 
                 Ok(store)
             }
@@ -105,10 +104,7 @@ impl LazyRocksCacheStore {
 
     pub async fn wait_upload_loop(&self) {
         if let Some(init_signal) = &self.init_signal {
-            let _ = init_signal
-                .clone()
-                .changed()
-                .await;
+            let _ = init_signal.clone().changed().await;
         }
 
         trace!("wait_upload_loop unblocked, Cache Store was initialized");
