@@ -2165,6 +2165,18 @@ impl RewriteRules for SplitRules {
                 ),
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
+            // NullIf
+            rewrite(
+                "split-push-down-nullif-inner-replacer",
+                inner_aggregate_split_replacer(
+                    fun_expr(
+                        "NullIf",
+                        vec!["?expr".to_string(), literal_expr("?literal")],
+                    ),
+                    "?cube",
+                ),
+                inner_aggregate_split_replacer("?expr", "?cube"),
+            ),
             // IS NULL, IS NOT NULL
             rewrite(
                 "split-push-down-is-null-inner-replacer",
@@ -3776,6 +3788,34 @@ impl RewriteRules for SplitRules {
                 |_, _| true,
                 false,
                 false,
+                true,
+                Some(vec![("?expr", column_expr("?column"))]),
+            )
+            .into_iter(),
+        );
+        // NullIf
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-nullif-replacer",
+                |split_replacer| {
+                    split_replacer(
+                        fun_expr("NullIf", vec!["?expr".to_string(), literal_expr("?else")]),
+                        "?cube",
+                    )
+                },
+                |_| vec![],
+                |split_replacer| {
+                    fun_expr(
+                        "NullIf",
+                        vec![
+                            split_replacer("?expr".to_string(), "?cube"),
+                            literal_expr("?else"),
+                        ],
+                    )
+                },
+                |_, _| true,
+                false,
+                true,
                 true,
                 Some(vec![("?expr", column_expr("?column"))]),
             )
