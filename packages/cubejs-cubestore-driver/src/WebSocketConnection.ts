@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { flatbuffers } from 'flatbuffers';
 import { InlineTable } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
+import { v4 as uuidv4 } from 'uuid';
 import {
   HttpCommand,
   HttpError,
@@ -24,12 +25,15 @@ export class WebSocketConnection {
 
   private url: string;
 
+  private connectionId: string;
+
   public constructor(url: string) {
     this.url = url;
     this.messageCounter = 1;
     this.maxConnectRetries = getEnv('cubeStoreMaxConnectRetries');
     this.noHeartBeatTimeout = getEnv('cubeStoreNoHeartBeatTimeout');
     this.currentConnectionTry = 0;
+    this.connectionId = uuidv4();
   }
 
   protected async initWebSocket() {
@@ -229,7 +233,8 @@ export class WebSocketConnection {
     }
     const httpQueryOffset = HttpQuery.endHttpQuery(builder);
     const messageId = this.messageCounter++;
-    const message = HttpMessage.createHttpMessage(builder, messageId, HttpCommand.HttpQuery, httpQueryOffset);
+    const connectionIdOffset = builder.createString(this.connectionId);
+    const message = HttpMessage.createHttpMessage(builder, messageId, HttpCommand.HttpQuery, httpQueryOffset, connectionIdOffset);
     builder.finish(message);
     return this.sendMessage(messageId, builder.asUint8Array());
   }

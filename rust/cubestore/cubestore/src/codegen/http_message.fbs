@@ -7,6 +7,7 @@ union HttpCommand {
 table HttpMessage {
     message_id: uint;
     command: HttpCommand;
+    connection_id: string;
 }
 
 table HttpQuery {

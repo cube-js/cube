@@ -74,10 +74,21 @@ command<T extends flatbuffers.Table>(obj:T):T|null {
 };
 
 /**
+ * @param flatbuffers.Encoding= optionalEncoding
+ * @returns string|Uint8Array|null
+ */
+connectionId():string|null
+connectionId(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+connectionId(optionalEncoding?:any):string|Uint8Array|null {
+  var offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+};
+
+/**
  * @param flatbuffers.Builder builder
  */
 static startHttpMessage(builder:flatbuffers.Builder) {
-  builder.startObject(3);
+  builder.startObject(4);
 };
 
 /**
@@ -106,6 +117,14 @@ static addCommand(builder:flatbuffers.Builder, commandOffset:flatbuffers.Offset)
 
 /**
  * @param flatbuffers.Builder builder
+ * @param flatbuffers.Offset connectionIdOffset
+ */
+static addConnectionId(builder:flatbuffers.Builder, connectionIdOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(3, connectionIdOffset, 0);
+};
+
+/**
+ * @param flatbuffers.Builder builder
  * @returns flatbuffers.Offset
  */
 static endHttpMessage(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -129,11 +148,12 @@ static finishSizePrefixedHttpMessageBuffer(builder:flatbuffers.Builder, offset:f
   builder.finish(offset, undefined, true);
 };
 
-static createHttpMessage(builder:flatbuffers.Builder, messageId:number, commandType:HttpCommand, commandOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createHttpMessage(builder:flatbuffers.Builder, messageId:number, commandType:HttpCommand, commandOffset:flatbuffers.Offset, connectionIdOffset:flatbuffers.Offset):flatbuffers.Offset {
   HttpMessage.startHttpMessage(builder);
   HttpMessage.addMessageId(builder, messageId);
   HttpMessage.addCommandType(builder, commandType);
   HttpMessage.addCommand(builder, commandOffset);
+  HttpMessage.addConnectionId(builder, connectionIdOffset);
   return HttpMessage.endHttpMessage(builder);
 }
 }

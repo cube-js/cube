@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use datafusion::cube_ext;
 use hex::ToHex;
 use log::{error, info, warn};
+use mockall::automock;
 use msql_srv::*;
 use std::convert::TryFrom;
 use std::io;
@@ -230,6 +231,7 @@ impl MySqlServer {
     }
 }
 
+#[automock]
 #[async_trait]
 pub trait SqlAuthService: Send + Sync {
     async fn authenticate(&self, user: Option<String>) -> Result<Option<String>, CubeError>;

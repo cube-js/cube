@@ -75,7 +75,9 @@ use std::mem::take;
 
 pub mod cache;
 pub mod parser;
+use mockall::automock;
 
+#[automock]
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
     async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError>;
@@ -170,6 +172,7 @@ pub struct SqlServiceImpl {
 }
 
 crate::di_service!(SqlServiceImpl, [SqlService]);
+crate::di_service!(MockSqlService, [SqlService]);
 
 impl SqlServiceImpl {
     pub fn new(
