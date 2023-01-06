@@ -88,9 +88,12 @@ impl<'a> HttpMessage<'a> {
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args HttpMessageArgs,
+        args: &'args HttpMessageArgs<'args>,
     ) -> flatbuffers::WIPOffset<HttpMessage<'bldr>> {
         let mut builder = HttpMessageBuilder::new(_fbb);
+        if let Some(x) = args.connection_id {
+            builder.add_connection_id(x);
+        }
         if let Some(x) = args.command {
             builder.add_command(x);
         }
@@ -102,6 +105,7 @@ impl<'a> HttpMessage<'a> {
     pub const VT_MESSAGE_ID: flatbuffers::VOffsetT = 4;
     pub const VT_COMMAND_TYPE: flatbuffers::VOffsetT = 6;
     pub const VT_COMMAND: flatbuffers::VOffsetT = 8;
+    pub const VT_CONNECTION_ID: flatbuffers::VOffsetT = 10;
 
     #[inline]
     pub fn message_id(&self) -> u32 {
@@ -122,6 +126,11 @@ impl<'a> HttpMessage<'a> {
                 HttpMessage::VT_COMMAND,
                 None,
             )
+    }
+    #[inline]
+    pub fn connection_id(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(HttpMessage::VT_CONNECTION_ID, None)
     }
     #[inline]
     #[allow(non_snake_case)]
@@ -154,18 +163,20 @@ impl<'a> HttpMessage<'a> {
     }
 }
 
-pub struct HttpMessageArgs {
+pub struct HttpMessageArgs<'a> {
     pub message_id: u32,
     pub command_type: HttpCommand,
     pub command: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub connection_id: Option<flatbuffers::WIPOffset<&'a str>>,
 }
-impl<'a> Default for HttpMessageArgs {
+impl<'a> Default for HttpMessageArgs<'a> {
     #[inline]
     fn default() -> Self {
         HttpMessageArgs {
             message_id: 0,
             command_type: HttpCommand::NONE,
             command: None,
+            connection_id: None,
         }
     }
 }
@@ -191,6 +202,13 @@ impl<'a: 'b, 'b> HttpMessageBuilder<'a, 'b> {
     pub fn add_command(&mut self, command: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<_>>(HttpMessage::VT_COMMAND, command);
+    }
+    #[inline]
+    pub fn add_connection_id(&mut self, connection_id: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            HttpMessage::VT_CONNECTION_ID,
+            connection_id,
+        );
     }
     #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> HttpMessageBuilder<'a, 'b> {

@@ -386,6 +386,12 @@ pub trait ConfigObj: DIService {
 
     fn stream_replay_check_interval_secs(&self) -> u64;
 
+    fn check_ws_orphaned_messages_interval_secs(&self) -> u64;
+
+    fn drop_ws_processing_messages_after_secs(&self) -> u64;
+
+    fn drop_ws_complete_messages_after_secs(&self) -> u64;
+
     fn skip_kafka_parsing_errors(&self) -> bool;
 
     fn dump_dir(&self) -> &Option<PathBuf>;
@@ -440,6 +446,9 @@ pub struct ConfigObjImpl {
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
+    pub check_ws_orphaned_messages_interval_secs: u64,
+    pub drop_ws_processing_messages_after_secs: u64,
+    pub drop_ws_complete_messages_after_secs: u64,
     pub skip_kafka_parsing_errors: bool,
 }
 
@@ -619,6 +628,18 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn skip_kafka_parsing_errors(&self) -> bool {
         self.skip_kafka_parsing_errors
+    }
+
+    fn check_ws_orphaned_messages_interval_secs(&self) -> u64 {
+        self.check_ws_orphaned_messages_interval_secs
+    }
+
+    fn drop_ws_processing_messages_after_secs(&self) -> u64 {
+        self.drop_ws_processing_messages_after_secs
+    }
+
+    fn drop_ws_complete_messages_after_secs(&self) -> u64 {
+        self.drop_ws_complete_messages_after_secs
     }
 
     fn dump_dir(&self) -> &Option<PathBuf> {
@@ -817,6 +838,18 @@ impl Config {
                     "CUBESTORE_STREAM_REPLAY_CHECK_INTERVAL",
                     0,
                 ),
+                check_ws_orphaned_messages_interval_secs: env_parse(
+                    "CUBESTORE_CHECK_WS_ORPHANED_MESSAGES_INTERVAL",
+                    30,
+                ),
+                drop_ws_processing_messages_after_secs: env_parse(
+                    "CUBESTORE_DROP_WS_PROCESSING_MESSAGES_AFTER",
+                    60 * 60,
+                ),
+                drop_ws_complete_messages_after_secs: env_parse(
+                    "CUBESTORE_DROP_WS_COMPLETE_MESSAGES_AFTER",
+                    10 * 60,
+                ),
                 skip_kafka_parsing_errors: env_parse("CUBESTORE_SKIP_KAFKA_PARSING_ERRORS", false),
             }),
         }
@@ -881,6 +914,9 @@ impl Config {
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
                 stream_replay_check_interval_secs: 60,
+                check_ws_orphaned_messages_interval_secs: 1,
+                drop_ws_processing_messages_after_secs: 60,
+                drop_ws_complete_messages_after_secs: 10,
                 skip_kafka_parsing_errors: false,
             }),
         }
@@ -1421,15 +1457,14 @@ impl Config {
 
             self.injector
                 .register_typed::<HttpServer, _, _, _>(async move |i| {
+                    let config = i.get_service_typed::<dyn ConfigObj>().await;
                     HttpServer::new(
-                        i.get_service_typed::<dyn ConfigObj>()
-                            .await
-                            .http_bind_address()
-                            .as_ref()
-                            .unwrap()
-                            .to_string(),
+                        config.http_bind_address().as_ref().unwrap().to_string(),
                         i.get_service_typed().await,
                         i.get_service_typed().await,
+                        Duration::from_secs(config.check_ws_orphaned_messages_interval_secs()),
+                        Duration::from_secs(config.drop_ws_processing_messages_after_secs()),
+                        Duration::from_secs(config.drop_ws_complete_messages_after_secs()),
                     )
                 })
                 .await;

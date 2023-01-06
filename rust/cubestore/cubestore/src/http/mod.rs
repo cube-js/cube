@@ -13,13 +13,14 @@ use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
 use crate::sql::{InlineTable, InlineTables, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
-use crate::table::TableValue;
+use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use async_std::fs::File;
 use datafusion::cube_ext;
 use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
+use futures_timer::Delay;
 use hex::ToHex;
 use http_auth_basic::Credentials;
 use log::error;
@@ -29,9 +30,11 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
+use std::time::{Duration, SystemTime};
 use tempfile::NamedTempFile;
 use tokio::io::BufReader;
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc, Mutex};
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
 use warp::http::StatusCode;
@@ -41,7 +44,11 @@ pub struct HttpServer {
     bind_address: String,
     sql_service: Arc<dyn SqlService>,
     auth: Arc<dyn SqlAuthService>,
+    check_orphaned_messages_interval: Duration,
+    drop_processing_messages_after: Duration,
+    drop_complete_messages_after: Duration,
     worker_loop: WorkerLoop,
+    drop_orphaned_messages_loop: WorkerLoop,
     cancel_token: CancellationToken,
 }
 
@@ -71,19 +78,26 @@ impl HttpServer {
         bind_address: String,
         auth: Arc<dyn SqlAuthService>,
         sql_service: Arc<dyn SqlService>,
+        check_orphaned_messages_interval: Duration,
+        drop_processing_messages_after: Duration,
+        drop_complete_messages_after: Duration,
     ) -> Arc<Self> {
         Arc::new(Self {
             bind_address,
             auth,
             sql_service,
+            check_orphaned_messages_interval,
+            drop_processing_messages_after,
+            drop_complete_messages_after,
             worker_loop: WorkerLoop::new("HttpServer message processing"),
+            drop_orphaned_messages_loop: WorkerLoop::new("HttpServer drop orphaned messages"),
             cancel_token: CancellationToken::new(),
         })
     }
 
     pub async fn run_server(&self) -> Result<(), CubeError> {
         let (tx, mut rx) =
-            mpsc::channel::<(mpsc::Sender<HttpMessage>, SqlQueryContext, HttpMessage)>(100000);
+            mpsc::channel::<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>(100000);
         let auth_service = self.auth.clone();
         let tx_to_move_filter = warp::any().map(move || tx.clone());
 
@@ -111,11 +125,11 @@ impl HttpServer {
         let query_route = warp::path!("ws")
             .and(context_filter_to_move)
             .and(warp::ws::ws())
-            .and_then(|tx: mpsc::Sender<(mpsc::Sender<HttpMessage>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
+            .and_then(|tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
                 Result::<_, Rejection>::Ok(ws.on_upgrade(async move |mut web_socket| {
-                    let (response_tx, mut response_rx) = mpsc::channel::<HttpMessage>(10000);
+                    let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
                     loop {
                         tokio::select! {
                             Some(res) = response_rx.recv() => {
@@ -138,11 +152,12 @@ impl HttpServer {
                                                 Ok(msg) => {
                                                     trace!("Received web socket message");
                                                     let message_id = msg.message_id;
+                                                    let connection_id = msg.connection_id.clone();
                                                     // TODO use timeout instead of try send for burst control however try_send is safer for now
                                                     if let Err(e) = tx_to_move.try_send((response_tx.clone(), sql_query_context.clone(), msg)) {
                                                         error!("Websocket channel error: {:?}", e);
                                                         let send_res = web_socket.send(
-                                                            Message::binary(HttpMessage { message_id, command: HttpCommand::Error { error: e.to_string() } }.bytes())
+                                                            Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error: e.to_string() } }.bytes())
                                                         ).await;
                                                         if let Err(e) = send_res {
                                                             error!("Websocket message send error: {:?}", e)
@@ -190,43 +205,223 @@ impl HttpServer {
 
         let addr: SocketAddr = self.bind_address.parse().unwrap();
         info!("Http Server is listening on {}", self.bind_address);
+        pub enum ProcessingState {
+            Processing {
+                subscribed_senders: Vec<Sender<Arc<HttpMessage>>>,
+                last_touch: SystemTime,
+            },
+            Complete {
+                result: Arc<HttpMessage>,
+                last_touch: SystemTime,
+            },
+        }
+
+        let messages_state = Arc::new(Mutex::new(
+            HashMap::<(Option<String>, u32), ProcessingState>::new(),
+        ));
         let process_loop = self.worker_loop.process_channel(
-            sql_service,
+            Arc::new((sql_service, messages_state.clone())),
             &mut rx,
-            async move |sql_service,
+            async move |service,
                         (
                 sender,
                 sql_query_context,
                 HttpMessage {
                     message_id,
+                    connection_id,
                     command,
                 },
             )| {
-                cube_ext::spawn(async move {
-                    let res =
-                        HttpServer::process_command(sql_service, sql_query_context, command).await;
-                    let message = match res {
-                        Ok(command) => HttpMessage {
-                            message_id,
-                            command,
-                        },
-                        Err(e) => {
-                            log::error!(
+                let (sql_service, messages_state) = service.as_ref();
+                let sql_service = sql_service.clone();
+                let messages_state = messages_state.clone();
+                if connection_id.is_some() {
+                    cube_ext::spawn(async move {
+                        let key = (connection_id.clone(), message_id);
+                        {
+                            let mut messages = messages_state.lock().await;
+                            let state = messages.get_mut(&key);
+                            match state {
+                                None => {
+                                    messages.insert(key.clone(), ProcessingState::Processing { subscribed_senders: vec![sender], last_touch: SystemTime::now() });
+                                }
+                                Some(ProcessingState::Processing { subscribed_senders, .. }) => {
+                                    subscribed_senders.push(sender);
+                                    return;
+                                }
+                                Some(ProcessingState::Complete { result, .. }) => {
+                                    if let Err(e) = sender.send(result.clone()).await {
+                                        error!("Websocket send completed message error: {:?}", e);
+                                    } else {
+                                        messages.remove(&key);
+                                    }
+                                    return;
+                                }
+                            }
+                        };
+                        let res = HttpServer::process_command(
+                            sql_service.clone(),
+                            sql_query_context,
+                            command.clone(),
+                        )
+                            .await;
+                        let message = Arc::new(match res {
+                            Ok(command) => HttpMessage {
+                                message_id,
+                                connection_id,
+                                command,
+                            },
+                            Err(e) => {
+                                log::error!(
                                 "Error processing HTTP command: {}\n",
                                 e.display_with_backtrace()
                             );
-                            HttpMessage {
-                                message_id,
-                                command: HttpCommand::Error {
-                                    error: e.to_string(),
-                                },
+                                HttpMessage {
+                                    message_id,
+                                    connection_id,
+                                    command: HttpCommand::Error {
+                                        error: e.to_string(),
+                                    },
+                                }
+                            }
+                        });
+                        let senders = {
+                            let mut messages = messages_state.lock().await;
+                            match messages.remove(&key) {
+                                None => {
+                                    trace!("Websocket message with '{:?}' key was already resolved: {:?}", key, command);
+                                    return;
+                                }
+                                Some(ProcessingState::Processing { subscribed_senders, .. }) => {
+                                    messages.insert(key.clone(), ProcessingState::Complete { result: message.clone(), last_touch: SystemTime::now() });
+                                    subscribed_senders
+                                }
+                                Some(ProcessingState::Complete { .. }) => {
+                                    trace!("Websocket message with '{:?}' key was already completed by another process: {:?}", key, command);
+                                    return;
+                                }
+                            }
+                        };
+                        let mut sent_successfully = false;
+                        for sender in senders.into_iter() {
+                            if sender.is_closed() {
+                                trace!("Websocket is closed. Skipping send for '{:?}' key: {:?}", key, command);
+                                continue;
+                            }
+                            if let Err(e) = sender.send(message.clone()).await {
+                                error!("Websocket send error. Skipping send for '{:?}' key: {:?}, {}", key, command, e);
+                                continue;
+                            }
+                            sent_successfully = true;
+                        }
+
+                        {
+                            let mut messages = messages_state.lock().await;
+                            match messages.get(&key) {
+                                None => {
+                                    trace!("Websocket message was resolved just after send. Skipping send for '{:?}' key: {:?}", key, command);
+                                    return;
+                                }
+                                Some(ProcessingState::Processing { .. }) => {
+                                    trace!("Websocket message with '{:?}' key was switched to processing just after send: {:?}", key, command);
+                                }
+                                Some(ProcessingState::Complete { .. }) => {
+                                    if sent_successfully {
+                                        messages.remove(&key);
+                                    }
+                                }
                             }
                         }
-                    };
-                    if let Err(e) = sender.send(message).await {
-                        error!("Send result channel error: {:?}", e);
+                    });
+                } else {
+                    cube_ext::spawn(async move {
+                        let res = HttpServer::process_command(
+                            sql_service.clone(),
+                            sql_query_context,
+                            command,
+                        )
+                            .await;
+                        let message = Arc::new(match res {
+                            Ok(command) => HttpMessage {
+                                message_id,
+                                connection_id,
+                                command,
+                            },
+                            Err(e) => {
+                                log::error!(
+                                "Error processing HTTP command: {}\n",
+                                e.display_with_backtrace()
+                            );
+                                HttpMessage {
+                                    message_id,
+                                    connection_id,
+                                    command: HttpCommand::Error {
+                                        error: e.to_string(),
+                                    },
+                                }
+                            }
+                        });
+                        if sender.is_closed() {
+                            trace!(
+                                "Websocket is closed. Dropping message with id: {:?}",
+                                message_id
+                            );
+                            return;
+                        }
+                        if let Err(e) = sender.send(message).await {
+                            error!("Websocket send result channel error: {:?}", e);
+                        }
+                    });
+                }
+                Ok(())
+            },
+        );
+
+        let check_orphaned_messages_interval = self.check_orphaned_messages_interval.clone();
+        let drop_complete_messages_after = self.drop_complete_messages_after.clone();
+        let drop_processing_messages_after = self.drop_processing_messages_after.clone();
+        let drop_orphaned_messages_loop = self.drop_orphaned_messages_loop.process(
+            messages_state,
+            async move |_| Ok(Delay::new(check_orphaned_messages_interval.clone()).await),
+            async move |messages_state, _| {
+                let mut messages_state = messages_state.lock().await;
+                let mut keys_to_remove = Vec::new();
+                let mut orphaned_complete_results = 0;
+                for (key, state) in messages_state.iter() {
+                    match state {
+                        ProcessingState::Processing { last_touch, .. } => {
+                            if SystemTime::now()
+                                .duration_since(last_touch.clone())
+                                .unwrap()
+                                > drop_processing_messages_after
+                            {
+                                trace!("Removing orphaned processing message with '{:?}' key", key);
+                                keys_to_remove.push(key.clone());
+                            }
+                        }
+                        ProcessingState::Complete { last_touch, .. } => {
+                            if SystemTime::now()
+                                .duration_since(last_touch.clone())
+                                .unwrap()
+                                > drop_complete_messages_after
+                            {
+                                trace!("Removing orphaned complete message with '{:?}' key", key);
+                                keys_to_remove.push(key.clone());
+                            } else {
+                                orphaned_complete_results += 1;
+                            }
+                        }
                     }
-                });
+                }
+                if orphaned_complete_results > 100 {
+                    log::warn!(
+                        "Keeping {} orphaned complete results to be retrieved by reconnecting socket",
+                        orphaned_complete_results
+                    );
+                }
+                for key in keys_to_remove {
+                    messages_state.remove(&key);
+                }
                 Ok(())
             },
         );
@@ -257,7 +452,7 @@ impl HttpServer {
             },
         ))
         .bind_with_graceful_shutdown(addr, async move { cancel_token.cancelled().await });
-        let _ = tokio::join!(process_loop, server_future);
+        let _ = tokio::join!(process_loop, server_future, drop_orphaned_messages_loop);
 
         Ok(())
     }
@@ -351,17 +546,19 @@ impl HttpServer {
 
     pub async fn stop_processing(&self) {
         self.worker_loop.stop();
+        self.drop_orphaned_messages_loop.stop();
         self.cancel_token.cancel();
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HttpMessage {
     message_id: u32,
     command: HttpCommand,
+    connection_id: Option<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HttpCommand {
     Query {
         query: String,
@@ -444,6 +641,10 @@ impl HttpMessage {
                     )
                 }
             },
+            connection_id: self
+                .connection_id
+                .as_ref()
+                .map(|c| builder.create_string(c)),
         };
         let message =
             crate::codegen::http_message_generated::HttpMessage::create(&mut builder, &args);
@@ -526,6 +727,7 @@ impl HttpMessage {
         let http_message = get_root_as_http_message(buffer.as_slice());
         Ok(HttpMessage {
             message_id: http_message.message_id(),
+            connection_id: http_message.connection_id().map(|s| s.to_string()),
             command: match http_message.command_type() {
                 crate::codegen::http_message_generated::HttpCommand::HttpQuery => {
                     let query = http_message.command_as_http_query().unwrap();
@@ -574,6 +776,41 @@ impl HttpMessage {
                         trace_obj: query.trace_obj().map(|q| q.to_string()),
                     }
                 }
+                crate::codegen::http_message_generated::HttpCommand::HttpResultSet => {
+                    let result_set = http_message.command_as_http_result_set().unwrap();
+                    let mut result_rows = Vec::new();
+                    if let Some(rows) = result_set.rows() {
+                        for row in rows.iter() {
+                            let mut result_row = Vec::new();
+                            if let Some(values) = row.values() {
+                                for value in values.iter() {
+                                    result_row.push(
+                                        value
+                                            .string_value()
+                                            .map(|s| TableValue::String(s.to_string()))
+                                            .unwrap_or(TableValue::Null),
+                                    );
+                                }
+                            }
+                            result_rows.push(Row::new(result_row));
+                        }
+                    }
+                    let mut result_columns = Vec::new();
+                    if let Some(columns) = result_set.columns() {
+                        let mut index = 0;
+                        for column in columns.iter() {
+                            result_columns.push(Column::new(
+                                column.to_string(),
+                                ColumnType::String,
+                                index,
+                            ));
+                            index += 1;
+                        }
+                    }
+                    HttpCommand::ResultSet {
+                        data_frame: Arc::new(DataFrame::new(result_columns, result_rows)),
+                    }
+                }
                 command => {
                     return Err(CubeError::internal(format!(
                         "Unexpected command: {:?}",
@@ -590,14 +827,27 @@ mod tests {
     use crate::codegen::http_message_generated::{
         HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs,
     };
-    use crate::http::{HttpCommand, HttpMessage};
+    use crate::config::init_test_logger;
+    use crate::http::{HttpCommand, HttpMessage, HttpServer};
     use crate::metastore::{Column, ColumnType};
-    use crate::sql::{timestamp_from_string, InlineTable};
+    use crate::mysql::MockSqlAuthService;
+    use crate::sql::{timestamp_from_string, InlineTable, QueryPlans, SqlQueryContext, SqlService};
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
+    use crate::CubeError;
+    use async_trait::async_trait;
+    use datafusion::cube_ext;
     use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
+    use futures_util::{SinkExt, StreamExt};
     use indoc::indoc;
+    use std::path::Path;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::net::TcpStream;
+    use tokio_tungstenite::tungstenite::Message;
+    use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+    use url::Url;
 
     fn build_types<'a: 'ma, 'ma>(
         builder: &'ma mut FlatBufferBuilder<'a>,
@@ -621,6 +871,7 @@ mod tests {
                 inline_tables: vec![],
                 trace_obj: Some("test trace".to_string()),
             },
+            connection_id: Some("foo".to_string()),
         };
         let bytes = message.bytes();
         let output_message = HttpMessage::read(bytes).await.unwrap();
@@ -669,6 +920,7 @@ mod tests {
         let columns_vec = HttpMessage::build_columns(&mut builder, &columns);
         let types_vec = build_types(&mut builder, &columns);
         let csv_rows_value = builder.create_string(csv_rows);
+        let connection_id_offset = builder.create_string("foo");
         let inline_table_offset = HttpTable::create(
             &mut builder,
             &HttpTableArgs {
@@ -692,6 +944,7 @@ mod tests {
             message_id: 1234,
             command_type: crate::codegen::http_message_generated::HttpCommand::HttpQuery,
             command: Some(query_value.as_union_value()),
+            connection_id: Some(connection_id_offset),
         };
         let message =
             crate::codegen::http_message_generated::HttpMessage::create(&mut builder, &args);
@@ -710,8 +963,191 @@ mod tests {
                         Arc::new(DataFrame::new(columns, rows.clone()))
                     )],
                     trace_obj: None
-                }
+                },
+                connection_id: Some("foo".to_string()),
             }
         );
+    }
+
+    pub struct SqlServiceMock {
+        message_counter: AtomicU64,
+    }
+
+    crate::di_service!(SqlServiceMock, [SqlService]);
+
+    #[async_trait]
+    impl SqlService for SqlServiceMock {
+        async fn exec_query(&self, _query: &str) -> Result<Arc<DataFrame>, CubeError> {
+            todo!()
+        }
+
+        async fn exec_query_with_context(
+            &self,
+            _context: SqlQueryContext,
+            _query: &str,
+        ) -> Result<Arc<DataFrame>, CubeError> {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            let counter = self.message_counter.fetch_add(1, Ordering::Relaxed);
+            Ok(Arc::new(DataFrame::new(
+                vec![Column::new("foo".to_string(), ColumnType::String, 0)],
+                vec![Row::new(vec![TableValue::String(format!("{}", counter))])],
+            )))
+        }
+
+        async fn plan_query(&self, _query: &str) -> Result<QueryPlans, CubeError> {
+            todo!()
+        }
+
+        async fn plan_query_with_context(
+            &self,
+            _context: SqlQueryContext,
+            _query: &str,
+        ) -> Result<QueryPlans, CubeError> {
+            todo!()
+        }
+
+        async fn upload_temp_file(
+            &self,
+            _context: SqlQueryContext,
+            _name: String,
+            _file_path: &Path,
+        ) -> Result<(), CubeError> {
+            todo!()
+        }
+
+        async fn temp_uploads_dir(&self, _context: SqlQueryContext) -> Result<String, CubeError> {
+            todo!()
+        }
+    }
+
+    #[tokio::test]
+    async fn ws_test() {
+        init_test_logger().await;
+
+        let sql_service = SqlServiceMock {
+            message_counter: AtomicU64::new(0),
+        };
+        let mut auth = MockSqlAuthService::new();
+        auth.expect_authenticate().return_const(Ok(None));
+        let http_server = Arc::new(HttpServer::new(
+            "127.0.0.1:53031".to_string(),
+            Arc::new(auth),
+            Arc::new(sql_service),
+            Duration::from_millis(100),
+            Duration::from_millis(10000),
+            Duration::from_millis(1000),
+        ));
+        {
+            let http_server = http_server.clone();
+            cube_ext::spawn(async move { http_server.run_server().await });
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        async fn connect_and_send(
+            message_id: u32,
+            connection_id: Option<String>,
+        ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+            let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53031/ws").unwrap())
+                .await
+                .unwrap();
+            socket
+                .send(Message::binary(
+                    HttpMessage {
+                        message_id,
+                        command: HttpCommand::Query {
+                            query: "foo".to_string(),
+                            inline_tables: vec![],
+                            trace_obj: None,
+                        },
+                        connection_id,
+                    }
+                    .bytes(),
+                ))
+                .await
+                .unwrap();
+            socket
+        }
+
+        async fn assert_message(
+            socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
+            counter: &str,
+        ) {
+            let msg = socket.next().await.unwrap().unwrap();
+            let message = HttpMessage::read(msg.into_data()).await.unwrap();
+            if let HttpCommand::ResultSet { data_frame } = message.command {
+                if let TableValue::String(v) = data_frame
+                    .get_rows()
+                    .iter()
+                    .next()
+                    .unwrap()
+                    .values()
+                    .iter()
+                    .next()
+                    .unwrap()
+                {
+                    assert_eq!(v.as_str(), counter);
+                } else {
+                    panic!("String expected");
+                }
+            } else {
+                panic!("Result set expected");
+            }
+        }
+
+        tokio::join!(
+            // Two sockets for the same message
+            async move {
+                let mut socket = connect_and_send(1, Some("foo".to_string())).await;
+                assert_message(&mut socket, "0").await;
+                socket.close(None).await.unwrap();
+            },
+            async move {
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                let mut socket = connect_and_send(1, Some("foo".to_string())).await;
+                assert_message(&mut socket, "0").await;
+                socket.close(None).await.unwrap();
+            },
+            // Orphaned complete message
+            async move {
+                // takes message 1
+                let mut socket = connect_and_send(1, Some("bar".to_string())).await;
+                socket.close(None).await.unwrap();
+            },
+            async move {
+                tokio::time::sleep(Duration::from_millis(4000)).await;
+                let mut socket = connect_and_send(1, Some("bar".to_string())).await;
+                assert_message(&mut socket, "5").await;
+                socket.close(None).await.unwrap();
+            },
+            // Retrieve complete message
+            async move {
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                // takes message 2
+                let mut socket = connect_and_send(2, Some("foo".to_string())).await;
+                socket.close(None).await.unwrap();
+            },
+            async move {
+                tokio::time::sleep(Duration::from_millis(3000)).await;
+                let mut socket = connect_and_send(2, Some("foo".to_string())).await;
+                assert_message(&mut socket, "2").await;
+                socket.close(None).await.unwrap();
+            },
+            async move {
+                tokio::time::sleep(Duration::from_millis(3500)).await;
+                let mut socket = connect_and_send(2, Some("foo".to_string())).await;
+                assert_message(&mut socket, "4").await;
+                socket.close(None).await.unwrap();
+            },
+            // First message but after resolved
+            async move {
+                tokio::time::sleep(Duration::from_millis(2500)).await;
+                let mut socket = connect_and_send(1, Some("foo".to_string())).await;
+                assert_message(&mut socket, "3").await;
+                socket.close(None).await.unwrap();
+            },
+        );
+
+        http_server.stop_processing().await;
     }
 }

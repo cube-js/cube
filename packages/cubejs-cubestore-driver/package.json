@@ -38,7 +38,8 @@
     "node-fetch": "^2.6.1",
     "sqlstring": "^2.3.2",
     "tempy": "^1.0.1",
-    "ws": "^7.4.3"
+    "ws": "^7.4.3",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.31.0",
