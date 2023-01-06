@@ -260,12 +260,21 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         _partition: usize,
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
-        // TODO:
+        // TODO: move envs to config
         let stream_mode = std::env::var("CUBESQL_STREAM_MODE")
             .ok()
             .map(|v| v.parse::<bool>().unwrap())
             .unwrap_or(false);
+        let query_limit = std::env::var("CUBEJS_DB_QUERY_LIMIT")
+            .ok()
+            .map(|v| v.parse::<i32>().unwrap())
+            .unwrap_or(50000);
 
+        let stream_mode = match (stream_mode, self.request.limit) {
+            (true, None) => true,
+            (true, Some(limit)) if limit > query_limit => true,
+            (_, _) => false,
+        };
         if stream_mode {
             let mut meta = self.meta.clone();
             meta.set_change_user(self.options.change_user.clone());
@@ -281,23 +290,22 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             )));
         }
 
-        let no_members_query = self.request.measures.as_ref().map(|v| v.len()).unwrap_or(0) == 0
-            && self
-                .request
-                .dimensions
-                .as_ref()
-                .map(|v| v.len())
-                .unwrap_or(0)
-                == 0
-            && self
-                .request
+        // In case stream_mode is disabled
+        let mut request = self.request.clone();
+        if request.limit.unwrap_or_default() > query_limit {
+            request.limit = Some(query_limit);
+        }
+
+        let no_members_query = request.measures.as_ref().map(|v| v.len()).unwrap_or(0) == 0
+            && request.dimensions.as_ref().map(|v| v.len()).unwrap_or(0) == 0
+            && request
                 .time_dimensions
                 .as_ref()
                 .map(|v| v.iter().filter(|d| d.granularity.is_some()).count())
                 .unwrap_or(0)
                 == 0;
         let result = if no_members_query {
-            let limit = self.request.limit.unwrap_or(1);
+            let limit = request.limit.unwrap_or(1);
             let mut data = Vec::new();
             for _ in 0..limit {
                 data.push(serde_json::Value::Null)
@@ -317,7 +325,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
 
             let result = self
                 .transport
-                .load(self.request.clone(), self.auth_context.clone(), meta)
+                .load(request, self.auth_context.clone(), meta)
                 .await;
 
             let mut response = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
