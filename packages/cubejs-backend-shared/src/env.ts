@@ -190,6 +190,9 @@ const variables: Record<string, (...args: any) => any> = {
   maxPartitionsPerCube: () => get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
     .default('10000')
     .asInt(),
+  scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
+    .default('1')
+    .asInt(),
 
   /** ****************************************************************
    * Common db options                                               *

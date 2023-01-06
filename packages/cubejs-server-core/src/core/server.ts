@@ -446,6 +446,7 @@ export class CubejsServerCore {
         basePath: this.options.basePath,
         checkAuthMiddleware: this.options.checkAuthMiddleware,
         contextRejectionMiddleware: this.contextRejectionMiddleware.bind(this),
+        wsContextAcceptor: this.contextAcceptor.shouldAcceptWs,
         checkAuth: this.options.checkAuth,
         queryRewrite:
           this.options.queryRewrite || this.options.queryTransformer,

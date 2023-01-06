@@ -55,6 +55,7 @@ import {
   CheckAuthMiddlewareFn,
   RequestLoggerMiddlewareFn,
   ContextRejectionMiddlewareFn,
+  ContextAcceptorFn,
 } from './interfaces';
 import { getRequestIdFromRequest, requestParser } from './requestParser';
 import { UserError } from './UserError';
@@ -130,6 +131,8 @@ class ApiGateway {
   
   protected readonly contextRejectionMiddleware: ContextRejectionMiddlewareFn;
 
+  protected readonly wsContextAcceptor: ContextAcceptorFn;
+
   protected readonly releaseListeners: (() => any)[] = [];
 
   protected readonly playgroundAuthSecret?: string;
@@ -161,7 +164,8 @@ class ApiGateway {
       : this.checkAuth;
     this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
-    this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => { next(); });
+    this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => next());
+    this.wsContextAcceptor = options.wsContextAcceptor || (() => ({ accepted: true }));
   }
 
   public initApp(app: ExpressApplication) {
@@ -392,7 +396,7 @@ class ApiGateway {
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
-    return new SubscriptionServer(this, sendMessage, this.subscriptionStore);
+    return new SubscriptionServer(this, sendMessage, this.subscriptionStore, this.wsContextAcceptor);
   }
 
   protected duration(requestStarted) {
