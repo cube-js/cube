@@ -105,11 +105,10 @@ impl LazyRocksCacheStore {
 
     pub async fn wait_upload_loop(&self) {
         if let Some(init_signal) = &self.init_signal {
-            init_signal
+            let _ = init_signal
                 .clone()
                 .changed()
-                .await
-                .expect("Everything is fine");
+                .await;
         }
 
         trace!("wait_upload_loop unblocked, Cache Store was initialized");
