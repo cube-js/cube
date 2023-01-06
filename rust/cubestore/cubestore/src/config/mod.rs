@@ -106,7 +106,7 @@ impl CubeServices {
         if !self.cluster.is_select_worker() {
             let rocks_meta_store = self.rocks_meta_store.clone().unwrap();
             futures.push(cube_ext::spawn(async move {
-                RocksMetaStore::wait_upload_loop(rocks_meta_store).await;
+                rocks_meta_store.wait_upload_loop().await;
                 Ok(())
             }));
 
