@@ -35,7 +35,7 @@ impl Buffer {
 
         let mut lock = self.data.lock().expect("Can't lock");
         // TODO: check size
-        while lock.len() >= 1000 {
+        while lock.len() >= 100 {
             lock = self.data_cv.wait(lock).expect("Can't wait");
         }
         lock.push(chunk);
@@ -44,7 +44,7 @@ impl Buffer {
         true
     }
 
-    fn release(&self) {
+    fn release(&self, err: String) {
         let mut lock = self.rejected.lock().expect("Can't lock");
         if *lock {
             return;
@@ -53,7 +53,8 @@ impl Buffer {
         *lock = true;
 
         let mut lock = self.data.lock().expect("Can't lock");
-        *lock = vec![Err(CubeError::user("rejected".to_string()))];
+        *lock = vec![Err(CubeError::user(err))];
+        self.data_cv.notify_one();
     }
 }
 
@@ -70,7 +71,7 @@ impl CubeReadStream for Buffer {
     }
 
     fn reject(&self) {
-        self.release();
+        self.release("rejected".to_string());
     }
 }
 
@@ -110,8 +111,8 @@ impl JsWriteStream {
         self.writer.push(Ok(None));
     }
 
-    fn reject(&self) {
-        self.writer.release();
+    fn reject(&self, err: String) {
+        self.writer.release(err);
     }
 }
 
@@ -147,7 +148,8 @@ fn js_stream_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let this = cx
         .this()
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
-    this.reject();
+    let result = cx.argument::<JsString>(0)?;
+    this.reject(result.value(&mut cx));
 
     Ok(cx.undefined())
 }

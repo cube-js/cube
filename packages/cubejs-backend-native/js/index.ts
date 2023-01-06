@@ -107,35 +107,65 @@ function wrapNativeFunctionWithChannelCallback(
     };
 };
 
+// TODO: Refactor - define classes
 function wrapNativeFunctionWithStream(
     fn: (extra: any) => unknown | Promise<unknown>
 ) {
     return async (extra: any, writer: any) => {
+        let streamResponse: any;
         try {
-            const streamResponse: any = await fn(JSON.parse(extra));
-            streamResponse.rowStream.on('data', (chunk: any) => {
-                if (!writer.chunk(chunk.toString())) {
-                    streamResponse.release();
+            streamResponse = await fn(JSON.parse(extra));
+
+            let chunk: object[] = [];
+            streamResponse.stream.on('data', (c: object) => {
+                chunk.push(c);
+                // TODO: move to config??
+                if (chunk.length >= 16000) {
+                    if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+                        console.debug("[js] stream.chunk");
+                    }
+
+                    if (!writer.chunk(JSON.stringify(chunk))) {
+                        streamResponse.stream.removeAllListeners();
+                    }
+                    chunk = [];
                 }
             });
-            streamResponse.rowStream.on('close', () => {
-                streamResponse.release();
+            streamResponse.stream.on('close', () => {
+                if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+                    console.debug("[js] stream.close");
+                }
+
+                streamResponse.stream.removeAllListeners();
+                if (chunk.length > 0) {
+                    writer.chunk(JSON.stringify(chunk));
+                }
                 writer.end("");
             });
 
-            // TODO: on reject
+            streamResponse.stream.on('error', (err: any) => {
+                if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+                    console.debug("[js] stream.error", {
+                        err
+                    });
+                }
 
-          } catch (e: any) {
+                streamResponse.stream.removeAllListeners();
+                writer.reject(err.message || "Unknown JS exception");
+            });
+        } catch (e: any) {
             if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
-                console.debug("[js] channel.reject", {
+                console.debug("[js] stream.reject", {
                     e
                 });
             }
 
-            writer.reject("");
-
-            // throw e;
-          }
+            if (!!streamResponse && !!streamResponse.stream) {
+                console.log(streamResponse.stream);
+                streamResponse.stream.removeAllListeners();
+            }
+            writer.reject(e.message || "Unknown JS exception");
+        }
     };
 };
 
