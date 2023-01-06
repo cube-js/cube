@@ -1102,10 +1102,11 @@ class ApiGateway {
   protected async getNormalizedQueries(
     query: Record<string, any> | Record<string, any>[],
     context: RequestContext,
+    persistent = false,
   ): Promise<[QueryType, NormalizedQuery[]]> {
     query = this.parseQueryParam(query);
-    let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
 
+    let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
     if (!Array.isArray(query)) {
       query = this.compareDateRangeTransformer(query);
       if (Array.isArray(query)) {
@@ -1116,6 +1117,7 @@ class ApiGateway {
     }
 
     const queries = Array.isArray(query) ? query : [query];
+
     const normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
         async (currentQuery) => validatePostRewrite(
@@ -1126,6 +1128,10 @@ class ApiGateway {
         )
       )
     );
+
+    normalizedQueries.forEach((q) => {
+      this.processQueryLimit(q, persistent);
+    });
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
@@ -1143,6 +1149,24 @@ class ApiGateway {
     }
 
     return [queryType, normalizedQueries];
+  }
+
+  /**
+   * Asserts query limit, sets the default value if neccessary.
+   *
+   * @throw {Error}
+   */
+  public processQueryLimit(query: NormalizedQuery, persistent = false): void {
+    const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
+      ? getEnv('dbQueryDefaultLimit')
+      : getEnv('dbQueryLimit');
+
+    if (!persistent) {
+      if ((!!query.limit && (query.limit > getEnv('dbQueryLimit')))) {
+        throw new Error('The query limit has been exceeded.');
+      }
+      query.limit = query.limit || def;
+    }
   }
 
   public async sql({ query, context, res }: QueryRequest) {
@@ -1424,7 +1448,7 @@ class ApiGateway {
     const requestStarted = new Date();
     try {
       this.log({ type: 'Streaming Query', query }, context);
-      const [, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
       const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
       const q = {
         ...sqlQuery,
