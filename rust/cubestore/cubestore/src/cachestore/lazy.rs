@@ -4,7 +4,7 @@ use crate::metastore::{IdRow, MetaStoreFs};
 use crate::CubeError;
 use async_trait::async_trait;
 use log::trace;
-use std::borrow::Borrow;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::watch::{Receiver, Sender};
 
@@ -22,11 +22,25 @@ pub enum LazyRocksCacheStoreState {
 }
 
 pub struct LazyRocksCacheStore {
-    init_signal: Receiver<bool>,
+    init_signal: Option<Receiver<bool>>,
     state: tokio::sync::RwLock<LazyRocksCacheStoreState>,
 }
 
 impl LazyRocksCacheStore {
+    pub async fn load_from_dump(
+        path: &Path,
+        dump_path: &Path,
+        metastore_fs: Arc<dyn MetaStoreFs>,
+        config: Arc<dyn ConfigObj>,
+    ) -> Result<Arc<Self>, CubeError> {
+        let store = RocksCacheStore::load_from_dump(path, dump_path, metastore_fs, config).await?;
+
+        Ok(Arc::new(Self {
+            init_signal: None,
+            state: tokio::sync::RwLock::new(LazyRocksCacheStoreState::Initialized { store }),
+        }))
+    }
+
     pub async fn load_from_remote(
         path: &str,
         metastore_fs: Arc<dyn MetaStoreFs>,
@@ -35,7 +49,7 @@ impl LazyRocksCacheStore {
         let (init_flag, init_signal) = tokio::sync::watch::channel::<bool>(false);
 
         Ok(Arc::new(Self {
-            init_signal,
+            init_signal: Some(init_signal),
             state: tokio::sync::RwLock::new(LazyRocksCacheStoreState::FromRemote {
                 path: path.to_string(),
                 metastore_fs,
@@ -90,33 +104,27 @@ impl LazyRocksCacheStore {
     }
 
     pub async fn wait_upload_loop(&self) {
-        self.init_signal
-            .clone()
-            .changed()
-            .await
-            .expect("Everything is fine");
+        if let Some(init_signal) = &self.init_signal {
+            init_signal
+                .clone()
+                .changed()
+                .await
+                .expect("Everything is fine");
+        }
 
         trace!("wait_upload_loop unblocked, Cache Store was initialized");
 
         self.get_initialized_store()
             .await
             .unwrap()
-            .wait_upload_loop();
+            .wait_upload_loop()
+            .await;
     }
 
     pub async fn stop_processing_loops(&self) {
-        self.init_signal
-            .clone()
-            .changed()
-            .await
-            .expect("Everything is fine");
-
-        trace!("stop_processing_loops unblocked, Cache Store was initialized");
-
-        self.get_initialized_store()
-            .await
-            .unwrap()
-            .stop_processing_loops();
+        if let Ok(store) = self.get_initialized_store().await {
+            store.stop_processing_loops().await;
+        }
     }
 }
 

@@ -2,9 +2,7 @@
 pub mod injection;
 pub mod processing_loop;
 
-use crate::cachestore::{
-    CacheStore, ClusterCacheStoreClient, LazyRocksCacheStore, RocksCacheStore,
-};
+use crate::cachestore::{CacheStore, ClusterCacheStoreClient, LazyRocksCacheStore};
 use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
@@ -1269,15 +1267,14 @@ impl Config {
                         let config = i.get_service_typed::<dyn ConfigObj>().await;
                         let cachestore_fs = i.get_service("cachestore_fs").await;
                         let cache_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            // RocksCacheStore::load_from_dump(
-                            //     &Path::new(&path),
-                            //     dump_dir,
-                            //     cachestore_fs,
-                            //     config,
-                            // )
-                            // .await
-                            // .unwrap()
-                            panic!("kek");
+                            LazyRocksCacheStore::load_from_dump(
+                                &Path::new(&path),
+                                dump_dir,
+                                cachestore_fs,
+                                config,
+                            )
+                            .await
+                            .unwrap()
                         } else {
                             LazyRocksCacheStore::load_from_remote(&path, cachestore_fs, config)
                                 .await
