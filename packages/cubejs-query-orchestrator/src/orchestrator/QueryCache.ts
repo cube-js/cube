@@ -584,33 +584,37 @@ export class QueryCache {
         },
         stream: async (req, target) => {
           const client = await clientFactory();
-          const source = await client.streamQuery(req.query, req.values);
+          try {
+            const source = await client.streamQuery(req.query, req.values);
 
-          const cleanup = (error) => {
-            if (!source.destroyed) {
-              source.destroy(error);
-            }
-            if (!target.destroyed) {
-              target.destroy(error);
-            }
-          };
-
-          source.once('end', cleanup);
-          source.once('error', cleanup);
-          source.once('close', cleanup);
-
-          target.once('end', cleanup);
-          target.once('error', cleanup);
-          target.once('close', cleanup);
-
-          // @ts-ignore
-          if (client.streamFields) {
+            const cleanup = (error) => {
+              if (!source.destroyed) {
+                source.destroy(error);
+              }
+              if (!target.destroyed) {
+                target.destroy(error);
+              }
+            };
+  
+            source.once('end', cleanup);
+            source.once('error', cleanup);
+            source.once('close', cleanup);
+  
+            target.once('end', cleanup);
+            target.once('error', cleanup);
+            target.once('close', cleanup);
+  
             // @ts-ignore
-            const fields = await client.streamFields(source);
-            target.emit('fields', fields);
+            if (client.streamFields) {
+              // @ts-ignore
+              const fields = await client.streamFields(source);
+              target.emit('fields', fields);
+            }
+  
+            source.pipe(target);
+          } catch (e) {
+            target.emit('error', e);
           }
-
-          source.pipe(target);
         },
       },
       cancelHandlers: {
