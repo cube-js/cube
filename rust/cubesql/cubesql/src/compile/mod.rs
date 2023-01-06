@@ -16103,4 +16103,44 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_thoughtspot_nullif_measure_dimension() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                NULLIF(CAST("ta_1"."taxful_total_price" AS FLOAT8), 0.0) "ca_1",
+                NULLIF(CAST("ta_1"."count" AS FLOAT8), 0.0) "ca_2"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            GROUP BY
+                "ca_1",
+                "ca_2"
+            ORDER BY
+                "ca_1" ASC,
+                "ca_2" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
 }
