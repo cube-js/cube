@@ -75,7 +75,6 @@ pub enum Statement {
     },
     System(SystemCommand),
     Dump(Box<Query>),
-    Metastore(MetastoreCommand),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -90,6 +89,7 @@ pub enum SystemCommand {
     KillAllJobs,
     Repartition { partition_id: u64 },
     PanicWorker,
+    Metastore(MetastoreCommand),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -114,10 +114,6 @@ impl<'a> CubeStoreParser<'a> {
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         match self.parser.peek_token() {
             Token::Word(w) => match w.keyword {
-                _ if w.value.eq_ignore_ascii_case("metastore") => {
-                    self.parser.next_token();
-                    self.parse_metastore()
-                }
                 _ if w.value.eq_ignore_ascii_case("sys") => {
                     self.parser.next_token();
                     self.parse_system()
@@ -230,14 +226,16 @@ impl<'a> CubeStoreParser<'a> {
     pub fn parse_metastore(&mut self) -> Result<Statement, ParserError> {
         if self.parse_custom_token("set_current") {
             match self.parser.parse_number_value()? {
-                Value::Number(id, _) => Ok(Statement::Metastore(MetastoreCommand::SetCurrent {
-                    id: id.parse::<u128>().map_err(|e| {
-                        ParserError::ParserError(format!(
-                            "Can't parse metastore snapshot id: {}",
-                            e
-                        ))
-                    })?,
-                })),
+                Value::Number(id, _) => Ok(Statement::System(SystemCommand::Metastore(
+                    MetastoreCommand::SetCurrent {
+                        id: id.parse::<u128>().map_err(|e| {
+                            ParserError::ParserError(format!(
+                                "Can't parse metastore snapshot id: {}",
+                                e
+                            ))
+                        })?,
+                    },
+                ))),
                 x => Err(ParserError::ParserError(format!(
                     "Snapshot id expected but {:?} found",
                     x
@@ -268,6 +266,8 @@ impl<'a> CubeStoreParser<'a> {
                     x
                 ))),
             }
+        } else if self.parse_custom_token("metastore") {
+            self.parse_metastore()
         } else if self.parse_custom_token("panic") && self.parse_custom_token("worker") {
             Ok(Statement::System(SystemCommand::PanicWorker))
         } else if self.parse_custom_token("compaction") {
@@ -538,11 +538,11 @@ mod tests {
 
     #[test]
     fn parse_metastore_set_current() {
-        let query = "MeTasTore SEt_Current 1671235558783";
+        let query = "sys MeTasTore SEt_Current 1671235558783";
         let mut parser = CubeStoreParser::new(&query).unwrap();
         let res = parser.parse_statement().unwrap();
         match res {
-            Statement::Metastore(MetastoreCommand::SetCurrent { id }) => {
+            Statement::System(SystemCommand::Metastore(MetastoreCommand::SetCurrent { id })) => {
                 assert_eq!(id, 1671235558783);
             }
             _ => {

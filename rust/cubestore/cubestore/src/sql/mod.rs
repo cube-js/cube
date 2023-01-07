@@ -821,12 +821,6 @@ impl SqlService for SqlServiceImpl {
                     x => Err(CubeError::user(format!("Unknown SHOW: {}", x))),
                 }
             }
-            CubeStoreStatement::Metastore(command) => match command {
-                MetastoreCommand::SetCurrent { id } => {
-                    self.db.set_current_snapshot(id).await?;
-                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
-                }
-            },
             CubeStoreStatement::System(command) => match command {
                 SystemCommand::Compaction { store } => {
                     match store {
@@ -878,6 +872,12 @@ impl SqlService for SqlServiceImpl {
                     }
                     panic!("worker did not panic")
                 }
+                SystemCommand::Metastore(command) => match command {
+                    MetastoreCommand::SetCurrent { id } => {
+                        self.db.set_current_snapshot(id).await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                },
             },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
