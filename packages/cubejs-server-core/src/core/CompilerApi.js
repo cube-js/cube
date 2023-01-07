@@ -148,7 +148,7 @@ export class CompilerApi {
     if (this.sqlCache) {
       return (subKey, cacheFn) => compilers.compilerCache.getQueryCache(key).cache(path.concat(subKey), cacheFn);
     } else {
-      return (cacheFn) => cacheFn();
+      return (subKey, cacheFn) => cacheFn();
     }
   }
 
