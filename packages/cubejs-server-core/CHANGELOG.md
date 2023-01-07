@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.35](https://github.com/cube-js/cube.js/compare/v0.31.34...v0.31.35) (2023-01-07)
+
+
+### Bug Fixes
+
+* Reduce memory footprint for pre-aggregations with many partitions by caching partition SQL ([5f72d8f](https://github.com/cube-js/cube.js/commit/5f72d8f99b588e579527ed3c8f550bf7949fab4e))
+
+
+
+
+
 ## [0.31.34](https://github.com/cube-js/cube.js/compare/v0.31.33...v0.31.34) (2023-01-05)
 
 

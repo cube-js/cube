@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.35](https://github.com/cube-js/cube.js/compare/v0.31.34...v0.31.35) (2023-01-07)
+
+
+### Bug Fixes
+
+* **client-core:** Added type CubesMap for cubeMap in Meta ([#5897](https://github.com/cube-js/cube.js/issues/5897)) ([92d1ccb](https://github.com/cube-js/cube.js/commit/92d1ccb9166e3a608424a1e11457f1746119e5f2))
+* **cubestore:** Get query execution results even after web socket disconnect ([#5931](https://github.com/cube-js/cube.js/issues/5931)) ([c6ccc1a](https://github.com/cube-js/cube.js/commit/c6ccc1a1c37d3f0c2fb5b4cdeacafdcad39321b3))
+* **cubestore:** Maintain minimum count of metastore snapshots ([#5925](https://github.com/cube-js/cube.js/issues/5925)) ([b303aa6](https://github.com/cube-js/cube.js/commit/b303aa68b7040d22334673c436808564a505e097))
+* Reduce memory footprint for pre-aggregations with many partitions by caching partition SQL ([5f72d8f](https://github.com/cube-js/cube.js/commit/5f72d8f99b588e579527ed3c8f550bf7949fab4e))
+
+
+### Features
+
+* **cubejs-cli:** add type-checking for `cube.js` files to newly-generated projects ([ba31d4f](https://github.com/cube-js/cube.js/commit/ba31d4fac969faa2a0bd35c15863595c66f36ea0))
+* **cubesql:** Support `NULLIF` in projection ([129fc58](https://github.com/cube-js/cube.js/commit/129fc580579062be73d362cfa829e3af82f37ad0))
+* **cubesql:** Support Thoughtspot starts/ends LIKE exprs ([e6798cc](https://github.com/cube-js/cube.js/commit/e6798cca8f9de33badf34b9cd64c41a2a7e6ce88))
+
+
+
+
+
 ## [0.31.34](https://github.com/cube-js/cube.js/compare/v0.31.33...v0.31.34) (2023-01-05)
 
 

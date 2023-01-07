@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.35](https://github.com/cube-js/cube.js/compare/v0.31.34...v0.31.35) (2023-01-07)
+
+
+### Bug Fixes
+
+* **cubestore:** Get query execution results even after web socket disconnect ([#5931](https://github.com/cube-js/cube.js/issues/5931)) ([c6ccc1a](https://github.com/cube-js/cube.js/commit/c6ccc1a1c37d3f0c2fb5b4cdeacafdcad39321b3))
+
+
+
+
+
 ## [0.31.34](https://github.com/cube-js/cube.js/compare/v0.31.33...v0.31.34) (2023-01-05)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

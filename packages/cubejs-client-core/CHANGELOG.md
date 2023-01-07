@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.35](https://github.com/cube-js/cube.js/compare/v0.31.34...v0.31.35) (2023-01-07)
+
+
+### Bug Fixes
+
+* **client-core:** Added type CubesMap for cubeMap in Meta ([#5897](https://github.com/cube-js/cube.js/issues/5897)) ([92d1ccb](https://github.com/cube-js/cube.js/commit/92d1ccb9166e3a608424a1e11457f1746119e5f2))
+
+
+
+
+
 ## [0.31.34](https://github.com/cube-js/cube.js/compare/v0.31.33...v0.31.34) (2023-01-05)
 
 
