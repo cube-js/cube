@@ -9,6 +9,10 @@
 - name: CUBEJS_SQL_PORT
   value: {{ .Values.config.sqlPort | quote }}
 {{- end }}
+{{- if .Values.config.pgSqlPort }}
+- name: CUBEJS_PG_SQL_PORT
+  value: {{ .Values.config.pgSqlPort | quote }}
+{{- end }}
 {{- if .Values.config.sqlUser }}
 - name: CUBEJS_SQL_USER
   value: {{ .Values.config.sqlUser | quote }}

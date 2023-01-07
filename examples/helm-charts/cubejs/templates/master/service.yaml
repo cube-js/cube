@@ -22,6 +22,11 @@ spec:
       port: {{ .Values.config.sqlPort }}
       targetPort: sql
     {{- end}}
+    {{- if .Values.config.pgSqlPort }}
+    - name: pgsql
+      port: {{ .Values.config.pgSqlPort }}
+      targetPort: pgsql
+    {{- end}}
   selector:
     app.kubernetes.io/component: master
     {{- include "cubejs.selectorLabels" . | nindent 4 }}
