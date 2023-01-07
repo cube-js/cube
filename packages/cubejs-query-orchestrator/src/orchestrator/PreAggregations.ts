@@ -1450,7 +1450,7 @@ export class PreAggregationPartitionRangeLoader {
     this.requestId = options.requestId;
     this.lambdaQuery = options.lambdaQuery;
     this.dataSource = preAggregation.dataSource;
-    this.compilerCacheFn = options.compilerCacheFn || ((subKey, cacheFn) => cacheFn());
+    this.compilerCacheFn = options.compilerCacheFn || ((subKey, cacheFn) => { console.log(`!!!! cacheFn`, cacheFn); return cacheFn(); });
   }
 
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
