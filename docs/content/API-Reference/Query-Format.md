@@ -206,6 +206,17 @@ The opposite operator of `contains`. It supports multiple values.
 }
 ```
 
+This opertor adds `IS NULL` check to include `NULL` values unless you add `null` to `values`.
+For example:
+
+```javascript
+{
+  member: "Posts.title",
+  operator: "notContains",
+  values: ["ruby", null]
+}
+```
+
 ### <--{"id" : "Filters Operators"}--> startsWith
 
 The `startsWith` filter acts as a case-insensitive `LIKE` operator with a
