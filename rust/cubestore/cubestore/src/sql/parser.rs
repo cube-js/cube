@@ -75,6 +75,7 @@ pub enum Statement {
     },
     System(SystemCommand),
     Dump(Box<Query>),
+    Metastore(MetastoreCommand),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,6 +90,11 @@ pub enum SystemCommand {
     KillAllJobs,
     Repartition { partition_id: u64 },
     PanicWorker,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MetastoreCommand {
+    SetCurrent { id: u128 },
 }
 
 pub struct CubeStoreParser<'a> {
@@ -108,6 +114,10 @@ impl<'a> CubeStoreParser<'a> {
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         match self.parser.peek_token() {
             Token::Word(w) => match w.keyword {
+                _ if w.value.eq_ignore_ascii_case("metastore") => {
+                    self.parser.next_token();
+                    self.parse_metastore()
+                }
                 _ if w.value.eq_ignore_ascii_case("sys") => {
                     self.parser.next_token();
                     self.parse_system()
@@ -214,6 +224,29 @@ impl<'a> CubeStoreParser<'a> {
                 "Unknown cache command: {}",
                 command
             ))),
+        }
+    }
+
+    pub fn parse_metastore(&mut self) -> Result<Statement, ParserError> {
+        if self.parse_custom_token("set_current") {
+            match self.parser.parse_number_value()? {
+                Value::Number(id, _) => Ok(Statement::Metastore(MetastoreCommand::SetCurrent {
+                    id: id.parse::<u128>().map_err(|e| {
+                        ParserError::ParserError(format!(
+                            "Can't parse metastore snapshot id: {}",
+                            e
+                        ))
+                    })?,
+                })),
+                x => Err(ParserError::ParserError(format!(
+                    "Snapshot id expected but {:?} found",
+                    x
+                ))),
+            }
+        } else {
+            Err(ParserError::ParserError(
+                "Unknown metastore command".to_string(),
+            ))
         }
     }
 
@@ -500,6 +533,21 @@ mod tests {
                 }
             }
             _ => {}
+        }
+    }
+
+    #[test]
+    fn parse_metastore_set_current() {
+        let query = "MeTasTore SEt_Current 1671235558783";
+        let mut parser = CubeStoreParser::new(&query).unwrap();
+        let res = parser.parse_statement().unwrap();
+        match res {
+            Statement::Metastore(MetastoreCommand::SetCurrent { id }) => {
+                assert_eq!(id, 1671235558783);
+            }
+            _ => {
+                assert!(false)
+            }
         }
     }
 }

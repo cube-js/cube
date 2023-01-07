@@ -1,4 +1,5 @@
 use crate::config::ConfigObj;
+use crate::metastore::snapshot_info::SnapshotInfo;
 use crate::metastore::{RocksStore, RocksStoreDetails, WriteBatchContainer};
 use crate::remotefs::RemoteFs;
 use crate::CubeError;
@@ -8,6 +9,7 @@ use futures::future::join_all;
 use itertools::Itertools;
 use log::{error, info, trace};
 use regex::Regex;
+use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -45,6 +47,8 @@ pub trait MetaStoreFs: Send + Sync {
         snapshot: u128,
         rocks_store: &Arc<RocksStore>,
     ) -> Result<(), CubeError>;
+    async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError>;
+    async fn write_metastore_current(&self, remote_path: &str) -> Result<(), CubeError>;
 }
 
 #[derive(Clone)]
@@ -184,28 +188,7 @@ impl BaseRocksStoreFs {
             Ok(vec![])
         }
     }
-    pub async fn write_metastore_current(&self, remote_path: &str) -> Result<(), CubeError> {
-        let uploads_dir = self.remote_fs.uploads_dir().await?;
-        let prefix = format!("{}-current", self.name);
-        let (file, file_path) = cube_ext::spawn_blocking(move || {
-            tempfile::Builder::new()
-                .prefix(&prefix)
-                .tempfile_in(uploads_dir)
-        })
-        .await??
-        .into_parts();
 
-        tokio::io::AsyncWriteExt::write_all(&mut fs::File::from_std(file), remote_path.as_bytes())
-            .await?;
-
-        self.remote_fs
-            .upload_file(
-                file_path.keep()?.to_str().unwrap(),
-                &format!("{}-current", self.name),
-            )
-            .await?;
-        Ok(())
-    }
     pub async fn is_remote_metadata_exists(&self) -> Result<bool, CubeError> {
         let res = self
             .remote_fs
@@ -227,7 +210,6 @@ impl BaseRocksStoreFs {
             return Ok(None);
         }
 
-        let re = Regex::new(&format!(r"^{}-(\d+)", &self.name)).unwrap();
         info!("Downloading remote {}", self.name);
 
         let current_metastore_file = self
@@ -240,7 +222,16 @@ impl BaseRocksStoreFs {
         self.remote_fs
             .download_file(&format!("{}-current", self.name), None)
             .await?;
+        self.parse_local_current_snapshot_id().await
+    }
 
+    pub async fn parse_local_current_snapshot_id(&self) -> Result<Option<u128>, CubeError> {
+        let current_metastore_file = self
+            .remote_fs
+            .local_file(&format!("{}-current", self.name))
+            .await?;
+
+        let re = Regex::new(&format!(r"^{}-(\d+)", &self.name)).unwrap();
         let mut file = File::open(current_metastore_file.as_str()).await?;
         let mut buffer = Vec::new();
         tokio::io::AsyncReadExt::read_to_end(&mut file, &mut buffer).await?;
@@ -399,6 +390,54 @@ impl MetaStoreFs for BaseRocksStoreFs {
                 break;
             }
         }
+        Ok(())
+    }
+
+    async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError> {
+        let remote_fs = self.remote_fs();
+
+        let re = Regex::new(&*format!(r"^{}-(\d+)/", self.get_name())).unwrap();
+        let stores = remote_fs.list(&format!("{}-", self.get_name())).await?;
+        let mut snapshots = BTreeSet::new();
+        for store in stores.iter() {
+            let parse_result = re
+                .captures(store)
+                .map(|c| c.get(1).unwrap().as_str())
+                .map(|p| u128::from_str(p));
+            if let Some(Ok(millis)) = parse_result {
+                snapshots.insert(millis);
+            }
+        }
+        let current_id = self.parse_local_current_snapshot_id().await.unwrap_or(None);
+        let res = snapshots
+            .into_iter()
+            .map(|v| SnapshotInfo {
+                id: v,
+                current: current_id.map_or(false, |cid| cid == v),
+            })
+            .collect::<Vec<_>>();
+        Ok(res)
+    }
+    async fn write_metastore_current(&self, remote_path: &str) -> Result<(), CubeError> {
+        let uploads_dir = self.remote_fs.uploads_dir().await?;
+        let prefix = format!("{}-current", self.name);
+        let (file, file_path) = cube_ext::spawn_blocking(move || {
+            tempfile::Builder::new()
+                .prefix(&prefix)
+                .tempfile_in(uploads_dir)
+        })
+        .await??
+        .into_parts();
+
+        tokio::io::AsyncWriteExt::write_all(&mut fs::File::from_std(file), remote_path.as_bytes())
+            .await?;
+
+        self.remote_fs
+            .upload_file(
+                file_path.keep()?.to_str().unwrap(),
+                &format!("{}-current", self.name),
+            )
+            .await?;
         Ok(())
     }
 }

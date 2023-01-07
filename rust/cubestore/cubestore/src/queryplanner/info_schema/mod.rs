@@ -6,6 +6,7 @@ mod system_indexes;
 mod system_jobs;
 mod system_partitions;
 mod system_replay_handles;
+mod system_snapshots;
 mod system_tables;
 
 pub use info_schema_schemata::*;
@@ -16,4 +17,5 @@ pub use system_indexes::*;
 pub use system_jobs::*;
 pub use system_partitions::*;
 pub use system_replay_handles::*;
+pub use system_snapshots::*;
 pub use system_tables::*;
