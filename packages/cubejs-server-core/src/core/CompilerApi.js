@@ -143,6 +143,15 @@ export class CompilerApi {
     }
   }
 
+  async compilerCacheFn(requestId, key, path) {
+    const compilers = await this.getCompilers({ requestId });
+    if (this.sqlCache) {
+      return (subKey, cacheFn) => compilers.compilerCache.getQueryCache(key).cache(path.concat(subKey), cacheFn);
+    } else {
+      return (cacheFn) => cacheFn();
+    }
+  }
+
   async preAggregations(filter) {
     const { cubeEvaluator } = await this.getCompilers();
     return cubeEvaluator.preAggregations(filter);

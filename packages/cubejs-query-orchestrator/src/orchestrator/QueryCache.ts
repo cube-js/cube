@@ -36,6 +36,7 @@ export type Query = {
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
   renewQuery?: boolean;
+  compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
 
 export type QueryBody = {

@@ -158,7 +158,8 @@ export class RefreshScheduler {
     const queryBody = {
       preAggregations: preAggregationDescriptionList,
       preAggregationsLoadCacheByDataSource,
-      requestId: context.requestId
+      requestId: context.requestId,
+      compilerCacheFn: await compilerApi.compilerCacheFn(context.requestId, baseQuery, ['expandPartitions']),
     };
 
     if (queryingOptions.cacheOnly) {

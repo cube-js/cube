@@ -1398,7 +1398,7 @@ export class PreAggregationLoader {
   }
 }
 
-interface PreAggsPartiotionRangeLoaderOpts {
+interface PreAggsPartitionRangeLoaderOpts {
   maxPartitions: number;
   maxSourceRowLimit: number;
   waitForRenew?: boolean;
@@ -1409,6 +1409,7 @@ interface PreAggsPartiotionRangeLoaderOpts {
   orphanedTimeout?: number;
   lambdaQuery?: LambdaQuery;
   isJob?: boolean;
+  compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 }
 
 export class PreAggregationPartitionRangeLoader {
@@ -1427,6 +1428,8 @@ export class PreAggregationPartitionRangeLoader {
 
   protected dataSource: string;
 
+  protected compilerCacheFn: <T>(subKey: string[], cacheFn: () => T) => T;
+
   public constructor(
     private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactory,
@@ -1437,7 +1440,7 @@ export class PreAggregationPartitionRangeLoader {
     private readonly preAggregation: PreAggregationDescription,
     private readonly preAggregationsTablesToTempTables: any,
     private readonly loadCache: any,
-    private readonly options: PreAggsPartiotionRangeLoaderOpts = {
+    private readonly options: PreAggsPartitionRangeLoaderOpts = {
       maxPartitions: 10000,
       maxSourceRowLimit: 10000,
     },
@@ -1447,6 +1450,7 @@ export class PreAggregationPartitionRangeLoader {
     this.requestId = options.requestId;
     this.lambdaQuery = options.lambdaQuery;
     this.dataSource = preAggregation.dataSource;
+    this.compilerCacheFn = options.compilerCacheFn || ((subKey, cacheFn) => cacheFn());
   }
 
   private async loadRangeQuery(rangeQuery: QueryTuple, partitionRange?: QueryDateRange) {
@@ -1681,7 +1685,7 @@ export class PreAggregationPartitionRangeLoader {
   public async partitionPreAggregations(): Promise<PreAggregationDescription[]> {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
       const { buildRange, partitionRanges } = await this.partitionRanges();
-      return partitionRanges.map(range => this.partitionPreAggregationDescription(range, buildRange));
+      return this.compilerCacheFn(['partitions', JSON.stringify(buildRange)], () => partitionRanges.map(range => this.partitionPreAggregationDescription(range, buildRange)));
     } else {
       return [this.preAggregation];
     }
@@ -1701,10 +1705,10 @@ export class PreAggregationPartitionRangeLoader {
       // use last partition so outer query can receive expected table structure.
       dateRange = [buildRange[1], buildRange[1]];
     }
-    const partitionRanges = PreAggregationPartitionRangeLoader.timeSeries(
+    const partitionRanges = this.compilerCacheFn(['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange)], () => PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       dateRange,
-    );
+    ));
     if (partitionRanges.length > this.options.maxPartitions) {
       throw new Error(
         `The maximum number of partitions (${
@@ -2145,6 +2149,7 @@ export class PreAggregations {
           waitForRenew: queryBody.renewQuery,
           requestId: queryBody.requestId,
           externalRefresh: this.externalRefresh,
+          compilerCacheFn: queryBody.compilerCacheFn,
         },
       );
 
