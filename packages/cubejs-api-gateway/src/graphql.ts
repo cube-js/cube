@@ -8,6 +8,7 @@ import {
   FieldNode,
   VariableNode,
   ValueNode,
+  GraphQLSchema,
 } from 'graphql';
 
 import {
@@ -154,7 +155,7 @@ function mapWhereValue(operator: string, value: any) {
       if (value.length === 1 && !/^[0-9]/.test(value[0])) {
         return value[0].toString();
       }
-      
+
       return value.map(v => v.toString());
     default:
       return Array.isArray(value) ? value.map(v => v.toString()) : [value.toString()];
@@ -171,6 +172,33 @@ function capitalize(name: string) {
 
 function unCapitalize(name: string) {
   return `${name[0].toLowerCase()}${name.slice(1)}`;
+}
+
+function normalizeCubeCapital(cube: any) {
+  const { config } = cube;
+  if (config.name[0] === config.name[0].toUpperCase()) {
+    return cube;
+  }
+  const normalizedConfig = { ...config };
+  normalizedConfig.name = capitalize(config.name);
+  if (config.measures) {
+    normalizedConfig.measures = config.measures.map(
+      (m: {name: string}) => ({ ...m, name: capitalize(m.name) })
+    );
+  }
+  if (config.dimensions) {
+    normalizedConfig.dimensions = config.dimensions.map(
+      (m: {name: string}) => ({ ...m, name: capitalize(m.name) })
+    );
+  }
+  if (config.segments) {
+    normalizedConfig.segments = config.dimensions.map(
+      (m: {name: string}) => ({ ...m, name: capitalize(m.name) })
+    );
+  }
+  return {
+    config: normalizedConfig
+  };
 }
 
 function applyDirectives(
@@ -245,7 +273,7 @@ function whereArgToQueryFilters(
   prefix?: string
 ) {
   const queryFilters: any[] = [];
-  
+
   Object.keys(whereArg).forEach((key) => {
     if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
@@ -333,7 +361,7 @@ function parseDates(result: any) {
   });
 }
 
-export function makeSchema(metaConfig: any) {
+export function makeSchema(metaConfig: any): GraphQLSchema {
   const types: any[] = [
     DateTimeScalar,
     FloatFilter,
@@ -342,12 +370,14 @@ export function makeSchema(metaConfig: any) {
     OrderBy,
     TimeDimension
   ];
-  
+
   function hasMembers(cube: any) {
     return cube.config.measures.length || cube.config.dimensions.length;
   }
 
-  metaConfig.forEach(cube => {
+  const normalizedMetaConfig = metaConfig.map((cube: any) => (normalizeCubeCapital(cube)));
+
+  normalizedMetaConfig.forEach(cube => {
     if (hasMembers(cube)) {
       types.push(objectType({
         name: `${cube.config.name}Members`,
@@ -370,7 +400,7 @@ export function makeSchema(metaConfig: any) {
           });
         }
       }));
-    
+
       types.push(inputObjectType({
         name: `${cube.config.name}WhereInput`,
         definition(t) {
@@ -420,7 +450,7 @@ export function makeSchema(metaConfig: any) {
     definition(t) {
       t.field('AND', { type: list(nonNull('RootWhereInput')) });
       t.field('OR', { type: list(nonNull('RootWhereInput')) });
-      metaConfig.forEach(cube => {
+      normalizedMetaConfig.forEach(cube => {
         if (hasMembers(cube)) {
           t.field(unCapitalize(cube.config.name), {
             type: `${cube.config.name}WhereInput`
@@ -429,11 +459,11 @@ export function makeSchema(metaConfig: any) {
       });
     }
   }));
-  
+
   types.push(inputObjectType({
     name: 'RootOrderByInput',
     definition(t) {
-      metaConfig.forEach(cube => {
+      normalizedMetaConfig.forEach(cube => {
         if (hasMembers(cube)) {
           t.field(unCapitalize(cube.config.name), {
             type: `${cube.config.name}OrderByInput`
@@ -446,7 +476,7 @@ export function makeSchema(metaConfig: any) {
   types.push(objectType({
     name: 'Result',
     definition(t) {
-      metaConfig.forEach(cube => {
+      normalizedMetaConfig.forEach(cube => {
         if (hasMembers(cube)) {
           t.nonNull.field(unCapitalize(cube.config.name), {
             type: `${cube.config.name}Members`,
@@ -487,11 +517,11 @@ export function makeSchema(metaConfig: any) {
           const timeDimensions: any[] = [];
           let filters: any[] = [];
           const order: [string, 'asc' | 'desc'][] = [];
-          
+
           if (where) {
             filters = whereArgToQueryFilters(where);
           }
-          
+
           if (orderBy) {
             Object.entries<any>(orderBy).forEach(([cubeName, members]) => {
               Object.entries<any>(members).forEach(([member, value]) => {
@@ -514,20 +544,20 @@ export function makeSchema(metaConfig: any) {
             if (whereArg) {
               filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
             }
-            
+
             const inDateRangeFilters = {};
             filters = filters.filter((f) => {
               if (f.operator === 'inDateRange') {
                 inDateRangeFilters[f.member] = f.values;
                 return false;
               }
-              
+
               return true;
             });
 
             getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
               const memberName = memberNode.name.value;
-              const memberType = getMemberType(metaConfig, cubeName, memberName);
+              const memberType = getMemberType(normalizedMetaConfig, cubeName, memberName);
               const key = `${cubeName}.${memberName}`;
 
               if (memberType === MemberType.MEASURES) {
@@ -567,7 +597,7 @@ export function makeSchema(metaConfig: any) {
             ...(filters.length && { filters }),
             ...(renewQuery && { renewQuery }),
           };
-          
+
           // eslint-disable-next-line no-async-promise-executor
           const results = await (new Promise<any>(async (resolve, reject) => {
             try {
