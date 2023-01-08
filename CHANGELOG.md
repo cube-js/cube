@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.36](https://github.com/cube-js/cube.js/compare/v0.31.35...v0.31.36) (2023-01-08)
+
+
+### Bug Fixes
+
+* graphql non capital cube name issue ([#5680](https://github.com/cube-js/cube.js/issues/5680)) Thanks @MattFanto! ([47956ea](https://github.com/cube-js/cube.js/commit/47956ea695443547a13c4f05eed382a750324f11)), closes [#5643](https://github.com/cube-js/cube.js/issues/5643)
+* Potential OOM due to recursion while recovering Cube Store websocket ([8a0fd1f](https://github.com/cube-js/cube.js/commit/8a0fd1fe1901b80b369bd9fe5feff0da4f054ed5))
+
+
+### Features
+
+* **cubestore:** Set metastore current snapshot system command ([#5940](https://github.com/cube-js/cube.js/issues/5940)) ([f590a20](https://github.com/cube-js/cube.js/commit/f590a20a5ff3d81e500f54f03eeb31698fbf8a42))
+
+
+
+
+
 ## [0.31.35](https://github.com/cube-js/cube.js/compare/v0.31.34...v0.31.35) (2023-01-07)
 
 
