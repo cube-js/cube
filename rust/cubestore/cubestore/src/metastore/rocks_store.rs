@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
 
+use crate::metastore::snapshot_info::SnapshotInfo;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -26,7 +27,7 @@ use std::{env, mem, time};
 use tokio::fs;
 use tokio::fs::File;
 use tokio::sync::broadcast::Sender;
-use tokio::sync::{oneshot, Notify, RwLock};
+use tokio::sync::{oneshot, Mutex as AsyncMutex, Notify, RwLock};
 
 macro_rules! enum_from_primitive_impl {
     ($name:ident, $( $variant:ident )*) => {
@@ -506,6 +507,7 @@ pub struct RocksStore {
     pub(crate) write_completed_notify: Arc<Notify>,
     last_upload_seq: Arc<RwLock<u64>>,
     last_check_seq: Arc<RwLock<u64>>,
+    snapshots_upload_stopped: Arc<AsyncMutex<bool>>,
     pub(crate) cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
     rw_loop_tx: std::sync::mpsc::SyncSender<
         Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
@@ -577,6 +579,7 @@ impl RocksStore {
             write_completed_notify: Arc::new(Notify::new()),
             last_upload_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
+            snapshots_upload_stopped: Arc::new(AsyncMutex::new(false)),
             config,
             cached_tables: Arc::new(Mutex::new(None)),
             rw_loop_tx,
@@ -793,18 +796,21 @@ impl RocksStore {
     }
 
     pub async fn upload_check_point(&self) -> Result<(), CubeError> {
-        let mut check_point_time = self.last_checkpoint_time.write().await;
+        let upload_stopped = self.snapshots_upload_stopped.lock().await;
+        if !*upload_stopped {
+            let mut check_point_time = self.last_checkpoint_time.write().await;
 
-        let (remote_path, checkpoint_path) = {
-            let _db = self.db.clone();
-            *check_point_time = SystemTime::now();
-            self.prepare_checkpoint(&check_point_time).await?
-        };
+            let (remote_path, checkpoint_path) = {
+                let _db = self.db.clone();
+                *check_point_time = SystemTime::now();
+                self.prepare_checkpoint(&check_point_time).await?
+            };
 
-        self.metastore_fs
-            .upload_checkpoint(remote_path, checkpoint_path)
-            .await?;
-        self.write_completed_notify.notify_waiters();
+            self.metastore_fs
+                .upload_checkpoint(remote_path, checkpoint_path)
+                .await?;
+            self.write_completed_notify.notify_waiters();
+        }
         Ok(())
     }
 
@@ -943,5 +949,37 @@ impl RocksStore {
             .get_updates_since(self.last_upload_seq().await)?
             .next()
             .is_some())
+    }
+
+    pub async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError> {
+        self.metastore_fs.get_snapshots_list().await
+    }
+
+    pub async fn set_current_snapshot(&self, snapshot_id: u128) -> Result<(), CubeError> {
+        let mut upload_stopped = self.snapshots_upload_stopped.lock().await;
+
+        let snapshots = self.get_snapshots_list().await?;
+        let snapshot = snapshots.iter().find(|info| info.id == snapshot_id);
+        if snapshot.is_none() {
+            return Err(CubeError::user(format!(
+                "Metastore snapshot with id {} don't exists",
+                snapshot_id
+            )));
+        }
+        let snapshot = snapshot.unwrap();
+        if snapshot.current {
+            return Err(CubeError::user(format!(
+                "Metastore snapshot with id {} is already current snapshot",
+                snapshot_id
+            )));
+        }
+
+        let remote_path = format!("{}-{}", self.details.get_name(), snapshot_id);
+        self.metastore_fs
+            .write_metastore_current(&remote_path)
+            .await?;
+
+        *upload_stopped = true;
+        Ok(())
     }
 }

@@ -9,6 +9,7 @@ mod rocks_fs;
 mod rocks_store;
 mod rocks_table;
 pub mod schema;
+pub mod snapshot_info;
 pub mod source;
 pub mod table;
 pub mod wal;
@@ -79,6 +80,7 @@ use std::str::FromStr;
 
 use crate::cachestore::CacheItem;
 use crate::remotefs::LocalDirRemoteFs;
+use snapshot_info::SnapshotInfo;
 use std::time::Duration;
 use table::Table;
 use table::{TableRocksIndex, TableRocksTable};
@@ -1013,6 +1015,9 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn debug_dump(&self, out_path: String) -> Result<(), CubeError>;
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
+
+    async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError>;
+    async fn set_current_snapshot(&self, snapshot_id: u128) -> Result<(), CubeError>;
 }
 
 crate::di_service!(RocksMetaStore, [MetaStore]);
@@ -3916,6 +3921,12 @@ impl MetaStore for RocksMetaStore {
         })
         .await
     }
+    async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError> {
+        self.store.get_snapshots_list().await
+    }
+    async fn set_current_snapshot(&self, snapshot_id: u128) -> Result<(), CubeError> {
+        self.store.set_current_snapshot(snapshot_id).await
+    }
 }
 
 pub async fn deactivate_table_on_corrupt_data<'a, T: 'static>(
@@ -4926,6 +4937,268 @@ mod tests {
             services2
                 .meta_store
                 .get_schema("bar".to_string())
+                .await
+                .unwrap();
+            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.remote_dir()).unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn get_snapshots_list() {
+        {
+            let config = Config::test("get_snapshots_list");
+
+            let _ = fs::remove_dir_all(config.local_dir());
+            let _ = fs::remove_dir_all(config.remote_dir());
+
+            let services = config.configure().await;
+            services.start_processing_loops().await.unwrap();
+            let snapshots = services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .get_snapshots_list()
+                .await
+                .unwrap();
+            assert_eq!(snapshots.len(), 0);
+            services
+                .meta_store
+                .create_schema("foo1".to_string(), false)
+                .await
+                .unwrap();
+            assert_eq!(snapshots.len(), 0);
+            services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .upload_check_point()
+                .await
+                .unwrap();
+            let snapshots = services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .get_snapshots_list()
+                .await
+                .unwrap();
+            assert_eq!(snapshots.len(), 1);
+            assert!(snapshots[0].current);
+            services
+                .meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .upload_check_point()
+                .await
+                .unwrap();
+            let snapshots = services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .get_snapshots_list()
+                .await
+                .unwrap();
+            assert_eq!(snapshots.len(), 2);
+            assert!(!snapshots[0].current);
+            assert!(snapshots[1].current);
+            services
+                .meta_store
+                .create_schema("bar".to_string(), false)
+                .await
+                .unwrap();
+            services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .upload_check_point()
+                .await
+                .unwrap();
+            let snapshots = services
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .get_snapshots_list()
+                .await
+                .unwrap();
+            assert_eq!(snapshots.len(), 3);
+            assert!(!snapshots[0].current);
+            assert!(!snapshots[1].current);
+            assert!(snapshots[2].current);
+            services.stop_processing_loops().await.unwrap();
+
+            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            fs::remove_dir_all(config.local_dir()).unwrap();
+        }
+
+        {
+            let config = Config::test("get_snapshots_list");
+
+            let services2 = config.configure().await;
+            let snapshots = services2
+                .rocks_meta_store
+                .as_ref()
+                .unwrap()
+                .get_snapshots_list()
+                .await
+                .unwrap();
+            assert_eq!(snapshots.len(), 3);
+            assert!(!snapshots[0].current);
+            assert!(!snapshots[1].current);
+            assert!(snapshots[2].current);
+            fs::remove_dir_all(config.local_dir()).unwrap();
+            fs::remove_dir_all(config.remote_dir()).unwrap();
+        }
+    }
+    #[tokio::test]
+    async fn set_current_snapshot() {
+        {
+            let config = Config::test("set_current_snapshot");
+
+            let _ = fs::remove_dir_all(config.local_dir());
+            let _ = fs::remove_dir_all(config.remote_dir());
+
+            let services = config.configure().await;
+            services.start_processing_loops().await.unwrap();
+            let rocks_meta_store = services.rocks_meta_store.as_ref().unwrap();
+            services
+                .meta_store
+                .create_schema("foo1".to_string(), false)
+                .await
+                .unwrap();
+            rocks_meta_store.upload_check_point().await.unwrap();
+            services
+                .meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            rocks_meta_store.upload_check_point().await.unwrap();
+            services
+                .meta_store
+                .create_schema("bar".to_string(), false)
+                .await
+                .unwrap();
+            rocks_meta_store.upload_check_point().await.unwrap();
+            let snapshots = services.meta_store.get_snapshots_list().await.unwrap();
+            assert_eq!(snapshots.len(), 3);
+            assert!(!snapshots[0].current);
+            assert!(!snapshots[1].current);
+            assert!(snapshots[2].current);
+
+            let res = services.meta_store.set_current_snapshot(111).await;
+            assert_eq!(
+                res.unwrap_err().to_string(),
+                "Metastore snapshot with id 111 don't exists".to_string()
+            );
+
+            let res = services
+                .meta_store
+                .set_current_snapshot(snapshots[2].id)
+                .await;
+            assert_eq!(
+                res.unwrap_err().to_string(),
+                format!(
+                    "Metastore snapshot with id {} is already current snapshot",
+                    snapshots[2].id
+                )
+            );
+
+            let res = services
+                .meta_store
+                .set_current_snapshot(snapshots[1].id)
+                .await;
+            assert!(res.is_ok());
+
+            services
+                .meta_store
+                .create_schema("bar_after".to_string(), false)
+                .await
+                .unwrap();
+            rocks_meta_store.upload_check_point().await.unwrap();
+            rocks_meta_store.run_upload().await.unwrap();
+
+            let snapshots = services.meta_store.get_snapshots_list().await.unwrap();
+            assert_eq!(snapshots.len(), 3);
+            assert!(!snapshots[0].current);
+            assert!(snapshots[1].current);
+            assert!(!snapshots[2].current);
+
+            services.stop_processing_loops().await.unwrap();
+
+            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            fs::remove_dir_all(config.local_dir()).unwrap();
+        }
+
+        {
+            let config = Config::test("set_current_snapshot");
+
+            let services2 = config.configure().await;
+            let snapshots = services2.meta_store.get_snapshots_list().await.unwrap();
+            assert_eq!(snapshots.len(), 3);
+            assert!(!snapshots[0].current);
+            assert!(snapshots[1].current);
+            assert!(!snapshots[2].current);
+            services2
+                .meta_store
+                .get_schema("foo1".to_string())
+                .await
+                .unwrap();
+            services2
+                .meta_store
+                .get_schema("foo".to_string())
+                .await
+                .unwrap();
+            assert!(services2
+                .meta_store
+                .get_schema("bar".to_string())
+                .await
+                .is_err());
+            assert!(services2
+                .meta_store
+                .get_schema("bar_after".to_string())
+                .await
+                .is_err());
+
+            let res = services2
+                .meta_store
+                .set_current_snapshot(snapshots[2].id)
+                .await;
+            assert!(res.is_ok());
+            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            fs::remove_dir_all(config.local_dir()).unwrap();
+        }
+
+        {
+            let config = Config::test("set_current_snapshot");
+
+            let services3 = config.configure().await;
+            let snapshots = services3.meta_store.get_snapshots_list().await.unwrap();
+            assert_eq!(snapshots.len(), 3);
+            assert!(!snapshots[0].current);
+            assert!(!snapshots[1].current);
+            assert!(snapshots[2].current);
+            services3
+                .meta_store
+                .get_schema("foo1".to_string())
+                .await
+                .unwrap();
+            services3
+                .meta_store
+                .get_schema("foo".to_string())
+                .await
+                .unwrap();
+            services3
+                .meta_store
+                .get_schema("bar".to_string())
+                .await
+                .unwrap();
+            services3
+                .meta_store
+                .get_schema("bar_after".to_string())
                 .await
                 .unwrap();
             fs::remove_dir_all(config.local_dir()).unwrap();

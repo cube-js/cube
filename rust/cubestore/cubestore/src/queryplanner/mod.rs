@@ -24,7 +24,7 @@ use crate::metastore::{IdRow, MetaStore};
 use crate::queryplanner::info_schema::{
     SchemataInfoSchemaTableDef, SystemCacheTableDef, SystemChunksTableDef, SystemIndexesTableDef,
     SystemJobsTableDef, SystemPartitionsTableDef, SystemReplayHandlesTableDef,
-    SystemTablesTableDef, TablesInfoSchemaTableDef,
+    SystemSnapshotsTableDef, SystemTablesTableDef, TablesInfoSchemaTableDef,
 };
 use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
@@ -337,6 +337,11 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 self.cache_store.clone(),
                 InfoSchemaTable::SystemJobs,
             ))),
+            ("system", "snapshots") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                self.cache_store.clone(),
+                InfoSchemaTable::SystemSnapshots,
+            ))),
             _ => None,
         })
     }
@@ -376,6 +381,7 @@ pub enum InfoSchemaTable {
     SystemChunks,
     SystemReplayHandles,
     SystemCache,
+    SystemSnapshots,
 }
 
 pub struct InfoSchemaTableDefContext {
@@ -442,6 +448,7 @@ impl InfoSchemaTable {
             InfoSchemaTable::SystemPartitions => Box::new(SystemPartitionsTableDef),
             InfoSchemaTable::SystemJobs => Box::new(SystemJobsTableDef),
             InfoSchemaTable::SystemCache => Box::new(SystemCacheTableDef),
+            InfoSchemaTable::SystemSnapshots => Box::new(SystemSnapshotsTableDef),
         }
     }
 

@@ -56,7 +56,9 @@ use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef, RocksStoreName, SystemCommand};
+use crate::sql::parser::{
+    CubeStoreParser, MetastoreCommand, PartitionedIndexRef, RocksStoreName, SystemCommand,
+};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
@@ -870,6 +872,12 @@ impl SqlService for SqlServiceImpl {
                     }
                     panic!("worker did not panic")
                 }
+                SystemCommand::Metastore(command) => match command {
+                    MetastoreCommand::SetCurrent { id } => {
+                        self.db.set_current_snapshot(id).await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                },
             },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
