@@ -177,14 +177,12 @@ export class WebSocketConnection {
             reject(err);
           }
         });
-        socket.sentMessages[messageId] = {
-          resolve,
-          reject,
-          buffer
-        };
-      } else {
-        resolve(this.sendMessage(messageId, buffer));
       }
+      socket.sentMessages[messageId] = {
+        resolve,
+        reject,
+        buffer
+      };
     });
   }
 
