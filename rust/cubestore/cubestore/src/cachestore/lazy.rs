@@ -15,6 +15,7 @@ pub enum LazyRocksCacheStoreState {
         config: Arc<dyn ConfigObj>,
         init_flag: Sender<bool>,
     },
+    Closed {},
     Initialized {
         store: Arc<RocksCacheStore>,
     },
@@ -61,9 +62,17 @@ impl LazyRocksCacheStore {
     async fn init(&self) -> Result<Arc<RocksCacheStore>, CubeError> {
         {
             let guard = self.state.read().await;
-            if let LazyRocksCacheStoreState::Initialized { store } = &*guard {
-                return Ok(store.clone());
-            };
+            match &*guard {
+                LazyRocksCacheStoreState::FromRemote { .. } => {}
+                LazyRocksCacheStoreState::Closed { .. } => {
+                    return Err(CubeError::internal(
+                        "Unable to initialize Cache Store on lazy call, it was closed".to_string(),
+                    ));
+                }
+                LazyRocksCacheStoreState::Initialized { store } => {
+                    return Ok(store.clone());
+                }
+            }
         }
 
         let mut guard = self.state.write().await;
@@ -91,50 +100,57 @@ impl LazyRocksCacheStore {
         }
     }
 
-    async fn get_initialized_store(&self) -> Result<Arc<RocksCacheStore>, CubeError> {
-        let guard = self.state.read().await;
-        if let LazyRocksCacheStoreState::Initialized { store } = &*guard {
-            Ok(store.clone())
-        } else {
-            Err(CubeError::internal(
-                "Unable to extract store from the state".to_string(),
-            ))
-        }
-    }
-
     pub async fn wait_upload_loop(&self) {
         if let Some(init_signal) = &self.init_signal {
             let _ = init_signal.clone().changed().await;
         }
 
+        let store = {
+            let guard = self.state.read().await;
+            if let LazyRocksCacheStoreState::Initialized { store } = &*guard {
+                store.clone()
+            } else {
+                return ();
+            }
+        };
+
         trace!("wait_upload_loop unblocked, Cache Store was initialized");
 
-        self.get_initialized_store()
-            .await
-            .unwrap()
-            .wait_upload_loop()
-            .await;
+        store.wait_upload_loop().await
     }
 
     pub async fn stop_processing_loops(&self) {
-        if let Ok(store) = self.get_initialized_store().await {
-            store.stop_processing_loops().await;
-        }
+        let store = {
+            let mut guard = self.state.write().await;
+            match &*guard {
+                LazyRocksCacheStoreState::Closed { .. } => {
+                    return ();
+                }
+                LazyRocksCacheStoreState::FromRemote { .. } => {
+                    *guard = LazyRocksCacheStoreState::Closed {};
+
+                    return ();
+                }
+                LazyRocksCacheStoreState::Initialized { store } => {
+                    let store_to_move = store.clone();
+
+                    *guard = LazyRocksCacheStoreState::Closed {};
+
+                    store_to_move
+                }
+            }
+        };
+
+        trace!("stop_processing_loops unblocked, Cache Store was initialized");
+
+        store.stop_processing_loops().await
     }
 }
 
 #[async_trait]
 impl CacheStore for LazyRocksCacheStore {
-    async fn cache_incr(&self, path: String) -> Result<IdRow<CacheItem>, CubeError> {
-        self.init().await?.cache_incr(path).await
-    }
-
     async fn cache_all(&self) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
         self.init().await?.cache_all().await
-    }
-
-    async fn compaction(&self) -> Result<(), CubeError> {
-        self.init().await?.compaction().await
     }
 
     async fn cache_set(
@@ -162,6 +178,14 @@ impl CacheStore for LazyRocksCacheStore {
 
     async fn cache_keys(&self, prefix: String) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
         self.init().await?.cache_keys(prefix).await
+    }
+
+    async fn cache_incr(&self, path: String) -> Result<IdRow<CacheItem>, CubeError> {
+        self.init().await?.cache_incr(path).await
+    }
+
+    async fn compaction(&self) -> Result<(), CubeError> {
+        self.init().await?.compaction().await
     }
 }
 
