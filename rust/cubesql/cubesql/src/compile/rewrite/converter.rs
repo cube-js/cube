@@ -1541,7 +1541,6 @@ impl LanguageToLogicalPlanConverter {
                                 if n > cube_scan_query_limit {
                                     limit_was_changed = true;
                                 }
-                                
                                 Some(n)
                             }
                             None => {
