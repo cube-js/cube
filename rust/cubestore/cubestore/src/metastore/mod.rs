@@ -1166,17 +1166,16 @@ impl RocksMetaStore {
         Ok(Self::new_from_store(store))
     }
 
-    pub async fn wait_upload_loop(meta_store: Arc<Self>) {
-        if !meta_store.store.config.upload_to_remote() {
+    pub async fn wait_upload_loop(self: Arc<Self>) {
+        if !self.store.config.upload_to_remote() {
             log::info!("Not running metastore upload loop");
             return;
         }
 
-        let upload_interval = meta_store.store.config.meta_store_log_upload_interval();
-        meta_store
-            .upload_loop
+        let upload_interval = self.store.config.meta_store_log_upload_interval();
+        self.upload_loop
             .process(
-                meta_store.clone(),
+                self.clone(),
                 async move |_| Ok(Delay::new(Duration::from_secs(upload_interval)).await),
                 async move |m, _| m.store.run_upload().await,
             )

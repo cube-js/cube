@@ -2,7 +2,7 @@
 pub mod injection;
 pub mod processing_loop;
 
-use crate::cachestore::{CacheStore, ClusterCacheStoreClient, RocksCacheStore};
+use crate::cachestore::{CacheStore, ClusterCacheStoreClient, LazyRocksCacheStore};
 use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
@@ -58,7 +58,7 @@ pub struct CubeServices {
     pub sql_service: Arc<dyn SqlService>,
     pub scheduler: Arc<SchedulerImpl>,
     pub rocks_meta_store: Option<Arc<RocksMetaStore>>,
-    pub rocks_cache_store: Option<Arc<RocksCacheStore>>,
+    pub rocks_cache_store: Option<Arc<LazyRocksCacheStore>>,
     pub meta_store: Arc<dyn MetaStore>,
     pub cluster: Arc<ClusterImpl>,
 }
@@ -104,13 +104,13 @@ impl CubeServices {
         if !self.cluster.is_select_worker() {
             let rocks_meta_store = self.rocks_meta_store.clone().unwrap();
             futures.push(cube_ext::spawn(async move {
-                RocksMetaStore::wait_upload_loop(rocks_meta_store).await;
+                rocks_meta_store.wait_upload_loop().await;
                 Ok(())
             }));
 
             let rocks_cache_store = self.rocks_cache_store.clone().unwrap();
             futures.push(cube_ext::spawn(async move {
-                RocksCacheStore::wait_upload_loop(rocks_cache_store).await;
+                rocks_cache_store.wait_upload_loop().await;
                 Ok(())
             }));
 
@@ -1262,12 +1262,12 @@ impl Config {
                 .await;
             let path = self.cache_store_path().to_str().unwrap().to_string();
             self.injector
-                .register_typed_with_default::<dyn CacheStore, RocksCacheStore, _, _>(
+                .register_typed_with_default::<dyn CacheStore, LazyRocksCacheStore, _, _>(
                     async move |i| {
                         let config = i.get_service_typed::<dyn ConfigObj>().await;
                         let cachestore_fs = i.get_service("cachestore_fs").await;
                         let cache_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            RocksCacheStore::load_from_dump(
+                            LazyRocksCacheStore::load_from_dump(
                                 &Path::new(&path),
                                 dump_dir,
                                 cachestore_fs,
@@ -1276,7 +1276,7 @@ impl Config {
                             .await
                             .unwrap()
                         } else {
-                            RocksCacheStore::load_from_remote(&path, cachestore_fs, config)
+                            LazyRocksCacheStore::load_from_remote(&path, cachestore_fs, config)
                                 .await
                                 .unwrap()
                         };
@@ -1511,7 +1511,11 @@ impl Config {
             } else {
                 None
             },
-            rocks_cache_store: if self.injector.has_service_typed::<RocksCacheStore>().await {
+            rocks_cache_store: if self
+                .injector
+                .has_service_typed::<LazyRocksCacheStore>()
+                .await
+            {
                 Some(self.injector.get_service_typed().await)
             } else {
                 None
