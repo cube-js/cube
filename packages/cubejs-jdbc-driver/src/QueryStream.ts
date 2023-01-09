@@ -11,7 +11,7 @@ export type nextFn = () => {
   value: Row,
 };
 
-export class DataStream extends Readable {
+export class QueryStream extends Readable {
   private next: nextFn;
 
   public constructor(nextFn: nextFn) {

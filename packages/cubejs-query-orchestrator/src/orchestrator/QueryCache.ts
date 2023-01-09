@@ -604,13 +604,6 @@ export class QueryCache {
             target.once('error', cleanup);
             target.once('close', cleanup);
   
-            // @ts-ignore
-            if (client.streamFields) {
-              // @ts-ignore
-              const fields = await client.streamFields(source);
-              target.emit('fields', fields);
-            }
-  
             source.pipe(target);
           } catch (e) {
             target.emit('error', e);

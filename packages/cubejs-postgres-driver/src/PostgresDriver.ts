@@ -249,26 +249,21 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         types: { getTypeParser: this.getTypeParser },
         highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
       });
-      const rows: QueryStream = await conn.query(query);
+      const rowsStream: QueryStream = await conn.query(query);
       const cleanup = (err?: Error) => {
-        if (!rows.destroyed) {
+        if (!rowsStream.destroyed) {
           conn.release();
-          rows.destroy(err);
+          rowsStream.destroy(err);
         }
       };
-      rows.once('end', cleanup);
-      rows.once('error', cleanup);
-      rows.once('close', cleanup);
-      return rows;
+      rowsStream.once('end', cleanup);
+      rowsStream.once('error', cleanup);
+      rowsStream.once('close', cleanup);
+      return rowsStream;
     } catch (e) {
       await conn.release();
       throw e;
     }
-  }
-
-  public async streamFields(queryStream: QueryStream): Promise<TableStructure> {
-    const fields = await queryStream.fields(this.mapFields.bind(this));
-    return fields;
   }
 
   public async stream(
@@ -288,11 +283,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         highWaterMark
       });
       const rowStream: QueryStream = await conn.query(queryStream);
-      const fields = await this.streamFields(rowStream);
+      const fields = await await rowStream.fields();
 
       return {
         rowStream,
-        types: fields,
+        types: this.mapFields(fields),
         release: async () => {
           await conn.release();
         }
@@ -337,8 +332,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     const res = await this.queryResponse(query, values);
     return {
       rows: res.rows,
-      // @ts-ignore
-      types: res.fields(this.mapFields.bind(this)),
+      types: this.mapFields(res.fields),
     };
   }
 

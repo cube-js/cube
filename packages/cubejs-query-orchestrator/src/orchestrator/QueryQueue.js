@@ -1,4 +1,3 @@
-import * as stream from 'stream';
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 
@@ -7,60 +6,7 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
 import { getProcessUid } from './utils';
-
-/**
- * Data stream class. This stream is uses to pipe data from the data
- * source stream to the gateway stream consumer (sql api, websocket
- * client, etc.).
- */
-class DataStream extends stream.Writable {
-  constructor({
-    key,
-    maps,
-    aliasNameToMember,
-  }) {
-    super({
-      objectMode: true,
-      highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
-    });
-
-    /**
-     * @type {string}
-     */
-    this.queryKey = key;
-    
-    /**
-     * @type {{ queued: Map<string, DataStream>, processing: Map<string, DataStream> }}
-     */
-    this.maps = maps;
-
-    /**
-     * @type {{ [alias: string]: string }}
-     */
-    this.aliasNameToMember = aliasNameToMember;
-  }
-
-  _write(chunk, encoding, callback) {
-    if (this.maps.queued.has(this.queryKey)) {
-      this.maps.queued.delete(this.queryKey);
-      this.maps.processing.set(this.queryKey, this);
-    }
-    const row = {};
-    Object.keys(chunk).forEach((alias) => {
-      row[this.aliasNameToMember[alias]] = chunk[alias];
-    });
-    callback();
-    this.emit('data', row);
-  }
-
-  _destroy(error, callback) {
-    this.emit('end');
-    this.maps.processing.delete(this.queryKey);
-    delete this.queryKey;
-    delete this.maps;
-    super._destroy(error, callback);
-  }
-}
+import { QueryStream } from './QueryStream';
 
 /**
  * QueryQueue class.
@@ -184,7 +130,7 @@ export class QueryQueue {
   getQueryStream(queryKey, aliasNameToMember) {
     const key = this.redisHash(queryKey);
     if (!this.streams.queued.has(key)) {
-      const _stream = new DataStream({
+      const _stream = new QueryStream({
         key,
         maps: this.streams,
         aliasNameToMember,
@@ -264,7 +210,9 @@ export class QueryQueue {
     try {
       priority = priority || 0;
       if (!(priority >= -10000 && priority <= 10000)) {
-        throw new Error('Priority should be between -10000 and 10000');
+        throw new Error(
+          'Priority should be between -10000 and 10000'
+        );
       }
       const time = new Date().getTime();
       const keyScore = time + (10000 - priority) * 1E14;
