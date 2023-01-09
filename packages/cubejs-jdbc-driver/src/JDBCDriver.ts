@@ -19,7 +19,7 @@ import genericPool, { Factory, Pool } from 'generic-pool';
 import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { JDBCDriverConfiguration } from './types';
-import { DataStream, nextFn, Row } from './DataStream';
+import { QueryStream, nextFn, Row } from './QueryStream';
 
 const DriverManager = require('jdbc/lib/drivermanager');
 const Connection = require('jdbc/lib/connection');
@@ -263,7 +263,7 @@ export class JDBCDriver extends BaseDriver {
               },
             ) => {
               if (err) reject(err);
-              const rowsStream = new DataStream(res.rows.next);
+              const rowsStream = new QueryStream(res.rows.next);
               const cleanup = (e?: Error) => {
                 if (!rowsStream.destroyed) {
                   rowsStream.destroy(e);

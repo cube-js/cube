@@ -86,16 +86,6 @@ import {
   transformJoins,
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
-import { DataStream, StreamResponse } from './DataStream';
-
-// const timeoutPromise = (timeout) => (
-//   new Promise((resolve) => (
-//     setTimeout(
-//       () => resolve(null),
-//       timeout,
-//     )
-//   ))
-// );
 
 /**
  * API gateway server class.
@@ -1162,10 +1152,15 @@ class ApiGateway {
       : getEnv('dbQueryLimit');
 
     if (!persistent) {
-      if ((!!query.limit && (query.limit > getEnv('dbQueryLimit')))) {
+      if (
+        typeof query.limit === 'number' &&
+        query.limit > getEnv('dbQueryLimit')
+      ) {
         throw new Error('The query limit has been exceeded.');
       }
-      query.limit = query.limit || def;
+      query.limit = typeof query.limit === 'number'
+        ? query.limit
+        : def;
     }
   }
 
@@ -1326,7 +1321,6 @@ class ApiGateway {
     context: RequestContext,
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
-    apiType: string,
   ) {
     const queries = [{
       ...sqlQuery,
@@ -1480,92 +1474,6 @@ class ApiGateway {
   }
 
   /**
-   * Returns stream object to fetch data.
-   */
-  // public async streamVanila(context: RequestContext, query: Query): Promise<StreamResponse> {
-  //   // const CUBEJS_DB_QUERY_LIMIT = getEnv('dbQueryLimit'); // 50000
-  //   // const CUBEJS_DB_QUERY_DEFAULT_LIMIT = getEnv('dbQueryDefaultLimit'); // 10000
-  //   const CUBEJS_DB_QUERY_STREAM_OFFSET = getEnv('dbQueryStreamOffset'); // 5000
-
-  //   const { limit, offset } = query;
-
-  //   const response = {
-  //     types: [],
-  //     rowStream: new DataStream(),
-  //     release: async () => {
-  //       if (!response.rowStream.destroyed) {
-  //         response.rowStream.destroy();
-  //       }
-  //       return response.rowStream;
-  //     }
-  //   };
-
-  //   const chunk = async (lim: number, ofs: number) => {
-  //     try {
-  //       await this.load({
-  //         apiType: 'stream',
-  //         queryType: 'multi',
-  //         query: {
-  //           ...query,
-  //           limit: lim,
-  //           offset: ofs,
-  //         },
-  //         res: (message: Record<string, any> | Record<string, any>[]) => {
-  //           const { results, error } = <{
-  //             queryType?: any,
-  //             results?: any,
-  //             error?: string,
-  //             requestId?: string,
-  //           }>message;
-
-  //           if (error) {
-  //             throw new Error(error);
-  //           } else {
-  //             const cnt = results[0].data.length;
-  //             const data = cnt > 0 && JSON.stringify(results[0].data);
-  //             const added = cnt > 0 && response.rowStream.write(data, 'utf8');
-
-  //             // The stream is blocked:
-  //             if (cnt > 0 && !added) {
-  //               response.rowStream.once('drain', () => chunk(lim, ofs));
-  //             }
-
-  //             // No more data:
-  //             if (cnt === 0 || (cnt > 0 && cnt < CUBEJS_DB_QUERY_STREAM_OFFSET)) {
-  //               response.rowStream.destroy();
-  //             }
-              
-  //             // Next chunk:
-  //             if (added && cnt === CUBEJS_DB_QUERY_STREAM_OFFSET) {
-  //               chunk(
-  //                 limit && ((ofs + 2 * lim) > limit)
-  //                   ? limit - (ofs + lim)
-  //                   : lim,
-  //                 ofs + lim,
-  //               );
-  //             }
-  //           }
-  //         },
-  //         context,
-  //       });
-  //     } catch (e) {
-  //       if ((<any>e).error === 'Continue wait') {
-  //         chunk(lim, ofs);
-  //       }
-  //     }
-  //   };
-
-  //   chunk(
-  //     limit && limit < CUBEJS_DB_QUERY_STREAM_OFFSET
-  //       ? limit
-  //       : CUBEJS_DB_QUERY_STREAM_OFFSET,
-  //     offset || 0
-  //   );
-
-  //   return response;
-  // }
-
-  /**
    * Data queries APIs (`/load`, `/subscribe`) entry point. Used by
    * `CubejsApi#load` and `CubejsApi#subscribe` methods to fetch the
    * data.
@@ -1621,7 +1529,6 @@ class ApiGateway {
             context,
             normalizedQuery,
             sqlQueries[index],
-            apiType,
           );
 
           return this.getResultInternal(
