@@ -24,6 +24,9 @@ spec:
       labels:
         app.kubernetes.io/component: workers
         {{- include "cubestore.selectorLabels" . | nindent 8 }}
+        {{- if .Values.commonLabels }}
+        {{- toYaml .Values.commonLabels | nindent 8 }}
+        {{- end }}
       {{- if .Values.commonAnnotations }}
       annotations:
       {{- toYaml .Values.commonAnnotations | nindent 8 }}
