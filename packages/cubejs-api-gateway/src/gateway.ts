@@ -351,6 +351,19 @@ class ApiGateway {
         systemMiddlewares,
         this.preAggregationsJobs.bind(this),
       );
+
+      app.post(
+        '/cubejs-system/v1/sql-runner',
+        jsonParser,
+        systemMiddlewares,
+        async (req: Request, res: Response) => {
+          await this.sqlRunner({
+            query: req.body.query,
+            context: req.context!,
+            res: this.resToResultFn(res),
+          });
+        }
+      );
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -987,6 +1000,54 @@ class ApiGateway {
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
+      });
+    }
+  }
+
+  protected async sqlRunner({ query, context, res }: QueryRequest) {
+    const requestStarted = new Date();
+    try {
+      if (!query) {
+        throw new UserError(
+          'A user\'s query must contain a body'
+        );
+      }
+
+      if (!Array.isArray(query) && !query.query) {
+        throw new UserError(
+          'A user\'s query must contain at least one query param.'
+        );
+      }
+
+      query = {
+        ...query,
+        requestId: context.requestId
+      };
+
+      this.log(
+        {
+          type: 'Load SQL Runner Request',
+          query,
+        },
+        context
+      );
+
+      const result = await this.getAdapterApi(context).executeQuery(query);
+
+      this.log(
+        {
+          type: 'Load SQL Runner Request Success',
+          query,
+          duration: this.duration(requestStarted),
+          dbType: result.dbType,
+        },
+        context
+      );
+
+      res(result);
+    } catch (e) {
+      this.handleError({
+        e, context, query, res, requestStarted
       });
     }
   }
