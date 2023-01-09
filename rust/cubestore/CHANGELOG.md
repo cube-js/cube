@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
+
+
+### Features
+
+* **cubestore:** Support lazy initialization for CacheStore ([#5933](https://github.com/cube-js/cube.js/issues/5933)) ([37b4a95](https://github.com/cube-js/cube.js/commit/37b4a953e6c3bc535520203b23fef1632bf04aee))
+
+
+
+
+
 ## [0.31.36](https://github.com/cube-js/cube.js/compare/v0.31.35...v0.31.36) (2023-01-08)
 
 

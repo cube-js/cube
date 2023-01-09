@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
+
+
+### Bug Fixes
+
+* Remove missed `cacheFn` console.log ([ec9e56b](https://github.com/cube-js/cube.js/commit/ec9e56b79e5acf0399c634e3e50b3457175404b6))
+
+
+
+
+
 ## [0.31.36](https://github.com/cube-js/cube.js/compare/v0.31.35...v0.31.36) (2023-01-08)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
+
+
+### Bug Fixes
+
+* Remove missed `cacheFn` console.log ([ec9e56b](https://github.com/cube-js/cube.js/commit/ec9e56b79e5acf0399c634e3e50b3457175404b6))
+
+
+### Features
+
+* **cubejs-api-gateway:** added endpoint to run sql query directly ([#5786](https://github.com/cube-js/cube.js/issues/5786)) ([61d5798](https://github.com/cube-js/cube.js/commit/61d579834800c839defd3c2991aae65a42318027))
+* **cubestore:** Support lazy initialization for CacheStore ([#5933](https://github.com/cube-js/cube.js/issues/5933)) ([37b4a95](https://github.com/cube-js/cube.js/commit/37b4a953e6c3bc535520203b23fef1632bf04aee))
+
+
+
+
+
 ## [0.31.36](https://github.com/cube-js/cube.js/compare/v0.31.35...v0.31.36) (2023-01-08)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
+
+
+### Features
+
+* **cubejs-api-gateway:** added endpoint to run sql query directly ([#5786](https://github.com/cube-js/cube.js/issues/5786)) ([61d5798](https://github.com/cube-js/cube.js/commit/61d579834800c839defd3c2991aae65a42318027))
+
+
+
+
+
 ## [0.31.36](https://github.com/cube-js/cube.js/compare/v0.31.35...v0.31.36) (2023-01-08)
 
 
