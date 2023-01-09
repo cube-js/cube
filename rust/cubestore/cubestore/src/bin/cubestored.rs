@@ -1,10 +1,10 @@
-use cubestore::app_metrics;
 use cubestore::config::{validate_config, Config, CubeServices};
 use cubestore::http::status::serve_status_probes;
 use cubestore::telemetry::{init_agent_sender, track_event};
 use cubestore::util::logger::init_cube_logger;
 use cubestore::util::metrics::init_metrics;
 use cubestore::util::{metrics, spawn_malloc_trim_loop};
+use cubestore::{app_metrics, CubeError};
 use datafusion::cube_ext;
 use log::debug;
 use serde_json::Value;
@@ -32,7 +32,19 @@ fn main() {
         Err(_) => metrics::Compatibility::StatsD,
     };
     init_metrics("127.0.0.1:0", "127.0.0.1:8125", metrics_mode);
-    init_cube_logger(true);
+    let telemetry_env = std::env::var("CUBESTORE_TELEMETRY")
+        .or(std::env::var("CUBEJS_TELEMETRY"))
+        .unwrap_or("true".to_string());
+    let enable_telemetry = telemetry_env
+        .parse::<bool>()
+        .map_err(|e| {
+            CubeError::user(format!(
+                "Can't parse telemetry env variable '{}': {}",
+                telemetry_env, e
+            ))
+        })
+        .unwrap();
+    init_cube_logger(enable_telemetry);
 
     log::info!("Cube Store version {}", version);
 
