@@ -161,7 +161,6 @@ function wrapNativeFunctionWithStream(
             }
 
             if (!!streamResponse && !!streamResponse.stream) {
-                console.log(streamResponse.stream);
                 streamResponse.stream.removeAllListeners();
             }
             writer.reject(e.message || "Unknown JS exception");

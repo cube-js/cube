@@ -74,6 +74,19 @@ pub trait CubeReadStream: Send + Sync + Debug {
 }
 
 #[derive(Debug)]
+pub struct CubeDummyStream {}
+
+impl CubeReadStream for CubeDummyStream {
+    fn poll_next(&self) -> Result<Option<String>, CubeError> {
+        panic!("CubeDummyStream.poll_next - can not be called");
+    }
+
+    fn reject(&self) {
+        panic!("CubeDummyStream.reject - can not be called");
+    }
+}
+
+#[derive(Debug)]
 struct MetaCacheBucket {
     lifetime: Instant,
     value: Arc<MetaContext>,

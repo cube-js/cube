@@ -27,7 +27,7 @@ use log::warn;
 
 use crate::{
     sql::AuthContextRef,
-    transport::{CubeReadStream, LoadRequestMeta, TransportService},
+    transport::{CubeDummyStream, CubeReadStream, LoadRequestMeta, TransportService},
 };
 use chrono::{TimeZone, Utc};
 use datafusion::{
@@ -275,83 +275,68 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             (true, Some(limit)) if limit > query_limit => true,
             (_, _) => false,
         };
-        if stream_mode {
-            let mut meta = self.meta.clone();
-            meta.set_change_user(self.options.change_user.clone());
-            let result =
-                self.transport
-                    .load_stream(self.request.clone(), self.auth_context.clone(), meta);
-            let stream = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
 
-            return Ok(Box::pin(CubeScanMemoryStream::new(
-                stream,
-                self.schema.clone(),
-                self.member_fields.clone(),
-            )));
-        }
-
-        // In case stream_mode is disabled
         let mut request = self.request.clone();
         if request.limit.unwrap_or_default() > query_limit {
             request.limit = Some(query_limit);
         }
 
-        let no_members_query = request.measures.as_ref().map(|v| v.len()).unwrap_or(0) == 0
-            && request.dimensions.as_ref().map(|v| v.len()).unwrap_or(0) == 0
-            && request
-                .time_dimensions
-                .as_ref()
-                .map(|v| v.iter().filter(|d| d.granularity.is_some()).count())
-                .unwrap_or(0)
-                == 0;
-        let result = if no_members_query {
-            let limit = request.limit.unwrap_or(1);
-            let mut data = Vec::new();
-            for _ in 0..limit {
-                data.push(serde_json::Value::Null)
-            }
-            V1LoadResult::new(
-                V1LoadResultAnnotation {
-                    measures: json!(Vec::<serde_json::Value>::new()),
-                    dimensions: json!(Vec::<serde_json::Value>::new()),
-                    segments: json!(Vec::<serde_json::Value>::new()),
-                    time_dimensions: json!(Vec::<serde_json::Value>::new()),
-                },
-                data,
-            )
-        } else {
-            let mut meta = self.meta.clone();
-            meta.set_change_user(self.options.change_user.clone());
+        let mut meta = self.meta.clone();
+        meta.set_change_user(self.options.change_user.clone());
 
-            let result = self
-                .transport
-                .load(request, self.auth_context.clone(), meta)
-                .await;
-
-            let mut response = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
-
-            if let Some(data) = response.results.pop() {
-                if let Some(max_records) = self.options.max_records {
-                    if data.data.len() >= max_records {
-                        return Err(DataFusionError::Execution(format!("One of the Cube queries exceeded the maximum row limit ({}). JOIN/UNION is not possible as it will produce incorrect results. Try filtering the results more precisely or moving post-processing functions to an outer query.", max_records)));
-                    }
-                }
-
-                data
-            } else {
-                return Err(DataFusionError::Execution(format!(
-                    "Unable to extract result from Cube.js response",
-                )));
-            }
-        };
-
-        Ok(Box::pin(CubeScanOneShotStream::new(
-            vec![transform_response(
-                result.data,
-                self.schema.clone(),
-                &self.member_fields,
-            )?],
+        let mut one_shot_stream = CubeScanOneShotStream::new(
             self.schema.clone(),
+            self.member_fields.clone(),
+            request.clone(),
+            self.auth_context.clone(),
+            self.transport.clone(),
+            meta.clone(),
+            self.options.clone(),
+        );
+
+        if stream_mode {
+            let result =
+                self.transport
+                    .load_stream(self.request.clone(), self.auth_context.clone(), meta);
+            let stream = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
+            let main_stream =
+                CubeScanMemoryStream::new(stream, self.schema.clone(), self.member_fields.clone());
+
+            return Ok(Box::pin(CubeScanStreamRouter::new(
+                main_stream,
+                one_shot_stream,
+                self.schema.clone(),
+                false,
+            )));
+        } else if self.request.limit.unwrap_or_default() > query_limit {
+            let mut request = self.request.clone();
+            request.limit = Some(query_limit);
+            one_shot_stream.request = request;
+        }
+
+        one_shot_stream.data = Some(transform_response(
+            load_data(
+                request,
+                self.auth_context.clone(),
+                self.transport.clone(),
+                meta.clone(),
+                self.options.clone(),
+            )
+            .await?
+            .data,
+            one_shot_stream.schema.clone(),
+            &one_shot_stream.member_fields,
+        )?);
+
+        Ok(Box::pin(CubeScanStreamRouter::new(
+            CubeScanMemoryStream::new(
+                Arc::new(CubeDummyStream {}),
+                self.schema.clone(),
+                self.member_fields.clone(),
+            ),
+            one_shot_stream,
+            self.schema.clone(),
+            true,
         )))
     }
 
@@ -374,50 +359,50 @@ impl ExecutionPlan for CubeScanExecutionPlan {
 }
 
 struct CubeScanOneShotStream {
-    /// Vector of record batches
-    data: Vec<RecordBatch>,
-    /// Schema representing the data
+    data: Option<RecordBatch>,
     schema: SchemaRef,
-    /// Index into the data
-    index: usize,
+    member_fields: Vec<MemberField>,
+    request: V1LoadRequestQuery,
+    auth_context: AuthContextRef,
+    transport: Arc<dyn TransportService>,
+    meta: LoadRequestMeta,
+    options: CubeScanOptions,
+    fired: bool,
 }
 
 impl CubeScanOneShotStream {
-    pub fn new(data: Vec<RecordBatch>, schema: SchemaRef) -> Self {
+    pub fn new(
+        schema: SchemaRef,
+        member_fields: Vec<MemberField>,
+        request: V1LoadRequestQuery,
+        auth_context: AuthContextRef,
+        transport: Arc<dyn TransportService>,
+        meta: LoadRequestMeta,
+        options: CubeScanOptions,
+    ) -> Self {
         Self {
-            data,
+            data: None,
             schema,
-            index: 0,
+            member_fields,
+            request,
+            auth_context,
+            transport,
+            meta,
+            options,
+            fired: false,
         }
     }
-}
 
-impl Stream for CubeScanOneShotStream {
-    type Item = ArrowResult<RecordBatch>;
+    fn poll_next(&mut self) -> Option<ArrowResult<RecordBatch>> {
+        if !self.fired {
+            self.fired = true;
 
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        _: &mut Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        Poll::Ready(if self.index < self.data.len() {
-            self.index += 1;
-            let batch = &self.data[self.index - 1];
+            if let Some(batch) = &self.data {
+                return Some(Ok(batch.clone()));
+            }
+        }
 
-            Some(Ok(batch.clone()))
-        } else {
-            None
-        })
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.data.len(), Some(self.data.len()))
-    }
-}
-
-impl RecordBatchStream for CubeScanOneShotStream {
-    /// Get the schema
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        None
     }
 }
 
@@ -425,7 +410,6 @@ struct CubeScanMemoryStream {
     stream: Arc<dyn CubeReadStream>,
     /// Schema representing the data
     schema: SchemaRef,
-
     member_fields: Vec<MemberField>,
 }
 
@@ -441,24 +425,158 @@ impl CubeScanMemoryStream {
             member_fields,
         }
     }
-}
 
-impl Stream for CubeScanMemoryStream {
-    type Item = ArrowResult<RecordBatch>;
-
-    fn poll_next(self: std::pin::Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Poll::Ready(match self.stream.poll_next() {
+    fn poll_next(&mut self) -> Option<ArrowResult<RecordBatch>> {
+        match self.stream.poll_next() {
             Ok(chunk) => parse_chunk(chunk, self.schema.clone(), &self.member_fields),
             Err(err) => Some(Err(ArrowError::ComputeError(err.to_string()))),
-        })
+        }
     }
 }
 
-impl RecordBatchStream for CubeScanMemoryStream {
+struct CubeScanStreamRouter {
+    main_stream: CubeScanMemoryStream,
+    one_shot_stream: CubeScanOneShotStream,
+    schema: SchemaRef,
+    one_shot_mode: bool,
+}
+
+impl CubeScanStreamRouter {
+    pub fn new(
+        main_stream: CubeScanMemoryStream,
+        one_shot_stream: CubeScanOneShotStream,
+        schema: SchemaRef,
+        one_shot_mode: bool,
+    ) -> Self {
+        Self {
+            main_stream,
+            one_shot_stream,
+            schema,
+            one_shot_mode,
+        }
+    }
+}
+
+impl Stream for CubeScanStreamRouter {
+    type Item = ArrowResult<RecordBatch>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        if !self.one_shot_mode {
+            let mut chunk = self.main_stream.poll_next();
+            match &chunk {
+                Some(res) => match res {
+                    Err(ArrowError::ComputeError(err))
+                        if err
+                            .as_str()
+                            .contains("streamQuery() method is not implemented yet") =>
+                    {
+                        warn!("{}", err);
+
+                        self.one_shot_mode = true;
+
+                        match load_to_steam_sync(&mut self.one_shot_stream) {
+                            Ok(_) => {
+                                chunk = self.one_shot_stream.poll_next();
+                            }
+                            Err(e) => {
+                                chunk = Some(Err(e.into()));
+                            }
+                        }
+                    }
+                    _ => (),
+                },
+                None => (),
+            }
+
+            return Poll::Ready(chunk);
+        }
+
+        Poll::Ready(self.one_shot_stream.poll_next())
+    }
+}
+
+impl RecordBatchStream for CubeScanStreamRouter {
     /// Get the schema
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
+}
+
+async fn load_data(
+    request: V1LoadRequestQuery,
+    auth_context: AuthContextRef,
+    transport: Arc<dyn TransportService>,
+    meta: LoadRequestMeta,
+    options: CubeScanOptions,
+) -> ArrowResult<V1LoadResult> {
+    let no_members_query = request.measures.as_ref().map(|v| v.len()).unwrap_or(0) == 0
+        && request.dimensions.as_ref().map(|v| v.len()).unwrap_or(0) == 0
+        && request
+            .time_dimensions
+            .as_ref()
+            .map(|v| v.iter().filter(|d| d.granularity.is_some()).count())
+            .unwrap_or(0)
+            == 0;
+    let result = if no_members_query {
+        let limit = request.limit.unwrap_or(1);
+        let mut data = Vec::new();
+        for _ in 0..limit {
+            data.push(serde_json::Value::Null)
+        }
+        V1LoadResult::new(
+            V1LoadResultAnnotation {
+                measures: json!(Vec::<serde_json::Value>::new()),
+                dimensions: json!(Vec::<serde_json::Value>::new()),
+                segments: json!(Vec::<serde_json::Value>::new()),
+                time_dimensions: json!(Vec::<serde_json::Value>::new()),
+            },
+            data,
+        )
+    } else {
+        let result = transport.load(request, auth_context, meta).await;
+        let mut response = result.map_err(|err| ArrowError::ComputeError(err.to_string()))?;
+        if let Some(data) = response.results.pop() {
+            match (options.max_records, data.data.len()) {
+                (Some(max_records), len) if len >= max_records => {
+                    return Err(ArrowError::ComputeError(format!("One of the Cube queries exceeded the maximum row limit ({}). JOIN/UNION is not possible as it will produce incorrect results. Try filtering the results more precisely or moving post-processing functions to an outer query.", max_records)));
+                }
+                (_, _) => (),
+            }
+
+            data
+        } else {
+            return Err(ArrowError::ComputeError(format!(
+                "Unable to extract result from Cube.js response",
+            )));
+        }
+    };
+
+    Ok(result)
+}
+
+fn load_to_steam_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()> {
+    let req = one_shot_stream.request.clone();
+    let auth = one_shot_stream.auth_context.clone();
+    let transport = one_shot_stream.transport.clone();
+    let meta = one_shot_stream.meta.clone();
+    let options = one_shot_stream.options.clone();
+
+    let handle = tokio::runtime::Handle::current();
+    let res =
+        std::thread::spawn(move || handle.block_on(load_data(req, auth, transport, meta, options)))
+            .join()
+            .map_err(|_| DataFusionError::Execution(format!("Can't load to steram")))?;
+
+    one_shot_stream.data = Some(transform_response(
+        res.unwrap().data,
+        one_shot_stream.schema.clone(),
+        &one_shot_stream.member_fields,
+    )?);
+
+    Ok(())
 }
 
 fn parse_chunk(
