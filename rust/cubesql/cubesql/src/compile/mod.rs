@@ -16185,4 +16185,62 @@ ORDER BY \"COUNT(count)\" DESC"
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_thoughtspot_filter_date_trunc_column_with_literal() {
+        init_logger();
+
+        let test_data = vec![
+            // (operator, literal date, filter operator, filter value)
+            (">=", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
+            (">=", "2020-04-01", "afterDate", "2020-04-01T00:00:00.000Z"),
+            (">=", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
+            ("<=", "2020-03-25", "beforeDate", "2020-03-31T23:59:59.999Z"),
+            ("<=", "2020-04-01", "beforeDate", "2020-04-30T23:59:59.999Z"),
+            ("<=", "2020-04-10", "beforeDate", "2020-04-30T23:59:59.999Z"),
+            (">", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
+            (">", "2020-04-01", "afterDate", "2020-05-01T00:00:00.000Z"),
+            (">", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
+            ("<", "2020-03-25", "beforeDate", "2020-03-31T23:59:59.999Z"),
+            ("<", "2020-04-01", "beforeDate", "2020-03-31T23:59:59.999Z"),
+            ("<", "2020-04-10", "beforeDate", "2020-04-30T23:59:59.999Z"),
+        ];
+
+        for (operator, literal_date, filter_operator, filter_value) in test_data {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "
+                    SELECT
+                        \"ta_1\".\"order_date\" \"ca_1\"
+                    FROM KibanaSampleDataEcommerce \"ta_1\"
+                    WHERE DATE_TRUNC('MONTH', CAST(\"ta_1\".\"order_date\" as TIMESTAMP)) {} to_date('{}', 'yyyy-MM-dd')
+                    ",
+                    operator, literal_date,
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: Some(vec![V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                        operator: Some(filter_operator.to_string()),
+                        values: Some(vec![filter_value.to_string()]),
+                        or: None,
+                        and: None
+                    }]),
+                }
+            );
+        }
+    }
 }

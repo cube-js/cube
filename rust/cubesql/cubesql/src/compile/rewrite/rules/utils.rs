@@ -26,24 +26,33 @@ pub fn parse_granularity(granularity: &ScalarValue, to_normalize: bool) -> Optio
     }
 }
 
-pub fn granularity_to_interval(granularity: &ScalarValue) -> Option<ScalarValue> {
+pub fn granularity_scalar_to_interval(granularity: &ScalarValue) -> Option<ScalarValue> {
     if let Some(granularity) = parse_granularity(granularity, false) {
-        let interval = match granularity.as_str() {
-            "second" => ScalarValue::IntervalDayTime(Some(1000)),
-            "minute" => ScalarValue::IntervalDayTime(Some(60000)),
-            "hour" => ScalarValue::IntervalDayTime(Some(3600000)),
-            "day" => ScalarValue::IntervalDayTime(Some(4294967296)),
-            "week" => ScalarValue::IntervalDayTime(Some(30064771072)),
-            "month" => ScalarValue::IntervalYearMonth(Some(1)),
-            "quarter" => ScalarValue::IntervalYearMonth(Some(3)),
-            "year" => ScalarValue::IntervalYearMonth(Some(12)),
-            _ => return None,
-        };
-
-        return Some(interval);
+        return granularity_to_interval(&granularity);
     }
-
     None
+}
+
+pub fn granularity_str_to_interval(granularity: &str) -> Option<ScalarValue> {
+    if let Some(granularity) = parse_granularity_string(granularity, false) {
+        return granularity_to_interval(&granularity);
+    }
+    None
+}
+
+fn granularity_to_interval(granularity: &str) -> Option<ScalarValue> {
+    let interval = match granularity.to_lowercase().as_str() {
+        "second" => ScalarValue::IntervalDayTime(Some(1000)),
+        "minute" => ScalarValue::IntervalDayTime(Some(60000)),
+        "hour" => ScalarValue::IntervalDayTime(Some(3600000)),
+        "day" => ScalarValue::IntervalDayTime(Some(4294967296)),
+        "week" => ScalarValue::IntervalDayTime(Some(30064771072)),
+        "month" => ScalarValue::IntervalYearMonth(Some(1)),
+        "quarter" => ScalarValue::IntervalYearMonth(Some(3)),
+        "year" => ScalarValue::IntervalYearMonth(Some(12)),
+        _ => return None,
+    };
+    Some(interval)
 }
 
 pub fn min_max_granularity(
