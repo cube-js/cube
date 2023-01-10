@@ -584,16 +584,27 @@ fn parse_chunk(
     schema: SchemaRef,
     member_fields: &Vec<MemberField>,
 ) -> Option<ArrowResult<RecordBatch>> {
-    match chunk {
+    let mut rows_count = "0 or error".to_string();
+    let start = std::time::Instant::now();
+
+    let res = match chunk {
         Some(chunk) => match serde_json::from_str::<Vec<serde_json::Value>>(&chunk) {
             Ok(data) => match transform_response(data, schema, member_fields) {
-                Ok(batch) => Some(Ok(batch)),
+                Ok(batch) => {
+                    rows_count = format!("{}", batch.num_rows());
+
+                    Some(Ok(batch))
+                },
                 Err(err) => Some(Err(err.into())),
             },
             Err(e) => Some(Err(e.into())),
         },
         None => None,
-    }
+    };
+
+    println!("CHUNK: rows - {} | parsing time: {} ns", rows_count, start.elapsed().as_nanos());
+
+    res
 }
 
 fn transform_response(
