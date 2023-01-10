@@ -79,7 +79,9 @@ fn main() {
 
         let services = config.cube_services().await;
 
-        track_event("Cube Store Start".to_string(), HashMap::new()).await;
+        if enable_telemetry {
+            track_event("Cube Store Start".to_string(), HashMap::new()).await;
+        }
 
         stop_on_ctrl_c(&services).await;
         services.wait_processing_loops().await.unwrap();
