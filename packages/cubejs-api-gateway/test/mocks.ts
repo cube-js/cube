@@ -183,9 +183,18 @@ export class AdapterApiMock {
     return [];
   }
 
-  public async executeQuery() {
+  public async executeQuery(query) {
+    if (query?.query === 'SELECT * FROM sql-runner') {
+      return {
+        data: [
+          { skip: 'skip' },
+          { string: 'string', number: 1, buffer: { type: 'Buffer', data: [48, 48] }, bufferTwo: { type: 'Placeholder', data: [48, 48, 48, 48] }, object: { ob: 'object' } }
+        ],
+      };
+    }
+
     return {
-      data: [{ foo__bar: 42 }]
+      data: [{ foo__bar: 42 }],
     };
   }
 
