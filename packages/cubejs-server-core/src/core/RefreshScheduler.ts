@@ -580,7 +580,7 @@ export class RefreshScheduler {
 
     const preAggregationsLoadCacheByDataSource = {};
     const queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> } = {};
-    return Promise.all(R.range(0, concurrency)
+    await Promise.all(R.range(0, concurrency)
       .filter(workerIndex => workerIndices.indexOf(workerIndex) !== -1)
       .map(async workerIndex => {
         const queryIteratorStateKey = JSON.stringify({ ...securityContext, workerIndex });
@@ -603,6 +603,7 @@ export class RefreshScheduler {
           }
         }
       }));
+    await this.serverCore.getOrchestratorApi(context).updateRefreshEndReached();
   }
 
   public async buildPreAggregations(

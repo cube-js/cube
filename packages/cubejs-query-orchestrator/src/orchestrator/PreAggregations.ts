@@ -1375,8 +1375,10 @@ export class PreAggregationLoader {
           R.map(p => p[1][0])
         )(versionEntries);
 
+      const refreshEndReached = await this.preAggregations.getRefreshEndReached();
+
       const tablesToSave =
-        this.preAggregations.dropPreAggregationsWithoutTouch ?
+        this.preAggregations.dropPreAggregationsWithoutTouch && refreshEndReached ?
           (await this.preAggregations.tablesUsed()).concat(await this.preAggregations.tablesTouched()).concat([justCreatedTable]) :
           (
             (await this.preAggregations.tablesUsed())
@@ -1896,6 +1898,11 @@ export class PreAggregations {
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_TOUCH', tableName);
   }
 
+  protected refreshEndReachedKey() {
+    // TODO add dataSource?
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', '');
+  }
+
   public async addTableUsed(tableName) {
     return this.queryCache.getCacheDriver().set(this.tablesUsedRedisKey(tableName), true, this.usedTablePersistTime);
   }
@@ -1912,6 +1919,14 @@ export class PreAggregations {
   public async tablesTouched() {
     return (await this.queryCache.getCacheDriver().keysStartingWith(this.tablesTouchRedisKey('')))
       .map(k => k.replace(this.tablesTouchRedisKey(''), ''));
+  }
+
+  public async updateRefreshEndReached() {
+    return this.queryCache.getCacheDriver().set(this.refreshEndReachedKey(), new Date().getTime(), this.touchTablePersistTime);
+  }
+
+  public async getRefreshEndReached(): Promise<number> {
+    return this.queryCache.getCacheDriver().get(this.refreshEndReachedKey());
   }
 
   /**

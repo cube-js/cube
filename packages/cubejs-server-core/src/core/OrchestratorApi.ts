@@ -307,4 +307,8 @@ export class OrchestratorApi {
   public async unSubscribeQueueEvents(id) {
     return this.orchestrator.unSubscribeQueueEvents(id);
   }
+
+  public async updateRefreshEndReached() {
+    return this.orchestrator.updateRefreshEndReached();
+  }
 }
