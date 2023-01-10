@@ -391,9 +391,6 @@ describe('index.test', () => {
 
     test('CompilerApi dataSources default', async () => {
       const dataSources = await compilerApi.dataSources({
-        requestId: 'XXX',
-        skipQueryFactory: true,
-      }, {
         driverFactory: jest.fn(async () => true)
       });
 
@@ -413,9 +410,6 @@ describe('index.test', () => {
     const dataSourcesSpy = jest.spyOn(compilerApi, 'dataSources');
     test('CompilerApi dataSources', async () => {
       const dataSources = await compilerApi.dataSources({
-        requestId: 'XXX',
-        skipQueryFactory: true,
-      }, {
         driverFactory: jest.fn(async () => true)
       });
 
@@ -427,9 +421,6 @@ describe('index.test', () => {
 
     test('CompilerApi dataSources with driverFactory error', async () => {
       const dataSources = await compilerApi.dataSources({
-        requestId: 'XXX',
-        skipQueryFactory: true,
-      }, {
         driverFactory: jest.fn(async () => {
           throw new Error('Some driverFactory error');
         })

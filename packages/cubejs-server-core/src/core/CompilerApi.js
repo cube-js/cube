@@ -33,7 +33,7 @@ export class CompilerApi {
     return this.graphqlSchema;
   }
 
-  async getCompilers({ requestId, skipQueryFactory = false } = {}) {
+  async getCompilers({ requestId } = {}) {
     let compilerVersion = (
       this.schemaVersion && await this.schemaVersion() ||
       'default_schema_version'
@@ -60,9 +60,7 @@ export class CompilerApi {
         standalone: this.standalone,
       });
       this.compilerVersion = compilerVersion;
-      if (!skipQueryFactory) {
-        this.queryFactory = await this.createQueryFactory(this.compilers);
-      }
+      this.queryFactory = await this.createQueryFactory(this.compilers);
     }
 
     return this.compilers;
@@ -198,8 +196,26 @@ export class CompilerApi {
     };
   }
 
-  async dataSources(options, orchestratorApi) {
-    const { cubeEvaluator } = await this.getCompilers(options);
+  async dataSources(orchestratorApi) {
+    let compilerVersion = (
+      this.schemaVersion && await this.schemaVersion() ||
+      'default_schema_version'
+    );
+
+    if (typeof compilerVersion === 'object') {
+      compilerVersion = JSON.stringify(compilerVersion);
+    }
+
+    if (!this.compilers || this.compilerVersion !== compilerVersion) {
+      this.compilers = await compile(this.repository, {
+        allowNodeRequire: this.allowNodeRequire,
+        compileContext: this.compileContext,
+        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
+        standalone: this.standalone,
+      });
+    }
+
+    const { cubeEvaluator } = await this.compilers;
 
     let dataSources = await Promise.all(
       cubeEvaluator

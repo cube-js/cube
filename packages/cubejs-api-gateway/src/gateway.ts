@@ -1023,10 +1023,7 @@ class ApiGateway {
 
     try {
       const orchestratorApi = await this.getAdapterApi(context);
-      const { dataSources } = await this.getCompilerApi(context).dataSources({
-        requestId: context?.requestId,
-        skipQueryFactory: true,
-      }, orchestratorApi);
+      const { dataSources } = await this.getCompilerApi(context).dataSources(orchestratorApi);
 
       res({ dataSources });
     } catch (e) {
