@@ -60,7 +60,7 @@ pretty_assertions = "1.0.0"
 insta = "1.12"
 mysql_async = "0.29"
 portpicker = "0.1.1"
-tokio-postgres = { version = "0.7.6", features = ["with-chrono-0_4", "runtime"] }
+tokio-postgres = { version = "0.7.7", features = ["with-chrono-0_4", "runtime"] }
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
 pg_interval = "0.4.1"
 criterion = { version = "0.4.0", features = ["html_reports"] }
