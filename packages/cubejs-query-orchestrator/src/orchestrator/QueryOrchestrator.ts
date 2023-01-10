@@ -399,4 +399,8 @@ export class QueryOrchestrator {
   public async unSubscribeQueueEvents(id) {
     return this.getQueueEventsBus().unsubscribe(id);
   }
+
+  public async updateRefreshEndReached() {
+    return this.preAggregations.updateRefreshEndReached();
+  }
 }
