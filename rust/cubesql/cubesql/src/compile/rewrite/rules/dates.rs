@@ -397,13 +397,15 @@ impl RewriteRules for DateRules {
                     "?interval",
                 ),
             ),
-            rewrite(
+            // TODO: TO_DATE should return Date32, but Timestamp works for all supported cases
+            transforming_rewrite(
                 "thoughtspot-to-date-to-timestamp",
                 udf_expr(
                     "to_date",
-                    vec![literal_expr("?date"), literal_string("YYYY-MM-DD")],
+                    vec![literal_expr("?date"), literal_expr("?format")],
                 ),
                 udf_expr("date_to_timestamp", vec![literal_expr("?date")]),
+                self.transform_to_date_to_timestamp("?format"),
             ),
             rewrite(
                 "datastudio-dates",
@@ -519,6 +521,25 @@ impl DateRules {
                 }
             }
 
+            false
+        }
+    }
+
+    fn transform_to_date_to_timestamp(
+        &self,
+        format_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let format_var = var!(format_var);
+        move |egraph, subst| {
+            for format in var_iter!(egraph[subst[format_var]], LiteralExprValue) {
+                match format {
+                    ScalarValue::Utf8(Some(format)) => match format.as_str() {
+                        "YYYY-MM-DD" | "yyyy-MM-dd" => return true,
+                        _ => (),
+                    },
+                    _ => (),
+                }
+            }
             false
         }
     }
