@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile-upstream:master-experimental
-FROM node:14.20.0-bullseye-slim
+FROM node:14.21.1-bullseye-slim
 
 ARG IMAGE_VERSION=unknown
 
