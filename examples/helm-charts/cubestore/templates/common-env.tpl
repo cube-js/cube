@@ -7,6 +7,8 @@
 - name: CUBESTORE_NO_UPLOAD
   value: {{ .Values.config.noUpload | quote }}
 {{- end }}
+- name: CUBESTORE_TELEMETRY
+  value: {{ .Values.config.telemetry | quote }}
 {{- if .Values.config.jobRunners }}
 - name: CUBESTORE_JOB_RUNNERS
   value: {{ .Values.config.jobRunners | quote }}
