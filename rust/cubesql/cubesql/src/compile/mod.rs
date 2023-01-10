@@ -16243,4 +16243,40 @@ ORDER BY \"COUNT(count)\" DESC"
             );
         }
     }
+
+    #[tokio::test]
+    async fn test_thoughtspot_double_date_trunc_with_cast() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                DATE_TRUNC('MONTH', CAST(DATE_TRUNC('MONTH', CAST("ta_1"."order_date" as TIMESTAMP)) as TIMESTAMP)) AS "ca_1"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            GROUP BY "ca_1"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("month".to_owned()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
 }

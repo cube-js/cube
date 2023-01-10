@@ -75,7 +75,7 @@ pub fn min_max_granularity(
     granularity_int_order_to_str(result, week_as_day)
 }
 
-fn granularity_str_to_int_order(granularity: &str, week_as_day: Option<bool>) -> Option<i32> {
+pub fn granularity_str_to_int_order(granularity: &str, week_as_day: Option<bool>) -> Option<i32> {
     match granularity.to_lowercase().as_str() {
         "second" => Some(0),
         "minute" => Some(1),
