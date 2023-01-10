@@ -1362,25 +1362,29 @@ impl AsyncPostgresShim {
         cancel: CancellationToken,
     ) -> Result<(), ConnectionError> {
         let mut writer = BatchWriter::new(portal.get_format());
-        let completion = portal.execute(&mut writer, max_rows).await?;
 
-        if cancel.is_cancelled() {
-            return Ok(());
+        tokio::select! {
+            _ = cancel.cancelled() => {
+                return Ok(());
+            },
+            res = portal.execute(&mut writer, max_rows) => {
+                let completion = res?;
+
+                // Special handling for special queries, such as DISCARD ALL.
+                if let Some(description) = portal.get_description()? {
+                    match description.len() {
+                        0 => self.write(protocol::NoData::new()).await?,
+                        _ => self.write(description).await?,
+                    };
+                }
+
+                if writer.has_data() {
+                    buffer::write_direct(&mut self.socket, writer).await?;
+                };
+
+                self.write_completion(completion).await
+            }
         }
-
-        // Special handling for special queries, such as DISCARD ALL.
-        if let Some(description) = portal.get_description()? {
-            match description.len() {
-                0 => self.write(protocol::NoData::new()).await?,
-                _ => self.write(description).await?,
-            };
-        }
-
-        if writer.has_data() {
-            buffer::write_direct(&mut self.socket, writer).await?;
-        };
-
-        self.write_completion(completion).await
     }
 
     /// Pipeline of Execution
