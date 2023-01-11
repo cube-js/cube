@@ -32,6 +32,7 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   secretAccessKey?: string
   workGroup?: string
   catalog?: string
+  schema?: string
   S3OutputLocation?: string
   exportBucket?: string
   pollTimeout?: number
@@ -53,6 +54,11 @@ function applyParams(query: string, params: any[]): string {
   return SqlString.format(query, params);
 }
 
+interface AthenaTable {
+  schema: string
+  name: string
+}
+
 export class AthenaDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns default concurrency value.
@@ -64,6 +70,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   private config: AthenaDriverOptionsInitialized;
 
   private athena: Athena;
+
+  private schema: string;
 
   /**
    * Class constructor.
@@ -95,8 +103,14 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       config.secretAccessKey ||
       getEnv('athenaAwsSecret', { dataSource });
 
+    const { schema, ...restConfig } = config;
+
+    this.schema = schema ||
+      getEnv('dbName', { dataSource }) ||
+      getEnv('dbSchema', { dataSource });
+
     this.config = {
-      ...config,
+      ...restConfig,
       credentials: accessKeyId && secretAccessKey
         ? { accessKeyId, secretAccessKey }
         : undefined,
@@ -233,6 +247,13 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     };
   }
 
+  public informationSchemaQuery() {
+    if (this.schema) {
+      return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.schema}'`;
+    }
+    return super.informationSchemaQuery();
+  }
+
   public async tablesSchema(): Promise<DatabaseStructure> {
     const tablesSchema = await super.tablesSchema();
     const viewsSchema = await this.viewsSchema(tablesSchema);
@@ -322,7 +343,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async viewsSchema(tablesSchema: DatabaseStructure): Promise<DatabaseStructure> {
-    const isView = (table: TableName) => !tablesSchema[table.schema]
+    const isView = (table: AthenaTable) => !tablesSchema[table.schema]
       || !tablesSchema[table.schema][table.name];
 
     const allTables = await this.getAllTables();
@@ -335,21 +356,25 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     return this.mergeSchemas(arrViewsSchema);
   }
 
-  protected async getAllTables(): Promise<TableName[]> {
+  protected async getAllTables(): Promise<AthenaTable[]> {
+    let allTablesQuery = `
+      SELECT table_schema AS schema, table_name AS name
+      FROM information_schema.tables
+      WHERE tables.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+    `;
+    if (this.schema) {
+      allTablesQuery = `${allTablesQuery} AND tables.table_schema = '${this.schema}'`;
+    }
     const rows = await this.query(
-      `
-        SELECT table_schema AS schema, table_name AS name
-        FROM information_schema.tables
-        WHERE tables.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
-      `,
+      allTablesQuery,
       []
     );
 
-    return rows as TableName[];
+    return rows as AthenaTable[];
   }
 
-  protected async getColumns(table: TableName): Promise<DatabaseStructure> {
-    const data: { column: string }[] = await this.query(`SHOW COLUMNS IN \`${table.join()}\``, []);
+  protected async getColumns(table: AthenaTable): Promise<DatabaseStructure> {
+    const data: { column: string }[] = await this.query(`SHOW COLUMNS IN \`${table.schema}\`.\`${table.name}\``, []);
 
     return {
       [table.schema]: {
