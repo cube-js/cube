@@ -37,7 +37,7 @@ describe('athena', () => {
   test('query measure', () => testQueryMeasure(client));
 
   test('can list views', async () => {
-    await (await fetch(`${birdbox.configuration.systemUrl}/sql-runner`, {
+    const result = await (await fetch(`${birdbox.configuration.systemUrl}/sql-runner`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -45,7 +45,13 @@ describe('athena', () => {
           query: 'CREATE OR REPLACE VIEW default.view_fetch_test AS SELECT 1 as order_id, 10 as amount'
         }
       }),
-    })).json();
+    }));
+
+    if (result.status !== 200) {
+      throw new Error(((await result.json()).error));
+    }
+
+    console.log(await result.json());
 
     await delay(5000);
 
