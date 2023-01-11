@@ -11,7 +11,7 @@ import {
   pausePromise,
   Required,
 } from '@cubejs-backend/shared';
-import { Athena, GetQueryResultsCommandOutput } from '@aws-sdk/client-athena';
+import { Athena, GetQueryResultsCommandOutput, StartQueryExecutionCommandInput } from '@aws-sdk/client-athena';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as stream from 'stream';
@@ -31,6 +31,7 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   accessKeyId?: string
   secretAccessKey?: string
   workGroup?: string
+  catalog?: string
   S3OutputLocation?: string
   exportBucket?: string
   pollTimeout?: number
@@ -109,6 +110,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         config.workGroup ||
         getEnv('athenaAwsWorkgroup', { dataSource }) ||
         'primary',
+      catalog:
+        config.catalog ||
+        getEnv('athenaAwsCatalog', { dataSource }),
       exportBucket:
         config.exportBucket ||
         getEnv('dbExportBucket', { dataSource }),
@@ -243,12 +247,13 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         toSqlString: () => SqlString.escape(s).replace(/\\\\([_%])/g, '\\$1').replace(/\\'/g, '\'\'')
       } : s))
     );
-    const request = {
+    const request: StartQueryExecutionCommandInput = {
       QueryString: queryString,
       WorkGroup: this.config.workGroup,
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
-      }
+      },
+      ...(this.config.catalog != null ? { QueryExecutionContext: { Catalog: this.config.catalog } } : {})
     };
     const { QueryExecutionId } = await this.athena.startQueryExecution(request);
     return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
