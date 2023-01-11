@@ -5,8 +5,19 @@ import { CubeStoreDriver } from './CubeStoreDriver';
 
 export class CubeStoreCacheDriver implements CacheDriverInterface {
   public constructor(
-    protected readonly connection: CubeStoreDriver
+    protected connectionFactory: () => Promise<CubeStoreDriver>,
   ) {}
+
+  protected connection: CubeStoreDriver | null = null;
+
+  protected async getConnection(): Promise<CubeStoreDriver> {
+    if (this.connection) {
+      return this.connection;
+    }
+
+    // eslint-disable-next-line no-return-assign
+    return this.connection = await this.connectionFactory();
+  }
 
   public withLock = (
     key: string,
@@ -18,11 +29,13 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
       return false;
     }
 
-    const rows = await this.connection.query('CACHE SET NX TTL ? ? ?', [expiration, key, '1']);
+    const connection = (await this.getConnection());
+
+    const rows = await connection.query('CACHE SET NX TTL ? ? ?', [expiration, key, '1']);
     if (rows && rows.length === 1 && rows[0]?.success === 'true') {
       if (tkn.isCanceled()) {
         if (freeAfter) {
-          await this.connection.query('CACHE REMOVE ?', [
+          await connection.query('CACHE REMOVE ?', [
             key
           ]);
         }
@@ -34,7 +47,7 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
         await tkn.with(cb());
       } finally {
         if (freeAfter) {
-          await this.connection.query('CACHE REMOVE ?', [
+          await connection.query('CACHE REMOVE ?', [
             key
           ]);
         }
@@ -47,7 +60,7 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
   });
 
   public async get(key: string) {
-    const rows = await this.connection.query('CACHE GET ?', [
+    const rows = await (await this.getConnection()).query('CACHE GET ?', [
       key
     ]);
     if (rows && rows.length === 1) {
@@ -59,7 +72,7 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
 
   public async set(key: string, value, expiration) {
     const strValue = JSON.stringify(value);
-    await this.connection.query('CACHE SET TTL ? ? ?', [expiration, key, strValue]);
+    await (await this.getConnection()).query('CACHE SET TTL ? ? ?', [expiration, key, strValue]);
 
     return {
       key,
@@ -68,13 +81,13 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
   }
 
   public async remove(key: string) {
-    await this.connection.query('CACHE REMOVE ?', [
+    await (await this.getConnection()).query('CACHE REMOVE ?', [
       key
     ]);
   }
 
   public async keysStartingWith(prefix: string) {
-    const rows = await this.connection.query('CACHE KEYS ?', [
+    const rows = await (await this.getConnection()).query('CACHE KEYS ?', [
       prefix
     ]);
     return rows.map((row) => row.key);
@@ -85,6 +98,6 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
   }
 
   public async testConnection(): Promise<void> {
-    return this.connection.testConnection();
+    return (await this.getConnection()).testConnection();
   }
 }

@@ -117,7 +117,7 @@ export interface QueryCacheOptions {
     heartBeatInterval?: number;
   }>;
   redisPool?: any;
-  cubeStoreDriver?: CubeStoreDriver,
+  cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
   continueWaitTimeout?: number;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   maxInMemoryCacheEntries?: number;
@@ -148,7 +148,7 @@ export class QueryCache {
         break;
       case 'cubestore':
         this.cacheDriver = new CubeStoreCacheDriver(
-          options.cubeStoreDriver || new CubeStoreDriver({})
+          options.cubeStoreDriverFactory || (async () => new CubeStoreDriver({}))
         );
         break;
       default:
