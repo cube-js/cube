@@ -264,22 +264,59 @@ impl PostgresIntegrationTestSuite {
         }
     }
 
-    async fn test_cancel(&self) -> RunResult<()> {
-        let cancel_token = self.client.cancel_token();
+    async fn test_cancel_execute_prepared(&self) -> RunResult<()> {
+        let client = PostgresIntegrationTestSuite::create_client(
+            format!("host=127.0.0.1 port={} user=test password=test", self.port)
+                .parse()
+                .unwrap(),
+        )
+        .await;
+
+        let cancel_token = client.cancel_token();
         let cancel = async move {
-            tokio::time::sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(1000)).await;
 
             cancel_token.cancel_query(NoTls).await
         };
 
         // testing_blocking tables will neven finish. It's a special testing table
-        let sleep = self
-            .client
-            .batch_execute("SELECT * FROM information_schema.testing_blocking");
+        let sleep = client.batch_execute("SELECT * FROM information_schema.testing_blocking");
 
         match join!(sleep, cancel) {
             (Err(ref e), Ok(())) if e.code() == Some(&SqlState::QUERY_CANCELED) => {}
-            t => panic!("unexpected return {:?}", t),
+            res => panic!(
+                "unexpected return, prepared must be cancelled, actual: {:?}",
+                res
+            ),
+        };
+
+        Ok(())
+    }
+
+    async fn test_cancel_simple_query(&self) -> RunResult<()> {
+        let client = PostgresIntegrationTestSuite::create_client(
+            format!("host=127.0.0.1 port={} user=test password=test", self.port)
+                .parse()
+                .unwrap(),
+        )
+        .await;
+
+        let cancel_token = client.cancel_token();
+        let cancel = async move {
+            sleep(Duration::from_millis(1000)).await;
+
+            cancel_token.cancel_query(NoTls).await
+        };
+
+        // testing_blocking tables will neven finish. It's a special testing table
+        let sleep = client.simple_query("SELECT * FROM information_schema.testing_blocking");
+
+        match join!(sleep, cancel) {
+            (Err(ref e), Ok(())) if e.code() == Some(&SqlState::QUERY_CANCELED) => {}
+            (_, err) => panic!(
+                "unexpected return, simple query must be cancelled, actual: {:?}",
+                err
+            ),
         };
 
         Ok(())
@@ -830,7 +867,8 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
     }
 
     async fn run(&mut self) -> RunResult<()> {
-        self.test_cancel().await?;
+        self.test_cancel_simple_query().await?;
+        self.test_cancel_execute_prepared().await?;
         self.test_prepare().await?;
         self.test_extended_error().await?;
         self.test_prepare_empty_query().await?;
