@@ -60,19 +60,19 @@ export class QueryOrchestrator {
       throw new Error('Only \'redis\', \'memory\' or \'cubestore\' are supported for cacheAndQueueDriver option');
     }
 
+    const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
+
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     this.redisPool = redisPool;
 
-    const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
-
-    const cubeStoreDriverFactory = async () => {
+    const cubeStoreDriverFactory = cacheAndQueueDriver === 'cubestore' ? async () => {
       const externalDriver = await externalDriverFactory();
       if (externalDriver instanceof CubeStoreDriver) {
         return externalDriver;
       }
 
       throw new Error('It`s not possible to use CubeStore as queue & cache driver without using it as external');
-    };
+    } : undefined;
 
     this.queryCache = new QueryCache(
       this.redisPrefix,
