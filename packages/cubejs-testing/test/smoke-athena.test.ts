@@ -42,7 +42,7 @@ describe('athena', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: {
-          query: 'CREATE OR REPLACE VIEW view_fetch_test AS SELECT 1 as order_id, 10 as amount'
+          query: 'CREATE OR REPLACE VIEW default.view_fetch_test AS SELECT 1 as order_id, 10 as amount'
         }
       }),
     })).json();
@@ -52,7 +52,9 @@ describe('athena', () => {
       headers: { 'Content-Type': 'application/json' },
     })).json();
 
-    expect(schema.tablesSchema.default.view_fetch_test).toEqual([
+    console.log(JSON.stringify(schema.tablesSchema, null, 2));
+
+    expect(schema.tablesSchema[Object.keys(schema.tablesSchema)[0]].view_fetch_test).toEqual([
       { name: 'order_id', type: 'integer', attributes: [] },
       { name: 'amount', type: 'integer', attributes: [] }
     ]);
@@ -64,7 +66,7 @@ describe('athena', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: {
-          query: 'DROP VIEW view_fetch_test'
+          query: 'DROP VIEW default.view_fetch_test'
         }
       }),
     })).json();
