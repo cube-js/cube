@@ -5,6 +5,8 @@ import { afterAll, beforeAll, jest, expect } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
+const delay = (t: number) => new Promise(resolve => setTimeout(() => resolve(null), t));
+
 describe('athena', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
@@ -54,6 +56,8 @@ describe('athena', () => {
       { name: 'order_id', type: 'integer', attributes: [] },
       { name: 'amount', type: 'integer', attributes: [] }
     ]);
+
+    await delay(5000);
 
     await (await fetch(`${birdbox.configuration.systemUrl}/sql-runner`, {
       method: 'POST',
