@@ -14,7 +14,7 @@ use datafusion::assert_contains;
 use pg_interval::Interval;
 use pg_srv::{PgType, PgTypeId};
 use tokio::join;
-use tokio_postgres::{error::SqlState, Client, Error, NoTls, Row, SimpleQueryMessage};
+use tokio_postgres::{error::SqlState, Client, NoTls, Row, SimpleQueryMessage};
 
 use super::basic::{AsyncTestConstructorResult, AsyncTestSuite, RunResult};
 
