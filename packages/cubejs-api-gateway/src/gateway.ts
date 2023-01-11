@@ -1,4 +1,5 @@
 /* eslint-disable no-restricted-syntax */
+import * as stream from 'stream';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import bodyParser from 'body-parser';
@@ -83,15 +84,6 @@ import {
   transformJoins,
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
-
-// const timeoutPromise = (timeout) => (
-//   new Promise((resolve) => (
-//     setTimeout(
-//       () => resolve(null),
-//       timeout,
-//     )
-//   ))
-// );
 
 /**
  * API gateway server class.
@@ -210,6 +202,37 @@ class ApiGateway {
         res: this.resToResultFn(res),
         queryType: req.body.queryType
       });
+    }));
+
+    app.post(`${this.basePath}/v1/stream`, jsonParser, userMiddlewares, (async (req, res) => {
+      const run = async (n) => {
+        const _stream = await this.stream(req.context, req.body.query);
+        console.log(JSON.stringify(_stream, undefined, 2));
+        _stream?.stream.on('fields', (fields) => {
+          console.log(`stream#${n} fields: ${JSON.stringify(fields, undefined, 2)}`);
+        });
+        _stream?.stream.on('data', (chunk) => {
+          console.log(`stream#${n} chunk: ${JSON.stringify(chunk, undefined, 2)}`);
+        });
+        _stream?.stream.on('end', () => {
+          console.log(`stream#${n} end ${JSON.stringify(_stream.stream, undefined, 2)}`);
+        });
+        _stream?.stream.on('close', () => {
+          _stream?.stream.removeAllListeners();
+          console.log(`stream#${n} close ${JSON.stringify(_stream.stream, undefined, 2)}`);
+        });
+        _stream?.stream.on('error', (err) => {
+          _stream?.stream.removeAllListeners();
+          console.error(`stream#${n} error ${err}`);
+        });
+      };
+
+      run(0);
+      // for (let i = 1; i <= 10; i++) {
+      //   run(i);
+      // }
+      
+      this.resToResultFn(res)(true);
     }));
 
     app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, (async (req, res) => {
@@ -1059,10 +1082,11 @@ class ApiGateway {
   protected async getNormalizedQueries(
     query: Record<string, any> | Record<string, any>[],
     context: RequestContext,
+    persistent = false,
   ): Promise<[QueryType, NormalizedQuery[]]> {
     query = this.parseQueryParam(query);
-    let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
 
+    let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
     if (!Array.isArray(query)) {
       query = this.compareDateRangeTransformer(query);
       if (Array.isArray(query)) {
@@ -1073,6 +1097,7 @@ class ApiGateway {
     }
 
     const queries = Array.isArray(query) ? query : [query];
+
     const normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
         async (currentQuery) => validatePostRewrite(
@@ -1083,6 +1108,10 @@ class ApiGateway {
         )
       )
     );
+
+    normalizedQueries.forEach((q) => {
+      this.processQueryLimit(q, persistent);
+    });
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
@@ -1100,6 +1129,29 @@ class ApiGateway {
     }
 
     return [queryType, normalizedQueries];
+  }
+
+  /**
+   * Asserts query limit, sets the default value if neccessary.
+   *
+   * @throw {Error}
+   */
+  public processQueryLimit(query: NormalizedQuery, persistent = false): void {
+    const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
+      ? getEnv('dbQueryDefaultLimit')
+      : getEnv('dbQueryLimit');
+
+    if (!persistent) {
+      if (
+        typeof query.limit === 'number' &&
+        query.limit > getEnv('dbQueryLimit')
+      ) {
+        throw new Error('The query limit has been exceeded.');
+      }
+      query.limit = typeof query.limit === 'number'
+        ? query.limit
+        : def;
+    }
   }
 
   public async sql({ query, context, res }: QueryRequest) {
@@ -1259,7 +1311,6 @@ class ApiGateway {
     context: RequestContext,
     normalizedQuery: NormalizedQuery,
     sqlQuery: any,
-    apiType: string,
   ) {
     const queries = [{
       ...sqlQuery,
@@ -1269,7 +1320,7 @@ class ApiGateway {
       renewQuery: normalizedQuery.renewQuery,
       requestId: context.requestId,
       context,
-      persistent: false, // apiType === 'sql',
+      persistent: false,
     }];
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
@@ -1369,6 +1420,50 @@ class ApiGateway {
   }
 
   /**
+   * Returns stream object which will be used to stream results from
+   * the data source if applicable, returns `null` otherwise.
+   */
+  public async stream(context: RequestContext, query: Query): Promise<null | {
+    originalQuery: Query;
+    normalizedQuery: NormalizedQuery;
+    streamingQuery: unknown;
+    stream: stream.Writable;
+  }> {
+    const requestStarted = new Date();
+    try {
+      this.log({ type: 'Streaming Query', query }, context);
+      const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
+      const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
+      const q = {
+        ...sqlQuery,
+        query: sqlQuery.sql[0],
+        values: sqlQuery.sql[1],
+        continueWait: true,
+        renewQuery: false,
+        requestId: context.requestId,
+        context,
+        persistent: true,
+        forceNoCache: true,
+      };
+      const _stream = {
+        originalQuery: query,
+        normalizedQuery: normalizedQueries[0],
+        streamingQuery: q,
+        stream: await this.getAdapterApi(context).streamQuery(q),
+      };
+      return _stream;
+    } catch (e) {
+      this.log({
+        type: 'Streaming Error',
+        query,
+        error: (<Error>e).message,
+        duration: this.duration(requestStarted),
+      }, context);
+      return null;
+    }
+  }
+
+  /**
    * Data queries APIs (`/load`, `/subscribe`) entry point. Used by
    * `CubejsApi#load` and `CubejsApi#subscribe` methods to fetch the
    * data.
@@ -1424,7 +1519,6 @@ class ApiGateway {
             context,
             normalizedQuery,
             sqlQueries[index],
-            apiType,
           );
 
           return this.getResultInternal(
