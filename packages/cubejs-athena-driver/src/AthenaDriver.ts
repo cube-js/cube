@@ -188,7 +188,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     params: any,
   ): Promise<any> {
     if (this.config.S3OutputLocation === undefined) {
-      throw new Error('Unload is not configured');
+      throw new Error('Unload is not configured. Please define CUBEJS_AWS_S3_OUTPUT_LOCATION env var ');
     }
 
     const qid = await this.startQuery(loadSql, params);
