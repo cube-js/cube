@@ -47,6 +47,8 @@ describe('athena', () => {
       }),
     })).json();
 
+    await delay(5000);
+
     const schema = await (await fetch(`${birdbox.configuration.playgroundUrl}/playground/db-schema`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -58,8 +60,6 @@ describe('athena', () => {
       { name: 'order_id', type: 'integer', attributes: [] },
       { name: 'amount', type: 'integer', attributes: [] }
     ]);
-
-    await delay(5000);
 
     await (await fetch(`${birdbox.configuration.systemUrl}/sql-runner`, {
       method: 'POST',
