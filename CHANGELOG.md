@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
+
+
+### Bug Fixes
+
+* **athena-driver:** Add catalog config ([#5835](https://github.com/cube-js/cube.js/issues/5835)) Thanks [@tkislan](https://github.com/tkislan) ! ([c33a5c5](https://github.com/cube-js/cube.js/commit/c33a5c596622c5a2b67987da6cfd3f8bef6acebe))
+* **athena-driver:** TypeError: table.join is not a function ([#5988](https://github.com/cube-js/cube.js/issues/5988)) ([4e56a04](https://github.com/cube-js/cube.js/commit/4e56a0402dbb13d757e073fb38a547522c0936d1)), closes [#5143](https://github.com/cube-js/cube.js/issues/5143)
+* Delete `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` pre-aggregations only after refresh end to avoid cold start removals ([#5982](https://github.com/cube-js/cube.js/issues/5982)) ([58ad02f](https://github.com/cube-js/cube.js/commit/58ad02f24c5cc5940d6c668a0586fd66ff843795))
+
+
+### Features
+
+* **cubesql:** Improve memory usage in writting for pg-wire ([#4870](https://github.com/cube-js/cube.js/issues/4870)) ([401fbcf](https://github.com/cube-js/cube.js/commit/401fbcfa1e11a36d65555f7848280f5e60801808))
+* **docker:** Upgrade Node.js to 14.21.1 ([#5970](https://github.com/cube-js/cube.js/issues/5970)) ([0394ed2](https://github.com/cube-js/cube.js/commit/0394ed2b38827e345a4a43ab35b129dfd845057b))
+
+
+
+
+
 ## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
 
 

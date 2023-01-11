@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
+
+
+### Bug Fixes
+
+* **athena-driver:** Add catalog config ([#5835](https://github.com/cube-js/cube.js/issues/5835)) Thanks [@tkislan](https://github.com/tkislan) ! ([c33a5c5](https://github.com/cube-js/cube.js/commit/c33a5c596622c5a2b67987da6cfd3f8bef6acebe))
+
+
+
+
+
 ## [0.31.33](https://github.com/cube-js/cube.js/compare/v0.31.32...v0.31.33) (2023-01-03)
 
 **Note:** Version bump only for package @cubejs-backend/shared

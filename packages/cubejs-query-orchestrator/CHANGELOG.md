@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
+
+
+### Bug Fixes
+
+* Delete `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` pre-aggregations only after refresh end to avoid cold start removals ([#5982](https://github.com/cube-js/cube.js/issues/5982)) ([58ad02f](https://github.com/cube-js/cube.js/commit/58ad02f24c5cc5940d6c668a0586fd66ff843795))
+
+
+
+
+
 ## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
 
 

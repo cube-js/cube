@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
+
+
+### Bug Fixes
+
+* **athena-driver:** TypeError: table.join is not a function ([#5988](https://github.com/cube-js/cube.js/issues/5988)) ([4e56a04](https://github.com/cube-js/cube.js/commit/4e56a0402dbb13d757e073fb38a547522c0936d1)), closes [#5143](https://github.com/cube-js/cube.js/issues/5143)
+
+
+
+
+
 ## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
 
 **Note:** Version bump only for package @cubejs-backend/testing

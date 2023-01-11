@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
+
+
+### Features
+
+* **cubesql:** Improve memory usage in writting for pg-wire ([#4870](https://github.com/cube-js/cube.js/issues/4870)) ([401fbcf](https://github.com/cube-js/cube.js/commit/401fbcfa1e11a36d65555f7848280f5e60801808))
+
+
+
+
+
 ## [0.31.35](https://github.com/cube-js/cube.js/compare/v0.31.34...v0.31.35) (2023-01-07)
 
 

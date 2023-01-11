@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
+
+
+### Features
+
+* **docker:** Upgrade Node.js to 14.21.1 ([#5970](https://github.com/cube-js/cube.js/issues/5970)) ([0394ed2](https://github.com/cube-js/cube.js/commit/0394ed2b38827e345a4a43ab35b129dfd845057b))
+
+
+
+
+
 ## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
 
 **Note:** Version bump only for package @cubejs-backend/docker
