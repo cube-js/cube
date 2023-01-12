@@ -2065,6 +2065,10 @@ impl MetaStore for RocksMetaStore {
             let cache = self.store.cached_tables.clone();
             // Can't do read_operation_out_of_queue as we need to update cache on the same thread where it's dropped
             self.read_operation(move |db_ref| {
+                let cached_tables = { cache.lock().unwrap().clone() };
+                if let Some(t) = cached_tables {
+                    return Ok(t);
+                }
                 let table_rocks_table = TableRocksTable::new(db_ref.clone());
                 let mut tables = Vec::new();
                 for t in table_rocks_table.scan_all_rows()? {
