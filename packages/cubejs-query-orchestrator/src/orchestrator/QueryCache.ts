@@ -582,6 +582,8 @@ export class QueryCache {
           return result;
         },
         stream: async (req, target) => {
+          let logged = false;
+          queue.logger('Streaming SQL', { ...req });
           const client = await clientFactory();
           try {
             const source = await client.streamQuery(req.query, req.values);
@@ -592,6 +594,20 @@ export class QueryCache {
               }
               if (!target.destroyed) {
                 target.destroy(error);
+              }
+              if (!logged && source.destroyed && target.destroyed) {
+                logged = true;
+                if (error) {
+                  queue.logger('Streaming done with error', {
+                    query: req.query,
+                    query_values: req.values,
+                    error,
+                  });
+                } else {
+                  queue.logger('Streaming successfully completed', {
+                    requestId: req.requestId,
+                  });
+                }
               }
             };
   

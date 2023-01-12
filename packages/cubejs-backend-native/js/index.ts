@@ -113,69 +113,32 @@ function wrapNativeFunctionWithStream(
     fn: (extra: any) => unknown | Promise<unknown>
 ) {
     return async (extra: any, writer: any) => {
-        console.log('==============================================');
         let streamResponse: any;
         try {
             streamResponse = await fn(JSON.parse(extra));
-
-            const s = performance.now();
             let chunk: object[] = [];
-            let str: string;
             streamResponse.stream.on('data', (c: object) => {
                 chunk.push(c);
                 if (chunk.length >= getEnv('dbQueryStreamHighWaterMark')) {
-                    if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
-                        console.debug("[js] stream.chunk");
-                    }
-
-                    const start = performance.now();
-                    str = JSON.stringify(chunk);
-                    console.log(`[js] JSON.stringlify: ${(performance.now() - start) * 1000000} ns`);
-
-                    if (!writer.chunk(str)) {
+                    if (!writer.chunk(JSON.stringify(chunk))) {
                         streamResponse.stream.removeAllListeners();
                     }
-                    console.log(`[js] writer.chunk: ${(performance.now() - start) * 1000000} ns`);
                     chunk = [];
                 }
             });
             streamResponse.stream.on('close', () => {
-                if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
-                    console.debug("[js] stream.close");
-                }
-
-                streamResponse.stream.removeAllListeners();
                 if (chunk.length > 0) {
-                    
-                    const start = performance.now();
-                    str = JSON.stringify(chunk);
-                    console.log(`[js] stringlify2: ${(performance.now() - start) * 1000000} ns`);
-
-                    writer.chunk(str);
+                    writer.chunk(JSON.stringify(chunk));
                 }
                 writer.end("");
-                console.log(`[js] total query: ${(performance.now() - s) * 1000000} ns`);
             });
 
             streamResponse.stream.on('error', (err: any) => {
-                if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
-                    console.debug("[js] stream.error", {
-                        err
-                    });
-                }
-
-                streamResponse.stream.removeAllListeners();
                 writer.reject(err.message || "Unknown JS exception");
             });
         } catch (e: any) {
-            if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
-                console.debug("[js] stream.reject", {
-                    e
-                });
-            }
-
             if (!!streamResponse && !!streamResponse.stream) {
-                streamResponse.stream.removeAllListeners();
+                streamResponse.stream.destroy(e);
             }
             writer.reject(e.message || "Unknown JS exception");
         }

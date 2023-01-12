@@ -20,7 +20,7 @@ export class QueryStream extends Readable {
   public constructor(nextFn: nextFn) {
     super({
       objectMode: true,
-      // highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
+      highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
     });
     this.next = nextFn;
   }
@@ -29,27 +29,14 @@ export class QueryStream extends Readable {
    * @override
    */
   public _read(highWaterMark: number): void {
-    // if (this.next) {
-    //   const start = performance.now();
-    //   let row = this.next();
-    //   while (!row.done) {
-    //     this.push(row.value);
-    //     row = this.next();
-    //   }
-    //   this.push(null);
-    //   console.log(`[js] _read: ${(performance.now() - start) * 1000000} ns`);
-    // }
-    
     for (let i = 0; i < highWaterMark; i++) {
       if (this.next) {
-        const start = performance.now();
         const row = this.next();
         if (row.value) {
           this.push(row.value);
         }
         if (row.done) {
           this.push(null);
-          console.log(`[js] _read: ${(performance.now() - start) * 1000000} ns`);
           break;
         }
       }
@@ -65,6 +52,5 @@ export class QueryStream extends Readable {
   ): void {
     this.next = null;
     callback(error);
-    // super._destroy(error, callback);
   }
 }

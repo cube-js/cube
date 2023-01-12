@@ -28,7 +28,7 @@ export class QueryStream extends stream.Transform {
   }) {
     super({
       objectMode: true,
-      // highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
+      highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
     });
     this.queryKey = key;
     this.maps = maps;
