@@ -288,7 +288,6 @@ export class JDBCDriver extends BaseDriver {
   protected async executeStatement(conn: any, query: any, cancelObj?: any) {
     const createStatementAsync = promisify(conn.createStatement.bind(conn));
     const statement = await createStatementAsync();
-    // statement.setFetchSize(1);
     if (cancelObj) {
       cancelObj.cancel = promisify(statement.cancel.bind(statement));
     }
