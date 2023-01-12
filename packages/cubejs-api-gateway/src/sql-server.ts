@@ -112,6 +112,33 @@ export class SQLServer {
           }
         });
       },
+      stream: async ({ request, session, query }) => {
+        let userForContext = session.user;
+
+        if (request.meta.changeUser && request.meta.changeUser !== session.user) {
+          const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
+          if (canSwitch) {
+            userForContext = request.meta.changeUser;
+          } else {
+            throw new Error(
+              `You cannot change security context via __user from ${session.user} to ${request.meta.changeUser}, because it's not allowed.`
+            );
+          }
+        }
+
+        // @todo Store security context in native for session's user, but not for switching
+        const current = await checkSqlAuth(request, userForContext);
+        const context = await this.contextByNativeReq(request, current.securityContext, request.id);
+
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise(async (resolve, reject) => {
+          try {
+            resolve(await this.apiGateway.stream(context, query));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
     });
   }
 

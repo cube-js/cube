@@ -565,6 +565,13 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   /**
+   * Query stream `highWaterMark` value.
+   */
+  dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
+    .default(5000)
+    .asInt(),
+
+  /**
    * Expire time for touch records
    */
   touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')

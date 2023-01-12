@@ -3324,7 +3324,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
-                limit: Some(50000),
+                limit: Some(1000001),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -3373,7 +3373,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     date_range: None,
                 }]),
                 order: None,
-                limit: Some(50000),
+                limit: Some(1000001),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
@@ -3432,7 +3432,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ])),
                 }]),
                 order: None,
-                limit: Some(50000),
+                limit: Some(1000001),
                 offset: None,
                 filters: None,
             }
@@ -3458,7 +3458,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
-                limit: Some(50000),
+                limit: Some(1000001),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
@@ -11566,7 +11566,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                limit: Some(50000),
+                limit: Some(100000),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -11773,7 +11773,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                limit: Some(50000),
+                limit: Some(100000),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),

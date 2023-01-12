@@ -1,4 +1,5 @@
 /* eslint-disable no-throw-literal */
+import * as stream from 'stream';
 import pt from 'promise-timeout';
 import {
   QueryOrchestrator,
@@ -51,6 +52,16 @@ export class OrchestratorApi {
    */
   public async forceReconcile(datasource = 'default') {
     await this.orchestrator.forceReconcile(datasource);
+  }
+
+  /**
+   * Returns stream object which will be used to stream results from
+   * the data source if applicable. Throw otherwise.
+   *
+   * @throw Error
+   */
+  public async streamQuery(query: QueryBody): Promise<stream.Writable> {
+    return this.orchestrator.streamQuery(query);
   }
 
   /**

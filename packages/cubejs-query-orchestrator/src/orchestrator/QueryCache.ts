@@ -53,6 +53,9 @@ export type QueryBody = {
   forceNoCache?: boolean;
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
+  aliasNameToMember?: {
+    [alias: string]: string;
+  };
   preAggregationsLoadCacheByDataSource?: {
     [key: string]: any;
   };
@@ -190,6 +193,14 @@ export class QueryCache {
     }
   }
 
+  /**
+   * Generates from the `queryBody` the final `sql` query and push it to
+   * the queue. Returns promise which will be resolved by the different
+   * objects, depend from the original `queryBody` object. For the
+   * persistent queries returns the `stream.Writable` instance.
+   *
+   * @throw Error
+   */
   public async cachedQueryResult(
     queryBody: QueryBody,
     preAggregationsTablesToTempTables: PreAggTableToTempTable[],
@@ -230,24 +241,42 @@ export class QueryCache {
 
     const expireSecs = this.getExpireSecs(queryBody);
 
-    if (!cacheKeyQueries || queryBody.external && this.options.skipExternalCacheAndQueue) {
-      return {
-        data: await this.queryWithRetryAndRelease(
-          query,
-          values,
-          {
-            cacheKey: [query, values],
-            external: queryBody.external,
-            requestId: queryBody.requestId,
-            dataSource: queryBody.dataSource,
-            persistent: queryBody.persistent,
-            inlineTables,
-          }
-        ),
-      };
-    }
-
     const cacheKey = QueryCache.queryCacheKey(queryBody);
+
+    if (
+      !cacheKeyQueries ||
+      queryBody.external && this.options.skipExternalCacheAndQueue ||
+      queryBody.persistent
+    ) {
+      if (queryBody.persistent) {
+        // stream will be returned here
+        return this.queryWithRetryAndRelease(query, values, {
+          cacheKey,
+          priority: queuePriority,
+          external: queryBody.external,
+          requestId: queryBody.requestId,
+          persistent: queryBody.persistent,
+          dataSource: queryBody.dataSource,
+          useCsvQuery: queryBody.useCsvQuery,
+          aliasNameToMember: queryBody.aliasNameToMember,
+        });
+      } else {
+        return {
+          data: await this.queryWithRetryAndRelease(
+            query,
+            values,
+            {
+              cacheKey: [query, values],
+              external: queryBody.external,
+              requestId: queryBody.requestId,
+              dataSource: queryBody.dataSource,
+              persistent: queryBody.persistent,
+              inlineTables,
+            }
+          ),
+        };
+      }
+    }
 
     if (queryBody.renewQuery) {
       this.logger('Requested renew', { cacheKey, requestId: queryBody.requestId });
@@ -280,7 +309,7 @@ export class QueryCache {
           requestId: queryBody.requestId,
           dataSource: queryBody.dataSource,
           persistent: queryBody.persistent,
-          skipRefreshKeyWaitForRenew: true
+          skipRefreshKeyWaitForRenew: true,
         }
       );
 
@@ -392,6 +421,12 @@ export class QueryCache {
       : replacedKeyQuery;
   }
 
+  /**
+   * Determines queue type, resolves `QueryQueue` instance and runs the
+   * `executeInQueue` method passing incoming `query` into it. Resolves
+   * promise with the `executeInQueue` method result for the not persistent
+   * queries and with the `stream.Writable` instance for the persistent.
+   */
   public async queryWithRetryAndRelease(
     query: string | QueryTuple,
     values: string[],
@@ -401,41 +436,49 @@ export class QueryCache {
       external,
       priority,
       requestId,
-      persistent,
       inlineTables,
       useCsvQuery,
+      persistent,
+      aliasNameToMember,
     }: {
       cacheKey: CacheKey,
       dataSource: string,
       external: boolean,
       priority?: number,
       requestId?: string,
-      persistent?: boolean,
       inlineTables?: InlineTables,
       useCsvQuery?: boolean,
+      persistent?: boolean,
+      aliasNameToMember?: { [alias: string]: string },
     }
   ) {
     const queue = external
       ? this.getExternalQueue()
       : await this.getQueue(dataSource);
-    return queue.executeInQueue(
-      'query',
-      cacheKey,
-      {
-        queryKey: cacheKey,
-        query,
-        values,
-        requestId,
-        inlineTables,
-        useCsvQuery,
-      },
-      priority,
-      {
-        stageQueryKey: cacheKey,
-        requestId,
-        persistent,
-      }
-    );
+
+    const _query = {
+      queryKey: cacheKey,
+      query,
+      values,
+      requestId,
+      inlineTables,
+      useCsvQuery,
+    };
+
+    const opt = {
+      stageQueryKey: cacheKey,
+      requestId,
+    };
+
+    if (!persistent) {
+      return queue.executeInQueue('query', cacheKey, _query, priority, opt);
+    } else {
+      const _stream = queue.getQueryStream(cacheKey, aliasNameToMember);
+      // we don't want to handle error here as we want it to bubble up
+      // to the api gateway
+      queue.executeInQueue('stream', cacheKey, _query, priority, opt);
+      return _stream;
+    }
   }
 
   public async getQueue(dataSource = 'default') {
@@ -443,14 +486,12 @@ export class QueryCache {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
         () => this.driverFactory(dataSource),
-        (client, q) => {
-          this.logger('Executing SQL', {
-            ...q
-          });
-          if (q.useCsvQuery) {
-            return this.csvQuery(client, q);
+        (client, req) => {
+          this.logger('Executing SQL', { ...req });
+          if (req.useCsvQuery) {
+            return this.csvQuery(client, req);
           } else {
-            return client.query(q.query, q.values, q);
+            return client.query(req.query, req.values, req);
           }
         },
         {
@@ -518,15 +559,15 @@ export class QueryCache {
   public static createQueue(
     redisPrefix: string,
     clientFactory: DriverFactory,
-    executeFn: (client: BaseDriver, q: any) => any,
+    executeFn: (client: BaseDriver, req: any) => any,
     options: Record<string, any> = {}
   ): QueryQueue {
     const queue: any = new QueryQueue(redisPrefix, {
       getQueueEventsBus: options.getQueueEventsBus,
       queryHandlers: {
-        query: async (q, setCancelHandle) => {
+        query: async (req, setCancelHandle) => {
           const client = await clientFactory();
-          const resultPromise = executeFn(client, q);
+          const resultPromise = executeFn(client, req);
           let handle;
           if (resultPromise.cancel) {
             queue.cancelHandlerCounter += 1;
@@ -539,13 +580,56 @@ export class QueryCache {
             delete queue.handles[handle];
           }
           return result;
-        }
+        },
+        stream: async (req, target) => {
+          let logged = false;
+          queue.logger('Streaming SQL', { ...req });
+          const client = await clientFactory();
+          try {
+            const source = await client.streamQuery(req.query, req.values);
+
+            const cleanup = (error) => {
+              if (!source.destroyed) {
+                source.destroy(error);
+              }
+              if (!target.destroyed) {
+                target.destroy(error);
+              }
+              if (!logged && source.destroyed && target.destroyed) {
+                logged = true;
+                if (error) {
+                  queue.logger('Streaming done with error', {
+                    query: req.query,
+                    query_values: req.values,
+                    error,
+                  });
+                } else {
+                  queue.logger('Streaming successfully completed', {
+                    requestId: req.requestId,
+                  });
+                }
+              }
+            };
+  
+            source.once('end', cleanup);
+            source.once('error', cleanup);
+            source.once('close', cleanup);
+  
+            target.once('end', cleanup);
+            target.once('error', cleanup);
+            target.once('close', cleanup);
+  
+            source.pipe(target);
+          } catch (e) {
+            target.emit('error', e);
+          }
+        },
       },
       cancelHandlers: {
-        query: async (q) => {
-          if (q.cancelHandler && queue.handles[q.cancelHandler]) {
-            await queue.handles[q.cancelHandler].cancel();
-            delete queue.handles[q.cancelHandler];
+        query: async (req) => {
+          if (req.cancelHandler && queue.handles[req.cancelHandler]) {
+            await queue.handles[req.cancelHandler].cancel();
+            delete queue.handles[req.cancelHandler];
           }
         }
       },
@@ -608,8 +692,8 @@ export class QueryCache {
       skipRefreshKeyWaitForRenew?: boolean,
       external?: boolean,
       dataSource: string,
-      persistent?: boolean,
       useCsvQuery?: boolean,
+      persistent?: boolean,
     }
   ) {
     options = options || { dataSource: 'default' };
@@ -626,7 +710,8 @@ export class QueryCache {
       .then(async cacheKeyQueryResults => (
         {
           data: await this.cacheQueryResult(
-            query, values,
+            query,
+            values,
             cacheKey,
             expireSecs,
             {
@@ -640,8 +725,8 @@ export class QueryCache {
               external: options.external,
               requestId: options.requestId,
               dataSource: options.dataSource,
-              persistent: options.persistent,
               useCsvQuery: options.useCsvQuery,
+              persistent: options.persistent,
             }
           ),
           refreshKeyValues: cacheKeyQueryResults,
@@ -728,8 +813,8 @@ export class QueryCache {
         priority: options.priority,
         external: options.external,
         requestId: options.requestId,
-        dataSource: options.dataSource,
         persistent: options.persistent,
+        dataSource: options.dataSource,
         useCsvQuery: options.useCsvQuery,
       }).then(res => {
         const result = {
@@ -737,7 +822,9 @@ export class QueryCache {
           result: res,
           renewalKey
         };
-        return this.cacheDriver.set(redisKey, result, expiration)
+        return this
+          .cacheDriver
+          .set(redisKey, result, expiration)
           .then(({ bytes }) => {
             this.logger('Renewed', { cacheKey, requestId: options.requestId });
             this.logger('Outgoing network usage', {

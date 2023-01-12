@@ -6,6 +6,7 @@ import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
 import { getProcessUid } from './utils';
+import { QueryStream } from './QueryStream';
 
 /**
  * QueryQueue class.
@@ -110,12 +111,38 @@ export class QueryQueue {
      * @type {boolean}
      */
     this.skipQueue = options.skipQueue;
+
+    /**
+     * Persistent queries streams maps.
+     */
+    this.streams = {
+      queued: new Map(),
+      processing: new Map(),
+    };
   }
 
   /**
-   * Push query to the queue and call `QueryQueue.reconcileQueue()` method if
-   * `options.skipQueue` is set to `false`, execute query skipping queue
-   * otherwise.
+   * Returns stream object which will be used to pipe data from data source.
+   *
+   * @param {*} queryKey
+   * @param {{ [alias: string]: string }} aliasNameToMember
+   */
+  getQueryStream(queryKey, aliasNameToMember) {
+    const key = this.redisHash(queryKey);
+    if (!this.streams.queued.has(key)) {
+      const _stream = new QueryStream({
+        key,
+        maps: this.streams,
+        aliasNameToMember,
+      });
+      this.streams.queued.set(key, _stream);
+    }
+    return this.streams.queued.get(key);
+  }
+
+  /**
+   * Depends on the `queryHandler` value either runs `executeQueryInQueue`
+   * or `executeStreamInQueue` method.
    *
    * @param {string} queryHandler For the regular query is eq to 'query'.
    * @param {*} queryKey
@@ -127,6 +154,112 @@ export class QueryQueue {
    * @throw {ContinueWaitError}
    */
   async executeInQueue(
+    queryHandler,
+    queryKey,
+    query,
+    priority,
+    options,
+  ) {
+    switch (queryHandler) {
+      case 'stream':
+        return this.executeStreamInQueue(
+          queryHandler,
+          queryKey,
+          query,
+          priority,
+          options,
+        );
+      case 'query':
+        return this.executeQueryInQueue(
+          queryHandler,
+          queryKey,
+          query,
+          priority,
+          options,
+        );
+      default:
+        return this.executeQueryInQueue(
+          queryHandler,
+          queryKey,
+          query,
+          priority,
+          options,
+        );
+    }
+  }
+
+  /**
+   * Push persistent query to the queue and call `QueryQueue.reconcileQueue()` method.
+   *
+   * @param {string} queryHandler
+   * @param {*} queryKey
+   * @param {*} query
+   * @param {number=} priority
+   * @param {*=} options
+   * @returns {Promise<void>}
+   */
+  async executeStreamInQueue(
+    queryHandler,
+    queryKey,
+    query,
+    priority,
+    options,
+  ) {
+    options = options || {};
+    const redisClient = await this.queueDriver.createConnection();
+    try {
+      priority = priority || 0;
+      if (!(priority >= -10000 && priority <= 10000)) {
+        throw new Error(
+          'Priority should be between -10000 and 10000'
+        );
+      }
+      const time = new Date().getTime();
+      const keyScore = time + (10000 - priority) * 1E14;
+      const orphanedTimeout = 'orphanedTimeout' in query
+        ? query.orphanedTimeout
+        : this.orphanedTimeout;
+      const orphanedTime = time + (orphanedTimeout * 1000);
+      const [added, _b, _c, queueSize, addedToQueueTime] = await redisClient.addToQueue(
+        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
+      );
+      if (added > 0) {
+        this.logger('Added to queue (persistent)', {
+          priority,
+          queueSize,
+          queryKey,
+          queuePrefix: this.redisQueuePrefix,
+          requestId: options.requestId,
+          metadata: query.metadata,
+          preAggregationId: query.preAggregation?.preAggregationId,
+          newVersionEntry: query.newVersionEntry,
+          forceBuild: query.forceBuild,
+          preAggregation: query.preAggregation,
+          addedToQueueTime,
+          persistent: queryKey.persistent,
+        });
+      }
+      this.reconcileQueue();
+    } finally {
+      this.queueDriver.release(redisClient);
+    }
+  }
+
+  /**
+   * Push query to the queue and call `QueryQueue.reconcileQueue()` method if
+   * `options.skipQueue` is set to `false`, execute query skipping queue
+   * otherwise.
+   *
+   * @param {string} queryHandler
+   * @param {*} queryKey
+   * @param {*} query
+   * @param {number=} priority
+   * @param {*=} options
+   * @returns {*}
+   *
+   * @throw {ContinueWaitError}
+   */
+  async executeQueryInQueue(
     queryHandler,
     queryKey,
     query,
@@ -198,7 +331,8 @@ export class QueryQueue {
           newVersionEntry: query.newVersionEntry,
           forceBuild: query.forceBuild,
           preAggregation: query.preAggregation,
-          addedToQueueTime
+          addedToQueueTime,
+          persistent: !!queryKey.persistent,
         });
       }
 
@@ -224,8 +358,8 @@ export class QueryQueue {
       // Result here won't be fetched for a jobed build query (initialized by
       // the /cubejs-system/v1/pre-aggregations/jobs endpoint).
       result = !query.isJob && await redisClient.getResultBlocking(queryKey);
-
-      // We don't want to throw the ContinueWaitError for  a jobed build query.
+      
+      // We don't want to throw the ContinueWaitError for a jobed build query.
       if (!query.isJob && !result) {
         throw new ContinueWaitError();
       }
@@ -595,6 +729,7 @@ export class QueryQueue {
       if (retrieveResult) {
         [insertedCount, _removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
       }
+
       const activated = activeKeys && activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
       if (!query) {
         query = await redisClient.getQueryDef(this.redisHash(queryKey));
@@ -623,31 +758,41 @@ export class QueryQueue {
           this.heartBeatInterval * 1000
         );
         try {
-          executionResult = {
-            result: await this.queryTimeout(
-              this.queryHandlers[query.queryHandler](
-                query.query,
-                async (cancelHandler) => {
-                  try {
-                    return redisClient.optimisticQueryUpdate(queryKey, { cancelHandler }, processingId);
-                  } catch (e) {
-                    this.logger('Error while query update', {
-                      queryKey: query.queryKey,
-                      error: e.stack || e,
-                      queuePrefix: this.redisQueuePrefix,
-                      requestId: query.requestId,
-                      metadata: query.query?.metadata,
-                      preAggregationId: query.query?.preAggregation?.preAggregationId,
-                      newVersionEntry: query.query?.newVersionEntry,
-                      preAggregation: query.query?.preAggregation,
-                      addedToQueueTime: query.addedToQueueTime,
-                    });
-                  }
-                  return null;
-                }
-              )
-            )
-          };
+          const handler = query?.queryHandler;
+          let target;
+          switch (handler) {
+            case 'stream':
+              target = this.getQueryStream(activeKeys[0]);
+              await this.queryTimeout(this.queryHandlers.stream(query.query, target));
+              break;
+            default:
+              executionResult = {
+                result: await this.queryTimeout(
+                  this.queryHandlers[handler](
+                    query.query,
+                    async (cancelHandler) => {
+                      try {
+                        return redisClient.optimisticQueryUpdate(queryKey, { cancelHandler }, processingId);
+                      } catch (e) {
+                        this.logger('Error while query update', {
+                          queryKey: query.queryKey,
+                          error: e.stack || e,
+                          queuePrefix: this.redisQueuePrefix,
+                          requestId: query.requestId,
+                          metadata: query.query?.metadata,
+                          preAggregationId: query.query?.preAggregation?.preAggregationId,
+                          newVersionEntry: query.query?.newVersionEntry,
+                          preAggregation: query.query?.preAggregation,
+                          addedToQueueTime: query.addedToQueueTime,
+                        });
+                      }
+                      return null;
+                    },
+                  )
+                )
+              };
+              break;
+          }
           this.logger('Performing query completed', {
             processingId,
             queueSize,

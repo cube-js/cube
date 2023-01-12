@@ -4,6 +4,7 @@ mod auth;
 mod channel;
 mod config;
 mod logger;
+mod stream;
 mod transport;
 mod utils;
 
@@ -94,6 +95,9 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let transport_meta = options
         .get::<JsFunction, _, _>(&mut cx, "meta")?
         .root(&mut cx);
+    let transport_load_stream = options
+        .get::<JsFunction, _, _>(&mut cx, "stream")?
+        .root(&mut cx);
 
     let nonce_handle = options.get_value(&mut cx, "nonce")?;
     let nonce = if nonce_handle.is_a::<JsString, _>(&mut cx) {
@@ -125,7 +129,12 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let channel = cx.channel();
 
     let runtime = runtime(&mut cx)?;
-    let transport_service = NodeBridgeTransport::new(cx.channel(), transport_load, transport_meta);
+    let transport_service = NodeBridgeTransport::new(
+        cx.channel(),
+        transport_load,
+        transport_meta,
+        transport_load_stream,
+    );
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
     std::thread::spawn(move || {
