@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.39](https://github.com/cube-js/cube.js/compare/v0.31.38...v0.31.39) (2023-01-12)
+
+**Note:** Version bump only for package @cubejs-backend/materialize-driver
+
+
+
+
+
 ## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
 
 **Note:** Version bump only for package @cubejs-backend/materialize-driver

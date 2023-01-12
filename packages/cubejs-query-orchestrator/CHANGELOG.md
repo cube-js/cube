@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.39](https://github.com/cube-js/cube.js/compare/v0.31.38...v0.31.39) (2023-01-12)
+
+
+### Features
+
+* Re-use connection to Cube Store from externalDriver ([#5993](https://github.com/cube-js/cube.js/issues/5993)) ([69a35ed](https://github.com/cube-js/cube.js/commit/69a35edb74e9b5e09f74b13a91afe7076fa344cb))
+
+
+
+
+
 ## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
 
 
