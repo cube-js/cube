@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@cubejs-backend/cubesql": "^0.31.40",
+    "@cubejs-backend/shared": "^0.31.4",
     "@mapbox/node-pre-gyp": "^1"
   },
   "binary": {
