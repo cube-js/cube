@@ -225,33 +225,39 @@ export class JDBCDriver extends BaseDriver {
   }
 
   public async streamQuery(sql: string, values: string[]): Promise<Readable> {
+    const start = performance.now();
+
     const query = applyParams(sql, values);
     const cancelObj: {cancel?: Function} = {};
-    const prepareQueries = this.prepareConnectionQueries() || [];
+    // const prepareQueries = this.prepareConnectionQueries() || [];
     try {
       const conn = await this.pool.acquire();
       try {
-        for (let i = 0; i < prepareQueries.length; i++) {
-          await this.executeStatement(conn, prepareQueries[i]);
-        }
-        
         const createStatement = promisify(conn.createStatement.bind(conn));
         const statement = await createStatement();
 
         // TODO (buntarb): check whether this have sense or not?
+
         statement.setFetchSize(
           getEnv('dbQueryStreamHighWaterMark'),
           (err: unknown) => { if (err) console.error(err); }
         );
+
         if (cancelObj) {
           cancelObj.cancel = promisify(statement.cancel.bind(statement));
         }
 
         // TODO (buntarb): timeout decision needs.
+
         // const setQueryTimeout = promisify(statement.setQueryTimeout.bind(statement));
         // await setQueryTimeout(600);
+
         const executeQuery = promisify(statement.execute.bind(statement));
+
+        console.log(`[js] before resultSet: ${(performance.now() - start) * 1000000} ns`);
         const resultSet = await executeQuery(query);
+        console.log(`[js] after resultSet: ${(performance.now() - start) * 1000000} ns`);
+        
         return new Promise((resolve, reject) => {
           resultSet.toObjectIter(
             (
@@ -267,6 +273,7 @@ export class JDBCDriver extends BaseDriver {
               const cleanup = (e?: Error) => {
                 if (!rowsStream.destroyed) {
                   rowsStream.destroy(e);
+                  console.log(`[js] rowsStream destroyed: ${(performance.now() - start) * 1000000} ns`);
                 }
               };
               rowsStream.once('end', cleanup);

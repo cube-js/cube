@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { getEnv } from '@cubejs-backend/shared';
 
 export interface BaseMeta {
     // postgres or mysql
@@ -112,22 +113,29 @@ function wrapNativeFunctionWithStream(
     fn: (extra: any) => unknown | Promise<unknown>
 ) {
     return async (extra: any, writer: any) => {
+        console.log('==============================================');
         let streamResponse: any;
         try {
             streamResponse = await fn(JSON.parse(extra));
 
+            const s = performance.now();
             let chunk: object[] = [];
+            let str: string;
             streamResponse.stream.on('data', (c: object) => {
                 chunk.push(c);
-                // TODO: move to config??
-                if (chunk.length >= 16000) {
+                if (chunk.length >= getEnv('dbQueryStreamHighWaterMark')) {
                     if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
                         console.debug("[js] stream.chunk");
                     }
 
-                    if (!writer.chunk(JSON.stringify(chunk))) {
+                    const start = performance.now();
+                    str = JSON.stringify(chunk);
+                    console.log(`[js] JSON.stringlify: ${(performance.now() - start) * 1000000} ns`);
+
+                    if (!writer.chunk(str)) {
                         streamResponse.stream.removeAllListeners();
                     }
+                    console.log(`[js] writer.chunk: ${(performance.now() - start) * 1000000} ns`);
                     chunk = [];
                 }
             });
@@ -138,9 +146,15 @@ function wrapNativeFunctionWithStream(
 
                 streamResponse.stream.removeAllListeners();
                 if (chunk.length > 0) {
-                    writer.chunk(JSON.stringify(chunk));
+                    
+                    const start = performance.now();
+                    str = JSON.stringify(chunk);
+                    console.log(`[js] stringlify2: ${(performance.now() - start) * 1000000} ns`);
+
+                    writer.chunk(str);
                 }
                 writer.end("");
+                console.log(`[js] total query: ${(performance.now() - s) * 1000000} ns`);
             });
 
             streamResponse.stream.on('error', (err: any) => {
