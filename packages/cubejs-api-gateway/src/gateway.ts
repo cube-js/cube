@@ -1161,15 +1161,18 @@ class ApiGateway {
 
       const orchestratorApi = await this.getAdapterApi(context);
       const schema = await orchestratorApi.fetchSchema(query.dataSource, context?.securityContext, query.renew);
+      const result = this.getSchemaDataByLevel(
+        schema,
+        query.levelChain,
+        query.limit,
+        query.offset,
+        query.search
+      );
 
       res({
-        data: this.getSchemaDataByLevel(
-          schema,
-          query.levelChain,
-          query.limit,
-          query.offset,
-          query.search
-        ),
+        data: result.data,
+        total: result.total,
+        nextOffset: result.nextOffset,
       });
     } catch (e) {
       this.handleError({ e,
@@ -1186,7 +1189,7 @@ class ApiGateway {
     limit?: number,
     offset?: number,
     search?: string
-  ) {
+  ): { data: any, total: number, nextOffset: number | null } {
     const currentData =
       levelChain?.reduce((obj, key) => {
         if (!obj[key]) {
@@ -1227,11 +1230,18 @@ class ApiGateway {
       }
     }
 
+    const total = result.length;
+
+    let nextOffset: null | number = null;
     if (limit) {
-      result = result.slice(offset, (offset || 0) + limit);
+      const end = (offset || 0) + limit;
+      result = result.slice(offset, end);
+      if (end < total) {
+        nextOffset = end;
+      }
     }
 
-    return result;
+    return { data: result, total, nextOffset };
   }
 
   /**
