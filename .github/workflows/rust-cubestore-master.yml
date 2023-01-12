@@ -140,7 +140,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-buildx-
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./rust/cubestore
           file: ./rust/cubestore/Dockerfile

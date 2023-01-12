@@ -281,7 +281,7 @@ jobs:
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest.Dockerfile
@@ -353,7 +353,7 @@ jobs:
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest-alpine.Dockerfile
@@ -425,7 +425,7 @@ jobs:
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest-debian-jdk.Dockerfile
@@ -524,7 +524,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-buildx-${{ matrix.tag }}-
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./rust/cubestore/
           file: ./rust/cubestore/Dockerfile
