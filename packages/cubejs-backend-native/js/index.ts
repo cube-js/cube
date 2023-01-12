@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { getEnv } from '@cubejs-backend/shared';
+// import { getEnv } from '@cubejs-backend/shared';
 
 export interface BaseMeta {
     // postgres or mysql
@@ -119,7 +119,7 @@ function wrapNativeFunctionWithStream(
             let chunk: object[] = [];
             streamResponse.stream.on('data', (c: object) => {
                 chunk.push(c);
-                if (chunk.length >= getEnv('dbQueryStreamHighWaterMark')) {
+                if (chunk.length >= 10000) {
                     if (!writer.chunk(JSON.stringify(chunk))) {
                         streamResponse.stream.removeAllListeners();
                     }
