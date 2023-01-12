@@ -277,7 +277,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         };
 
         let mut request = self.request.clone();
-        if request.limit.unwrap_or_default() > query_limit {
+        if request.limit.unwrap_or_default() > query_limit || request.limit.is_none() {
             request.limit = Some(query_limit);
         }
 
@@ -308,10 +308,6 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                 self.schema.clone(),
                 false,
             )));
-        } else if self.request.limit.unwrap_or_default() > query_limit {
-            let mut request = self.request.clone();
-            request.limit = Some(query_limit);
-            one_shot_stream.request = request;
         }
 
         one_shot_stream.data = Some(transform_response(
@@ -477,7 +473,7 @@ impl Stream for CubeScanStreamRouter {
 
                         self.one_shot_mode = true;
 
-                        match load_to_steam_sync(&mut self.one_shot_stream) {
+                        match load_to_stream_sync(&mut self.one_shot_stream) {
                             Ok(_) => {
                                 chunk = self.one_shot_stream.poll_next();
                             }
@@ -557,7 +553,7 @@ async fn load_data(
     Ok(result)
 }
 
-fn load_to_steam_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()> {
+fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()> {
     let req = one_shot_stream.request.clone();
     let auth = one_shot_stream.auth_context.clone();
     let transport = one_shot_stream.transport.clone();
@@ -584,25 +580,16 @@ fn parse_chunk(
     schema: SchemaRef,
     member_fields: &Vec<MemberField>,
 ) -> Option<ArrowResult<RecordBatch>> {
-    let mut rows_count = "0 or error".to_string();
-    let start = std::time::Instant::now();
-
     let res = match chunk {
         Some(chunk) => match serde_json::from_str::<Vec<serde_json::Value>>(&chunk) {
             Ok(data) => match transform_response(data, schema, member_fields) {
-                Ok(batch) => {
-                    rows_count = format!("{}", batch.num_rows());
-
-                    Some(Ok(batch))
-                },
+                Ok(batch) => Some(Ok(batch)),
                 Err(err) => Some(Err(err.into())),
             },
             Err(e) => Some(Err(e.into())),
         },
         None => None,
     };
-
-    println!("CHUNK: rows - {} | parsing time: {} ns", rows_count, start.elapsed().as_nanos());
 
     res
 }
