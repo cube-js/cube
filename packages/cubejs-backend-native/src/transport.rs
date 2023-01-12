@@ -190,8 +190,6 @@ impl TransportService for NodeBridgeTransport {
             },
         })?;
 
-        
-
         call_js_with_stream_as_callback(
             self.channel.clone(),
             self.on_load_stream.clone(),
