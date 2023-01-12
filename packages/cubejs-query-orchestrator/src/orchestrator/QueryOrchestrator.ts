@@ -1,5 +1,6 @@
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
+import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 
 import { QueryCache, QueryBody, TempTable } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
@@ -59,13 +60,19 @@ export class QueryOrchestrator {
       throw new Error('Only \'redis\', \'memory\' or \'cubestore\' are supported for cacheAndQueueDriver option');
     }
 
+    const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
+
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     this.redisPool = redisPool;
 
-    // TODO: Re-use connection from external database
-    const cubeStoreDriver = undefined;
+    const cubeStoreDriverFactory = cacheAndQueueDriver === 'cubestore' ? async () => {
+      const externalDriver = await externalDriverFactory();
+      if (externalDriver instanceof CubeStoreDriver) {
+        return externalDriver;
+      }
 
-    const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
+      throw new Error('It`s not possible to use CubeStore as queue & cache driver without using it as external');
+    } : undefined;
 
     this.queryCache = new QueryCache(
       this.redisPrefix,
@@ -75,7 +82,7 @@ export class QueryOrchestrator {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
-        cubeStoreDriver,
+        cubeStoreDriverFactory,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.queryCacheOptions,

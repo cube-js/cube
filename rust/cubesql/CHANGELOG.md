@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.39](https://github.com/cube-js/cube.js/compare/v0.31.38...v0.31.39) (2023-01-12)
+
+
+### Bug Fixes
+
+* **cubesql:** Query cancellation for simple query protocol ([#5987](https://github.com/cube-js/cube.js/issues/5987)) ([aae758f](https://github.com/cube-js/cube.js/commit/aae758f83d45a2572caddfc5f85663e059406c78))
+
+
+
+
+
 ## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
 
 

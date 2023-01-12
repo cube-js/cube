@@ -3,7 +3,7 @@ import { QueryCacheTest } from '../../unit/QueryCache.abstract';
 
 let beforeAll;
 let afterAll;
-let cubeStoreDriver = new CubeStoreDriver({});
+let cubeStoreDriverFactory = async () => new CubeStoreDriver({});
 
 if ((process.env.CUBEJS_TESTING_CUBESTORE_AUTO_PROVISIONING || 'true') === 'true') {
   const cubeStoreHandler = new CubeStoreHandler({
@@ -22,14 +22,14 @@ if ((process.env.CUBEJS_TESTING_CUBESTORE_AUTO_PROVISIONING || 'true') === 'true
     await cubeStoreHandler.acquire();
   };
   afterAll = async () => cubeStoreHandler.release(true);
-  cubeStoreDriver = new CubeStoreDevDriver(cubeStoreHandler);
+  cubeStoreDriverFactory = async () => new CubeStoreDevDriver(cubeStoreHandler);
 }
 
 QueryCacheTest(
   'CubeStore Cache Driver',
   {
     cacheAndQueueDriver: 'cubestore',
-    cubeStoreDriver,
+    cubeStoreDriverFactory,
     beforeAll,
     afterAll
   }
