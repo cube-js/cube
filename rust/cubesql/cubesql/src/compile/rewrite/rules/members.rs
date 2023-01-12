@@ -1306,7 +1306,7 @@ impl MemberRules {
                     let column_name_to_alias = expr_to_alias
                         .clone()
                         .into_iter()
-                        .map(|(e, a)| (expr_column_name_with_relation(e, &mut relation), a))
+                        .map(|(e, a, _)| (expr_column_name_with_relation(e, &mut relation), a))
                         .collect::<Vec<_>>();
                     if let Some(member_name_to_expr) = egraph
                         .index(subst[members_var])

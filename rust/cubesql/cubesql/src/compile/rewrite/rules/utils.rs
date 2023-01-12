@@ -1,6 +1,6 @@
 use std::cmp::{max, min};
 
-use datafusion::scalar::ScalarValue;
+use datafusion::{physical_plan::aggregates::AggregateFunction, scalar::ScalarValue};
 
 pub fn parse_granularity_string(granularity: &str, to_normalize: bool) -> Option<String> {
     if to_normalize {
@@ -141,4 +141,13 @@ pub fn negated_cube_filter_op(op: &str) -> Option<&'static str> {
     ];
 
     Some(negated)
+}
+
+pub fn reaggragate_fun(cube_fun: &str) -> Option<AggregateFunction> {
+    Some(match cube_fun {
+        "count" | "sum" => AggregateFunction::Sum,
+        "min" => AggregateFunction::Min,
+        "max" => AggregateFunction::Max,
+        _ => return None,
+    })
 }
