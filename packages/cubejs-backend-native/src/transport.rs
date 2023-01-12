@@ -178,28 +178,23 @@ impl TransportService for NodeBridgeTransport {
             .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let request_id = Uuid::new_v4().to_string();
+        let extra = serde_json::to_string(&LoadRequest {
+            request: TransportRequest {
+                id: format!("{}-span-{}", request_id, 1),
+                meta: Some(meta),
+            },
+            query,
+            session: SessionContext {
+                user: native_auth.user.clone(),
+                superuser: native_auth.superuser,
+            },
+        })?;
 
-        loop {
-            let extra = serde_json::to_string(&LoadRequest {
-                request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, 1),
-                    meta: Some(meta.clone()),
-                },
-                query: query.clone(),
-                session: SessionContext {
-                    user: native_auth.user.clone(),
-                    superuser: native_auth.superuser,
-                },
-            })?;
-
-            let response = call_js_with_stream_as_callback(
-                self.channel.clone(),
-                self.on_load_stream.clone(),
-                Some(extra.clone()),
-            );
-
-            return response;
-        }
+        call_js_with_stream_as_callback(
+            self.channel.clone(),
+            self.on_load_stream.clone(),
+            Some(extra),
+        )
     }
 }
 

@@ -104,7 +104,7 @@ impl JsWriteStream {
     }
 
     fn push_chunk(&self, chunk: String) -> bool {
-        return self.writer.push(Ok(Some(chunk)));
+        self.writer.push(Ok(Some(chunk)))
     }
 
     fn end(&self) {
@@ -159,7 +159,7 @@ pub fn call_js_with_stream_as_callback(
     js_method: Arc<Root<JsFunction>>,
     query: Option<String>,
 ) -> Result<Arc<dyn CubeReadStream>, CubeError> {
-    let channel = channel.clone();
+    let channel = channel;
     let buffer = Arc::new(Buffer::new());
     let writer = buffer.clone();
 
