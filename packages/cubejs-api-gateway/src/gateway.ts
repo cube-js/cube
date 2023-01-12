@@ -213,37 +213,6 @@ class ApiGateway {
       });
     }));
 
-    app.post(`${this.basePath}/v1/stream`, jsonParser, userMiddlewares, (async (req, res) => {
-      const run = async (n) => {
-        const _stream = await this.stream(req.context, req.body.query);
-        console.log(JSON.stringify(_stream, undefined, 2));
-        _stream?.stream.on('fields', (fields) => {
-          console.log(`stream#${n} fields: ${JSON.stringify(fields, undefined, 2)}`);
-        });
-        _stream?.stream.on('data', (chunk) => {
-          console.log(`stream#${n} chunk: ${JSON.stringify(chunk, undefined, 2)}`);
-        });
-        _stream?.stream.on('end', () => {
-          console.log(`stream#${n} end ${JSON.stringify(_stream.stream, undefined, 2)}`);
-        });
-        _stream?.stream.on('close', () => {
-          _stream?.stream.removeAllListeners();
-          console.log(`stream#${n} close ${JSON.stringify(_stream.stream, undefined, 2)}`);
-        });
-        _stream?.stream.on('error', (err) => {
-          _stream?.stream.removeAllListeners();
-          console.error(`stream#${n} error ${err}`);
-        });
-      };
-
-      run(0);
-      // for (let i = 1; i <= 10; i++) {
-      //   run(i);
-      // }
-      
-      this.resToResultFn(res)(true);
-    }));
-
     app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, (async (req, res) => {
       await this.load({
         query: req.query.query,
