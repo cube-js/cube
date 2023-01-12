@@ -187,6 +187,7 @@ export interface CreateOptions {
   scheduledRefreshTimeZones?: string[];
   scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
   scheduledRefreshConcurrency?: number;
+  scheduledRefreshBatchSize?: number;
   compilerCacheSize?: number;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
@@ -228,3 +229,23 @@ export type ServerCoreInitializedOptions = Required<
 export type SystemOptions = {
   isCubeConfigEmpty: boolean;
 };
+
+// Types to support the ContextAcceptance mechanism
+export type ContextAcceptanceResult = {
+  accepted: boolean;
+};
+
+export type ContextAcceptanceResultHttp = ContextAcceptanceResult & {
+  rejectHeaders?: { [key: string]: string };
+  rejectStatusCode?: number;
+};
+
+export type ContextAcceptanceResultWs = ContextAcceptanceResult & {
+  rejectMessage?: any;
+};
+
+export interface ContextAcceptor {
+  shouldAccept(context: RequestContext | null): ContextAcceptanceResult;
+  shouldAcceptHttp(context: RequestContext | null): ContextAcceptanceResultHttp;
+  shouldAcceptWs(context: RequestContext | null): ContextAcceptanceResultWs;
+}

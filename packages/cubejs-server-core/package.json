@@ -48,6 +48,7 @@
     "lru-cache": "^5.1.1",
     "moment": "^2.29.1",
     "node-fetch": "^2.6.0",
+    "p-limit": "^3.1.0",
     "promise-timeout": "^1.3.0",
     "ramda": "^0.27.0",
     "semver": "^6.3.0",
