@@ -1,4 +1,4 @@
-FROM node:14.21.1-alpine3.14
+FROM node:14.21.1-alpine3.15
 
 ARG IMAGE_VERSION=unknown
 
