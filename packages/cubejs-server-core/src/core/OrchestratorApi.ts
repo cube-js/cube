@@ -253,7 +253,7 @@ export class OrchestratorApi {
     }
 
     const driver = await this.driverFactory(dataSource);
-    const tablesSchema = await driver.tablesSchema();
+    const tablesSchema = await driver.tablesSchemaByOrchestrator(this);
     cacheDriver.set(cacheHash, tablesSchema, 86400); // cache for 1 day
     return tablesSchema;
   }

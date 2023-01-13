@@ -276,6 +276,14 @@ export abstract class BaseDriver implements DriverInterface {
     return sortByKeys(result);
   }
 
+  public async tablesSchemaByOrchestrator(orchestrator) {
+    const query = this.informationSchemaQuery();
+
+    const data = await orchestrator.executeQuery({ query });
+
+    return reduce(this.informationColumnsSchemaReducer, {}, data.data);
+  }
+
   public tablesSchema() {
     const query = this.informationSchemaQuery();
 
