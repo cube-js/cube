@@ -71,6 +71,7 @@ impl SqlResultCache {
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self, inline_tables, plan, exec))]
     pub async fn get<F>(
         &self,
         query: &str,
@@ -92,7 +93,7 @@ impl SqlResultCache {
         }
 
         let queue_key = SqlQueueCacheKey::from_query(query, inline_tables);
-        let (sender, mut receiver) = {
+        let (sender, receiver) = {
             let key = queue_key.clone();
             let mut cache = self.queue_cache.lock().await;
             if !cache.contains(&key) {
@@ -129,6 +130,18 @@ impl SqlResultCache {
             return result;
         }
 
+        std::mem::drop(plan);
+        std::mem::drop(result_key);
+
+        self.wait_for_queue(receiver, query).await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self, receiver))]
+    async fn wait_for_queue(
+        &self,
+        mut receiver: Option<watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>,
+        query: &str,
+    ) -> Result<Arc<DataFrame>, CubeError> {
         if let Some(receiver) = &mut receiver {
             loop {
                 receiver.changed().await?;
@@ -140,7 +153,6 @@ impl SqlResultCache {
                 }
             }
         }
-
         panic!("Unexpected state: wait receiver expected but cache was empty")
     }
 }
