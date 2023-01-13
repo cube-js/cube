@@ -1,5 +1,6 @@
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::sql::InlineTables;
+use crate::sql::SqlQueryContext;
 use crate::store::DataFrame;
 use crate::CubeError;
 use futures::Future;
@@ -71,17 +72,18 @@ impl SqlResultCache {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, inline_tables, plan, exec))]
+    #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
     pub async fn get<F>(
         &self,
         query: &str,
-        inline_tables: &InlineTables,
+        context: SqlQueryContext,
         plan: SerializedPlan,
         exec: impl FnOnce(SerializedPlan) -> F,
     ) -> Result<Arc<DataFrame>, CubeError>
     where
         F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
     {
+        let inline_tables = &context.inline_tables;
         let result_key = SqlResultCacheKey::from_plan(query, inline_tables, &plan);
         let cached_result = {
             let mut result_cache = self.result_cache.lock().await;
@@ -132,6 +134,7 @@ impl SqlResultCache {
 
         std::mem::drop(plan);
         std::mem::drop(result_key);
+        std::mem::drop(context);
 
         self.wait_for_queue(receiver, query).await
     }
@@ -162,7 +165,7 @@ mod tests {
     use crate::queryplanner::serialized_plan::SerializedPlan;
     use crate::queryplanner::PlanningMeta;
     use crate::sql::cache::SqlResultCache;
-    use crate::sql::InlineTables;
+    use crate::sql::{InlineTables, SqlQueryContext};
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
     use crate::CubeError;
@@ -200,13 +203,33 @@ mod tests {
                 )])],
             ))
         };
-        let inline_tables = InlineTables::new();
+
         let futures = vec![
-            cache.get("SELECT 1", &inline_tables, plan.clone(), exec.clone()),
-            cache.get("SELECT 2", &inline_tables, plan.clone(), exec.clone()),
-            cache.get("SELECT 3", &inline_tables, plan.clone(), exec.clone()),
-            cache.get("SELECT 1", &inline_tables, plan.clone(), exec.clone()),
-            cache.get("SELECT 1", &inline_tables, plan, exec),
+            cache.get(
+                "SELECT 1",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec.clone(),
+            ),
+            cache.get(
+                "SELECT 2",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec.clone(),
+            ),
+            cache.get(
+                "SELECT 3",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec.clone(),
+            ),
+            cache.get(
+                "SELECT 1",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec.clone(),
+            ),
+            cache.get("SELECT 1", SqlQueryContext::default(), plan, exec),
         ];
 
         let res = join_all(futures)
