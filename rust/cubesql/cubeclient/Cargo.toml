@@ -16,7 +16,7 @@ url = "^2.2"
 reqwest-middleware = "0.1.0"
 anyhow = "1.0"
 async-trait = "0.1.51"
-tokio = { version = "1.6", features = ["time"] }
+tokio = { version = "1.18", features = ["time"] }
 uuid = { version = "0.8", features = ["v4"] }
 log = "0.4"
 

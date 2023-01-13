@@ -17,7 +17,7 @@ pg-srv = { path = "../pg-srv" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "10782e5d11fc0e2900c9359dddee0fbefbffd359" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
-tokio = { version = "1.0", features = ["full", "rt", "tracing"] }
+tokio = { version = "1.18", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
 itertools = "0.10.2"
 serde_derive = "^1.0"

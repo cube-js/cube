@@ -13,7 +13,7 @@ with-chrono = ["chrono"]
 default = ["with-chrono"]
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.18", features = ["full"] }
 async-trait = "0.1.36"
 log = "0.4"
 bytes = "1.2"
