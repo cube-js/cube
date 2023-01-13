@@ -554,10 +554,17 @@ describe('API Gateway', () => {
         method: 'post',
         successBody: {
           query: {
-            query: 'SELECT * FROM test'
+            query: 'SELECT * FROM sql-runner',
+            resultFilter: {
+              objectLimit: 2,
+              stringLimit: 2,
+              objectTypes: ['Buffer'],
+              limit: 1,
+              offset: 1,
+            },
           }
         },
-        successResult: { data: [{ foo__bar: 42 }] },
+        successResult: { data: [{ string: 'st', number: 1, buffer: '[4', bufferTwo: 'Placeholder', object: '{"' }] },
         wrongPayloads: [{
           result: {
             status: 400,
@@ -570,6 +577,19 @@ describe('API Gateway', () => {
             error: 'A user\'s query must contain at least one query param.'
           },
           body: { query: {} }
+        }, {
+          result: {
+            status: 400,
+            error: 'A query.resultFilter.objectTypes must be an array of strings'
+          },
+          body: {
+            query: {
+              query: 'SELECT * FROM sql-runner',
+              resultFilter: {
+                objectTypes: 'text'
+              },
+            }
+          }
         }]
       },
     ];

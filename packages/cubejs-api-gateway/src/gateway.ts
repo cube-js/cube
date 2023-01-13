@@ -1026,6 +1026,12 @@ class ApiGateway {
         requestId: context.requestId
       };
 
+      if (query.resultFilter?.objectTypes && !Array.isArray(query.resultFilter.objectTypes)) {
+        throw new UserError(
+          'A query.resultFilter.objectTypes must be an array of strings'
+        );
+      }
+      
       this.log(
         {
           type: 'Load SQL Runner Request',
@@ -1035,6 +1041,32 @@ class ApiGateway {
       );
 
       const result = await this.getAdapterApi(context).executeQuery(query);
+      if (result.data.length) {
+        const objectLimit = Number(query.resultFilter?.objectLimit) || 100;
+        const stringLimit = Number(query.resultFilter?.stringLimit) || 100;
+        const objectTypes = query.resultFilter?.objectTypes || [];
+        const limit = Number(query.resultFilter?.limit) || 20;
+        const offset = Number(query.resultFilter?.offset) || 0;
+        result.total = result.data.length;
+        result.offset = offset;
+        result.data = result.data.slice(offset, offset + limit);
+        result.data = result.data.map((row) => {
+          Object.keys(row).forEach((key) => {
+            if (
+              typeof row[key] === 'object' && row[key] !== null && row[key].type &&
+              (objectTypes.length === 0 || !objectTypes.includes(row[key].type))
+            ) {
+              row[key] = row[key].type;
+            } else if (typeof row[key] === 'object' && row[key] !== null) {
+              row[key] = JSON.stringify(row[key].data || row[key]).slice(0, objectLimit);
+            } else if (typeof row[key] === 'string') {
+              row[key] = row[key].slice(0, stringLimit);
+            }
+          });
+
+          return row;
+        });
+      }
 
       this.log(
         {
