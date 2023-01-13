@@ -206,8 +206,9 @@ export class CompilerApi {
       compilerVersion = JSON.stringify(compilerVersion);
     }
 
-    if (!this.compilers || this.compilerVersion !== compilerVersion) {
-      this.compilers = await compile(this.repository, {
+    let { compilers } = this;
+    if (!compilers || this.compilerVersion !== compilerVersion) {
+      compilers = await compile(this.repository, {
         allowNodeRequire: this.allowNodeRequire,
         compileContext: this.compileContext,
         allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
@@ -215,7 +216,7 @@ export class CompilerApi {
       });
     }
 
-    const { cubeEvaluator } = await this.compilers;
+    const { cubeEvaluator } = await compilers;
 
     let dataSources = await Promise.all(
       cubeEvaluator
