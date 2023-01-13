@@ -1,7 +1,6 @@
 /* eslint-disable no-throw-literal */
 import * as stream from 'stream';
 import pt from 'promise-timeout';
-import crypto from 'crypto';
 import {
   QueryOrchestrator,
   ContinueWaitError,
@@ -9,6 +8,7 @@ import {
   DriverType,
   QueryOrchestratorOptions,
   QueryBody,
+  getCacheHash
 } from '@cubejs-backend/query-orchestrator';
 
 import { DbTypeAsyncFn, ExternalDbTypeFn, RequestContext } from './types';
@@ -232,18 +232,11 @@ export class OrchestratorApi {
   }
 
   public async fetchSchema(dataSource: string, securityContext?: { [key: string]: any; }, renew?: boolean) {
-    const cacheDriver = this.orchestrator
-      .getQueryCache()
-      .getCacheDriver();
+    const queryCache = this.orchestrator.getQueryCache();
+    const cacheDriver = queryCache.getCacheDriver();
 
-    const cacheHash = crypto
-      .createHash('md5')
-      .update(JSON.stringify([
-        'FETCH_SCHEMA',
-        dataSource,
-        securityContext
-      ]))
-      .digest('hex');
+    const cacheHash = this.orchestrator.getQueryCache()
+      .getKey('FETCH_SCHEMA', getCacheHash({ dataSource, securityContext }));
 
     if (!renew) {
       const cachedData = await cacheDriver.get(cacheHash);
@@ -252,9 +245,10 @@ export class OrchestratorApi {
       }
     }
 
-    const driver = await this.driverFactory(dataSource);
-    const tablesSchema = await driver.tablesSchema();
-    cacheDriver.set(cacheHash, tablesSchema, 86400); // cache for 1 day
+    const queue = await queryCache.getQueue(dataSource);
+    const tablesSchema = await queue.executeQueryInQueue('query', cacheHash, { tablesSchema: true });
+
+    await cacheDriver.set(cacheHash, tablesSchema, 86400); // cache for 1 day
     return tablesSchema;
   }
 
