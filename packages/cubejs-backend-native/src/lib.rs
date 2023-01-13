@@ -18,9 +18,11 @@ use cubesql::{config::CubeServices, telemetry::ReportingLogger};
 use log::Level;
 use logger::NodeBridgeLogger;
 use neon::prelude::*;
+use serde_derive::Deserialize;
 use simple_logger::SimpleLogger;
 use tokio::runtime::{Builder, Runtime};
 use transport::NodeBridgeTransport;
+use crate::channel::call_js_with_channel_as_callback;
 
 struct SQLInterface {
     services: Arc<CubeServices>,
@@ -186,11 +188,47 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
+// #[cfg(bench)]
+fn bench_js_call(mut cx: FunctionContext) -> JsResult<JsPromise> {
+    let options = cx.argument::<JsObject>(0)?;
+    let callback = options
+        .get::<JsFunction, _, _>(&mut cx, "callback")?
+        .root(&mut cx);
+
+    let (deferred, promise) = cx.promise();
+    let channel = cx.channel();
+
+    let runtime = runtime(&mut cx)?;
+
+    #[derive(Debug, Deserialize)]
+    struct TestBenchPayload {
+    }
+
+    let move_callback = Arc::new(callback);
+    let move_channel = Arc::new(cx.channel());
+
+    runtime.block_on(async move {
+        for _ in 1..1_000 {
+            let call: TestBenchPayload = call_js_with_channel_as_callback(
+                move_channel.clone(),
+                move_callback.clone(),
+                None
+            ).await.unwrap();
+        }
+    });
+    deferred.settle_with(&channel, move |mut cx| Ok(cx.undefined()));
+
+    Ok(promise)
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("setupLogger", setup_logger)?;
     cx.export_function("registerInterface", register_interface)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
+
+    // #[cfg(bench)]
+    cx.export_function("bench_js_call", bench_js_call)?;
 
     Ok(())
 }

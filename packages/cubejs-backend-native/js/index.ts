@@ -192,3 +192,12 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
 }
+
+export const bench_js_call = async (options: any): Promise<void> => {
+    const native = loadNative();
+
+    await native.bench_js_call({
+        ...options,
+        callback: wrapNativeFunctionWithChannelCallback(options.callback),
+    });
+}
