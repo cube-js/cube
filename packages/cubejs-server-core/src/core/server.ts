@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import fs from 'fs-extra';
 import LRUCache from 'lru-cache';
 import isDocker from 'is-docker';
+import pLimit from 'p-limit';
 
 import { ApiGateway, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import {
@@ -11,7 +12,7 @@ import {
   getEnv, assertDataSource, getRealType, internalExceptions, track,
 } from '@cubejs-backend/shared';
 
-import type { Application as ExpressApplication } from 'express';
+import type { Application as ExpressApplication, NextFunction } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
 import { FileRepository, SchemaFileRepository } from './FileRepository';
@@ -47,7 +48,7 @@ import type {
   LoggerFn,
   DriverConfig,
 } from './types';
-import { ContextToOrchestratorIdFn } from './types';
+import { ContextToOrchestratorIdFn, ContextAcceptanceResult, ContextAcceptanceResultHttp, ContextAcceptanceResultWs, ContextAcceptor } from './types';
 
 const { version } = require('../../../package.json');
 
@@ -59,19 +60,26 @@ function wrapToFnIfNeeded<T, R>(possibleFn: T | ((a: R) => T)): (a: R) => T {
   return () => possibleFn;
 }
 
+class AcceptAllAcceptor {
+  public shouldAccept(): ContextAcceptanceResult {
+    return { accepted: true };
+  }
+
+  public shouldAcceptHttp(): ContextAcceptanceResultHttp {
+    return { accepted: true };
+  }
+
+  public shouldAcceptWs(): ContextAcceptanceResultWs {
+    return { accepted: true };
+  }
+}
+
 export class CubejsServerCore {
   /**
    * Returns core version based on package.json.
    */
   public static version() {
     return version;
-  }
-
-  /**
-   * Create an instance of the core.
-   */
-  public static create(options?: CreateOptions, systemOptions?: SystemOptions) {
-    return new CubejsServerCore(options, systemOptions);
   }
 
   /**
@@ -142,6 +150,8 @@ export class CubejsServerCore {
 
   public coreServerVersion: string | null = null;
 
+  private contextAcceptor: ContextAcceptor;
+
   /**
    * Class constructor.
    */
@@ -178,6 +188,8 @@ export class CubejsServerCore {
       this.contextToAppId = this.options.contextToAppId;
       this.standalone = false;
     }
+
+    this.contextAcceptor = this.createContextAcceptor();
 
     if (this.options.contextToDataSourceId) {
       throw new Error('contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.');
@@ -309,6 +321,10 @@ export class CubejsServerCore {
     }
   }
 
+  protected createContextAcceptor(): ContextAcceptor {
+    return new AcceptAllAcceptor();
+  }
+
   /**
    * Determines whether current instance is ready to process queries.
    */
@@ -419,7 +435,7 @@ export class CubejsServerCore {
       return this.apiGatewayInstance;
     }
 
-    return this.apiGatewayInstance = new ApiGateway(
+    return (this.apiGatewayInstance = new ApiGateway(
       this.options.apiSecret,
       this.getCompilerApi.bind(this),
       this.getOrchestratorApi.bind(this),
@@ -429,17 +445,34 @@ export class CubejsServerCore {
         dataSourceStorage: this.orchestratorStorage,
         basePath: this.options.basePath,
         checkAuthMiddleware: this.options.checkAuthMiddleware,
+        contextRejectionMiddleware: this.contextRejectionMiddleware.bind(this),
+        wsContextAcceptor: this.contextAcceptor.shouldAcceptWs,
         checkAuth: this.options.checkAuth,
-        queryRewrite: this.options.queryRewrite || this.options.queryTransformer,
+        queryRewrite:
+          this.options.queryRewrite || this.options.queryTransformer,
         extendContext: this.options.extendContext,
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),
         jwt: this.options.jwt,
         refreshScheduler: () => new RefreshScheduler(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
-        serverCoreVersion: this.coreServerVersion
+        serverCoreVersion: this.coreServerVersion,
       }
-    );
+    ));
+  }
+
+  protected async contextRejectionMiddleware(req, res, next) {
+    if (!this.standalone) {
+      const result = this.contextAcceptor.shouldAcceptHttp(req.context);
+      if (!result.accepted) {
+        res.writeHead(result.rejectStatusCode!, result.rejectHeaders!);
+        res.send();
+        return;
+      }
+    }
+    if (next) {
+      next();
+    }
   }
 
   public getCompilerApi(context: RequestContext) {
@@ -648,22 +681,33 @@ export class CubejsServerCore {
    * @internal Please dont use this method directly, use refreshTimer
    */
   public handleScheduledRefreshInterval = async (options) => {
-    const contexts = await this.options.scheduledRefreshContexts();
+    const contexts = (await this.options.scheduledRefreshContexts()).filter(
+      (context) => this.contextAcceptor.shouldAccept(this.migrateBackgroundContext(context)).accepted
+    );
     if (contexts.length < 1) {
       this.logger('Refresh Scheduler Error', {
         error: 'At least one context should be returned by scheduledRefreshContexts'
       });
     }
 
-    return Promise.all(contexts.map(async context => {
-      const queryingOptions: any = { ...options, concurrency: this.options.scheduledRefreshConcurrency };
+    const batchLimit = pLimit(this.options.scheduledRefreshBatchSize);
+    return Promise.all(
+      contexts
+        .map((context) => async () => {
+          const queryingOptions: any = {
+            ...options,
+            concurrency: this.options.scheduledRefreshConcurrency,
+          };
 
-      if (this.options.scheduledRefreshTimeZones) {
-        queryingOptions.timezones = this.options.scheduledRefreshTimeZones;
-      }
+          if (this.options.scheduledRefreshTimeZones) {
+            queryingOptions.timezones = this.options.scheduledRefreshTimeZones;
+          }
 
-      return this.runScheduledRefresh(context, queryingOptions);
-    }));
+          return this.runScheduledRefresh(context, queryingOptions);
+        })
+        // Limit the number of refresh contexts we process per iteration
+        .map(batchLimit)
+    );
   };
 
   protected getRefreshScheduler() {

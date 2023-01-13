@@ -96,12 +96,17 @@ describe('SQLInterface', () => {
       throw new Error('Please specify user');
     });
 
+    const stream = jest.fn(async ({ request, session }) => {
+      // TODO:
+    });
+
     const instance = await native.registerInterface({
       // nonce: '12345678910111213141516'.substring(0, 20),
       port: 4545,
       checkAuth,
       load,
       meta,
+      stream,
     });
     console.log(instance);
 

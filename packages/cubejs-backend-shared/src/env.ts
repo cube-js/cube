@@ -190,6 +190,9 @@ const variables: Record<string, (...args: any) => any> = {
   maxPartitionsPerCube: () => get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
     .default('10000')
     .asInt(),
+  scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
+    .default('1')
+    .asInt(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -559,6 +562,13 @@ const variables: Record<string, (...args: any) => any> = {
    */
   dbQueryDefaultLimit: (): number => get('CUBEJS_DB_QUERY_DEFAULT_LIMIT')
     .default(10000)
+    .asInt(),
+
+  /**
+   * Query stream `highWaterMark` value.
+   */
+  dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
+    .default(5000)
     .asInt(),
 
   /**

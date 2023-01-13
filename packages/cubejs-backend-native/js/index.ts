@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+// import { getEnv } from '@cubejs-backend/shared';
 
 export interface BaseMeta {
     // postgres or mysql
@@ -53,6 +54,7 @@ export type SQLInterfaceOptions = {
     checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
     load: (payload: LoadPayload) => unknown | Promise<unknown>,
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
+    stream: (payload: LoadPayload) => unknown | Promise<unknown>,
 };
 
 function loadNative() {
@@ -106,6 +108,43 @@ function wrapNativeFunctionWithChannelCallback(
     };
 };
 
+// TODO: Refactor - define classes
+function wrapNativeFunctionWithStream(
+    fn: (extra: any) => unknown | Promise<unknown>
+) {
+    return async (extra: any, writer: any) => {
+        let streamResponse: any;
+        try {
+            streamResponse = await fn(JSON.parse(extra));
+            let chunk: object[] = [];
+            streamResponse.stream.on('data', (c: object) => {
+                chunk.push(c);
+                if (chunk.length >= 10000) {
+                    if (!writer.chunk(JSON.stringify(chunk))) {
+                        streamResponse.stream.removeAllListeners();
+                    }
+                    chunk = [];
+                }
+            });
+            streamResponse.stream.on('close', () => {
+                if (chunk.length > 0) {
+                    writer.chunk(JSON.stringify(chunk));
+                }
+                writer.end("");
+            });
+
+            streamResponse.stream.on('error', (err: any) => {
+                writer.reject(err.message || "Unknown JS exception");
+            });
+        } catch (e: any) {
+            if (!!streamResponse && !!streamResponse.stream) {
+                streamResponse.stream.destroy(e);
+            }
+            writer.reject(e.message || "Unknown JS exception");
+        }
+    };
+};
+
 type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
 export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel): void => {
@@ -132,12 +171,17 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
         throw new Error('options.meta must be a function');
     }
 
+    if (typeof options.stream != 'function') {
+        throw new Error('options.stream must be a function');
+    }
+
     const native = loadNative();
     return native.registerInterface({
         ...options,
         checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
         load: wrapNativeFunctionWithChannelCallback(options.load),
         meta: wrapNativeFunctionWithChannelCallback(options.meta),
+        stream: wrapNativeFunctionWithStream(options.stream),
     });
 };
 

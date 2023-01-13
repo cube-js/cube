@@ -4,6 +4,7 @@
  * @fileoverview The `BaseDriver` and related types declaration.
  */
 
+import * as stream from 'stream';
 import {
   getEnv,
   keyByDataSource,
@@ -228,6 +229,11 @@ export abstract class BaseDriver implements DriverInterface {
 
   abstract query<R = unknown>(_query: string, _values?: unknown[], _options?: QueryOptions): Promise<R[]>;
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public async streamQuery(sql: string, values: string[]): Promise<stream.Readable> {
+    throw new TypeError('Driver\'s .streamQuery() method is not implemented yet.');
+  }
+
   public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
     const rows = await this.query<Row>(query, values);
     if (rows.length === 0) {
@@ -366,6 +372,7 @@ export abstract class BaseDriver implements DriverInterface {
     return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async queryColumnTypes(sql: string, params?: unknown[]): Promise<{ name: any; type: string; }[]> {
     return [];
   }

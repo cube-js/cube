@@ -3,6 +3,35 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.41](https://github.com/cube-js/cube.js/compare/v0.31.40...v0.31.41) (2023-01-13)
+
+
+### Bug Fixes
+
+* **cubestore:** Metastore get_tables_with_path cache is not work correctly ([#6000](https://github.com/cube-js/cube.js/issues/6000)) ([75699c8](https://github.com/cube-js/cube.js/commit/75699c85f3b428d3e1967642b2c440be77e7b095))
+
+
+### Features
+
+* streaming capabilities ([#5995](https://github.com/cube-js/cube.js/issues/5995)) ([d336c4e](https://github.com/cube-js/cube.js/commit/d336c4eaa3547422484bb003df19dfd4c7be5f96))
+
+
+
+
+
+## [0.31.40](https://github.com/cube-js/cube.js/compare/v0.31.39...v0.31.40) (2023-01-12)
+
+
+### Features
+
+* **cubesql:** Support `date_trunc` over column filter ([c9e71e6](https://github.com/cube-js/cube.js/commit/c9e71e6a13f41e2af388b7f91043e4118ba91f40))
+* **docker:** Alpine - migrate to 3.15 (3.14 was removed) ([#5997](https://github.com/cube-js/cube.js/issues/5997)) ([cf9078a](https://github.com/cube-js/cube.js/commit/cf9078a2c29d31d78b8c1e100ce254495128e1a0))
+* Hooks for the context rejection mechanism ([#5901](https://github.com/cube-js/cube.js/issues/5901)) ([b6f0506](https://github.com/cube-js/cube.js/commit/b6f0506e1b5821a16857d6695a40c6b957887941))
+
+
+
+
+
 ## [0.31.39](https://github.com/cube-js/cube.js/compare/v0.31.38...v0.31.39) (2023-01-12)
 
 

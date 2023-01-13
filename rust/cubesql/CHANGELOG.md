@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.41](https://github.com/cube-js/cube.js/compare/v0.31.40...v0.31.41) (2023-01-13)
+
+
+### Features
+
+* streaming capabilities ([#5995](https://github.com/cube-js/cube.js/issues/5995)) ([d336c4e](https://github.com/cube-js/cube.js/commit/d336c4eaa3547422484bb003df19dfd4c7be5f96))
+
+
+
+
+
+## [0.31.40](https://github.com/cube-js/cube.js/compare/v0.31.39...v0.31.40) (2023-01-12)
+
+
+### Features
+
+* **cubesql:** Support `date_trunc` over column filter ([c9e71e6](https://github.com/cube-js/cube.js/commit/c9e71e6a13f41e2af388b7f91043e4118ba91f40))
+
+
+
+
+
 ## [0.31.39](https://github.com/cube-js/cube.js/compare/v0.31.38...v0.31.39) (2023-01-12)
 
 

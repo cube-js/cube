@@ -3324,7 +3324,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
-                limit: Some(50000),
+                limit: Some(1000001),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -3373,7 +3373,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     date_range: None,
                 }]),
                 order: None,
-                limit: Some(50000),
+                limit: Some(1000001),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
@@ -3432,7 +3432,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ])),
                 }]),
                 order: None,
-                limit: Some(50000),
+                limit: Some(1000001),
                 offset: None,
                 filters: None,
             }
@@ -3458,7 +3458,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
-                limit: Some(50000),
+                limit: Some(1000001),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
@@ -11566,7 +11566,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                limit: Some(50000),
+                limit: Some(100000),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -11773,7 +11773,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                limit: Some(50000),
+                limit: Some(100000),
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
@@ -16176,6 +16176,100 @@ ORDER BY \"COUNT(count)\" DESC"
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
                     granularity: Some("day".to_owned()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_filter_date_trunc_column_with_literal() {
+        init_logger();
+
+        let test_data = vec![
+            // (operator, literal date, filter operator, filter value)
+            (">=", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
+            (">=", "2020-04-01", "afterDate", "2020-04-01T00:00:00.000Z"),
+            (">=", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
+            ("<=", "2020-03-25", "beforeDate", "2020-03-31T23:59:59.999Z"),
+            ("<=", "2020-04-01", "beforeDate", "2020-04-30T23:59:59.999Z"),
+            ("<=", "2020-04-10", "beforeDate", "2020-04-30T23:59:59.999Z"),
+            (">", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
+            (">", "2020-04-01", "afterDate", "2020-05-01T00:00:00.000Z"),
+            (">", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
+            ("<", "2020-03-25", "beforeDate", "2020-03-31T23:59:59.999Z"),
+            ("<", "2020-04-01", "beforeDate", "2020-03-31T23:59:59.999Z"),
+            ("<", "2020-04-10", "beforeDate", "2020-04-30T23:59:59.999Z"),
+        ];
+
+        for (operator, literal_date, filter_operator, filter_value) in test_data {
+            let logical_plan = convert_select_to_query_plan(
+                format!(
+                    "
+                    SELECT
+                        \"ta_1\".\"order_date\" \"ca_1\"
+                    FROM KibanaSampleDataEcommerce \"ta_1\"
+                    WHERE DATE_TRUNC('MONTH', CAST(\"ta_1\".\"order_date\" as TIMESTAMP)) {} to_date('{}', 'yyyy-MM-dd')
+                    ",
+                    operator, literal_date,
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            assert_eq!(
+                logical_plan.find_cube_scan().request,
+                V1LoadRequestQuery {
+                    measures: Some(vec![]),
+                    dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                    segments: Some(vec![]),
+                    time_dimensions: None,
+                    order: None,
+                    limit: None,
+                    offset: None,
+                    filters: Some(vec![V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                        operator: Some(filter_operator.to_string()),
+                        values: Some(vec![filter_value.to_string()]),
+                        or: None,
+                        and: None
+                    }]),
+                }
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_double_date_trunc_with_cast() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                DATE_TRUNC('MONTH', CAST(DATE_TRUNC('MONTH', CAST("ta_1"."order_date" as TIMESTAMP)) as TIMESTAMP)) AS "ca_1"
+            FROM KibanaSampleDataEcommerce "ta_1"
+            GROUP BY "ca_1"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("month".to_owned()),
                     date_range: None
                 }]),
                 order: None,

@@ -16,6 +16,8 @@ import {
 import {
   CheckAuthMiddlewareFn,
   RequestLoggerMiddlewareFn,
+  ContextRejectionMiddlewareFn,
+  ContextAcceptorFn,
 } from '../interfaces';
 
 type UserBackgroundContext = {
@@ -59,6 +61,8 @@ interface ApiGatewayOptions {
   enforceSecurityChecks?: boolean;
   playgroundAuthSecret?: string;
   serverCoreVersion?: string;
+  contextRejectionMiddleware?: ContextRejectionMiddlewareFn;
+  wsContextAcceptor?: ContextAcceptorFn;
   checkAuth?: CheckAuthFn;
   /**
    * @deprecated Use checkAuth property instead.

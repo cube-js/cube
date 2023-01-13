@@ -1,3 +1,4 @@
+import * as stream from 'stream';
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
@@ -159,6 +160,25 @@ export class QueryOrchestrator {
       key,
       token,
     );
+  }
+
+  /**
+   * Returns stream object which will be used to stream results from
+   * the data source if applicable. Throw otherwise.
+   *
+   * @throw Error
+   */
+  public async streamQuery(query: QueryBody): Promise<stream.Transform> {
+    const {
+      preAggregationsTablesToTempTables,
+      values,
+    } = await this.preAggregations.loadAllPreAggregationsIfNeeded(query);
+    query.values = values || query.values;
+    const _stream = await this.queryCache.cachedQueryResult(
+      query,
+      preAggregationsTablesToTempTables,
+    );
+    return <stream.Transform>_stream;
   }
 
   /**

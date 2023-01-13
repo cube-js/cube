@@ -1540,10 +1540,8 @@ impl LanguageToLogicalPlanConverter {
                             Some(n) => {
                                 if n > cube_scan_query_limit {
                                     limit_was_changed = true;
-                                    Some(cube_scan_query_limit)
-                                } else {
-                                    Some(n)
                                 }
+                                Some(n)
                             }
                             None => {
                                 if fail_on_max_limit_hit {

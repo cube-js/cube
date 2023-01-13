@@ -1,4 +1,4 @@
-use super::utils::parse_granularity;
+use super::utils;
 use crate::{
     compile::{
         engine::provider::CubeContext,
@@ -12,7 +12,10 @@ use crate::{
     },
     var, var_iter,
 };
-use datafusion::{arrow::datatypes::DataType, scalar::ScalarValue};
+use datafusion::{
+    arrow::datatypes::{DataType, TimeUnit},
+    scalar::ScalarValue,
+};
 use egg::{EGraph, Rewrite, Subst};
 use std::{convert::TryFrom, sync::Arc};
 
@@ -218,20 +221,50 @@ impl RewriteRules for DateRules {
                     vec![literal_string("day"), column_expr("?column")],
                 ),
             ),
-            rewrite(
+            transforming_rewrite(
                 "cast-in-date-trunc",
                 fun_expr(
                     "DateTrunc",
-                    // TODO check data_type?
                     vec![
-                        "?granularity".to_string(),
+                        literal_expr("?granularity"),
                         cast_expr(column_expr("?column"), "?data_type"),
                     ],
                 ),
                 fun_expr(
                     "DateTrunc",
-                    vec!["?granularity".to_string(), column_expr("?column")],
+                    vec![literal_expr("?granularity"), column_expr("?column")],
                 ),
+                self.unwrap_cast_to_timestamp("?data_type", "?granularity"),
+            ),
+            transforming_rewrite(
+                "cast-in-date-trunc-double",
+                fun_expr(
+                    "DateTrunc",
+                    vec![
+                        literal_expr("?granularity"),
+                        cast_expr(
+                            fun_expr(
+                                "DateTrunc",
+                                vec![
+                                    literal_expr("?granularity"),
+                                    cast_expr("?expr", "?data_type"),
+                                ],
+                            ),
+                            "?data_type",
+                        ),
+                    ],
+                ),
+                fun_expr(
+                    "DateTrunc",
+                    vec![
+                        literal_expr("?granularity"),
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), "?expr".to_string()],
+                        ),
+                    ],
+                ),
+                self.unwrap_cast_to_timestamp("?data_type", "?granularity"),
             ),
             rewrite(
                 "current-timestamp-to-now",
@@ -397,13 +430,15 @@ impl RewriteRules for DateRules {
                     "?interval",
                 ),
             ),
-            rewrite(
+            // TODO: TO_DATE should return Date32, but Timestamp works for all supported cases
+            transforming_rewrite(
                 "thoughtspot-to-date-to-timestamp",
                 udf_expr(
                     "to_date",
-                    vec![literal_expr("?date"), literal_string("YYYY-MM-DD")],
+                    vec![literal_expr("?date"), literal_expr("?format")],
                 ),
                 udf_expr("date_to_timestamp", vec![literal_expr("?date")]),
+                self.transform_to_date_to_timestamp("?format"),
             ),
             rewrite(
                 "datastudio-dates",
@@ -483,7 +518,7 @@ impl DateRules {
                 };
 
                 for datepart in var_iter!(egraph[subst[datepart_var]], LiteralExprValue) {
-                    let interval = match parse_granularity(datepart, false).as_deref() {
+                    let interval = match utils::parse_granularity(datepart, false).as_deref() {
                         Some("millisecond") => {
                             ScalarValue::IntervalDayTime(Some(i64::from(interval_int)))
                         }
@@ -523,6 +558,25 @@ impl DateRules {
         }
     }
 
+    fn transform_to_date_to_timestamp(
+        &self,
+        format_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let format_var = var!(format_var);
+        move |egraph, subst| {
+            for format in var_iter!(egraph[subst[format_var]], LiteralExprValue) {
+                match format {
+                    ScalarValue::Utf8(Some(format)) => match format.as_str() {
+                        "YYYY-MM-DD" | "yyyy-MM-dd" => return true,
+                        _ => (),
+                    },
+                    _ => (),
+                }
+            }
+            false
+        }
+    }
+
     fn unwrap_cast_to_date(
         &self,
         data_type_var: &'static str,
@@ -541,6 +595,40 @@ impl DateRules {
                 }
             }
 
+            false
+        }
+    }
+
+    fn unwrap_cast_to_timestamp(
+        &self,
+        data_type_var: &'static str,
+        granularity_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let data_type_var = var!(data_type_var);
+        let granularity_var = var!(granularity_var);
+        move |egraph, subst| {
+            for data_type in var_iter!(egraph[subst[data_type_var]], CastExprDataType) {
+                match data_type {
+                    DataType::Timestamp(TimeUnit::Nanosecond, None) => return true,
+                    DataType::Date32 => {
+                        for granularity in
+                            var_iter!(egraph[subst[granularity_var]], LiteralExprValue)
+                        {
+                            if let ScalarValue::Utf8(Some(granularity)) = granularity {
+                                if let (Some(original_granularity), Some(day_granularity)) = (
+                                    utils::granularity_str_to_int_order(&granularity, Some(false)),
+                                    utils::granularity_str_to_int_order("day", Some(false)),
+                                ) {
+                                    if original_granularity >= day_granularity {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+            }
             false
         }
     }
