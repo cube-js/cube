@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -21,14 +21,14 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js 14.x
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: 14.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
       - name: Restore lerna
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
@@ -88,7 +88,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -97,14 +97,14 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
       - name: Restore lerna
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ${{ steps.yarn-cache-dir-path.outputs.dir }}
@@ -159,7 +159,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -167,14 +167,14 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
       - name: Restore lerna (excluding windows)
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         if: ${{ !startsWith(matrix.os-version, 'windows') }}
         with:
           path: |
@@ -189,7 +189,7 @@ jobs:
       # cache will include rust cache for native, which causes 3GB archive
       # Right now, GH provides 10 gb for each repository with automatic retention.
       - name: Restore lerna (Windows only)
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         if: ${{ startsWith(matrix.os-version, 'windows') }}
         with:
           path: |
@@ -238,7 +238,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Repo metadata
         id: repo
         uses: actions/github-script@v3
@@ -281,7 +281,7 @@ jobs:
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest.Dockerfile
@@ -308,7 +308,7 @@ jobs:
 
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Repo metadata
         id: repo
         uses: actions/github-script@v3
@@ -353,7 +353,7 @@ jobs:
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest-alpine.Dockerfile
@@ -380,7 +380,7 @@ jobs:
 
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Repo metadata
         id: repo
         uses: actions/github-script@v3
@@ -425,7 +425,7 @@ jobs:
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./packages/cubejs-docker
           file: ./packages/cubejs-docker/latest-debian-jdk.Dockerfile
@@ -473,7 +473,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Repo metadata
         id: repo
         uses: actions/github-script@v3
@@ -517,14 +517,14 @@ jobs:
         with:
           version: v0.9.1
       - name: Cache Docker layers
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-${{ matrix.target }}-buildx-${{ matrix.tag }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-buildx-${{ matrix.tag }}-
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./rust/cubestore/
           file: ./rust/cubestore/Dockerfile
@@ -602,7 +602,7 @@ jobs:
             compress: false
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:

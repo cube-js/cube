@@ -24,11 +24,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, ubuntu-18.04, macos-10.15, windows-2019]
+        os: [ubuntu-20.04, ubuntu-18.04, macos-11, windows-2019]
         node-version: [14.x]
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -36,11 +36,11 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -96,7 +96,7 @@ jobs:
         arch: ['', '-alpine']
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -104,11 +104,11 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js 14.x
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: 14.x
       - name: Restore lerna
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -165,7 +165,7 @@ jobs:
             container: cypress/browsers:node12.18.3-chrome89-ff86
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -173,11 +173,11 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js 14.x
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: 14.x
       - name: Restore lerna
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |

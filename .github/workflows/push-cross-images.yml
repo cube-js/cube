@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Login to DockerHub
         if: ${{ github.ref == 'refs/heads/master' }}
         uses: docker/login-action@v1
@@ -45,7 +45,7 @@ jobs:
         with:
           path: rust/cubestore/cross/
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./
           file: ./rust/cubestore/cross/${{ matrix.target }}.Dockerfile
