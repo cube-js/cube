@@ -1183,37 +1183,28 @@ impl SqlService for SqlServiceImpl {
                         timeout(
                             self.query_timeout,
                             self.cache
-                                .get(
-                                    query,
-                                    &context.inline_tables,
-                                    serialized,
-                                    async move |plan| {
-                                        let records;
-                                        if workers.len() == 0 {
-                                            records = executor
-                                                .execute_router_plan(plan, cluster)
-                                                .await?
-                                                .1;
-                                        } else {
-                                            // Pick one of the workers to run as main for the request.
-                                            let i =
-                                                thread_rng().sample(Uniform::new(0, workers.len()));
-                                            let rs =
-                                                cluster.route_select(&workers[i], plan).await?.1;
-                                            records = rs
-                                                .into_iter()
-                                                .map(|r| r.read())
-                                                .collect::<Result<Vec<_>, _>>()?;
-                                        }
-                                        Ok(cube_ext::spawn_blocking(
-                                            move || -> Result<DataFrame, CubeError> {
-                                                let df = batch_to_dataframe(&records)?;
-                                                Ok(df)
-                                            },
-                                        )
-                                        .await??)
-                                    },
-                                )
+                                .get(query, context, serialized, async move |plan| {
+                                    let records;
+                                    if workers.len() == 0 {
+                                        records =
+                                            executor.execute_router_plan(plan, cluster).await?.1;
+                                    } else {
+                                        // Pick one of the workers to run as main for the request.
+                                        let i = thread_rng().sample(Uniform::new(0, workers.len()));
+                                        let rs = cluster.route_select(&workers[i], plan).await?.1;
+                                        records = rs
+                                            .into_iter()
+                                            .map(|r| r.read())
+                                            .collect::<Result<Vec<_>, _>>()?;
+                                    }
+                                    Ok(cube_ext::spawn_blocking(
+                                        move || -> Result<DataFrame, CubeError> {
+                                            let df = batch_to_dataframe(&records)?;
+                                            Ok(df)
+                                        },
+                                    )
+                                    .await??)
+                                })
                                 .with_current_subscriber(),
                         )
                         .await??
