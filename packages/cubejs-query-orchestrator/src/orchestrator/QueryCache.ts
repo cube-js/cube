@@ -490,6 +490,8 @@ export class QueryCache {
           this.logger('Executing SQL', { ...req });
           if (req.useCsvQuery) {
             return this.csvQuery(client, req);
+          } else if (req.tablesSchema) {
+            return client.tablesSchema();
           } else {
             return client.query(req.query, req.values, req);
           }
