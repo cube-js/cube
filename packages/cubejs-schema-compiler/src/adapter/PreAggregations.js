@@ -874,6 +874,15 @@ export class PreAggregations {
             lastRollupLambda: i === referencedPreAggregations.length - 1,
           }
         };
+        if (i > 0) {
+          const partitionGranularity = PreAggregations.checkPartitionGranularityDefined(cube, preAggregationName, referencedPreAggregations[i]);
+          const prevReferencedPreAggregation = referencedPreAggregations[i - 1];
+          const partitionGranularityPrev = PreAggregations.checkPartitionGranularityDefined(cube, preAggregationName, prevReferencedPreAggregation);
+          const minGranularity = this.query.minGranularity(partitionGranularityPrev, partitionGranularity);
+          if (minGranularity !== partitionGranularity) {
+            throw new UserError(`'${prevReferencedPreAggregation.cube}.${prevReferencedPreAggregation.preAggregationName}' and '${referencedPreAggregation.cube}.${referencedPreAggregation.preAggregationName}' referenced by '${cube}.${preAggregationName}' rollupLambda have incompatible partition granularities. '${partitionGranularityPrev}' can't be padded by '${partitionGranularity}'`)
+          }
+        }
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'measures');
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'dimensions');
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'timeDimensions');
@@ -887,6 +896,13 @@ export class PreAggregations {
     }
   }
 
+  static checkPartitionGranularityDefined(cube, preAggregationName, preAggregation) {
+    if (!preAggregation.preAggregation.partitionGranularity) {
+      throw new UserError(`'${preAggregation.cube}.${preAggregation.preAggregationName}' referenced by '${cube}.${preAggregationName}' rollupLambda doesn't have partition granularity. Partition granularity is required if multiple rollups are provided.`);
+    }
+    return preAggregation.preAggregation.partitionGranularity;
+  }
+
   static memberNameMismatchValidation(preAggA, preAggB, memberType) {
     const preAggAMemberNames = PreAggregations.memberShortNames(preAggA.references[memberType], memberType === 'timeDimensions');
     const preAggBMemberNames = PreAggregations.memberShortNames(preAggB.references[memberType], memberType === 'timeDimensions');
@@ -894,12 +910,12 @@ export class PreAggregations {
       preAggAMemberNames,
       preAggBMemberNames
     )) {
-      throw new UserError(`Names for ${memberType} doesn't match between '${preAggA.cube}.${preAggA.preAggregationName}' and '${preAggB.cube}.${preAggB.preAggregationName}': ${JSON.stringify(preAggAMemberNames)} != ${JSON.stringify(preAggBMemberNames)}`);
+      throw new UserError(`Names for ${memberType} doesn't match between '${preAggA.cube}.${preAggA.preAggregationName}' and '${preAggB.cube}.${preAggB.preAggregationName}': ${JSON.stringify(preAggAMemberNames)} does not equal to ${JSON.stringify(preAggBMemberNames)}`);
     }
   }
 
   static memberShortNames(memberArray, isTimeDimension) {
-    return memberArray.map(member => (isTimeDimension ? member.dimension.split('.')[1] : member.split('.')[1]));
+    return memberArray.map(member => (isTimeDimension ? `${member.dimension.split('.')[1]}.${member.granularity}` : member.split('.')[1]));
   }
 
   rollupMatchResultDescriptions() {
