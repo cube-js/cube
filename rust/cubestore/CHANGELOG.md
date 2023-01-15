@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.42](https://github.com/cube-js/cube.js/compare/v0.31.41...v0.31.42) (2023-01-15)
+
+
+### Bug Fixes
+
+* **cubestore:** Large memory consumption while waiting for the queue cache ([#6004](https://github.com/cube-js/cube.js/issues/6004)) ([8c029bb](https://github.com/cube-js/cube.js/commit/8c029bb96cf4c451f061cef2d83b5d5dc3a8637c))
+* **cubestore:** Large memory consumption while waiting for the queue cache: drop context ([#6005](https://github.com/cube-js/cube.js/issues/6005)) ([b39920f](https://github.com/cube-js/cube.js/commit/b39920f6f5f2b10b2ea598712bd5f5d1b02a3308))
+
+
+
+
+
 ## [0.31.41](https://github.com/cube-js/cube.js/compare/v0.31.40...v0.31.41) (2023-01-13)
 
 

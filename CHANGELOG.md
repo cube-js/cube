@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.42](https://github.com/cube-js/cube.js/compare/v0.31.41...v0.31.42) (2023-01-15)
+
+
+### Bug Fixes
+
+* **cubestore:** Large memory consumption while waiting for the queue cache ([#6004](https://github.com/cube-js/cube.js/issues/6004)) ([8c029bb](https://github.com/cube-js/cube.js/commit/8c029bb96cf4c451f061cef2d83b5d5dc3a8637c))
+* **cubestore:** Large memory consumption while waiting for the queue cache: drop context ([#6005](https://github.com/cube-js/cube.js/issues/6005)) ([b39920f](https://github.com/cube-js/cube.js/commit/b39920f6f5f2b10b2ea598712bd5f5d1b02a3308))
+
+
+### Features
+
+* **api-gateway:** added result filter for sql-runner ([#5985](https://github.com/cube-js/cube.js/issues/5985)) ([89f1b92](https://github.com/cube-js/cube.js/commit/89f1b922e1e3d8a02fbdaf2bda2c2cb77c0bdc78))
+* Multiple rollups in `rollupLambda` support ([#6008](https://github.com/cube-js/cube.js/issues/6008)) ([84fff0d](https://github.com/cube-js/cube.js/commit/84fff0d7745ccf657bb8eca0c5cc426c82ffd516))
+* **native:** Channel.resolve/reject without lock ([#6001](https://github.com/cube-js/cube.js/issues/6001)) ([9133a3b](https://github.com/cube-js/cube.js/commit/9133a3bf885ca17f14ac18041a1692201d4c1cfb))
+
+
+
+
+
 ## [0.31.41](https://github.com/cube-js/cube.js/compare/v0.31.40...v0.31.41) (2023-01-13)
 
 

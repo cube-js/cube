@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.42](https://github.com/cube-js/cube.js/compare/v0.31.41...v0.31.42) (2023-01-15)
+
+
+### Features
+
+* Multiple rollups in `rollupLambda` support ([#6008](https://github.com/cube-js/cube.js/issues/6008)) ([84fff0d](https://github.com/cube-js/cube.js/commit/84fff0d7745ccf657bb8eca0c5cc426c82ffd516))
+
+
+
+
+
 ## [0.31.41](https://github.com/cube-js/cube.js/compare/v0.31.40...v0.31.41) (2023-01-13)
 
 **Note:** Version bump only for package @cubejs-backend/testing

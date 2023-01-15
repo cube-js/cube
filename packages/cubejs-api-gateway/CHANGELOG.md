@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.42](https://github.com/cube-js/cube.js/compare/v0.31.41...v0.31.42) (2023-01-15)
+
+
+### Features
+
+* **api-gateway:** added result filter for sql-runner ([#5985](https://github.com/cube-js/cube.js/issues/5985)) ([89f1b92](https://github.com/cube-js/cube.js/commit/89f1b922e1e3d8a02fbdaf2bda2c2cb77c0bdc78))
+
+
+
+
+
 ## [0.31.41](https://github.com/cube-js/cube.js/compare/v0.31.40...v0.31.41) (2023-01-13)
 
 
