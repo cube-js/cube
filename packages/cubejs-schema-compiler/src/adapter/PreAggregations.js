@@ -880,7 +880,7 @@ export class PreAggregations {
           const partitionGranularityPrev = PreAggregations.checkPartitionGranularityDefined(cube, preAggregationName, prevReferencedPreAggregation);
           const minGranularity = this.query.minGranularity(partitionGranularityPrev, partitionGranularity);
           if (minGranularity !== partitionGranularity) {
-            throw new UserError(`'${prevReferencedPreAggregation.cube}.${prevReferencedPreAggregation.preAggregationName}' and '${referencedPreAggregation.cube}.${referencedPreAggregation.preAggregationName}' referenced by '${cube}.${preAggregationName}' rollupLambda have incompatible partition granularities. '${partitionGranularityPrev}' can't be padded by '${partitionGranularity}'`)
+            throw new UserError(`'${prevReferencedPreAggregation.cube}.${prevReferencedPreAggregation.preAggregationName}' and '${referencedPreAggregation.cube}.${referencedPreAggregation.preAggregationName}' referenced by '${cube}.${preAggregationName}' rollupLambda have incompatible partition granularities. '${partitionGranularityPrev}' can't be padded by '${partitionGranularity}'`);
           }
         }
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'measures');
