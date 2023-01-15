@@ -3,12 +3,20 @@ import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
   constructor({ csvImport } = {}) {
-    this.tables = [];
+    this.tablesObj = [];
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
     this.csvImport = csvImport;
     this.now = new Date().getTime();
+  }
+
+  get tables() {
+    return this.tablesObj.map(t => t.tableName || t);
+  }
+
+  resetTables() {
+    this.tablesObj = [];
   }
 
   query(query) {
@@ -24,6 +32,10 @@ class MockDriver {
 
     if (query.match(/^SELECT NOW\(\)$/)) {
       promise = promise.then(() => [{ now: new Date().toJSON() }]);
+    }
+
+    if (query.match(/^SELECT '(\d+-\d+-\d+)'/)) {
+      promise = promise.then(() => [{ date: new Date(`${query.match(/^SELECT '(\d+-\d+-\d+)'/)[1]}T00:00:00.000Z`).toJSON() }]);
     }
 
     if (query.match(/^SELECT MAX\(timestamp\)/)) {
@@ -56,7 +68,11 @@ class MockDriver {
     if (this.tablesQueryDelay) {
       await this.delay(this.tablesQueryDelay);
     }
-    return this.tables.filter(t => t.split('.')[0] === schema).map(t => ({ table_name: t.replace(`${schema}.`, '') }));
+    return this.tablesObj.filter(t => (t.tableName || t).split('.')[0] === schema)
+      .map(t => ({
+        table_name: (t.tableName || t).replace(`${schema}.`, ''),
+        build_range_end: t.buildRangeEnd
+      }));
   }
 
   delay(timeout) {
@@ -69,7 +85,7 @@ class MockDriver {
   }
 
   loadPreAggregationIntoTable(preAggregationTableName, loadSql) {
-    this.tables.push(preAggregationTableName.substring(0, 100));
+    this.tablesObj.push({ tableName: preAggregationTableName.substring(0, 100) });
     const promise = this.query(loadSql);
     const resPromise = promise.then(() => this.tablesReady.push(preAggregationTableName.substring(0, 100)));
     resPromise.cancel = promise.cancel;
@@ -77,7 +93,7 @@ class MockDriver {
   }
 
   async dropTable(tableName) {
-    this.tables = this.tables.filter(t => t !== tableName);
+    this.tablesObj = this.tablesObj.filter(t => (t.tableName || t) !== tableName);
     return this.query(`DROP TABLE ${tableName}`);
   }
 
@@ -109,12 +125,12 @@ class ExternalMockDriver extends MockDriver {
   }
 
   async uploadTable(table) {
-    this.tables.push(table.substring(0, 100));
+    this.tablesObj.push({ tableName: table.substring(0, 100) });
     throw new Error('uploadTable has been called instead of uploadTableWithIndexes');
   }
 
-  async uploadTableWithIndexes(table, columns, tableData, indexesSql) {
-    this.tables.push(table.substring(0, 100));
+  async uploadTableWithIndexes(table, columns, tableData, indexesSql, uniqueKeyColumns, queryTracingObj, externalOptions) {
+    this.tablesObj.push({ tableName: table.substring(0, 100), buildRangeEnd: queryTracingObj?.buildRangeEnd });
     if (tableData.csvFile) {
       this.csvFiles.push(tableData.csvFile);
     }
@@ -209,7 +225,7 @@ describe('QueryOrchestrator', () => {
         }),
       },
       preAggregationsOptions: {
-        maxPartitions: 32,
+        maxPartitions: 100,
         queueOptions: () => ({
           executionTimeout: 2,
           concurrency: 2,
@@ -535,7 +551,7 @@ describe('QueryOrchestrator', () => {
   });
 
   test('save structure versions', async () => {
-    mockDriver.tables = [];
+    mockDriver.resetTables();
     await queryOrchestrator.fetchQuery({
       query: 'SELECT * FROM stb_pre_aggregations.orders',
       values: [],
@@ -1017,7 +1033,7 @@ describe('QueryOrchestrator', () => {
     await expect(async () => {
       await queryOrchestrator.fetchQuery(query);
     }).rejects.toThrow(
-      'The maximum number of partitions (32) was reached for the pre-aggregation'
+      'Pre-aggregation \'stb_pre_aggregations.orders_d\' requested to build 745 partitions which exceeds the maximum number of partitions per pre-aggregation of 100'
     );
   });
 
@@ -1135,6 +1151,73 @@ describe('QueryOrchestrator', () => {
     };
     const result = await queryOrchestrator.fetchQuery(query);
     expect(result.data[0]).toMatch(/orders_d20210601/);
+  });
+
+  test('lambda partitions', async () => {
+    const query = (matchedTimeDimensionDateRange) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d UNION ALL SELECT * FROM stb_pre_aggregations.orders_h',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'day',
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        matchedTimeDimensionDateRange
+      }, {
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_h',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_h AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT \'2021-05-30\'', []],
+          ['SELECT MAX(timestamp) FROM orders', []],
+        ],
+        external: true,
+        partitionGranularity: 'hour',
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        lastRollupLambda: true,
+        matchedTimeDimensionDateRange
+      }],
+      requestId: 'lambda partitions',
+      external: true,
+    });
+    let result = await queryOrchestrator.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).toMatch(/orders_d20210501/);
+    expect(result.data[0]).not.toMatch(/orders_h2021053000/);
+    expect(result.data[0]).toMatch(/orders_h2021053100/);
+
+    result = await queryOrchestrator.fetchQuery(query(['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).toMatch(/orders_h2021053100/);
   });
 
   test('loadRefreshKeys', async () => {
