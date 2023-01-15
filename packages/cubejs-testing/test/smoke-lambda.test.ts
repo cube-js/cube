@@ -330,4 +330,31 @@ describe('lambda', () => {
     console.log(await preAggs.json());
     expect(preAggs.status).toBe(200);
   });
+
+  test('Pre-aggregations API partitions', async () => {
+    const partitions = await (await fetch(`${birdbox.configuration.systemUrl}/pre-aggregations/partitions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: {
+          preAggregations: [
+            {
+              id: 'Orders.ordersByCompletedAtLambda'
+            },
+            {
+              id: 'Orders.ordersByCompletedAt'
+            },
+            {
+              id: 'Orders.ordersByCompletedByDay'
+            }
+          ]
+        }
+      }),
+    })).json();
+    console.log(JSON.stringify(partitions, null, 2));
+    const completedAtPartition = partitions.preAggregationPartitions[1].partitions[0];
+    expect(completedAtPartition.loadSql[0]).toMatch(/orders_orders_by_completed_at/);
+    const completedByDayPartition = partitions.preAggregationPartitions[2].partitions[0];
+    expect(completedByDayPartition.loadSql[0]).toMatch(/orders_orders_by_completed_by_day/);
+  });
 });

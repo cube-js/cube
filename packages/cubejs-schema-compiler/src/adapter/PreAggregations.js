@@ -660,7 +660,8 @@ export class PreAggregations {
       this.preAggregationForQuery =
         this
           .rollupMatchResults()
-          .find(p => p.canUsePreAggregation);
+          // Refresh worker can access specific pre-aggregations even in case those hidden by others
+          .find(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId));
     }
     return this.preAggregationForQuery;
   }
@@ -827,7 +828,8 @@ export class PreAggregations {
       preAggregation,
       cube,
       canUsePreAggregation: canUsePreAggregation(references),
-      references
+      references,
+      preAggregationId: `${cube}.${preAggregationName}`
     };
 
     if (preAggregation.type === 'rollupJoin') {
