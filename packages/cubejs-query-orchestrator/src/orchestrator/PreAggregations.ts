@@ -8,7 +8,7 @@ import {
   FROM_PARTITION_RANGE,
   getEnv,
   inDbTimeZone,
-  MAX_SOURCE_ROW_LIMIT,
+  MAX_SOURCE_ROW_LIMIT, reformatInIsoLocal,
   timeSeries,
   TO_PARTITION_RANGE,
   utcToLocalTimeZone,
@@ -192,6 +192,8 @@ export type PreAggregationDescription = {
   buildRangeEnd?: string;
   updateWindowSeconds?: number;
   sealAt?: string;
+  rollupLambdaId?: string;
+  lastRollupLambda?: boolean;
 };
 
 const tablesToVersionEntries = (schema, tables: TableCacheEntry[]): VersionEntry[] => R.sortBy(
@@ -456,6 +458,8 @@ type LoadPreAggregationResult = {
   buildRangeEnd?: string;
   lambdaTable?: InlineTable;
   queryKey?: any[];
+  rollupLambdaId?: string;
+  partitionRange?: QueryDateRange;
 };
 
 export class PreAggregationLoader {
@@ -1440,7 +1444,7 @@ export class PreAggregationPartitionRangeLoader {
     // eslint-disable-next-line no-use-before-define
     private readonly preAggregations: PreAggregations,
     private readonly preAggregation: PreAggregationDescription,
-    private readonly preAggregationsTablesToTempTables: any,
+    private readonly preAggregationsTablesToTempTables: [string, LoadPreAggregationResult][],
     private readonly loadCache: any,
     private readonly options: PreAggsPartitionRangeLoaderOpts = {
       maxPartitions: 10000,
@@ -1562,7 +1566,7 @@ export class PreAggregationPartitionRangeLoader {
     );
     const [_, buildRangeEnd] = buildRange;
     const loadRange: [string, string] = [...range];
-    if (this.preAggregation.unionWithSourceData && buildRangeEnd < range[1]) {
+    if (buildRangeEnd < range[1]) {
       loadRange[1] = buildRangeEnd;
     }
     const sealAt = addSecondsToLocalTimestamp(
@@ -1581,7 +1585,7 @@ export class PreAggregationPartitionRangeLoader {
         .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName) })),
       previewSql: this.preAggregation.previewSql &&
         this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
-      buildRangeEnd,
+      buildRangeEnd: loadRange[1],
       sealAt, // Used only for kSql pre aggregations
     };
   }
@@ -1600,34 +1604,61 @@ export class PreAggregationPartitionRangeLoader {
         this.loadCache,
         this.options,
       ));
-      const resolveResults = await Promise.all(partitionLoaders.map(l => l.loadPreAggregation(false)));
-      const loadResults = resolveResults.filter(res => res !== null);
+      const resolveResults = await Promise.all(partitionLoaders.map(async (l, i) => {
+        const result = await l.loadPreAggregation(false);
+        return result && {
+          ...result,
+          partitionRange: partitionRanges[i]
+        };
+      }));
+      let loadResults = resolveResults.filter(res => res !== null);
       if (this.options.externalRefresh && loadResults.length === 0) {
         throw new Error(
           // eslint-disable-next-line no-use-before-define
           PreAggregations.noPreAggregationPartitionsBuiltMessage(partitionLoaders.map(p => p.preAggregation))
         );
       }
+
+      let lambdaTable: InlineTable;
+      let emptyResult = false;
+
+      if (this.preAggregation.rollupLambdaId) {
+        if (this.lambdaQuery && loadResults.length > 0) {
+          const { buildRangeEnd } = loadResults[loadResults.length - 1];
+          lambdaTable = await this.downloadLambdaTable(buildRangeEnd);
+        }
+        const rollupLambdaResults = this.preAggregationsTablesToTempTables.filter(tempTableResult => tempTableResult[1].rollupLambdaId === this.preAggregation.rollupLambdaId);
+        const lastResult = rollupLambdaResults[rollupLambdaResults.length - 1];
+        const filteredResults = loadResults.filter(
+          r => (this.preAggregation.lastRollupLambda || reformatInIsoLocal(r.buildRangeEnd) === reformatInIsoLocal(r.partitionRange[1])) &&
+            (!lastResult || !lastResult[1].buildRangeEnd || reformatInIsoLocal(lastResult[1].buildRangeEnd) < reformatInIsoLocal(r.partitionRange[0]))
+        );
+        if (filteredResults.length === 0) {
+          emptyResult = true;
+          loadResults = [loadResults[loadResults.length - 1]];
+        } else {
+          loadResults = filteredResults;
+        }
+      }
+
       const allTableTargetNames = loadResults.map(targetTableName => targetTableName.targetTableName);
       let lastUpdatedAt = getLastUpdatedAtTimestamp(loadResults.map(r => r.lastUpdatedAt));
-      let lambdaTable: InlineTable;
 
-      if (this.lambdaQuery && loadResults.length > 0) {
-        const { buildRangeEnd } = loadResults[loadResults.length - 1];
-        lambdaTable = await this.downloadLambdaTable(buildRangeEnd);
+      if (lambdaTable) {
         allTableTargetNames.push(lambdaTable.name);
         lastUpdatedAt = Date.now();
       }
 
       const unionTargetTableName = allTableTargetNames
-        .map(targetTableName => `SELECT * FROM ${targetTableName}`)
+        .map(targetTableName => `SELECT * FROM ${targetTableName}${emptyResult ? ' WHERE 1 = 0' : ''}`)
         .join(' UNION ALL ');
       return {
-        targetTableName: allTableTargetNames.length === 1 ? allTableTargetNames[0] : `(${unionTargetTableName})`,
+        targetTableName: allTableTargetNames.length === 1 && !emptyResult ? allTableTargetNames[0] : `(${unionTargetTableName})`,
         refreshKeyValues: loadResults.map(t => t.refreshKeyValues),
         lastUpdatedAt,
-        buildRangeEnd: undefined,
+        buildRangeEnd: !emptyResult && loadResults.length && loadResults[loadResults.length - 1].buildRangeEnd,
         lambdaTable,
+        rollupLambdaId: this.preAggregation.rollupLambdaId,
       };
     } else {
       return new PreAggregationLoader(
@@ -1713,9 +1744,7 @@ export class PreAggregationPartitionRangeLoader {
     ));
     if (partitionRanges.length > this.options.maxPartitions) {
       throw new Error(
-        `The maximum number of partitions (${
-          this.options.maxPartitions
-        }) was reached for the pre-aggregation`
+        `Pre-aggregation '${this.preAggregation.tableName}' requested to build ${partitionRanges.length} partitions which exceeds the maximum number of partitions per pre-aggregation of ${this.options.maxPartitions}`
       );
     }
     return { buildRange: dateRange, partitionRanges };

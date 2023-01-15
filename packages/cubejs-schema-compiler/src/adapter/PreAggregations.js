@@ -233,6 +233,8 @@ export class PreAggregations {
       readOnly: preAggregation.readOnly || this.query.preAggregationReadOnly(cube, preAggregation),
       streamOffset: preAggregation.streamOffset,
       unionWithSourceData: preAggregation.unionWithSourceData,
+      rollupLambdaId: preAggregation.rollupLambdaId,
+      lastRollupLambda: preAggregation.lastRollupLambda,
     };
   }
 
@@ -862,17 +864,25 @@ export class PreAggregations {
       if (referencedPreAggregations.length === 0) {
         throw new UserError(`rollupLambda '${cube}.${preAggregationName}' should reference at least on rollup`);
       }
-      if (referencedPreAggregations.length > 1) {
-        throw new UserError(`rollupLambda '${cube}.${preAggregationName}' references multiple rollups. This feature is currently in early access preview. Please get in touch with us to get access to it: https://cube.dev/contact.`);
-      }
-      referencedPreAggregations[referencedPreAggregations.length - 1] = {
-        ...referencedPreAggregations[referencedPreAggregations.length - 1],
-        preAggregation: {
-          ...referencedPreAggregations[referencedPreAggregations.length - 1].preAggregation,
-          unionWithSourceData: preAggObj.preAggregation.unionWithSourceData,
+      referencedPreAggregations.forEach((referencedPreAggregation, i) => {
+        referencedPreAggregations[i] = {
+          ...referencedPreAggregations[i],
+          preAggregation: {
+            ...referencedPreAggregations[i].preAggregation,
+            unionWithSourceData: i === referencedPreAggregations.length - 1 ? preAggObj.preAggregation.unionWithSourceData : false,
+            rollupLambdaId: `${cube}.${preAggregationName}`,
+            lastRollupLambda: i === referencedPreAggregations.length - 1,
+          }
+        };
+        if (i > 0) {
+          const partitionGranularity = PreAggregations.checkPartitionGranularityDefined(cube, preAggregationName, referencedPreAggregations[i]);
+          const prevReferencedPreAggregation = referencedPreAggregations[i - 1];
+          const partitionGranularityPrev = PreAggregations.checkPartitionGranularityDefined(cube, preAggregationName, prevReferencedPreAggregation);
+          const minGranularity = this.query.minGranularity(partitionGranularityPrev, partitionGranularity);
+          if (minGranularity !== partitionGranularity) {
+            throw new UserError(`'${prevReferencedPreAggregation.cube}.${prevReferencedPreAggregation.preAggregationName}' and '${referencedPreAggregation.cube}.${referencedPreAggregation.preAggregationName}' referenced by '${cube}.${preAggregationName}' rollupLambda have incompatible partition granularities. '${partitionGranularityPrev}' can't be padded by '${partitionGranularity}'`);
+          }
         }
-      };
-      referencedPreAggregations.forEach(referencedPreAggregation => {
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'measures');
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'dimensions');
         PreAggregations.memberNameMismatchValidation(preAggObj, referencedPreAggregation, 'timeDimensions');
@@ -886,6 +896,13 @@ export class PreAggregations {
     }
   }
 
+  static checkPartitionGranularityDefined(cube, preAggregationName, preAggregation) {
+    if (!preAggregation.preAggregation.partitionGranularity) {
+      throw new UserError(`'${preAggregation.cube}.${preAggregation.preAggregationName}' referenced by '${cube}.${preAggregationName}' rollupLambda doesn't have partition granularity. Partition granularity is required if multiple rollups are provided.`);
+    }
+    return preAggregation.preAggregation.partitionGranularity;
+  }
+
   static memberNameMismatchValidation(preAggA, preAggB, memberType) {
     const preAggAMemberNames = PreAggregations.memberShortNames(preAggA.references[memberType], memberType === 'timeDimensions');
     const preAggBMemberNames = PreAggregations.memberShortNames(preAggB.references[memberType], memberType === 'timeDimensions');
@@ -893,12 +910,12 @@ export class PreAggregations {
       preAggAMemberNames,
       preAggBMemberNames
     )) {
-      throw new UserError(`Names for ${memberType} doesn't match between '${preAggA.cube}.${preAggA.preAggregationName}' and '${preAggB.cube}.${preAggB.preAggregationName}': ${JSON.stringify(preAggAMemberNames)} != ${JSON.stringify(preAggBMemberNames)}`);
+      throw new UserError(`Names for ${memberType} doesn't match between '${preAggA.cube}.${preAggA.preAggregationName}' and '${preAggB.cube}.${preAggB.preAggregationName}': ${JSON.stringify(preAggAMemberNames)} does not equal to ${JSON.stringify(preAggBMemberNames)}`);
     }
   }
 
   static memberShortNames(memberArray, isTimeDimension) {
-    return memberArray.map(member => (isTimeDimension ? member.dimension.split('.')[1] : member.split('.')[1]));
+    return memberArray.map(member => (isTimeDimension ? `${member.dimension.split('.')[1]}.${member.granularity}` : member.split('.')[1]));
   }
 
   rollupMatchResultDescriptions() {
@@ -1049,12 +1066,33 @@ export class PreAggregations {
     );
   }
 
+  rollupLambdaUnion(preAggregationForQuery) {
+    if (!preAggregationForQuery.referencedPreAggregations) {
+      return this.preAggregationTableName(
+        preAggregationForQuery.cube,
+        preAggregationForQuery.preAggregationName,
+        preAggregationForQuery.preAggregation
+      );
+    }
+    const tables = preAggregationForQuery.referencedPreAggregations.map(preAggregation => this.preAggregationTableName(
+      preAggregation.cube,
+      preAggregation.preAggregationName,
+      preAggregation.preAggregation
+    ));
+    if (tables.length === 1) {
+      return tables[0];
+    }
+    const union = tables.map(table => `SELECT * FROM ${table}`).join(' UNION ALL ');
+    return `(${union})`;
+  }
+
   rollupPreAggregation(preAggregationForQuery, measures, isFullSimpleQuery, filters) {
     let toJoin;
 
     const sqlAndAlias = (preAgg) => ({
       preAggregation: preAgg,
-      alias: this.query.cubeAlias(this.query.cubeEvaluator.pathFromArray([preAgg.cube, preAgg.preAggregationName]))
+      alias: this.query.cubeAlias(this.query.cubeEvaluator.pathFromArray([preAgg.cube, preAgg.preAggregationName])),
+      sql: this.rollupLambdaUnion(preAgg)
     });
 
     if (preAggregationForQuery.preAggregation.type === 'rollupJoin') {
@@ -1079,25 +1117,12 @@ export class PreAggregations {
         )
       ];
     } else if (preAggregationForQuery.preAggregation.type === 'rollupLambda') {
-      const lambdaPreAggregations = preAggregationForQuery.referencedPreAggregations;
-
-      // TODO support lambda union of rollups
-      toJoin = [sqlAndAlias(lambdaPreAggregations[0])];
+      toJoin = [sqlAndAlias(preAggregationForQuery)];
     } else {
       toJoin = [sqlAndAlias(preAggregationForQuery)];
     }
 
-    const from = this.query.joinSql(
-      toJoin.map(j => ({
-        ...j,
-        sql:
-          this.query.preAggregationTableName(
-            j.preAggregation.cube,
-            // @todo Dont use sqlAlias directly, we needed to move it in preAggregationTableName
-            j.preAggregation.preAggregation.sqlAlias || j.preAggregation.preAggregationName
-          )
-      }))
-    );
+    const from = this.query.joinSql(toJoin);
 
     const segmentFilters = this.query.segments.map(
       s => this.query.newFilter({ dimension: s.segment, operator: 'equals', values: [true] })

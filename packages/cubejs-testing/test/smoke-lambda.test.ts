@@ -33,30 +33,26 @@ async function checkCubestoreState(cubestore: any) {
     {
       table_schema: 'dev_pre_aggregations',
       table_name: 'orders_orders_by_completed_at20200201',
-      build_range_end: '2020-05-07T00:00:00.000Z',
+      build_range_end: '2020-02-29T23:59:59.999Z',
     },
     {
       table_schema: 'dev_pre_aggregations',
       table_name: 'orders_orders_by_completed_at20200301',
-      build_range_end: '2020-05-07T00:00:00.000Z',
+      build_range_end: '2020-03-31T23:59:59.999Z',
     },
     {
       table_schema: 'dev_pre_aggregations',
       table_name: 'orders_orders_by_completed_at20200401',
-      build_range_end: '2020-05-07T00:00:00.000Z',
+      build_range_end: '2020-04-30T23:59:59.999Z',
     },
     {
       table_schema: 'dev_pre_aggregations',
       table_name: 'orders_orders_by_completed_at20200501',
-      build_range_end: '2020-05-07T00:00:00.000Z',
+      build_range_end: '2020-05-01T00:00:00.000Z',
     },
   ]);
-  expect(table.build_range_end).toEqual('2020-05-07T00:00:00.000Z');
+  expect(table.build_range_end).toEqual('2020-05-01T00:00:00.000Z');
   rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name}`, []);
-  expect(rows.length).toEqual(18);
-  rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name} WHERE orders__completed_at_day < to_timestamp('${table.build_range_end}')`, []);
-  expect(rows.length).toEqual(18);
-  rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name} WHERE orders__completed_at_day >= to_timestamp('${table.build_range_end}')`, []);
   expect(rows.length).toEqual(0);
 }
 
@@ -143,7 +139,8 @@ describe('lambda', () => {
 
     // @ts-ignore
     expect(Object.keys(response.loadResponse.results[0].usedPreAggregations)).toEqual([
-      'dev_pre_aggregations.orders_orders_by_completed_at'
+      'dev_pre_aggregations.orders_orders_by_completed_at',
+      'dev_pre_aggregations.orders_orders_by_completed_by_day'
     ]);
 
     // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.

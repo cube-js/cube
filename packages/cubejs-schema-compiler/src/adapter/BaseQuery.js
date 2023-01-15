@@ -576,7 +576,7 @@ class BaseQuery {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
     const result = {};
     if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
-      const lambdaPreAgg = preAggForQuery.referencedPreAggregations[0];
+      const lambdaPreAgg = preAggForQuery.referencedPreAggregations[preAggForQuery.referencedPreAggregations.length - 1];
       // TODO(cristipp) Use source query instead of preaggregation references.
       const references = this.cubeEvaluator.evaluatePreAggregationReferences(lambdaPreAgg.cube, lambdaPreAgg.preAggregation);
       const lambdaQuery = this.newSubQuery(
