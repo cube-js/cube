@@ -165,7 +165,7 @@ mod tests {
     use crate::queryplanner::serialized_plan::SerializedPlan;
     use crate::queryplanner::PlanningMeta;
     use crate::sql::cache::SqlResultCache;
-    use crate::sql::{InlineTables, SqlQueryContext};
+    use crate::sql::SqlQueryContext;
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
     use crate::CubeError;

@@ -67,7 +67,7 @@ fn try_remove_sub_union(
     for inp in parent_inputs.iter() {
         match inp {
             LogicalPlan::Union { inputs, schema, .. } => {
-                if *schema == *&parent_schema {
+                if schema.to_schema_ref() == parent_schema.to_schema_ref() {
                     may_be_result.extend(inputs.iter().cloned());
                 } else {
                     return parent_inputs.clone();
