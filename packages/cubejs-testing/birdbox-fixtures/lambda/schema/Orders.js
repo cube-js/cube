@@ -10,7 +10,7 @@ cube(`Orders`, {
 
     ordersByCompletedAtLambda: {
       type: `rollupLambda`,
-      rollups: [ordersByCompletedAt, ordersByCompletedByDay],
+      rollups: [ordersByCompletedAt, ordersByCompletedByDay, AOrdersByCompletedByHour],
       unionWithSourceData: true,
     },
 
@@ -65,6 +65,23 @@ cube(`Orders`, {
       partitionGranularity: `day`,
       buildRangeStart: {
         sql: `SELECT DATE('2020-05-1')`,
+      },
+      buildRangeEnd: {
+        sql: `SELECT DATE('2020-05-5')`,
+      },
+      refreshKey: {
+        every: '1 day'
+      },
+    },
+
+    AOrdersByCompletedByHour: {
+      measures: [count],
+      dimensions: [status],
+      timeDimension: completedAt,
+      granularity: `day`,
+      partitionGranularity: `hour`,
+      buildRangeStart: {
+        sql: `SELECT DATE('2020-05-5')`,
       },
       buildRangeEnd: {
         sql: `SELECT DATE('2020-05-7')`,
