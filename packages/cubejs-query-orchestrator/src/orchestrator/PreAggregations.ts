@@ -90,7 +90,7 @@ export function getLastUpdatedAtTimestamp(
 }
 
 function getStructureVersion(preAggregation) {
-  const versionArray = [preAggregation.loadSql];
+  const versionArray = [preAggregation.structureVersionLoadSql || preAggregation.loadSql];
   if (preAggregation.indexesSql && preAggregation.indexesSql.length) {
     versionArray.push(preAggregation.indexesSql);
   }
@@ -179,6 +179,7 @@ export type PreAggregationDescription = {
   timezone: string;
   indexesSql: IndexDescription[];
   invalidateKeyQueries: QueryWithParams[];
+  structureVersionLoadSql: QueryWithParams;
   sql: QueryWithParams;
   loadSql: QueryWithParams;
   tableName: string;
@@ -1575,6 +1576,8 @@ export class PreAggregationPartitionRangeLoader {
     return {
       ...this.preAggregation,
       tableName: partitionTableName,
+      structureVersionLoadSql: this.preAggregation.loadSql &&
+        this.replacePartitionSqlAndParams(this.preAggregation.loadSql, range, partitionTableName),
       loadSql: this.preAggregation.loadSql &&
         this.replacePartitionSqlAndParams(this.preAggregation.loadSql, loadRange, partitionTableName),
       sql: this.preAggregation.sql &&
