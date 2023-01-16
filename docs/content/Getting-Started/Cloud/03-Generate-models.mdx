@@ -1,0 +1,100 @@
+---
+title: Generate models
+permalink: /getting-started/cloud/generate-models
+category: Getting Started
+subCategory: Cube Cloud
+menuOrder: 4
+isDisableFeedbackBlock: true
+---
+
+In this step, you will generate models using the connected data source from the
+last step. Cube's models provide a declarative way to define important facts
+about your data, relationships between them and access control.
+
+## Select tables
+
+Start by selecting the database tables to generate the data schema from, then
+click **Measures and Dimensions**:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Generate Models Screen detected tables from data source for selection"
+    src="https://ucarecdn.com/e0420b86-64bc-4e01-aa74-16a7e926f523/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Measures and dimensions
+
+Next, you'll see all detected measures and dimensions from the data source.
+Click **Primary Keys** to progress to the next step:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Generate Models Screen showing detected measures and dimensions"
+    src="https://ucarecdn.com/e0f8e8c3-9961-4360-ab9f-cfd96306c832/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Primary keys
+
+Review the detected primary keys for each cube and click **Joins** to move to
+the next step:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Generate Models Screen showing detected primary keys"
+    src="https://ucarecdn.com/e13e8279-e9e9-40df-b8f6-8cf5bb34ee14/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Joins
+
+Once again, review the detected joins and click **Review**:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Generate Models Screen showing detected joins"
+    src="https://ucarecdn.com/8190bd70-e4e3-4e9f-9cee-e9416ddf964b/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## Review
+
+The last screen allows you to review all the detected cubes and their
+corresponding measures, dimensions and joins. If everything looks good, pick
+either YAML or JavaScript for the model's syntax and click **Confirm &
+Generate**:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Generate Models Screen showing review screen"
+    src="https://ucarecdn.com/59e18ad2-b8fc-48dc-b409-d829579048f5/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Cube Cloud will now generate the models and spin up your Cube deployment, and in
+a few moments you should see the following screen:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Deployment Overview Screen"
+    src="https://ucarecdn.com/7fa603ae-6100-4492-91e4-564d311f701e/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+You're now ready for the last step, [querying the data source via the Cube
+API][ref-getting-started-cloud-query-cube].
+
+[ref-getting-started-cloud-query-cube]: /getting-started/cloud/query-data

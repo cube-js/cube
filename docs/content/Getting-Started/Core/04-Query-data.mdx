@@ -1,0 +1,102 @@
+---
+title: Query data
+permalink: /getting-started/core/query-data
+category: Getting Started
+subCategory: Core
+menuOrder: 6
+isDisableFeedbackBlock: true
+---
+
+In this step, you will learn how to query your data using the models you created
+in the previous step. Cube provides several ways to query your data, and we'll
+go over them here.
+
+## Developer Playground
+
+The [Developer Playground](/dev-tools/dev-playground) is a web-based tool which
+allows for model generation and data exploration.
+
+Select the measures and dimensions you want to query, and then run the query.
+Let's do this for the `Orders` cube you generated in the previous step.
+
+Click **+ Measure** to display the available measures and add `Orders.count`,
+then click **+ Dimension** for available dimensions and add `Orders.status`.
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Deployment Developer Playground Screen with selected measures and dimensions"
+    src="https://ucarecdn.com/0c5af31d-9b33-4e4c-9192-966d3a315d02/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Then click the **Run** button to execute the query and see the results:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Deployment Developer Playground Screen showing query results"
+    src="https://ucarecdn.com/81cccc1f-9153-4917-920d-feea0de6591b/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+## GraphQL API
+
+Cube supports using GraphQL to query cubes via the `/graphql` endpoint:
+
+```bash{outputLines: 2-4}
+curl \
+  --data-raw '{"query":"{cube{orders{count}}}"}' \
+  https://localhost:4000/cubejs-api/graphql
+```
+
+## REST API
+
+Cube supports using GraphQL to query cubes via the `/load` endpoint:
+
+```bash{outputLines: 2-4}
+curl \
+  --data-urlencode 'query={"measures":["Orders.count"]}' \
+  https://fierce-boar.aws-eu-central-1.cubecloudapp.dev/dev-mode/dev-hassan-45a93e7e/cubejs-api/v1/load
+```
+
+## SQL API
+
+To enable the SQL API, we first need to add a few new environment variables to
+the project's `.env` file:
+
+```bash
+CUBEJS_PG_SQL_PORT=5432
+CUBEJS_SQL_USER=myusername
+CUBEJS_SQL_PASSWORD=mypassword
+```
+
+If you're running Cube through Docker Compose, remember to add a port mapping to
+the Cube service for `CUBEJS_PG_SQL_PORT`:
+
+```yaml
+services:
+  cube:
+    image: cubejs/cube
+    ports:
+      - 5432:5432 # Cube SQL API
+```
+
+Now, you can start your Cube instance and connect via the `psql` client with
+provided credentials:
+
+```bash{outputLines: 2-13}
+psql -h 127.0.0.1 --port 5432 -U myusername --password
+
+psql (14.5, server 14.2 (Cube SQL))
+SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, bits: 256, compression: off)
+Type "help" for help.
+
+cube=> SELECT COUNT(*) FROM Orders;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
