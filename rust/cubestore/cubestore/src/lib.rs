@@ -18,6 +18,7 @@ extern crate core;
 
 use crate::metastore::TableId;
 use crate::remotefs::queue::RemoteFsOpResult;
+use anyhow;
 use arrow::error::ArrowError;
 use cubehll::HllError;
 use cubezetasketch::ZetaError;
@@ -287,14 +288,9 @@ impl From<flexbuffers::SerializationError> for CubeError {
     }
 }
 
-impl From<s3::S3Error> for CubeError {
-    fn from(v: s3::S3Error) -> Self {
-        let mut m = format!("AWS S3 error: {}", v);
-        if let Some(data) = v.data {
-            m += ": ";
-            m += &data
-        }
-        CubeError::internal(m)
+impl From<anyhow::Error> for CubeError {
+    fn from(v: anyhow::Error) -> Self {
+        CubeError::internal(format!("Error: {}", v.to_string()))
     }
 }
 
