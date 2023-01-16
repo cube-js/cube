@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.45](https://github.com/cube-js/cube.js/compare/v0.31.44...v0.31.45) (2023-01-16)
+
+
+### Bug Fixes
+
+* **cubestore:** Panic on combination of `Union All` and single select in root `Union All` ([#6012](https://github.com/cube-js/cube.js/issues/6012)) ([0d1a3d8](https://github.com/cube-js/cube.js/commit/0d1a3d8e2732d47f193aa5cf018e8ca5c6d7cf31))
+
+
+### Features
+
+* **cubestore:** Initial queue support ([#5541](https://github.com/cube-js/cube.js/issues/5541)) ([7109039](https://github.com/cube-js/cube.js/commit/7109039beaf5819fa1179751e98a3431a04b3cac))
+
+
+
+
+
 ## [0.31.44](https://github.com/cube-js/cube.js/compare/v0.31.43...v0.31.44) (2023-01-16)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
