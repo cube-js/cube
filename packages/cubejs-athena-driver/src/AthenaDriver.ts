@@ -30,9 +30,11 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   readOnly?: boolean
   accessKeyId?: string
   secretAccessKey?: string
+  sessionToken?: string
   workGroup?: string
   catalog?: string
   schema?: string
+  database?: string
   S3OutputLocation?: string
   exportBucket?: string
   pollTimeout?: number
@@ -103,6 +105,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       config.secretAccessKey ||
       getEnv('athenaAwsSecret', { dataSource });
 
+    const sessionToken =
+      config.sessionToken ||
+      getEnv('athenaAwsSessionToken', { dataSource });
+
     const { schema, ...restConfig } = config;
 
     this.schema = schema ||
@@ -112,7 +118,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     this.config = {
       ...restConfig,
       credentials: accessKeyId && secretAccessKey
-        ? { accessKeyId, secretAccessKey }
+        ? { accessKeyId, secretAccessKey, sessionToken }
         : undefined,
       region:
         config.region ||
@@ -127,6 +133,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       catalog:
         config.catalog ||
         getEnv('athenaAwsCatalog', { dataSource }),
+      database:
+        config.database ||
+        getEnv('athenaAwsDatabase', { dataSource }),
       exportBucket:
         config.exportBucket ||
         getEnv('dbExportBucket', { dataSource }),
@@ -274,7 +283,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
       },
-      ...(this.config.catalog != null ? { QueryExecutionContext: { Catalog: this.config.catalog } } : {})
+      QueryExecutionContext: {
+        Catalog: this.config.catalog,
+        Database: this.config.database
+      }
     };
     const { QueryExecutionId } = await this.athena.startQueryExecution(request);
     return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };

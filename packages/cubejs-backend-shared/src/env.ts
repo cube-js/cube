@@ -849,6 +849,18 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Athena AWS secret.
+   */
+  athenaAwsSessionToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    // TODO (buntarb): this name is a common. Deprecate and replace?
+    process.env[keyByDataSource('CUBEJS_AWS_SESSION_TOKEN', dataSource)]
+  ),
+
+  /**
    * Athena AWS region.
    */
   athenaAwsRegion: ({
@@ -899,6 +911,20 @@ const variables: Record<string, (...args: any) => any> = {
     // TODO (buntarb): Deprecate and replace?
     process.env[
       keyByDataSource('CUBEJS_AWS_ATHENA_CATALOG', dataSource)
+    ]
+  ),
+
+  /**
+   * Athena AWS Database.
+   */
+  athenaAwsDatabase: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    // TODO (buntarb): Deprecate and replace?
+    process.env[
+      keyByDataSource('CUBEJS_AWS_ATHENA_DATABASE', dataSource)
     ]
   ),
 
