@@ -51,11 +51,13 @@ spec:
               containerPort: {{ .Values.config.sqlPort }}
               protocol: TCP
             {{- end }}
-            {{- if .Values.config.pgSqlPort }}
+	    {{- if .Values.config.pgSqlPort }}
             - name: pgsql
               containerPort: {{ .Values.config.pgSqlPort }}
               protocol: TCP
             {{- end }}
+          envFrom:
+           {{- include "custom_cubejs_environment_from" . | default "\n  []" | indent 10 }}
           env:
             {{- include "cubejs.common-env" . | nindent 12 }}
           {{- if .Values.master.livenessProbe.enabled }}
