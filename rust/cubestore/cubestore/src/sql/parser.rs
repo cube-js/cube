@@ -225,24 +225,7 @@ impl<'a> CubeStoreParser<'a> {
             "set" => {
                 let nx = self.parse_custom_token(&"nx");
                 let ttl = if self.parse_custom_token(&"ttl") {
-                    match self.parser.parse_number_value()? {
-                        Value::Number(ttl, false) => {
-                            let r = ttl.parse::<u32>().map_err(|err| {
-                                ParserError::ParserError(format!(
-                                    "TTL must be a positive integer, error: {}",
-                                    err
-                                ))
-                            })?;
-
-                            Some(r)
-                        }
-                        x => {
-                            return Err(ParserError::ParserError(format!(
-                                "TTL must be a positive integer, actual: {:?}",
-                                x
-                            )))
-                        }
-                    }
+                    Some(self.parse_number("ttl")?)
                 } else {
                     None
                 };
@@ -434,24 +417,7 @@ impl<'a> CubeStoreParser<'a> {
             }
             "retrieve" => {
                 let concurrency = if self.parse_custom_token(&"concurrency") {
-                    match self.parser.parse_number_value()? {
-                        Value::Number(concurrency, false) => {
-                            let r = concurrency.parse::<u32>().map_err(|err| {
-                                ParserError::ParserError(format!(
-                                    "CONCURRENCY must be a positive integer, error: {}",
-                                    err
-                                ))
-                            })?;
-
-                            r
-                        }
-                        x => {
-                            return Err(ParserError::ParserError(format!(
-                                "CONCURRENCY must be a positive integer, actual: {:?}",
-                                x
-                            )))
-                        }
-                    }
+                    self.parse_number("concurrency")?
                 } else {
                     1
                 };
