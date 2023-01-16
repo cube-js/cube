@@ -2294,6 +2294,68 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn flatten_union() {
+        Config::test("flatten_union").start_test(async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.a (a int, b int, c int)").await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.b (a int, b int, c int)").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.a1 (a int, b int, c int)").await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.b1 (a int, b int, c int)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.a (a, b, c) VALUES (1, 1, 1)"
+            ).await.unwrap();
+            service.exec_query(
+                "INSERT INTO foo.b (a, b, c) VALUES (2, 2, 1)"
+            ).await.unwrap();
+            service.exec_query(
+                "INSERT INTO foo.a1 (a, b, c) VALUES (1, 1, 2)"
+            ).await.unwrap();
+            service.exec_query(
+                "INSERT INTO foo.b1 (a, b, c) VALUES (2, 2, 2)"
+            ).await.unwrap();
+
+            let result = service.exec_query("EXPLAIN SELECT a, b, sum(c) from ( \
+                         select * from ( \
+                                        select * from foo.a \
+                                        union all \
+                                        select * from foo.b \
+                                        ) \
+                             union all 
+                             select * from 
+                                ( \
+                                        select * from foo.a1 \
+                                        union all \
+                                        select * from foo.b1 \
+                                        union all \
+                                        select * from foo.b \
+                                ) \
+                         ) group by 1, 2").await.unwrap();
+            match &result.get_rows()[0].values()[0] {
+                TableValue::String(s) => {
+                    assert_eq!(s,
+                                "Projection, [a, b, SUM(c)]\
+                                \n  Aggregate\
+                                \n    ClusterSend, indices: [[1, 2, 3, 4, 2]]\
+                                \n      Union\
+                                \n        Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n        Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *\
+                                \n        Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n        Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n        Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+
+                               );
+                }
+                _ => assert!(false),
+            };
+        }).await;
+    }
+
+    #[tokio::test]
     async fn over_10k_join() {
         Config::test("over_10k_join").update_config(|mut c| {
             c.partition_split_threshold = 1000000;

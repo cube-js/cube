@@ -11,6 +11,7 @@ mod topk;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;
 mod filter_by_key_range;
+mod flatten_union;
 pub mod info_schema;
 pub mod now;
 pub mod udfs;
@@ -21,6 +22,7 @@ use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{IdRow, MetaStore};
+use crate::queryplanner::flatten_union::FlattenUnion;
 use crate::queryplanner::info_schema::{
     SchemataInfoSchemaTableDef, SystemCacheTableDef, SystemChunksTableDef, SystemIndexesTableDef,
     SystemJobsTableDef, SystemPartitionsTableDef, SystemReplayHandlesTableDef,
@@ -171,7 +173,9 @@ impl QueryPlannerImpl {
 impl QueryPlannerImpl {
     async fn execution_context(&self) -> Result<Arc<ExecutionContext>, CubeError> {
         Ok(Arc::new(ExecutionContext::with_config(
-            ExecutionConfig::new().add_optimizer_rule(Arc::new(MaterializeNow {})),
+            ExecutionConfig::new()
+                .add_optimizer_rule(Arc::new(MaterializeNow {}))
+                .add_optimizer_rule(Arc::new(FlattenUnion {})),
         )))
     }
 }
