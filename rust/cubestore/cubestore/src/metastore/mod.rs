@@ -78,7 +78,7 @@ use std::mem::take;
 use std::path::Path;
 use std::str::FromStr;
 
-use crate::cachestore::CacheItem;
+use crate::cachestore::{CacheItem, QueueItem, QueueItemStatus, QueueResult, QueueResultAckEvent};
 use crate::remotefs::LocalDirRemoteFs;
 use snapshot_info::SnapshotInfo;
 use std::time::Duration;
@@ -160,7 +160,7 @@ macro_rules! base_rocks_secondary_index {
                 RocksSecondaryIndex::is_ttl(self)
             }
 
-            fn get_expire<'a>(&self, row: &'a $table) -> &'a Option<chrono::DateTime<chrono::Utc>> {
+            fn get_expire(&self, row: &$table) -> Option<chrono::DateTime<chrono::Utc>> {
                 RocksSecondaryIndex::get_expire(self, row)
             }
         }
@@ -178,6 +178,12 @@ impl DataFrameValue<String> for String {
 }
 
 impl DataFrameValue<String> for u64 {
+    fn value(v: &Self) -> String {
+        format!("{}", v)
+    }
+}
+
+impl DataFrameValue<String> for i64 {
     fn value(v: &Self) -> String {
         format!("{}", v)
     }
@@ -242,6 +248,12 @@ impl DataFrameValue<String> for Option<Vec<Option<SeqPointer>>> {
 }
 
 impl DataFrameValue<String> for IndexType {
+    fn value(v: &Self) -> String {
+        format!("{:?}", v)
+    }
+}
+
+impl DataFrameValue<String> for QueueItemStatus {
     fn value(v: &Self) -> String {
         format!("{:?}", v)
     }
@@ -1058,6 +1070,13 @@ pub enum MetaStoreEvent {
     // TODO: Split to CacheStoreEvent
     UpdateCacheItem(IdRow<CacheItem>, IdRow<CacheItem>),
     DeleteCacheItem(IdRow<CacheItem>),
+
+    UpdateQueueItem(IdRow<QueueItem>, IdRow<QueueItem>),
+    DeleteQueueItem(IdRow<QueueItem>),
+    AckQueueItem(QueueResultAckEvent),
+
+    UpdateQueueResult(IdRow<QueueResult>, IdRow<QueueResult>),
+    DeleteQueueResult(IdRow<QueueResult>),
 }
 
 fn meta_store_merge(

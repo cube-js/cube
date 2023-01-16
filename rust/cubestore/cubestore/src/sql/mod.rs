@@ -35,7 +35,7 @@ use tracing_futures::WithSubscriber;
 use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
-use crate::cachestore::{CacheItem, CacheStore};
+use crate::cachestore::{CacheItem, CacheStore, QueueItem, QueueResultResponse};
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -1162,6 +1162,189 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
+            CubeStoreStatement::QueueAdd {
+                key,
+                priority,
+                value,
+            } => {
+                self.cachestore
+                    .queue_add(QueueItem::new(
+                        key.value,
+                        value,
+                        QueueItem::status_default(),
+                        priority,
+                    ))
+                    .await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::QueueTruncate {} => {
+                self.cachestore.queue_truncate().await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::QueueCancel { key } => {
+                let columns = vec![
+                    Column::new("payload".to_string(), ColumnType::String, 0),
+                    Column::new("extra".to_string(), ColumnType::String, 1),
+                ];
+
+                let result = self.cachestore.queue_cancel(key.value).await?;
+                if let Some(result) = result {
+                    Ok(Arc::new(DataFrame::new(
+                        columns,
+                        vec![result.into_row().into_queue_cancel_row()],
+                    )))
+                } else {
+                    Ok(Arc::new(DataFrame::new(columns, vec![])))
+                }
+            }
+            CubeStoreStatement::QueueHeartbeat { key } => {
+                self.cachestore.queue_heartbeat(key.value).await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::QueueMergeExtra { key, payload } => {
+                self.cachestore
+                    .queue_merge_extra(key.value, payload)
+                    .await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::QueueAck { key, result } => {
+                self.cachestore.queue_ack(key.value, result).await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::QueueGet { key } => {
+                let columns = vec![
+                    Column::new("payload".to_string(), ColumnType::String, 0),
+                    Column::new("extra".to_string(), ColumnType::String, 1),
+                ];
+
+                let result = self.cachestore.queue_get(key.value).await?;
+                if let Some(result) = result {
+                    Ok(Arc::new(DataFrame::new(
+                        columns,
+                        vec![result.into_row().into_queue_get_row()],
+                    )))
+                } else {
+                    Ok(Arc::new(DataFrame::new(columns, vec![])))
+                }
+            }
+            CubeStoreStatement::QueueToCancel {
+                prefix,
+                orphaned_timeout,
+                stalled_timeout,
+            } => {
+                let rows = self
+                    .cachestore
+                    .queue_to_cancel(prefix.value, orphaned_timeout, stalled_timeout)
+                    .await?;
+
+                let columns = vec![Column::new("id".to_string(), ColumnType::String, 0)];
+
+                Ok(Arc::new(DataFrame::new(
+                    columns,
+                    rows.into_iter()
+                        .map(|item| {
+                            Row::new(vec![TableValue::String(item.get_row().get_key().clone())])
+                        })
+                        .collect(),
+                )))
+            }
+            CubeStoreStatement::QueueList {
+                prefix,
+                with_payload,
+                status_filter,
+                sort_by_priority,
+            } => {
+                let rows = self
+                    .cachestore
+                    .queue_list(prefix.value, status_filter, sort_by_priority)
+                    .await?;
+
+                let mut columns = vec![
+                    Column::new("id".to_string(), ColumnType::String, 0),
+                    Column::new("status".to_string(), ColumnType::String, 1),
+                    Column::new("extra".to_string(), ColumnType::String, 2),
+                ];
+
+                if with_payload {
+                    columns.push(Column::new("payload".to_string(), ColumnType::String, 3));
+                }
+
+                Ok(Arc::new(DataFrame::new(
+                    columns,
+                    rows.into_iter()
+                        .map(|item| item.into_row().into_queue_list_row(with_payload))
+                        .collect(),
+                )))
+            }
+            CubeStoreStatement::QueueRetrieve { key, concurrency } => {
+                let result = self
+                    .cachestore
+                    .queue_retrieve(key.value, concurrency)
+                    .await?;
+                let rows = if let Some(result) = result {
+                    vec![result.into_row().into_queue_retrieve_row()]
+                } else {
+                    vec![]
+                };
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![
+                        Column::new("payload".to_string(), ColumnType::String, 0),
+                        Column::new("extra".to_string(), ColumnType::String, 1),
+                    ],
+                    rows,
+                )))
+            }
+            CubeStoreStatement::QueueResult { key } => {
+                let columns = vec![
+                    Column::new("payload".to_string(), ColumnType::String, 0),
+                    Column::new("type".to_string(), ColumnType::String, 1),
+                ];
+
+                let ack_result = self.cachestore.queue_result(key.value).await?;
+                if let Some(ack_result) = ack_result {
+                    match ack_result {
+                        QueueResultResponse::Success { value } => Ok(Arc::new(DataFrame::new(
+                            columns,
+                            vec![Row::new(vec![
+                                TableValue::String(value),
+                                TableValue::String("success".to_string()),
+                            ])],
+                        ))),
+                    }
+                } else {
+                    Ok(Arc::new(DataFrame::new(columns, vec![])))
+                }
+            }
+            CubeStoreStatement::QueueResultBlocking { timeout, key } => {
+                let columns = vec![
+                    Column::new("payload".to_string(), ColumnType::String, 0),
+                    Column::new("type".to_string(), ColumnType::String, 1),
+                ];
+
+                let ack_result = self
+                    .cachestore
+                    .queue_result_blocking(key.value, timeout)
+                    .await?;
+                if let Some(ack_result) = ack_result {
+                    match ack_result {
+                        QueueResultResponse::Success { value } => Ok(Arc::new(DataFrame::new(
+                            columns,
+                            vec![Row::new(vec![
+                                TableValue::String(value),
+                                TableValue::String("success".to_string()),
+                            ])],
+                        ))),
+                    }
+                } else {
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
+            }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
                     .query_planner
@@ -1245,20 +1428,17 @@ impl SqlService for SqlServiceImpl {
                 )))
             }
             CubeStoreStatement::CacheGet { key } => {
-                let row = self.cachestore.cache_get(key.value).await?;
-                if let Some(r) = row {
-                    Ok(Arc::new(DataFrame::new(
-                        vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                        vec![Row::new(vec![TableValue::String(
-                            r.get_row().get_value().clone(),
-                        )])],
-                    )))
+                let result = self.cachestore.cache_get(key.value).await?;
+                let value = if let Some(result) = result {
+                    TableValue::String(result.into_row().value)
                 } else {
-                    Ok(Arc::new(DataFrame::new(
-                        vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                        vec![Row::new(vec![TableValue::Null])],
-                    )))
-                }
+                    TableValue::Null
+                };
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                    vec![Row::new(vec![value])],
+                )))
             }
             CubeStoreStatement::CacheKeys { prefix } => {
                 let rows = self.cachestore.cache_keys(prefix.value).await?;
@@ -3437,7 +3617,7 @@ mod tests {
                 ).await.unwrap();
 
             let result = service.exec_query(
-                "EXPLAIN SELECT platform, sum(amount) from foo.orders where age > 15 group by platform" 
+                "EXPLAIN SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
             ).await.unwrap();
             assert_eq!(result.len(), 1);
             assert_eq!(result.get_columns().len(), 1);
@@ -3489,7 +3669,7 @@ mod tests {
                     ).await.unwrap();
 
                 let result = service.exec_query(
-                    "EXPLAIN ANALYZE SELECT platform, sum(amount) from foo.orders where age > 15 group by platform" 
+                    "EXPLAIN ANALYZE SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
                     ).await.unwrap();
 
                 assert_eq!(result.len(), 2);

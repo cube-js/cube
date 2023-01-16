@@ -125,8 +125,8 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
         true
     }
 
-    fn get_expire<'a>(&self, row: &'a CacheItem) -> &'a Option<DateTime<Utc>> {
-        row.get_expire()
+    fn get_expire(&self, row: &CacheItem) -> Option<DateTime<Utc>> {
+        row.get_expire().clone()
     }
 
     fn version(&self) -> u32 {

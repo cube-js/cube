@@ -72,7 +72,9 @@ enum_from_primitive! {
         MultiIndexes = 0x0900,
         MultiPartitions = 0x0A00,
         ReplayHandles = 0x0B00,
-        CacheItems = 0x0C00
+        CacheItems = 0x0C00,
+        QueueItems = 0x0D00,
+        QueueResults = 0x0E00
     }
 }
 
@@ -91,6 +93,8 @@ impl TableId {
             TableId::MultiPartitions => false,
             TableId::ReplayHandles => false,
             TableId::CacheItems => true,
+            TableId::QueueItems => true,
+            TableId::QueueResults => true,
         }
     }
 }
@@ -500,7 +504,7 @@ pub struct RocksStore {
     pub db: Arc<DB>,
     pub config: Arc<dyn ConfigObj>,
     seq_store: Arc<Mutex<HashMap<TableId, u64>>>,
-    listeners: Arc<RwLock<Vec<Sender<MetaStoreEvent>>>>,
+    pub listeners: Arc<RwLock<Vec<Sender<MetaStoreEvent>>>>,
     metastore_fs: Arc<dyn MetaStoreFs>,
     last_checkpoint_time: Arc<RwLock<SystemTime>>,
     write_notify: Arc<Notify>,
