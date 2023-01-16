@@ -445,7 +445,7 @@ export class CubeEvaluator extends CubeSymbols {
         aggregation.measureReferences && this.evaluateReferences(cube, aggregation.measureReferences) || [],
       timeDimensions,
       rollups:
-        aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences) || [],
+        aggregation.rollupReferences && this.evaluateReferences(cube, aggregation.rollupReferences, { originalSorting: true }) || [],
     };
   }
 }
