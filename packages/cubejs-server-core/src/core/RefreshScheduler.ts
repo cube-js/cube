@@ -190,7 +190,7 @@ export class RefreshScheduler {
     const compilers = await compilerApi.getCompilers();
     const query = await compilerApi.createQueryByDataSource(compilers, queryingOptions);
     if (preAggregation.preAggregation.partitionGranularity || preAggregation.preAggregation.type === 'rollup') {
-      return { ...queryingOptions, ...preAggregation.references };
+      return { ...queryingOptions, ...preAggregation.references, preAggregationId: preAggregation.id };
     } else if (preAggregation.preAggregation.type === 'originalSql') {
       const cubeFromPath = query.cubeEvaluator.cubeFromPath(preAggregation.cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
