@@ -13,13 +13,14 @@ use s3::{Bucket, Region};
 use std::env;
 use std::fmt;
 use std::fmt::Formatter;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tempfile::NamedTempFile;
+use tempfile::tempdir_in;
 use tokio::fs;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 pub struct S3RemoteFs {
     dir: PathBuf,
@@ -167,9 +168,9 @@ impl RemoteFs for S3RemoteFs {
             debug!("Uploading {}", remote_path);
             let path = self.s3_path(&remote_path);
             let bucket = self.bucket.read().unwrap().clone();
-            let temp_upload_path_copy = temp_upload_path.to_string();
+            let mut temp_upload_path_copy = tokio::fs::File::open(temp_upload_path).await?;
             let status_code = cube_ext::spawn_blocking(move || {
-                bucket.put_object_stream_blocking(temp_upload_path_copy, path)
+                bucket.put_object_stream_blocking(&mut temp_upload_path_copy, path)
             })
             .await??;
 
@@ -224,25 +225,32 @@ impl RemoteFs for S3RemoteFs {
             debug!("Downloading {}", remote_path);
             let path = self.s3_path(&remote_path);
             let bucket = self.bucket.read().unwrap().clone();
+
+            let temp_dir = tempdir_in(downloads_dir)?;
+            let temp_file_name = temp_dir.path().join(format!("{}.tmp", Uuid::new_v4()));
+            let mut async_tmp_file = fs::File::create(&temp_file_name)
+                .await
+                .expect("Unable to open file");
+
             let status_code = cube_ext::spawn_blocking(move || -> Result<u16, CubeError> {
-                let (mut temp_file, temp_path) =
-                    NamedTempFile::new_in(&downloads_dir)?.into_parts();
-
-                let res = bucket.get_object_stream_blocking(path.as_str(), &mut temp_file)?;
-                temp_file.flush()?;
-
-                temp_path.persist(local_file)?;
+                let res = bucket.get_object_stream_blocking(path.as_str(), &mut async_tmp_file)?;
+                let _ = async_tmp_file.flush();
 
                 Ok(res)
             })
             .await??;
-            info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
+
+            fs::rename(&temp_file_name, &local_file)
+                .await
+                .expect("Unable to copy file");
+
             if status_code != 200 {
                 return Err(CubeError::user(format!(
                     "S3 download returned non OK status: {}",
                     status_code
                 )));
             }
+            info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
         }
         Ok(local_file_str)
     }
@@ -307,7 +315,7 @@ impl RemoteFs for S3RemoteFs {
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list
             .iter()
-            .flat_map(|(res, _)| {
+            .flat_map(|res| {
                 res.contents
                     .iter()
                     .map(|o| -> Result<RemoteFile, CubeError> {

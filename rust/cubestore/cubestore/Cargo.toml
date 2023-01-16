@@ -54,7 +54,7 @@ mockall = "0.8.1"
 async-std = "0.99"
 itertools = "0.11.0"
 bigdecimal = { version = "0.2.0", features = ["serde"] }
-rust-s3 = "0.26.3"
+rust-s3 = { version = "0.28.1" , features = ["default", "blocking"] }
 aws-creds = "0.24.1"
 aws-region = "0.22.1"
 deadqueue = "0.2.4"
@@ -92,6 +92,7 @@ rdkafka = { version = "0.29.0" }
 parse-size = "1.0.0"
 humansize = "2.1.3"
 deepsize = "0.2.0"
+anyhow = "1.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rdkafka = { version = "0.29.0", features = ["ssl", "gssapi", "cmake-build"] }
