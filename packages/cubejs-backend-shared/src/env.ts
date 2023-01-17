@@ -849,7 +849,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Athena AWS secret.
+   * Athena AWS session token.
    */
   athenaAwsSessionToken: ({
     dataSource
