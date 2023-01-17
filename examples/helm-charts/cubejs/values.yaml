@@ -14,6 +14,23 @@ commonLabels: {}
 ##
 commonAnnotations: {}
 
+# Extra env 'items' that will be added to the definition of cubejs containers in every instance master and workers
+# a string is expected (can be templated).
+extraEnv: ~
+# eg:
+# extraEnv: |
+#   - name: PLATFORM
+#     value: FR
+
+# Extra envFrom 'items' that will be added to the definition of cubejs containers in every instance master and workers
+# A string is expected (can be templated).
+extraEnvFrom: ~
+# eg:
+# extraEnvFrom: |
+#   - secretRef:
+#       name: '{{ .Release.Name }}-cubejs-connections'
+#   - configMapRef:
+#       name: '{{ .Release.Name }}-cubejs-variables'
 image:
   ## Docker image repository
   ##

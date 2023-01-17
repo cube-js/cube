@@ -1,4 +1,15 @@
+{{/* User defined cubejs environment from */}}
+{{- define "custom_cubejs_environment_from" }}
+  {{- $Global := . }}
+  {{- with .Values.extraEnvFrom }}
+  {{- tpl . $Global | nindent 2 }}
+  {{- end }}
+{{- end }}
 {{- define "cubejs.common-env" -}}
+{{- $Global := . }}
+{{- with .Values.extraEnv }}
+{{- tpl . $Global }}
+{{- end }}
 - name: PORT
   value: {{ .Values.config.apiPort | quote }}
 {{- if .Values.config.debug }}
