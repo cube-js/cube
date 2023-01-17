@@ -57,7 +57,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       this.prefixKey(this.redisHash(queryKey)),
       JSON.stringify(data)
     ]);
-    if (rows.length > 0) {
+    if (rows && rows.length) {
       return [
         rows[0].added === 'true' ? 1 : 0,
         null,
@@ -67,14 +67,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       ];
     }
 
-    // TODO: Throw error in near time
-    return [
-      1,
-      null,
-      null,
-      1,
-      data.addedToQueueTime
-    ];
+    throw new Error('Empty response on QUEUE ADD');
   }
 
   // TODO: Looks useless, because we can do it in one step - getQueriesToCancel

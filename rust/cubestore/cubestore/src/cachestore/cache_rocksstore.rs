@@ -276,8 +276,8 @@ impl RocksCacheStore {
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct QueueAddResponse {
-    added: bool,
-    pending: u64,
+    pub added: bool,
+    pub pending: u64,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]

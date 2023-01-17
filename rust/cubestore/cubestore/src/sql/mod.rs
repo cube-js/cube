@@ -1167,7 +1167,8 @@ impl SqlService for SqlServiceImpl {
                 priority,
                 value,
             } => {
-                self.cachestore
+                let response = self
+                    .cachestore
                     .queue_add(QueueItem::new(
                         key.value,
                         value,
@@ -1176,7 +1177,16 @@ impl SqlService for SqlServiceImpl {
                     ))
                     .await?;
 
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                Ok(Arc::new(DataFrame::new(
+                    vec![
+                        Column::new("added".to_string(), ColumnType::Boolean, 0),
+                        Column::new("pending".to_string(), ColumnType::Int, 1),
+                    ],
+                    vec![Row::new(vec![
+                        TableValue::Boolean(response.added),
+                        TableValue::Int(response.pending as i64),
+                    ])],
+                )))
             }
             CubeStoreStatement::QueueTruncate {} => {
                 self.cachestore.queue_truncate().await?;
