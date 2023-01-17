@@ -83,7 +83,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return null;
   }
 
-  public async freeProcessingLock(queryKey: string, processingId: string, activated: unknown): Promise<void> {
+  public async freeProcessingLock(_queryKey: string, _processingId: string, _activated: unknown): Promise<void> {
     // nothing to do
   }
 
@@ -265,7 +265,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return null;
   }
 
-  public async setResultAndRemoveQuery(queryKey: string, executionResult: any, processingId: any): Promise<boolean> {
+  public async setResultAndRemoveQuery(queryKey: string, executionResult: any, _processingId: any): Promise<boolean> {
     await this.driver.query('QUEUE ACK ? ? ', [
       this.prefixKey(queryKey),
       JSON.stringify(executionResult)
