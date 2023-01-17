@@ -229,8 +229,8 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return true;
   }
 
-  public async release(): Promise<void> {
-    // throw new Error('Unimplemented release');
+  public release(): void {
+    // nothing to release
   }
 
   public async retrieveForProcessing(queryKey: string, _processingId: string): Promise<RetrieveForProcessingResponse> {
@@ -306,7 +306,7 @@ export class CubeStoreQueueDriver implements QueueDriverInterface {
     return new CubestoreQueueDriverConnection(await this.getConnection(), this.options);
   }
 
-  public async release(): Promise<void> {
+  public release(): void {
     // nothing to release
   }
 }
