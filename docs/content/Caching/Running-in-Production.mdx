@@ -111,6 +111,15 @@ In cluster mode, Cube Store runs two kinds of nodes:
   metadata and serves simple queries.
 - multiple **worker** nodes which execute SQL queries
 
+Cube Store querying performance is optimal when the count of partitions in a single query is less than or equal to the worker count.
+For example, you have a 200 million rows table that is partitioned by day, which is ten daily Cube partitions or 100 Cube Store partitions in total.
+The query sent by the user contains filters, and the resulting scan requires reading 16 Cube Store partitions in total.
+Optimal query performance, in this case, can be achieved with 16 or more workers.
+You can use `EXPLAIN` and `EXPLAIN ANALYZE` SQL commands to see how many partitions would be used in a specific Cube Store query.
+
+Resources required for the main node and workers can vary depending on the configuration.
+With default settings, you should expect to allocate at least 4 CPUs and up to 8GB per main and worker node.
+
 The configuration required for each node can be found in the table below. More
 information about these variables can be found [in the Environment Variables
 reference][ref-config-env].
