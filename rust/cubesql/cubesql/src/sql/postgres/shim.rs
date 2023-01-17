@@ -1,4 +1,4 @@
-use std::{backtrace::Backtrace, collections::HashMap, io::ErrorKind, sync::Arc};
+use std::{backtrace::Backtrace, collections::HashMap, io::ErrorKind, pin::Pin, sync::Arc};
 
 use super::extended::PreparedStatement;
 use crate::{
@@ -10,17 +10,16 @@ use crate::{
     },
     sql::{
         df_type_to_pg_tid,
-        extended::{Cursor, Portal, PortalFrom},
+        extended::{Cursor, Portal, PortalFrom, PortalResponse},
         session::DatabaseProtocol,
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
-        writer::BatchWriter,
         AuthContextRef, Session, StatusFlags,
     },
     telemetry::ContextLogger,
     CubeError,
 };
-use futures::FutureExt;
+use futures::{pin_mut, FutureExt, StreamExt};
 use log::{debug, error, trace};
 use pg_srv::{
     buffer, protocol,
@@ -698,7 +697,10 @@ impl AsyncPostgresShim {
                     .session
                     .state
                     .begin_query(format!("portal #{}", execute.portal));
-                let mut writer = BatchWriter::new(portal.get_format());
+
+                let mut portal = Pin::new(portal);
+                let stream = portal.execute(execute.max_rows as usize);
+                pin_mut!(stream);
 
                 tokio::select! {
                     _ = cancel.cancelled() => {
@@ -706,21 +708,43 @@ impl AsyncPostgresShim {
 
                         return Err(protocol::ErrorResponse::query_canceled().into());
                     },
-                    res = portal.execute(&mut writer, execute.max_rows as usize) => {
-                        self.session.state.end_query();
-
-                        // Unwrap result after ending query
-                        let completion = res?;
+                    chunk = stream.next() => {
+                        let chunk = match chunk {
+                            Some(chunk) => match chunk {
+                                Ok(chunk) => chunk,
+                                Err(_) => {
+                                    self.session.state.end_query();
+                                    chunk?
+                                }
+                            },
+                            None => return Ok(()),
+                        };
 
                         if cancel.is_cancelled() {
+                            self.session.state.end_query();
+
                             return Err(protocol::ErrorResponse::query_canceled().into());
                         }
 
-                        if writer.has_data() {
-                            buffer::write_direct(&mut self.socket, writer).await?
-                        }
+                        let chunk = match chunk {
+                            PortalResponse::Completion(completion) => {
+                                self.session.state.end_query();
 
-                        self.write_completion(completion).await?;
+                                // TODO:
+                                match completion {
+                                    PortalCompletion::Complete(c) => buffer::write_message(&mut self.socket, c).await?,
+                                    PortalCompletion::Suspended(s) => buffer::write_message(&mut self.socket, s).await?,
+                                }
+
+                                return Ok(());
+                            },
+                            PortalResponse::Batch(batch) => batch,
+                        };
+
+                        match chunk.writer {
+                            Some(writer) if writer.has_data() => buffer::write_direct(&mut self.socket, writer).await?,
+                            _ => (),
+                        }
                     },
                 }
             };
@@ -1368,29 +1392,40 @@ impl AsyncPostgresShim {
         max_rows: usize,
         cancel: CancellationToken,
     ) -> Result<(), ConnectionError> {
-        let mut writer = BatchWriter::new(portal.get_format());
+        let mut portal = Pin::new(portal);
+        let stream = portal.execute(max_rows);
+        pin_mut!(stream);
 
-        tokio::select! {
-            _ = cancel.cancelled() => {
-                // TODO: Cancellation handling via errors?
-                return Ok(());
-            },
-            res = portal.execute(&mut writer, max_rows) => {
-                let completion = res?;
-
-                // Special handling for special queries, such as DISCARD ALL.
-                if let Some(description) = portal.get_description()? {
-                    match description.len() {
-                        0 => self.write(protocol::NoData::new()).await?,
-                        _ => self.write(description).await?,
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => {
+                    // TODO: Cancellation handling via errors?
+                    return Ok(());
+                },
+                chunk = stream.next() => {
+                    let chunk = match chunk {
+                        Some(chunk) => chunk?,
+                        None => return Ok(()),
                     };
+
+                    let chunk = match chunk {
+                        PortalResponse::Completion(completion) => return self.write_completion(completion).await,
+                        PortalResponse::Batch(batch) => batch,
+                    };
+
+                    // Special handling for special queries, such as DISCARD ALL.
+                    if let Some(description) = chunk.description {
+                        match description.len() {
+                            0 => self.write(protocol::NoData::new()).await?,
+                            _ => self.write(description).await?,
+                        };
+                    }
+
+                    match chunk.writer {
+                        Some(writer) if writer.has_data() => buffer::write_direct(&mut self.socket, writer).await?,
+                        _ => (),
+                    }
                 }
-
-                if writer.has_data() {
-                    buffer::write_direct(&mut self.socket, writer).await?;
-                };
-
-                self.write_completion(completion).await
             }
         }
     }
