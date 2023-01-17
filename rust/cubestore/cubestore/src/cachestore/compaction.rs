@@ -35,7 +35,6 @@ impl MetaStoreCacheCompactionFilter {
     }
 }
 
-#[cfg(debug_assertions)]
 impl Drop for MetaStoreCacheCompactionFilter {
     fn drop(&mut self) {
         let elapsed = Utc::now() - self.current;
