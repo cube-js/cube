@@ -9,6 +9,17 @@ menuOrder: 2
 Cube supports using multiple data sources, allowing the use of different
 databases for different cubes.
 
+<InfoBox>
+
+Cube expects that a `default` data source is **always** defined. Ensure that a
+`default` data source is defined using [`driverFactory`]
+[ref-conf-ref-driverfactory] in your `cube.js` file **or** that `CUBEJS_DB_*`
+variables exist as environment variables.
+
+</InfoBox>
+
+[ref-conf-ref-driverfactory]: /config#options-reference-driver-factory
+
 ## Schema
 
 To configure multiple data sources, first explicitly declare a data source in
@@ -38,12 +49,12 @@ to configure each data source:
 
 ```bash
 CUBEJS_DATASOURCES=default,datasource1
-CUBEJS_DS_default_DB_TYPE=postgres
-CUBEJS_DS_default_DB_NAME=ecom
-CUBEJS_DS_default_DB_HOST=localhost
-CUBEJS_DS_datasource1_DB_TYPE=postgres
-CUBEJS_DS_datasource1_DB_NAME=ecom
-CUBEJS_DS_datasource1_DB_HOST=remotehost
+CUBEJS_DB_TYPE=postgres
+CUBEJS_DB_NAME=ecom
+CUBEJS_DB_HOST=localhost
+CUBEJS_DS_DATASOURCE1_DB_TYPE=postgres
+CUBEJS_DS_DATASOURCE1_DB_NAME=ecom
+CUBEJS_DS_DATASOURCE1_DB_HOST=remotehost
 ```
 
 ### Decorated environment variables
@@ -55,11 +66,11 @@ source name:
 CUBEJS_[DS_<DATASOURCE>_]<ENV_VAR>
 ```
 
-For example, using the `default` data source, `CUBEJS_DB_TYPE` could be
+For example, using the `datasource1` data source, `CUBEJS_DB_TYPE` could be
 decorated as:
 
 ```bash
-CUBEJS_DS_default_DB_TYPE=postgres
+CUBEJS_DS_DATASOURCE1_DB_TYPE=postgres
 ```
 
 For more information on environment variables that support decoration, check the
