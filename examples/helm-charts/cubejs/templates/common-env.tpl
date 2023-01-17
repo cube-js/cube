@@ -297,6 +297,10 @@ CUBEJS_REDIS_PASSWORD.
       name: {{ .Values.database.bigquery.credentialsFromSecret.name | required "database.bigquery.credentialsFromSecret.name is required" }}
       key: {{ .Values.database.bigquery.credentialsFromSecret.key | required "database.bigquery.credentialsFromSecret.key is required" }}
 {{- end }}
+{{- if .Values.database.bigquery.KeyFile }}
+- name: CUBEJS_DB_BQ_KEY_FILE
+  value: {{ .Values.database.bigquery.KeyFile }}
+{{- end }}
 {{- if .Values.exportBucket.name }}
 - name: CUBEJS_DB_EXPORT_BUCKET
   value: {{ .Values.exportBucket.name | quote }}
