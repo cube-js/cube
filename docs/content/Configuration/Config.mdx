@@ -459,6 +459,14 @@ for pre-aggregations.
 
 </WarningBox>
 
+<WarningBox>
+
+Setting this variable enables refresh worker mode, which means it shouldn't usually be set to any constant number but depend on your cluster environment.
+Setting it to the constant value in the cluster environment will lead to the instantiation of Refresh Worker on every Cube instance of your cluster, including API ones.
+This will usually lead to refreshing race conditions and to out of memory errors.
+
+</WarningBox>
+
 Cube.js enables background refresh by default using the `CUBEJS_REFRESH_WORKER`
 environment variable.
 
