@@ -3,6 +3,91 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.45](https://github.com/cube-js/cube.js/compare/v0.31.44...v0.31.45) (2023-01-16)
+
+
+### Bug Fixes
+
+* **cubestore:** Panic on combination of `Union All` and single select in root `Union All` ([#6012](https://github.com/cube-js/cube.js/issues/6012)) ([0d1a3d8](https://github.com/cube-js/cube.js/commit/0d1a3d8e2732d47f193aa5cf018e8ca5c6d7cf31))
+
+
+### Features
+
+* **cubestore:** Initial queue support ([#5541](https://github.com/cube-js/cube.js/issues/5541)) ([7109039](https://github.com/cube-js/cube.js/commit/7109039beaf5819fa1179751e98a3431a04b3cac))
+
+
+
+
+
+## [0.31.44](https://github.com/cube-js/cube.js/compare/v0.31.43...v0.31.44) (2023-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.31.43](https://github.com/cube-js/cube.js/compare/v0.31.42...v0.31.43) (2023-01-16)
+
+
+### Bug Fixes
+
+* **cubestore:** Panic when nested Union All ([#6010](https://github.com/cube-js/cube.js/issues/6010)) ([331242e](https://github.com/cube-js/cube.js/commit/331242e263435513544ece0ee7b174d14562f05b))
+
+
+
+
+
+## [0.31.42](https://github.com/cube-js/cube.js/compare/v0.31.41...v0.31.42) (2023-01-15)
+
+
+### Bug Fixes
+
+* **cubestore:** Large memory consumption while waiting for the queue cache ([#6004](https://github.com/cube-js/cube.js/issues/6004)) ([8c029bb](https://github.com/cube-js/cube.js/commit/8c029bb96cf4c451f061cef2d83b5d5dc3a8637c))
+* **cubestore:** Large memory consumption while waiting for the queue cache: drop context ([#6005](https://github.com/cube-js/cube.js/issues/6005)) ([b39920f](https://github.com/cube-js/cube.js/commit/b39920f6f5f2b10b2ea598712bd5f5d1b02a3308))
+
+
+
+
+
+## [0.31.41](https://github.com/cube-js/cube.js/compare/v0.31.40...v0.31.41) (2023-01-13)
+
+
+### Bug Fixes
+
+* **cubestore:** Metastore get_tables_with_path cache is not work correctly ([#6000](https://github.com/cube-js/cube.js/issues/6000)) ([75699c8](https://github.com/cube-js/cube.js/commit/75699c85f3b428d3e1967642b2c440be77e7b095))
+
+
+
+
+
+## [0.31.40](https://github.com/cube-js/cube.js/compare/v0.31.39...v0.31.40) (2023-01-12)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
+
+
+### Features
+
+* **cubestore:** Support lazy initialization for CacheStore ([#5933](https://github.com/cube-js/cube.js/issues/5933)) ([37b4a95](https://github.com/cube-js/cube.js/commit/37b4a953e6c3bc535520203b23fef1632bf04aee))
+
+
+
+
+
 ## [0.31.36](https://github.com/cube-js/cube.js/compare/v0.31.35...v0.31.36) (2023-01-08)
 
 

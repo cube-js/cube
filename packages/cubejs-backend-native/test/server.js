@@ -9,7 +9,7 @@ const meta_fixture = require('./meta');
         query ,
       });
 
-      throw new Error('Unsupported');
+      throw new Error('load is not implemented');
     };
 
     const meta = async ({ request, session }) => {
@@ -19,6 +19,16 @@ const meta_fixture = require('./meta');
         });
 
         return meta_fixture;
+    };
+
+    const stream = async ({ request, session, query }) => {
+      console.log('[js] stream',  {
+        request,
+        session,
+        query ,
+      });
+
+      throw new Error('stream is not implemented');
     };
 
     const checkAuth = async ({ request, user }) => {
@@ -57,21 +67,22 @@ const meta_fixture = require('./meta');
       'trace',
     );
 
-    const interface = await native.registerInterface({
+    const server = await native.registerInterface({
       // nonce: '12345678910111213141516'.substring(0, 20),
       checkAuth,
       load,
       meta,
+      stream,
     });
     console.log({
-      interface
+      server
     });
 
     process.on('SIGINT', async () => {
       console.log('SIGINT signal');
 
       try {
-        await native.shutdownInterface(interface);
+        await native.shutdownInterface(server);
       } catch (e) {
         console.log(e);
       } finally {

@@ -14,7 +14,10 @@ use sqlparser::ast;
 use std::fmt;
 
 use crate::sql::shim::{ConnectionError, QueryPlanExt};
-use datafusion::{dataframe::DataFrame as DFDataFrame, physical_plan::SendableRecordBatchStream};
+use datafusion::{
+    arrow::array::Array, dataframe::DataFrame as DFDataFrame,
+    physical_plan::SendableRecordBatchStream,
+};
 use futures::*;
 use pg_srv::protocol::{PortalCompletion, PortalSuspended};
 
@@ -181,6 +184,26 @@ pub struct Portal {
 unsafe impl Send for Portal {}
 unsafe impl Sync for Portal {}
 
+fn split_record_batch(batch: RecordBatch, mid: usize) -> (RecordBatch, Option<RecordBatch>) {
+    if batch.num_rows() <= mid {
+        return (batch, None);
+    }
+
+    let schema = batch.schema();
+    let mut left = Vec::with_capacity(schema.fields().len());
+    let mut right = Vec::with_capacity(schema.fields().len());
+
+    for column in batch.columns() {
+        left.push(column.slice(0, mid));
+        right.push(column.slice(mid, column.len() - mid));
+    }
+
+    (
+        RecordBatch::try_new(schema.clone(), left).unwrap(),
+        Some(RecordBatch::try_new(schema, right).unwrap()),
+    )
+}
+
 impl Portal {
     pub fn new(plan: QueryPlan, format: protocol::Format, from: PortalFrom) -> Self {
         Self {
@@ -241,11 +264,7 @@ impl Portal {
             )
             .into())
         } else {
-            self.write_dataframe_to_writer(
-                writer,
-                frame_state.batch,
-                if max_rows == 0 { rows_read } else { max_rows },
-            )?;
+            self.write_dataframe_to_writer(writer, frame_state.batch)?;
 
             Ok((
                 PortalState::Finished(FinishedState {
@@ -278,29 +297,23 @@ impl Portal {
         &self,
         writer: &mut BatchWriter,
         frame: DataFrame,
-        rows_to_read: usize,
     ) -> Result<(), ProtocolError> {
-        for (idx, row) in frame.get_rows().iter().enumerate() {
-            // TODO: It's a hack, because we dont limit batch_to_dataframe by number of expected rows
-            if idx >= rows_to_read {
-                break;
-            }
-
-            for value in row.values() {
+        for row in frame.to_rows().into_iter() {
+            for value in row.to_values() {
                 match value {
                     TableValue::Null => writer.write_value::<Option<bool>>(None)?,
-                    TableValue::String(v) => writer.write_value(v.clone())?,
-                    TableValue::Int16(v) => writer.write_value(*v)?,
-                    TableValue::Int32(v) => writer.write_value(*v)?,
-                    TableValue::Int64(v) => writer.write_value(*v)?,
-                    TableValue::Boolean(v) => writer.write_value(*v)?,
-                    TableValue::Float32(v) => writer.write_value(*v)?,
-                    TableValue::Float64(v) => writer.write_value(*v)?,
-                    TableValue::List(v) => writer.write_value(v.clone())?,
-                    TableValue::Timestamp(v) => writer.write_value(v.clone())?,
-                    TableValue::Date(v) => writer.write_value(v.clone())?,
-                    TableValue::Decimal128(v) => writer.write_value(v.clone())?,
-                    TableValue::Interval(v) => writer.write_value(v.clone())?,
+                    TableValue::String(v) => writer.write_value(v)?,
+                    TableValue::Int16(v) => writer.write_value(v)?,
+                    TableValue::Int32(v) => writer.write_value(v)?,
+                    TableValue::Int64(v) => writer.write_value(v)?,
+                    TableValue::Boolean(v) => writer.write_value(v)?,
+                    TableValue::Float32(v) => writer.write_value(v)?,
+                    TableValue::Float64(v) => writer.write_value(v)?,
+                    TableValue::List(v) => writer.write_value(v)?,
+                    TableValue::Timestamp(v) => writer.write_value(v)?,
+                    TableValue::Date(v) => writer.write_value(v)?,
+                    TableValue::Decimal128(v) => writer.write_value(v)?,
+                    TableValue::Interval(v) => writer.write_value(v)?,
                 };
             }
 
@@ -319,28 +332,23 @@ impl Portal {
     ) -> Result<Option<RecordBatch>, ConnectionError> {
         let mut unused: Option<RecordBatch> = None;
 
-        let (batch_for_write, rows_to_read) = if max_rows == 0 {
-            let batch_num_rows = batch.num_rows();
-            (batch, batch_num_rows)
+        let batch_for_write = if max_rows == 0 {
+            batch
         } else {
             if batch.num_rows() > *left {
-                let unused_batch = batch.slice(*left, batch.num_rows() - *left);
-                unused = Some(unused_batch);
-
-                let r = (batch, *left);
+                let (batch, right) = split_record_batch(batch, *left);
+                unused = right;
                 *left = 0;
 
-                r
+                batch
             } else {
                 *left = *left - batch.num_rows();
-                let batch_num_rows = batch.num_rows();
-                (batch, batch_num_rows)
+                batch
             }
         };
 
-        // TODO: Split doesn't split batches, it copy the part, lets dont convert whole batch to dataframe
         let frame = batch_to_dataframe(batch_for_write.schema().as_ref(), &vec![batch_for_write])?;
-        self.write_dataframe_to_writer(writer, frame, rows_to_read)?;
+        self.write_dataframe_to_writer(writer, frame)?;
 
         Ok(unused)
     }
@@ -487,6 +495,7 @@ impl Portal {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::{
         compile::engine::information_schema::postgres::InfoSchemaTestingDatasetProvider,
         sql::{
@@ -499,7 +508,13 @@ mod tests {
     use pg_srv::protocol::{CommandComplete, Format, PortalCompletion, PortalSuspended};
 
     use crate::sql::{extended::PortalFrom, shim::ConnectionError};
-    use datafusion::prelude::SessionContext;
+    use datafusion::{
+        arrow::{
+            array::{ArrayRef, StringArray},
+            datatypes::{DataType, Field, Schema},
+        },
+        prelude::SessionContext,
+    };
     use std::sync::Arc;
 
     fn generate_testing_data_frame(cnt: usize) -> DataFrame {
@@ -517,6 +532,73 @@ mod tests {
             )],
             rows,
         )
+    }
+
+    #[test]
+    fn test_split_record_batch() -> Result<(), ConnectionError> {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "KibanaSampleDataEcommerce.count",
+            DataType::Utf8,
+            false,
+        )]));
+        let column1 = Arc::new(StringArray::from(vec![
+            Some("1"),
+            Some("2"),
+            Some("3"),
+            Some("4"),
+            Some("5"),
+            Some("6"),
+        ])) as ArrayRef;
+
+        // 0
+        {
+            let (left, right) = split_record_batch(
+                RecordBatch::try_new(schema.clone(), vec![column1.clone()])?,
+                0,
+            );
+            assert_eq!(left.num_rows(), 0);
+            assert_eq!(right.unwrap().num_rows(), 6);
+        }
+
+        // 3
+        {
+            let (left, right) = split_record_batch(
+                RecordBatch::try_new(schema.clone(), vec![column1.clone()])?,
+                3,
+            );
+            assert_eq!(left.num_rows(), 3);
+
+            let left_column = left
+                .column(0)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap();
+            assert_eq!(left_column.value(0), "1");
+            assert_eq!(left_column.value(1), "2");
+            assert_eq!(left_column.value(2), "3");
+
+            let right = right.unwrap();
+            assert_eq!(right.num_rows(), 3);
+
+            let right_column = right
+                .column(0)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap();
+            assert_eq!(right_column.value(0), "4");
+            assert_eq!(right_column.value(1), "5");
+            assert_eq!(right_column.value(2), "6");
+        }
+
+        // 6
+        {
+            let (left, right) =
+                split_record_batch(RecordBatch::try_new(schema.clone(), vec![column1])?, 6);
+            assert_eq!(left.num_rows(), 6);
+            assert_eq!(right, None);
+        }
+
+        Ok(())
     }
 
     #[tokio::test]

@@ -25,7 +25,8 @@ type ApiType =
   'sql' |
   'graphql' |
   'rest' |
-  'ws';
+  'ws' |
+  'stream';
 
 /**
  * Parsed query type data type.

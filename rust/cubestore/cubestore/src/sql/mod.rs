@@ -35,7 +35,7 @@ use tracing_futures::WithSubscriber;
 use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
-use crate::cachestore::{CacheItem, CacheStore};
+use crate::cachestore::{CacheItem, CacheStore, QueueItem, QueueResultResponse};
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -1162,6 +1162,189 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
+            CubeStoreStatement::QueueAdd {
+                key,
+                priority,
+                value,
+            } => {
+                self.cachestore
+                    .queue_add(QueueItem::new(
+                        key.value,
+                        value,
+                        QueueItem::status_default(),
+                        priority,
+                    ))
+                    .await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::QueueTruncate {} => {
+                self.cachestore.queue_truncate().await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::QueueCancel { key } => {
+                let columns = vec![
+                    Column::new("payload".to_string(), ColumnType::String, 0),
+                    Column::new("extra".to_string(), ColumnType::String, 1),
+                ];
+
+                let result = self.cachestore.queue_cancel(key.value).await?;
+                if let Some(result) = result {
+                    Ok(Arc::new(DataFrame::new(
+                        columns,
+                        vec![result.into_row().into_queue_cancel_row()],
+                    )))
+                } else {
+                    Ok(Arc::new(DataFrame::new(columns, vec![])))
+                }
+            }
+            CubeStoreStatement::QueueHeartbeat { key } => {
+                self.cachestore.queue_heartbeat(key.value).await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::QueueMergeExtra { key, payload } => {
+                self.cachestore
+                    .queue_merge_extra(key.value, payload)
+                    .await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::QueueAck { key, result } => {
+                self.cachestore.queue_ack(key.value, result).await?;
+
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
+            CubeStoreStatement::QueueGet { key } => {
+                let columns = vec![
+                    Column::new("payload".to_string(), ColumnType::String, 0),
+                    Column::new("extra".to_string(), ColumnType::String, 1),
+                ];
+
+                let result = self.cachestore.queue_get(key.value).await?;
+                if let Some(result) = result {
+                    Ok(Arc::new(DataFrame::new(
+                        columns,
+                        vec![result.into_row().into_queue_get_row()],
+                    )))
+                } else {
+                    Ok(Arc::new(DataFrame::new(columns, vec![])))
+                }
+            }
+            CubeStoreStatement::QueueToCancel {
+                prefix,
+                orphaned_timeout,
+                stalled_timeout,
+            } => {
+                let rows = self
+                    .cachestore
+                    .queue_to_cancel(prefix.value, orphaned_timeout, stalled_timeout)
+                    .await?;
+
+                let columns = vec![Column::new("id".to_string(), ColumnType::String, 0)];
+
+                Ok(Arc::new(DataFrame::new(
+                    columns,
+                    rows.into_iter()
+                        .map(|item| {
+                            Row::new(vec![TableValue::String(item.get_row().get_key().clone())])
+                        })
+                        .collect(),
+                )))
+            }
+            CubeStoreStatement::QueueList {
+                prefix,
+                with_payload,
+                status_filter,
+                sort_by_priority,
+            } => {
+                let rows = self
+                    .cachestore
+                    .queue_list(prefix.value, status_filter, sort_by_priority)
+                    .await?;
+
+                let mut columns = vec![
+                    Column::new("id".to_string(), ColumnType::String, 0),
+                    Column::new("status".to_string(), ColumnType::String, 1),
+                    Column::new("extra".to_string(), ColumnType::String, 2),
+                ];
+
+                if with_payload {
+                    columns.push(Column::new("payload".to_string(), ColumnType::String, 3));
+                }
+
+                Ok(Arc::new(DataFrame::new(
+                    columns,
+                    rows.into_iter()
+                        .map(|item| item.into_row().into_queue_list_row(with_payload))
+                        .collect(),
+                )))
+            }
+            CubeStoreStatement::QueueRetrieve { key, concurrency } => {
+                let result = self
+                    .cachestore
+                    .queue_retrieve(key.value, concurrency)
+                    .await?;
+                let rows = if let Some(result) = result {
+                    vec![result.into_row().into_queue_retrieve_row()]
+                } else {
+                    vec![]
+                };
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![
+                        Column::new("payload".to_string(), ColumnType::String, 0),
+                        Column::new("extra".to_string(), ColumnType::String, 1),
+                    ],
+                    rows,
+                )))
+            }
+            CubeStoreStatement::QueueResult { key } => {
+                let columns = vec![
+                    Column::new("payload".to_string(), ColumnType::String, 0),
+                    Column::new("type".to_string(), ColumnType::String, 1),
+                ];
+
+                let ack_result = self.cachestore.queue_result(key.value).await?;
+                if let Some(ack_result) = ack_result {
+                    match ack_result {
+                        QueueResultResponse::Success { value } => Ok(Arc::new(DataFrame::new(
+                            columns,
+                            vec![Row::new(vec![
+                                TableValue::String(value),
+                                TableValue::String("success".to_string()),
+                            ])],
+                        ))),
+                    }
+                } else {
+                    Ok(Arc::new(DataFrame::new(columns, vec![])))
+                }
+            }
+            CubeStoreStatement::QueueResultBlocking { timeout, key } => {
+                let columns = vec![
+                    Column::new("payload".to_string(), ColumnType::String, 0),
+                    Column::new("type".to_string(), ColumnType::String, 1),
+                ];
+
+                let ack_result = self
+                    .cachestore
+                    .queue_result_blocking(key.value, timeout)
+                    .await?;
+                if let Some(ack_result) = ack_result {
+                    match ack_result {
+                        QueueResultResponse::Success { value } => Ok(Arc::new(DataFrame::new(
+                            columns,
+                            vec![Row::new(vec![
+                                TableValue::String(value),
+                                TableValue::String("success".to_string()),
+                            ])],
+                        ))),
+                    }
+                } else {
+                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                }
+            }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
                     .query_planner
@@ -1183,37 +1366,28 @@ impl SqlService for SqlServiceImpl {
                         timeout(
                             self.query_timeout,
                             self.cache
-                                .get(
-                                    query,
-                                    &context.inline_tables,
-                                    serialized,
-                                    async move |plan| {
-                                        let records;
-                                        if workers.len() == 0 {
-                                            records = executor
-                                                .execute_router_plan(plan, cluster)
-                                                .await?
-                                                .1;
-                                        } else {
-                                            // Pick one of the workers to run as main for the request.
-                                            let i =
-                                                thread_rng().sample(Uniform::new(0, workers.len()));
-                                            let rs =
-                                                cluster.route_select(&workers[i], plan).await?.1;
-                                            records = rs
-                                                .into_iter()
-                                                .map(|r| r.read())
-                                                .collect::<Result<Vec<_>, _>>()?;
-                                        }
-                                        Ok(cube_ext::spawn_blocking(
-                                            move || -> Result<DataFrame, CubeError> {
-                                                let df = batch_to_dataframe(&records)?;
-                                                Ok(df)
-                                            },
-                                        )
-                                        .await??)
-                                    },
-                                )
+                                .get(query, context, serialized, async move |plan| {
+                                    let records;
+                                    if workers.len() == 0 {
+                                        records =
+                                            executor.execute_router_plan(plan, cluster).await?.1;
+                                    } else {
+                                        // Pick one of the workers to run as main for the request.
+                                        let i = thread_rng().sample(Uniform::new(0, workers.len()));
+                                        let rs = cluster.route_select(&workers[i], plan).await?.1;
+                                        records = rs
+                                            .into_iter()
+                                            .map(|r| r.read())
+                                            .collect::<Result<Vec<_>, _>>()?;
+                                    }
+                                    Ok(cube_ext::spawn_blocking(
+                                        move || -> Result<DataFrame, CubeError> {
+                                            let df = batch_to_dataframe(&records)?;
+                                            Ok(df)
+                                        },
+                                    )
+                                    .await??)
+                                })
                                 .with_current_subscriber(),
                         )
                         .await??
@@ -1254,20 +1428,17 @@ impl SqlService for SqlServiceImpl {
                 )))
             }
             CubeStoreStatement::CacheGet { key } => {
-                let row = self.cachestore.cache_get(key.value).await?;
-                if let Some(r) = row {
-                    Ok(Arc::new(DataFrame::new(
-                        vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                        vec![Row::new(vec![TableValue::String(
-                            r.get_row().get_value().clone(),
-                        )])],
-                    )))
+                let result = self.cachestore.cache_get(key.value).await?;
+                let value = if let Some(result) = result {
+                    TableValue::String(result.into_row().value)
                 } else {
-                    Ok(Arc::new(DataFrame::new(
-                        vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                        vec![Row::new(vec![TableValue::Null])],
-                    )))
-                }
+                    TableValue::Null
+                };
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                    vec![Row::new(vec![value])],
+                )))
             }
             CubeStoreStatement::CacheKeys { prefix } => {
                 let rows = self.cachestore.cache_keys(prefix.value).await?;
@@ -2303,6 +2474,148 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn flatten_union() {
+        Config::test("flatten_union").start_test(async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.a (a int, b int, c int)").await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.b (a int, b int, c int)").await.unwrap();
+
+            let _ = service.exec_query("CREATE TABLE foo.a1 (a int, b int, c int)").await.unwrap();
+            let _ = service.exec_query("CREATE TABLE foo.b1 (a int, b int, c int)").await.unwrap();
+
+            service.exec_query(
+                "INSERT INTO foo.a (a, b, c) VALUES (1, 1, 1)"
+            ).await.unwrap();
+            service.exec_query(
+                "INSERT INTO foo.b (a, b, c) VALUES (2, 2, 1)"
+            ).await.unwrap();
+            service.exec_query(
+                "INSERT INTO foo.a1 (a, b, c) VALUES (1, 1, 2)"
+            ).await.unwrap();
+            service.exec_query(
+                "INSERT INTO foo.b1 (a, b, c) VALUES (2, 2, 2)"
+            ).await.unwrap();
+
+            let result = service.exec_query("EXPLAIN SELECT a `sel__a`, b `sel__b`, sum(c) `sel__c` from ( \
+                         select * from ( \
+                                        select * from foo.a \
+                                        union all \
+                                        select * from foo.b \
+                                        ) \
+                             union all 
+                             select * from 
+                                ( \
+                                        select * from foo.a1 \
+                                        union all \
+                                        select * from foo.b1 \
+                                        union all \
+                                        select * from foo.b \
+                                ) \
+                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
+            match &result.get_rows()[0].values()[0] {
+                TableValue::String(s) => {
+                    assert_eq!(s,
+                                "Sort\
+                                \n  Projection, [sel__a, sel__b, sel__c]\
+                                \n    Aggregate\
+                                \n      ClusterSend, indices: [[1, 2, 3, 4, 2]]\
+                                \n        Union\
+                                \n          Filter\
+                                \n            Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n          Filter\
+                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *\
+                                \n          Filter\
+                                \n            Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n          Filter\
+                                \n            Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n          Filter\
+                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+
+                               );
+                }
+                _ => assert!(false),
+            };
+
+            let result = service.exec_query("EXPLAIN SELECT a `sel__a`, b `sel__b`, sum(c) `sel__c` from ( \
+                         select * from ( \
+                                        select * from foo.a\
+                                        ) \
+                             union all 
+                             select * from 
+                                ( \
+                                        select * from foo.a1 \
+                                        union all \
+                                        select * from foo.b1 \
+                                ) \
+                            union all
+                            select * from foo.b \
+                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
+            match &result.get_rows()[0].values()[0] {
+                TableValue::String(s) => {
+                    println!("!! s {}", s);
+                    assert_eq!(s,
+                                "Sort\
+                                \n  Projection, [sel__a, sel__b, sel__c]\
+                                \n    Aggregate\
+                                \n      ClusterSend, indices: [[1, 3, 4, 2]]\
+                                \n        Union\
+                                \n          Filter\
+                                \n            Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n          Filter\
+                                \n            Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n          Filter\
+                                \n            Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n          Filter\
+                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+
+                               );
+                }
+                _ => assert!(false),
+            };
+            let result = service.exec_query("EXPLAIN SELECT a `sel__a`, b `sel__b`, sum(c) `sel__c` from ( \
+                         select * from ( \
+                                        select * from foo.a where 1 = 0\
+                                        ) \
+                             union all 
+                             select * from 
+                                ( \
+                                        select * from foo.a1 \
+                                        union all \
+                                        select * from foo.b1 \
+                                ) \
+                            union all
+                            select * from foo.b \
+                         ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
+            match &result.get_rows()[0].values()[0] {
+                TableValue::String(s) => {
+                    println!("!! s {}", s);
+                    assert_eq!(s,
+                                "Sort\
+                                \n  Projection, [sel__a, sel__b, sel__c]\
+                                \n    Aggregate\
+                                \n      ClusterSend, indices: [[1, 3, 4, 2]]\
+                                \n        Union\
+                                \n          Filter\
+                                \n            Filter\
+                                \n              Scan foo.a, source: CubeTable(index: default:1:[1]:sort_on[a, b]), fields: *\
+                                \n          Filter\
+                                \n            Scan foo.a1, source: CubeTable(index: default:3:[3]:sort_on[a, b]), fields: *\
+                                \n          Filter\
+                                \n            Scan foo.b1, source: CubeTable(index: default:4:[4]:sort_on[a, b]), fields: *\
+                                \n          Filter\
+                                \n            Scan foo.b, source: CubeTable(index: default:2:[2]:sort_on[a, b]), fields: *"
+
+                               );
+                }
+                _ => assert!(false),
+            };
+        }).await;
+    }
+
+    #[tokio::test]
     async fn over_10k_join() {
         Config::test("over_10k_join").update_config(|mut c| {
             c.partition_split_threshold = 1000000;
@@ -3304,7 +3617,7 @@ mod tests {
                 ).await.unwrap();
 
             let result = service.exec_query(
-                "EXPLAIN SELECT platform, sum(amount) from foo.orders where age > 15 group by platform" 
+                "EXPLAIN SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
             ).await.unwrap();
             assert_eq!(result.len(), 1);
             assert_eq!(result.get_columns().len(), 1);
@@ -3356,7 +3669,7 @@ mod tests {
                     ).await.unwrap();
 
                 let result = service.exec_query(
-                    "EXPLAIN ANALYZE SELECT platform, sum(amount) from foo.orders where age > 15 group by platform" 
+                    "EXPLAIN ANALYZE SELECT platform, sum(amount) from foo.orders where age > 15 group by platform"
                     ).await.unwrap();
 
                 assert_eq!(result.len(), 2);

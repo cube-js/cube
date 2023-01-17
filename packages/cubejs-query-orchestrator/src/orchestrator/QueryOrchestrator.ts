@@ -1,5 +1,7 @@
+import * as stream from 'stream';
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
+import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 
 import { QueryCache, QueryBody, TempTable } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
@@ -59,13 +61,19 @@ export class QueryOrchestrator {
       throw new Error('Only \'redis\', \'memory\' or \'cubestore\' are supported for cacheAndQueueDriver option');
     }
 
+    const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
+
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     this.redisPool = redisPool;
 
-    // TODO: Re-use connection from external database
-    const cubeStoreDriver = undefined;
+    const cubeStoreDriverFactory = cacheAndQueueDriver === 'cubestore' ? async () => {
+      const externalDriver = await externalDriverFactory();
+      if (externalDriver instanceof CubeStoreDriver) {
+        return externalDriver;
+      }
 
-    const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
+      throw new Error('It`s not possible to use CubeStore as queue & cache driver without using it as external');
+    } : undefined;
 
     this.queryCache = new QueryCache(
       this.redisPrefix,
@@ -75,7 +83,7 @@ export class QueryOrchestrator {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
-        cubeStoreDriver,
+        cubeStoreDriverFactory,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.queryCacheOptions,
@@ -152,6 +160,25 @@ export class QueryOrchestrator {
       key,
       token,
     );
+  }
+
+  /**
+   * Returns stream object which will be used to stream results from
+   * the data source if applicable. Throw otherwise.
+   *
+   * @throw Error
+   */
+  public async streamQuery(query: QueryBody): Promise<stream.Transform> {
+    const {
+      preAggregationsTablesToTempTables,
+      values,
+    } = await this.preAggregations.loadAllPreAggregationsIfNeeded(query);
+    query.values = values || query.values;
+    const _stream = await this.queryCache.cachedQueryResult(
+      query,
+      preAggregationsTablesToTempTables,
+    );
+    return <stream.Transform>_stream;
   }
 
   /**
@@ -398,5 +425,9 @@ export class QueryOrchestrator {
 
   public async unSubscribeQueueEvents(id) {
     return this.getQueueEventsBus().unsubscribe(id);
+  }
+
+  public async updateRefreshEndReached() {
+    return this.preAggregations.updateRefreshEndReached();
   }
 }

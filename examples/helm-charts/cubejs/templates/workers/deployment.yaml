@@ -48,6 +48,8 @@ spec:
             - name: http
               containerPort: {{ .Values.config.apiPort }}
               protocol: TCP
+          envFrom:
+           {{- include "custom_cubejs_environment_from" . | default "\n  []" | indent 10 }}          
           env:
             {{- include "cubejs.common-env" . | nindent 12 }}
             - name: CUBEJS_REFRESH_WORKER

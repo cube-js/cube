@@ -3,6 +3,90 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.45](https://github.com/cube-js/cube.js/compare/v0.31.44...v0.31.45) (2023-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.31.44](https://github.com/cube-js/cube.js/compare/v0.31.43...v0.31.44) (2023-01-16)
+
+
+### Bug Fixes
+
+* Rollups are sorted by name in `rollups` params of pre-aggregations ([#6011](https://github.com/cube-js/cube.js/issues/6011)) ([235ec70](https://github.com/cube-js/cube.js/commit/235ec70c296846f02e337acc4be90b4863556d15))
+
+
+
+
+
+## [0.31.43](https://github.com/cube-js/cube.js/compare/v0.31.42...v0.31.43) (2023-01-16)
+
+
+### Features
+
+* Pre-aggregations API for `rollupLambda` support ([#6009](https://github.com/cube-js/cube.js/issues/6009)) ([b90b3f2](https://github.com/cube-js/cube.js/commit/b90b3f2b5c991a0046220d7821ce74fc11ddbb85))
+
+
+
+
+
+## [0.31.42](https://github.com/cube-js/cube.js/compare/v0.31.41...v0.31.42) (2023-01-15)
+
+
+### Features
+
+* Multiple rollups in `rollupLambda` support ([#6008](https://github.com/cube-js/cube.js/issues/6008)) ([84fff0d](https://github.com/cube-js/cube.js/commit/84fff0d7745ccf657bb8eca0c5cc426c82ffd516))
+
+
+
+
+
+## [0.31.41](https://github.com/cube-js/cube.js/compare/v0.31.40...v0.31.41) (2023-01-13)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.31.40](https://github.com/cube-js/cube.js/compare/v0.31.39...v0.31.40) (2023-01-12)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.31.39](https://github.com/cube-js/cube.js/compare/v0.31.38...v0.31.39) (2023-01-12)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
+
+
+### Bug Fixes
+
+* **athena-driver:** TypeError: table.join is not a function ([#5988](https://github.com/cube-js/cube.js/issues/5988)) ([4e56a04](https://github.com/cube-js/cube.js/commit/4e56a0402dbb13d757e073fb38a547522c0936d1)), closes [#5143](https://github.com/cube-js/cube.js/issues/5143)
+
+
+
+
+
+## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
 ## [0.31.36](https://github.com/cube-js/cube.js/compare/v0.31.35...v0.31.36) (2023-01-08)
 
 **Note:** Version bump only for package @cubejs-backend/testing

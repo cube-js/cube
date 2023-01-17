@@ -12,6 +12,7 @@ import {
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
+import { SystemOptions } from '@cubejs-backend/server-core';
 
 import {
   getMajorityVersion,
@@ -231,9 +232,7 @@ export class ServerContainer {
       configuration.scheduledRefreshTimer = false;
     }
 
-    const server = new CubejsServer(configuration, {
-      isCubeConfigEmpty
-    });
+    const server = this.createServer(configuration, { isCubeConfigEmpty });
 
     if (!embedded) {
       try {
@@ -249,6 +248,10 @@ export class ServerContainer {
     }
 
     return server;
+  }
+
+  protected createServer(config: CreateOptions, systemOptions?: SystemOptions): CubejsServer {
+    return new CubejsServer(config, systemOptions);
   }
 
   public async lookupConfiguration(override: boolean = false): Promise<CreateOptions> {

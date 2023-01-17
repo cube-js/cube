@@ -3,6 +3,151 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.45](https://github.com/cube-js/cube.js/compare/v0.31.44...v0.31.45) (2023-01-16)
+
+
+### Bug Fixes
+
+* **cubestore:** Panic on combination of `Union All` and single select in root `Union All` ([#6012](https://github.com/cube-js/cube.js/issues/6012)) ([0d1a3d8](https://github.com/cube-js/cube.js/commit/0d1a3d8e2732d47f193aa5cf018e8ca5c6d7cf31))
+* Do not update structure version on build range end update ([#6015](https://github.com/cube-js/cube.js/issues/6015)) ([7891b6c](https://github.com/cube-js/cube.js/commit/7891b6c7d3033cfdf4705402ce54a156f24f29e3))
+
+
+### Features
+
+* **cubestore:** Initial queue support ([#5541](https://github.com/cube-js/cube.js/issues/5541)) ([7109039](https://github.com/cube-js/cube.js/commit/7109039beaf5819fa1179751e98a3431a04b3cac))
+
+
+
+
+
+## [0.31.44](https://github.com/cube-js/cube.js/compare/v0.31.43...v0.31.44) (2023-01-16)
+
+
+### Bug Fixes
+
+* Rollups are sorted by name in `rollups` params of pre-aggregations ([#6011](https://github.com/cube-js/cube.js/issues/6011)) ([235ec70](https://github.com/cube-js/cube.js/commit/235ec70c296846f02e337acc4be90b4863556d15))
+
+
+
+
+
+## [0.31.43](https://github.com/cube-js/cube.js/compare/v0.31.42...v0.31.43) (2023-01-16)
+
+
+### Bug Fixes
+
+* **cubestore:** Panic when nested Union All ([#6010](https://github.com/cube-js/cube.js/issues/6010)) ([331242e](https://github.com/cube-js/cube.js/commit/331242e263435513544ece0ee7b174d14562f05b))
+* fix a mistake in the websocket context acceptance mechanism ([#6006](https://github.com/cube-js/cube.js/issues/6006)) ([1d8a9bd](https://github.com/cube-js/cube.js/commit/1d8a9bd06804681ef74f6e4e70357cefb05f9c29))
+
+
+### Features
+
+* Pre-aggregations API for `rollupLambda` support ([#6009](https://github.com/cube-js/cube.js/issues/6009)) ([b90b3f2](https://github.com/cube-js/cube.js/commit/b90b3f2b5c991a0046220d7821ce74fc11ddbb85))
+
+
+
+
+
+## [0.31.42](https://github.com/cube-js/cube.js/compare/v0.31.41...v0.31.42) (2023-01-15)
+
+
+### Bug Fixes
+
+* **cubestore:** Large memory consumption while waiting for the queue cache ([#6004](https://github.com/cube-js/cube.js/issues/6004)) ([8c029bb](https://github.com/cube-js/cube.js/commit/8c029bb96cf4c451f061cef2d83b5d5dc3a8637c))
+* **cubestore:** Large memory consumption while waiting for the queue cache: drop context ([#6005](https://github.com/cube-js/cube.js/issues/6005)) ([b39920f](https://github.com/cube-js/cube.js/commit/b39920f6f5f2b10b2ea598712bd5f5d1b02a3308))
+
+
+### Features
+
+* **api-gateway:** added result filter for sql-runner ([#5985](https://github.com/cube-js/cube.js/issues/5985)) ([89f1b92](https://github.com/cube-js/cube.js/commit/89f1b922e1e3d8a02fbdaf2bda2c2cb77c0bdc78))
+* Multiple rollups in `rollupLambda` support ([#6008](https://github.com/cube-js/cube.js/issues/6008)) ([84fff0d](https://github.com/cube-js/cube.js/commit/84fff0d7745ccf657bb8eca0c5cc426c82ffd516))
+* **native:** Channel.resolve/reject without lock ([#6001](https://github.com/cube-js/cube.js/issues/6001)) ([9133a3b](https://github.com/cube-js/cube.js/commit/9133a3bf885ca17f14ac18041a1692201d4c1cfb))
+
+
+
+
+
+## [0.31.41](https://github.com/cube-js/cube.js/compare/v0.31.40...v0.31.41) (2023-01-13)
+
+
+### Bug Fixes
+
+* **cubestore:** Metastore get_tables_with_path cache is not work correctly ([#6000](https://github.com/cube-js/cube.js/issues/6000)) ([75699c8](https://github.com/cube-js/cube.js/commit/75699c85f3b428d3e1967642b2c440be77e7b095))
+
+
+### Features
+
+* streaming capabilities ([#5995](https://github.com/cube-js/cube.js/issues/5995)) ([d336c4e](https://github.com/cube-js/cube.js/commit/d336c4eaa3547422484bb003df19dfd4c7be5f96))
+
+
+
+
+
+## [0.31.40](https://github.com/cube-js/cube.js/compare/v0.31.39...v0.31.40) (2023-01-12)
+
+
+### Features
+
+* **cubesql:** Support `date_trunc` over column filter ([c9e71e6](https://github.com/cube-js/cube.js/commit/c9e71e6a13f41e2af388b7f91043e4118ba91f40))
+* **docker:** Alpine - migrate to 3.15 (3.14 was removed) ([#5997](https://github.com/cube-js/cube.js/issues/5997)) ([cf9078a](https://github.com/cube-js/cube.js/commit/cf9078a2c29d31d78b8c1e100ce254495128e1a0))
+* Hooks for the context rejection mechanism ([#5901](https://github.com/cube-js/cube.js/issues/5901)) ([b6f0506](https://github.com/cube-js/cube.js/commit/b6f0506e1b5821a16857d6695a40c6b957887941))
+
+
+
+
+
+## [0.31.39](https://github.com/cube-js/cube.js/compare/v0.31.38...v0.31.39) (2023-01-12)
+
+
+### Bug Fixes
+
+* **cubesql:** Query cancellation for simple query protocol ([#5987](https://github.com/cube-js/cube.js/issues/5987)) ([aae758f](https://github.com/cube-js/cube.js/commit/aae758f83d45a2572caddfc5f85663e059406c78))
+
+
+### Features
+
+* Re-use connection to Cube Store from externalDriver ([#5993](https://github.com/cube-js/cube.js/issues/5993)) ([69a35ed](https://github.com/cube-js/cube.js/commit/69a35edb74e9b5e09f74b13a91afe7076fa344cb))
+
+
+
+
+
+## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
+
+
+### Bug Fixes
+
+* **athena-driver:** Add catalog config ([#5835](https://github.com/cube-js/cube.js/issues/5835)) Thanks [@tkislan](https://github.com/tkislan) ! ([c33a5c5](https://github.com/cube-js/cube.js/commit/c33a5c596622c5a2b67987da6cfd3f8bef6acebe))
+* **athena-driver:** TypeError: table.join is not a function ([#5988](https://github.com/cube-js/cube.js/issues/5988)) ([4e56a04](https://github.com/cube-js/cube.js/commit/4e56a0402dbb13d757e073fb38a547522c0936d1)), closes [#5143](https://github.com/cube-js/cube.js/issues/5143)
+* Delete `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH` pre-aggregations only after refresh end to avoid cold start removals ([#5982](https://github.com/cube-js/cube.js/issues/5982)) ([58ad02f](https://github.com/cube-js/cube.js/commit/58ad02f24c5cc5940d6c668a0586fd66ff843795))
+
+
+### Features
+
+* **cubesql:** Improve memory usage in writting for pg-wire ([#4870](https://github.com/cube-js/cube.js/issues/4870)) ([401fbcf](https://github.com/cube-js/cube.js/commit/401fbcfa1e11a36d65555f7848280f5e60801808))
+* **docker:** Upgrade Node.js to 14.21.1 ([#5970](https://github.com/cube-js/cube.js/issues/5970)) ([0394ed2](https://github.com/cube-js/cube.js/commit/0394ed2b38827e345a4a43ab35b129dfd845057b))
+
+
+
+
+
+## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
+
+
+### Bug Fixes
+
+* Remove missed `cacheFn` console.log ([ec9e56b](https://github.com/cube-js/cube.js/commit/ec9e56b79e5acf0399c634e3e50b3457175404b6))
+
+
+### Features
+
+* **cubejs-api-gateway:** added endpoint to run sql query directly ([#5786](https://github.com/cube-js/cube.js/issues/5786)) ([61d5798](https://github.com/cube-js/cube.js/commit/61d579834800c839defd3c2991aae65a42318027))
+* **cubestore:** Support lazy initialization for CacheStore ([#5933](https://github.com/cube-js/cube.js/issues/5933)) ([37b4a95](https://github.com/cube-js/cube.js/commit/37b4a953e6c3bc535520203b23fef1632bf04aee))
+
+
+
+
+
 ## [0.31.36](https://github.com/cube-js/cube.js/compare/v0.31.35...v0.31.36) (2023-01-08)
 
 

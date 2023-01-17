@@ -190,6 +190,9 @@ const variables: Record<string, (...args: any) => any> = {
   maxPartitionsPerCube: () => get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
     .default('10000')
     .asInt(),
+  scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
+    .default('1')
+    .asInt(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -562,6 +565,13 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   /**
+   * Query stream `highWaterMark` value.
+   */
+  dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
+    .default(5000)
+    .asInt(),
+
+  /**
    * Expire time for touch records
    */
   touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
@@ -875,6 +885,20 @@ const variables: Record<string, (...args: any) => any> = {
     // TODO (buntarb): Deprecate and replace?
     process.env[
       keyByDataSource('CUBEJS_AWS_ATHENA_WORKGROUP', dataSource)
+    ]
+  ),
+
+  /**
+   * Athena AWS Catalog.
+   */
+  athenaAwsCatalog: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    // TODO (buntarb): Deprecate and replace?
+    process.env[
+      keyByDataSource('CUBEJS_AWS_ATHENA_CATALOG', dataSource)
     ]
   ),
 

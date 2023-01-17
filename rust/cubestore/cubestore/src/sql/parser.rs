@@ -1,3 +1,4 @@
+use crate::cachestore::QueueItemStatus;
 use sqlparser::ast::{
     HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement, Value,
 };
@@ -73,6 +74,52 @@ pub enum Statement {
     CacheIncr {
         path: Ident,
     },
+    // queue
+    QueueAdd {
+        priority: i64,
+        key: Ident,
+        value: String,
+    },
+    QueueGet {
+        key: Ident,
+    },
+    QueueToCancel {
+        prefix: Ident,
+        orphaned_timeout: Option<u32>,
+        stalled_timeout: Option<u32>,
+    },
+    QueueList {
+        prefix: Ident,
+        with_payload: bool,
+        status_filter: Option<QueueItemStatus>,
+        sort_by_priority: bool,
+    },
+    QueueCancel {
+        key: Ident,
+    },
+    QueueHeartbeat {
+        key: Ident,
+    },
+    QueueAck {
+        key: Ident,
+        result: String,
+    },
+    QueueMergeExtra {
+        key: Ident,
+        payload: String,
+    },
+    QueueRetrieve {
+        key: Ident,
+        concurrency: u32,
+    },
+    QueueResult {
+        key: Ident,
+    },
+    QueueResultBlocking {
+        key: Ident,
+        timeout: u64,
+    },
+    QueueTruncate {},
     System(SystemCommand),
     Dump(Box<Query>),
 }
@@ -117,6 +164,10 @@ impl<'a> CubeStoreParser<'a> {
                 _ if w.value.eq_ignore_ascii_case("sys") => {
                     self.parser.next_token();
                     self.parse_system()
+                }
+                _ if w.value.eq_ignore_ascii_case("queue") => {
+                    self.parser.next_token();
+                    self.parse_queue()
                 }
                 Keyword::CACHE => {
                     self.parser.next_token();
@@ -174,24 +225,7 @@ impl<'a> CubeStoreParser<'a> {
             "set" => {
                 let nx = self.parse_custom_token(&"nx");
                 let ttl = if self.parse_custom_token(&"ttl") {
-                    match self.parser.parse_number_value()? {
-                        Value::Number(ttl, false) => {
-                            let r = ttl.parse::<u32>().map_err(|err| {
-                                ParserError::ParserError(format!(
-                                    "TTL must be a positive integer, error: {}",
-                                    err
-                                ))
-                            })?;
-
-                            Some(r)
-                        }
-                        x => {
-                            return Err(ParserError::ParserError(format!(
-                                "TTL must be a positive integer, actual: {:?}",
-                                x
-                            )))
-                        }
-                    }
+                    Some(self.parse_number("ttl")?)
                 } else {
                     None
                 };
@@ -223,6 +257,23 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
+    fn parse_number(&mut self, var_name: &str) -> Result<u32, ParserError> {
+        match self.parser.parse_number_value()? {
+            Value::Number(var, false) => var.parse::<u32>().map_err(|err| {
+                ParserError::ParserError(format!(
+                    "{} must be a positive integer, error: {}",
+                    var_name, err
+                ))
+            }),
+            x => {
+                return Err(ParserError::ParserError(format!(
+                    "{} must be a positive integer, actual: {:?}",
+                    var_name, x
+                )))
+            }
+        }
+    }
+
     pub fn parse_metastore(&mut self) -> Result<Statement, ParserError> {
         if self.parse_custom_token("set_current") {
             match self.parser.parse_number_value()? {
@@ -245,6 +296,170 @@ impl<'a> CubeStoreParser<'a> {
             Err(ParserError::ParserError(
                 "Unknown metastore command".to_string(),
             ))
+        }
+    }
+
+    fn parse_queue(&mut self) -> Result<Statement, ParserError> {
+        let command = match self.parser.next_token() {
+            Token::Word(w) => w.value.to_ascii_lowercase(),
+            _ => {
+                return Err(ParserError::ParserError(
+                    "Unknown queue command, available: ADD|TRUNCATE".to_string(),
+                ))
+            }
+        };
+
+        match command.as_str() {
+            "add" => {
+                let priority = if self.parse_custom_token(&"priority") {
+                    match self.parser.parse_number_value()? {
+                        Value::Number(priority, _) => {
+                            let r = priority.parse::<i64>().map_err(|err| {
+                                ParserError::ParserError(format!(
+                                    "priority must be a positive integer, error: {}",
+                                    err
+                                ))
+                            })?;
+
+                            r
+                        }
+                        x => {
+                            return Err(ParserError::ParserError(format!(
+                                "priority must be a positive integer, actual: {:?}",
+                                x
+                            )))
+                        }
+                    }
+                } else {
+                    0
+                };
+
+                Ok(Statement::QueueAdd {
+                    priority,
+                    key: self.parser.parse_identifier()?,
+                    value: self.parser.parse_literal_string()?,
+                })
+            }
+            "cancel" => Ok(Statement::QueueCancel {
+                key: self.parser.parse_identifier()?,
+            }),
+            "heartbeat" => Ok(Statement::QueueHeartbeat {
+                key: self.parser.parse_identifier()?,
+            }),
+            "ack" => Ok(Statement::QueueAck {
+                key: self.parser.parse_identifier()?,
+                result: self.parser.parse_literal_string()?,
+            }),
+            "merge_extra" => Ok(Statement::QueueMergeExtra {
+                key: self.parser.parse_identifier()?,
+                payload: self.parser.parse_literal_string()?,
+            }),
+            "get" => Ok(Statement::QueueGet {
+                key: self.parser.parse_identifier()?,
+            }),
+            "stalled" => {
+                let stalled_timeout = self.parse_number("stalled timeout")?;
+
+                Ok(Statement::QueueToCancel {
+                    prefix: self.parser.parse_identifier()?,
+                    orphaned_timeout: None,
+                    stalled_timeout: Some(stalled_timeout),
+                })
+            }
+            "orphaned" => {
+                let orphaned_timeout = self.parse_number("orphaned timeout")?;
+
+                Ok(Statement::QueueToCancel {
+                    prefix: self.parser.parse_identifier()?,
+                    orphaned_timeout: Some(orphaned_timeout),
+                    stalled_timeout: None,
+                })
+            }
+            "to_cancel" => {
+                let stalled_timeout = self.parse_number("stalled timeout")?;
+                let orphaned_timeout = self.parse_number("orphaned timeout")?;
+
+                Ok(Statement::QueueToCancel {
+                    prefix: self.parser.parse_identifier()?,
+                    orphaned_timeout: Some(stalled_timeout),
+                    stalled_timeout: Some(orphaned_timeout),
+                })
+            }
+            "pending" => {
+                let with_payload = self.parse_custom_token(&"with_payload");
+
+                Ok(Statement::QueueList {
+                    prefix: self.parser.parse_identifier()?,
+                    with_payload,
+                    status_filter: Some(QueueItemStatus::Pending),
+                    sort_by_priority: true,
+                })
+            }
+            "active" => {
+                let with_payload = self.parse_custom_token(&"with_payload");
+
+                Ok(Statement::QueueList {
+                    prefix: self.parser.parse_identifier()?,
+                    with_payload,
+                    status_filter: Some(QueueItemStatus::Active),
+                    sort_by_priority: false,
+                })
+            }
+            "list" => {
+                let with_payload = self.parse_custom_token(&"with_payload");
+
+                Ok(Statement::QueueList {
+                    prefix: self.parser.parse_identifier()?,
+                    with_payload,
+                    status_filter: None,
+                    sort_by_priority: true,
+                })
+            }
+            "retrieve" => {
+                let concurrency = if self.parse_custom_token(&"concurrency") {
+                    self.parse_number("concurrency")?
+                } else {
+                    1
+                };
+
+                Ok(Statement::QueueRetrieve {
+                    key: self.parser.parse_identifier()?,
+                    concurrency,
+                })
+            }
+            "result" => Ok(Statement::QueueResult {
+                key: self.parser.parse_identifier()?,
+            }),
+            "result_blocking" => {
+                let timeout = match self.parser.parse_number_value()? {
+                    Value::Number(concurrency, false) => {
+                        let r = concurrency.parse::<u64>().map_err(|err| {
+                            ParserError::ParserError(format!(
+                                "TIMEOUT must be a positive integer, error: {}",
+                                err
+                            ))
+                        })?;
+
+                        r
+                    }
+                    x => {
+                        return Err(ParserError::ParserError(format!(
+                            "TIMEOUT must be a positive integer, actual: {:?}",
+                            x
+                        )))
+                    }
+                };
+
+                Ok(Statement::QueueResultBlocking {
+                    timeout,
+                    key: self.parser.parse_identifier()?,
+                })
+            }
+            "truncate" => Ok(Statement::QueueTruncate {}),
+            command => Err(ParserError::ParserError(format!(
+                "Unknown queue command: {}",
+                command
+            ))),
         }
     }
 

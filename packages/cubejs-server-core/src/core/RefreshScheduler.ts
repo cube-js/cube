@@ -190,7 +190,7 @@ export class RefreshScheduler {
     const compilers = await compilerApi.getCompilers();
     const query = await compilerApi.createQueryByDataSource(compilers, queryingOptions);
     if (preAggregation.preAggregation.partitionGranularity || preAggregation.preAggregation.type === 'rollup') {
-      return { ...queryingOptions, ...preAggregation.references };
+      return { ...queryingOptions, ...preAggregation.references, preAggregationId: preAggregation.id };
     } else if (preAggregation.preAggregation.type === 'originalSql') {
       const cubeFromPath = query.cubeEvaluator.cubeFromPath(preAggregation.cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
@@ -580,7 +580,7 @@ export class RefreshScheduler {
 
     const preAggregationsLoadCacheByDataSource = {};
     const queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> } = {};
-    return Promise.all(R.range(0, concurrency)
+    await Promise.all(R.range(0, concurrency)
       .filter(workerIndex => workerIndices.indexOf(workerIndex) !== -1)
       .map(async workerIndex => {
         const queryIteratorStateKey = JSON.stringify({ ...securityContext, workerIndex });
@@ -603,6 +603,7 @@ export class RefreshScheduler {
           }
         }
       }));
+    await this.serverCore.getOrchestratorApi(context).updateRefreshEndReached();
   }
 
   public async buildPreAggregations(

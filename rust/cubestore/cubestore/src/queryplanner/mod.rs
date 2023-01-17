@@ -11,6 +11,7 @@ mod topk;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;
 mod filter_by_key_range;
+mod flatten_union;
 pub mod info_schema;
 pub mod now;
 pub mod udfs;
@@ -21,9 +22,10 @@ use crate::config::ConfigObj;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{IdRow, MetaStore};
+use crate::queryplanner::flatten_union::FlattenUnion;
 use crate::queryplanner::info_schema::{
     SchemataInfoSchemaTableDef, SystemCacheTableDef, SystemChunksTableDef, SystemIndexesTableDef,
-    SystemJobsTableDef, SystemPartitionsTableDef, SystemReplayHandlesTableDef,
+    SystemJobsTableDef, SystemPartitionsTableDef, SystemQueueTableDef, SystemReplayHandlesTableDef,
     SystemSnapshotsTableDef, SystemTablesTableDef, TablesInfoSchemaTableDef,
 };
 use crate::queryplanner::now::MaterializeNow;
@@ -171,7 +173,9 @@ impl QueryPlannerImpl {
 impl QueryPlannerImpl {
     async fn execution_context(&self) -> Result<Arc<ExecutionContext>, CubeError> {
         Ok(Arc::new(ExecutionContext::with_config(
-            ExecutionConfig::new().add_optimizer_rule(Arc::new(MaterializeNow {})),
+            ExecutionConfig::new()
+                .add_optimizer_rule(Arc::new(MaterializeNow {}))
+                .add_optimizer_rule(Arc::new(FlattenUnion {})),
         )))
     }
 }
@@ -327,6 +331,11 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 self.cache_store.clone(),
                 InfoSchemaTable::SystemChunks,
             ))),
+            ("system", "queue") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                self.cache_store.clone(),
+                InfoSchemaTable::SystemQueue,
+            ))),
             ("system", "replay_handles") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
                 self.cache_store.clone(),
@@ -379,6 +388,7 @@ pub enum InfoSchemaTable {
     SystemIndexes,
     SystemPartitions,
     SystemChunks,
+    SystemQueue,
     SystemReplayHandles,
     SystemCache,
     SystemSnapshots,
@@ -444,6 +454,7 @@ impl InfoSchemaTable {
             InfoSchemaTable::SystemTables => Box::new(SystemTablesTableDef),
             InfoSchemaTable::SystemIndexes => Box::new(SystemIndexesTableDef),
             InfoSchemaTable::SystemChunks => Box::new(SystemChunksTableDef),
+            InfoSchemaTable::SystemQueue => Box::new(SystemQueueTableDef),
             InfoSchemaTable::SystemReplayHandles => Box::new(SystemReplayHandlesTableDef),
             InfoSchemaTable::SystemPartitions => Box::new(SystemPartitionsTableDef),
             InfoSchemaTable::SystemJobs => Box::new(SystemJobsTableDef),

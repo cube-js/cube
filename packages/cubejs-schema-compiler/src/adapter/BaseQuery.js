@@ -576,7 +576,7 @@ class BaseQuery {
     const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
     const result = {};
     if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
-      const lambdaPreAgg = preAggForQuery.referencedPreAggregations[0];
+      const lambdaPreAgg = preAggForQuery.referencedPreAggregations[preAggForQuery.referencedPreAggregations.length - 1];
       // TODO(cristipp) Use source query instead of preaggregation references.
       const references = this.cubeEvaluator.evaluatePreAggregationReferences(lambdaPreAgg.cube, lambdaPreAgg.preAggregation);
       const lambdaQuery = this.newSubQuery(
@@ -1609,16 +1609,8 @@ class BaseQuery {
     if (this.rowLimit !== null) {
       if (this.rowLimit === MAX_SOURCE_ROW_LIMIT) {
         limitClause = ` LIMIT ${this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT)}`;
-      } else {
-        const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
-          ? getEnv('dbQueryDefaultLimit')
-          : getEnv('dbQueryLimit');
-        const row = this.rowLimit ? parseInt(this.rowLimit, 10) : false;
-        if (row && row > getEnv('dbQueryLimit')) {
-          throw new Error('The query limit has been exceeded.');
-        }
-        const lim = row || def;
-        limitClause = ` LIMIT ${lim}`;
+      } else if (typeof this.rowLimit === 'number') {
+        limitClause = ` LIMIT ${this.rowLimit}`;
       }
     }
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';

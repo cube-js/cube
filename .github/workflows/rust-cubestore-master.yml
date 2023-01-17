@@ -20,7 +20,7 @@ jobs:
       RUST: ${{ matrix.rust }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -81,7 +81,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Repo metadata
         id: repo
         uses: actions/github-script@v3
@@ -133,14 +133,14 @@ jobs:
         with:
           version: v0.9.1
       - name: Cache Docker layers
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-${{ matrix.target }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-buildx-
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./rust/cubestore
           file: ./rust/cubestore/Dockerfile
@@ -210,7 +210,7 @@ jobs:
             compress: false
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:

@@ -67,6 +67,19 @@ The port of the Cube Store deployment.
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | `3030`                 | `3030`                |
 
+## `CUBEJS_DATASOURCES`
+
+A comma-separated list of data source names. Data sources defined here
+can be used to [decorate `CUBEJS_DB_*`][ref-config-multiple-ds-decorating-env] environment variables.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A comma-separated list of strings | N/A                 | N/A                |
+
+```bash
+CUBEJS_DATASOURCES=default,datasource1
+```
+
 ## `CUBEJS_DB_EXPORT_BUCKET`
 
 The name of a bucket in cloud storage to store the database export snapshots.
@@ -318,7 +331,7 @@ The port to listen to Postgres-compatible connections on.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
-| A valid port number | XXX                    | XXX                   |
+| A valid port number | N/A                    | N/A                   |
 
 ## `CUBEJS_PRE_AGGREGATIONS_BUILDER`
 
@@ -421,7 +434,7 @@ accordingly
 
 | Possible Values                                | Default in Development | Default in Production |
 | ---------------------------------------------- | ---------------------- | --------------------- |
-| A valid number of concurrent refresh processes | XXX                    | XXX                   |
+| A valid number of concurrent refresh processes | N/A                    | N/A                   |
 
 ## `CUBEJS_SCHEDULED_REFRESH_TIMEZONES`
 
@@ -431,7 +444,7 @@ for][ref-config-sched-refresh-timer]. Used in conjunction with
 
 | Possible Values                                           | Default in Development | Default in Production |
 | --------------------------------------------------------- | ---------------------- | --------------------- |
-| [A valid timezone from the tz database][wiki-tz-database] | XXX                    | XXX                   |
+| [A valid timezone from the tz database][wiki-tz-database] | N/A                    | N/A                   |
 
 ## `CUBEJS_SCHEMA_PATH`
 

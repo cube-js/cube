@@ -3,6 +3,84 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.45](https://github.com/cube-js/cube.js/compare/v0.31.44...v0.31.45) (2023-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.31.44](https://github.com/cube-js/cube.js/compare/v0.31.43...v0.31.44) (2023-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.31.43](https://github.com/cube-js/cube.js/compare/v0.31.42...v0.31.43) (2023-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.31.42](https://github.com/cube-js/cube.js/compare/v0.31.41...v0.31.42) (2023-01-15)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.31.41](https://github.com/cube-js/cube.js/compare/v0.31.40...v0.31.41) (2023-01-13)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.31.40](https://github.com/cube-js/cube.js/compare/v0.31.39...v0.31.40) (2023-01-12)
+
+
+### Features
+
+* **docker:** Alpine - migrate to 3.15 (3.14 was removed) ([#5997](https://github.com/cube-js/cube.js/issues/5997)) ([cf9078a](https://github.com/cube-js/cube.js/commit/cf9078a2c29d31d78b8c1e100ce254495128e1a0))
+
+
+
+
+
+## [0.31.39](https://github.com/cube-js/cube.js/compare/v0.31.38...v0.31.39) (2023-01-12)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.31.38](https://github.com/cube-js/cube.js/compare/v0.31.37...v0.31.38) (2023-01-11)
+
+
+### Features
+
+* **docker:** Upgrade Node.js to 14.21.1 ([#5970](https://github.com/cube-js/cube.js/issues/5970)) ([0394ed2](https://github.com/cube-js/cube.js/commit/0394ed2b38827e345a4a43ab35b129dfd845057b))
+
+
+
+
+
+## [0.31.37](https://github.com/cube-js/cube.js/compare/v0.31.36...v0.31.37) (2023-01-09)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
 ## [0.31.36](https://github.com/cube-js/cube.js/compare/v0.31.35...v0.31.36) (2023-01-08)
 
 **Note:** Version bump only for package @cubejs-backend/docker

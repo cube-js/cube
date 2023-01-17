@@ -30,7 +30,7 @@ pub struct LogicalPlanData {
     pub original_expr: Option<Expr>,
     pub member_name_to_expr: Option<Vec<(Option<String>, Expr)>>,
     pub column: Option<Column>,
-    pub expr_to_alias: Option<Vec<(Expr, String)>>,
+    pub expr_to_alias: Option<Vec<(Expr, String, Option<bool>)>>,
     pub referenced_expr: Option<Vec<Expr>>,
     pub constant: Option<ConstantFolding>,
     pub constant_in_list: Option<Vec<ScalarValue>>,
@@ -227,7 +227,7 @@ impl LogicalPlanAnalysis {
     fn make_expr_to_alias(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Vec<(Expr, String)>> {
+    ) -> Option<Vec<(Expr, String, Option<bool>)>> {
         let original_expr = |id| egraph.index(id).data.original_expr.clone();
         let id_to_column_name = |id| egraph.index(id).data.column.clone();
         let column_name_to_alias = |id| egraph.index(id).data.expr_to_alias.clone();
@@ -240,16 +240,27 @@ impl LogicalPlanAnalysis {
                         .next()
                         .unwrap()
                         .to_string(),
+                    Some(true),
                 ));
                 Some(map)
             }
             LogicalPlanLanguage::ProjectionExpr(params) => {
                 for id in params.iter() {
                     if let Some(col_name) = id_to_column_name(*id) {
-                        map.push((original_expr(*id)?, col_name.name.to_string()));
-                    } else {
-                        map.extend(column_name_to_alias(*id)?.into_iter());
+                        map.push((original_expr(*id)?, col_name.name.to_string(), None));
+                        continue;
                     }
+                    if let Some(expr) = original_expr(*id) {
+                        match expr {
+                            Expr::Alias(_, _) => (),
+                            expr @ _ => {
+                                let expr_name = expr.name(&DFSchema::empty());
+                                map.push((expr, expr_name.ok()?, Some(false)));
+                                continue;
+                            }
+                        };
+                    }
+                    map.extend(column_name_to_alias(*id)?.into_iter());
                 }
                 Some(map)
             }

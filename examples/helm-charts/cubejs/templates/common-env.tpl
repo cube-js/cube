@@ -1,4 +1,15 @@
+{{/* User defined cubejs environment from */}}
+{{- define "custom_cubejs_environment_from" }}
+  {{- $Global := . }}
+  {{- with .Values.extraEnvFrom }}
+  {{- tpl . $Global | nindent 2 }}
+  {{- end }}
+{{- end }}
 {{- define "cubejs.common-env" -}}
+{{- $Global := . }}
+{{- with .Values.extraEnv }}
+{{- tpl . $Global }}
+{{- end }}
 - name: PORT
   value: {{ .Values.config.apiPort | quote }}
 {{- if .Values.config.debug }}
@@ -285,6 +296,10 @@ CUBEJS_REDIS_PASSWORD.
     secretKeyRef:
       name: {{ .Values.database.bigquery.credentialsFromSecret.name | required "database.bigquery.credentialsFromSecret.name is required" }}
       key: {{ .Values.database.bigquery.credentialsFromSecret.key | required "database.bigquery.credentialsFromSecret.key is required" }}
+{{- end }}
+{{- if .Values.database.bigquery.KeyFile }}
+- name: CUBEJS_DB_BQ_KEY_FILE
+  value: {{ .Values.database.bigquery.KeyFile }}
 {{- end }}
 {{- if .Values.exportBucket.name }}
 - name: CUBEJS_DB_EXPORT_BUCKET

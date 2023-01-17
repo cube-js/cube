@@ -29,7 +29,8 @@ cube('Foo', {
   
   preAggregations: {
     main: {
-      type: 'originalSql'
+      type: 'originalSql',
+      scheduledRefresh: false
     },
     first: {
       type: 'rollup',
@@ -37,7 +38,6 @@ cube('Foo', {
       timeDimensionReference: time,
       granularity: 'day',
       partitionGranularity: 'day',
-      scheduledRefresh: true,
       refreshKey: {
         every: '1 hour',
         updateWindow: '1 day',
@@ -50,7 +50,6 @@ cube('Foo', {
       timeDimensionReference: time,
       granularity: 'day',
       partitionGranularity: 'day',
-      scheduledRefresh: true,
       refreshKey: {
         every: '1 hour',
         updateWindow: '1 day',
@@ -63,7 +62,6 @@ cube('Foo', {
       timeDimensionReference: time,
       granularity: 'day',
       partitionGranularity: 'day',
-      scheduledRefresh: true,
       refreshKey: {
         every: '1 hour',
         updateWindow: '1 day',
@@ -110,7 +108,6 @@ cube('Bar', {
       timeDimensionReference: time,
       granularity: 'day',
       partitionGranularity: 'day',
-      scheduledRefresh: true,
       refreshKey: {
         every: '1 hour',
         updateWindow: '1 day',
@@ -397,48 +394,53 @@ describe('Refresh Scheduler', () => {
 
   test('Round robin pre-aggregation refresh by history priority', async () => {
     process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
-    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
     const {
       refreshScheduler, mockDriver,
     } = setupScheduler({ repository: repositoryWithPreAggregations, useOriginalSqlPreAggregations: true });
     const result1 = [
       { tableName: 'stb_pre_aggregations.foo_first20201231', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.bar_first20201231', timezone: 'UTC', fromTable: 'bar' },
       { tableName: 'stb_pre_aggregations.foo_main', timezone: null, fromTable: 'foo_tenant1' },
-      {
-        tableName: 'stb_pre_aggregations.foo_second20201230',
-        timezone: 'UTC',
-        fromTable: { preAggTable: 'stb_pre_aggregations.foo_main' },
-      },
-      { tableName: 'stb_pre_aggregations.foo_first20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.bar_first20201229', timezone: 'UTC', fromTable: 'bar' },
-      {
-        tableName: 'stb_pre_aggregations.foo_second20201228',
-        timezone: 'UTC',
-        fromTable: { preAggTable: 'stb_pre_aggregations.foo_main' },
-      },
-      {
-        tableName: 'stb_pre_aggregations.foo_second20201227',
-        timezone: 'UTC',
-        fromTable: { preAggTable: 'stb_pre_aggregations.foo_main' },
-      },
-    ];
-
-    const result2 = [
       {
         tableName: 'stb_pre_aggregations.foo_second20201231',
         timezone: 'UTC',
         fromTable: { preAggTable: 'stb_pre_aggregations.foo_main' },
       },
       { tableName: 'stb_pre_aggregations.foo_first20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.bar_first20201230', timezone: 'UTC', fromTable: 'bar' },
+      {
+        tableName: 'stb_pre_aggregations.foo_second20201230',
+        timezone: 'UTC',
+        fromTable: { preAggTable: 'stb_pre_aggregations.foo_main' },
+      },
+      { tableName: 'stb_pre_aggregations.foo_first20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
       {
         tableName: 'stb_pre_aggregations.foo_second20201229',
         timezone: 'UTC',
         fromTable: { preAggTable: 'stb_pre_aggregations.foo_main' },
       },
       { tableName: 'stb_pre_aggregations.foo_first20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
-      { tableName: 'stb_pre_aggregations.foo_first20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      {
+        tableName: 'stb_pre_aggregations.foo_second20201228',
+        timezone: 'UTC',
+        fromTable: { preAggTable: 'stb_pre_aggregations.foo_main' },
+      },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
+    ];
+
+    const result2 = [
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201231', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.bar_first20201231', timezone: 'UTC', fromTable: 'bar' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.bar_first20201230', timezone: 'UTC', fromTable: 'bar' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.bar_first20201229', timezone: 'UTC', fromTable: 'bar' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_first20201227', timezone: 'UTC', fromTable: 'foo_tenant1', },
+      {
+        tableName: 'stb_pre_aggregations.foo_second20201227',
+        timezone: 'UTC',
+        fromTable: { preAggTable: 'stb_pre_aggregations.foo_main' },
+      },
     ];
 
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
@@ -472,7 +474,7 @@ describe('Refresh Scheduler', () => {
 
   test('Manual build', async () => {
     process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
-    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
     const {
       refreshScheduler, mockDriver,
     } = setupScheduler({ repository: repositoryWithPreAggregations, useOriginalSqlPreAggregations: true });
@@ -527,6 +529,18 @@ describe('Refresh Scheduler', () => {
 
     const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
 
+    for (let i = 0; i < 1000; i++) {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(
+        ctx,
+        { concurrency: 1, workerIndices: [0], timezones: ['UTC'] },
+      );
+      if (refreshResult.finished) {
+        break;
+      }
+    }
+
+    expect(mockDriver.tables).toHaveLength(0);
+
     for (let i = 0; i < 100; i++) {
       try {
         await refreshScheduler.buildPreAggregations(ctx, {
@@ -553,6 +567,18 @@ describe('Refresh Scheduler', () => {
     expect(mockDriver.tables[0]).toMatch(/^stb_pre_aggregations\.foo_first20201230/);
 
     await mockDriver.delay(3000);
+
+    for (let i = 0; i < 1000; i++) {
+      const refreshResult = await refreshScheduler.runScheduledRefresh(
+        ctx,
+        { concurrency: 1, workerIndices: [0], timezones: ['UTC'] },
+      );
+      if (refreshResult.finished) {
+        break;
+      }
+    }
+
+    expect(mockDriver.tables).toHaveLength(1);
 
     for (let i = 0; i < 100; i++) {
       try {
@@ -582,7 +608,7 @@ describe('Refresh Scheduler', () => {
 
   test('Cache only pre-aggregation partitions', async () => {
     process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
-    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
     const {
       refreshScheduler,
     } = setupScheduler({ repository: repositoryWithPreAggregations, useOriginalSqlPreAggregations: true });
@@ -641,11 +667,14 @@ describe('Refresh Scheduler', () => {
   });
 
   test('Round robin pre-aggregation with timezones', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
     const {
       refreshScheduler, mockDriver,
     } = setupScheduler({ repository: repositoryWithPreAggregations });
     const result = [
       { tableName: 'stb_pre_aggregations.foo_first20201231', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201231', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_second20201231', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.bar_first20201231', timezone: 'UTC', fromTable: 'bar' },
       {
@@ -653,6 +682,7 @@ describe('Refresh Scheduler', () => {
         timezone: 'America/Los_Angeles',
         fromTable: 'foo_tenant1',
       },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201231', timezone: 'America/Los_Angeles', fromTable: 'foo_tenant1' },
       {
         tableName: 'stb_pre_aggregations.foo_second20201231',
         timezone: 'America/Los_Angeles',
@@ -661,6 +691,7 @@ describe('Refresh Scheduler', () => {
       { tableName: 'stb_pre_aggregations.bar_first20201231', timezone: 'America/Los_Angeles', fromTable: 'bar' },
 
       { tableName: 'stb_pre_aggregations.foo_first20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_second20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.bar_first20201230', timezone: 'UTC', fromTable: 'bar' },
       {
@@ -668,6 +699,7 @@ describe('Refresh Scheduler', () => {
         timezone: 'America/Los_Angeles',
         fromTable: 'foo_tenant1',
       },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201230', timezone: 'America/Los_Angeles', fromTable: 'foo_tenant1' },
       {
         tableName: 'stb_pre_aggregations.foo_second20201230',
         timezone: 'America/Los_Angeles',
@@ -676,6 +708,7 @@ describe('Refresh Scheduler', () => {
       { tableName: 'stb_pre_aggregations.bar_first20201230', timezone: 'America/Los_Angeles', fromTable: 'bar' },
 
       { tableName: 'stb_pre_aggregations.foo_first20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_second20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.bar_first20201229', timezone: 'UTC', fromTable: 'bar' },
       {
@@ -683,6 +716,7 @@ describe('Refresh Scheduler', () => {
         timezone: 'America/Los_Angeles',
         fromTable: 'foo_tenant1',
       },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201229', timezone: 'America/Los_Angeles', fromTable: 'foo_tenant1' },
       {
         tableName: 'stb_pre_aggregations.foo_second20201229',
         timezone: 'America/Los_Angeles',
@@ -691,12 +725,14 @@ describe('Refresh Scheduler', () => {
       { tableName: 'stb_pre_aggregations.bar_first20201229', timezone: 'America/Los_Angeles', fromTable: 'bar' },
 
       { tableName: 'stb_pre_aggregations.foo_first20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_second20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
       {
         tableName: 'stb_pre_aggregations.foo_first20201228',
         timezone: 'America/Los_Angeles',
         fromTable: 'foo_tenant1',
       },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201228', timezone: 'America/Los_Angeles', fromTable: 'foo_tenant1' },
       {
         tableName: 'stb_pre_aggregations.foo_second20201228',
         timezone: 'America/Los_Angeles',
@@ -704,12 +740,14 @@ describe('Refresh Scheduler', () => {
       },
 
       { tableName: 'stb_pre_aggregations.foo_first20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_second20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
       {
         tableName: 'stb_pre_aggregations.foo_first20201227',
         timezone: 'America/Los_Angeles',
         fromTable: 'foo_tenant1',
       },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201227', timezone: 'America/Los_Angeles', fromTable: 'foo_tenant1' },
       {
         tableName: 'stb_pre_aggregations.foo_second20201227',
         timezone: 'America/Los_Angeles',
@@ -763,23 +801,28 @@ describe('Refresh Scheduler', () => {
 
   test('Iterator waits before advance', async () => {
     process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
-    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
     const {
       refreshScheduler, mockDriver,
     } = setupScheduler({ repository: repositoryWithPreAggregations });
     const result = [
       { tableName: 'stb_pre_aggregations.foo_first20201231', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201231', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_second20201231', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.bar_first20201231', timezone: 'UTC', fromTable: 'bar' },
       { tableName: 'stb_pre_aggregations.foo_first20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_second20201230', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.bar_first20201230', timezone: 'UTC', fromTable: 'bar' },
       { tableName: 'stb_pre_aggregations.foo_first20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_second20201229', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.bar_first20201229', timezone: 'UTC', fromTable: 'bar' },
       { tableName: 'stb_pre_aggregations.foo_first20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_second20201228', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_first20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
+      { tableName: 'stb_pre_aggregations.foo_orphaned20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
       { tableName: 'stb_pre_aggregations.foo_second20201227', timezone: 'UTC', fromTable: 'foo_tenant1' },
     ];
 
@@ -806,6 +849,8 @@ describe('Refresh Scheduler', () => {
   });
 
   test('Empty pre-aggregations', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
     const { refreshScheduler, mockDriver } = setupScheduler({
       repository: repositoryWithoutPreAggregations,
     });
@@ -826,6 +871,8 @@ describe('Refresh Scheduler', () => {
   });
 
   test('Empty security context', async () => {
+    process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+    process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
     const { refreshScheduler } = setupScheduler({
       repository: repositoryWithoutPreAggregations,
     });

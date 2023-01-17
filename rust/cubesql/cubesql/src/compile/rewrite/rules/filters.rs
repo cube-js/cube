@@ -1761,6 +1761,57 @@ impl RewriteRules for FilterRules {
                 ),
                 self.transform_granularity_to_interval("?granularity", "?interval"),
             ),
+            transforming_rewrite(
+                "filter-binary-expr-date-trunc-column-with-literal",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "?op",
+                        literal_expr("?date"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        column_expr("?column"),
+                        "?new_op",
+                        fun_expr(
+                            "DateTrunc",
+                            vec![
+                                literal_expr("?granularity"),
+                                udf_expr(
+                                    "date_sub",
+                                    vec![
+                                        udf_expr(
+                                            "date_add",
+                                            vec![
+                                                literal_expr("?date"),
+                                                literal_expr("?date_add_interval"),
+                                            ],
+                                        ),
+                                        literal_expr("?date_sub_interval"),
+                                    ],
+                                ),
+                            ],
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_binary_expr_date_trunc_column_with_literal(
+                    "?granularity",
+                    "?op",
+                    "?new_op",
+                    "?date_add_interval",
+                    "?date_sub_interval",
+                ),
+            ),
             rewrite(
                 "between-move-interval-beyond-equal-sign",
                 between_expr(
@@ -3378,7 +3429,7 @@ impl FilterRules {
         let interval_var = var!(interval_var);
         move |egraph, subst| {
             for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
-                if let Some(interval) = utils::granularity_to_interval(granularity) {
+                if let Some(interval) = utils::granularity_scalar_to_interval(granularity) {
                     subst.insert(
                         interval_var,
                         egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
@@ -3390,6 +3441,69 @@ impl FilterRules {
                 }
             }
 
+            false
+        }
+    }
+
+    fn transform_binary_expr_date_trunc_column_with_literal(
+        &self,
+        granularity_var: &'static str,
+        op_var: &'static str,
+        new_op_var: &'static str,
+        date_add_interval_var: &'static str,
+        date_sub_interval_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let granularity_var = var!(granularity_var);
+        let op_var = var!(op_var);
+        let new_op_var = var!(new_op_var);
+        let date_add_interval_var = var!(date_add_interval_var);
+        let date_sub_interval_var = var!(date_sub_interval_var);
+        move |egraph, subst| {
+            for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                let new_op = match op {
+                    Operator::GtEq | Operator::Gt => Operator::GtEq,
+                    Operator::LtEq | Operator::Lt => Operator::Lt,
+                    _ => continue,
+                };
+
+                for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
+                    if let ScalarValue::Utf8(Some(granularity)) = granularity {
+                        if let (Some(date_add_interval), Some(date_sub_interval)) = (
+                            utils::granularity_str_to_interval(&granularity),
+                            match op {
+                                Operator::GtEq | Operator::Lt => {
+                                    utils::granularity_str_to_interval("second")
+                                }
+                                Operator::Gt | Operator::LtEq => {
+                                    Some(ScalarValue::IntervalDayTime(Some(0)))
+                                }
+                                _ => None,
+                            },
+                        ) {
+                            subst.insert(
+                                new_op_var,
+                                egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(new_op))),
+                            );
+
+                            subst.insert(
+                                date_add_interval_var,
+                                egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                                    LiteralExprValue(date_add_interval),
+                                )),
+                            );
+
+                            subst.insert(
+                                date_sub_interval_var,
+                                egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                                    LiteralExprValue(date_sub_interval),
+                                )),
+                            );
+
+                            return true;
+                        }
+                    }
+                }
+            }
             false
         }
     }

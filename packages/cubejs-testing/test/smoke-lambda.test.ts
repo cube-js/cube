@@ -32,32 +32,27 @@ async function checkCubestoreState(cubestore: any) {
   expect(rows.slice(0, 4)).toEqual([
     {
       table_schema: 'dev_pre_aggregations',
-      table_name: 'orders_orders_by_completed_at20200201',
-      build_range_end: '2020-05-07T00:00:00.000Z',
+      table_name: 'orders__a_orders_by_completed_by_hour2020050500',
+      build_range_end: '2020-05-05T00:59:59.999Z',
     },
     {
       table_schema: 'dev_pre_aggregations',
-      table_name: 'orders_orders_by_completed_at20200301',
-      build_range_end: '2020-05-07T00:00:00.000Z',
+      table_name: 'orders__a_orders_by_completed_by_hour2020050501',
+      build_range_end: '2020-05-05T01:59:59.999Z',
     },
     {
       table_schema: 'dev_pre_aggregations',
-      table_name: 'orders_orders_by_completed_at20200401',
-      build_range_end: '2020-05-07T00:00:00.000Z',
+      table_name: 'orders__a_orders_by_completed_by_hour2020050502',
+      build_range_end: '2020-05-05T02:59:59.999Z',
     },
     {
       table_schema: 'dev_pre_aggregations',
-      table_name: 'orders_orders_by_completed_at20200501',
-      build_range_end: '2020-05-07T00:00:00.000Z',
+      table_name: 'orders__a_orders_by_completed_by_hour2020050503',
+      build_range_end: '2020-05-05T03:59:59.999Z',
     },
   ]);
-  expect(table.build_range_end).toEqual('2020-05-07T00:00:00.000Z');
   rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name}`, []);
-  expect(rows.length).toEqual(18);
-  rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name} WHERE orders__completed_at_day < to_timestamp('${table.build_range_end}')`, []);
-  expect(rows.length).toEqual(18);
-  rows = await cubestore.query(`SELECT * FROM ${table.table_schema}.${table.table_name} WHERE orders__completed_at_day >= to_timestamp('${table.build_range_end}')`, []);
-  expect(rows.length).toEqual(0);
+  expect(rows.length).toEqual(1);
 }
 
 describe('lambda', () => {
@@ -143,7 +138,9 @@ describe('lambda', () => {
 
     // @ts-ignore
     expect(Object.keys(response.loadResponse.results[0].usedPreAggregations)).toEqual([
-      'dev_pre_aggregations.orders_orders_by_completed_at'
+      'dev_pre_aggregations.orders_orders_by_completed_at',
+      'dev_pre_aggregations.orders_orders_by_completed_by_day',
+      'dev_pre_aggregations.orders__a_orders_by_completed_by_hour'
     ]);
 
     // With lambda-view we observe all 'fresh' data, with no partition/buildRange limit.
@@ -332,5 +329,32 @@ describe('lambda', () => {
     });
     console.log(await preAggs.json());
     expect(preAggs.status).toBe(200);
+  });
+
+  test('Pre-aggregations API partitions', async () => {
+    const partitions = await (await fetch(`${birdbox.configuration.systemUrl}/pre-aggregations/partitions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: {
+          preAggregations: [
+            {
+              id: 'Orders.ordersByCompletedAtLambda'
+            },
+            {
+              id: 'Orders.ordersByCompletedAt'
+            },
+            {
+              id: 'Orders.ordersByCompletedByDay'
+            }
+          ]
+        }
+      }),
+    })).json();
+    console.log(JSON.stringify(partitions, null, 2));
+    const completedAtPartition = partitions.preAggregationPartitions[1].partitions[0];
+    expect(completedAtPartition.loadSql[0]).toMatch(/orders_orders_by_completed_at/);
+    const completedByDayPartition = partitions.preAggregationPartitions[2].partitions[0];
+    expect(completedByDayPartition.loadSql[0]).toMatch(/orders_orders_by_completed_by_day/);
   });
 });
