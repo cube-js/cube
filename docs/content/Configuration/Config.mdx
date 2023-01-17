@@ -450,11 +450,10 @@ module.exports = {
 
 <WarningBox>
 
-This is merely a refresh worker heart beat. It doesn't affect freshness of
-pre-aggregations or refresh keys. Setting this value to `30s` doesn't mean
-pre-aggregations would be refreshed every 30 seconds but rather checked for
-freshness every 30 seconds. Please consult the [`refreshKey`
-documentation][ref-pre-aggregations-refresh-key] on how to set refresh intervals
+This is merely a refresh worker's heartbeat. It doesn't affect the freshness of
+pre-aggregations or refresh keys, nor how frequently Cube accesses the database. 
+Setting this value to `30s` doesn't mean pre-aggregations or in-memory cache would be refreshed every 30 seconds but instead refresh key is checked for freshness every 30 seconds in the background. 
+Please consult the [cube `refreshKey` documentation][ref-schema-cube-ref-refresh-key] and [pre-aggregation `refreshKey` documentation][ref-pre-aggregations-refresh-key] on how to set refresh intervals
 for pre-aggregations.
 
 </WarningBox>
