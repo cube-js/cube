@@ -1,6 +1,11 @@
 import R from 'ramda';
+import { QueueDriverInterface, QueueDriverConnectionInterface } from '@cubejs-backend/base-driver';
+
 import { BaseQueueDriver } from './BaseQueueDriver';
 
+/**
+ * @implements {QueueDriverConnectionInterface}
+ */
 export class RedisQueueDriverConnection {
   constructor(driver, options) {
     this.driver = driver;
@@ -29,6 +34,21 @@ export class RedisQueueDriverConnection {
     const resultListKey = this.resultListKey(queryKey);
     const result = await this.redisClient.rpopAsync(resultListKey);
     return result && JSON.parse(result);
+  }
+
+  async getQueriesToCancel() {
+    return (
+      await this.getStalledQueries()
+    ).concat(
+      await this.getOrphanedQueries()
+    );
+  }
+
+  async getActiveAndToProcess() {
+    const active = await this.getActiveQueries();
+    const toProcess = await this.getToProcessQueries();
+
+    return [active, toProcess];
   }
 
   /**
@@ -135,7 +155,7 @@ export class RedisQueueDriverConnection {
         .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
         .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
         .del(this.queryProcessingLockKey(queryKey));
-      
+
       if (this.getQueueEventsBus) {
         tx.publish(
           this.getQueueEventsBus().eventsChannel,
@@ -337,6 +357,9 @@ export class RedisQueueDriverConnection {
   }
 }
 
+/**
+ * @implements {QueueDriverInterface}
+ */
 export class RedisQueueDriver extends BaseQueueDriver {
   constructor(options) {
     super();

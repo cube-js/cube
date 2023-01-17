@@ -79,7 +79,7 @@ export class RedisPool {
     }
   }
 
-  public release(client) {
+  public release(client: AsyncRedisClient) {
     if (this.pool) {
       this.pool.release(client);
     } else if (client) {

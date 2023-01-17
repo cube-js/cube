@@ -2,10 +2,22 @@ import { CubeStoreDevDriver, CubeStoreDriver, CubeStoreHandler } from '@cubejs-b
 import { QueryCacheTest } from '../../unit/QueryCache.abstract';
 
 let beforeAll;
-let afterAll;
-let cubeStoreDriverFactory = async () => new CubeStoreDriver({});
+let cubeStoreDriver;
+let afterAll = async () => {
+  if (cubeStoreDriver) {
+    await cubeStoreDriver.release();
+  }
+};
+let cubeStoreDriverFactory = async () => {
+  if (cubeStoreDriver) {
+    return cubeStoreDriver;
+  }
 
-if ((process.env.CUBEJS_TESTING_CUBESTORE_AUTO_PROVISIONING || 'true') === 'true') {
+  // eslint-disable-next-line no-return-assign
+  return cubeStoreDriver = new CubeStoreDriver({});
+};
+
+if ((process.env.CUBEJS_TESTING_CUBESTORE_AUTO_PROVISIONING || 'false') === 'true') {
   const cubeStoreHandler = new CubeStoreHandler({
     stdout: (data) => {
       console.log(data.toString().trim());
