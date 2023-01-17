@@ -1595,32 +1595,46 @@ export class PreAggregationPartitionRangeLoader {
 
   public async loadPreAggregations(): Promise<LoadPreAggregationResult> {
     if (this.preAggregation.partitionGranularity && !this.preAggregation.expandedPartition) {
-      const { buildRange, partitionRanges } = await this.partitionRanges();
-      const partitionLoaders = partitionRanges.map(range => new PreAggregationLoader(
-        this.redisPrefix,
-        this.driverFactory,
-        this.logger,
-        this.queryCache,
-        this.preAggregations,
-        this.partitionPreAggregationDescription(range, buildRange),
-        this.preAggregationsTablesToTempTables,
-        this.loadCache,
-        this.options,
-      ));
-      const resolveResults = await Promise.all(partitionLoaders.map(async (l, i) => {
-        const result = await l.loadPreAggregation(false);
-        return result && {
-          ...result,
-          partitionRange: partitionRanges[i]
-        };
-      }));
-      let loadResults = resolveResults.filter(res => res !== null);
-      if (this.options.externalRefresh && loadResults.length === 0) {
+      const loadPreAggregationsByPartitionRanges = async ({ buildRange, partitionRanges }: PartitionRanges) => {
+        const partitionLoaders = partitionRanges.map(range => new PreAggregationLoader(
+          this.redisPrefix,
+          this.driverFactory,
+          this.logger,
+          this.queryCache,
+          this.preAggregations,
+          this.partitionPreAggregationDescription(range, buildRange),
+          this.preAggregationsTablesToTempTables,
+          this.loadCache,
+          this.options,
+        ));
+        const resolveResults = await Promise.all(partitionLoaders.map(async (l, i) => {
+          const result = await l.loadPreAggregation(false);
+          return result && {
+            ...result,
+            partitionRange: partitionRanges[i]
+          };
+        }));
+        return { loadResults: resolveResults.filter(res => res !== null), partitionLoaders };
+      };
+
+      // eslint-disable-next-line prefer-const
+      let loadResultAndLoaders = await loadPreAggregationsByPartitionRanges(await this.partitionRanges());
+      if (this.options.externalRefresh && loadResultAndLoaders.loadResults.length === 0) {
+        loadResultAndLoaders = await loadPreAggregationsByPartitionRanges(await this.partitionRanges(true));
+        // In case there're no partitions ready at matched time dimension intersection then no data can be retrieved.
+        // We need to provide any table so query can just execute successfully.
+        if (loadResultAndLoaders.loadResults.length > 0) {
+          loadResultAndLoaders.loadResults = [loadResultAndLoaders.loadResults[loadResultAndLoaders.loadResults.length - 1]];
+        }
+      }
+      if (this.options.externalRefresh && loadResultAndLoaders.loadResults.length === 0) {
         throw new Error(
           // eslint-disable-next-line no-use-before-define
-          PreAggregations.noPreAggregationPartitionsBuiltMessage(partitionLoaders.map(p => p.preAggregation))
+          PreAggregations.noPreAggregationPartitionsBuiltMessage(loadResultAndLoaders.partitionLoaders.map(p => p.preAggregation))
         );
       }
+
+      let { loadResults } = loadResultAndLoaders;
 
       let lambdaTable: InlineTable;
       let emptyResult = false;
@@ -1727,14 +1741,14 @@ export class PreAggregationPartitionRangeLoader {
     }
   }
 
-  private async partitionRanges(): Promise<PartitionRanges> {
+  private async partitionRanges(ignoreMatchedDateRange?: boolean): Promise<PartitionRanges> {
     const buildRange = await this.loadBuildRange();
     if (!buildRange[0] || !buildRange[1]) {
       return { buildRange, partitionRanges: [] };
     }
     let dateRange = PreAggregationPartitionRangeLoader.intersectDateRanges(
       buildRange,
-      this.preAggregation.matchedTimeDimensionDateRange,
+      ignoreMatchedDateRange ? undefined : this.preAggregation.matchedTimeDimensionDateRange,
     );
     if (!dateRange) {
       // If there's no date range intersection between query data range and pre-aggregation build range

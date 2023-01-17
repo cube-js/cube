@@ -1076,8 +1076,8 @@ describe('QueryOrchestrator', () => {
   });
 
   test('empty partitions with externalRefresh', async () => {
-    const query = {
-      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+    const query = ({ startQuery, endQuery, matchedTimeDimensionDateRange }) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_empty',
       values: [],
       cacheKeyQueries: {
         queries: []
@@ -1100,19 +1100,28 @@ describe('QueryOrchestrator', () => {
           indexName: 'orders_d_main'
         }],
         preAggregationStartEndQueries: [
-          ['SELECT MIN(created_at) FROM orders', []],
-          ['SELECT MAX(created_at) FROM orders', []],
+          [startQuery || 'SELECT MIN(created_at) FROM orders', []],
+          [endQuery || 'SELECT MAX(created_at) FROM orders', []],
         ],
         partitionGranularity: 'day',
-        timezone: 'UTC'
+        timezone: 'UTC',
+        matchedTimeDimensionDateRange
       }],
-      requestId: 'empty partitions',
-    };
+      requestId: 'empty partitions with externalRefresh',
+    });
     await expect(async () => {
-      await queryOrchestratorExternalRefresh.fetchQuery(query);
+      await queryOrchestratorExternalRefresh.fetchQuery(query({}));
     }).rejects.toThrow(
       /refresh worker/
     );
+    await queryOrchestrator.fetchQuery(query({ startQuery: 'SELECT \'2021-05-01\'', endQuery: 'SELECT \'2021-05-15\'' }));
+    const result = await queryOrchestratorExternalRefresh.fetchQuery(query({
+      startQuery: 'SELECT \'2021-05-01\'',
+      endQuery: 'SELECT \'2021-05-15\'',
+      matchedTimeDimensionDateRange: ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']
+    }));
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).toMatch(/orders_empty20210515/);
   });
 
   test('empty intersection', async () => {
