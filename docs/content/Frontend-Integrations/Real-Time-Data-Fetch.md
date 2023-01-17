@@ -54,7 +54,8 @@ const cubejsApi = cubejs({
   }),
 });
 
-cubejsApi.subscribe(
+// Create a subscription
+const subscription = cubejsApi.subscribe(
   {
     measures: ['Logs.count'],
     timeDimensions: [
@@ -72,6 +73,9 @@ cubejsApi.subscribe(
     }
   }
 );
+
+// Later on, unsubscribe from subscription
+subscription.unsubscribe();
 ```
 
 ### <--{"id" : "Client Subscriptions"}-->  React hooks
@@ -81,6 +85,7 @@ import { useCubeQuery } from '@cubejs-client/react';
 
 const Chart = ({ query }) => {
   const { resultSet, error, isLoading } = useCubeQuery(query, {
+    // The component will automatically unsubscribe when unmounted
     subscribe: true,
   });
 

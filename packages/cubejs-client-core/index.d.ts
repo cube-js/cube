@@ -984,7 +984,7 @@ declare module '@cubejs-client/core' {
    * @order 4
    */
   export class Meta {
-    
+
     constructor(metaResponse: MetaResponse);
 
     /**
@@ -1087,7 +1087,8 @@ declare module '@cubejs-client/core' {
      * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
      *
      * ```js
-     * cubejsApi.subscribe(
+     * // Subscribe to a query's updates
+     * const subscription = await cubejsApi.subscribe(
      *   {
      *     measures: ['Logs.count'],
      *     timeDimensions: [
@@ -1105,6 +1106,9 @@ declare module '@cubejs-client/core' {
      *     }
      *   }
      * );
+     *
+     * // Unsubscribe from a query's updates
+     * subscription.unsubscribe();
      * ```
      */
     subscribe<QueryType extends DeeplyReadonly<Query | Query[]>>(
