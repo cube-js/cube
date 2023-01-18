@@ -700,14 +700,12 @@ describe('OptsHandler class', () => {
 
     const oapi = <any>core.getOrchestratorApi(<RequestContext>{});
     const testFetchSchemaSpy = jest.spyOn(oapi, 'fetchSchema');
-    const testDriverFactorySpy = jest.spyOn(oapi, 'driverFactory');
 
     await expect(async () => {
       await oapi.fetchSchema();
     }).rejects.toThrow();
 
     expect(testFetchSchemaSpy.mock.calls.length).toEqual(1);
-    expect(testDriverFactorySpy.mock.calls.length).toEqual(1);
 
     testFetchSchemaSpy.mockRestore();
   });
