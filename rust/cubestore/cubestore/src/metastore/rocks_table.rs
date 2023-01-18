@@ -519,6 +519,23 @@ pub trait RocksTable: Debug + Send + Sync {
         Ok(existing_keys)
     }
 
+    fn count_rows_by_index<K: Debug + Hash>(
+        &self,
+        row_key: &K,
+        secondary_index: &impl RocksSecondaryIndex<Self::T, K>,
+    ) -> Result<u64, CubeError> {
+        #[cfg(debug_assertions)]
+        if RocksSecondaryIndex::is_unique(secondary_index) {
+            return Err(CubeError::internal(format!(
+                "Wrong usage of count_rows_by_index, called on unique index for {:?} table",
+                self
+            )));
+        }
+
+        let rows_ids = self.get_row_ids_by_index(row_key, secondary_index)?;
+        Ok(rows_ids.len() as u64)
+    }
+
     fn get_rows_by_index<K: Debug>(
         &self,
         row_key: &K,

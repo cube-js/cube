@@ -52,19 +52,22 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       addedToQueueTime: new Date().getTime()
     };
 
-    const _rows = await this.driver.query('QUEUE ADD PRIORITY ? ? ?', [
+    const rows = await this.driver.query('QUEUE ADD PRIORITY ? ? ?', [
       priority,
       this.prefixKey(this.redisHash(queryKey)),
       JSON.stringify(data)
     ]);
+    if (rows && rows.length) {
+      return [
+        rows[0].added === 'true' ? 1 : 0,
+        null,
+        null,
+        parseInt(rows[0].pending, 10),
+        data.addedToQueueTime
+      ];
+    }
 
-    return [
-      1,
-      null,
-      null,
-      1,
-      data.addedToQueueTime
-    ];
+    throw new Error('Empty response on QUEUE ADD');
   }
 
   // TODO: Looks useless, because we can do it in one step - getQueriesToCancel

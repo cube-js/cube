@@ -261,6 +261,23 @@ impl RocksCacheStore {
             })
             .await
     }
+
+    fn queue_count_by_prefix_and_status(
+        db_ref: DbTableRef,
+        prefix: &Option<String>,
+        status: QueueItemStatus,
+    ) -> Result<u64, CubeError> {
+        let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+        let index_key =
+            QueueItemIndexKey::ByPrefixAndStatus(prefix.clone().unwrap_or("".to_string()), status);
+        queue_schema.count_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefixAndStatus)
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+pub struct QueueAddResponse {
+    pub added: bool,
+    pub pending: u64,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
@@ -285,7 +302,7 @@ pub trait CacheStore: DIService + Send + Sync {
 
     // queue
     async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError>;
-    async fn queue_add(&self, item: QueueItem) -> Result<bool, CubeError>;
+    async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError>;
     async fn queue_truncate(&self) -> Result<(), CubeError>;
     async fn queue_get(&self, key: String) -> Result<Option<IdRow<QueueItem>>, CubeError>;
     async fn queue_to_cancel(
@@ -453,7 +470,7 @@ impl CacheStore for RocksCacheStore {
             .await
     }
 
-    async fn queue_add(&self, item: QueueItem) -> Result<bool, CubeError> {
+    async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -461,11 +478,24 @@ impl CacheStore for RocksCacheStore {
                 let id_row_opt = queue_schema
                     .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
 
-                if id_row_opt.is_none() {
-                    queue_schema.insert(item, batch_pipe)?;
-                }
+                let pending = Self::queue_count_by_prefix_and_status(
+                    db_ref,
+                    item.get_prefix(),
+                    QueueItemStatus::Pending,
+                )?;
 
-                Ok(true)
+                let added = if id_row_opt.is_none() {
+                    queue_schema.insert(item, batch_pipe)?;
+
+                    true
+                } else {
+                    false
+                };
+
+                Ok(QueueAddResponse {
+                    added,
+                    pending: if added { pending + 1 } else { pending },
+                })
             })
             .await
     }
@@ -629,26 +659,12 @@ impl CacheStore for RocksCacheStore {
 
                 if let Some(id_row) = id_row_opt {
                     if id_row.get_row().get_status() == &QueueItemStatus::Pending {
-                        // TODO: Introduce count + Active index?
-                        let index_key = QueueItemIndexKey::ByPrefix(
-                            if let Some(prefix) = id_row.get_row().get_prefix() {
-                                prefix.clone()
-                            } else {
-                                "".to_string()
-                            },
-                        );
-                        let in_queue = queue_schema
-                            .get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?;
-
-                        let mut current_active = 0;
-
-                        for item in in_queue {
-                            if item.get_row().get_status() == &QueueItemStatus::Active {
-                                current_active += 1;
-                            }
-                        }
-
-                        if current_active >= allow_concurrency {
+                        let current_active = Self::queue_count_by_prefix_and_status(
+                            db_ref,
+                            id_row.get_row().get_prefix(),
+                            QueueItemStatus::Active,
+                        )?;
+                        if current_active >= (allow_concurrency as u64) {
                             return Ok(None);
                         }
 
@@ -835,7 +851,7 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_all was used.")
     }
 
-    async fn queue_add(&self, _item: QueueItem) -> Result<bool, CubeError> {
+    async fn queue_add(&self, _item: QueueItem) -> Result<QueueAddResponse, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_add was used.")
     }
 

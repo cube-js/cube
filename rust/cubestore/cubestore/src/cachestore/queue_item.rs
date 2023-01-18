@@ -217,14 +217,14 @@ impl QueueItem {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum QueueItemRocksIndex {
     ByPath = 1,
-    ByStatus = 2,
+    ByPrefixAndStatus = 2,
     ByPrefix = 3,
 }
 
 rocks_table_impl!(QueueItem, QueueItemRocksTable, TableId::QueueItems, {
     vec![
         Box::new(QueueItemRocksIndex::ByPath),
-        Box::new(QueueItemRocksIndex::ByStatus),
+        Box::new(QueueItemRocksIndex::ByPrefixAndStatus),
         Box::new(QueueItemRocksIndex::ByPrefix),
     ]
 });
@@ -232,7 +232,7 @@ rocks_table_impl!(QueueItem, QueueItemRocksTable, TableId::QueueItems, {
 #[derive(Hash, Clone, Debug)]
 pub enum QueueItemIndexKey {
     ByPath(String),
-    ByStatus(QueueItemStatus),
+    ByPrefixAndStatus(String, QueueItemStatus),
     ByPrefix(String),
 }
 
@@ -242,13 +242,12 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
     fn typed_key_by(&self, row: &QueueItem) -> QueueItemIndexKey {
         match self {
             QueueItemRocksIndex::ByPath => QueueItemIndexKey::ByPath(row.get_path()),
-            QueueItemRocksIndex::ByStatus => QueueItemIndexKey::ByStatus(row.get_status().clone()),
+            QueueItemRocksIndex::ByPrefixAndStatus => QueueItemIndexKey::ByPrefixAndStatus(
+                row.get_prefix().clone().unwrap_or("".to_string()),
+                row.get_status().clone(),
+            ),
             QueueItemRocksIndex::ByPrefix => {
-                QueueItemIndexKey::ByPrefix(if let Some(prefix) = row.get_prefix() {
-                    prefix.clone()
-                } else {
-                    "".to_string()
-                })
+                QueueItemIndexKey::ByPrefix(row.get_prefix().clone().unwrap_or("".to_string()))
             }
         }
     }
@@ -257,8 +256,9 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
         match key {
             QueueItemIndexKey::ByPath(s) => s.as_bytes().to_vec(),
             QueueItemIndexKey::ByPrefix(s) => s.as_bytes().to_vec(),
-            QueueItemIndexKey::ByStatus(s) => {
-                let mut r = Vec::with_capacity(1);
+            QueueItemIndexKey::ByPrefixAndStatus(prefix, s) => {
+                let mut r = Vec::with_capacity(prefix.len() + 1);
+                r.extend_from_slice(&prefix.as_bytes());
 
                 match s {
                     QueueItemStatus::Pending => r.push(0_u8),
@@ -274,7 +274,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
     fn is_unique(&self) -> bool {
         match self {
             QueueItemRocksIndex::ByPath => true,
-            QueueItemRocksIndex::ByStatus => false,
+            QueueItemRocksIndex::ByPrefixAndStatus => false,
             QueueItemRocksIndex::ByPrefix => false,
         }
     }
@@ -282,7 +282,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
     fn version(&self) -> u32 {
         match self {
             QueueItemRocksIndex::ByPath => 1,
-            QueueItemRocksIndex::ByStatus => 1,
+            QueueItemRocksIndex::ByPrefixAndStatus => 2,
             QueueItemRocksIndex::ByPrefix => 1,
         }
     }
