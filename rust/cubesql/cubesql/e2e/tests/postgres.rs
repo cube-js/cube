@@ -274,7 +274,7 @@ impl PostgresIntegrationTestSuite {
 
         let cancel_token = client.cancel_token();
         let cancel = async move {
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(2000)).await;
 
             cancel_token.cancel_query(NoTls).await
         };
@@ -303,7 +303,7 @@ impl PostgresIntegrationTestSuite {
 
         let cancel_token = client.cancel_token();
         let cancel = async move {
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(3000)).await;
 
             cancel_token.cancel_query(NoTls).await
         };
@@ -583,6 +583,126 @@ impl PostgresIntegrationTestSuite {
                 assert_eq!(messages.len(), 2);
             }
         ).await?;
+
+        self.test_simple_query(
+            r#"declare test_cursor_fetching_less_than_batch_size cursor with hold for SELECT * from information_schema.testing_dataset order by id;"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 1);
+            }
+        ).await?;
+
+        self.test_simple_query(
+            r#"fetch 800 in test_cursor_fetching_less_than_batch_size; fetch 800 in test_cursor_fetching_less_than_batch_size; fetch 5000 in test_cursor_fetching_less_than_batch_size;"#
+                .to_string(),
+            |messages| {
+                // 5000 rows | 3 completions
+                assert_eq!(messages.len(), 5003);
+
+                for i in 0..800 {
+                    if let SimpleQueryMessage::Row(row) = &messages[i] {
+                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
+                    } else {
+                        panic!("Must be Row command, {}", i)
+                    }
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[800] {
+                    assert_eq!(rows, 800_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 800")
+                }
+
+                for i in 800..1600 {
+                    if let SimpleQueryMessage::Row(row) = &messages[i+1] {
+                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
+                    } else {
+                        panic!("Must be Row command, {}", i)
+                    }
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[1601] {
+                    assert_eq!(rows, 800_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 800")
+                }
+
+                for i in 1600..5000 {
+                    if let SimpleQueryMessage::Row(row) = &messages[i+2] {
+                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
+                    } else {
+                        panic!("Must be Row command, {}", i)
+                    }
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[5002] {
+                    assert_eq!(rows, 3400_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 3400")
+                }
+            },
+        )
+        .await?;
+
+        self.test_simple_query(
+            r#"declare test_cursor_fetching_more_than_batch_size cursor with hold for SELECT * from information_schema.testing_dataset order by id;"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 1);
+            }
+        ).await?;
+
+        self.test_simple_query(
+            r#"fetch 2400 in test_cursor_fetching_more_than_batch_size; fetch 2400 in test_cursor_fetching_more_than_batch_size; fetch 5000 in test_cursor_fetching_more_than_batch_size;"#
+                .to_string(),
+            |messages| {
+                // 5000 rows | 3 completions
+                assert_eq!(messages.len(), 5003);
+
+                for i in 0..2400 {
+                    if let SimpleQueryMessage::Row(row) = &messages[i] {
+                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
+                    } else {
+                        panic!("Must be Row command, {}", i)
+                    }
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[2400] {
+                    assert_eq!(rows, 2400_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 2400")
+                }
+
+                for i in 2400..4800 {
+                    if let SimpleQueryMessage::Row(row) = &messages[i+1] {
+                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
+                    } else {
+                        panic!("Must be Row command, {}", i)
+                    }
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[4801] {
+                    assert_eq!(rows, 2400_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 800")
+                }
+
+                for i in 4800..5000 {
+                    if let SimpleQueryMessage::Row(row) = &messages[i+2] {
+                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
+                    } else {
+                        panic!("Must be Row command, {}", i)
+                    }
+                }
+
+                if let SimpleQueryMessage::CommandComplete(rows) = messages[5002] {
+                    assert_eq!(rows, 200_u64);
+                } else {
+                    panic!("Must be CommandComplete command, 200")
+                }
+            },
+        )
+        .await?;
 
         Ok(())
     }

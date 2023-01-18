@@ -10,7 +10,7 @@ use crate::{
     },
     sql::{
         df_type_to_pg_tid,
-        extended::{Cursor, Portal, PortalFrom, PortalResponse},
+        extended::{Cursor, Portal, PortalBatch, PortalFrom},
         session::DatabaseProtocol,
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
@@ -702,50 +702,48 @@ impl AsyncPostgresShim {
                 let stream = portal.execute(execute.max_rows as usize);
                 pin_mut!(stream);
 
-                tokio::select! {
-                    _ = cancel.cancelled() => {
-                        self.session.state.end_query();
-
-                        return Err(protocol::ErrorResponse::query_canceled().into());
-                    },
-                    chunk = stream.next() => {
-                        let chunk = match chunk {
-                            Some(chunk) => match chunk {
-                                Ok(chunk) => chunk,
-                                Err(_) => {
-                                    self.session.state.end_query();
-                                    chunk?
-                                }
-                            },
-                            None => return Ok(()),
-                        };
-
-                        if cancel.is_cancelled() {
+                loop {
+                    tokio::select! {
+                        _ = cancel.cancelled() => {
                             self.session.state.end_query();
 
                             return Err(protocol::ErrorResponse::query_canceled().into());
-                        }
+                        },
+                        chunk = stream.next() => {
+                            let chunk = match chunk {
+                                Some(chunk) => match chunk {
+                                    Ok(chunk) => chunk,
+                                    Err(_) => {
+                                        self.session.state.end_query();
+                                        chunk?
+                                    }
+                                },
+                                None => return Ok(()),
+                            };
 
-                        let chunk = match chunk {
-                            PortalResponse::Completion(completion) => {
+                            if cancel.is_cancelled() {
                                 self.session.state.end_query();
 
-                                // TODO:
-                                match completion {
-                                    PortalCompletion::Complete(c) => buffer::write_message(&mut self.socket, c).await?,
-                                    PortalCompletion::Suspended(s) => buffer::write_message(&mut self.socket, s).await?,
-                                }
+                                return Err(protocol::ErrorResponse::query_canceled().into());
+                            }
 
-                                return Ok(());
-                            },
-                            PortalResponse::Batch(batch) => batch,
-                        };
+                            match chunk {
+                                PortalBatch::Rows(writer) if writer.has_data() => buffer::write_direct(&mut self.socket, writer).await?,
+                                PortalBatch::Completion(completion) => {
+                                    self.session.state.end_query();
 
-                        match chunk.writer {
-                            Some(writer) if writer.has_data() => buffer::write_direct(&mut self.socket, writer).await?,
-                            _ => (),
-                        }
-                    },
+                                    // TODO:
+                                    match completion {
+                                        PortalCompletion::Complete(c) => buffer::write_message(&mut self.socket, c).await?,
+                                        PortalCompletion::Suspended(s) => buffer::write_message(&mut self.socket, s).await?,
+                                    }
+
+                                    return Ok(());
+                                },
+                                _ => (),
+                            }
+                        },
+                    }
                 }
             };
 
@@ -1155,6 +1153,22 @@ impl AsyncPostgresShim {
                 sensitive,
                 hold,
             } => {
+                // TODO: move envs to config
+                let stream_mode = std::env::var("CUBESQL_STREAM_MODE")
+                    .ok()
+                    .map(|v| v.parse::<bool>().unwrap())
+                    .unwrap_or(false);
+                if stream_mode {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "DECLARE statement can not be used if CUBESQL_STREAM_MODE == true"
+                                .to_string(),
+                        )
+                        .into(),
+                    ));
+                }
+
                 // The default is to allow scrolling in some cases; this is not the same as specifying SCROLL.
                 if scroll.is_some() {
                     return Err(ConnectionError::Protocol(
@@ -1408,22 +1422,24 @@ impl AsyncPostgresShim {
                         None => return Ok(()),
                     };
 
-                    let chunk = match chunk {
-                        PortalResponse::Completion(completion) => return self.write_completion(completion).await,
-                        PortalResponse::Batch(batch) => batch,
-                    };
+                    // if cancel.is_cancelled() {
+                    //     self.session.state.end_query();
 
-                    // Special handling for special queries, such as DISCARD ALL.
-                    if let Some(description) = chunk.description {
-                        match description.len() {
+                    //     return Err(protocol::ErrorResponse::query_canceled().into());
+                    // }
+
+                    match chunk {
+                        PortalBatch::Description(description) => match description.len() {
+                            // Special handling for special queries, such as DISCARD ALL.
                             0 => self.write(protocol::NoData::new()).await?,
                             _ => self.write(description).await?,
-                        };
-                    }
-
-                    match chunk.writer {
-                        Some(writer) if writer.has_data() => buffer::write_direct(&mut self.socket, writer).await?,
-                        _ => (),
+                        },
+                        PortalBatch::Rows(writer) => {
+                            if writer.has_data() {
+                                buffer::write_direct(&mut self.socket, writer).await?
+                            }
+                        }
+                        PortalBatch::Completion(completion) => return self.write_completion(completion).await,
                     }
                 }
             }

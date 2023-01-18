@@ -176,13 +176,9 @@ pub enum PortalFrom {
     Extended,
 }
 
-pub struct PortalBatch {
-    pub writer: Option<BatchWriter>,
-    pub description: Option<protocol::RowDescription>,
-}
-
-pub enum PortalResponse {
-    Batch(PortalBatch),
+pub enum PortalBatch {
+    Description(protocol::RowDescription),
+    Rows(BatchWriter),
     Completion(protocol::PortalCompletion),
 }
 
@@ -265,7 +261,7 @@ impl Portal {
         &'a mut self,
         frame_state: InExecutionFrameState,
         max_rows: usize,
-    ) -> impl Stream<Item = Result<PortalResponse, ConnectionError>> + 'a {
+    ) -> impl Stream<Item = Result<PortalBatch, ConnectionError>> + 'a {
         stream! {
             let rows_read = frame_state.batch.len();
             if max_rows > 0 && rows_read > 0 && rows_read > max_rows {
@@ -281,13 +277,17 @@ impl Portal {
                 let writer = self.dataframe_to_writer(frame_state.batch)?;
                 let num_rows = writer.num_rows() as u32;
 
-                yield Ok(PortalResponse::Batch(self.new_batch(Some(writer), frame_state.description.clone())?));
+                if let Some(description) = &frame_state.description {
+                    yield Ok(PortalBatch::Description(description.clone()));
+                }
+
+                yield Ok(PortalBatch::Rows(writer));
 
                 self.state = Some(PortalState::Finished(FinishedState {
                     description: frame_state.description,
                 }));
 
-                return yield Ok(PortalResponse::Completion(self.new_portal_completion(num_rows, false)));
+                return yield Ok(PortalBatch::Completion(self.new_portal_completion(num_rows, false)));
             }
         }
     }
@@ -370,33 +370,28 @@ impl Portal {
         &'a mut self,
         mut stream_state: InExecutionStreamState,
         max_rows: usize,
-    ) -> impl Stream<Item = Result<PortalResponse, ConnectionError>> + 'a {
+    ) -> impl Stream<Item = Result<PortalBatch, ConnectionError>> + 'a {
         stream! {
             let mut left: usize = max_rows;
-            let mut writer: Option<BatchWriter> = None;
+            let mut num_of_rows = 0;
+
+            if let Some(description) = &stream_state.description {
+                yield Ok(PortalBatch::Description(description.clone()));
+            }
 
             if let Some(unused_batch) = stream_state.unused.take() {
                 let (usused_batch, batch_writer) = self.iterate_stream_batch(unused_batch, max_rows, &mut left)?;
                 stream_state.unused = usused_batch;
-                writer = Some(batch_writer);
+                num_of_rows = batch_writer.num_rows() as u32;
+
+                yield Ok(PortalBatch::Rows(batch_writer));
             }
 
             if max_rows > 0 && left == 0 {
                 self.state = Some(PortalState::InExecutionStream(stream_state));
 
-                let num_rows = match &writer {
-                    Some(writer) => writer.num_rows() as u32,
-                    None => 0,
-                };
-
-                yield Ok(PortalResponse::Batch(self.new_batch(writer, self.get_description()?)?));
-                yield Ok(PortalResponse::Completion(self.new_portal_completion(num_rows, true)));
-
-                return;
+                return yield Ok(PortalBatch::Completion(self.new_portal_completion(num_of_rows, true)));
             }
-
-            let mut num_of_rows = 0;
-            let mut description = stream_state.description.clone();
 
             loop {
                 match stream_state.stream.next().await {
@@ -405,7 +400,7 @@ impl Portal {
                             description: stream_state.description,
                         }));
 
-                        return yield Ok(PortalResponse::Completion(self.new_portal_completion(0, false)));
+                        return yield Ok(PortalBatch::Completion(self.new_portal_completion(num_of_rows, false)));
                     }
                     Some(res) => match res {
                         Ok(batch) => {
@@ -413,16 +408,14 @@ impl Portal {
 
                             num_of_rows += writer.num_rows() as u32;
 
-                            yield Ok(PortalResponse::Batch(self.new_batch(Some(writer), description)?));
-
-                            description = None;
+                            yield Ok(PortalBatch::Rows(writer));
 
                             if max_rows > 0 && left == 0 {
                                 stream_state.unused = unused_batch;
 
                                 self.state = Some(PortalState::InExecutionStream(stream_state));
 
-                                return yield Ok(PortalResponse::Completion(self.new_portal_completion(num_of_rows, true)));
+                                return yield Ok(PortalBatch::Completion(self.new_portal_completion(num_of_rows, true)));
                             }
                         }
                         Err(err) => return yield Err(err.into()),
@@ -436,7 +429,7 @@ impl Portal {
     pub fn execute<'a>(
         self: &'a mut Pin<&'a mut Self>,
         max_rows: usize,
-    ) -> impl Stream<Item = Result<PortalResponse, ConnectionError>> + 'a {
+    ) -> impl Stream<Item = Result<PortalBatch, ConnectionError>> + 'a {
         stream! {
             let state = self
                 .state
@@ -458,7 +451,7 @@ impl Portal {
                         QueryPlan::MetaOk(_, completion) => {
                             self.state = Some(PortalState::Finished(FinishedState { description }));
 
-                            return yield Ok(PortalResponse::Completion(PortalCompletion::Complete(
+                            return yield Ok(PortalBatch::Completion(PortalCompletion::Complete(
                                 completion.clone().to_pg_command(),
                             )));
                         }
@@ -510,38 +503,37 @@ impl Portal {
                 PortalState::Finished(finish_state) => {
                     self.state = Some(PortalState::Finished(finish_state));
 
-                    return yield Ok(PortalResponse::Completion(self.new_portal_completion(0, false)));
+                    if let Some(description) = self.get_description()? {
+                        yield Ok(PortalBatch::Description(description.clone()));
+                    }
+
+                    return yield Ok(PortalBatch::Completion(self.new_portal_completion(0, false)));
                 }
             }
         }
-    }
-
-    fn new_batch(
-        &self,
-        writer: Option<BatchWriter>,
-        description: Option<protocol::RowDescription>,
-    ) -> Result<PortalBatch, ConnectionError> {
-        Ok(PortalBatch {
-            writer,
-            description,
-        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sql::{
-        dataframe::{Column, DataFrame, Row, TableValue},
-        extended::{InExecutionFrameState, Portal, PortalState},
-        ColumnFlags, ColumnType,
+    use crate::{
+        compile::engine::information_schema::postgres::InfoSchemaTestingDatasetProvider,
+        sql::{
+            dataframe::{Column, DataFrame, Row, TableValue},
+            extended::{InExecutionFrameState, Portal, PortalState},
+            ColumnFlags, ColumnType,
+        },
     };
     use pg_srv::protocol::Format;
 
     use crate::sql::{extended::PortalFrom, shim::ConnectionError};
-    use datafusion::arrow::{
-        array::{ArrayRef, StringArray},
-        datatypes::{DataType, Field, Schema},
+    use datafusion::{
+        arrow::{
+            array::{ArrayRef, StringArray},
+            datatypes::{DataType, Field, Schema},
+        },
+        prelude::SessionContext,
     };
     use futures_util::stream::StreamExt;
     use std::sync::Arc;
@@ -647,16 +639,16 @@ mod tests {
 
         let response = stream.next().await.unwrap()?;
         match response {
-            PortalResponse::Batch(batch) => {
-                assert_eq!(3, batch.writer.unwrap().num_rows());
+            PortalBatch::Rows(writer) => {
+                assert_eq!(3, writer.num_rows());
             }
-            PortalResponse::Completion(_) => panic!("must be batch here"),
+            _ => panic!("must be rows here"),
         }
 
         let response = stream.next().await.unwrap()?;
         match response {
-            PortalResponse::Batch(_) => panic!("must be Completion here"),
-            PortalResponse::Completion(_) => (),
+            PortalBatch::Completion(_) => (),
+            _ => panic!("must be Completion here"),
         }
 
         Ok(())
@@ -696,7 +688,7 @@ mod tests {
             from: PortalFrom::Extended,
             state: Some(PortalState::InExecutionFrame(InExecutionFrameState::new(
                 generate_testing_data_frame(3),
-                None,
+                Some(protocol::RowDescription::new(vec![])),
             ))),
         };
 
@@ -706,103 +698,119 @@ mod tests {
 
         let response = stream.next().await.unwrap()?;
         match response {
-            PortalResponse::Batch(batch) => assert_eq!(3, batch.writer.unwrap().num_rows()),
-            PortalResponse::Completion(_) => panic!("must be Batch here"),
+            PortalBatch::Description(_) => (),
+            _ => panic!("must be Description here"),
+        }
+
+        let response = stream.next().await.unwrap()?;
+        match response {
+            PortalBatch::Rows(writer) => assert_eq!(3, writer.num_rows()),
+            _ => panic!("must be rows here"),
         }
 
         Ok(())
     }
 
-    // #[tokio::test]
-    // async fn test_portal_df_stream_single_batch() -> Result<(), ConnectionError> {
-    //     let mut writer = BatchWriter::new(Format::Binary);
+    #[tokio::test]
+    async fn test_portal_df_stream_single_batch() -> Result<(), ConnectionError> {
+        let ctx = SessionContext::new();
+        let table = Arc::new(InfoSchemaTestingDatasetProvider::new(1, 250));
+        let stream = ctx.read_table(table)?.execute_stream().await?;
 
-    //     let ctx = SessionContext::new();
-    //     let table = Arc::new(InfoSchemaTestingDatasetProvider::new(1, 250));
-    //     let stream = ctx.read_table(table)?.execute_stream().await?;
+        let mut portal = Portal {
+            format: Format::Binary,
+            from: PortalFrom::Extended,
+            state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
+                stream,
+                Some(protocol::RowDescription::new(vec![])),
+            ))),
+        };
 
-    //     let mut portal = Portal {
-    //         format: Format::Binary,
-    //         from: PortalFrom::Extended,
-    //         state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
-    //             stream, None,
-    //         ))),
-    //     };
+        execute_portal_single_batch(&mut portal, 1, 1).await?;
+        execute_portal_single_batch(&mut portal, 5, 5).await?;
+        execute_portal_single_batch(&mut portal, 1000, 244).await?;
 
-    //     let completion = portal.execute(&mut writer, 1).await?;
-    //     // batch 1 will be spited to 250 -1 (unused) and 1
-    //     assert_eq!(1, writer.num_rows());
-    //     assert_eq!(
-    //         completion,
-    //         PortalCompletion::Suspended(PortalSuspended::new())
-    //     );
+        Ok(())
+    }
 
-    //     // usage of unused batch, 249 - 6 (unused) and 6
-    //     let completion = portal.execute(&mut writer, 5).await?;
-    //     assert_eq!(6, writer.num_rows());
-    //     assert_eq!(
-    //         completion,
-    //         PortalCompletion::Suspended(PortalSuspended::new())
-    //     );
+    #[tokio::test]
+    async fn test_portal_df_stream_small_batches() -> Result<(), ConnectionError> {
+        let ctx = SessionContext::new();
+        let table = Arc::new(InfoSchemaTestingDatasetProvider::new(10, 15));
+        let stream = ctx.read_table(table)?.execute_stream().await?;
 
-    //     // usage of unused batch
-    //     let completion = portal.execute(&mut writer, 1000).await?;
-    //     assert_eq!(250, writer.num_rows());
-    //     assert_eq!(
-    //         completion,
-    //         PortalCompletion::Complete(CommandComplete::Select(250))
-    //     );
+        let mut portal = Portal {
+            format: Format::Binary,
+            from: PortalFrom::Extended,
+            state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
+                stream,
+                Some(protocol::RowDescription::new(vec![])),
+            ))),
+        };
 
-    //     Ok(())
-    // }
+        // use 1 batch
+        execute_portal(&mut portal, 10, 10).await?;
 
-    // #[tokio::test]
-    // async fn test_portal_df_stream_small_batches() -> Result<(), ConnectionError> {
-    //     let mut writer = BatchWriter::new(Format::Binary);
+        // use 2 batch
+        execute_portal(&mut portal, 20, 20).await?;
 
-    //     let ctx = SessionContext::new();
-    //     let table = Arc::new(InfoSchemaTestingDatasetProvider::new(10, 15));
-    //     let stream = ctx.read_table(table)?.execute_stream().await?;
+        // use 0.5 batch
+        execute_portal(&mut portal, 5, 5).await?;
 
-    //     let mut portal = Portal {
-    //         format: Format::Binary,
-    //         from: PortalFrom::Extended,
-    //         state: Some(PortalState::InExecutionStream(InExecutionStreamState::new(
-    //             stream, None,
-    //         ))),
-    //     };
+        execute_portal(&mut portal, 15, 15).await?;
 
-    //     // use 1 batch
-    //     let completion = portal.execute(&mut writer, 10).await.unwrap();
-    //     assert_eq!(10, writer.num_rows());
-    //     assert_eq!(
-    //         completion,
-    //         PortalCompletion::Suspended(PortalSuspended::new())
-    //     );
+        // use 7 batches
+        execute_portal(&mut portal, 1000, 100).await?;
 
-    //     // use 2 batch
-    //     let completion = portal.execute(&mut writer, 20).await.unwrap();
-    //     assert_eq!(30, writer.num_rows());
-    //     assert_eq!(
-    //         completion,
-    //         PortalCompletion::Suspended(PortalSuspended::new())
-    //     );
+        Ok(())
+    }
 
-    //     // use 0.5 batch
-    //     portal.execute(&mut writer, 5).await.unwrap();
-    //     assert_eq!(35, writer.num_rows());
+    async fn execute_portal_single_batch(
+        portal: &mut Portal,
+        max_rows: usize,
+        expecting_rows: u32,
+    ) -> Result<(), ConnectionError> {
+        let mut p = Pin::new(portal);
+        let stream = p.execute(max_rows);
+        pin_mut!(stream);
 
-    //     portal.execute(&mut writer, 15).await.unwrap();
-    //     assert_eq!(50, writer.num_rows());
+        match stream.next().await.unwrap()? {
+            PortalBatch::Description(_) => (),
+            _ => panic!("must be Description here"),
+        }
 
-    //     // use 7 batches
-    //     let completion = portal.execute(&mut writer, 1000).await.unwrap();
-    //     assert_eq!(150, writer.num_rows());
-    //     assert_eq!(
-    //         completion,
-    //         PortalCompletion::Complete(CommandComplete::Select(150))
-    //     );
+        match stream.next().await.unwrap()? {
+            PortalBatch::Rows(writer) => assert_eq!(expecting_rows, writer.num_rows()),
+            _ => panic!("must be Rows here"),
+        }
 
-    //     Ok(())
-    // }
+        match stream.next().await.unwrap()? {
+            PortalBatch::Completion(_) => (),
+            _ => panic!("must be Completion here"),
+        }
+
+        Ok(())
+    }
+
+    async fn execute_portal(
+        portal: &mut Portal,
+        max_rows: usize,
+        expecting_rows: u32,
+    ) -> Result<(), ConnectionError> {
+        let mut p = Pin::new(portal);
+        let stream = p.execute(max_rows);
+        pin_mut!(stream);
+
+        let mut total_rows = 0;
+        while let Some(batch) = stream.next().await {
+            match batch? {
+                PortalBatch::Rows(writer) => total_rows += writer.num_rows(),
+                _ => (),
+            }
+        }
+
+        assert_eq!(expecting_rows, total_rows);
+
+        Ok(())
+    }
 }
