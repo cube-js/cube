@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.46](https://github.com/cube-js/cube.js/compare/v0.31.45...v0.31.46) (2023-01-18)
+
+
+### Bug Fixes
+
+* **athena-driver:** Help user to understand CUBEJS_AWS_S3_OUTPUT_LOCATION parameter is missing ([#5991](https://github.com/cube-js/cube.js/issues/5991)) Thanks [@fbalicchia](https://github.com/fbalicchia) ! ([eedd12a](https://github.com/cube-js/cube.js/commit/eedd12a18645d2d6faa68a43963a6cb98560b5a6))
+
+
+
+
+
 ## [0.31.45](https://github.com/cube-js/cube.js/compare/v0.31.44...v0.31.45) (2023-01-16)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver

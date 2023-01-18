@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.46](https://github.com/cube-js/cube.js/compare/v0.31.45...v0.31.46) (2023-01-18)
+
+
+### Features
+
+* **query-orchestrator:** Introduce CubeStoreQueueDriver ([#6014](https://github.com/cube-js/cube.js/issues/6014)) ([f4744bf](https://github.com/cube-js/cube.js/commit/f4744bfb218a8a8cb28effe28237867157d01074))
+
+
+
+
+
 ## [0.31.45](https://github.com/cube-js/cube.js/compare/v0.31.44...v0.31.45) (2023-01-16)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

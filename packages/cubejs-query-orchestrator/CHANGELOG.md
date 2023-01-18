@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.46](https://github.com/cube-js/cube.js/compare/v0.31.45...v0.31.46) (2023-01-18)
+
+
+### Bug Fixes
+
+* Do not fail if partitions are not ready for specified date range interval but there's at least one ready for pre-aggregation ([#6026](https://github.com/cube-js/cube.js/issues/6026)) ([2d39fe4](https://github.com/cube-js/cube.js/commit/2d39fe48b31b544f4aefa00c87e084102d134b2e))
+
+
+### Features
+
+* **query-orchestrator:** Introduce CubeStoreQueueDriver ([#6014](https://github.com/cube-js/cube.js/issues/6014)) ([f4744bf](https://github.com/cube-js/cube.js/commit/f4744bfb218a8a8cb28effe28237867157d01074))
+
+
+
+
+
 ## [0.31.45](https://github.com/cube-js/cube.js/compare/v0.31.44...v0.31.45) (2023-01-16)
 
 
