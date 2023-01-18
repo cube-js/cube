@@ -25,12 +25,14 @@ import {
   StreamOptions,
   UnloadOptions
 } from '@cubejs-backend/base-driver';
+import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryQueue } from './QueryQueue';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
+import { RedisPool } from './RedisPool';
 
 /// Name of the inline table containing the lambda rows.
 export const LAMBDA_TABLE_PREFIX = 'lambda';
@@ -1883,7 +1885,8 @@ type PreAggregationsOptions = {
     orphanedTimeout?: number;
     heartBeatInterval?: number;
   }>;
-  redisPool?: any;
+  redisPool?: RedisPool;
+  cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>;
   continueWaitTimeout?: number;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   skipExternalCacheAndQueue?: boolean;
@@ -2264,6 +2267,7 @@ export class PreAggregations {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
+          cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
           ...(await this.options.queueOptions(dataSource)),
@@ -2310,6 +2314,7 @@ export class PreAggregations {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
+          cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
           ...this.options.loadCacheQueueOptions
         }
       );

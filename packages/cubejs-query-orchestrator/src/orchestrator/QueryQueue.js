@@ -22,8 +22,12 @@ function factoryQueueDriver(cacheAndQueueDriver, queueDriverOptions) {
     case 'memory':
       return new LocalQueueDriver(queueDriverOptions);
     case 'cubestore':
+      if (!queueDriverOptions.cubeStoreDriverFactory) {
+        throw new Error('cubeStoreDriverFactory is a required option for Cube Store queue driver');
+      }
+
       return new CubeStoreQueueDriver(
-        queueDriverOptions.cubeStoreDriverFactory || (async () => new CubeStoreDriver({})),
+        queueDriverOptions.cubeStoreDriverFactory,
         queueDriverOptions
       );
     default:
