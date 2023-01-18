@@ -39,6 +39,13 @@ COPY . .
 RUN npm install
 ```
 
+You can then build and run the image using the following commands:
+
+```bash
+docker build -t cubejs-jdk .
+docker run -it -p 4000:4000 --env-file=.env cubejs-jdk
+```
+
 ## Environment Variables
 
 | Environment Variable                 | Description                                                                                     | Possible Values       | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
