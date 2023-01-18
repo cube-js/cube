@@ -445,7 +445,7 @@ based on the criteria in the flowchart below:
 >
   <img
   alt="Pre-Aggregation Selection Flowchart"
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/pre-agg-selection-flow.png"
+  src="https://ucarecdn.com/f986b0cb-a9ea-47b7-a743-ca9a4644c246/"
   style="border: none"
   width="100%"
   />
