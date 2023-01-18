@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.47](https://github.com/cube-js/cube.js/compare/v0.31.46...v0.31.47) (2023-01-18)
+
+
+### Bug Fixes
+
+* Re-use external connection for CubeStore in queue ([#6028](https://github.com/cube-js/cube.js/issues/6028)) ([ff724f7](https://github.com/cube-js/cube.js/commit/ff724f734039d059b762c9200688c7b1afcb0f76))
+
+
+### Features
+
+* **cubestore:** Correct queue add handling ([#6022](https://github.com/cube-js/cube.js/issues/6022)) ([0f4a431](https://github.com/cube-js/cube.js/commit/0f4a431bc6c2b1324bbfd53dd1204874120a5082))
+
+
+
+
+
 ## [0.31.46](https://github.com/cube-js/cube.js/compare/v0.31.45...v0.31.46) (2023-01-18)
 
 
