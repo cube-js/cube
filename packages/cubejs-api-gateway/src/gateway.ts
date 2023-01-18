@@ -1136,11 +1136,6 @@ class ApiGateway {
   protected async dbSchema({ query, context, res }: {
     query: {
       dataSource: string;
-      levelChain?: string[],
-      search?: string,
-      limit?: number,
-      offset?: number,
-      renew?: boolean,
     };
     context?: RequestContext;
     res: ResponseResultFn;
@@ -1160,20 +1155,9 @@ class ApiGateway {
       }
 
       const orchestratorApi = await this.getAdapterApi(context);
-      const schema = await orchestratorApi.fetchSchema(query.dataSource, context?.securityContext, query.renew);
-      const result = this.getSchemaDataByLevel(
-        schema,
-        query.levelChain,
-        query.limit,
-        query.offset,
-        query.search
-      );
+      const schema = await orchestratorApi.fetchSchema(query.dataSource, context?.securityContext);
 
-      res({
-        data: result.data,
-        total: result.total,
-        nextOffset: result.nextOffset,
-      });
+      res({ data: schema });
     } catch (e) {
       this.handleError({ e,
         context,
@@ -1181,67 +1165,6 @@ class ApiGateway {
         requestStarted,
       });
     }
-  }
-
-  protected getSchemaDataByLevel(
-    data: { [key: string]: any },
-    levelChain?: string[],
-    limit?: number,
-    offset?: number,
-    search?: string
-  ): { data: any, total: number, nextOffset: number | null } {
-    const currentData =
-      levelChain?.reduce((obj, key) => {
-        if (!obj[key]) {
-          throw new UserError(`levelChain item: ${key} is empty`);
-        }
-        return obj[key];
-      }, data) || data;
-
-    let result = currentData;
-    if (!Array.isArray(currentData)) {
-      result = Object.keys(currentData);
-    }
-
-    if (search) {
-      if (Array.isArray(currentData)) {
-        result = result.filter((item: { name: string }) => item.name.includes(search));
-      } else {
-        // replacing column array to columnName for unnecessary search text
-        const clear = (d: {}) => {
-          Object.keys(d).forEach((key) => {
-            if (Array.isArray(d?.[key])) {
-              d[key] = d[key].map(
-                (item: { name: string }) => item.name
-              );
-            } else {
-              clear(d[key]);
-            }
-          });
-
-          return d;
-        };
-
-        const clearData = clear(currentData);
-        result = result.filter(
-          (item: string) => item.includes(search) ||
-            JSON.stringify(clearData[item]).includes(search)
-        );
-      }
-    }
-
-    const total = result.length;
-
-    let nextOffset: null | number = null;
-    if (limit) {
-      const end = (offset || 0) + limit;
-      result = result.slice(offset, end);
-      if (end < total) {
-        nextOffset = end;
-      }
-    }
-
-    return { data: result, total, nextOffset };
   }
 
   /**

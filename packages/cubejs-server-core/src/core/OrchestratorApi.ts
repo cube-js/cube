@@ -231,24 +231,15 @@ export class OrchestratorApi {
     }
   }
 
-  public async fetchSchema(dataSource: string, securityContext?: { [key: string]: any; }, renew?: boolean) {
+  public async fetchSchema(dataSource: string, securityContext?: { [key: string]: any; }) {
     const queryCache = this.orchestrator.getQueryCache();
-    const cacheDriver = queryCache.getCacheDriver();
 
-    const cacheHash = this.orchestrator.getQueryCache()
+    const queryKey = this.orchestrator.getQueryCache()
       .getKey('FETCH_SCHEMA', getCacheHash({ dataSource, securityContext }));
 
-    if (!renew) {
-      const cachedData = await cacheDriver.get(cacheHash);
-      if (cachedData) {
-        return cachedData;
-      }
-    }
-
     const queue = await queryCache.getQueue(dataSource);
-    const tablesSchema = await queue.executeQueryInQueue('query', cacheHash, { tablesSchema: true });
+    const tablesSchema = await queue.executeQueryInQueue('query', queryKey, { tablesSchema: true });
 
-    await cacheDriver.set(cacheHash, tablesSchema, 86400); // cache for 1 day
     return tablesSchema;
   }
 

@@ -269,31 +269,6 @@ export class AdapterApiMock {
             type: 'integer',
             attributes: [],
           },
-          {
-            name: 'number',
-            type: 'integer',
-            attributes: [],
-          },
-          {
-            name: 'status',
-            type: 'text',
-            attributes: [],
-          },
-          {
-            name: 'completed_at',
-            type: 'timestamp without time zone',
-            attributes: [],
-          },
-          {
-            name: 'created_at',
-            type: 'timestamp without time zone',
-            attributes: [],
-          },
-          {
-            name: 'product_id',
-            type: 'integer',
-            attributes: [],
-          },
         ],
       },
     };

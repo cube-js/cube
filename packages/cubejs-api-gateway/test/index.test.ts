@@ -619,12 +619,25 @@ describe('API Gateway', () => {
         successBody: {
           query: {
             dataSource: 'default',
-            limit: 1,
-            offset: 1,
           }
         },
         successResult: {
-          data: ['other'],
+          data: {
+            other: {
+              orders: [
+                {
+                  name: 'id',
+                  type: 'integer',
+                  attributes: [],
+                },
+                {
+                  name: 'test_id',
+                  type: 'integer',
+                  attributes: [],
+                },
+              ],
+            },
+          },
         },
         wrongPayloads: [
           {
@@ -640,74 +653,8 @@ describe('API Gateway', () => {
               error: 'A user\'s query must contain dataSource.'
             },
             body: { query: {} }
-          },
-          {
-            result: {
-              status: 400,
-              error: 'levelChain item: wrongLevelChain is empty'
-            },
-            body: {
-              query: {
-                dataSource: 'default',
-                levelChain: ['wrongLevelChain'],
-              }
-            }
           }
         ]
-      },
-      {
-        route: 'db-schema',
-        method: 'post',
-        successBody: {
-          query: {
-            dataSource: 'default',
-            levelChain: ['public'],
-            limit: 1,
-            offset: 1,
-          }
-        },
-        successResult: {
-          data: [
-            'line_items_count_by_states'
-          ],
-        },
-      },
-      {
-        route: 'db-schema',
-        method: 'post',
-        successBody: {
-          query: {
-            dataSource: 'default',
-            limit: 10,
-            offset: 0,
-            search: 'test_id',
-          }
-        },
-        successResult: {
-          data: [
-            'other',
-          ],
-        },
-      },
-      {
-        route: 'db-schema',
-        method: 'post',
-        successBody: {
-          query: {
-            dataSource: 'default',
-            levelChain: ['public', 'orders'],
-            limit: 10,
-            offset: 0,
-            search: 'user_id',
-          }
-        },
-        successResult: {
-          data: [{
-            name: 'user_id',
-            type: 'integer',
-            attributes: [],
-          }],
-        },
       },
     ];
 
