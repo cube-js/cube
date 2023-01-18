@@ -1422,12 +1422,6 @@ impl AsyncPostgresShim {
                         None => return Ok(()),
                     };
 
-                    // if cancel.is_cancelled() {
-                    //     self.session.state.end_query();
-
-                    //     return Err(protocol::ErrorResponse::query_canceled().into());
-                    // }
-
                     match chunk {
                         PortalBatch::Description(description) => match description.len() {
                             // Special handling for special queries, such as DISCARD ALL.
