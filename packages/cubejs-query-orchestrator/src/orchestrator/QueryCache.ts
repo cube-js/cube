@@ -150,8 +150,12 @@ export class QueryCache {
         this.cacheDriver = new LocalCacheDriver();
         break;
       case 'cubestore':
+        if (!options.cubeStoreDriverFactory) {
+          throw new Error('cubeStoreDriverFactory is a required option for Cube Store cache driver');
+        }
+
         this.cacheDriver = new CubeStoreCacheDriver(
-          options.cubeStoreDriverFactory || (async () => new CubeStoreDriver({}))
+          options.cubeStoreDriverFactory
         );
         break;
       default:
@@ -498,6 +502,7 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
+          cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
           ...(await this.options.queueOptions(dataSource)),
@@ -546,6 +551,7 @@ export class QueryCache {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
+          cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
           skipQueue: this.options.skipExternalCacheAndQueue,
