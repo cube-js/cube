@@ -455,17 +455,9 @@ impl<'a> CubeStoreParser<'a> {
         {
             Ok(Statement::System(SystemCommand::KillAllJobs))
         } else if self.parse_custom_token("repartition") {
-            match self.parser.parse_number_value()? {
-                Value::Number(id, _) => Ok(Statement::System(SystemCommand::Repartition {
-                    partition_id: id.parse::<u64>().map_err(|e| {
-                        ParserError::ParserError(format!("Can't parse partition id: {}", e))
-                    })?,
-                })),
-                x => Err(ParserError::ParserError(format!(
-                    "Partition id expected but {:?} found",
-                    x
-                ))),
-            }
+            Ok(Statement::System(SystemCommand::Repartition {
+                partition_id: self.parse_integer("partition id", false)?,
+            }))
         } else if self.parse_custom_token("metastore") {
             self.parse_metastore()
         } else if self.parse_custom_token("panic") && self.parse_custom_token("worker") {
