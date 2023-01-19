@@ -306,22 +306,11 @@ impl<'a> CubeStoreParser<'a> {
 
     pub fn parse_metastore(&mut self) -> Result<Statement, ParserError> {
         if self.parse_custom_token("set_current") {
-            match self.parser.parse_number_value()? {
-                Value::Number(id, _) => Ok(Statement::System(SystemCommand::Metastore(
-                    MetastoreCommand::SetCurrent {
-                        id: id.parse::<u128>().map_err(|e| {
-                            ParserError::ParserError(format!(
-                                "Can't parse metastore snapshot id: {}",
-                                e
-                            ))
-                        })?,
-                    },
-                ))),
-                x => Err(ParserError::ParserError(format!(
-                    "Snapshot id expected but {:?} found",
-                    x
-                ))),
-            }
+            Ok(Statement::System(SystemCommand::Metastore(
+                MetastoreCommand::SetCurrent {
+                    id: self.parse_integer("metastore snapshot id", false)?,
+                },
+            )))
         } else {
             Err(ParserError::ParserError(
                 "Unknown metastore command".to_string(),
