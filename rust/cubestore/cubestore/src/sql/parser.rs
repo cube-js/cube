@@ -225,7 +225,7 @@ impl<'a> CubeStoreParser<'a> {
             "set" => {
                 let nx = self.parse_custom_token(&"nx");
                 let ttl = if self.parse_custom_token(&"ttl") {
-                    Some(self.parse_number("ttl")?)
+                    Some(self.parse_integer("ttl", false)?)
                 } else {
                     None
                 };
@@ -257,17 +257,47 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
-    fn parse_number(&mut self, var_name: &str) -> Result<u32, ParserError> {
+    fn parse_integer<R: num::Integer + std::str::FromStr>(
+        &mut self,
+        var_name: &str,
+        allow_negative: bool,
+    ) -> Result<R, ParserError>
+    where
+        <R as std::str::FromStr>::Err: std::fmt::Display,
+    {
+        let is_negative = match self.parser.peek_token() {
+            Token::Minus => {
+                self.parser.next_token();
+                true
+            }
+            _ => false,
+        };
+
         match self.parser.parse_number_value()? {
-            Value::Number(var, false) => var.parse::<u32>().map_err(|err| {
-                ParserError::ParserError(format!(
-                    "{} must be a positive integer, error: {}",
-                    var_name, err
-                ))
-            }),
+            Value::Number(var, false) => {
+                let value = if is_negative {
+                    "-".to_string() + &var
+                } else {
+                    var
+                };
+
+                if is_negative && !allow_negative {
+                    return Err(ParserError::ParserError(format!(
+                        "{} must be a positive integer, actual: {}",
+                        var_name, value
+                    )));
+                }
+
+                value.parse::<R>().map_err(|err| {
+                    ParserError::ParserError(format!(
+                        "{} must be a valid integer, error: {}",
+                        var_name, err
+                    ))
+                })
+            }
             x => {
                 return Err(ParserError::ParserError(format!(
-                    "{} must be a positive integer, actual: {:?}",
+                    "{} must be a valid integer, actual: {:?}",
                     var_name, x
                 )))
             }
@@ -312,24 +342,7 @@ impl<'a> CubeStoreParser<'a> {
         match command.as_str() {
             "add" => {
                 let priority = if self.parse_custom_token(&"priority") {
-                    match self.parser.parse_number_value()? {
-                        Value::Number(priority, _) => {
-                            let r = priority.parse::<i64>().map_err(|err| {
-                                ParserError::ParserError(format!(
-                                    "priority must be a positive integer, error: {}",
-                                    err
-                                ))
-                            })?;
-
-                            r
-                        }
-                        x => {
-                            return Err(ParserError::ParserError(format!(
-                                "priority must be a positive integer, actual: {:?}",
-                                x
-                            )))
-                        }
-                    }
+                    self.parse_integer(&"priority", true)?
                 } else {
                     0
                 };
@@ -358,7 +371,7 @@ impl<'a> CubeStoreParser<'a> {
                 key: self.parser.parse_identifier()?,
             }),
             "stalled" => {
-                let stalled_timeout = self.parse_number("stalled timeout")?;
+                let stalled_timeout = self.parse_integer("stalled timeout", false)?;
 
                 Ok(Statement::QueueToCancel {
                     prefix: self.parser.parse_identifier()?,
@@ -367,7 +380,7 @@ impl<'a> CubeStoreParser<'a> {
                 })
             }
             "orphaned" => {
-                let orphaned_timeout = self.parse_number("orphaned timeout")?;
+                let orphaned_timeout = self.parse_integer("orphaned timeout", false)?;
 
                 Ok(Statement::QueueToCancel {
                     prefix: self.parser.parse_identifier()?,
@@ -376,8 +389,8 @@ impl<'a> CubeStoreParser<'a> {
                 })
             }
             "to_cancel" => {
-                let stalled_timeout = self.parse_number("stalled timeout")?;
-                let orphaned_timeout = self.parse_number("orphaned timeout")?;
+                let stalled_timeout = self.parse_integer("stalled timeout", false)?;
+                let orphaned_timeout = self.parse_integer("orphaned timeout", false)?;
 
                 Ok(Statement::QueueToCancel {
                     prefix: self.parser.parse_identifier()?,
@@ -417,7 +430,7 @@ impl<'a> CubeStoreParser<'a> {
             }
             "retrieve" => {
                 let concurrency = if self.parse_custom_token(&"concurrency") {
-                    self.parse_number("concurrency")?
+                    self.parse_integer("concurrency", false)?
                 } else {
                     1
                 };
@@ -431,24 +444,7 @@ impl<'a> CubeStoreParser<'a> {
                 key: self.parser.parse_identifier()?,
             }),
             "result_blocking" => {
-                let timeout = match self.parser.parse_number_value()? {
-                    Value::Number(concurrency, false) => {
-                        let r = concurrency.parse::<u64>().map_err(|err| {
-                            ParserError::ParserError(format!(
-                                "TIMEOUT must be a positive integer, error: {}",
-                                err
-                            ))
-                        })?;
-
-                        r
-                    }
-                    x => {
-                        return Err(ParserError::ParserError(format!(
-                            "TIMEOUT must be a positive integer, actual: {:?}",
-                            x
-                        )))
-                    }
-                };
+                let timeout = self.parse_integer(&"timeout", false)?;
 
                 Ok(Statement::QueueResultBlocking {
                     timeout,

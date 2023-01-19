@@ -39,9 +39,6 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     priority: number,
     options: AddToQueueOptions
   ): Promise<AddToQueueResponse> {
-    // TODO: Fix sqlparser, support negative number
-    priority = priority < 0 ? 0 : priority;
-
     const data = {
       queryHandler,
       query,
