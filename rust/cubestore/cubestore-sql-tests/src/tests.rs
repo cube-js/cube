@@ -6430,7 +6430,12 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
         .unwrap();
 
     service
-        .exec_query(r#"QUEUE ADD PRIORITY 50 "STANDALONE#queue:4" "payload3";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 50 "STANDALONE#queue:4" "payload4";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY -1 "STANDALONE#queue:5" "payload5";"#)
         .await
         .unwrap();
 
@@ -6470,6 +6475,11 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
                     TableValue::String("pending".to_string()),
                     TableValue::Null
                 ]),
+                Row::new(vec![
+                    TableValue::String("5".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
             ]
         );
     }
@@ -6484,7 +6494,7 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
 
     {
         let retrieve_response = service
-            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 2 "STANDALONE#queue:3""#)
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:3""#)
             .await
             .unwrap();
         assert_eq!(
@@ -6501,6 +6511,22 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
                 TableValue::Null,
             ]),]
         );
+    }
+
+    {
+        // concurrency limit
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:4""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            retrieve_response.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(retrieve_response.get_rows().len(), 0);
     }
 
     {
