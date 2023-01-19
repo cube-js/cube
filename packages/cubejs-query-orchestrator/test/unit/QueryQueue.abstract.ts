@@ -132,7 +132,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(await queue.getQueryStage('12')).toEqual(undefined);
     });
 
-    nonCubestoreTest('negative priority', async () => {
+    test('negative priority', async () => {
       delayCount = 0;
       const results = [];
 
