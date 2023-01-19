@@ -174,13 +174,13 @@ impl RemoteFs for S3RemoteFs {
             })
             .await??;
 
-            info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
             if status_code != 200 {
                 return Err(CubeError::user(format!(
                     "S3 upload returned non OK status: {}",
                     status_code
                 )));
             }
+            info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         }
         let size = fs::metadata(&temp_upload_path).await?.len();
         self.check_upload_file(remote_path.clone(), size).await?;
