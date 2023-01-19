@@ -55,71 +55,8 @@ pub enum Statement {
         credentials: Vec<SqlOption>,
         or_update: bool,
     },
-    CacheSet {
-        key: Ident,
-        value: String,
-        ttl: Option<u32>,
-        nx: bool,
-    },
-    CacheGet {
-        key: Ident,
-    },
-    CacheKeys {
-        prefix: Ident,
-    },
-    CacheRemove {
-        key: Ident,
-    },
-    CacheTruncate {},
-    CacheIncr {
-        path: Ident,
-    },
-    // queue
-    QueueAdd {
-        priority: i64,
-        key: Ident,
-        value: String,
-    },
-    QueueGet {
-        key: Ident,
-    },
-    QueueToCancel {
-        prefix: Ident,
-        orphaned_timeout: Option<u32>,
-        stalled_timeout: Option<u32>,
-    },
-    QueueList {
-        prefix: Ident,
-        with_payload: bool,
-        status_filter: Option<QueueItemStatus>,
-        sort_by_priority: bool,
-    },
-    QueueCancel {
-        key: Ident,
-    },
-    QueueHeartbeat {
-        key: Ident,
-    },
-    QueueAck {
-        key: Ident,
-        result: String,
-    },
-    QueueMergeExtra {
-        key: Ident,
-        payload: String,
-    },
-    QueueRetrieve {
-        key: Ident,
-        concurrency: u32,
-    },
-    QueueResult {
-        key: Ident,
-    },
-    QueueResultBlocking {
-        key: Ident,
-        timeout: u64,
-    },
-    QueueTruncate {},
+    Cache(CacheCommand),
+    Queue(QueueCommand),
     System(SystemCommand),
     Dump(Box<Query>),
 }
@@ -128,6 +65,78 @@ pub enum Statement {
 pub enum RocksStoreName {
     Meta,
     Cache,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CacheCommand {
+    Set {
+        key: Ident,
+        value: String,
+        ttl: Option<u32>,
+        nx: bool,
+    },
+    Get {
+        key: Ident,
+    },
+    Keys {
+        prefix: Ident,
+    },
+    Remove {
+        key: Ident,
+    },
+    Truncate {},
+    Incr {
+        path: Ident,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum QueueCommand {
+    Add {
+        priority: i64,
+        key: Ident,
+        value: String,
+    },
+    Get {
+        key: Ident,
+    },
+    ToCancel {
+        prefix: Ident,
+        orphaned_timeout: Option<u32>,
+        stalled_timeout: Option<u32>,
+    },
+    List {
+        prefix: Ident,
+        with_payload: bool,
+        status_filter: Option<QueueItemStatus>,
+        sort_by_priority: bool,
+    },
+    Cancel {
+        key: Ident,
+    },
+    Heartbeat {
+        key: Ident,
+    },
+    Ack {
+        key: Ident,
+        result: String,
+    },
+    MergeExtra {
+        key: Ident,
+        payload: String,
+    },
+    Retrieve {
+        key: Ident,
+        concurrency: u32,
+    },
+    Result {
+        key: Ident,
+    },
+    ResultBlocking {
+        key: Ident,
+        timeout: u64,
+    },
+    Truncate {},
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -211,17 +220,17 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_cache(&mut self) -> Result<Statement, ParserError> {
-        let command = match self.parser.next_token() {
+        let method = match self.parser.next_token() {
             Token::Word(w) => w.value.to_ascii_lowercase(),
-            _ => {
-                return Err(ParserError::ParserError(
-                    "Unknown cache command, available: SET|GET|KEYS|INC|REMOVE|TRUNCATE"
-                        .to_string(),
-                ))
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Invalid token: {}, expected Word (command)",
+                    other
+                )))
             }
         };
 
-        match command.as_str() {
+        let command = match method.as_str() {
             "set" => {
                 let nx = self.parse_custom_token(&"nx");
                 let ttl = if self.parse_custom_token(&"ttl") {
@@ -230,31 +239,35 @@ impl<'a> CubeStoreParser<'a> {
                     None
                 };
 
-                Ok(Statement::CacheSet {
+                CacheCommand::Set {
                     key: self.parser.parse_identifier()?,
                     value: self.parser.parse_literal_string()?,
                     ttl,
                     nx,
-                })
+                }
             }
-            "get" => Ok(Statement::CacheGet {
+            "get" => CacheCommand::Get {
                 key: self.parser.parse_identifier()?,
-            }),
-            "keys" => Ok(Statement::CacheKeys {
+            },
+            "keys" => CacheCommand::Keys {
                 prefix: self.parser.parse_identifier()?,
-            }),
-            "incr" => Ok(Statement::CacheIncr {
+            },
+            "incr" => CacheCommand::Incr {
                 path: self.parser.parse_identifier()?,
-            }),
-            "remove" => Ok(Statement::CacheRemove {
+            },
+            "remove" => CacheCommand::Remove {
                 key: self.parser.parse_identifier()?,
-            }),
-            "truncate" => Ok(Statement::CacheTruncate {}),
-            command => Err(ParserError::ParserError(format!(
-                "Unknown cache command: {}",
-                command
-            ))),
-        }
+            },
+            "truncate" => CacheCommand::Truncate {},
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Unknown cache command: {}, available: SET|GET|KEYS|INC|REMOVE|TRUNCATE",
+                    other
+                )))
+            }
+        };
+
+        Ok(Statement::Cache(command))
     }
 
     fn parse_integer<R: num::Integer + std::str::FromStr>(
@@ -319,16 +332,17 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     fn parse_queue(&mut self) -> Result<Statement, ParserError> {
-        let command = match self.parser.next_token() {
+        let method = match self.parser.next_token() {
             Token::Word(w) => w.value.to_ascii_lowercase(),
-            _ => {
-                return Err(ParserError::ParserError(
-                    "Unknown queue command, available: ADD|TRUNCATE".to_string(),
-                ))
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Invalid token: {}, expected Word (command)",
+                    other
+                )))
             }
         };
 
-        match command.as_str() {
+        let command = match method.as_str() {
             "add" => {
                 let priority = if self.parse_custom_token(&"priority") {
                     self.parse_integer(&"priority", true)?
@@ -336,86 +350,86 @@ impl<'a> CubeStoreParser<'a> {
                     0
                 };
 
-                Ok(Statement::QueueAdd {
+                QueueCommand::Add {
                     priority,
                     key: self.parser.parse_identifier()?,
                     value: self.parser.parse_literal_string()?,
-                })
+                }
             }
-            "cancel" => Ok(Statement::QueueCancel {
+            "cancel" => QueueCommand::Cancel {
                 key: self.parser.parse_identifier()?,
-            }),
-            "heartbeat" => Ok(Statement::QueueHeartbeat {
+            },
+            "heartbeat" => QueueCommand::Heartbeat {
                 key: self.parser.parse_identifier()?,
-            }),
-            "ack" => Ok(Statement::QueueAck {
+            },
+            "ack" => QueueCommand::Ack {
                 key: self.parser.parse_identifier()?,
                 result: self.parser.parse_literal_string()?,
-            }),
-            "merge_extra" => Ok(Statement::QueueMergeExtra {
+            },
+            "merge_extra" => QueueCommand::MergeExtra {
                 key: self.parser.parse_identifier()?,
                 payload: self.parser.parse_literal_string()?,
-            }),
-            "get" => Ok(Statement::QueueGet {
+            },
+            "get" => QueueCommand::Get {
                 key: self.parser.parse_identifier()?,
-            }),
+            },
             "stalled" => {
                 let stalled_timeout = self.parse_integer("stalled timeout", false)?;
 
-                Ok(Statement::QueueToCancel {
+                QueueCommand::ToCancel {
                     prefix: self.parser.parse_identifier()?,
                     orphaned_timeout: None,
                     stalled_timeout: Some(stalled_timeout),
-                })
+                }
             }
             "orphaned" => {
                 let orphaned_timeout = self.parse_integer("orphaned timeout", false)?;
 
-                Ok(Statement::QueueToCancel {
+                QueueCommand::ToCancel {
                     prefix: self.parser.parse_identifier()?,
                     orphaned_timeout: Some(orphaned_timeout),
                     stalled_timeout: None,
-                })
+                }
             }
             "to_cancel" => {
                 let stalled_timeout = self.parse_integer("stalled timeout", false)?;
                 let orphaned_timeout = self.parse_integer("orphaned timeout", false)?;
 
-                Ok(Statement::QueueToCancel {
+                QueueCommand::ToCancel {
                     prefix: self.parser.parse_identifier()?,
                     orphaned_timeout: Some(stalled_timeout),
                     stalled_timeout: Some(orphaned_timeout),
-                })
+                }
             }
             "pending" => {
                 let with_payload = self.parse_custom_token(&"with_payload");
 
-                Ok(Statement::QueueList {
+                QueueCommand::List {
                     prefix: self.parser.parse_identifier()?,
                     with_payload,
                     status_filter: Some(QueueItemStatus::Pending),
                     sort_by_priority: true,
-                })
+                }
             }
             "active" => {
                 let with_payload = self.parse_custom_token(&"with_payload");
 
-                Ok(Statement::QueueList {
+                QueueCommand::List {
                     prefix: self.parser.parse_identifier()?,
                     with_payload,
                     status_filter: Some(QueueItemStatus::Active),
                     sort_by_priority: false,
-                })
+                }
             }
             "list" => {
                 let with_payload = self.parse_custom_token(&"with_payload");
 
-                Ok(Statement::QueueList {
+                QueueCommand::List {
                     prefix: self.parser.parse_identifier()?,
                     with_payload,
                     status_filter: None,
                     sort_by_priority: true,
-                })
+                }
             }
             "retrieve" => {
                 let concurrency = if self.parse_custom_token(&"concurrency") {
@@ -424,28 +438,32 @@ impl<'a> CubeStoreParser<'a> {
                     1
                 };
 
-                Ok(Statement::QueueRetrieve {
+                QueueCommand::Retrieve {
                     key: self.parser.parse_identifier()?,
                     concurrency,
-                })
+                }
             }
-            "result" => Ok(Statement::QueueResult {
+            "result" => QueueCommand::Result {
                 key: self.parser.parse_identifier()?,
-            }),
+            },
             "result_blocking" => {
                 let timeout = self.parse_integer(&"timeout", false)?;
 
-                Ok(Statement::QueueResultBlocking {
+                QueueCommand::ResultBlocking {
                     timeout,
                     key: self.parser.parse_identifier()?,
-                })
+                }
             }
-            "truncate" => Ok(Statement::QueueTruncate {}),
-            command => Err(ParserError::ParserError(format!(
-                "Unknown queue command: {}",
-                command
-            ))),
-        }
+            "truncate" => QueueCommand::Truncate {},
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Unknown queue command: {}",
+                    other
+                )))
+            }
+        };
+
+        Ok(Statement::Queue(command))
     }
 
     fn parse_system(&mut self) -> Result<Statement, ParserError> {

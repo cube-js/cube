@@ -13,3 +13,9 @@ pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data
 /// Incoming SQL queries that only read metadata or do trivial computations.
 pub static META_QUERIES: Counter = metrics::counter("cs.sql.query.meta");
 pub static META_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.meta.ms");
+/// Incoming cache queries.
+pub static CACHE_QUERIES: Counter = metrics::counter("cs.sql.query.cache");
+pub static CACHE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.cache.ms");
+/// Incoming queue queries.
+pub static QUEUE_QUERIES: Counter = metrics::counter("cs.sql.query.queue");
+pub static QUEUE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.queue.ms");

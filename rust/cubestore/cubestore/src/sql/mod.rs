@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use arrow::array::*;
 use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
@@ -19,7 +19,7 @@ use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
 use hex::FromHex;
 use itertools::Itertools;
-use log::trace;
+use log::{debug, trace};
 use rand::distributions::Uniform;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,8 @@ use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{
-    CubeStoreParser, MetastoreCommand, PartitionedIndexRef, RocksStoreName, SystemCommand,
+    CacheCommand, CubeStoreParser, MetastoreCommand, PartitionedIndexRef, QueueCommand,
+    RocksStoreName, SystemCommand,
 };
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
@@ -1162,198 +1163,217 @@ impl SqlService for SqlServiceImpl {
                     .await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
-            CubeStoreStatement::QueueAdd {
-                key,
-                priority,
-                value,
-            } => {
-                let response = self
-                    .cachestore
-                    .queue_add(QueueItem::new(
-                        key.value,
-                        value,
-                        QueueItem::status_default(),
+            CubeStoreStatement::Queue(command) => {
+                app_metrics::QUEUE_QUERIES.increment();
+                let execution_time = SystemTime::now();
+
+                let result = match command {
+                    QueueCommand::Add {
+                        key,
                         priority,
-                    ))
-                    .await?;
+                        value,
+                    } => {
+                        let response = self
+                            .cachestore
+                            .queue_add(QueueItem::new(
+                                key.value,
+                                value,
+                                QueueItem::status_default(),
+                                priority,
+                            ))
+                            .await?;
 
-                Ok(Arc::new(DataFrame::new(
-                    vec![
-                        Column::new("added".to_string(), ColumnType::Boolean, 0),
-                        Column::new("pending".to_string(), ColumnType::Int, 1),
-                    ],
-                    vec![Row::new(vec![
-                        TableValue::Boolean(response.added),
-                        TableValue::Int(response.pending as i64),
-                    ])],
-                )))
-            }
-            CubeStoreStatement::QueueTruncate {} => {
-                self.cachestore.queue_truncate().await?;
+                        Ok(Arc::new(DataFrame::new(
+                            vec![
+                                Column::new("added".to_string(), ColumnType::Boolean, 0),
+                                Column::new("pending".to_string(), ColumnType::Int, 1),
+                            ],
+                            vec![Row::new(vec![
+                                TableValue::Boolean(response.added),
+                                TableValue::Int(response.pending as i64),
+                            ])],
+                        )))
+                    }
+                    QueueCommand::Truncate {} => {
+                        self.cachestore.queue_truncate().await?;
 
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
-            }
-            CubeStoreStatement::QueueCancel { key } => {
-                let columns = vec![
-                    Column::new("payload".to_string(), ColumnType::String, 0),
-                    Column::new("extra".to_string(), ColumnType::String, 1),
-                ];
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    QueueCommand::Cancel { key } => {
+                        let columns = vec![
+                            Column::new("payload".to_string(), ColumnType::String, 0),
+                            Column::new("extra".to_string(), ColumnType::String, 1),
+                        ];
 
-                let result = self.cachestore.queue_cancel(key.value).await?;
-                if let Some(result) = result {
-                    Ok(Arc::new(DataFrame::new(
-                        columns,
-                        vec![result.into_row().into_queue_cancel_row()],
-                    )))
-                } else {
-                    Ok(Arc::new(DataFrame::new(columns, vec![])))
-                }
-            }
-            CubeStoreStatement::QueueHeartbeat { key } => {
-                self.cachestore.queue_heartbeat(key.value).await?;
+                        let result = self.cachestore.queue_cancel(key.value).await?;
+                        if let Some(result) = result {
+                            Ok(Arc::new(DataFrame::new(
+                                columns,
+                                vec![result.into_row().into_queue_cancel_row()],
+                            )))
+                        } else {
+                            Ok(Arc::new(DataFrame::new(columns, vec![])))
+                        }
+                    }
+                    QueueCommand::Heartbeat { key } => {
+                        self.cachestore.queue_heartbeat(key.value).await?;
 
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
-            }
-            CubeStoreStatement::QueueMergeExtra { key, payload } => {
-                self.cachestore
-                    .queue_merge_extra(key.value, payload)
-                    .await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    QueueCommand::MergeExtra { key, payload } => {
+                        self.cachestore
+                            .queue_merge_extra(key.value, payload)
+                            .await?;
 
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
-            }
-            CubeStoreStatement::QueueAck { key, result } => {
-                self.cachestore.queue_ack(key.value, result).await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    QueueCommand::Ack { key, result } => {
+                        self.cachestore.queue_ack(key.value, result).await?;
 
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
-            }
-            CubeStoreStatement::QueueGet { key } => {
-                let columns = vec![
-                    Column::new("payload".to_string(), ColumnType::String, 0),
-                    Column::new("extra".to_string(), ColumnType::String, 1),
-                ];
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    QueueCommand::Get { key } => {
+                        let columns = vec![
+                            Column::new("payload".to_string(), ColumnType::String, 0),
+                            Column::new("extra".to_string(), ColumnType::String, 1),
+                        ];
 
-                let result = self.cachestore.queue_get(key.value).await?;
-                if let Some(result) = result {
-                    Ok(Arc::new(DataFrame::new(
-                        columns,
-                        vec![result.into_row().into_queue_get_row()],
-                    )))
-                } else {
-                    Ok(Arc::new(DataFrame::new(columns, vec![])))
-                }
-            }
-            CubeStoreStatement::QueueToCancel {
-                prefix,
-                orphaned_timeout,
-                stalled_timeout,
-            } => {
-                let rows = self
-                    .cachestore
-                    .queue_to_cancel(prefix.value, orphaned_timeout, stalled_timeout)
-                    .await?;
+                        let result = self.cachestore.queue_get(key.value).await?;
+                        if let Some(result) = result {
+                            Ok(Arc::new(DataFrame::new(
+                                columns,
+                                vec![result.into_row().into_queue_get_row()],
+                            )))
+                        } else {
+                            Ok(Arc::new(DataFrame::new(columns, vec![])))
+                        }
+                    }
+                    QueueCommand::ToCancel {
+                        prefix,
+                        orphaned_timeout,
+                        stalled_timeout,
+                    } => {
+                        let rows = self
+                            .cachestore
+                            .queue_to_cancel(prefix.value, orphaned_timeout, stalled_timeout)
+                            .await?;
 
-                let columns = vec![Column::new("id".to_string(), ColumnType::String, 0)];
+                        let columns = vec![Column::new("id".to_string(), ColumnType::String, 0)];
 
-                Ok(Arc::new(DataFrame::new(
-                    columns,
-                    rows.into_iter()
-                        .map(|item| {
-                            Row::new(vec![TableValue::String(item.get_row().get_key().clone())])
-                        })
-                        .collect(),
-                )))
-            }
-            CubeStoreStatement::QueueList {
-                prefix,
-                with_payload,
-                status_filter,
-                sort_by_priority,
-            } => {
-                let rows = self
-                    .cachestore
-                    .queue_list(prefix.value, status_filter, sort_by_priority)
-                    .await?;
+                        Ok(Arc::new(DataFrame::new(
+                            columns,
+                            rows.into_iter()
+                                .map(|item| {
+                                    Row::new(vec![TableValue::String(
+                                        item.get_row().get_key().clone(),
+                                    )])
+                                })
+                                .collect(),
+                        )))
+                    }
+                    QueueCommand::List {
+                        prefix,
+                        with_payload,
+                        status_filter,
+                        sort_by_priority,
+                    } => {
+                        let rows = self
+                            .cachestore
+                            .queue_list(prefix.value, status_filter, sort_by_priority)
+                            .await?;
 
-                let mut columns = vec![
-                    Column::new("id".to_string(), ColumnType::String, 0),
-                    Column::new("status".to_string(), ColumnType::String, 1),
-                    Column::new("extra".to_string(), ColumnType::String, 2),
-                ];
+                        let mut columns = vec![
+                            Column::new("id".to_string(), ColumnType::String, 0),
+                            Column::new("status".to_string(), ColumnType::String, 1),
+                            Column::new("extra".to_string(), ColumnType::String, 2),
+                        ];
 
-                if with_payload {
-                    columns.push(Column::new("payload".to_string(), ColumnType::String, 3));
-                }
+                        if with_payload {
+                            columns.push(Column::new("payload".to_string(), ColumnType::String, 3));
+                        }
 
-                Ok(Arc::new(DataFrame::new(
-                    columns,
-                    rows.into_iter()
-                        .map(|item| item.into_row().into_queue_list_row(with_payload))
-                        .collect(),
-                )))
-            }
-            CubeStoreStatement::QueueRetrieve { key, concurrency } => {
-                let result = self
-                    .cachestore
-                    .queue_retrieve(key.value, concurrency)
-                    .await?;
-                let rows = if let Some(result) = result {
-                    vec![result.into_row().into_queue_retrieve_row()]
-                } else {
-                    vec![]
+                        Ok(Arc::new(DataFrame::new(
+                            columns,
+                            rows.into_iter()
+                                .map(|item| item.into_row().into_queue_list_row(with_payload))
+                                .collect(),
+                        )))
+                    }
+                    QueueCommand::Retrieve { key, concurrency } => {
+                        let result = self
+                            .cachestore
+                            .queue_retrieve(key.value, concurrency)
+                            .await?;
+                        let rows = if let Some(result) = result {
+                            vec![result.into_row().into_queue_retrieve_row()]
+                        } else {
+                            vec![]
+                        };
+
+                        Ok(Arc::new(DataFrame::new(
+                            vec![
+                                Column::new("payload".to_string(), ColumnType::String, 0),
+                                Column::new("extra".to_string(), ColumnType::String, 1),
+                            ],
+                            rows,
+                        )))
+                    }
+                    QueueCommand::Result { key } => {
+                        let columns = vec![
+                            Column::new("payload".to_string(), ColumnType::String, 0),
+                            Column::new("type".to_string(), ColumnType::String, 1),
+                        ];
+
+                        let ack_result = self.cachestore.queue_result(key.value).await?;
+                        if let Some(ack_result) = ack_result {
+                            match ack_result {
+                                QueueResultResponse::Success { value } => {
+                                    Ok(Arc::new(DataFrame::new(
+                                        columns,
+                                        vec![Row::new(vec![
+                                            TableValue::String(value),
+                                            TableValue::String("success".to_string()),
+                                        ])],
+                                    )))
+                                }
+                            }
+                        } else {
+                            Ok(Arc::new(DataFrame::new(columns, vec![])))
+                        }
+                    }
+                    QueueCommand::ResultBlocking { timeout, key } => {
+                        let columns = vec![
+                            Column::new("payload".to_string(), ColumnType::String, 0),
+                            Column::new("type".to_string(), ColumnType::String, 1),
+                        ];
+
+                        let ack_result = self
+                            .cachestore
+                            .queue_result_blocking(key.value, timeout)
+                            .await?;
+                        if let Some(ack_result) = ack_result {
+                            match ack_result {
+                                QueueResultResponse::Success { value } => {
+                                    Ok(Arc::new(DataFrame::new(
+                                        columns,
+                                        vec![Row::new(vec![
+                                            TableValue::String(value),
+                                            TableValue::String("success".to_string()),
+                                        ])],
+                                    )))
+                                }
+                            }
+                        } else {
+                            Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                        }
+                    }
                 };
 
-                Ok(Arc::new(DataFrame::new(
-                    vec![
-                        Column::new("payload".to_string(), ColumnType::String, 0),
-                        Column::new("extra".to_string(), ColumnType::String, 1),
-                    ],
-                    rows,
-                )))
-            }
-            CubeStoreStatement::QueueResult { key } => {
-                let columns = vec![
-                    Column::new("payload".to_string(), ColumnType::String, 0),
-                    Column::new("type".to_string(), ColumnType::String, 1),
-                ];
+                let execution_time = execution_time.elapsed()?;
+                app_metrics::QUEUE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
+                debug!("Queue command processing time: {:?}", execution_time,);
 
-                let ack_result = self.cachestore.queue_result(key.value).await?;
-                if let Some(ack_result) = ack_result {
-                    match ack_result {
-                        QueueResultResponse::Success { value } => Ok(Arc::new(DataFrame::new(
-                            columns,
-                            vec![Row::new(vec![
-                                TableValue::String(value),
-                                TableValue::String("success".to_string()),
-                            ])],
-                        ))),
-                    }
-                } else {
-                    Ok(Arc::new(DataFrame::new(columns, vec![])))
-                }
-            }
-            CubeStoreStatement::QueueResultBlocking { timeout, key } => {
-                let columns = vec![
-                    Column::new("payload".to_string(), ColumnType::String, 0),
-                    Column::new("type".to_string(), ColumnType::String, 1),
-                ];
-
-                let ack_result = self
-                    .cachestore
-                    .queue_result_blocking(key.value, timeout)
-                    .await?;
-                if let Some(ack_result) = ack_result {
-                    match ack_result {
-                        QueueResultResponse::Success { value } => Ok(Arc::new(DataFrame::new(
-                            columns,
-                            vec![Row::new(vec![
-                                TableValue::String(value),
-                                TableValue::String("success".to_string()),
-                            ])],
-                        ))),
-                    }
-                } else {
-                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
-                }
+                result
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
@@ -1419,65 +1439,78 @@ impl SqlService for SqlServiceImpl {
 
             CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
 
-            CubeStoreStatement::CacheSet {
-                key,
-                value,
-                ttl,
-                nx,
-            } => {
-                let key = key.value;
+            CubeStoreStatement::Cache(command) => {
+                app_metrics::CACHE_QUERIES.increment();
+                let execution_time = SystemTime::now();
 
-                let success = self
-                    .cachestore
-                    .cache_set(CacheItem::new(key, ttl, value), nx)
-                    .await?;
+                let result = match command {
+                    CacheCommand::Set {
+                        key,
+                        value,
+                        ttl,
+                        nx,
+                    } => {
+                        let key = key.value;
 
-                Ok(Arc::new(DataFrame::new(
-                    vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
-                    vec![Row::new(vec![TableValue::Boolean(success)])],
-                )))
-            }
-            CubeStoreStatement::CacheGet { key } => {
-                let result = self.cachestore.cache_get(key.value).await?;
-                let value = if let Some(result) = result {
-                    TableValue::String(result.into_row().value)
-                } else {
-                    TableValue::Null
+                        let success = self
+                            .cachestore
+                            .cache_set(CacheItem::new(key, ttl, value), nx)
+                            .await?;
+
+                        Ok(Arc::new(DataFrame::new(
+                            vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
+                            vec![Row::new(vec![TableValue::Boolean(success)])],
+                        )))
+                    }
+                    CacheCommand::Get { key } => {
+                        let result = self.cachestore.cache_get(key.value).await?;
+                        let value = if let Some(result) = result {
+                            TableValue::String(result.into_row().value)
+                        } else {
+                            TableValue::Null
+                        };
+
+                        Ok(Arc::new(DataFrame::new(
+                            vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                            vec![Row::new(vec![value])],
+                        )))
+                    }
+                    CacheCommand::Keys { prefix } => {
+                        let rows = self.cachestore.cache_keys(prefix.value).await?;
+                        Ok(Arc::new(DataFrame::new(
+                            vec![Column::new("key".to_string(), ColumnType::String, 0)],
+                            rows.iter()
+                                .map(|i| Row::new(vec![TableValue::String(i.get_row().get_path())]))
+                                .collect(),
+                        )))
+                    }
+                    CacheCommand::Remove { key } => {
+                        self.cachestore.cache_delete(key.value).await?;
+
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    CacheCommand::Truncate {} => {
+                        self.cachestore.cache_truncate().await?;
+
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    CacheCommand::Incr { path } => {
+                        let row = self.cachestore.cache_incr(path.value).await?;
+
+                        Ok(Arc::new(DataFrame::new(
+                            vec![Column::new("value".to_string(), ColumnType::String, 0)],
+                            vec![Row::new(vec![TableValue::String(
+                                row.get_row().get_value().clone(),
+                            )])],
+                        )))
+                    }
                 };
 
-                Ok(Arc::new(DataFrame::new(
-                    vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                    vec![Row::new(vec![value])],
-                )))
-            }
-            CubeStoreStatement::CacheKeys { prefix } => {
-                let rows = self.cachestore.cache_keys(prefix.value).await?;
-                Ok(Arc::new(DataFrame::new(
-                    vec![Column::new("key".to_string(), ColumnType::String, 0)],
-                    rows.iter()
-                        .map(|i| Row::new(vec![TableValue::String(i.get_row().get_path())]))
-                        .collect(),
-                )))
-            }
-            CubeStoreStatement::CacheRemove { key } => {
-                self.cachestore.cache_delete(key.value).await?;
+                let execution_time = execution_time.elapsed()?;
+                app_metrics::CACHE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
+                debug!("Cache command processing time: {:?}", execution_time,);
 
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
-            }
-            CubeStoreStatement::CacheTruncate {} => {
-                self.cachestore.cache_truncate().await?;
-
-                Ok(Arc::new(DataFrame::new(vec![], vec![])))
-            }
-            CubeStoreStatement::CacheIncr { path } => {
-                let row = self.cachestore.cache_incr(path.value).await?;
-
-                Ok(Arc::new(DataFrame::new(
-                    vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                    vec![Row::new(vec![TableValue::String(
-                        row.get_row().get_value().clone(),
-                    )])],
-                )))
+                result
             }
 
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
