@@ -1,4 +1,4 @@
-use std::{backtrace::Backtrace, collections::HashMap, io::ErrorKind, sync::Arc};
+use std::{backtrace::Backtrace, collections::HashMap, io::ErrorKind, pin::Pin, sync::Arc};
 
 use super::extended::PreparedStatement;
 use crate::{
@@ -10,17 +10,16 @@ use crate::{
     },
     sql::{
         df_type_to_pg_tid,
-        extended::{Cursor, Portal, PortalFrom},
+        extended::{Cursor, Portal, PortalBatch, PortalFrom},
         session::DatabaseProtocol,
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
-        writer::BatchWriter,
         AuthContextRef, Session, StatusFlags,
     },
     telemetry::ContextLogger,
     CubeError,
 };
-use futures::FutureExt;
+use futures::{pin_mut, FutureExt, StreamExt};
 use log::{debug, error, trace};
 use pg_srv::{
     buffer, protocol,
@@ -698,30 +697,53 @@ impl AsyncPostgresShim {
                     .session
                     .state
                     .begin_query(format!("portal #{}", execute.portal));
-                let mut writer = BatchWriter::new(portal.get_format());
 
-                tokio::select! {
-                    _ = cancel.cancelled() => {
-                        self.session.state.end_query();
+                let mut portal = Pin::new(portal);
+                let stream = portal.execute(execute.max_rows as usize);
+                pin_mut!(stream);
 
-                        return Err(protocol::ErrorResponse::query_canceled().into());
-                    },
-                    res = portal.execute(&mut writer, execute.max_rows as usize) => {
-                        self.session.state.end_query();
+                loop {
+                    tokio::select! {
+                        _ = cancel.cancelled() => {
+                            self.session.state.end_query();
 
-                        // Unwrap result after ending query
-                        let completion = res?;
-
-                        if cancel.is_cancelled() {
                             return Err(protocol::ErrorResponse::query_canceled().into());
-                        }
+                        },
+                        chunk = stream.next() => {
+                            let chunk = match chunk {
+                                Some(chunk) => match chunk {
+                                    Ok(chunk) => chunk,
+                                    Err(_) => {
+                                        self.session.state.end_query();
+                                        chunk?
+                                    }
+                                },
+                                None => return Ok(()),
+                            };
 
-                        if writer.has_data() {
-                            buffer::write_direct(&mut self.socket, writer).await?
-                        }
+                            if cancel.is_cancelled() {
+                                self.session.state.end_query();
 
-                        self.write_completion(completion).await?;
-                    },
+                                return Err(protocol::ErrorResponse::query_canceled().into());
+                            }
+
+                            match chunk {
+                                PortalBatch::Rows(writer) if writer.has_data() => buffer::write_direct(&mut self.socket, writer).await?,
+                                PortalBatch::Completion(completion) => {
+                                    self.session.state.end_query();
+
+                                    // TODO:
+                                    match completion {
+                                        PortalCompletion::Complete(c) => buffer::write_message(&mut self.socket, c).await?,
+                                        PortalCompletion::Suspended(s) => buffer::write_message(&mut self.socket, s).await?,
+                                    }
+
+                                    return Ok(());
+                                },
+                                _ => (),
+                            }
+                        },
+                    }
                 }
             };
 
@@ -1131,6 +1153,22 @@ impl AsyncPostgresShim {
                 sensitive,
                 hold,
             } => {
+                // TODO: move envs to config
+                let stream_mode = std::env::var("CUBESQL_STREAM_MODE")
+                    .ok()
+                    .map(|v| v.parse::<bool>().unwrap())
+                    .unwrap_or(false);
+                if stream_mode {
+                    return Err(ConnectionError::Protocol(
+                        protocol::ErrorResponse::error(
+                            protocol::ErrorCode::FeatureNotSupported,
+                            "DECLARE statement can not be used if CUBESQL_STREAM_MODE == true"
+                                .to_string(),
+                        )
+                        .into(),
+                    ));
+                }
+
                 // The default is to allow scrolling in some cases; this is not the same as specifying SCROLL.
                 if scroll.is_some() {
                     return Err(ConnectionError::Protocol(
@@ -1368,29 +1406,36 @@ impl AsyncPostgresShim {
         max_rows: usize,
         cancel: CancellationToken,
     ) -> Result<(), ConnectionError> {
-        let mut writer = BatchWriter::new(portal.get_format());
+        let mut portal = Pin::new(portal);
+        let stream = portal.execute(max_rows);
+        pin_mut!(stream);
 
-        tokio::select! {
-            _ = cancel.cancelled() => {
-                // TODO: Cancellation handling via errors?
-                return Ok(());
-            },
-            res = portal.execute(&mut writer, max_rows) => {
-                let completion = res?;
-
-                // Special handling for special queries, such as DISCARD ALL.
-                if let Some(description) = portal.get_description()? {
-                    match description.len() {
-                        0 => self.write(protocol::NoData::new()).await?,
-                        _ => self.write(description).await?,
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => {
+                    // TODO: Cancellation handling via errors?
+                    return Ok(());
+                },
+                chunk = stream.next() => {
+                    let chunk = match chunk {
+                        Some(chunk) => chunk?,
+                        None => return Ok(()),
                     };
+
+                    match chunk {
+                        PortalBatch::Description(description) => match description.len() {
+                            // Special handling for special queries, such as DISCARD ALL.
+                            0 => self.write(protocol::NoData::new()).await?,
+                            _ => self.write(description).await?,
+                        },
+                        PortalBatch::Rows(writer) => {
+                            if writer.has_data() {
+                                buffer::write_direct(&mut self.socket, writer).await?
+                            }
+                        }
+                        PortalBatch::Completion(completion) => return self.write_completion(completion).await,
+                    }
                 }
-
-                if writer.has_data() {
-                    buffer::write_direct(&mut self.socket, writer).await?;
-                };
-
-                self.write_completion(completion).await
             }
         }
     }

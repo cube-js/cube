@@ -681,6 +681,7 @@ name = "cubesql"
 version = "0.28.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "async-trait",
  "base64 0.13.0",
  "bincode",
@@ -696,6 +697,8 @@ dependencies = [
  "datafusion",
  "egg",
  "futures",
+ "futures-core",
+ "futures-util",
  "itertools",
  "lazy_static",
  "log",

@@ -584,6 +584,72 @@ impl PostgresIntegrationTestSuite {
             }
         ).await?;
 
+        self.test_simple_query(
+            r#"declare test_cursor_fetching_less_than_batch_size cursor with hold for SELECT * from information_schema.testing_dataset order by id;"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 1);
+            }
+        ).await?;
+
+        self.test_simple_query(
+            r#"fetch 800 in test_cursor_fetching_less_than_batch_size; fetch 800 in test_cursor_fetching_less_than_batch_size; fetch 5000 in test_cursor_fetching_less_than_batch_size;"#
+                .to_string(),
+            |messages| {
+                // 5000 rows | 3 completions
+                assert_eq!(messages.len(), 5003);
+
+                self.assert_row(&messages[0], "0".to_string());
+                self.assert_row(&messages[799], "799".to_string());
+
+                self.assert_complete(&messages[800], 800);
+
+                self.assert_row(&messages[801], "800".to_string());
+                self.assert_row(&messages[1600], "1599".to_string());
+
+                self.assert_complete(&messages[1601], 800);
+
+                self.assert_row(&messages[1602], "1600".to_string());
+                self.assert_row(&messages[5001], "4999".to_string());
+
+                self.assert_complete(&messages[5002], 3400);
+            },
+        )
+        .await?;
+
+        self.test_simple_query(
+            r#"declare test_cursor_fetching_more_than_batch_size cursor with hold for SELECT * from information_schema.testing_dataset order by id;"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 1);
+            }
+        ).await?;
+
+        self.test_simple_query(
+            r#"fetch 2400 in test_cursor_fetching_more_than_batch_size; fetch 2400 in test_cursor_fetching_more_than_batch_size; fetch 5000 in test_cursor_fetching_more_than_batch_size;"#
+                .to_string(),
+            |messages| {
+                // 5000 rows | 3 completions
+                assert_eq!(messages.len(), 5003);
+
+                self.assert_row(&messages[0], "0".to_string());
+                self.assert_row(&messages[2399], "2399".to_string());
+
+                self.assert_complete(&messages[2400], 2400);
+
+                self.assert_row(&messages[2401], "2400".to_string());
+                self.assert_row(&messages[4800], "4799".to_string());
+
+                self.assert_complete(&messages[4801], 2400);
+
+                self.assert_row(&messages[4802], "4800".to_string());
+                self.assert_row(&messages[5001], "4999".to_string());
+
+                self.assert_complete(&messages[5002], 200);
+            },
+        )
+        .await?;
+
         Ok(())
     }
 
@@ -856,6 +922,22 @@ impl PostgresIntegrationTestSuite {
         );
 
         Ok(())
+    }
+
+    fn assert_row(&self, message: &SimpleQueryMessage, expected_value: String) {
+        if let SimpleQueryMessage::Row(row) = message {
+            assert_eq!(row.get(0), Some(expected_value.as_str()));
+        } else {
+            panic!("Must be Row command, {}", expected_value)
+        }
+    }
+
+    fn assert_complete(&self, message: &SimpleQueryMessage, expected_value: u64) {
+        if let SimpleQueryMessage::CommandComplete(rows) = message {
+            assert_eq!(rows, &expected_value);
+        } else {
+            panic!("Must be CommandComplete command, {}", expected_value)
+        }
     }
 }
 
