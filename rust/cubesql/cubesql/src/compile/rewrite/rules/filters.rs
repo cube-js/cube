@@ -2113,7 +2113,7 @@ impl RewriteRules for FilterRules {
                     "?time_dimension_date_range",
                 ),
             ),
-            rewrite(
+            transforming_rewrite(
                 "in-date-range-to-time-dimension-swap-to-members",
                 cube_scan(
                     "?source_table_name",
@@ -2141,10 +2141,11 @@ impl RewriteRules for FilterRules {
                     "?order",
                     "?limit",
                     "?offset",
-                    "?aliases",
+                    "?aliases_none",
                     "CubeScanSplit:false",
                     "?can_pushdown_join",
                 ),
+                self.transform_cube_scan_aliases_none("?aliases_none"),
             ),
             transforming_rewrite(
                 "time-dimension-date-range-replacer-push-down-left",
@@ -2284,6 +2285,10 @@ impl FilterRules {
                 for cube_aliases in
                     var_iter!(egraph[subst[cube_aliases_var]], CubeScanAliases).cloned()
                 {
+                    if cube_aliases.is_none() {
+                        continue;
+                    }
+
                     if let Some(_referenced_expr) =
                         &egraph.index(subst[exp_var]).data.referenced_expr
                     {
@@ -3809,6 +3814,20 @@ impl FilterRules {
                 }
             }
             false
+        }
+    }
+
+    fn transform_cube_scan_aliases_none(
+        &self,
+        aliases_none_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let aliases_none_var = var!(aliases_none_var);
+        move |egraph, subst| {
+            subst.insert(
+                aliases_none_var,
+                egraph.add(LogicalPlanLanguage::CubeScanAliases(CubeScanAliases(None))),
+            );
+            true
         }
     }
 }
