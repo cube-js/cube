@@ -599,47 +599,20 @@ impl PostgresIntegrationTestSuite {
                 // 5000 rows | 3 completions
                 assert_eq!(messages.len(), 5003);
 
-                for i in 0..800 {
-                    if let SimpleQueryMessage::Row(row) = &messages[i] {
-                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
-                    } else {
-                        panic!("Must be Row command, {}", i)
-                    }
-                }
+                self.assert_row(&messages[0], "0".to_string());
+                self.assert_row(&messages[799], "799".to_string());
 
-                if let SimpleQueryMessage::CommandComplete(rows) = messages[800] {
-                    assert_eq!(rows, 800_u64);
-                } else {
-                    panic!("Must be CommandComplete command, 800")
-                }
+                self.assert_complete(&messages[800], 800);
 
-                for i in 800..1600 {
-                    if let SimpleQueryMessage::Row(row) = &messages[i+1] {
-                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
-                    } else {
-                        panic!("Must be Row command, {}", i)
-                    }
-                }
+                self.assert_row(&messages[801], "800".to_string());
+                self.assert_row(&messages[1600], "1599".to_string());
 
-                if let SimpleQueryMessage::CommandComplete(rows) = messages[1601] {
-                    assert_eq!(rows, 800_u64);
-                } else {
-                    panic!("Must be CommandComplete command, 800")
-                }
+                self.assert_complete(&messages[1601], 800);
 
-                for i in 1600..5000 {
-                    if let SimpleQueryMessage::Row(row) = &messages[i+2] {
-                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
-                    } else {
-                        panic!("Must be Row command, {}", i)
-                    }
-                }
+                self.assert_row(&messages[1602], "1600".to_string());
+                self.assert_row(&messages[5001], "4999".to_string());
 
-                if let SimpleQueryMessage::CommandComplete(rows) = messages[5002] {
-                    assert_eq!(rows, 3400_u64);
-                } else {
-                    panic!("Must be CommandComplete command, 3400")
-                }
+                self.assert_complete(&messages[5002], 3400);
             },
         )
         .await?;
@@ -659,47 +632,20 @@ impl PostgresIntegrationTestSuite {
                 // 5000 rows | 3 completions
                 assert_eq!(messages.len(), 5003);
 
-                for i in 0..2400 {
-                    if let SimpleQueryMessage::Row(row) = &messages[i] {
-                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
-                    } else {
-                        panic!("Must be Row command, {}", i)
-                    }
-                }
+                self.assert_row(&messages[0], "0".to_string());
+                self.assert_row(&messages[2399], "2399".to_string());
 
-                if let SimpleQueryMessage::CommandComplete(rows) = messages[2400] {
-                    assert_eq!(rows, 2400_u64);
-                } else {
-                    panic!("Must be CommandComplete command, 2400")
-                }
+                self.assert_complete(&messages[2400], 2400);
 
-                for i in 2400..4800 {
-                    if let SimpleQueryMessage::Row(row) = &messages[i+1] {
-                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
-                    } else {
-                        panic!("Must be Row command, {}", i)
-                    }
-                }
+                self.assert_row(&messages[2401], "2400".to_string());
+                self.assert_row(&messages[4800], "4799".to_string());
 
-                if let SimpleQueryMessage::CommandComplete(rows) = messages[4801] {
-                    assert_eq!(rows, 2400_u64);
-                } else {
-                    panic!("Must be CommandComplete command, 800")
-                }
+                self.assert_complete(&messages[4801], 2400);
 
-                for i in 4800..5000 {
-                    if let SimpleQueryMessage::Row(row) = &messages[i+2] {
-                        assert_eq!(row.get(0), Some(i.to_string().as_str()));
-                    } else {
-                        panic!("Must be Row command, {}", i)
-                    }
-                }
+                self.assert_row(&messages[4802], "4800".to_string());
+                self.assert_row(&messages[5001], "4999".to_string());
 
-                if let SimpleQueryMessage::CommandComplete(rows) = messages[5002] {
-                    assert_eq!(rows, 200_u64);
-                } else {
-                    panic!("Must be CommandComplete command, 200")
-                }
+                self.assert_complete(&messages[5002], 200);
             },
         )
         .await?;
@@ -976,6 +922,22 @@ impl PostgresIntegrationTestSuite {
         );
 
         Ok(())
+    }
+
+    fn assert_row(&self, message: &SimpleQueryMessage, expected_value: String) {
+        if let SimpleQueryMessage::Row(row) = message {
+            assert_eq!(row.get(0), Some(expected_value.as_str()));
+        } else {
+            panic!("Must be Row command, {}", expected_value)
+        }
+    }
+
+    fn assert_complete(&self, message: &SimpleQueryMessage, expected_value: u64) {
+        if let SimpleQueryMessage::CommandComplete(rows) = message {
+            assert_eq!(rows, &expected_value);
+        } else {
+            panic!("Must be CommandComplete command, {}", expected_value)
+        }
     }
 }
 
