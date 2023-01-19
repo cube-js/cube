@@ -239,31 +239,33 @@ impl<'a> CubeStoreParser<'a> {
                     None
                 };
 
-                Ok(CacheCommand::Set {
+                CacheCommand::Set {
                     key: self.parser.parse_identifier()?,
                     value: self.parser.parse_literal_string()?,
                     ttl,
                     nx,
-                })
+                }
             }
-            "get" => Ok(CacheCommand::Get {
+            "get" => CacheCommand::Get {
                 key: self.parser.parse_identifier()?,
-            }),
-            "keys" => Ok(CacheCommand::Keys {
+            },
+            "keys" => CacheCommand::Keys {
                 prefix: self.parser.parse_identifier()?,
-            }),
-            "incr" => Ok(CacheCommand::Incr {
+            },
+            "incr" => CacheCommand::Incr {
                 path: self.parser.parse_identifier()?,
-            }),
-            "remove" => Ok(CacheCommand::Remove {
+            },
+            "remove" => CacheCommand::Remove {
                 key: self.parser.parse_identifier()?,
-            }),
-            "truncate" => Ok(CacheCommand::Truncate {}),
-            command => Err(ParserError::ParserError(format!(
-                "Unknown cache command: {}",
-                command
-            ))),
-        }?;
+            },
+            "truncate" => CacheCommand::Truncate {},
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Unknown cache command: {}",
+                    other
+                )))
+            }
+        };
 
         Ok(Statement::Cache(command))
     }
@@ -452,10 +454,10 @@ impl<'a> CubeStoreParser<'a> {
                 }
             }
             "truncate" => QueueCommand::Truncate {},
-            command => {
+            other => {
                 return Err(ParserError::ParserError(format!(
                     "Unknown queue command: {}",
-                    command
+                    other
                 )))
             }
         };
