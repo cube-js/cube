@@ -407,6 +407,7 @@ struct CubeScanMemoryStream {
     /// Schema representing the data
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
+    is_completed: bool,
 }
 
 impl CubeScanMemoryStream {
@@ -419,13 +420,29 @@ impl CubeScanMemoryStream {
             stream,
             schema,
             member_fields,
+            is_completed: false,
         }
     }
 
     fn poll_next(&mut self) -> Option<ArrowResult<RecordBatch>> {
         match self.stream.poll_next() {
-            Ok(chunk) => parse_chunk(chunk, self.schema.clone(), &self.member_fields),
+            Ok(chunk) => {
+                let chunk = parse_chunk(chunk, self.schema.clone(), &self.member_fields);
+                if chunk.is_none() {
+                    self.is_completed = true;
+                }
+
+                chunk
+            }
             Err(err) => Some(Err(ArrowError::ComputeError(err.to_string()))),
+        }
+    }
+}
+
+impl Drop for CubeScanMemoryStream {
+    fn drop(&mut self) {
+        if !self.is_completed {
+            self.stream.reject();
         }
     }
 }

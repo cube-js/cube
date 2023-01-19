@@ -81,9 +81,7 @@ impl CubeReadStream for CubeDummyStream {
         panic!("CubeDummyStream.poll_next - can not be called");
     }
 
-    fn reject(&self) {
-        panic!("CubeDummyStream.reject - can not be called");
-    }
+    fn reject(&self) {}
 }
 
 #[derive(Debug)]
