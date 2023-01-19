@@ -100,8 +100,15 @@ function wrapNativeFunctionWithChannelCallback(
                     e
                 });
             }
-
-            channel.reject(e.message || 'Unknown JS exception');
+            try {
+                channel.reject(e.message || 'Unknown JS exception');
+            } catch(e) {
+                if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+                    console.debug("[js] channel.reject exception", {
+                        e
+                    });
+                }
+            }
 
             // throw e;
           }
@@ -121,7 +128,9 @@ function wrapNativeFunctionWithStream(
                 chunk.push(c);
                 if (chunk.length >= 10000) {
                     if (!writer.chunk(JSON.stringify(chunk))) {
-                        streamResponse.stream.removeAllListeners();
+                        streamResponse.stream.destroy({
+                            stack: "Rejected by client"
+                        });
                     }
                     chunk = [];
                 }
