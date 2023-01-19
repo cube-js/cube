@@ -190,7 +190,7 @@ export class AdapterApiMock {
   }
 
   public async executeQuery(query) {
-    if (query?.query === 'SELECT * FROM sql-runner') {
+    if (query?.query.includes('SELECT * FROM sql-runner')) {
       return {
         data: [
           { skip: 'skip' },

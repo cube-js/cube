@@ -1050,17 +1050,25 @@ class ApiGateway {
           'A user\'s query must contain at least one query param.'
         );
       }
-
+      
       query = {
         ...query,
         requestId: context.requestId
       };
+
+      if (!query.limit || !Number.isInteger(query.limit) || query.limit > 50000 || query.limit < 1) {
+        throw new UserError(
+          'A user\'s query must contain limit query param and it must be positive number less than 50000.'
+        );
+      }
 
       if (query.resultFilter?.objectTypes && !Array.isArray(query.resultFilter.objectTypes)) {
         throw new UserError(
           'A query.resultFilter.objectTypes must be an array of strings'
         );
       }
+
+      query.query = `${query.query.replace(';', '')} LIMIT ${query.limit};`;
       
       this.log(
         {
@@ -1071,6 +1079,7 @@ class ApiGateway {
       );
 
       const result = await this.getAdapterApi(context).executeQuery(query);
+
       if (result.data.length) {
         const objectLimit = Number(query.resultFilter?.objectLimit) || 100;
         const stringLimit = Number(query.resultFilter?.stringLimit) || 100;
