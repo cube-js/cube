@@ -60,7 +60,10 @@ LEFT JOIN organizations
     main: {
       dimensions: [CUBE.id, CUBE.organizationId]
       timeDimension: CUBE.createdAt,
-      incremental: true,
+      refreshKey: {
+        every: `1 day`,
+        incremental: true,
+      },
       granularity: `day`,
       partitionGranularity: `month`,
       buildRangeStart: { sql: `SELECT DATE('2021-01-01')` },
