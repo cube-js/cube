@@ -222,11 +222,11 @@ impl<'a> CubeStoreParser<'a> {
     fn parse_cache(&mut self) -> Result<Statement, ParserError> {
         let method = match self.parser.next_token() {
             Token::Word(w) => w.value.to_ascii_lowercase(),
-            _ => {
-                return Err(ParserError::ParserError(
-                    "Unknown cache command, available: SET|GET|KEYS|INC|REMOVE|TRUNCATE"
-                        .to_string(),
-                ))
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Invalid token: {}, expected Word (command)",
+                    other
+                )))
             }
         };
 
@@ -261,7 +261,7 @@ impl<'a> CubeStoreParser<'a> {
             "truncate" => CacheCommand::Truncate {},
             other => {
                 return Err(ParserError::ParserError(format!(
-                    "Unknown cache command: {}",
+                    "Unknown cache command: {}, available: SET|GET|KEYS|INC|REMOVE|TRUNCATE",
                     other
                 )))
             }
@@ -334,10 +334,11 @@ impl<'a> CubeStoreParser<'a> {
     fn parse_queue(&mut self) -> Result<Statement, ParserError> {
         let method = match self.parser.next_token() {
             Token::Word(w) => w.value.to_ascii_lowercase(),
-            _ => {
-                return Err(ParserError::ParserError(
-                    "Unknown queue command, available: ADD|TRUNCATE".to_string(),
-                ))
+            other => {
+                return Err(ParserError::ParserError(format!(
+                    "Invalid token: {}, expected Word (command)",
+                    other
+                )))
             }
         };
 
