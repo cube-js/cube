@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.48](https://github.com/cube-js/cube.js/compare/v0.31.47...v0.31.48) (2023-01-20)
+
+
+### Features
+
+* **cubesql:** Postgres protocol - stream support ([#6025](https://github.com/cube-js/cube.js/issues/6025)) ([d5786df](https://github.com/cube-js/cube.js/commit/d5786df63a1f48dec2697a8bb5e8c017c1b13ae4))
+* **cubesql:** Streams - cancel query and drop conection handling ([8c585f2](https://github.com/cube-js/cube.js/commit/8c585f24003c768300a31e0ed6774a3a724e54fa))
+* **cubestore:** Collect metrics for queue/cache commands ([#6032](https://github.com/cube-js/cube.js/issues/6032)) ([9ac7d0c](https://github.com/cube-js/cube.js/commit/9ac7d0ce67571c6945b7afe4095c995a1190da19))
+* **cubestore:** Support negative priority for queue ([#6031](https://github.com/cube-js/cube.js/issues/6031)) ([9924a1a](https://github.com/cube-js/cube.js/commit/9924a1a900f83fe246ede0b3a19e0c6ea7d5efc4))
+* streaming desync ([#6034](https://github.com/cube-js/cube.js/issues/6034)) ([a4c8b09](https://github.com/cube-js/cube.js/commit/a4c8b09a680d2857d28a42817d29fa567dcf63b2))
+
+
+
+
+
 ## [0.31.47](https://github.com/cube-js/cube.js/compare/v0.31.46...v0.31.47) (2023-01-18)
 
 
