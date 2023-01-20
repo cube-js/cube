@@ -201,7 +201,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
 
   protected decodeQueryDefFromRow(row: { payload: string, extra?: string }, method: string): QueryDef {
     if (!row.payload) {
-      throw new Error(`Field payload is empty, incorrect response in method ${method}`);
+      throw new Error(`Field payload is empty, incorrect response for ${method} method`);
     }
 
     const payload = JSON.parse(row.payload);
