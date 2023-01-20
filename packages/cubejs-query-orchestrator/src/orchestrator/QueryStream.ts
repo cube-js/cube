@@ -2,6 +2,8 @@ import * as stream from 'stream';
 import { getEnv } from '@cubejs-backend/shared';
 
 export class QueryStream extends stream.Transform {
+  private counter = 0;
+
   public queryKey: string;
 
   public maps: {
@@ -47,7 +49,17 @@ export class QueryStream extends stream.Transform {
     Object.keys(chunk).forEach((alias) => {
       row[this.aliasNameToMember[alias]] = chunk[alias];
     });
-    callback(null, row);
+    if (this.counter < this.writableHighWaterMark) {
+      this.counter++;
+      callback(null, row);
+    } else {
+      this.pause();
+      setTimeout(() => {
+        this.resume();
+        this.counter = 0;
+        callback(null, row);
+      }, 0);
+    }
   }
 
   /**

@@ -568,7 +568,7 @@ const variables: Record<string, (...args: any) => any> = {
    * Query stream `highWaterMark` value.
    */
   dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
-    .default(5000)
+    .default(8192)
     .asInt(),
 
   /**

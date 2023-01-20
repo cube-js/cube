@@ -119,6 +119,10 @@ function wrapNativeFunctionWithChannelCallback(
 function wrapNativeFunctionWithStream(
     fn: (extra: any) => unknown | Promise<unknown>
 ) {
+    const chunkLength = parseInt(
+        process.env.CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK || '8192',
+        10
+    );
     return async (extra: any, writer: any) => {
         let streamResponse: any;
         try {
@@ -126,7 +130,7 @@ function wrapNativeFunctionWithStream(
             let chunk: object[] = [];
             streamResponse.stream.on('data', (c: object) => {
                 chunk.push(c);
-                if (chunk.length >= 10000) {
+                if (chunk.length >= chunkLength) {
                     if (!writer.chunk(JSON.stringify(chunk))) {
                         streamResponse.stream.destroy({
                             stack: "Rejected by client"
