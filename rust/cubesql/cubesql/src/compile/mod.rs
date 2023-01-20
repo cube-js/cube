@@ -10,6 +10,10 @@ use datafusion::{
         plan::{Analyze, Explain, Extension, Projection, ToStringifiedPlan},
         DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
     },
+    optimizer::{
+        optimizer::{OptimizerConfig, OptimizerRule},
+        projection_drop_out::ProjectionDropOut,
+    },
     prelude::*,
     scalar::ScalarValue,
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
@@ -1230,7 +1234,13 @@ WHERE `TABLE_SCHEMA` = '{}'",
             qtrace.set_df_plan(&plan);
         }
 
-        let optimized_plan = plan;
+        let projection_drop_out_optimizer = ProjectionDropOut::new();
+        // TODO: report an error when the plan can't be optimized
+        let optimized_plan = projection_drop_out_optimizer
+            .optimize(&plan, &OptimizerConfig::new())
+            .unwrap_or(plan);
+
+        //let optimized_plan = plan;
         // ctx.optimize(&plan).map_err(|err| {
         //    CompilationError::Internal(format!("Planning optimization error: {}", err))
         // })?;
