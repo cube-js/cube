@@ -77,7 +77,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       this.prefixKey(queryKey)
     ]);
     if (rows && rows.length) {
-      return this.decodeQueryDefFromRow(rows[0]);
+      return this.decodeQueryDefFromRow(rows[0], 'cancelQuery');
     }
 
     return null;
@@ -148,7 +148,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
 
     for (const row of rows) {
       if (!onlyKeys) {
-        defs[row.id] = this.decodeQueryDefFromRow(row);
+        defs[row.id] = this.decodeQueryDefFromRow(row, 'getQueryStageState');
       }
 
       if (row.status === 'pending') {
@@ -168,7 +168,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       this.prefixKey(this.redisHash(queryKey)),
     ]);
     if (rows && rows.length) {
-      return JSON.parse(rows[0].value);
+      return this.decodeQueryDefFromRow(rows[0], 'getResult');
     }
 
     return null;
@@ -199,7 +199,11 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return rows.map((row) => row.id);
   }
 
-  protected decodeQueryDefFromRow(row: any): QueryDef {
+  protected decodeQueryDefFromRow(row: { payload: string, extra?: string }, method: string): QueryDef {
+    if (!row.payload) {
+      throw new Error(`Field payload is empty, incorrect response for ${method} method`);
+    }
+
     const payload = JSON.parse(row.payload);
 
     if (row.extra) {
@@ -214,7 +218,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       this.prefixKey(this.redisHash(queryKey))
     ]);
     if (rows && rows.length) {
-      return this.decodeQueryDefFromRow(rows[0]);
+      return this.decodeQueryDefFromRow(rows[0], 'getQueryDef');
     }
 
     return null;
@@ -243,7 +247,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       const active = [this.redisHash(queryKey)];
       const toProcess = 0;
       const lockAcquired = true;
-      const def = this.decodeQueryDefFromRow(rows[0]);
+      const def = this.decodeQueryDefFromRow(rows[0], 'retrieveForProcessing');
 
       return [
         addedCount, null, active, toProcess, def, lockAcquired
@@ -259,7 +263,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       this.prefixKey(this.redisHash(queryKey)),
     ]);
     if (rows && rows.length) {
-      return this.decodeQueryDefFromRow(rows[0]);
+      return this.decodeQueryDefFromRow(rows[0], 'getResultBlocking');
     }
 
     return null;
