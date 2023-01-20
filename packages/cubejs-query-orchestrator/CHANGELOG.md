@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.49](https://github.com/cube-js/cube.js/compare/v0.31.48...v0.31.49) (2023-01-20)
+
+
+### Bug Fixes
+
+* Content version gets updated on build range change ([0adc634](https://github.com/cube-js/cube.js/commit/0adc63493d51c74a68004c09fb239f1234dffe4a))
+
+
+
+
+
 ## [0.31.48](https://github.com/cube-js/cube.js/compare/v0.31.47...v0.31.48) (2023-01-20)
 
 

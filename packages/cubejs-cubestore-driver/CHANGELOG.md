@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.49](https://github.com/cube-js/cube.js/compare/v0.31.48...v0.31.49) (2023-01-20)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Unexpected token u in JSON at position 0 ([#6037](https://github.com/cube-js/cube.js/issues/6037)) ([1d00521](https://github.com/cube-js/cube.js/commit/1d005214c2b18f092ede5c9187798af151793cf8))
+
+
+
+
+
 ## [0.31.48](https://github.com/cube-js/cube.js/compare/v0.31.47...v0.31.48) (2023-01-20)
 
 
