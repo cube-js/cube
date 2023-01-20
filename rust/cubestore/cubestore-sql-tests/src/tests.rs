@@ -6657,6 +6657,14 @@ async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
             TableValue::String("success".to_string())
         ]),]
     );
+
+    // second call should not return anything, because first call should remove result
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
+        .await
+        .unwrap();
+
+    assert_eq!(result.get_rows().len(), 0);
 }
 
 async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) {
