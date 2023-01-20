@@ -702,12 +702,13 @@ impl CacheStore for RocksCacheStore {
                 if let Some(item_row) = item_row {
                     queue_schema.delete(item_row.get_id(), batch_pipe)?;
 
-                    let queue_result = QueueResult::new(path.clone(), result);
+                    let queue_result = QueueResult::new(path.clone(), result.clone());
                     let result_row = result_schema.insert(queue_result, batch_pipe)?;
 
                     batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
                         row_id: result_row.get_id(),
                         path,
+                        result,
                     }));
 
                     Ok(())
@@ -747,16 +748,11 @@ impl CacheStore for RocksCacheStore {
                     self.store
                         .write_operation(move |db_ref, batch_pipe| {
                             let queue_schema = QueueResultRocksTable::new(db_ref.clone());
-                            let queue_result =
-                                queue_schema.try_delete(ack_event.row_id, batch_pipe)?;
+                            queue_schema.try_delete(ack_event.row_id, batch_pipe)?;
 
-                            if let Some(queue_result) = queue_result {
-                                Ok(Some(QueueResultResponse::Success {
-                                    value: queue_result.row.value,
-                                }))
-                            } else {
-                                Ok(None)
-                            }
+                            Ok(Some(QueueResultResponse::Success {
+                                value: ack_event.result,
+                            }))
                         })
                         .await
                 }

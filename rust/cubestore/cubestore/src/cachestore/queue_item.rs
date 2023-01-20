@@ -29,6 +29,7 @@ fn merge(a: serde_json::Value, b: serde_json::Value) -> Option<serde_json::Value
 pub struct QueueResultAckEvent {
     pub path: String,
     pub row_id: u64,
+    pub result: String,
 }
 
 #[repr(u8)]
