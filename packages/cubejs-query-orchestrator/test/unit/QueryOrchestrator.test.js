@@ -1223,7 +1223,7 @@ describe('QueryOrchestrator', () => {
     expect(result.data[0]).toMatch(/orders_d20210501/);
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
-    expect(result.data[0]).toMatch(/orders_h2021060100_2i3ibaj2_d004iq51/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
 
     result = await queryOrchestrator.fetchQuery(query(['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
     console.log(JSON.stringify(result, null, 2));

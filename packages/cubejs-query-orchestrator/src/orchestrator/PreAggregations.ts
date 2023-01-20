@@ -786,7 +786,7 @@ export class PreAggregationLoader {
   }
 
   protected contentVersion(invalidationKeys) {
-    const versionArray = [this.preAggregation.loadSql];
+    const versionArray = [this.preAggregation.structureVersionLoadSql || this.preAggregation.loadSql];
     if (this.preAggregation.indexesSql && this.preAggregation.indexesSql.length) {
       versionArray.push(this.preAggregation.indexesSql);
     }
