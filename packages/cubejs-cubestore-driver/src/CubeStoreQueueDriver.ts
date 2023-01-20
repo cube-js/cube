@@ -168,7 +168,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       this.prefixKey(this.redisHash(queryKey)),
     ]);
     if (rows && rows.length) {
-      return JSON.parse(rows[0].value);
+      return this.decodeQueryDefFromRow(rows[0]);
     }
 
     return null;
