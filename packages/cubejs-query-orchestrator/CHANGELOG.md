@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.51](https://github.com/cube-js/cube.js/compare/v0.31.50...v0.31.51) (2023-01-21)
+
+
+### Bug Fixes
+
+* Incorrect partition filter for real time partitions ([6520279](https://github.com/cube-js/cube.js/commit/6520279096048f3cd19b38e5c431dd5a5c29323a))
+
+
+
+
+
 ## [0.31.50](https://github.com/cube-js/cube.js/compare/v0.31.49...v0.31.50) (2023-01-21)
 
 
