@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.50](https://github.com/cube-js/cube.js/compare/v0.31.49...v0.31.50) (2023-01-21)
+
+
+### Bug Fixes
+
+* Lambda pre-aggregations aren't served by external refresh instance ([bd45720](https://github.com/cube-js/cube.js/commit/bd4572083a9560cddb7ef23e2eccc9c9c806378a))
+* Real time partitions seal just after created ([882a7df](https://github.com/cube-js/cube.js/commit/882a7df2d1184e754c41d7f5daea9f43f3ac53f8))
+
+
+
+
+
 ## [0.31.49](https://github.com/cube-js/cube.js/compare/v0.31.48...v0.31.49) (2023-01-20)
 
 
