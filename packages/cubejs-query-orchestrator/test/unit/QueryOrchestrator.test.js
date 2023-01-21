@@ -1228,7 +1228,6 @@ describe('QueryOrchestrator', () => {
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
     expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
-    expect(externalMockDriver.tablesObj.find(t => t.tableName.indexOf('stb_pre_aggregations.orders_h2021060100') !== -1).sealAt).toBe('2021-06-01T00:59:59.999Z');
 
     result = await queryOrchestrator.fetchQuery(query(['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
     console.log(JSON.stringify(result, null, 2));
@@ -1240,6 +1239,44 @@ describe('QueryOrchestrator', () => {
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
     expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
+  });
+
+  test('real-time sealing partitions', async () => {
+    const query = (matchedTimeDimensionDateRange) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_d',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        partitionInvalidateKeyQueries: [],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'day',
+        timezone: 'UTC',
+        matchedTimeDimensionDateRange
+      }],
+      requestId: 'real-time sealing partitions',
+      external: true,
+    });
+    const result = await queryOrchestrator.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(externalMockDriver.tablesObj.find(t => t.tableName.indexOf('stb_pre_aggregations.orders_d20210531') !== -1).sealAt).toBe('2021-05-31T23:59:59.999Z');
   });
 
   test('loadRefreshKeys', async () => {

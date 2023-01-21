@@ -181,6 +181,7 @@ export type PreAggregationDescription = {
   timezone: string;
   indexesSql: IndexDescription[];
   invalidateKeyQueries: QueryWithParams[];
+  partitionInvalidateKeyQueries: QueryWithParams[];
   structureVersionLoadSql: QueryWithParams;
   sql: QueryWithParams;
   loadSql: QueryWithParams;
@@ -1571,12 +1572,14 @@ export class PreAggregationPartitionRangeLoader {
     );
     const [_, buildRangeEnd] = buildRange;
     const loadRange: [string, string] = [...range];
+    const partitionInvalidateKeyQueries = this.preAggregation.partitionInvalidateKeyQueries || this.preAggregation.invalidateKeyQueries;
+    // `partitionInvalidateKeyQueries = []` in case of real time
+    if ((!partitionInvalidateKeyQueries || partitionInvalidateKeyQueries.length > 0) && buildRangeEnd < range[1]) {
+      loadRange[1] = buildRangeEnd;
+    }
     const sealAt = addSecondsToLocalTimestamp(
       loadRange[1], this.preAggregation.timezone, this.preAggregation.updateWindowSeconds || 0
     ).toISOString();
-    if (buildRangeEnd < range[1]) {
-      loadRange[1] = buildRangeEnd;
-    }
     return {
       ...this.preAggregation,
       tableName: partitionTableName,
@@ -1588,6 +1591,8 @@ export class PreAggregationPartitionRangeLoader {
         this.replacePartitionSqlAndParams(this.preAggregation.sql, loadRange, partitionTableName),
       invalidateKeyQueries: (this.preAggregation.invalidateKeyQueries || [])
         .map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName)),
+      partitionInvalidateKeyQueries: this.preAggregation.partitionInvalidateKeyQueries &&
+        this.preAggregation.partitionInvalidateKeyQueries.map(q => this.replacePartitionSqlAndParams(q, range, partitionTableName)),
       indexesSql: (this.preAggregation.indexesSql || [])
         .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName) })),
       previewSql: this.preAggregation.previewSql &&
