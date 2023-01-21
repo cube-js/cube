@@ -458,7 +458,7 @@ type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: any[];
   lastUpdatedAt: number;
-  buildRangeEnd?: string;
+  buildRangeEnd: string;
   lambdaTable?: InlineTable;
   queryKey?: any[];
   rollupLambdaId?: string;
@@ -586,8 +586,9 @@ export class PreAggregationLoader {
           // immediately return the latest rollup data that instance already has
           return {
             targetTableName: this.targetTableName(versionEntryByStructureVersion),
-            lastUpdatedAt: versionEntryByStructureVersion.last_updated_at,
             refreshKeyValues: [],
+            lastUpdatedAt: versionEntryByStructureVersion.last_updated_at,
+            buildRangeEnd: versionEntryByStructureVersion.build_range_end,
           };
         }
       }
@@ -726,6 +727,7 @@ export class PreAggregationLoader {
           targetTableName,
           refreshKeyValues: [],
           lastUpdatedAt: newVersionEntry.last_updated_at,
+          buildRangeEnd: this.preAggregation.buildRangeEnd,
         };
       } else {
         await this.executeInQueue(invalidationKeys, this.priority(10), newVersionEntry);

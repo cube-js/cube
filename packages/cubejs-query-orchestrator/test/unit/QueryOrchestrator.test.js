@@ -1228,6 +1228,13 @@ describe('QueryOrchestrator', () => {
     result = await queryOrchestrator.fetchQuery(query(['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).toMatch(/orders_h2021053100/);
+
+    result = await queryOrchestratorExternalRefresh.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).toMatch(/orders_d20210501/);
+    expect(result.data[0]).not.toMatch(/orders_h2021053000/);
+    expect(result.data[0]).toMatch(/orders_h2021053100/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
   });
 
   test('loadRefreshKeys', async () => {
