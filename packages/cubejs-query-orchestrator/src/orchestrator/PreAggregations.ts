@@ -1571,12 +1571,12 @@ export class PreAggregationPartitionRangeLoader {
     );
     const [_, buildRangeEnd] = buildRange;
     const loadRange: [string, string] = [...range];
-    if (buildRangeEnd < range[1]) {
-      loadRange[1] = buildRangeEnd;
-    }
     const sealAt = addSecondsToLocalTimestamp(
       loadRange[1], this.preAggregation.timezone, this.preAggregation.updateWindowSeconds || 0
     ).toISOString();
+    if (buildRangeEnd < range[1]) {
+      loadRange[1] = buildRangeEnd;
+    }
     return {
       ...this.preAggregation,
       tableName: partitionTableName,

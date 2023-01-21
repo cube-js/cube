@@ -130,7 +130,11 @@ class ExternalMockDriver extends MockDriver {
   }
 
   async uploadTableWithIndexes(table, columns, tableData, indexesSql, uniqueKeyColumns, queryTracingObj, externalOptions) {
-    this.tablesObj.push({ tableName: table.substring(0, 100), buildRangeEnd: queryTracingObj?.buildRangeEnd });
+    this.tablesObj.push({
+      tableName: table.substring(0, 100),
+      buildRangeEnd: queryTracingObj?.buildRangeEnd,
+      sealAt: externalOptions?.sealAt
+    });
     if (tableData.csvFile) {
       this.csvFiles.push(tableData.csvFile);
     }
@@ -1224,6 +1228,7 @@ describe('QueryOrchestrator', () => {
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
     expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
+    expect(externalMockDriver.tablesObj.find(t => t.tableName.indexOf('stb_pre_aggregations.orders_h2021060100') !== -1).sealAt).toBe('2021-06-01T00:59:59.999Z');
 
     result = await queryOrchestrator.fetchQuery(query(['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
     console.log(JSON.stringify(result, null, 2));
