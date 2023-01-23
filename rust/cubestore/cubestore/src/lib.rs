@@ -322,6 +322,12 @@ impl From<flexbuffers::SerializationError> for CubeError {
     }
 }
 
+impl From<s3::error::S3Error> for CubeError {
+    fn from(v: s3::error::S3Error) -> Self {
+        CubeError::internal(format!("AWS S3 error: {}", v.to_string()))
+    }
+}
+
 impl From<awscreds::AwsCredsError> for CubeError {
     fn from(v: awscreds::AwsCredsError) -> Self {
         CubeError::user(v.to_string())

@@ -54,7 +54,7 @@ mockall = "0.8.1"
 async-std = "0.99"
 itertools = "0.11.0"
 bigdecimal = { version = "0.2.0", features = ["serde"] }
-rust-s3 = { version = "0.28.1" , default-features = false, features = ["sync", "sync-native-tls"] }
+rust-s3 = { version = "0.32.3", default-features = false, features = ["sync", "sync-native-tls"] }
 aws-creds = "0.24.1"
 aws-region = "0.22.1"
 deadqueue = "0.2.4"
