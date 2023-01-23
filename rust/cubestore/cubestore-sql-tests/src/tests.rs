@@ -228,6 +228,11 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("cache_set_nx", cache_set_nx),
         t("cache_prefix_keys", cache_prefix_keys),
         t("queue_full_workflow", queue_full_workflow),
+        t("queue_ack_then_result", queue_ack_then_result),
+        t(
+            "queue_multiple_result_blocking",
+            queue_multiple_result_blocking,
+        ),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -6619,6 +6624,114 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             .await
             .unwrap();
         assert_eq!(get_response.get_rows().len(), 0);
+    }
+}
+
+async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:5555" "payload1";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ACK "STANDALONE#queue:5555" "result:5555""#)
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_columns(),
+        &vec![
+            Column::new("payload".to_string(), ColumnType::String, 0),
+            Column::new("type".to_string(), ColumnType::String, 1),
+        ]
+    );
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("result:5555".to_string()),
+            TableValue::String("success".to_string())
+        ]),]
+    );
+
+    // second call should not return anything, because first call should remove result
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
+        .await
+        .unwrap();
+
+    assert_eq!(result.get_rows().len(), 0);
+}
+
+async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:12345" "payload1";"#)
+        .await
+        .unwrap();
+
+    let service = Arc::new(service);
+
+    {
+        let service_to_move = service.clone();
+        let blocking1 = async move {
+            service_to_move
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:12345""#)
+                .await
+                .unwrap()
+        };
+
+        let service_to_move = service.clone();
+        let blocking2 = async move {
+            service_to_move
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:12345""#)
+                .await
+                .unwrap()
+        };
+
+        let service_to_move = service.clone();
+        let ack = async move {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+
+            service_to_move
+                .exec_query(r#"QUEUE ACK "STANDALONE#queue:12345" "result:12345""#)
+                .await
+                .unwrap()
+        };
+
+        let (blocking1_res, blocking2_res, _ack_res) = join!(blocking1, blocking2, ack);
+        assert_eq!(
+            blocking1_res.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("type".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            blocking1_res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("result:12345".to_string()),
+                TableValue::String("success".to_string())
+            ]),]
+        );
+
+        assert_eq!(
+            blocking2_res.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("type".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            blocking2_res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("result:12345".to_string()),
+                TableValue::String("success".to_string())
+            ]),]
+        );
     }
 }
 

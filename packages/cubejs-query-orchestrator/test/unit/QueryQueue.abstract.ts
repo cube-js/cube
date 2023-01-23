@@ -69,9 +69,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(result).toBe('select * from bar');
     });
 
-    const nonCubestoreTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
-
-    nonCubestoreTest('instant double wait resolve', async () => {
+    test('instant double wait resolve', async () => {
       const results = await Promise.all([
         queue.executeInQueue('delay', 'instant', { delay: 400, result: '2' }),
         queue.executeInQueue('delay', 'instant', { delay: 400, result: '2' })
@@ -149,7 +147,10 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(results.map(r => parseInt(r[0], 10) - parseInt(results[0][0], 10))).toEqual([0, 1, 2]);
     });
 
-    nonCubestoreTest('orphaned', async () => {
+    const nonCubeStoreTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
+
+    // TODO: CubeStore queue support
+    nonCubeStoreTest('orphaned', async () => {
       for (let i = 1; i <= 4; i++) {
         await queue.executeInQueue('delay', `11${i}`, { delay: 50, result: `${i}` }, 0);
       }
@@ -170,7 +171,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0);
     });
 
-    nonCubestoreTest('queue hash process persistent flag properly', () => {
+    // TODO: CubeStore queue support
+    nonCubeStoreTest('queue hash process persistent flag properly', () => {
       const query = ['select * from table'];
       const key1 = queue.redisHash(query);
       // @ts-ignore
@@ -197,7 +199,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(result).toBe('select * from bar');
     });
 
-    nonCubestoreTest('queue driver lock obtain race condition', async () => {
+    nonCubeStoreTest('queue driver lock obtain race condition', async () => {
       const redisClient: any = await queue.queueDriver.createConnection();
       const redisClient2: any = await queue.queueDriver.createConnection();
       const priority = 10;
@@ -252,7 +254,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await queue.queueDriver.release(redisClient2);
     });
 
-    nonCubestoreTest('activated but lock is not acquired', async () => {
+    nonCubeStoreTest('activated but lock is not acquired', async () => {
       const redisClient = await queue.queueDriver.createConnection();
       const redisClient2 = await queue.queueDriver.createConnection();
       const priority = 10;
