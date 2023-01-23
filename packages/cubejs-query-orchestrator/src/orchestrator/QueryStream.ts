@@ -35,6 +35,9 @@ export class QueryStream extends stream.Transform {
     this.queryKey = key;
     this.maps = maps;
     this.aliasNameToMember = aliasNameToMember;
+    if (!this.aliasNameToMember) {
+      this.emit('error', 'The QueryStream `aliasNameToMember` property is missed.');
+    }
   }
 
   /**
