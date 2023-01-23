@@ -15,7 +15,6 @@ extern crate core;
 
 use crate::metastore::TableId;
 use crate::remotefs::queue::RemoteFsOpResult;
-use anyhow;
 use arrow::error::ArrowError;
 use cubehll::HllError;
 use cubezetasketch::ZetaError;
@@ -320,12 +319,6 @@ impl From<bigdecimal::ParseBigDecimalError> for CubeError {
 impl From<flexbuffers::SerializationError> for CubeError {
     fn from(v: flexbuffers::SerializationError) -> Self {
         CubeError::from_error(v)
-    }
-}
-
-impl From<anyhow::Error> for CubeError {
-    fn from(v: anyhow::Error) -> Self {
-        CubeError::internal(format!("Error: {}", v.to_string()))
     }
 }
 

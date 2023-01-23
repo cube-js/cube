@@ -514,16 +514,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "block_on_proc"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b872f3528eeeb4370ee73b51194dc1cd93680c2d0eb6c7a223889038d2c1a167"
-dependencies = [
- "quote",
- "syn 1.0.107",
-]
-
-[[package]]
 name = "brotli"
 version = "3.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2634,15 +2624,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "minidom"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "332592c2149fc7dd40a64fc9ef6f0d65607284b474cef9817d1fc8c7e7b3608e"
-dependencies = [
- "quick-xml",
-]
-
-[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3642,15 +3623,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "quick-xml"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26aab6b48e2590e4a64d1ed808749ba06257882b461d01ca71baeb747074a6dd"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "quote"
 version = "1.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4141,10 +4113,10 @@ checksum = "2dc0e521d1084d6950e050d4e2595f0fbdaa2b96bb795bab3d90a282288c5e49"
 dependencies = [
  "anyhow",
  "async-trait",
+ "attohttpc 0.18.0",
  "aws-creds 0.27.1",
  "aws-region 0.23.5",
  "base64 0.13.0",
- "block_on_proc",
  "cfg-if 1.0.0",
  "chrono",
  "hex",
@@ -4153,14 +4125,11 @@ dependencies = [
  "log",
  "maybe-async",
  "md5",
- "minidom",
  "percent-encoding",
- "reqwest 0.11.10",
  "serde",
  "serde-xml-rs 0.5.1",
  "serde_derive",
  "sha2 0.9.5",
- "tokio 1.37.0",
  "tokio-stream",
  "url",
 ]

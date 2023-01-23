@@ -13,14 +13,14 @@ use s3::{Bucket, Region};
 use std::env;
 use std::fmt;
 use std::fmt::Formatter;
+use std::fs::File;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tempfile::tempdir_in;
+use tempfile::NamedTempFile;
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 pub struct S3RemoteFs {
     dir: PathBuf,
@@ -54,10 +54,29 @@ impl S3RemoteFs {
         let key_id = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
         let access_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
         let credentials =
-            Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None)?;
-        let region = region.parse::<Region>()?;
-        let bucket =
-            std::sync::RwLock::new(Bucket::new(&bucket_name, region.clone(), credentials)?);
+            Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None).map_err(
+                |err| {
+                    CubeError::internal(format!(
+                        "Failed to create S3 credentials: {}",
+                        err.to_string()
+                    ))
+                },
+            )?;
+        let region = region.parse::<Region>().map_err(|err| {
+            CubeError::internal(format!(
+                "Failed to parse Region '{}': {}",
+                region,
+                err.to_string()
+            ))
+        })?;
+        let bucket = std::sync::RwLock::new(
+            Bucket::new(&bucket_name, region.clone(), credentials).map_err(|err| {
+                CubeError::internal(format!(
+                    "Failed to create lock for S3 bucket: {}",
+                    err.to_string()
+                ))
+            })?,
+        );
         let fs = Arc::new(Self {
             dir,
             bucket,
@@ -168,9 +187,17 @@ impl RemoteFs for S3RemoteFs {
             debug!("Uploading {}", remote_path);
             let path = self.s3_path(&remote_path);
             let bucket = self.bucket.read().unwrap().clone();
-            let mut temp_upload_path_copy = tokio::fs::File::open(temp_upload_path).await?;
+            let mut temp_upload_file = File::open(temp_upload_path)?;
+
             let status_code = cube_ext::spawn_blocking(move || {
-                bucket.put_object_stream_blocking(&mut temp_upload_path_copy, path)
+                bucket
+                    .put_object_stream(&mut temp_upload_file, path)
+                    .map_err(|err| {
+                        CubeError::internal(format!(
+                            "Failed to put object in S3: {}",
+                            err.to_string()
+                        ))
+                    })
             })
             .await??;
 
@@ -226,23 +253,25 @@ impl RemoteFs for S3RemoteFs {
             let path = self.s3_path(&remote_path);
             let bucket = self.bucket.read().unwrap().clone();
 
-            let temp_dir = tempdir_in(downloads_dir)?;
-            let temp_file_name = temp_dir.path().join(format!("{}.tmp", Uuid::new_v4()));
-            let mut async_tmp_file = fs::File::create(&temp_file_name)
-                .await
-                .expect("Unable to open file");
-
             let status_code = cube_ext::spawn_blocking(move || -> Result<u16, CubeError> {
-                let res = bucket.get_object_stream_blocking(path.as_str(), &mut async_tmp_file)?;
-                let _ = async_tmp_file.flush();
+                let (mut temp_file, temp_path) =
+                    NamedTempFile::new_in(&downloads_dir)?.into_parts();
+
+                let res = bucket
+                    .get_object_stream(path.as_str(), &mut temp_file)
+                    .map_err(|err| {
+                        CubeError::internal(format!(
+                            "Failed to download file from S3: {}",
+                            err.to_string()
+                        ))
+                    })?;
+                temp_file.flush()?;
+
+                temp_path.persist(local_file)?;
 
                 Ok(res)
             })
             .await??;
-
-            fs::rename(&temp_file_name, &local_file)
-                .await
-                .expect("Unable to copy file");
 
             if status_code != 200 {
                 return Err(CubeError::user(format!(
@@ -267,9 +296,15 @@ impl RemoteFs for S3RemoteFs {
         debug!("Deleting {}", remote_path);
         let path = self.s3_path(&remote_path);
         let bucket = self.bucket.read().unwrap().clone();
-        let (_, status_code) =
-            cube_ext::spawn_blocking(move || bucket.delete_object_blocking(path)).await??;
-        info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
+        let (_, status_code) = cube_ext::spawn_blocking(move || {
+            bucket.delete_object(path).map_err(|err| {
+                CubeError::internal(format!(
+                    "Failed to delete object in S3: {}",
+                    err.to_string()
+                ))
+            })
+        })
+        .await??;
         if status_code != 204 {
             return Err(CubeError::user(format!(
                 "S3 delete returned non OK status: {}",
@@ -285,6 +320,7 @@ impl RemoteFs for S3RemoteFs {
                 .await?;
         }
 
+        info!("Deleted {} ({:?})", remote_path, time.elapsed()?);
         Ok(())
     }
 
@@ -303,7 +339,14 @@ impl RemoteFs for S3RemoteFs {
     ) -> Result<Vec<RemoteFile>, CubeError> {
         let path = self.s3_path(&remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
-        let list = cube_ext::spawn_blocking(move || bucket.list_blocking(path, None)).await??;
+        let list = cube_ext::spawn_blocking(move || bucket.list(path, None))
+            .await?
+            .map_err(|err| {
+                CubeError::internal(format!(
+                    "Failed to list files in S3 bucket: {}",
+                    err.to_string()
+                ))
+            })?;
         let pages_count = list.len();
         app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
             pages_count as i64,
