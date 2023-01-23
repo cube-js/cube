@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.52](https://github.com/cube-js/cube.js/compare/v0.31.51...v0.31.52) (2023-01-23)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** streams cluster ([#6048](https://github.com/cube-js/cube.js/issues/6048)) ([c5b6702](https://github.com/cube-js/cube.js/commit/c5b6702f69788cbcbf959608e5e86abfa4bd5385))
+
+
+### Features
+
+* **api-gateway, server-core:** Added dataSources method ([#5789](https://github.com/cube-js/cube.js/issues/5789)) ([128d017](https://github.com/cube-js/cube.js/commit/128d017e2c8eb75d9439a3d09c6739bc0c552938))
+* **cubestore:** Support multiple parallel QUEUE RESULT_BLOCKING ([#6038](https://github.com/cube-js/cube.js/issues/6038)) ([d8be78a](https://github.com/cube-js/cube.js/commit/d8be78a95f8fae466615063433a5ae53ab1c1bd6))
+* **cubestore:** Upgrade warp to 0.3.3 (use crates.io instead of git) ([#6043](https://github.com/cube-js/cube.js/issues/6043)) ([d2307a8](https://github.com/cube-js/cube.js/commit/d2307a8ce3449d8085810463e97d33de4b340db4))
+* new dark scheme at README ([#6044](https://github.com/cube-js/cube.js/issues/6044)) ([a44ebbb](https://github.com/cube-js/cube.js/commit/a44ebbbe8c0cbd2b94db6dfd5f7b9f30fa18bd34))
+
+
+
+
+
 ## [0.31.51](https://github.com/cube-js/cube.js/compare/v0.31.50...v0.31.51) (2023-01-21)
 
 

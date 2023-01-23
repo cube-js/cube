@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.52](https://github.com/cube-js/cube.js/compare/v0.31.51...v0.31.52) (2023-01-23)
+
+
+### Features
+
+* **api-gateway, server-core:** Added dataSources method ([#5789](https://github.com/cube-js/cube.js/issues/5789)) ([128d017](https://github.com/cube-js/cube.js/commit/128d017e2c8eb75d9439a3d09c6739bc0c552938))
+
+
+
+
+
 ## [0.31.51](https://github.com/cube-js/cube.js/compare/v0.31.50...v0.31.51) (2023-01-21)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

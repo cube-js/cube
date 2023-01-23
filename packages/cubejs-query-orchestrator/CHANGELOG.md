@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.52](https://github.com/cube-js/cube.js/compare/v0.31.51...v0.31.52) (2023-01-23)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** streams cluster ([#6048](https://github.com/cube-js/cube.js/issues/6048)) ([c5b6702](https://github.com/cube-js/cube.js/commit/c5b6702f69788cbcbf959608e5e86abfa4bd5385))
+
+
+### Features
+
+* **cubestore:** Support multiple parallel QUEUE RESULT_BLOCKING ([#6038](https://github.com/cube-js/cube.js/issues/6038)) ([d8be78a](https://github.com/cube-js/cube.js/commit/d8be78a95f8fae466615063433a5ae53ab1c1bd6))
+
+
+
+
+
 ## [0.31.51](https://github.com/cube-js/cube.js/compare/v0.31.50...v0.31.51) (2023-01-21)
 
 
