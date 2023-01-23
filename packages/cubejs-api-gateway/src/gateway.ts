@@ -366,6 +366,18 @@ class ApiGateway {
           });
         }
       );
+      
+      app.get(
+        '/cubejs-system/v1/data-sources',
+        jsonParser,
+        systemMiddlewares,
+        async (req: Request, res: Response) => {
+          await this.dataSources({
+            context: req.context,
+            res: this.resToResultFn(res),
+          });
+        }
+      );
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -1002,6 +1014,24 @@ class ApiGateway {
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
+      });
+    }
+  }
+  
+  protected async dataSources({ context, res }: { context?: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+
+    try {
+      const orchestratorApi = await this.getAdapterApi(context);
+      const { dataSources } = await this.getCompilerApi(context).dataSources(orchestratorApi);
+
+      res({ dataSources });
+    } catch (e) {
+      this.handleError({
+        e,
+        context,
+        res,
+        requestStarted,
       });
     }
   }

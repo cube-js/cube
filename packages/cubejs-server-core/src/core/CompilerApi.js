@@ -196,6 +196,54 @@ export class CompilerApi {
     };
   }
 
+  async dataSources(orchestratorApi) {
+    let compilerVersion = (
+      this.schemaVersion && await this.schemaVersion() ||
+      'default_schema_version'
+    );
+
+    if (typeof compilerVersion === 'object') {
+      compilerVersion = JSON.stringify(compilerVersion);
+    }
+
+    let { compilers } = this;
+    if (!compilers || this.compilerVersion !== compilerVersion) {
+      compilers = await compile(this.repository, {
+        allowNodeRequire: this.allowNodeRequire,
+        compileContext: this.compileContext,
+        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
+        standalone: this.standalone,
+      });
+    }
+
+    const { cubeEvaluator } = await compilers;
+
+    let dataSources = await Promise.all(
+      cubeEvaluator
+        .cubeNames()
+        .map(
+          async (cube) => cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default'
+        )
+    );
+
+    dataSources = [...new Set(dataSources)];
+
+    dataSources = await Promise.all(
+      dataSources.map(async (dataSource) => {
+        try {
+          await orchestratorApi.driverFactory(dataSource);
+          return dataSource;
+        } catch (err) {
+          return null;
+        }
+      })
+    );
+
+    return {
+      dataSources: dataSources.filter((source) => source),
+    };
+  }
+
   canUsePreAggregationForTransformedQuery(transformedQuery, refs) {
     return PreAggregations.canUsePreAggregationForTransformedQueryFn(transformedQuery, refs);
   }

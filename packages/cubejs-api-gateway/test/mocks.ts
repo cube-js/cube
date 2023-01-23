@@ -139,7 +139,13 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
 
   async preAggregations() {
     return preAggregationsResultFactory();
-  }
+  },
+
+  async dataSources() {
+    return {
+      dataSources: ['default']
+    };
+  },
 }));
 
 export class RefreshSchedulerMock {
