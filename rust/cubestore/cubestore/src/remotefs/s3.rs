@@ -68,9 +68,8 @@ impl S3RemoteFs {
                 err.to_string()
             ))
         })?;
-        let bucket = std::sync::RwLock::new(
-            Bucket::new(&bucket_name, region.clone(), credentials)?,
-        );
+        let bucket =
+            std::sync::RwLock::new(Bucket::new(&bucket_name, region.clone(), credentials)?);
         let fs = Arc::new(Self {
             dir,
             bucket,
