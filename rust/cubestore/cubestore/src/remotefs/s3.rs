@@ -165,14 +165,7 @@ impl RemoteFs for S3RemoteFs {
             let mut temp_upload_file = File::open(temp_upload_path)?;
 
             let status_code = cube_ext::spawn_blocking(move || {
-                bucket
-                    .put_object_stream(&mut temp_upload_file, path)
-                    .map_err(|err| {
-                        CubeError::internal(format!(
-                            "Failed to put object in S3: {}",
-                            err.to_string()
-                        ))
-                    })
+                bucket.put_object_stream(&mut temp_upload_file, path)
             })
             .await??;
 
@@ -225,14 +218,7 @@ impl RemoteFs for S3RemoteFs {
                 let (mut temp_file, temp_path) =
                     NamedTempFile::new_in(&downloads_dir)?.into_parts();
 
-                let res = bucket
-                    .get_object_stream(path.as_str(), &mut temp_file)
-                    .map_err(|err| {
-                        CubeError::internal(format!(
-                            "Failed to download file from S3: {}",
-                            err.to_string()
-                        ))
-                    })?;
+                let res = bucket.get_object_stream(path.as_str(), &mut temp_file)?;
                 temp_file.flush()?;
 
                 temp_path.persist(local_file)?;
@@ -257,19 +243,11 @@ impl RemoteFs for S3RemoteFs {
         debug!("Deleting {}", remote_path);
         let path = self.s3_path(remote_path);
         let bucket = self.bucket.read().unwrap().clone();
-        let (_, status_code) = cube_ext::spawn_blocking(move || {
-            bucket.delete_object(path).map_err(|err| {
-                CubeError::internal(format!(
-                    "Failed to delete object in S3: {}",
-                    err.to_string()
-                ))
-            })
-        })
-        .await??;
-        if status_code != 204 {
+        let res = cube_ext::spawn_blocking(move || bucket.delete_object(path)).await??;
+        if res.status_code() != 204 {
             return Err(CubeError::user(format!(
                 "S3 delete returned non OK status: {}",
-                status_code
+                res.status_code()
             )));
         }
 
@@ -297,14 +275,7 @@ impl RemoteFs for S3RemoteFs {
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
         let path = self.s3_path(remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
-        let list = cube_ext::spawn_blocking(move || bucket.list(path, None))
-            .await?
-            .map_err(|err| {
-                CubeError::internal(format!(
-                    "Failed to list files in S3 bucket: {}",
-                    err.to_string()
-                ))
-            })?;
+        let list = cube_ext::spawn_blocking(move || bucket.list(path, None)).await??;
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list
             .iter()
