@@ -70,12 +70,7 @@ impl S3RemoteFs {
             ))
         })?;
         let bucket = std::sync::RwLock::new(
-            Bucket::new(&bucket_name, region.clone(), credentials).map_err(|err| {
-                CubeError::internal(format!(
-                    "Failed to create lock for S3 bucket: {}",
-                    err.to_string()
-                ))
-            })?,
+            Bucket::new(&bucket_name, region.clone(), credentials)?,
         );
         let fs = Arc::new(Self {
             dir,

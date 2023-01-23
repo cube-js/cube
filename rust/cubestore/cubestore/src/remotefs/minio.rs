@@ -72,14 +72,7 @@ impl MINIORemoteFs {
                 .to_string(),
         };
         let bucket = std::sync::RwLock::new(
-            Bucket::new(&bucket_name, region.clone(), credentials)
-                .map_err(|err| {
-                    CubeError::internal(format!(
-                        "Failed to create minIO bucket: {}",
-                        err.to_string()
-                    ))
-                })?
-                .with_path_style(),
+            Bucket::new(&bucket_name, region.clone(), credentials)?.with_path_style(),
         );
         let fs = Arc::new(Self {
             dir,
@@ -185,12 +178,7 @@ impl RemoteFs for MINIORemoteFs {
             let path = self.s3_path(&remote_path);
             info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
-            let mut temp_upload_file = File::open(temp_upload_path).map_err(|err| {
-                CubeError::internal(format!(
-                    "Failed to open temp upload file: {}",
-                    err.to_string()
-                ))
-            })?;
+            let mut temp_upload_file = File::open(temp_upload_path)?;
             let status_code = cube_ext::spawn_blocking(move || {
                 bucket.put_object_stream(&mut temp_upload_file, path)
             })
