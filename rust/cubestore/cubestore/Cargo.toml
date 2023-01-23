@@ -37,9 +37,9 @@ futures = "0.3.26"
 smallvec = "1.11.0"
 flexbuffers = { version = "0.2.2", features = ["deserialize_human_readable", "serialize_human_readable"]}
 byteorder = "1.3.4"
-log = "0.4.20"
-simple_logger = "2.3.0"
-async-trait = "0.1.79"
+log = "0.4.21"
+simple_logger = "1.7.0"
+async-trait = "0.1.36"
 actix-rt = "2.7.0"
 regex = "1.3.9"
 uuid = { version = "0.8", features = ["serde", "v4"] }
