@@ -1150,7 +1150,6 @@ name = "cubestore"
 version = "0.1.0"
 dependencies = [
  "actix-rt",
- "anyhow",
  "arrow",
  "arrow-flight",
  "async-compression",
