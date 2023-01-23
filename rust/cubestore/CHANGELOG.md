@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.52](https://github.com/cube-js/cube.js/compare/v0.31.51...v0.31.52) (2023-01-23)
+
+
+### Features
+
+* **cubestore:** Support multiple parallel QUEUE RESULT_BLOCKING ([#6038](https://github.com/cube-js/cube.js/issues/6038)) ([d8be78a](https://github.com/cube-js/cube.js/commit/d8be78a95f8fae466615063433a5ae53ab1c1bd6))
+* **cubestore:** Upgrade warp to 0.3.3 (use crates.io instead of git) ([#6043](https://github.com/cube-js/cube.js/issues/6043)) ([d2307a8](https://github.com/cube-js/cube.js/commit/d2307a8ce3449d8085810463e97d33de4b340db4))
+
+
+
+
+
 ## [0.31.48](https://github.com/cube-js/cube.js/compare/v0.31.47...v0.31.48) (2023-01-20)
 
 
