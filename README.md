@@ -11,7 +11,7 @@
 __Cube is the headless business intelligence platform.__ It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
 <img
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-scheme.png"
+  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-scheme-dark.png"
   style="border: none"
   width="100%"
 />
