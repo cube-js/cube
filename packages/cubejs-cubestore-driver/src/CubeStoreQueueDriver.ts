@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import {
   QueueDriverInterface,
   QueueDriverConnectionInterface,
@@ -8,12 +9,18 @@ import {
   AddToQueueQuery,
   AddToQueueOptions, AddToQueueResponse, QueryKey,
 } from '@cubejs-backend/base-driver';
+import { getProcessUid } from '@cubejs-backend/shared';
 
-import crypto from 'crypto';
 import { CubeStoreDriver } from './CubeStoreDriver';
 
 function hashQueryKey(queryKey: QueryKey) {
-  return crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
+  const hash = crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
+
+  if (typeof queryKey === 'object' && queryKey.persistent) {
+    return `${hash}@${getProcessUid()}`;
+  }
+
+  return hash;
 }
 
 class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {

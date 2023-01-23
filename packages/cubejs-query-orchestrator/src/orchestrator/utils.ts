@@ -1,7 +1,8 @@
 /* eslint-disable no-restricted-syntax */
 import * as querystring from 'querystring';
-import { v1, v5 } from 'uuid';
 import crypto from 'crypto';
+
+import { getProcessUid } from '@cubejs-backend/shared';
 
 function parseHostPort(addr: string): { host: string, port: number } {
   if (addr.includes(':')) {
@@ -179,18 +180,6 @@ export function parseRedisUrl(url: Readonly<string>): RedisParsedResult {
 }
 
 /**
- * Unique process ID (aka 00000000-0000-0000-0000-000000000000).
- */
-const processUid = v5(v1(), v1()).toString();
-
-/**
- * Returns unique process ID.
- */
-export function getProcessUid(): string {
-  return processUid;
-}
-
-/**
  * Unique process ID regexp.
  */
 export const processUidRE = /^[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}$/;
@@ -208,7 +197,7 @@ export function getCacheHash(queryKey) {
         .digest('hex')
     }${
       typeof queryKey === 'object' && queryKey.persistent
-        ? `::${getProcessUid()}`
+        ? `@${getProcessUid()}`
         : ''
     }`;
 }

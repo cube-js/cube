@@ -1,13 +1,12 @@
 import R from 'ramda';
-import { getEnv } from '@cubejs-backend/shared';
+import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 import { QueueDriverInterface } from '@cubejs-backend/base-driver';
-import { CubeStoreDriver, CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
-import { getProcessUid } from './utils';
 import { QueryStream } from './QueryStream';
 
 /**
@@ -559,7 +558,7 @@ export class QueryQueue {
         R.pipe(
           R.filter(p => {
             if (active.indexOf(p) === -1) {
-              const subKeys = p.split('::');
+              const subKeys = p.split('@');
               if (subKeys.length === 1) {
                 // common queries
                 return true;
