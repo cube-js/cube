@@ -870,9 +870,9 @@ dependencies = [
 
 [[package]]
 name = "colored"
-version = "2.0.0"
+version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3616f750b84d8f0de8a58bda93e08e2a81ad3f523089b05f1dffecab48c6cbd"
+checksum = "f4ffc801dacf156c5854b9df4f425a626539c3a6ef7893cc0c5084a23f0b6c59"
 dependencies = [
  "atty",
  "lazy_static",
@@ -1612,9 +1612,9 @@ dependencies = [
 
 [[package]]
 name = "flexbuffers"
-version = "0.2.2"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3556c7e0d5b671814709229de0b91aa1e6dff7844df6102cd6b7ec6c3a46a187"
+checksum = "bf2255651c8e4ba123ff7027b70b4d0aaffeb84b38c99771a70d5cc6a75821b3"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -4421,9 +4421,9 @@ dependencies = [
 
 [[package]]
 name = "simple_logger"
-version = "2.3.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48047e77b528151aaf841a10a9025f9459da80ba820e425ff7eb005708a76dc7"
+checksum = "45b60258a35dc3cb8a16890b8fd6723349bfa458d7960e25e633f1b1c19d7b5e"
 dependencies = [
  "atty",
  "colored",
