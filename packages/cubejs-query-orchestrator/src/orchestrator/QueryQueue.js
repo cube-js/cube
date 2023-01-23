@@ -782,7 +782,7 @@ export class QueryQueue {
           let target;
           switch (handler) {
             case 'stream':
-              target = this.getQueryStream(activeKeys[0]);
+              target = this.getQueryStream(this.redisHash(queryKey));
               await this.queryTimeout(this.queryHandlers.stream(query.query, target));
               break;
             default:
@@ -897,6 +897,11 @@ export class QueryQueue {
           activated,
           queryExists: !!query
         });
+        // closing stream
+        if (query?.queryHandler === 'stream') {
+          const stream = this.getQueryStream(this.redisHash(queryKey));
+          stream.destroy();
+        }
         const currentProcessingId = await queueConnection.freeProcessingLock(queryKey, processingId, activated);
         if (currentProcessingId) {
           this.logger('Skipping free processing lock', {
