@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-logo.png" alt="Cube — Headless Business Intelligence" width="300px"></a>
+  <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-logo.png" alt="Cube — Semantic Layer for Data Applications" width="300px"></a>
 </p>
 
 [Website](https://cube.dev?ref=github-readme) • [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme) • [Docs](https://cube.dev/docs?ref=github-readme) • [Examples](https://cube.dev/docs/examples?ref=github-readme) • [Blog](https://cube.dev/blog?ref=github-readme) • [Slack](https://slack.cube.dev?ref=github-readme) • [Twitter](https://twitter.com/thecubejs)
@@ -8,7 +8,7 @@
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-__Cube is the headless business intelligence platform.__ It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
+__Cube is the semantic layer for building data applications.__ It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
 <img
   src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-scheme-dark.png"
