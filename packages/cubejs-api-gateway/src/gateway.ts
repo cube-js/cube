@@ -1077,8 +1077,23 @@ class ApiGateway {
       }
 
       // Determine SQL query type and add LIMIT clause if needed
-      const selectRegex = /^(SELECT|WITH)\b/i;
-      if (selectRegex.test(query.query)) {
+      const shouldAddLimit = (sql: string): Boolean => {
+        const ddlRegex = /^(CREATE|ALTER|DROP|TRUNCATE)\b/i;
+        const dmlRegex = /^(INSERT|UPDATE|DELETE)\b/i;
+        const selectRegex = /^(SELECT|WITH)\b/i;
+      
+        if ((ddlRegex.test(sql)) || (dmlRegex.test(sql))) {
+          return false;
+        } else if (selectRegex.test(sql)) {
+          return true;
+        } else {
+          throw new UserError(
+            'Invalid SQL query'
+          );
+        }
+      };
+
+      if (shouldAddLimit(query.query)) {
         query.query = `SELECT * FROM (${query.query}) LIMIT ${query.limit};`;
       }
       
