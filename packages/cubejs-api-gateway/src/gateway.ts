@@ -1048,9 +1048,7 @@ class ApiGateway {
     const requestStarted = new Date();
     try {
       if (!query) {
-        throw new UserError(
-          'A user\'s query must contain a body'
-        );
+        throw new UserError('A user\'s query must contain a body');
       }
 
       if (!Array.isArray(query) && !query.query) {
@@ -1061,13 +1059,33 @@ class ApiGateway {
 
       query = {
         ...query,
-        requestId: context.requestId
+        requestId: context.requestId,
       };
 
-      if (query.resultFilter?.objectTypes && !Array.isArray(query.resultFilter.objectTypes)) {
+      if (
+        !query.limit ||
+        !Number.isInteger(query.limit) ||
+        query.limit > 50000 ||
+        query.limit < 1
+      ) {
+        throw new UserError(
+          'A user\'s query must contain limit query param and it must be positive number less than 50000.'
+        );
+      }
+
+      if (
+        query.resultFilter?.objectTypes &&
+        !Array.isArray(query.resultFilter.objectTypes)
+      ) {
         throw new UserError(
           'A query.resultFilter.objectTypes must be an array of strings'
         );
+      }
+
+      // Determine SQL query type and add LIMIT clause if needed
+      const selectRegex = /^(SELECT|WITH)\b/i;
+      if (selectRegex.test(query.query)) {
+        query.query = `SELECT * FROM (${query.query}) LIMIT ${query.limit};`;
       }
       
       this.log(
