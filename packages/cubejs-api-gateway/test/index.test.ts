@@ -447,7 +447,7 @@ describe('API Gateway', () => {
 
     const scheduledRefreshTimeZonesFactory = () => (['UTC', 'America/Los_Angeles']);
 
-    const appPrepareFactory = () => {
+    const appPrepareFactory = (scope?: string[]) => {
       const playgroundAuthSecret = 'test12345';
       const { app } = createApiGateway(
         new AdapterApiMock(),
@@ -460,7 +460,7 @@ describe('API Gateway', () => {
           scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory()
         }
       );
-      const token = generateAuthToken({ uid: 5, }, {}, playgroundAuthSecret);
+      const token = generateAuthToken({ uid: 5, scope }, {}, playgroundAuthSecret);
       const tokenUser = generateAuthToken({ uid: 5, }, {}, API_SECRET);
 
       return { app, token, tokenUser };
@@ -490,8 +490,8 @@ describe('API Gateway', () => {
         .expect(404);
     };
 
-    const successTestFactory = ({ route, method = 'get', successBody = {}, successResult }) => async () => {
-      const { app, token } = appPrepareFactory();
+    const successTestFactory = ({ route, method = 'get', successBody = {}, successResult, scope = [''] }) => async () => {
+      const { app, token } = appPrepareFactory(scope);
 
       const req = request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
@@ -504,18 +504,19 @@ describe('API Gateway', () => {
       expect(res.body).toMatchObject(successResult);
     };
        
-    const wrongPayloadsTestFactory = ({ route, wrongPayloads }: {
+    const wrongPayloadsTestFactory = ({ route, wrongPayloads, scope }: {
       route: string,
       method: string,
+      scope?: string[],
       wrongPayloads: {
         result: {
           status: number,
           error: string
         },
-        body: {}
+        body: {},
       }[]
     }) => async () => {
-      const { app, token } = appPrepareFactory();
+      const { app, token } = appPrepareFactory(scope);
 
       for (const payload of wrongPayloads) {
         const req = request(app).post(`/cubejs-system/v1/${route}`)
@@ -551,6 +552,7 @@ describe('API Gateway', () => {
       },
       {
         route: 'sql-runner',
+        scope: ['sql-runner'],
         method: 'post',
         successBody: {
           query: {
@@ -592,7 +594,7 @@ describe('API Gateway', () => {
           }
         }]
       },
-      { route: 'data-sources', successResult: { dataSources: [{ dataSource: 'default', dbType: 'postgres' }] } },
+      { route: 'data-sources', scope: ['sql-runner'], successResult: { dataSources: [{ dataSource: 'default', dbType: 'postgres' }] } },
     ];
 
     testConfigs.forEach((config) => {

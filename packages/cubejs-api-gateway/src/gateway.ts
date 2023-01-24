@@ -354,10 +354,12 @@ class ApiGateway {
         this.preAggregationsJobs.bind(this),
       );
 
+      const sqlRunnerMiddlewares = [...systemMiddlewares, this.checkSqlRunnerScope];
+
       app.post(
         '/cubejs-system/v1/sql-runner',
         jsonParser,
-        systemMiddlewares,
+        sqlRunnerMiddlewares,
         async (req: Request, res: Response) => {
           await this.sqlRunner({
             query: req.body.query,
@@ -370,7 +372,7 @@ class ApiGateway {
       app.get(
         '/cubejs-system/v1/data-sources',
         jsonParser,
-        systemMiddlewares,
+        sqlRunnerMiddlewares,
         async (req: Request, res: Response) => {
           await this.dataSources({
             context: req.context,
@@ -2039,6 +2041,24 @@ class ApiGateway {
 
   protected checkAuthSystemMiddleware: RequestHandler = async (req, res, next) => {
     await this.checkAuthWrapper(this.checkAuthSystemFn, req, res, next);
+  };
+  
+  protected checkSqlRunnerScope: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+    await this.checkAuthWrapper(
+      async () => {
+        if (
+          !getEnv('devMode') &&
+          (!req.context?.securityContext?.scope ||
+          !Array.isArray(req.context?.securityContext?.scope) ||
+          !req.context?.securityContext?.scope.includes('sql-runner'))
+        ) {
+          throw new CubejsHandlerError(403, 'Forbidden', 'Sql-runner scope is missing.');
+        }
+      },
+      req,
+      res,
+      next
+    );
   };
 
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
