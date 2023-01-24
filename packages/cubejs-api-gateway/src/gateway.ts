@@ -1084,6 +1084,7 @@ class ApiGateway {
 
       // Determine SQL query type and add LIMIT clause if needed
       const shouldAddLimit = (sql: string): Boolean => {
+        // TODO: Enhance the way we determine query type
         const ddlRegex = /^(CREATE|ALTER|DROP|TRUNCATE)\b/i;
         const dmlRegex = /^(INSERT|UPDATE|DELETE)\b/i;
         const selectRegex = /^(SELECT|WITH)\b/i;
@@ -1103,6 +1104,8 @@ class ApiGateway {
         const compilerApi = this.getCompilerApi(context);
         const dbType = await compilerApi(query.dataSource);
 
+        // Temporary "hack" to support Oracle and MSSQL
+        // TODO: Get limit clause from driver
         switch (dbType) {
           case 'oracle':
             query.query = `SELECT * FROM (${query.query}) WHERE ROWNUM <= ${query.limit}`;
