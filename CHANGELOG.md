@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.53](https://github.com/cube-js/cube.js/compare/v0.31.52...v0.31.53) (2023-01-24)
+
+
+### Bug Fixes
+
+* Last lambda partition is incorrectly filtered in case of middle partition is filtered out ([656edcf](https://github.com/cube-js/cube.js/commit/656edcf24f8a784cf3b5425e7d501260d48a9dc1))
+
+
+### Features
+
+* **cubestore:** Correct metrics for queue/cache (ignore long commands) ([#6047](https://github.com/cube-js/cube.js/issues/6047)) ([1d5a1f6](https://github.com/cube-js/cube.js/commit/1d5a1f679b3b1ed8a2b132acb63640405443dc43))
+
+
+
+
+
 ## [0.31.52](https://github.com/cube-js/cube.js/compare/v0.31.51...v0.31.52) (2023-01-23)
 
 
