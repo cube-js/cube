@@ -1056,7 +1056,7 @@ class ApiGateway {
           'A user\'s query must contain at least one query param.'
         );
       }
-
+      
       query = {
         ...query,
         requestId: context.requestId,
@@ -1100,7 +1100,20 @@ class ApiGateway {
       };
 
       if (shouldAddLimit(query.query)) {
-        query.query = `SELECT * FROM (${query.query}) LIMIT ${query.limit};`;
+        const compilerApi = this.getCompilerApi(context);
+        const dbType = await compilerApi(query.dataSource);
+
+        switch (dbType) {
+          case 'oracle':
+            query.query = `SELECT * FROM (${query.query}) WHERE ROWNUM <= ${query.limit}`;
+            break;
+          case 'mssql':
+            query.query = `SELECT TOP ${query.limit} * FROM (${query.query})`;
+            break;
+          default:
+            query.query = `SELECT * FROM (${query.query}) LIMIT ${query.limit};`;
+            break;
+        }
       }
       
       this.log(
@@ -1111,7 +1124,9 @@ class ApiGateway {
         context
       );
 
-      const result = await this.getAdapterApi(context).executeQuery(query);
+      const orchestratorApi = this.getAdapterApi(context);
+      const result = await orchestratorApi.executeQuery(query);
+
       if (result.data.length) {
         const objectLimit = Number(query.resultFilter?.objectLimit) || 100;
         const stringLimit = Number(query.resultFilter?.stringLimit) || 100;
