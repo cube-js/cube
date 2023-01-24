@@ -27,11 +27,44 @@ const queries: Query[] = [
   {
     measures: ['Orders.count'],
     dimensions: ['Orders.status'],
+    filters: [
+      {
+        member: 'Orders.price',
+        operator: 'gt',
+        values: ['100']
+      },
+      {
+        member: 'Orders.price',
+        operator: 'lt',
+        values: ['100']
+      },
+      {
+        member: 'Orders.price',
+        operator: 'lte',
+        values: ['100']
+      },
+      {
+        member: 'Orders.price',
+        operator: 'gte',
+        values: ['100']
+      },
+    ],
     timeDimensions: [
       {
         dimension: 'Orders.createdAt',
         granularity: 'day',
         dateRange: ['2020-01-01', '2021-01-01'],
+      },
+    ],
+  },
+  {
+    measures: ['Orders.count'],
+    dimensions: ['Orders.status'],
+    filters: [
+      {
+        member: 'Orders.createdAt',
+        operator: 'afterDate',
+        values: ['2022-02-24']
       },
     ],
   },
@@ -111,9 +144,7 @@ const q: Query =   {
     },
     {
       member: 'Orders.status',
-      // operator: 'notEquals',
       operator: 'equals',
-      // values: ['completed']
       values: ['completed', 'shipped']
     }
   ],

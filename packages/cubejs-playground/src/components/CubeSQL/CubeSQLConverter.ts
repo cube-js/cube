@@ -1,5 +1,6 @@
 import {
   BinaryFilter,
+  BinaryOperator,
   Query,
   TQueryOrderArray,
   TQueryOrderObject,
@@ -14,6 +15,15 @@ enum MemberKind {
   Segment,
   TimeDimension,
 }
+
+const operators: Partial<Record<BinaryOperator, string>> = {
+  gt: '>',
+  gte: '>=',
+  lt: '<',
+  lte: '<=',
+  afterDate: '>',
+  beforeDate: '<',
+};
 
 type ConverterMember = {
   kind: MemberKind;
@@ -64,6 +74,12 @@ export class CubeSQLConverter {
         granularity: td.granularity,
       })
     );
+
+    // this.query.filters = this.query.filters?.map((f) => {
+    //   if (f.values) {
+    //     f.
+    //   }
+    // })
 
     const pathsList = getMembersList(this.query);
     this.tables = Array.from(
@@ -182,6 +198,11 @@ export class CubeSQLConverter {
       return `(${string})`;
     }
 
+    if (filter.values && operators[filter.operator]) {
+      const value = this.escapeValue(filter.values[0]);
+      return `${filter.member} ${operators[filter.operator]} ${value}`;
+    }
+
     return '';
   }
 
@@ -207,7 +228,14 @@ export class CubeSQLConverter {
       : Object.entries(queryOrder);
 
     return `ORDER BY ${orderArray
-      .map(([member, order]) => `${member} ${order.toUpperCase()}`)
+      .map(([member, order]) => {
+        const selectMember = this.members.find((m) => m.name === member);
+        if (selectMember?.position == null) {
+          return null;
+        }
+        return `${selectMember.position + 1} ${order.toUpperCase()}`;
+      })
+      .filter(Boolean)
       .join(', ')
       .trim()}`;
   }

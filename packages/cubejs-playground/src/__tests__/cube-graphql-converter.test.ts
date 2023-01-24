@@ -1,3 +1,5 @@
+import { Query } from '@cubejs-client/core';
+
 import { CubeGraphQLConverter } from '../components/GraphQL/CubeGraphQLConverter';
 
 const types = {
@@ -9,7 +11,7 @@ const types = {
   'Users.name': 'string',
 } as const;
 
-const queries = [
+const queries: Query[] = [
   {
     measures: ['Orders.count'],
     dimensions: ['Orders.status', 'Users.country', 'Orders.createdAt'],
