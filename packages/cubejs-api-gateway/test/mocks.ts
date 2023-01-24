@@ -190,7 +190,7 @@ export class AdapterApiMock {
   }
 
   public async executeQuery(query) {
-    if (query?.query.includes('SELECT * FROM sql-runner')) {
+    if (query?.query.includes('SELECT * FROM (SELECT * FROM sql-runner) LIMIT 10000')) {
       return {
         data: [
           { skip: 'skip' },
