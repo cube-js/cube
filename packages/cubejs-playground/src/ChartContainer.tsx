@@ -1,4 +1,4 @@
-import { Component, FunctionComponent, lazy, Suspense } from 'react';
+import { Component, FunctionComponent, Suspense } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
@@ -8,7 +8,7 @@ import {
   QuestionCircleOutlined,
   SyncOutlined,
 } from '@ant-design/icons';
-import { Dropdown, Menu, Modal } from 'antd';
+import { Dropdown, Menu, Modal, Typography } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
 import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
@@ -23,6 +23,7 @@ import { codeSandboxDefinition, copyToClipboard } from './utils';
 import DashboardSource from './DashboardSource';
 import { GraphQLIcon } from './shared/icons/GraphQLIcon';
 import { loadable } from './loadable';
+import { CubeSQLConverter } from './components/CubeSQL/CubeSQLConverter';
 
 const GraphiQLSandbox = loadable(
   () => import('./components/GraphQL/GraphiQLSandbox')
@@ -63,6 +64,19 @@ type FrameworkDescriptor = {
   placeholder?: UnsupportedPlaceholder;
   scaffoldingSupported?: boolean;
 };
+
+function getCubeSql(query: Query) {
+  let cubeSql = '';
+  try {
+    const converter = new CubeSQLConverter(query);
+    cubeSql = converter.convert();
+    cubeSql = cubeSql.replace(/\s(from|where|left|group|order)\s/gi, '\n$1 ');
+  } catch (_) {
+    //
+  }
+  
+  return cubeSql;
+}
 
 const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({
   framework,
@@ -149,6 +163,7 @@ type ChartContainerState = {
     loading: boolean;
     value?: string;
   };
+  cubeSql?: string;
   [k: string]: any;
 };
 
@@ -162,6 +177,11 @@ class ChartContainer extends Component<
   };
 
   static getDerivedStateFromProps(props, state) {
+    state = {
+      ...state,
+      cubeSql: getCubeSql(props.query),
+    };
+    
     if (
       props.isChartRendererReady &&
       props.iframeRef.current != null &&
@@ -413,6 +433,21 @@ class ChartContainer extends Component<
             </Button>
 
             <Button
+              data-testid="cubesql-btn"
+              icon={<QuestionCircleOutlined />}
+              size="small"
+              type={activeTab === 'cubesql' ? 'primary' : 'default'}
+              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
+              onClick={() => {
+                playgroundAction('Show Cube SQL');
+
+                this.setState({ activeTab: 'cubesql' });
+              }}
+            >
+              SQL
+            </Button>
+
+            <Button
               data-testid="cache-btn"
               icon={<SyncOutlined />}
               size="small"
@@ -552,6 +587,16 @@ class ChartContainer extends Component<
             />
           </Suspense>
         );
+      } else if (activeTab === 'cubesql' && meta) {
+        if (!this.state.cubeSql) {
+          return (
+            <Typography.Text>
+              Error converting query to Cube SQL
+            </Typography.Text>
+          );
+        }
+
+        return <PrismCode code={this.state.cubeSql} />;
       }
 
       return null;
@@ -611,6 +656,30 @@ class ChartContainer extends Component<
               onClick={async () => {
                 await copyToClipboard(sql.value, 'The SQL has been copied');
                 playgroundAction('Copy SQL to Clipboard');
+              }}
+              type="primary"
+            >
+              Copy to Clipboard
+            </Button>
+          ) : null}
+        </SectionRow>
+      );
+    } else if (activeTab === 'cubesql') {
+      title = (
+        <SectionRow>
+          <div>Cube SQL</div>
+
+          {this.state.cubeSql ? (
+            <Button
+              data-testid="copy-sql-btn"
+              icon={<CopyOutlined />}
+              size="small"
+              onClick={async () => {
+                await copyToClipboard(
+                  this.state.cubeSql,
+                  'The SQL has been copied'
+                );
+                playgroundAction('Copy Cube SQL to Clipboard');
               }}
               type="primary"
             >

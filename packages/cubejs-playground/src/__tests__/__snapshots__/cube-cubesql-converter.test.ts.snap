@@ -1,0 +1,19 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Cube CubeSQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.state","Orders.createdAt"],"order":[["Orders.count","desc"],["Orders.status","asc"],["Users.state","desc"]]} 1`] = `"SELECT MEASURE(Orders.count), Orders.status, Users.state, Orders.createdAt FROM Orders LEFT JOIN Users ON Orders.__cubeJoinField = Users.__cubeJoinField GROUP BY Orders.status, Users.state, Orders.createdAt ORDER BY Orders.count DESC, Orders.status ASC, Users.state DESC"`;
+
+exports[`Cube CubeSQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.state","Orders.createdAt"],"order":{"Orders.count":"desc","Orders.status":"asc","Users.state":"desc"}} 1`] = `"SELECT MEASURE(Orders.count), Orders.status, Users.state, Orders.createdAt FROM Orders LEFT JOIN Users ON Orders.__cubeJoinField = Users.__cubeJoinField GROUP BY Orders.status, Users.state, Orders.createdAt ORDER BY Orders.count DESC, Orders.status ASC, Users.state DESC"`;
+
+exports[`Cube CubeSQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.state","Orders.createdAt"]} 1`] = `"SELECT MEASURE(Orders.count), Orders.status, Users.state, Orders.createdAt FROM Orders LEFT JOIN Users ON Orders.__cubeJoinField = Users.__cubeJoinField GROUP BY Orders.status, Users.state, Orders.createdAt"`;
+
+exports[`Cube CubeSQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.state"],"filters":[{"member":"Users.state","operator":"equals","values":["US"]},{"member":"Orders.status","operator":"equals","values":["canceled","active"]}]} 1`] = `"SELECT MEASURE(Orders.count), Orders.status, Users.state FROM Orders LEFT JOIN Users ON Orders.__cubeJoinField = Users.__cubeJoinField WHERE (Users.state = 'US') AND (Orders.status IN ('canceled', 'active')) GROUP BY Orders.status, Users.state"`;
+
+exports[`Cube CubeSQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status","Users.state"],"filters":[{"member":"Users.state","operator":"equals","values":["US"]},{"member":"Users.state","operator":"equals","values":["Canada"]}]} 1`] = `"SELECT MEASURE(Orders.count), Orders.status, Users.state FROM Orders LEFT JOIN Users ON Orders.__cubeJoinField = Users.__cubeJoinField WHERE (Users.state = 'US') AND (Users.state = 'Canada') GROUP BY Orders.status, Users.state"`;
+
+exports[`Cube CubeSQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"timeDimensions":[{"dimension":"Orders.createdAt","granularity":"day","dateRange":["2020-01-01","2021-01-01"]}]} 1`] = `"SELECT MEASURE(Orders.count), Orders.status, DATE_TRUNC('day', Orders.createdAt) FROM Orders  GROUP BY Orders.status, Orders.createdAt"`;
+
+exports[`Cube CubeSQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"timezone":"America/Los_Angeles","limit":100} 1`] = `"SELECT MEASURE(Orders.count), Orders.status FROM Orders  GROUP BY Orders.status LIMIT 100"`;
+
+exports[`Cube CubeSQL converter: {"measures":["Orders.count"],"dimensions":["Orders.status"],"timezone":"America/Los_Angeles","limit":100} 2`] = `"SELECT MEASURE(Orders.count), Orders.status FROM Orders  GROUP BY Orders.status LIMIT 100"`;
+
+exports[`Cube CubeSQL converter: {"measures":["Orders.count"],"timeDimensions":[{"dimension":"Orders.createdAt","granularity":"quarter"}],"order":[["Orders.count","asc"],["Users.state","asc"]],"dimensions":["Users.state","Orders.createdAt"]} 1`] = `"SELECT MEASURE(Orders.count), Users.state, Orders.createdAt, DATE_TRUNC('quarter', Orders.createdAt) FROM Users LEFT JOIN Orders ON Users.__cubeJoinField = Orders.__cubeJoinField GROUP BY Users.state, Orders.createdAt, Orders.createdAt ORDER BY Orders.count ASC, Users.state ASC"`;
