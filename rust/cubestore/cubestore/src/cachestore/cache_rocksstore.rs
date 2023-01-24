@@ -30,6 +30,7 @@ use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
 use chrono::Utc;
 use itertools::Itertools;
+use log::trace;
 use serde_derive::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -553,11 +554,13 @@ impl CacheStore for RocksCacheStore {
 
                     if item.get_row().get_status() == &QueueItemStatus::Active {
                         if let Some(orphaned_timeout) = orphaned_timeout {
-                            if let Some(heartbeat) = item.get_row().get_heartbeat() {
-                                let elapsed = now - heartbeat.clone();
-                                if elapsed.num_milliseconds() > orphaned_timeout as i64 {
-                                    return true;
-                                }
+                            let elapsed = if let Some(heartbeat) = item.get_row().get_heartbeat() {
+                                now - heartbeat.clone()
+                            } else {
+                                now - item.get_row().get_created().clone()
+                            };
+                            if elapsed.num_milliseconds() > orphaned_timeout as i64 {
+                                return true;
                             }
                         }
                     }
@@ -579,17 +582,14 @@ impl CacheStore for RocksCacheStore {
         self.store
             .read_operation(move |db_ref| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let index_key = QueueItemIndexKey::ByPrefix(prefix);
-                let items =
-                    queue_schema.get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?;
 
                 let items = if let Some(status_filter) = status_filter {
-                    items
-                        .into_iter()
-                        .filter(|item| item.get_row().status == status_filter)
-                        .collect()
+                    let index_key = QueueItemIndexKey::ByPrefixAndStatus(prefix, status_filter);
+                    queue_schema
+                        .get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefixAndStatus)?
                 } else {
-                    items
+                    let index_key = QueueItemIndexKey::ByPrefix(prefix);
+                    queue_schema.get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?
                 };
 
                 if priority_sort {
@@ -632,13 +632,17 @@ impl CacheStore for RocksCacheStore {
                     .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
 
                 if let Some(id_row) = id_row_opt {
-                    queue_schema.update_with_fn(
-                        id_row.id,
-                        |item| item.update_heartbeat(),
-                        batch_pipe,
-                    )?;
+                    let mut new = id_row.get_row().clone();
+                    new.update_heartbeat();
+
+                    queue_schema.update(id_row.id, new, id_row.get_row(), batch_pipe)?;
                     Ok(())
                 } else {
+                    trace!(
+                        "Unable to update heartbeat for queue item with path: {}",
+                        key
+                    );
+
                     Ok(())
                 }
             })
@@ -668,18 +672,20 @@ impl CacheStore for RocksCacheStore {
                             return Ok(None);
                         }
 
-                        let new = queue_schema.update_with_fn(
-                            id_row.id,
-                            |item| {
-                                let mut new = item.clone();
-                                new.status = QueueItemStatus::Active;
+                        let mut new = id_row.get_row().clone();
+                        new.status = QueueItemStatus::Active;
+                        // It's an important to insert heartbeat, because
+                        // without that created datetime will be used for orphaned filtering
+                        new.update_heartbeat();
 
-                                new
-                            },
+                        let res = queue_schema.update(
+                            id_row.get_id(),
+                            new,
+                            id_row.get_row(),
                             batch_pipe,
                         )?;
 
-                        Ok(Some(new))
+                        Ok(Some(res))
                     } else {
                         Ok(None)
                     }

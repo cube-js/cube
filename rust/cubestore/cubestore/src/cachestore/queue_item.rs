@@ -190,11 +190,8 @@ impl QueueItem {
         QueueItemStatus::Pending
     }
 
-    pub fn update_heartbeat(&self) -> Self {
-        let mut new = self.clone();
-        new.heartbeat = Some(Utc::now());
-
-        new
+    pub fn update_heartbeat(&mut self) {
+        self.heartbeat = Some(Utc::now());
     }
 
     pub fn merge_extra(&self, payload: String) -> Result<Self, CubeError> {

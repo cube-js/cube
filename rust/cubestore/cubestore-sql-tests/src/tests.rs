@@ -229,6 +229,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("cache_prefix_keys", cache_prefix_keys),
         t("queue_full_workflow", queue_full_workflow),
         t("queue_ack_then_result", queue_ack_then_result),
+        t("queue_orphaned_timeout", queue_orphaned_timeout),
         t(
             "queue_multiple_result_blocking",
             queue_multiple_result_blocking,
@@ -6665,6 +6666,67 @@ async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows().len(), 0);
+}
+
+async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:2" "payload2";"#)
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query(r#"QUEUE TO_CANCEL 1000 1000 "STANDALONE#queue";"#)
+        .await
+        .unwrap();
+    assert_eq!(res.len(), 0);
+
+    // only active jobs can be orphaned
+    // RETRIEVE updates heartbeat
+    {
+        service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 2 "STANDALONE#queue:1""#)
+            .await
+            .unwrap();
+
+        service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 2 "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+    }
+
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+
+    service
+        .exec_query(r#"QUEUE HEARTBEAT "STANDALONE#queue:2";"#)
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query(r#"QUEUE TO_CANCEL 1000 1000 "STANDALONE#queue""#)
+        .await
+        .unwrap();
+    assert_eq!(
+        res.get_columns(),
+        &vec![Column::new("id".to_string(), ColumnType::String, 0),]
+    );
+    assert_eq!(
+        res.get_rows(),
+        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+    );
+
+    // awaiting for expiring heart beat for queue:2
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+
+    let res = service
+        .exec_query(r#"QUEUE TO_CANCEL 1000 1000 "STANDALONE#queue""#)
+        .await
+        .unwrap();
+    assert_eq!(res.len(), 2);
 }
 
 async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) {
