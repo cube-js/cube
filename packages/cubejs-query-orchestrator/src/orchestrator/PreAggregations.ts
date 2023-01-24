@@ -1654,10 +1654,9 @@ export class PreAggregationPartitionRangeLoader {
           lambdaTable = await this.downloadLambdaTable(buildRangeEnd);
         }
         const rollupLambdaResults = this.preAggregationsTablesToTempTables.filter(tempTableResult => tempTableResult[1].rollupLambdaId === this.preAggregation.rollupLambdaId);
-        const lastResult = rollupLambdaResults[rollupLambdaResults.length - 1];
         const filteredResults = loadResults.filter(
           r => (this.preAggregation.lastRollupLambda || reformatInIsoLocal(r.buildRangeEnd) === reformatInIsoLocal(r.partitionRange[1])) &&
-            (!lastResult || !lastResult[1].buildRangeEnd || reformatInIsoLocal(lastResult[1].buildRangeEnd) < reformatInIsoLocal(r.partitionRange[0]))
+            rollupLambdaResults.every(result => !result[1].buildRangeEnd || reformatInIsoLocal(result[1].buildRangeEnd) < reformatInIsoLocal(r.partitionRange[0]))
         );
         if (filteredResults.length === 0) {
           emptyResult = true;

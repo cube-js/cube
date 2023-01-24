@@ -1241,6 +1241,91 @@ describe('QueryOrchestrator', () => {
     expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
   });
 
+  test('lambda partitions week', async () => {
+    const query = (matchedTimeDimensionDateRange) => ({
+      query: 'SELECT * FROM stb_pre_aggregations.orders_w UNION ALL SELECT * FROM stb_pre_aggregations.orders_d UNION ALL SELECT * FROM stb_pre_aggregations.orders_h',
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_w',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_w AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'week',
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        matchedTimeDimensionDateRange
+      }, {
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_d AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT MIN(timestamp) FROM orders', []],
+          ['SELECT \'2021-05-31\'', []],
+        ],
+        external: true,
+        partitionGranularity: 'day',
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        matchedTimeDimensionDateRange
+      }, {
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_h',
+        loadSql: [
+          'CREATE TABLE stb_pre_aggregations.orders_h AS SELECT * FROM public.orders WHERE timestamp >= ? AND timestamp <= ?',
+          ['__FROM_PARTITION_RANGE', '__TO_PARTITION_RANGE']
+        ],
+        invalidateKeyQueries: [['SELECT CASE WHEN NOW() > ? THEN NOW() END as now', ['__TO_PARTITION_RANGE'], {
+          renewalThreshold: 1,
+          updateWindowSeconds: 86400,
+          renewalThresholdOutsideUpdateWindow: 86400,
+          incremental: true
+        }]],
+        preAggregationStartEndQueries: [
+          ['SELECT \'2021-05-30\'', []],
+          ['SELECT MAX(timestamp) FROM orders', []],
+        ],
+        external: true,
+        partitionGranularity: 'hour',
+        timezone: 'UTC',
+        rollupLambdaId: 'orders.d_lambda',
+        lastRollupLambda: true,
+        matchedTimeDimensionDateRange
+      }],
+      requestId: 'lambda partitions',
+      external: true,
+    });
+    const result = await queryOrchestrator.fetchQuery(query());
+    console.log(JSON.stringify(result, null, 2));
+    expect(result.data[0]).not.toMatch(/orders_h2021053000/);
+    expect(result.data[0]).toMatch(/orders_h2021053100/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
+  });
+
   test('real-time sealing partitions', async () => {
     const query = (matchedTimeDimensionDateRange) => ({
       query: 'SELECT * FROM stb_pre_aggregations.orders_d',
