@@ -750,7 +750,7 @@ export class QueryQueue {
 
       const activated = activeKeys && activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
       if (!query) {
-        query = await queueConnection.getQueryDef(this.redisHash(queryKey));
+        query = await queueConnection.getQueryDef(queryKey);
       }
 
       if (query && insertedCount && activated && processingLockAcquired) {
@@ -778,10 +778,9 @@ export class QueryQueue {
         );
         try {
           const handler = query?.queryHandler;
-          let target;
           switch (handler) {
             case 'stream':
-              target = this.getQueryStream(this.redisHash(queryKey));
+              const target = this.getQueryStream(queryKey);
               await this.queryTimeout(this.queryHandlers.stream(query.query, target));
               break;
             default:
@@ -898,7 +897,7 @@ export class QueryQueue {
         });
         // closing stream
         if (query?.queryHandler === 'stream') {
-          const stream = this.getQueryStream(this.redisHash(queryKey));
+          const stream = this.getQueryStream(queryKey);
           stream.destroy();
         }
         const currentProcessingId = await queueConnection.freeProcessingLock(queryKey, processingId, activated);
