@@ -1,5 +1,6 @@
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import { pausePromise } from '@cubejs-backend/shared';
+import type { QueryKey } from '@cubejs-backend/base-driver';
 import { QueryQueue } from '../../src';
 import { processUidRE } from '../../src/orchestrator/utils';
 
@@ -14,7 +15,11 @@ export type QueryQueueTestOptions = {
 export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}) => {
   describe(`QueryQueue${name}`, () => {
     let delayCount = 0;
+    let streamCount = 0;
+
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
+    const logger = jest.fn((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
+
     let cancelledQuery;
     const queue = new QueryQueue('test_query_queue', {
       queryHandlers: {
@@ -24,7 +29,10 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           delayCount += 1;
           await setCancelHandler(result);
           return delayFn(result, query.delay);
-        }
+        },
+        stream: async () => {
+          streamCount++;
+        },
       },
       cancelHandlers: {
         delay: (query) => {
@@ -36,7 +44,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       executionTimeout: 2,
       orphanedTimeout: 2,
       concurrency: 1,
-      ...options
+      ...options,
+      logger,
     });
 
     if (options?.cacheAndQueueDriver === 'cubestore') {
@@ -44,6 +53,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       afterEach(async () => {
         await queue.shutdown();
         await pausePromise(2500);
+
+        logger.mockClear();
       });
     }
 
@@ -194,6 +205,22 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       } else {
         expect(queue.redisHash('string')).toBe('string');
       }
+    });
+
+    test('stream handler', async () => {
+      const key: QueryKey = ['select * from table', []];
+      key.persistent = true;
+
+      queue.setQueryStream(key, {});
+
+      await queue.executeInQueue('stream', key, { }, 0);
+      await queue.shutdown();
+      // TODO(ovr): await with shutdown
+      await pausePromise(1500);
+
+      expect(streamCount).toEqual(1);
+      expect(logger.mock.calls.length).toEqual(3);
+      expect(logger.mock.calls[2][0]).toEqual('Performing query completed');
     });
 
     test('removed before reconciled', async () => {
