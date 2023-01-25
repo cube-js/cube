@@ -71,6 +71,10 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
     };
   },
 
+  async getDbType() {
+    return 'postgres';
+  },
+
   async metaConfig() {
     return [
       {
@@ -190,7 +194,7 @@ export class AdapterApiMock {
   }
 
   public async executeQuery(query) {
-    if (query?.query.includes('SELECT * FROM (SELECT * FROM sql-runner) LIMIT 10000')) {
+    if (query?.query.includes('SELECT * FROM sql-runner')) {
       return {
         data: [
           { skip: 'skip' },

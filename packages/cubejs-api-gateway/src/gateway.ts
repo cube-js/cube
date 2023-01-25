@@ -1095,21 +1095,14 @@ class ApiGateway {
       };
 
       if (shouldAddLimit(query.query)) {
-        const compilerApi = this.getCompilerApi(context);
-        const dbType = await compilerApi(query.dataSource);
+        const dbType = await this.getCompilerApi(context).getDbType('default');
 
-        // Temporary "hack" to support Oracle and MSSQL
-        // TODO: Get limit clause from driver
-        switch (dbType) {
-          case 'oracle':
-            query.query = `SELECT * FROM (${query.query}) WHERE ROWNUM <= ${query.limit}`;
-            break;
-          case 'mssql':
-            query.query = `SELECT TOP ${query.limit} * FROM (${query.query})`;
-            break;
-          default:
-            query.query = `SELECT * FROM (${query.query}) LIMIT ${query.limit};`;
-            break;
+        if (dbType === 'oracle') {
+          query.query = `SELECT * FROM (${query.query}) WHERE ROWNUM <= ${query.limit}`;
+        } else if (dbType === 'mssql') {
+          query.query = `SELECT TOP ${query.limit} * FROM (${query.query})`;
+        } else {
+          query.query = `SELECT * FROM (${query.query}) LIMIT ${query.limit}`;
         }
       }
       
