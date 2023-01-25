@@ -793,6 +793,8 @@ export class QueryQueue {
               await this.queryTimeout(
                 this.queryHandlers.stream(query.query, this.getQueryStream(queryKeyHashed))
               );
+
+              executionResult = {};
               break;
             default:
               executionResult = {
