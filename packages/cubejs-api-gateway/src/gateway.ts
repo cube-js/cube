@@ -1101,7 +1101,7 @@ class ApiGateway {
       };
 
       if (shouldAddLimit(query.query)) {
-        const dbType = await this.getCompilerApi(context).getDbType('default');
+        const dbType = await this.getCompilerApi(context).getDbType(query.dataSource);
 
         if (dbType === 'oracle') {
           query.query = `SELECT * FROM (${query.query}) WHERE ROWNUM <= ${query.limit}`;
