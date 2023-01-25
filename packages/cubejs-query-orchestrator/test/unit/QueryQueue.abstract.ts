@@ -48,15 +48,19 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       logger,
     });
 
-    if (options?.cacheAndQueueDriver === 'cubestore') {
-      // TODO: Find all problems with queue
-      afterEach(async () => {
+    afterEach(async () => {
+      if (options?.cacheAndQueueDriver === 'cubestore') {
         await queue.shutdown();
+        // TODO(ovr): Await with shutdown
         await pausePromise(2500);
+      }
 
-        logger.mockClear();
-      });
-    }
+      logger.mockClear();
+    });
+
+    beforeEach(async () => {
+      logger.mockClear();
+    });
 
     afterAll(async () => {
       await queue.shutdown();
