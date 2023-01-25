@@ -5,7 +5,7 @@ import LRUCache from 'lru-cache';
 import isDocker from 'is-docker';
 import pLimit from 'p-limit';
 
-import { ApiGateway, UserBackgroundContext } from '@cubejs-backend/api-gateway';
+import { ApiGateway, ApiGatewayOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import {
   CancelableInterval,
   createCancelableInterval, formatDuration, getAnonymousId,
@@ -435,7 +435,7 @@ export class CubejsServerCore {
       return this.apiGatewayInstance;
     }
 
-    return (this.apiGatewayInstance = new ApiGateway(
+    return (this.apiGatewayInstance = this.createApiGatewayInstance(
       this.options.apiSecret,
       this.getCompilerApi.bind(this),
       this.getOrchestratorApi.bind(this),
@@ -459,6 +459,16 @@ export class CubejsServerCore {
         serverCoreVersion: this.coreServerVersion,
       }
     ));
+  }
+
+  protected createApiGatewayInstance(
+    apiSecret: string,
+    getCompilerApi: (context: RequestContext) => CompilerApi,
+    getOrchestratorApi: (context: RequestContext) => OrchestratorApi,
+    logger: LoggerFn,
+    options: ApiGatewayOptions
+  ): ApiGateway {
+    return new ApiGateway(apiSecret, getCompilerApi, getOrchestratorApi, logger, options);
   }
 
   protected async contextRejectionMiddleware(req, res, next) {
