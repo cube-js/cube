@@ -477,11 +477,11 @@ export class QueryCache {
     if (!persistent) {
       return queue.executeInQueue('query', cacheKey, _query, priority, opt);
     } else {
-      const _stream = queue.getQueryStream(cacheKey, aliasNameToMember);
+      const stream = queue.setQueryStream(cacheKey, aliasNameToMember);
       // we don't want to handle error here as we want it to bubble up
       // to the api gateway
       queue.executeInQueue('stream', cacheKey, _query, priority, opt);
-      return _stream;
+      return stream;
     }
   }
 
