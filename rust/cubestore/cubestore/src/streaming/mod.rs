@@ -311,10 +311,6 @@ impl StreamingService for StreamingServiceImpl {
                 }
             }
             let seq_pointer = SeqPointer::new(start_seq, end_seq);
-            let replay_handle = self
-                .meta_store
-                .create_replay_handle(table.get_id(), location_index, seq_pointer)
-                .await?;
             let data = finish(builders);
             let data = source.apply_post_filter(data).await?;
 
