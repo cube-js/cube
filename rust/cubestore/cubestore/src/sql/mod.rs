@@ -35,7 +35,7 @@ use tracing_futures::WithSubscriber;
 use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
-use crate::cachestore::{CacheItem, CacheStore, QueueItem, QueueResultResponse};
+use crate::cachestore::{CacheItem, CacheStore, QueueItem};
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -1336,14 +1336,7 @@ impl SqlService for SqlServiceImpl {
                     QueueCommand::Result { key } => {
                         let ack_result = self.cachestore.queue_result(key.value).await?;
                         let rows = if let Some(ack_result) = ack_result {
-                            match ack_result {
-                                QueueResultResponse::Success { value } => {
-                                    vec![Row::new(vec![
-                                        TableValue::String(value),
-                                        TableValue::String("success".to_string()),
-                                    ])]
-                                }
-                            }
+                            vec![ack_result.into_queue_result_row()]
                         } else {
                             vec![]
                         };
@@ -1366,14 +1359,7 @@ impl SqlService for SqlServiceImpl {
                             .await?;
 
                         let rows = if let Some(ack_result) = ack_result {
-                            match ack_result {
-                                QueueResultResponse::Success { value } => {
-                                    vec![Row::new(vec![
-                                        TableValue::String(value),
-                                        TableValue::String("success".to_string()),
-                                    ])]
-                                }
-                            }
+                            vec![ack_result.into_queue_result_row()]
                         } else {
                             vec![]
                         };

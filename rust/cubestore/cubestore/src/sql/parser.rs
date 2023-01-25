@@ -119,7 +119,7 @@ pub enum QueueCommand {
     },
     Ack {
         key: Ident,
-        result: String,
+        result: Option<String>,
     },
     MergeExtra {
         key: Ident,
@@ -362,10 +362,16 @@ impl<'a> CubeStoreParser<'a> {
             "heartbeat" => QueueCommand::Heartbeat {
                 key: self.parser.parse_identifier()?,
             },
-            "ack" => QueueCommand::Ack {
-                key: self.parser.parse_identifier()?,
-                result: self.parser.parse_literal_string()?,
-            },
+            "ack" => {
+                let key = self.parser.parse_identifier()?;
+                let result = if self.parser.parse_keyword(Keyword::NULL) {
+                    None
+                } else {
+                    Some(self.parser.parse_literal_string()?)
+                };
+
+                QueueCommand::Ack { key, result }
+            }
             "merge_extra" => QueueCommand::MergeExtra {
                 key: self.parser.parse_identifier()?,
                 payload: self.parser.parse_literal_string()?,

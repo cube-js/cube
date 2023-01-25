@@ -279,7 +279,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   public async setResultAndRemoveQuery(queryKey: string, executionResult: any, _processingId: any): Promise<boolean> {
     await this.driver.query('QUEUE ACK ? ? ', [
       this.prefixKey(queryKey),
-      JSON.stringify(executionResult)
+      executionResult ? JSON.stringify(executionResult) : executionResult
     ]);
 
     return true;

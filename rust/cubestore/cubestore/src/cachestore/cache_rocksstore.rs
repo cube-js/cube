@@ -3,7 +3,7 @@ use crate::cachestore::cache_item::{
 };
 use crate::cachestore::queue_item::{
     QueueItem, QueueItemIndexKey, QueueItemRocksIndex, QueueItemRocksTable, QueueItemStatus,
-    QueueResultAckEvent,
+    QueueResultAckEvent, QueueResultAckEventResult,
 };
 use crate::cachestore::queue_result::{
     QueueResultIndexKey, QueueResultRocksIndex, QueueResultRocksTable,
@@ -28,6 +28,7 @@ use rocksdb::{Options, DB};
 
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
+use crate::table::{Row, TableValue};
 use chrono::Utc;
 use itertools::Itertools;
 use log::trace;
@@ -254,7 +255,7 @@ impl RocksCacheStore {
                     result_schema.try_delete(queue_result.get_id(), batch_pipe)?;
 
                     Ok(Some(QueueResultResponse::Success {
-                        value: queue_result.row.value,
+                        value: Some(queue_result.row.value),
                     }))
                 } else {
                     Ok(None)
@@ -283,7 +284,22 @@ pub struct QueueAddResponse {
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum QueueResultResponse {
-    Success { value: String },
+    Success { value: Option<String> },
+}
+
+impl QueueResultResponse {
+    pub fn into_queue_result_row(self) -> Row {
+        match self {
+            QueueResultResponse::Success { value } => Row::new(vec![
+                if let Some(v) = value {
+                    TableValue::String(v)
+                } else {
+                    TableValue::Null
+                },
+                TableValue::String("success".to_string()),
+            ]),
+        }
+    }
 }
 
 #[cuberpc::service]
@@ -325,7 +341,7 @@ pub trait CacheStore: DIService + Send + Sync {
         key: String,
         allow_concurrency: u32,
     ) -> Result<Option<IdRow<QueueItem>>, CubeError>;
-    async fn queue_ack(&self, key: String, result: String) -> Result<(), CubeError>;
+    async fn queue_ack(&self, key: String, result: Option<String>) -> Result<(), CubeError>;
     async fn queue_result(&self, key: String) -> Result<Option<QueueResultResponse>, CubeError>;
     async fn queue_result_blocking(
         &self,
@@ -696,7 +712,7 @@ impl CacheStore for RocksCacheStore {
             .await
     }
 
-    async fn queue_ack(&self, path: String, result: String) -> Result<(), CubeError> {
+    async fn queue_ack(&self, path: String, result: Option<String>) -> Result<(), CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -708,14 +724,23 @@ impl CacheStore for RocksCacheStore {
                 if let Some(item_row) = item_row {
                     queue_schema.delete(item_row.get_id(), batch_pipe)?;
 
-                    let queue_result = QueueResult::new(path.clone(), result.clone());
-                    let result_row = result_schema.insert(queue_result, batch_pipe)?;
+                    if let Some(result) = result {
+                        let queue_result = QueueResult::new(path.clone(), result.clone());
+                        let result_row = result_schema.insert(queue_result, batch_pipe)?;
 
-                    batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                        row_id: result_row.get_id(),
-                        path,
-                        result,
-                    }));
+                        batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
+                            path,
+                            result: QueueResultAckEventResult::WithResult {
+                                row_id: result_row.get_id(),
+                                result,
+                            },
+                        }));
+                    } else {
+                        batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
+                            path,
+                            result: QueueResultAckEventResult::Empty {},
+                        }));
+                    }
 
                     Ok(())
                 } else {
@@ -750,18 +775,23 @@ impl CacheStore for RocksCacheStore {
 
         if let Ok(res) = fut.await {
             match res {
-                Ok(Some(ack_event)) => {
-                    self.store
-                        .write_operation(move |db_ref, batch_pipe| {
-                            let queue_schema = QueueResultRocksTable::new(db_ref.clone());
-                            queue_schema.try_delete(ack_event.row_id, batch_pipe)?;
+                Ok(Some(ack_event)) => match ack_event.result {
+                    QueueResultAckEventResult::Empty => {
+                        Ok(Some(QueueResultResponse::Success { value: None }))
+                    }
+                    QueueResultAckEventResult::WithResult { row_id, result } => {
+                        self.store
+                            .write_operation(move |db_ref, batch_pipe| {
+                                let queue_schema = QueueResultRocksTable::new(db_ref.clone());
+                                queue_schema.try_delete(row_id, batch_pipe)?;
 
-                            Ok(Some(QueueResultResponse::Success {
-                                value: ack_event.result,
-                            }))
-                        })
-                        .await
-                }
+                                Ok(Some(QueueResultResponse::Success {
+                                    value: Some(result),
+                                }))
+                            })
+                            .await
+                    }
+                },
                 Ok(None) => Ok(None),
                 Err(e) => Err(e),
             }
@@ -899,7 +929,7 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_retrieve was used.")
     }
 
-    async fn queue_ack(&self, _key: String, _result: String) -> Result<(), CubeError> {
+    async fn queue_ack(&self, _key: String, _result: Option<String>) -> Result<(), CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_ack was used.")
     }
 

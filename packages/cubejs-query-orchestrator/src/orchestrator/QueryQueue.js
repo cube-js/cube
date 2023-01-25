@@ -794,7 +794,8 @@ export class QueryQueue {
                 this.queryHandlers.stream(query.query, this.getQueryStream(queryKeyHashed))
               );
 
-              executionResult = {};
+              // CubeStore has special handling for null
+              executionResult = null;
               break;
             default:
               executionResult = {

@@ -18,9 +18,9 @@ impl RocksCacheStoreListener {
     ) -> Result<Option<QueueResultAckEvent>, CubeError> {
         loop {
             let event = self.receiver.recv().await?;
-            if let MetaStoreEvent::AckQueueItem(payload) = event {
-                if payload.path == path {
-                    return Ok(Some(payload));
+            if let MetaStoreEvent::AckQueueItem(ack_event) = event {
+                if ack_event.path == path {
+                    return Ok(Some(ack_event));
                 }
             }
         }
