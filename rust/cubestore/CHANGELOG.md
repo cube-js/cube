@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.54](https://github.com/cube-js/cube.js/compare/v0.31.53...v0.31.54) (2023-01-25)
+
+
+### Features
+
+* **cubestore:** Filter for data from kafka streams ([#6054](https://github.com/cube-js/cube.js/issues/6054)) ([3b1b1ab](https://github.com/cube-js/cube.js/commit/3b1b1ab052c96d1de635da0eb10fdea5701c0442))
+* **cubestore:** Queue - improve orphaned detection + optimizations ([#6051](https://github.com/cube-js/cube.js/issues/6051)) ([70e68ae](https://github.com/cube-js/cube.js/commit/70e68ae35ed7bc66b8306512ae68c7919e45e2cc))
+
+
+
+
+
 ## [0.31.53](https://github.com/cube-js/cube.js/compare/v0.31.52...v0.31.53) (2023-01-24)
 
 
