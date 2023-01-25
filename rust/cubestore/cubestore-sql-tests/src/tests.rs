@@ -230,6 +230,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("queue_full_workflow", queue_full_workflow),
         t("queue_ack_then_result", queue_ack_then_result),
         t("queue_orphaned_timeout", queue_orphaned_timeout),
+        t("queue_heartbeat", queue_heartbeat),
+        t("queue_merge_extra", queue_merge_extra),
         t(
             "queue_multiple_result_blocking",
             queue_multiple_result_blocking,
@@ -6727,6 +6729,91 @@ async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(res.len(), 2);
+}
+
+async fn queue_heartbeat(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query(r#"SELECT heartbeat FROM system.queue WHERE prefix = 'STANDALONE#queue'"#)
+        .await
+        .unwrap();
+    assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Null,]),]);
+
+    service
+        .exec_query(r#"QUEUE HEARTBEAT "STANDALONE#queue:1";"#)
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query(r#"SELECT heartbeat FROM system.queue WHERE prefix = 'STANDALONE#queue'"#)
+        .await
+        .unwrap();
+
+    let row = res.get_rows().first().unwrap();
+    match row.values().first().unwrap() {
+        TableValue::Timestamp(_) => {}
+        other => panic!("heartbeat must be a timestamp type, actual: {:?}", other),
+    }
+}
+
+async fn queue_merge_extra(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    // extra must be empty after creation
+    {
+        let res = service
+            .exec_query(r#"QUEUE GET "STANDALONE#queue:1";"#)
+            .await
+            .unwrap();
+        assert_eq!(
+            res.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload1".to_string()),
+                TableValue::Null
+            ]),]
+        );
+    }
+
+    service
+        .exec_query(r#"QUEUE MERGE_EXTRA "STANDALONE#queue:1" '{"first": true}';"#)
+        .await
+        .unwrap();
+
+    // extra should contains first field
+    {
+        let res = service
+            .exec_query(r#"QUEUE GET "STANDALONE#queue:1";"#)
+            .await
+            .unwrap();
+        assert_eq!(
+            res.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload1".to_string()),
+                TableValue::String("{\"first\": true}".to_string())
+            ]),]
+        );
+    }
 }
 
 async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) {
