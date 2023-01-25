@@ -2,12 +2,30 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::table::StreamOffset;
 use crate::metastore::Column;
+use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::{parse_json_payload_and_key, StreamingSource};
 use crate::table::{Row, TableValue};
 use crate::CubeError;
+use arrow::array::ArrayRef;
+use arrow::record_batch::RecordBatch;
+use arrow::{datatypes::Schema, datatypes::SchemaRef};
 use async_std::stream;
 use async_trait::async_trait;
+use datafusion::catalog::TableReference;
 use datafusion::cube_ext;
+use datafusion::datasource::datasource::Statistics;
+use datafusion::datasource::TableProvider;
+use datafusion::error::DataFusionError;
+use datafusion::logical_plan::Expr as DExpr;
+use datafusion::logical_plan::LogicalPlan;
+use datafusion::physical_plan::empty::EmptyExec;
+use datafusion::physical_plan::memory::MemoryExec;
+use datafusion::physical_plan::udaf::AggregateUDF;
+use datafusion::physical_plan::udf::ScalarUDF;
+use datafusion::physical_plan::{collect, ExecutionPlan};
+use datafusion::prelude::ExecutionContext;
+use datafusion::sql::parser::Statement as DFStatement;
+use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use futures::Stream;
 use json::object::Object;
 use json::JsonValue;
@@ -16,6 +34,10 @@ use rdkafka::error::KafkaResult;
 use rdkafka::message::BorrowedMessage;
 use rdkafka::util::Timeout;
 use rdkafka::{ClientConfig, Message, Offset, TopicPartitionList};
+use sqlparser::ast::{Query, SetExpr, Statement};
+use sqlparser::parser::Parser;
+use sqlparser::tokenizer::Tokenizer;
+use std::any::Any;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -28,18 +50,18 @@ pub struct KafkaStreamingSource {
     password: Option<String>,
     topic: String,
     host: String,
-    // TODO Support parsing of filters and applying before insert
-    _select_statement: Option<String>,
     offset: Option<StreamOffset>,
     partition: usize,
     kafka_client: Arc<dyn KafkaClientService>,
     use_ssl: bool,
+    post_filter: Option<Arc<dyn ExecutionPlan>>,
 }
 
 impl KafkaStreamingSource {
     pub fn new(
         table_id: u64,
         unique_key_columns: Vec<Column>,
+        columns: Vec<Column>,
         user: Option<String>,
         password: Option<String>,
         topic: String,
@@ -50,6 +72,26 @@ impl KafkaStreamingSource {
         kafka_client: Arc<dyn KafkaClientService>,
         use_ssl: bool,
     ) -> Self {
+        let post_filter = if let Some(select_statement) = select_statement {
+            let planner = KafkaFilterPlanner {
+                topic: topic.clone(),
+                columns,
+            };
+            match planner.parse_select_statement(select_statement.clone()) {
+                Ok(p) => p,
+                Err(e) => {
+                    //FIXME May be we should stop execution here
+                    log::error!(
+                        "Error while parsing `select_statement`: {}. Select statement ignored",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         KafkaStreamingSource {
             table_id,
             unique_key_columns,
@@ -57,11 +99,129 @@ impl KafkaStreamingSource {
             password,
             topic,
             host,
-            _select_statement: select_statement,
             offset,
             partition,
             kafka_client,
             use_ssl,
+            post_filter,
+        }
+    }
+}
+
+pub struct KafkaFilterPlanner {
+    topic: String,
+    columns: Vec<Column>,
+}
+
+impl KafkaFilterPlanner {
+    fn parse_select_statement(
+        &self,
+        select_statement: String,
+    ) -> Result<Option<Arc<dyn ExecutionPlan>>, CubeError> {
+        let dialect = &MySqlDialectWithBackTicks {};
+        let mut tokenizer = Tokenizer::new(dialect, &select_statement);
+        let tokens = tokenizer.tokenize().unwrap();
+        let statement = Parser::new(tokens, dialect).parse_statement()?;
+
+        match &statement {
+            Statement::Query(box Query {
+                body: SetExpr::Select(s),
+                ..
+            }) => {
+                if s.selection.is_none() {
+                    return Ok(None);
+                }
+                let provider = TopicTableProvider::new(self.topic.clone(), &self.columns);
+                let query_planner = SqlToRel::new(&provider);
+                let logical_plan =
+                    query_planner.statement_to_plan(&DFStatement::Statement(statement.clone()))?;
+                let physical_filter = Self::make_physical_filter(&logical_plan)?;
+                Ok(physical_filter)
+            }
+            _ => Err(CubeError::user(format!(
+                "{} is not valid select query",
+                select_statement
+            ))),
+        }
+    }
+
+    /// Only Projection > Filter > TableScan plans are allowed
+    fn make_physical_filter(
+        plan: &LogicalPlan,
+    ) -> Result<Option<Arc<dyn ExecutionPlan>>, CubeError> {
+        match plan {
+            LogicalPlan::Projection { input, .. } => match input.as_ref() {
+                filter_plan @ LogicalPlan::Filter { input, .. } => match input.as_ref() {
+                    LogicalPlan::TableScan { .. } => {
+                        let plan_ctx = Arc::new(ExecutionContext::new());
+                        let phys_plan = plan_ctx.create_physical_plan(&filter_plan)?;
+                        Ok(Some(phys_plan))
+                    }
+                    _ => Ok(None),
+                },
+                _ => Ok(None),
+            },
+            _ => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct TopicTableProvider {
+    topic: String,
+    schema: SchemaRef,
+}
+
+impl TopicTableProvider {
+    pub fn new(topic: String, columns: &Vec<Column>) -> Self {
+        let schema = Arc::new(Schema::new(
+            columns.iter().map(|c| c.clone().into()).collect::<Vec<_>>(),
+        ));
+        Self { topic, schema }
+    }
+}
+
+impl ContextProvider for TopicTableProvider {
+    fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>> {
+        match name {
+            TableReference::Bare { table } if table == self.topic => Some(Arc::new(self.clone())),
+            _ => None,
+        }
+    }
+
+    fn get_function_meta(&self, _name: &str) -> Option<Arc<ScalarUDF>> {
+        None
+    }
+
+    fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
+        None
+    }
+}
+
+impl TableProvider for TopicTableProvider {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+
+    fn scan(
+        &self,
+        _projection: &Option<Vec<usize>>,
+        _batch_size: usize,
+        _filters: &[DExpr],
+        _limit: Option<usize>,
+    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        Ok(Arc::new(EmptyExec::new(false, self.schema())))
+    }
+
+    fn statistics(&self) -> Statistics {
+        Statistics {
+            num_rows: None,
+            total_byte_size: None,
+            column_statistics: None,
         }
     }
 }
@@ -295,6 +455,25 @@ impl StreamingSource for KafkaStreamingSource {
             .await?;
 
         Ok(stream)
+    }
+
+    async fn apply_post_filter(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
+        if let Some(post_filter) = &self.post_filter {
+            let schema = post_filter.children()[0].schema();
+            let batch = RecordBatch::try_new(schema.clone(), data)?;
+            let input = Arc::new(MemoryExec::try_new(&[vec![batch]], schema.clone(), None)?);
+            let filter = post_filter.with_new_children(vec![input])?;
+            let mut out_batches = collect(filter).await?;
+            let res = if out_batches.len() == 1 {
+                out_batches.pop().unwrap()
+            } else {
+                RecordBatch::concat(&schema, &out_batches)?
+            };
+
+            Ok(res.columns().to_vec())
+        } else {
+            Ok(data)
+        }
     }
 
     fn validate_table_location(&self) -> Result<(), CubeError> {
