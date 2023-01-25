@@ -588,7 +588,8 @@ jobs:
             strip: true
             # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
-          - os: macos-latest
+            # Please use minimal possible version of macOS, because it produces constraint on libstdc++
+          - os: macos-11
             target: x86_64-apple-darwin
             executable_name: cubestored
             cross: false
@@ -648,11 +649,6 @@ jobs:
         if: ${{ !matrix.cross }}
         run: |
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
-      - name: Brew update & install upx (workaround to use upx from github, instead of bintray)
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
-          brew update
-          brew install upx
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}

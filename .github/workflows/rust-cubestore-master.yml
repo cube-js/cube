@@ -194,7 +194,8 @@ jobs:
             strip: true
             # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
             compress: false
-          - os: macos-latest
+            # Please use minimal possible version of macOS, because it produces constraint on libstdc++
+          - os: macos-11
             target: x86_64-apple-darwin
             executable_name: cubestored
             cross: false
