@@ -135,7 +135,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         getEnv('athenaAwsCatalog', { dataSource }),
       database:
         config.database ||
-        getEnv('athenaAwsDatabase', { dataSource }),
+        getEnv('dbName', { dataSource }),
       exportBucket:
         config.exportBucket ||
         getEnv('dbExportBucket', { dataSource }),
