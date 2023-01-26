@@ -1097,12 +1097,16 @@ class ApiGateway {
       if (shouldAddLimit(query.query)) {
         const dbType = await this.getCompilerApi(context).getDbType(query.dataSource);
 
+        if (query.query.charAt(query.query.length - 1) === ';') {
+          query.query = query.query.slice(0, -1);
+        }
+
         if (dbType === 'oracle') {
-          query.query = `SELECT * FROM (${query.query}) WHERE ROWNUM <= ${query.limit}`;
+          query.query = `SELECT * FROM (${query.query}) AS t WHERE ROWNUM <= ${query.limit}`;
         } else if (dbType === 'mssql') {
-          query.query = `SELECT TOP ${query.limit} * FROM (${query.query})`;
+          query.query = `SELECT TOP ${query.limit} * FROM (${query.query}) AS t`;
         } else {
-          query.query = `SELECT * FROM (${query.query}) LIMIT ${query.limit}`;
+          query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
         }
       }
       
