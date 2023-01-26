@@ -60,8 +60,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await queue.shutdown();
       await Promise.all(processMessagePromises);
       await Promise.all(processCancelPromises);
-      // stdout conflict with console.log
-      await pausePromise(100);
 
       processMessagePromises = [];
       processCancelPromises = [];
@@ -79,6 +77,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
 
     afterAll(async () => {
       await awaitProcessing();
+      // stdout conflict with console.log
+      await pausePromise(100);
 
       if (options?.afterAll) {
         await options?.afterAll();
