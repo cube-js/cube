@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/cubestore-driver",
   "description": "Cube Store driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.54",
+  "version": "0.31.55",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -26,9 +26,9 @@
     "lint:fix": "eslint --fix src/*.ts"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "^0.31.48",
-    "@cubejs-backend/cubestore": "^0.31.54",
-    "@cubejs-backend/shared": "^0.31.48",
+    "@cubejs-backend/base-driver": "^0.31.55",
+    "@cubejs-backend/cubestore": "^0.31.55",
+    "@cubejs-backend/shared": "^0.31.55",
     "csv-write-stream": "^2.0.0",
     "flatbuffers": "^1.12.0",
     "fs-extra": "^9.1.0",

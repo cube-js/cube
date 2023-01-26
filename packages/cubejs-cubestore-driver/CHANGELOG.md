@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.55](https://github.com/cube-js/cube.js/compare/v0.31.54...v0.31.55) (2023-01-26)
+
+
+### Features
+
+* **cubestore-driver:** Queue  - support persistent flag/stream handling ([#6046](https://github.com/cube-js/cube.js/issues/6046)) ([5b12ec8](https://github.com/cube-js/cube.js/commit/5b12ec874f33d30a02df55f792f1fc1ce0a30bf4))
+
+
+
+
+
 ## [0.31.54](https://github.com/cube-js/cube.js/compare/v0.31.53...v0.31.54) (2023-01-25)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver
