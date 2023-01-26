@@ -1,6 +1,6 @@
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import { pausePromise } from '@cubejs-backend/shared';
 import type { QueryKey } from '@cubejs-backend/base-driver';
+import { pausePromise } from '@cubejs-backend/shared';
 import { QueryQueue } from '../../src';
 import { processUidRE } from '../../src/orchestrator/utils';
 
@@ -14,13 +14,15 @@ export type QueryQueueTestOptions = {
 
 export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}) => {
   describe(`QueryQueue${name}`, () => {
-    let delayCount = 0;
-    let streamCount = 0;
-
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
     const logger = jest.fn((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
 
+    let delayCount = 0;
+    let streamCount = 0;
+    let processMessagePromises = [];
+    let processCancelPromises = [];
     let cancelledQuery;
+
     const queue = new QueryQueue('test_query_queue', {
       queryHandlers: {
         foo: async (query) => `${query[0]} bar`,
@@ -33,6 +35,12 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
         stream: async () => {
           streamCount++;
         },
+      },
+      sendProcessMessageFn: async (queryKeyHashed) => {
+        processMessagePromises.push(queue.processQuery.bind(queue)(queryKeyHashed));
+      },
+      sendCancelMessageFn: async (query) => {
+        processCancelPromises.push(queue.processCancel.bind(queue)(query));
       },
       cancelHandlers: {
         delay: (query) => {
@@ -48,22 +56,29 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       logger,
     });
 
-    afterEach(async () => {
-      if (options?.cacheAndQueueDriver === 'cubestore') {
-        await queue.shutdown();
-        // TODO(ovr): Await with shutdown
-        await pausePromise(2500);
-      }
+    async function awaitProcessing() {
+      await queue.shutdown();
+      await Promise.all(processMessagePromises);
+      await Promise.all(processCancelPromises);
+      // stdout conflict with console.log
+      await pausePromise(100);
 
-      logger.mockClear();
+      processMessagePromises = [];
+      processCancelPromises = [];
+    }
+
+    afterEach(async () => {
+      await awaitProcessing();
     });
 
-    beforeEach(async () => {
+    beforeEach(() => {
       logger.mockClear();
+      delayCount = 0;
+      streamCount = 0;
     });
 
     afterAll(async () => {
-      await queue.shutdown();
+      await awaitProcessing();
 
       if (options?.afterAll) {
         await options?.afterAll();
@@ -93,7 +108,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('priority', async () => {
-      delayCount = 0;
       const result = await Promise.all([
         queue.executeInQueue('delay', '11', { delay: 600, result: '1' }, 1),
         queue.executeInQueue('delay', '12', { delay: 100, result: '2' }, 0),
@@ -103,7 +117,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('timeout', async () => {
-      delayCount = 0;
       const query = ['select * from 2'];
       let errorString = '';
 
@@ -124,7 +137,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('stage reporting', async () => {
-      delayCount = 0;
       const resultPromise = queue.executeInQueue('delay', '1', { delay: 200, result: '1' }, 0, { stageQueryKey: '1' });
       await delayFn(null, 50);
       expect((await queue.getQueryStage('1')).stage).toBe('Executing query');
@@ -133,7 +145,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('priority stage reporting', async () => {
-      delayCount = 0;
       const resultPromise1 = queue.executeInQueue('delay', '31', { delay: 200, result: '1' }, 20, { stageQueryKey: '12' });
       await delayFn(null, 50);
       const resultPromise2 = queue.executeInQueue('delay', '32', { delay: 200, result: '1' }, 10, { stageQueryKey: '12' });
@@ -146,7 +157,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('negative priority', async () => {
-      delayCount = 0;
       const results = [];
 
       queue.executeInQueue('delay', '31', { delay: 400, result: '4' }, -10);
@@ -218,9 +228,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       queue.setQueryStream(key, {});
 
       await queue.executeInQueue('stream', key, { }, 0);
-      await queue.shutdown();
-      // TODO(ovr): await with shutdown
-      await pausePromise(1500);
+      await awaitProcessing();
 
       expect(streamCount).toEqual(1);
       expect(logger.mock.calls.length).toEqual(3);
