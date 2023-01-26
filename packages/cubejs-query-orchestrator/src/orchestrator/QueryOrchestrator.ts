@@ -9,6 +9,7 @@ import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
+import { getCacheHash } from './utils';
 
 export type CacheAndQueryDriverType = 'redis' | 'memory' | 'cubestore';
 
@@ -430,5 +431,14 @@ export class QueryOrchestrator {
 
   public async updateRefreshEndReached() {
     return this.preAggregations.updateRefreshEndReached();
+  }
+
+  public async fetchSchema(dataSource: string, securityContext?: { [key: string]: any; }) {
+    const queryKey = this.queryCache.getKey('FETCH_SCHEMA', getCacheHash({ dataSource, securityContext }));
+
+    const queue = await this.queryCache.getQueue(dataSource);
+    const tablesSchema = await queue.executeQueryInQueue('query', queryKey, { tablesSchema: true });
+
+    return tablesSchema;
   }
 }

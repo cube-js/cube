@@ -14,4 +14,3 @@ export * from './RedisPool';
 export * from './RedisQueueDriver';
 export * from './TimeoutError';
 export * from './DriverFactory';
-export * from './utils';
