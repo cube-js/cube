@@ -172,10 +172,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(results.map(r => parseInt(r[0], 10) - parseInt(results[0][0], 10))).toEqual([0, 1, 2]);
     });
 
-    const nonCubeStoreTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
-
-    // TODO: CubeStore queue support
-    nonCubeStoreTest('orphaned', async () => {
+    test('orphaned', async () => {
       for (let i = 1; i <= 4; i++) {
         await queue.executeInQueue('delay', `11${i}`, { delay: 50, result: `${i}` }, 0);
       }
@@ -243,6 +240,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(result).toBe('select * from bar');
     });
 
+    const nonCubeStoreTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
     nonCubeStoreTest('queue driver lock obtain race condition', async () => {
       const redisClient: any = await queue.queueDriver.createConnection();
       const redisClient2: any = await queue.queueDriver.createConnection();
