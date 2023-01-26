@@ -1,4 +1,5 @@
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
+import type { QueryKey } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import { QueryQueue } from '../../src';
 import { processUidRE } from '../../src/orchestrator/utils';
@@ -13,9 +14,15 @@ export type QueryQueueTestOptions = {
 
 export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}) => {
   describe(`QueryQueue${name}`, () => {
-    let delayCount = 0;
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
+    const logger = jest.fn((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
+
+    let delayCount = 0;
+    let streamCount = 0;
+    let processMessagePromises = [];
+    let processCancelPromises = [];
     let cancelledQuery;
+
     const queue = new QueryQueue('test_query_queue', {
       queryHandlers: {
         foo: async (query) => `${query[0]} bar`,
@@ -24,7 +31,16 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           delayCount += 1;
           await setCancelHandler(result);
           return delayFn(result, query.delay);
-        }
+        },
+        stream: async () => {
+          streamCount++;
+        },
+      },
+      sendProcessMessageFn: async (queryKeyHashed) => {
+        processMessagePromises.push(queue.processQuery.bind(queue)(queryKeyHashed));
+      },
+      sendCancelMessageFn: async (query) => {
+        processCancelPromises.push(queue.processCancel.bind(queue)(query));
       },
       cancelHandlers: {
         delay: (query) => {
@@ -36,19 +52,33 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       executionTimeout: 2,
       orphanedTimeout: 2,
       concurrency: 1,
-      ...options
+      ...options,
+      logger,
     });
 
-    if (options?.cacheAndQueueDriver === 'cubestore') {
-      // TODO: Find all problems with queue
-      afterEach(async () => {
-        await queue.shutdown();
-        await pausePromise(2500);
-      });
+    async function awaitProcessing() {
+      await queue.shutdown();
+      await Promise.all(processMessagePromises);
+      await Promise.all(processCancelPromises);
+
+      processMessagePromises = [];
+      processCancelPromises = [];
     }
 
+    afterEach(async () => {
+      await awaitProcessing();
+    });
+
+    beforeEach(() => {
+      logger.mockClear();
+      delayCount = 0;
+      streamCount = 0;
+    });
+
     afterAll(async () => {
-      await queue.shutdown();
+      await awaitProcessing();
+      // stdout conflict with console.log
+      await pausePromise(100);
 
       if (options?.afterAll) {
         await options?.afterAll();
@@ -78,7 +108,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('priority', async () => {
-      delayCount = 0;
       const result = await Promise.all([
         queue.executeInQueue('delay', '11', { delay: 600, result: '1' }, 1),
         queue.executeInQueue('delay', '12', { delay: 100, result: '2' }, 0),
@@ -88,7 +117,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('timeout', async () => {
-      delayCount = 0;
       const query = ['select * from 2'];
       let errorString = '';
 
@@ -109,7 +137,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('stage reporting', async () => {
-      delayCount = 0;
       const resultPromise = queue.executeInQueue('delay', '1', { delay: 200, result: '1' }, 0, { stageQueryKey: '1' });
       await delayFn(null, 50);
       expect((await queue.getQueryStage('1')).stage).toBe('Executing query');
@@ -118,7 +145,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('priority stage reporting', async () => {
-      delayCount = 0;
       const resultPromise1 = queue.executeInQueue('delay', '31', { delay: 200, result: '1' }, 20, { stageQueryKey: '12' });
       await delayFn(null, 50);
       const resultPromise2 = queue.executeInQueue('delay', '32', { delay: 200, result: '1' }, 10, { stageQueryKey: '12' });
@@ -131,7 +157,6 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('negative priority', async () => {
-      delayCount = 0;
       const results = [];
 
       queue.executeInQueue('delay', '31', { delay: 400, result: '4' }, -10);
@@ -147,10 +172,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(results.map(r => parseInt(r[0], 10) - parseInt(results[0][0], 10))).toEqual([0, 1, 2]);
     });
 
-    const nonCubeStoreTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
-
-    // TODO: CubeStore queue support
-    nonCubeStoreTest('orphaned', async () => {
+    test('orphaned', async () => {
       for (let i = 1; i <= 4; i++) {
         await queue.executeInQueue('delay', `11${i}`, { delay: 50, result: `${i}` }, 0);
       }
@@ -171,8 +193,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0);
     });
 
-    // TODO: CubeStore queue support
-    nonCubeStoreTest('queue hash process persistent flag properly', () => {
+    test('queue hash process persistent flag properly', () => {
       const query = ['select * from table'];
       const key1 = queue.redisHash(query);
       // @ts-ignore
@@ -184,11 +205,31 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       const key4 = queue.redisHash(query);
 
       expect(key1).toEqual(key2);
-      expect(key1.split('::').length).toBe(1);
+      expect(key1.split('@').length).toBe(1);
+
       expect(key3).toEqual(key4);
-      expect(key3.split('::').length).toBe(2);
-      expect(processUidRE.test(key3.split('::')[1])).toBeTruthy();
-      expect(queue.redisHash('string')).toBe('string');
+      expect(key3.split('@').length).toBe(2);
+      expect(processUidRE.test(key3.split('@')[1])).toBeTruthy();
+
+      if (options.cacheAndQueueDriver === 'cubestore') {
+        expect(queue.redisHash('string')).toBe('095d71cf12556b9d5e330ad575b3df5d');
+      } else {
+        expect(queue.redisHash('string')).toBe('string');
+      }
+    });
+
+    test('stream handler', async () => {
+      const key: QueryKey = ['select * from table', []];
+      key.persistent = true;
+
+      queue.setQueryStream(key, {});
+
+      await queue.executeInQueue('stream', key, { }, 0);
+      await awaitProcessing();
+
+      expect(streamCount).toEqual(1);
+      expect(logger.mock.calls.length).toEqual(3);
+      expect(logger.mock.calls[2][0]).toEqual('Performing query completed');
     });
 
     test('removed before reconciled', async () => {
@@ -199,6 +240,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(result).toBe('select * from bar');
     });
 
+    const nonCubeStoreTest = options.cacheAndQueueDriver !== 'cubestore' ? test : xtest;
     nonCubeStoreTest('queue driver lock obtain race condition', async () => {
       const redisClient: any = await queue.queueDriver.createConnection();
       const redisClient2: any = await queue.queueDriver.createConnection();

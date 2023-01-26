@@ -259,7 +259,7 @@ impl CacheStore for LazyRocksCacheStore {
             .await
     }
 
-    async fn queue_ack(&self, key: String, result: String) -> Result<(), CubeError> {
+    async fn queue_ack(&self, key: String, result: Option<String>) -> Result<(), CubeError> {
         self.init().await?.queue_ack(key, result).await
     }
 

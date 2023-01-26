@@ -47,7 +47,8 @@
     "moment-timezone": "^0.5.33",
     "node-fetch": "^2.6.1",
     "shelljs": "^0.8.5",
-    "throttle-debounce": "^3.0.1"
+    "throttle-debounce": "^3.0.1",
+    "uuid": "^8.3.2"
   },
   "publishConfig": {
     "access": "public"

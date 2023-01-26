@@ -1,13 +1,12 @@
 import R from 'ramda';
-import { getEnv } from '@cubejs-backend/shared';
+import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 import { QueueDriverInterface } from '@cubejs-backend/base-driver';
-import { CubeStoreDriver, CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
+import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
-import { getProcessUid } from './utils';
 import { QueryStream } from './QueryStream';
 
 /**
@@ -140,20 +139,30 @@ export class QueryQueue {
   /**
    * Returns stream object which will be used to pipe data from data source.
    *
+   * @param {*} queryKeyHash
+   */
+  getQueryStream(queryKeyHash) {
+    if (!this.streams.queued.has(queryKeyHash)) {
+      throw new Error(`Unable to find stream for persisted query with id: ${queryKeyHash}`);
+    }
+
+    return this.streams.queued.get(queryKeyHash);
+  }
+
+  /**
    * @param {*} queryKey
    * @param {{ [alias: string]: string }} aliasNameToMember
    */
-  getQueryStream(queryKey, aliasNameToMember) {
+  setQueryStream(queryKey, aliasNameToMember) {
     const key = this.redisHash(queryKey);
-    if (!this.streams.queued.has(key)) {
-      const _stream = new QueryStream({
-        key,
-        maps: this.streams,
-        aliasNameToMember,
-      });
-      this.streams.queued.set(key, _stream);
-    }
-    return this.streams.queued.get(key);
+    const stream = new QueryStream({
+      key,
+      maps: this.streams,
+      aliasNameToMember,
+    });
+    this.streams.queued.set(key, stream);
+
+    return stream;
   }
 
   /**
@@ -559,7 +568,7 @@ export class QueryQueue {
         R.pipe(
           R.filter(p => {
             if (active.indexOf(p) === -1) {
-              const subKeys = p.split('::');
+              const subKeys = p.split('@');
               if (subKeys.length === 1) {
                 // common queries
                 return true;
@@ -729,10 +738,10 @@ export class QueryQueue {
    * Processing query specified by the `queryKey`. This method incapsulate most
    * of the logic related with the queues updates, heartbeating, etc.
    *
-   * @param {string} queryKey
+   * @param {string} queryKeyHashed
    * @return {Promise<{ result: undefined | Object, error: string | undefined }>}
    */
-  async processQuery(queryKey) {
+  async processQuery(queryKeyHashed) {
     const queueConnection = await this.queueDriver.createConnection();
 
     let insertedCount;
@@ -743,15 +752,15 @@ export class QueryQueue {
     let processingLockAcquired;
     try {
       const processingId = await queueConnection.getNextProcessingId();
-      const retrieveResult = await queueConnection.retrieveForProcessing(queryKey, processingId);
+      const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
 
       if (retrieveResult) {
         [insertedCount, _removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
       }
 
-      const activated = activeKeys && activeKeys.indexOf(this.redisHash(queryKey)) !== -1;
+      const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
       if (!query) {
-        query = await queueConnection.getQueryDef(this.redisHash(queryKey));
+        query = await queueConnection.getQueryDef(queryKeyHashed);
       }
 
       if (query && insertedCount && activated && processingLockAcquired) {
@@ -771,19 +780,22 @@ export class QueryQueue {
           preAggregation: query.query?.preAggregation,
           addedToQueueTime: query.addedToQueueTime,
         });
-        await queueConnection.optimisticQueryUpdate(queryKey, { startQueryTime }, processingId);
+        await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId);
 
         const heartBeatTimer = setInterval(
-          () => queueConnection.updateHeartBeat(queryKey),
+          () => queueConnection.updateHeartBeat(queryKeyHashed),
           this.heartBeatInterval * 1000
         );
         try {
           const handler = query?.queryHandler;
-          let target;
           switch (handler) {
             case 'stream':
-              target = this.getQueryStream(this.redisHash(queryKey));
-              await this.queryTimeout(this.queryHandlers.stream(query.query, target));
+              await this.queryTimeout(
+                this.queryHandlers.stream(query.query, this.getQueryStream(queryKeyHashed))
+              );
+
+              // CubeStore has special handling for null
+              executionResult = null;
               break;
             default:
               executionResult = {
@@ -792,7 +804,7 @@ export class QueryQueue {
                     query.query,
                     async (cancelHandler) => {
                       try {
-                        return queueConnection.optimisticQueryUpdate(queryKey, { cancelHandler }, processingId);
+                        return queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, processingId);
                       } catch (e) {
                         this.logger('Error while query update', {
                           queryKey: query.queryKey,
@@ -848,7 +860,7 @@ export class QueryQueue {
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
-            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKey);
+            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed);
             if (queryWithCancelHandle) {
               this.logger('Cancelling query due to timeout', {
                 processingId,
@@ -868,7 +880,7 @@ export class QueryQueue {
 
         clearInterval(heartBeatTimer);
 
-        if (!(await queueConnection.setResultAndRemoveQuery(queryKey, executionResult, processingId))) {
+        if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, processingId))) {
           this.logger('Orphaned execution result', {
             processingId,
             warn: 'Result for query was not set due to processing lock wasn\'t acquired',
@@ -887,7 +899,7 @@ export class QueryQueue {
       } else {
         this.logger('Skip processing', {
           processingId,
-          queryKey: query && query.queryKey || queryKey,
+          queryKey: query && query.queryKey || queryKeyHashed,
           requestId: query && query.requestId,
           queuePrefix: this.redisQueuePrefix,
           processingLockAcquired,
@@ -899,15 +911,15 @@ export class QueryQueue {
         });
         // closing stream
         if (query?.queryHandler === 'stream') {
-          const stream = this.getQueryStream(this.redisHash(queryKey));
+          const stream = this.getQueryStream(queryKeyHashed);
           stream.destroy();
         }
-        const currentProcessingId = await queueConnection.freeProcessingLock(queryKey, processingId, activated);
+        const currentProcessingId = await queueConnection.freeProcessingLock(queryKeyHashed, processingId, activated);
         if (currentProcessingId) {
           this.logger('Skipping free processing lock', {
             processingId,
             currentProcessingId,
-            queryKey: query && query.queryKey || queryKey,
+            queryKey: query && query.queryKey || queryKeyHashed,
             requestId: query && query.requestId,
             queuePrefix: this.redisQueuePrefix,
             processingLockAcquired,
@@ -921,7 +933,7 @@ export class QueryQueue {
       }
     } catch (e) {
       this.logger('Queue storage error', {
-        queryKey: query && query.queryKey || queryKey,
+        queryKey: query && query.queryKey || queryKeyHashed,
         requestId: query && query.requestId,
         error: (e.stack || e).toString(),
         queuePrefix: this.redisQueuePrefix

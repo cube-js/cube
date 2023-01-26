@@ -1,5 +1,7 @@
 export type QueryDef = unknown;
-export type QueryKey = string | [string, any[]];
+export type QueryKey = (string | [string, any[]]) & {
+  persistent?: true,
+};
 
 export type AddToQueueResponse = [added: number, _b: any, _c: any, queueSize: number, addedToQueueTime: number];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];

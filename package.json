@@ -73,8 +73,7 @@
   },
   "resolutions": {
     "@types/node": "^12",
-    "@types/ramda": "0.27.40",
-    "rc-tree": "4.1.5"
+    "@types/ramda": "0.27.40"
   },
   "license": "MIT",
   "packageManager": "yarn@1.22.19"

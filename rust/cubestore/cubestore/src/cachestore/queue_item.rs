@@ -26,10 +26,15 @@ fn merge(a: serde_json::Value, b: serde_json::Value) -> Option<serde_json::Value
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+pub enum QueueResultAckEventResult {
+    Empty,
+    WithResult { row_id: u64, result: String },
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct QueueResultAckEvent {
     pub path: String,
-    pub row_id: u64,
-    pub result: String,
+    pub result: QueueResultAckEventResult,
 }
 
 #[repr(u8)]

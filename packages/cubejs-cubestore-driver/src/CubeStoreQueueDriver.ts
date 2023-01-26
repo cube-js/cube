@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import {
   QueueDriverInterface,
   QueueDriverConnectionInterface,
@@ -8,12 +9,18 @@ import {
   AddToQueueQuery,
   AddToQueueOptions, AddToQueueResponse, QueryKey,
 } from '@cubejs-backend/base-driver';
+import { getProcessUid } from '@cubejs-backend/shared';
 
-import crypto from 'crypto';
 import { CubeStoreDriver } from './CubeStoreDriver';
 
 function hashQueryKey(queryKey: QueryKey) {
-  return crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
+  const hash = crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
+
+  if (typeof queryKey === 'object' && queryKey.persistent) {
+    return `${hash}@${getProcessUid()}`;
+  }
+
+  return hash;
 }
 
 class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
@@ -237,14 +244,14 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     // nothing to release
   }
 
-  public async retrieveForProcessing(queryKey: string, _processingId: string): Promise<RetrieveForProcessingResponse> {
+  public async retrieveForProcessing(queryKeyHashed: string, _processingId: string): Promise<RetrieveForProcessingResponse> {
     const rows = await this.driver.query('QUEUE RETRIEVE CONCURRENCY ? ?', [
       this.options.concurrency,
-      this.prefixKey(queryKey),
+      this.prefixKey(queryKeyHashed),
     ]);
     if (rows && rows.length) {
       const addedCount = 1;
-      const active = [this.redisHash(queryKey)];
+      const active = [queryKeyHashed];
       const toProcess = 0;
       const lockAcquired = true;
       const def = this.decodeQueryDefFromRow(rows[0], 'retrieveForProcessing');
@@ -272,7 +279,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   public async setResultAndRemoveQuery(queryKey: string, executionResult: any, _processingId: any): Promise<boolean> {
     await this.driver.query('QUEUE ACK ? ? ', [
       this.prefixKey(queryKey),
-      JSON.stringify(executionResult)
+      executionResult ? JSON.stringify(executionResult) : executionResult
     ]);
 
     return true;
