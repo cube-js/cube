@@ -1179,7 +1179,10 @@ class ApiGateway {
       }
 
       const orchestratorApi = await this.getAdapterApi(context);
-      const schema = await orchestratorApi.fetchSchema(query.dataSource, context?.securityContext);
+   
+      const schema = await orchestratorApi
+        .getQueryOrchestrator()
+        .fetchSchema(query.dataSource, context?.securityContext);
 
       res({ data: schema });
     } catch (e) {

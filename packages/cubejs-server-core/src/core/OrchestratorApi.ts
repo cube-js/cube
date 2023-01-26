@@ -8,7 +8,6 @@ import {
   DriverType,
   QueryOrchestratorOptions,
   QueryBody,
-  getCacheHash
 } from '@cubejs-backend/query-orchestrator';
 
 import { DbTypeAsyncFn, ExternalDbTypeFn, RequestContext } from './types';
@@ -229,18 +228,6 @@ export class OrchestratorApi {
         throw e;
       }
     }
-  }
-
-  public async fetchSchema(dataSource: string, securityContext?: { [key: string]: any; }) {
-    const queryCache = this.orchestrator.getQueryCache();
-
-    const queryKey = this.orchestrator.getQueryCache()
-      .getKey('FETCH_SCHEMA', getCacheHash({ dataSource, securityContext }));
-
-    const queue = await queryCache.getQueue(dataSource);
-    const tablesSchema = await queue.executeQueryInQueue('query', queryKey, { tablesSchema: true });
-
-    return tablesSchema;
   }
 
   /**

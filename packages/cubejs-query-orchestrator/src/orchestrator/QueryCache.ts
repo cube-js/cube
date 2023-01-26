@@ -972,4 +972,10 @@ export class QueryCache {
   public async testConnection() {
     return this.cacheDriver.testConnection();
   }
+  
+  public async fetchSchema(dataSource: string, securityContext?: { [key: string]: any; }) {
+    const queryKey = { query: getCacheHash([dataSource, [securityContext]]) };
+    const queue = await this.getQueue(dataSource);
+    return queue.executeQueryInQueue('query', queryKey, { tablesSchema: true });
+  }
 }
