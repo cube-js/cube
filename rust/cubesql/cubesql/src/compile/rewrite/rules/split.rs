@@ -3082,16 +3082,20 @@ impl RewriteRules for SplitRules {
                     ),
                 )],
                 alias_expr(
-                    udf_expr(
-                        "datediff",
-                        vec![
-                            literal_string("day"),
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_string("quarter"), column_expr("?outer_column")],
-                            ),
-                            column_expr("?outer_column"),
-                        ],
+                    binary_expr(
+                        udf_expr(
+                            "datediff",
+                            vec![
+                                literal_string("day"),
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![literal_string("quarter"), column_expr("?outer_column")],
+                                ),
+                                column_expr("?outer_column"),
+                            ],
+                        ),
+                        "+",
+                        literal_int(1),
                     ),
                     "?alias",
                 ),
