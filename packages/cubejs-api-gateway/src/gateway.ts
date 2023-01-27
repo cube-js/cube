@@ -1056,26 +1056,6 @@ class ApiGateway {
         requestId: context.requestId,
       };
 
-      if (
-        !query.limit ||
-        !Number.isInteger(query.limit) ||
-        query.limit > 50000 ||
-        query.limit < 1
-      ) {
-        throw new UserError(
-          'A user\'s query must contain limit query param and it must be positive number less than 50000.'
-        );
-      }
-
-      if (
-        query.resultFilter?.objectTypes &&
-        !Array.isArray(query.resultFilter.objectTypes)
-      ) {
-        throw new UserError(
-          'A query.resultFilter.objectTypes must be an array of strings'
-        );
-      }
-
       // Determine SQL query type and add LIMIT clause if needed
       const shouldAddLimit = (sql: string): Boolean => {
         // TODO: Enhance the way we determine query type
@@ -1095,6 +1075,26 @@ class ApiGateway {
       };
 
       if (shouldAddLimit(query.query)) {
+        if (
+          !query.limit ||
+          !Number.isInteger(query.limit) ||
+          query.limit > 50000 ||
+          query.limit < 1
+        ) {
+          throw new UserError(
+            'A user\'s query must contain limit query param and it must be positive number less than 50000.'
+          );
+        }
+  
+        if (
+          query.resultFilter?.objectTypes &&
+          !Array.isArray(query.resultFilter.objectTypes)
+        ) {
+          throw new UserError(
+            'A query.resultFilter.objectTypes must be an array of strings'
+          );
+        }
+        
         const dbType = await this.getCompilerApi(context).getDbType(query.dataSource);
 
         if (query.query.charAt(query.query.length - 1) === ';') {
