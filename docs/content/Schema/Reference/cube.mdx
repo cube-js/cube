@@ -228,13 +228,13 @@ cube(`Contacts`, {
 
 ## Parameters
 
-### <--{"id" : "Parameters"}--> dataSource
+### <--{"id" : "Parameters"}--> data_source
 
-Each cube in schema can have its own `dataSource` name to support scenarios
+Each cube in schema can have its own `data_source` name to support scenarios
 where data should be fetched from multiple databases. The value of the
-`dataSource` parameter will be passed to the
+`data_source` parameter will be passed to the
 [`driverFactory()`][ref-config-driverfactory] function as part of the `context`
-parameter. By default, each cube has a `default` value for its `dataSource`; to
+parameter. By default, each cube has a `default` value for its `data_source`; to
 override it you can use:
 
 <CodeTabs>
@@ -243,7 +243,7 @@ override it you can use:
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
 
-  dataSource: `prod_db`,
+  data_source: `prod_db`,
 });
 ```
 
@@ -364,13 +364,13 @@ cube(`ExtendedOrderFacts`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> refreshKey
+### <--{"id" : "Parameters"}--> refresh_key
 
-Cube's caching layer uses `refreshKey` queries to get the current version of
+Cube's caching layer uses `refresh_key` queries to get the current version of
 content for a specific cube. If a query result changes, Cube will invalidate all
 queries that rely on that cube.
 
-The default values for `refreshKey` are
+The default values for `refresh_key` are
 
 - `every: '2 minute'` for BigQuery, Athena, Snowflake, and Presto.
 - `every: '10 second'` for all other databases.
@@ -378,7 +378,7 @@ The default values for `refreshKey` are
 Refresh key of a query is a concatenation of all cubes refresh keys involved in
 query. For rollup queries pre-aggregation table name is used as a refresh key.
 
-You can set up a custom refresh check SQL by changing `refreshKey` property.
+You can set up a custom refresh check SQL by changing `refresh_key` property.
 Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option, or
 examining a metadata table for whatever system is managing the data to see when
 it last ran. timestamp in that case.
@@ -389,10 +389,10 @@ it last ran. timestamp in that case.
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
 
-  // With this refreshKey Cube will only refresh the data if
+  // With this refresh_key Cube will only refresh the data if
   // the value of previous MAX(updated_at_timestamp) changed
-  // By default Cube will check this refreshKey every 10 seconds
-  refreshKey: {
+  // By default Cube will check this refresh_key every 10 seconds
+  refresh_key: {
     sql: `SELECT MAX(updated_at_timestamp) FROM orders`,
   },
 });
@@ -408,7 +408,7 @@ cubes:
 
 </CodeTabs>
 
-You can use interval based `refreshKey`. For example:
+You can use interval based `refresh_key`. For example:
 
 <CodeTabs>
 
@@ -416,7 +416,7 @@ You can use interval based `refreshKey`. For example:
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
 
-  refreshKey: {
+  refresh_key: {
     every: `1 hour`,
   },
 });
@@ -443,7 +443,7 @@ For example:
 ```javascript
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
-  refreshKey: {
+  refresh_key: {
     every: '30 5 * * 5',
     timezone: 'America/Los_Angeles',
   },
@@ -471,21 +471,21 @@ with support for seconds.
 
 </WarningBox>
 
-Such `refreshKey` is just a syntactic sugar over `refreshKey` SQL. It's
-guaranteed that `refreshKey` change it's value at least once during `every`
+Such `refresh_key` is just a syntactic sugar over `refresh_key` SQL. It's
+guaranteed that `refresh_key` change its value at least once during `every`
 interval. It will be converted to appropriate SQL select which value will change
-over time based on interval value. Values of interval based `refreshKey` are
+over time based on interval value. Values of interval based `refresh_key` are
 tried to be checked ten times within defined interval but not more than once per
 `1 second` and not less than once per `5 minute`. For example if interval is
-`10 minute` it's `refreshKeyRenewalThreshold` will be 60 seconds and generated
-`refreshKey` SQL (Postgres) would be:
+`10 minute` it's `refresh_key_renewal_threshold` will be 60 seconds and
+generated `refresh_key` SQL (Postgres) would be:
 
 ```sql
 SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 600)
 ```
 
-For `5 second` interval `refreshKeyRenewalThreshold` will be just 1 second and
-SQL will be:
+For `5 second` interval `refresh_key_renewal_threshold` will be just 1 second
+and SQL will be:
 
 ```sql
 SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
@@ -520,7 +520,7 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 └───────────────────────── second (0 - 59, optional)
 ```
 
-### <--{"id" : "Parameters"}--> rewriteQueries
+### <--{"id" : "Parameters"}--> rewrite_queries
 
 Set this flag to true if you want Cube to rewrite your queries after final SQL
 has been generated. This may be helpful to apply filter pushdown optimizations
@@ -530,7 +530,7 @@ or reduce unnecessary query nesting. For example:
 
 ```javascript
 cube(`Tickets`, {
-  rewriteQueries: true,
+  rewrite_queries: true,
 });
 ```
 
@@ -602,9 +602,9 @@ cube(`Companies`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> sqlAlias
+### <--{"id" : "Parameters"}--> sql_alias
 
-Use `sqlAlias` when auto-generated cube alias prefix is too long and truncated
+Use `sql_alias` when auto-generated cube alias prefix is too long and truncated
 by DB such as Postgres:
 
 <CodeTabs>
@@ -613,7 +613,7 @@ by DB such as Postgres:
 cube(`OrderFacts`, {
   sql: `SELECT * FROM orders`,
 
-  sqlAlias: `ofacts`,
+  sql_alias: `ofacts`,
 
   // ...
 });
@@ -628,7 +628,7 @@ cubes:
 
 </CodeTabs>
 
-It'll generate aliases for members such as `ofacts__count`. `sqlAlias` affects
+It'll generate aliases for members such as `ofacts__count`. `sql_alias` affects
 all member names including pre-aggregation table names.
 
 ### <--{"id" : "Parameters"}--> title
@@ -705,8 +705,7 @@ cube(`OrderFacts`, {
 cubes:
   - name: OrderFacts
     sql: >
-      SELECT * FROM orders
-      WHERE {FILTER_PARAMS.OrderFacts.date.filter('date')}
+      SELECT * FROM orders WHERE {FILTER_PARAMS.OrderFacts.date.filter('date')}
     measures:
       - name: count
         type: count

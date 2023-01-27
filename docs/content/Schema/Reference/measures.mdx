@@ -88,13 +88,13 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> drillMembers
+### <--{"id" : "Parameters"}--> drill_members
 
-Using the `drillMembers` parameter, you can define a set of [drill
-down][ref-drilldowns] fields for the measure. `drillMembers` is defined as an
+Using the `drill_members` parameter, you can define a set of [drill
+down][ref-drilldowns] fields for the measure. `drill_members` is defined as an
 array of dimensions. Cube automatically injects dimensions’ names and other
 cubes’ names with dimensions in the context, so you can reference these
-variables in the `drillMembers` array. [Learn more about how to define and use
+variables in the `drill_members` array. [Learn more about how to define and use
 drill downs][ref-drilldowns].
 
 <CodeTabs>
@@ -105,7 +105,7 @@ cube('Orders', {
     revenue: {
       type: `sum`,
       sql: `price`,
-      drillMembers: [id, price, status, Products.name, Products.id],
+      drill_members: [id, price, status, Products.name, Products.id],
     },
   },
 });
@@ -226,15 +226,15 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> rollingWindow
+### <--{"id" : "Parameters"}--> rolling_window
 
 If you want to calculate some metric within a window, for example a week or a
-month, you should use a `rollingWindow` parameter. The `trailing` and `leading`
+month, you should use a `rolling_window` parameter. The `trailing` and `leading`
 parameters define window size.
 
 <WarningBox>
 
-`rollingWindow` only works for a query where there's a single `timeDimension`
+`rolling_window` only works for a query where there's a single `timeDimension`
 with a defined date range.
 
 </WarningBox>
@@ -259,7 +259,7 @@ cube(`Orders`, {
     rolling_count_month: {
       sql: `id`,
       type: `count`,
-      rollingWindow: {
+      rolling_window: {
         trailing: `1 month`,
       },
     },
@@ -289,7 +289,7 @@ cube(`Orders`, {
   measures: {
     cumulative_count: {
       type: `count`,
-      rollingWindow: {
+      rolling_window: {
         trailing: `unbounded`,
       },
     },
