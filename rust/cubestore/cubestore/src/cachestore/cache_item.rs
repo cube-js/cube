@@ -1,5 +1,7 @@
-use crate::metastore::{IndexId, RocksSecondaryIndex, TableId};
-use crate::{base_rocks_secondary_index, rocks_table_impl};
+use crate::metastore::{
+    BaseRocksTable, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId, TableInfo,
+};
+use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::ts_seconds_option;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -12,6 +14,8 @@ pub struct CacheItem {
     #[serde(with = "ts_seconds_option")]
     pub(crate) expire: Option<DateTime<Utc>>,
 }
+
+impl RocksEntity for CacheItem {}
 
 impl CacheItem {
     pub fn parse_path_to_prefix(mut path: String) -> String {
@@ -77,8 +81,23 @@ pub(crate) enum CacheItemRocksIndex {
     ByPath = 1,
     ByPrefix = 2,
 }
+pub struct CacheItemRocksTable<'a> {
+    db: crate::metastore::DbTableRef<'a>,
+}
 
-rocks_table_impl!(CacheItem, CacheItemRocksTable, TableId::CacheItems, {
+impl<'a> CacheItemRocksTable<'a> {
+    pub fn new(db: crate::metastore::DbTableRef<'a>) -> Self {
+        Self { db }
+    }
+}
+
+impl<'a> BaseRocksTable for CacheItemRocksTable<'a> {
+    fn migrate_table(&self, _table_info: TableInfo) -> Result<(), CubeError> {
+        self.migrate_table_by_truncate()
+    }
+}
+
+rocks_table_new!(CacheItem, CacheItemRocksTable, TableId::CacheItems, {
     vec![
         Box::new(CacheItemRocksIndex::ByPath),
         Box::new(CacheItemRocksIndex::ByPrefix),

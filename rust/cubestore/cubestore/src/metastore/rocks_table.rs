@@ -25,11 +25,30 @@ macro_rules! rocks_table_impl {
         }
 
         impl<'a> $rocks_table<'a> {
-            pub fn new(db: crate::metastore::DbTableRef<'a>) -> $rocks_table {
-                $rocks_table { db }
+            pub fn new(db: crate::metastore::DbTableRef<'a>) -> Self {
+                Self { db }
             }
         }
 
+        impl<'a> crate::metastore::BaseRocksTable for $rocks_table<'a> {
+            fn migrate_table(
+                &self,
+                table_info: crate::metastore::TableInfo,
+            ) -> Result<(), crate::CubeError> {
+                Err(crate::CubeError::internal(format!(
+                    "Unable to migrate table from {}. There is no support for auto migrations. Please implement migration.",
+                    table_info.version
+                )))
+            }
+        }
+
+        crate::rocks_table_new!($table, $rocks_table, $table_id, $indexes);
+    };
+}
+
+#[macro_export]
+macro_rules! rocks_table_new {
+    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block) => {
         impl<'a> crate::metastore::RocksTable for $rocks_table<'a> {
             type T = $table;
 
@@ -278,8 +297,18 @@ where
     }
 }
 
-pub trait RocksTable: Debug + Send + Sync {
-    type T: Serialize + Clone + Debug + Send;
+pub trait RocksEntity {
+    fn version() -> u32 {
+        1
+    }
+}
+
+pub trait BaseRocksTable {
+    fn migrate_table(&self, table_info: TableInfo) -> Result<(), CubeError>;
+}
+
+pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
+    type T: Serialize + Clone + Debug + Send + RocksEntity;
     fn delete_event(&self, row: IdRow<Self::T>) -> MetaStoreEvent;
     fn update_event(&self, old_row: IdRow<Self::T>, new_row: IdRow<Self::T>) -> MetaStoreEvent;
     fn db(&self) -> &DB;
@@ -292,6 +321,19 @@ pub trait RocksTable: Debug + Send + Sync {
     where
         D: Deserializer<'de>;
     fn indexes() -> Vec<Box<dyn BaseRocksSecondaryIndex<Self::T>>>;
+
+    fn migrate_table_by_truncate(&self) -> Result<(), CubeError> {
+        let mut batch = WriteBatch::default();
+        self.delete_all_rows_from_table(Self::table_id(), &mut batch)?;
+
+        for index in Self::indexes() {
+            self.delete_all_rows_from_index(index.get_id(), &mut batch)?;
+        }
+
+        self.db().write(batch)?;
+
+        Ok(())
+    }
 
     fn insert(
         &self,
@@ -356,7 +398,7 @@ pub trait RocksTable: Debug + Send + Sync {
         if let Some(table_info) = table_info {
             let table_info = self.deserialize_table_info(table_info.as_slice())?;
 
-            if table_info.version != self.version()
+            if table_info.version != Self::T::version()
                 || table_info.value_version != self.value_version()
             {
                 self.migrate_table(table_info)?
@@ -368,7 +410,7 @@ pub trait RocksTable: Debug + Send + Sync {
                 }
                 .to_bytes(),
                 self.serialize_table_info(TableInfo {
-                    version: self.version(),
+                    version: Self::T::version(),
                     value_version: self.value_version(),
                 })?
                 .as_slice(),
@@ -376,14 +418,6 @@ pub trait RocksTable: Debug + Send + Sync {
         };
 
         Ok(())
-    }
-
-    fn migrate_table(&self, table_info: TableInfo) -> Result<(), CubeError> {
-        Err(CubeError::internal(format!(
-            "Unable to migrate table from {} to {}. There is no support for auto migrations. Please implement migration.",
-            table_info.version,
-            self.value_version()
-        )))
     }
 
     fn migration_check_indexes(&self) -> Result<(), CubeError> {
@@ -416,10 +450,6 @@ pub trait RocksTable: Debug + Send + Sync {
             }
         }
         Ok(())
-    }
-
-    fn version(&self) -> u32 {
-        1
     }
 
     fn value_version(&self) -> u32 {
@@ -868,6 +898,32 @@ pub trait RocksTable: Debug + Send + Sync {
             };
         }
         Ok(res)
+    }
+
+    fn delete_all_rows_from_table(
+        &self,
+        table_id: TableId,
+        batch: &mut WriteBatch,
+    ) -> Result<(), CubeError> {
+        let ref db = self.snapshot();
+        let key_min = RowKey::Table(table_id, 0);
+
+        let iter = db.iterator(IteratorMode::From(
+            &key_min.to_bytes()[0..get_fixed_prefix()],
+            Direction::Forward,
+        ));
+
+        for (key, _) in iter {
+            let row_key = RowKey::from_bytes(&key);
+            if let RowKey::Table(row_table_id, _) = row_key {
+                if row_table_id == table_id {
+                    batch.delete(key);
+                } else {
+                    return Ok(());
+                }
+            }
+        }
+        Ok(())
     }
 
     fn delete_all_rows_from_index(

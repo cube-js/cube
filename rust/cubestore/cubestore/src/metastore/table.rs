@@ -2,7 +2,7 @@ use super::{
     AggregateFunction, Column, ColumnType, DataFrameValue, IndexId, RocksSecondaryIndex, TableId,
 };
 use crate::data_frame_from;
-use crate::metastore::{IdRow, ImportFormat, Schema};
+use crate::metastore::{IdRow, ImportFormat, RocksEntity, Schema};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::CubeAggregateUDFKind;
 use crate::rocks_table_impl;
@@ -154,6 +154,8 @@ pub struct Table {
     partition_split_threshold: Option<u64>
 }
 }
+
+impl RocksEntity for Table {}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TablePath {

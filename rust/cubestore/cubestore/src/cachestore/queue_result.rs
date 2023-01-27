@@ -1,5 +1,7 @@
-use crate::metastore::{IndexId, RocksSecondaryIndex, TableId};
-use crate::{base_rocks_secondary_index, rocks_table_impl};
+use crate::metastore::{
+    BaseRocksTable, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId, TableInfo,
+};
+use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -11,6 +13,8 @@ pub struct QueueResult {
     #[serde(with = "ts_seconds")]
     pub(crate) expire: DateTime<Utc>,
 }
+
+impl RocksEntity for QueueResult {}
 
 impl QueueResult {
     pub fn new(path: String, value: String) -> Self {
@@ -34,8 +38,23 @@ impl QueueResult {
 pub(crate) enum QueueResultRocksIndex {
     ByPath = 1,
 }
+pub struct QueueResultRocksTable<'a> {
+    db: crate::metastore::DbTableRef<'a>,
+}
 
-rocks_table_impl!(QueueResult, QueueResultRocksTable, TableId::QueueResults, {
+impl<'a> QueueResultRocksTable<'a> {
+    pub fn new(db: crate::metastore::DbTableRef<'a>) -> Self {
+        Self { db }
+    }
+}
+
+impl<'a> BaseRocksTable for QueueResultRocksTable<'a> {
+    fn migrate_table(&self, _table_info: TableInfo) -> Result<(), CubeError> {
+        self.migrate_table_by_truncate()
+    }
+}
+
+rocks_table_new!(QueueResult, QueueResultRocksTable, TableId::QueueResults, {
     vec![Box::new(QueueResultRocksIndex::ByPath)]
 });
 

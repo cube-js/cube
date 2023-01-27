@@ -548,6 +548,8 @@ pub struct Schema {
 }
 }
 
+impl RocksEntity for Schema {}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum IndexType {
     Regular = 1,
@@ -569,6 +571,8 @@ pub struct Index {
     index_type: IndexType
 }
 }
+
+impl RocksEntity for Index {}
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum AggregateFunction {
@@ -659,6 +663,8 @@ pub struct Partition {
 }
 }
 
+impl RocksEntity for Partition {}
+
 data_frame_from! {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct Chunk {
@@ -686,12 +692,16 @@ pub struct Chunk {
 }
 }
 
+impl RocksEntity for Chunk {}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct WAL {
     table_id: u64,
     row_count: u64,
     uploaded: bool,
 }
+
+impl RocksEntity for WAL {}
 
 meta_store_table_impl!(SchemaMetaStoreTable, Schema, SchemaRocksTable);
 meta_store_table_impl!(ChunkMetaStoreTable, Chunk, ChunkRocksTable);

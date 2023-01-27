@@ -1,7 +1,7 @@
 use super::{IndexId, RocksSecondaryIndex, TableId};
 use crate::base_rocks_secondary_index;
 use crate::metastore::table::Table;
-use crate::metastore::RowKey;
+use crate::metastore::{RocksEntity, RowKey};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
@@ -52,6 +52,8 @@ pub struct Job {
     last_heart_beat: DateTime<Utc>,
     status: JobStatus,
 }
+
+impl RocksEntity for Job {}
 
 impl Job {
     pub fn new(row_reference: RowKey, job_type: JobType, shard: String) -> Job {

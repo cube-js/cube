@@ -87,6 +87,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
     fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError> {
         CacheItemRocksTable::new(table_ref.clone()).migrate()?;
         QueueItemRocksTable::new(table_ref.clone()).migrate()?;
+        QueueResultRocksTable::new(table_ref.clone()).migrate()?;
 
         table_ref
             .db
