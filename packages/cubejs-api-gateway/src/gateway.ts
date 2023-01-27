@@ -1101,6 +1101,7 @@ class ApiGateway {
           query.query = query.query.slice(0, -1);
         }
 
+        // TODO: Move this logic to the driver
         if (dbType === 'oracle') {
           query.query = `SELECT * FROM (${query.query}) AS t WHERE ROWNUM <= ${query.limit}`;
         } else if (dbType === 'mssql') {
