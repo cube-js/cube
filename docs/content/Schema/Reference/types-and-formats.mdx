@@ -14,6 +14,105 @@ redirect_from:
 This section describes the various types that can be assigned to a **measure**.
 A measure can only have one type.
 
+### <--{"id" : "Measure Types"}--> string
+
+This measure type allows defining measures as a `string` value. In the example below,
+we create a `string` measure by converting a numerical value to a string:
+
+<CodeTabs>
+
+```javascript
+cube('Orders', {
+  measures: {
+    high_or_low: {
+      type: `string`,
+      sql: `CASE WHEN ${CUBE.number} > 100 THEN 'high' ELSE 'low' END`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: high_or_low
+        sql: "CASE WHEN {CUBE.number} > 100 THEN 'high' ELSE 'low' END"
+        type: string
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Types"}--> time
+
+This measure type allows defining measures as a `time` value. In the example below,
+we create a `time` measure from an existing dimension:
+
+<CodeTabs>
+
+```javascript
+cube('Orders', {
+  measures: {
+    last_order: {
+      sql: `MAX(created_at)`,
+      type: `time`,
+    },
+  },
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: last_order
+        sql: "MAX(created_at)"
+        type: time
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+</CodeTabs>
+
+### <--{"id" : "Measure Types"}--> boolean
+
+The `boolean` measure type can be used to condense data into a single boolean value.
+
+The example below adds an `is_completed` measure which only returns `true` if
+**all** orders have the `completed` status:
+
+<CodeTabs>
+
+```javascript
+cube('Orders', {
+  measures: {
+    is_completed: {
+      sql: `BOOL_AND(status = 'completed')`,
+      type: `boolean`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: Orders
+    measures:
+      - name: is_completed
+        sql: "BOOL_AND(status = 'completed')"
+        type: boolean
+```
+
+</CodeTabs>
+
 ### <--{"id" : "Measure Types"}--> number
 
 The `sql` parameter is required and can take any valid SQL expression that
@@ -40,7 +139,7 @@ cubes:
   - name: Orders
     measures:
       - name: purchases_ratio
-        sql: ${purchases} / ${count} * 100.0
+        sql: "{purchases} / {count} * 100.0"
         type: number
         format: percent
 ```
@@ -68,7 +167,7 @@ cubes:
   - name: Orders
     measures:
       - name: ratio
-        sql: 'SUM({CUBE}.amount) / count(*)'
+        sql: "SUM({CUBE}.amount) / count(*)"
         type: number
 ```
 
@@ -791,7 +890,6 @@ cubes:
 
 [ref-string-time-dims]:
   /schema/fundamentals/additional-concepts#string-time-dimensions
-[ref-schema-ref-preaggs-rollup]:
-  /schema/reference/pre-aggregations#type-rollup
+[ref-schema-ref-preaggs-rollup]: /schema/reference/pre-aggregations#type-rollup
 [ref-schema-ref-calc-measures]: /schema/reference/measures#calculated-measures
 [ref-drilldowns]: /schema/fundamentals/additional-concepts#drilldowns
