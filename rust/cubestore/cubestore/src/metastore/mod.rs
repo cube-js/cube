@@ -908,6 +908,10 @@ pub trait MetaStore: DIService + Send + Sync {
         partition_id: u64,
         include_inactive: bool,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
+    async fn get_used_disk_space_out_of_queue(&self) -> Result<u64, CubeError>;
+    async fn get_all_partitions_and_chunks_out_of_queue(
+        &self,
+    ) -> Result<(Vec<IdRow<Partition>>, Vec<IdRow<Chunk>>), CubeError>;
     async fn get_chunks_by_partition_out_of_queue(
         &self,
         partition_id: u64,
@@ -2228,6 +2232,30 @@ impl MetaStore for RocksMetaStore {
                 }
             };
             Ok((partition, index, table, multi_part))
+        })
+        .await
+    }
+
+    async fn get_used_disk_space_out_of_queue(&self) -> Result<u64, CubeError> {
+        let (partitions, chunks) = self.get_all_partitions_and_chunks_out_of_queue().await?;
+        let partitions_size: u64 = partitions
+            .into_iter()
+            .map(|p| p.get_row().file_size().unwrap_or(0))
+            .sum();
+        let chunks_size: u64 = chunks
+            .into_iter()
+            .map(|c| c.get_row().file_size().unwrap_or(0))
+            .sum();
+        Ok(partitions_size + chunks_size)
+    }
+
+    async fn get_all_partitions_and_chunks_out_of_queue(
+        &self,
+    ) -> Result<(Vec<IdRow<Partition>>, Vec<IdRow<Chunk>>), CubeError> {
+        self.read_operation_out_of_queue(move |db| {
+            let partitions = PartitionRocksTable::new(db.clone()).all_rows()?;
+            let chunks = ChunkRocksTable::new(db).all_rows()?;
+            Ok((partitions, chunks))
         })
         .await
     }

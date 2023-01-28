@@ -317,6 +317,19 @@ impl SqlServiceImpl {
         } else {
             None
         };
+
+        let max_disk_space = self.config_obj.max_disk_space();
+        if max_disk_space > 0 {
+            let used_space = self.db.get_used_disk_space_out_of_queue().await?;
+            if max_disk_space < used_space {
+                return Err(CubeError::user(format!(
+                    "Exceeded available storage space: {:.3} GB out of {} GB allowed. Please consider changing pre-aggregations build range, reducing index count or pre-aggregations granularity.",
+                    used_space as f64 / 1024. / 1024. / 1024.,
+                    max_disk_space as f64 / 1024. / 1024. / 1024.
+                )));
+            }
+        }
+
         if !external {
             return self
                 .db
@@ -3576,6 +3589,81 @@ mod tests {
 
                         let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
                         assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8)])]);
+                    })
+                    .await;
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn disk_space_limit() {
+        Config::test("disk_space_limit")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 1000000;
+                c.compaction_chunks_count_threshold = 100;
+                c.max_disk_space = 300_000;
+                c.select_workers = vec!["127.0.0.1:24306".to_string()];
+                c.metastore_bind_address = Some("127.0.0.1:25312".to_string());
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                Config::test("disk_space_limit_worker_1")
+                    .update_config(|mut c| {
+                        c.worker_bind_address = Some("127.0.0.1:24306".to_string());
+                        c.server_name = "127.0.0.1:24306".to_string();
+                        c.metastore_remote_address = Some("127.0.0.1:25312".to_string());
+                        c
+                    })
+                    .start_test_worker(async move |_| {
+                        let paths = {
+                            let dir = env::temp_dir();
+
+                            let path_1 = dir.clone().join("foo-cluster-1.csv");
+                            let path_2 = dir.clone().join("foo-cluster-2.csv.gz");
+                            let mut file = File::create(path_1.clone()).unwrap();
+
+                            file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
+                            for i in 0..100000
+                            {
+                                file.write_all(format!("{},\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23.123 UTC\n", i).as_bytes()).unwrap();
+                            }
+
+
+                            let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
+
+                            file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
+                            for i in 0..100000
+                            {
+                                file.write_all(format!("{},San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n", i).as_bytes()).await.unwrap();
+                            }
+
+                            file.shutdown().await.unwrap();
+
+                            vec![path_1, path_2]
+                        };
+
+                        let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+                        let _ = service.exec_query(
+                            &format!(
+                                "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
+                                paths.iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
+                            )
+                        ).await.unwrap();
+
+                        let res = service.exec_query(
+                            &format!(
+                                "CREATE TABLE Foo.Persons2 (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
+                                paths.iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
+                            )
+                        ).await;
+                        if let Err(err) = res {
+                            assert!(err.message.starts_with("Exceeded available storage "));
+                        } else {
+                            assert!(false);
+                        }
+
                     })
                     .await;
             })

@@ -399,6 +399,8 @@ pub trait ConfigObj: DIService {
     fn minimum_metastore_snapshots_count(&self) -> u64;
 
     fn metastore_snapshots_lifetime(&self) -> u64;
+
+    fn max_disk_space(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -456,6 +458,7 @@ pub struct ConfigObjImpl {
     pub skip_kafka_parsing_errors: bool,
     pub minimum_metastore_snapshots_count: u64,
     pub metastore_snapshots_lifetime: u64,
+    pub max_disk_space: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -658,6 +661,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn metastore_snapshots_lifetime(&self) -> u64 {
         self.metastore_snapshots_lifetime
+    }
+
+    fn max_disk_space(&self) -> u64 {
+        self.max_disk_space
     }
 }
 
@@ -873,6 +880,7 @@ impl Config {
                     "CUBESTORE_METASTORE_SNAPSHOTS_LIFETIME",
                     24 * 60 * 60,
                 ),
+                max_disk_space: env_parse("CUBESTORE_MAX_DISK_SPACE_GB", 0) * 1024 * 1024 * 1024,
             }),
         }
     }
@@ -942,6 +950,7 @@ impl Config {
                 skip_kafka_parsing_errors: false,
                 minimum_metastore_snapshots_count: 3,
                 metastore_snapshots_lifetime: 24 * 3600,
+                max_disk_space: 0,
             }),
         }
     }
