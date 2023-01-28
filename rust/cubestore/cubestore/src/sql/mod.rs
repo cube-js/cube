@@ -317,6 +317,18 @@ impl SqlServiceImpl {
         } else {
             None
         };
+
+        let max_disk_space = self.config_obj.max_disk_space_gb();
+        if max_disk_space > 0 {
+            let used_space = self.db.get_used_disk_space_out_of_queue().await?;
+            if max_disk_space * 1024 * 1024 * 1024 < used_space {
+                return Err(CubeError::user(format!(
+                    "Exceeded available storage space ({} Gb)",
+                    max_disk_space
+                )));
+            }
+        }
+
         if !external {
             return self
                 .db
