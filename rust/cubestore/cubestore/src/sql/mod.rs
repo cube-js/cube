@@ -323,7 +323,8 @@ impl SqlServiceImpl {
             let used_space = self.db.get_used_disk_space_out_of_queue().await?;
             if max_disk_space * 1024 * 1024 * 1024 < used_space {
                 return Err(CubeError::user(format!(
-                    "Exceeded available storage space ({} Gb)",
+                    "Exceeded available storage space: {:.3} GB out of {} GB allowed. Please consider changing pre-aggregations build range, reducing index count or pre-aggregations granularity.",
+                    used_space as f64 / 1024. / 1024. / 1024.,
                     max_disk_space
                 )));
             }
