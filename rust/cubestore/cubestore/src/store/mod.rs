@@ -1004,7 +1004,7 @@ impl ChunkStore {
             });
             if to_write.len() > 0 {
                 if !in_memory {
-                    self.check_node_disc_space(&partition).await?;
+                    self.check_node_disk_space(&partition).await?;
                 }
                 let to_write = UInt64Array::from(to_write);
                 let columns = columns
@@ -1025,7 +1025,7 @@ impl ChunkStore {
         Ok(new_chunks)
     }
 
-    async fn check_node_disc_space(&self, partition: &IdRow<Partition>) -> Result<(), CubeError> {
+    async fn check_node_disk_space(&self, partition: &IdRow<Partition>) -> Result<(), CubeError> {
         let max_disk_space = self.config.max_disk_space_per_worker();
         if max_disk_space == 0 {
             return Ok(());
