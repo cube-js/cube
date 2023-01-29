@@ -27,7 +27,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::cluster::Cluster;
+use crate::cluster::{node_name_by_partition, Cluster};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
@@ -173,7 +173,7 @@ pub struct ChunkStore {
     meta_store: Arc<dyn MetaStore>,
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
-    _config: Arc<dyn ConfigObj>,
+    config: Arc<dyn ConfigObj>,
     memory_chunks: RwLock<HashMap<u64, RecordBatch>>,
     chunk_size: usize,
 }
@@ -320,7 +320,7 @@ impl ChunkStore {
             meta_store,
             remote_fs,
             cluster,
-            _config: config,
+            config: config,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
         };
@@ -1003,6 +1003,9 @@ impl ChunkStore {
                         ) > Ordering::Equal)
             });
             if to_write.len() > 0 {
+                if !in_memory {
+                    self.check_node_disk_space(&partition).await?;
+                }
                 let to_write = UInt64Array::from(to_write);
                 let columns = columns
                     .iter()
@@ -1020,6 +1023,29 @@ impl ChunkStore {
         assert_eq!(remaining_rows.len(), 0);
 
         Ok(new_chunks)
+    }
+
+    async fn check_node_disk_space(&self, partition: &IdRow<Partition>) -> Result<(), CubeError> {
+        let max_disk_space = self.config.max_disk_space_per_worker();
+        if max_disk_space == 0 {
+            return Ok(());
+        }
+
+        let node_name = node_name_by_partition(self.config.as_ref(), partition);
+        let used_space = self
+            .meta_store
+            .get_used_disk_space_out_of_queue(Some(node_name.clone()))
+            .await?;
+
+        if max_disk_space < used_space {
+            return Err(CubeError::user(format!(
+                "Exceeded available storage space on worker {}: {:.3} GB out of {} GB allowed. Please consider changing pre-aggregations build range, reducing index count or pre-aggregations granularity.",
+                node_name,
+                used_space as f64 / 1024. / 1024. / 1024.,
+                max_disk_space as f64 / 1024. / 1024. / 1024.
+            )));
+        }
+        Ok(())
     }
 
     ///Post-processing of index columns chunk data before saving to parqet files.

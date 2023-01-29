@@ -18,6 +18,7 @@ pub use rocks_fs::*;
 pub use rocks_store::*;
 pub use rocks_table::*;
 
+use crate::cluster::node_name_by_partition;
 use async_trait::async_trait;
 use log::info;
 use rocksdb::{MergeOperands, Options, DB};
@@ -81,10 +82,11 @@ use std::str::FromStr;
 use crate::cachestore::{CacheItem, QueueItem, QueueItemStatus, QueueResult, QueueResultAckEvent};
 use crate::remotefs::LocalDirRemoteFs;
 use snapshot_info::SnapshotInfo;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use table::Table;
 use table::{TableRocksIndex, TableRocksTable};
 use tokio::sync::broadcast::Sender;
+use tokio::sync::RwLock;
 use wal::WALRocksTable;
 
 #[macro_export]
@@ -908,7 +910,10 @@ pub trait MetaStore: DIService + Send + Sync {
         partition_id: u64,
         include_inactive: bool,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
-    async fn get_used_disk_space_out_of_queue(&self) -> Result<u64, CubeError>;
+    async fn get_used_disk_space_out_of_queue(
+        &self,
+        node: Option<String>,
+    ) -> Result<u64, CubeError>;
     async fn get_all_partitions_and_chunks_out_of_queue(
         &self,
     ) -> Result<(Vec<IdRow<Partition>>, Vec<IdRow<Chunk>>), CubeError>;
@@ -1134,6 +1139,7 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
 
 pub struct RocksMetaStore {
     store: Arc<RocksStore>,
+    disk_space_cache: Arc<RwLock<Option<(HashMap<String, u64>, SystemTime)>>>,
     upload_loop: Arc<WorkerLoop>,
 }
 
@@ -1155,6 +1161,7 @@ impl RocksMetaStore {
     fn new_from_store(store: Arc<RocksStore>) -> Arc<Self> {
         Arc::new(Self {
             store,
+            disk_space_cache: Arc::new(RwLock::new(None)),
             upload_loop: Arc::new(WorkerLoop::new("Metastore upload")),
         })
     }
@@ -2236,17 +2243,73 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
-    async fn get_used_disk_space_out_of_queue(&self) -> Result<u64, CubeError> {
-        let (partitions, chunks) = self.get_all_partitions_and_chunks_out_of_queue().await?;
-        let partitions_size: u64 = partitions
-            .into_iter()
-            .map(|p| p.get_row().file_size().unwrap_or(0))
-            .sum();
-        let chunks_size: u64 = chunks
-            .into_iter()
-            .map(|c| c.get_row().file_size().unwrap_or(0))
-            .sum();
-        Ok(partitions_size + chunks_size)
+    async fn get_used_disk_space_out_of_queue(
+        &self,
+        node: Option<String>,
+    ) -> Result<u64, CubeError> {
+        let cached = if let Some((sizes, time)) = self.disk_space_cache.read().await.as_ref() {
+            let cache_duration =
+                Duration::from_secs(self.store.config.disk_space_cache_duration_secs());
+            if time.elapsed()? < cache_duration {
+                Some(sizes.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let sizes_map = if let Some(sizes) = cached {
+            sizes
+        } else {
+            let (partitions, chunks) = self.get_all_partitions_and_chunks_out_of_queue().await?;
+            let mut partitions_map = partitions
+                .into_iter()
+                .map(|p| {
+                    (
+                        p.get_id(),
+                        (
+                            p.get_row().file_size().unwrap_or(0),
+                            node_name_by_partition(self.store.config.as_ref(), &p),
+                        ),
+                    )
+                })
+                .collect::<HashMap<u64, (u64, String)>>();
+            for c in chunks.into_iter() {
+                if let Some((ref mut size, _)) =
+                    partitions_map.get_mut(&c.get_row().get_partition_id())
+                {
+                    *size = c.get_row().file_size().unwrap_or(0);
+                }
+            }
+
+            let workers = if self.store.config.select_workers().is_empty() {
+                vec![self.store.config.server_name().clone()]
+            } else {
+                self.store.config.select_workers().clone()
+            };
+
+            let mut map = workers
+                .into_iter()
+                .map(|n| (n, 0))
+                .collect::<HashMap<String, u64>>();
+
+            for (_, (size, node)) in partitions_map.into_iter() {
+                map.entry(node).and_modify(|s| *s += size).or_insert(0);
+            }
+
+            let mut cache = self.disk_space_cache.write().await;
+            *cache = Some((map.clone(), SystemTime::now()));
+
+            map
+        };
+
+        let res = if let Some(node_name) = node {
+            sizes_map.get(&node_name).unwrap_or(&0).clone()
+        } else {
+            sizes_map.values().sum::<u64>()
+        };
+
+        Ok(res)
     }
 
     async fn get_all_partitions_and_chunks_out_of_queue(
