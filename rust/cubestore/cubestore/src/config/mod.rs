@@ -401,6 +401,9 @@ pub trait ConfigObj: DIService {
     fn metastore_snapshots_lifetime(&self) -> u64;
 
     fn max_disk_space(&self) -> u64;
+    fn max_disk_space_per_worker(&self) -> u64;
+
+    fn disk_space_cache_duration_secs(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -459,6 +462,8 @@ pub struct ConfigObjImpl {
     pub minimum_metastore_snapshots_count: u64,
     pub metastore_snapshots_lifetime: u64,
     pub max_disk_space: u64,
+    pub max_disk_space_per_worker: u64,
+    pub disk_space_cache_duration_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -665,6 +670,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn max_disk_space(&self) -> u64 {
         self.max_disk_space
+    }
+
+    fn max_disk_space_per_worker(&self) -> u64 {
+        self.max_disk_space_per_worker
+    }
+
+    fn disk_space_cache_duration_secs(&self) -> u64 {
+        self.disk_space_cache_duration_secs
     }
 }
 
@@ -881,6 +894,11 @@ impl Config {
                     24 * 60 * 60,
                 ),
                 max_disk_space: env_parse("CUBESTORE_MAX_DISK_SPACE_GB", 0) * 1024 * 1024 * 1024,
+                max_disk_space_per_worker: env_parse("CUBESTORE_MAX_DISK_SPACE_PER_WORKER_GB", 0)
+                    * 1024
+                    * 1024
+                    * 1024,
+                disk_space_cache_duration_secs: 300,
             }),
         }
     }
@@ -951,6 +969,8 @@ impl Config {
                 minimum_metastore_snapshots_count: 3,
                 metastore_snapshots_lifetime: 24 * 3600,
                 max_disk_space: 0,
+                max_disk_space_per_worker: 0,
+                disk_space_cache_duration_secs: 0,
             }),
         }
     }

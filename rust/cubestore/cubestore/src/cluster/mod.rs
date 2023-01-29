@@ -442,11 +442,7 @@ impl Cluster for ClusterImpl {
     }
 
     fn node_name_by_partition(&self, p: &IdRow<Partition>) -> String {
-        if let Some(id) = p.get_row().multi_partition_id() {
-            pick_worker_by_ids(self.config_obj.as_ref(), [id]).to_string()
-        } else {
-            pick_worker_by_partitions(self.config_obj.as_ref(), [p]).to_string()
-        }
+        node_name_by_partition(self.config_obj.as_ref(), p)
     }
 
     async fn node_name_for_chunk_repartition(
@@ -1749,6 +1745,13 @@ fn is_self_reference(name: &str) -> bool {
     name.starts_with("@loop:")
 }
 
+pub fn node_name_by_partition<'a>(config: &'a dyn ConfigObj, p: &IdRow<Partition>) -> String {
+    if let Some(id) = p.get_row().multi_partition_id() {
+        pick_worker_by_ids(config, [id]).to_string()
+    } else {
+        pick_worker_by_partitions(config, [p]).to_string()
+    }
+}
 /// Picks a worker by opaque id for any distributing work in a cluster.
 /// Ids usually come from multi-partitions of the metastore.
 pub fn pick_worker_by_ids<'a>(
