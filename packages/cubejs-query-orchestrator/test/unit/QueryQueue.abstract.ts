@@ -1,6 +1,8 @@
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import type { QueryKey } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
+import crypto from 'crypto';
+
 import { QueryQueue } from '../../src';
 import { processUidRE } from '../../src/orchestrator/utils';
 
@@ -23,7 +25,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     let processCancelPromises = [];
     let cancelledQuery;
 
-    const queue = new QueryQueue('test_query_queue', {
+    const tenantPrefix = crypto.randomBytes(6).toString('hex');
+
+    const queue = new QueryQueue(`${tenantPrefix}#test_query_queue`, {
       queryHandlers: {
         foo: async (query) => `${query[0]} bar`,
         delay: async (query, setCancelHandler) => {
