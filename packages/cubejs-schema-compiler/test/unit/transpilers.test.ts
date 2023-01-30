@@ -26,7 +26,7 @@ describe('Transpilers', () => {
       await compiler.compile();
 
       throw new Error('Compile should thrown an error');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toMatch(/Duplicate property parsing test1 in main.js/);
     }
   });

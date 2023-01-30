@@ -62,7 +62,7 @@ class WebSocketTransport implements AgentTransport {
         if (method === 'callback' && this.callbacks[params.callbackId]) {
           this.callbacks[params.callbackId](params.result);
         }
-      } catch (e) {
+      } catch (e: any) {
         this.logger('Agent Error', { error: (e.stack || e).toString() });
       }
     });
@@ -166,7 +166,7 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
       if (!result && retries > 0) return flush(toFlush, retries - 1);
   
       return true;
-    } catch (e) {
+    } catch (e: any) {
       if (retries > 0) return flush(toFlush, retries - 1);
       logger('Agent Error', { error: (e.stack || e).toString() });
     }

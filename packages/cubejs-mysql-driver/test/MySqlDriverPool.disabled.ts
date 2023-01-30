@@ -28,7 +28,7 @@ describe('MySqlDriver Pool', () => {
         await poolErrorDriver.query('SELECT 1', []);
 
         throw new Error('Pool must throw an exception');
-      } catch (e) {
+      } catch (e: any) {
         console.log(e);
         expect(e.toString()).toContain('ResourceRequest timed out');
       }

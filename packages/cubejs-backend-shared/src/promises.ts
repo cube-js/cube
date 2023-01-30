@@ -362,7 +362,7 @@ export const asyncMemoizeBackground = <Ret, Arguments>(
 
       bucket.item = item;
       bucket.lifetime = Date.now() + options.extractCacheLifetime(item);
-    } catch (e) {
+    } catch (e: any) {
       options.onBackgroundException(e);
     }
   };

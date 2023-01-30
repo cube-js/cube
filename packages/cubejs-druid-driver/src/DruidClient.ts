@@ -68,7 +68,7 @@ export class DruidClient {
         }
 
         return response.data;
-      } catch (e) {
+      } catch (e: any) {
         if (cancelled) {
           throw new Error('Query cancelled');
         }
