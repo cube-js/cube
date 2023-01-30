@@ -1,5 +1,5 @@
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import type { QueryKey } from '@cubejs-backend/base-driver';
+import type { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
@@ -334,24 +334,24 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       const processingId2 = await redisClient.getNextProcessingId();
       const processingId3 = await redisClient.getNextProcessingId();
 
-      const retrieve1 = await redisClient.retrieveForProcessing('activated1', processingId1);
+      const retrieve1 = await redisClient.retrieveForProcessing('activated1' as any, processingId1);
       console.log(retrieve1);
-      const retrieve2 = await redisClient2.retrieveForProcessing('activated2', processingId2);
+      const retrieve2 = await redisClient2.retrieveForProcessing('activated2' as any, processingId2);
       console.log(retrieve2);
-      console.log(await redisClient.freeProcessingLock('activated1', processingId1, retrieve1 && retrieve1[2].indexOf('activated1' as any) !== -1));
-      const retrieve3 = await redisClient.retrieveForProcessing('activated2', processingId3);
+      console.log(await redisClient.freeProcessingLock('activated1' as any, processingId1, retrieve1 && retrieve1[2].indexOf('activated1' as any) !== -1));
+      const retrieve3 = await redisClient.retrieveForProcessing('activated2' as any, processingId3);
       console.log(retrieve3);
-      console.log(await redisClient.freeProcessingLock('activated2', processingId3, retrieve3 && retrieve3[2].indexOf('activated2' as any) !== -1));
+      console.log(await redisClient.freeProcessingLock('activated2' as any, processingId3, retrieve3 && retrieve3[2].indexOf('activated2' as any) !== -1));
       console.log(retrieve2[2].indexOf('activated2' as any) !== -1);
-      console.log(await redisClient2.freeProcessingLock('activated2', processingId2, retrieve2 && retrieve2[2].indexOf('activated2' as any) !== -1));
+      console.log(await redisClient2.freeProcessingLock('activated2' as any, processingId2, retrieve2 && retrieve2[2].indexOf('activated2' as any) !== -1));
 
-      const retrieve4 = await redisClient.retrieveForProcessing('activated2', await redisClient.getNextProcessingId());
+      const retrieve4 = await redisClient.retrieveForProcessing('activated2' as any, await redisClient.getNextProcessingId());
       console.log(retrieve4);
       expect(retrieve4[0]).toBe(1);
       expect(!!retrieve4[5]).toBe(true);
 
-      console.log(await redisClient.getQueryAndRemove('activated1'));
-      console.log(await redisClient.getQueryAndRemove('activated2'));
+      console.log(await redisClient.getQueryAndRemove('activated1' as any));
+      console.log(await redisClient.getQueryAndRemove('activated2' as any));
 
       await queue.queueDriver.release(redisClient);
       await queue.queueDriver.release(redisClient2);
