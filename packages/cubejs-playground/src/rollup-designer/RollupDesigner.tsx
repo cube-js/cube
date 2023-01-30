@@ -87,7 +87,7 @@ function getSelectedKeys(references: PreAggregationReferences) {
         keys.add(`td:${dimension}`);
       }
     } else {
-      references[memberKey]?.map((key) => keys.add(key));
+      references[memberKey]?.map((key) => key != null && keys.add(key));
     }
   });
 
