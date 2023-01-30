@@ -78,6 +78,7 @@ export class LocalQueueDriverConnection {
     if (this.resultPromises[resultListKey] && this.resultPromises[resultListKey].resolved) {
       return this.getResultBlocking(queryKey);
     }
+
     return null;
   }
 
@@ -221,7 +222,7 @@ export class LocalQueueDriverConnection {
   }
 
   async getQueryDef(queryKey) {
-    return this.queryDef[this.redisHash(queryKey)];
+    return this.queryDef[queryKey];
   }
 
   /**

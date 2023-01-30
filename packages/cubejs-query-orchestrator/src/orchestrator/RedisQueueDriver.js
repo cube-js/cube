@@ -197,7 +197,7 @@ export class RedisQueueDriverConnection {
   }
 
   async getQueryDef(queryKey) {
-    const query = await this.redisClient.hgetAsync([this.queriesDefKey(), this.redisHash(queryKey)]);
+    const query = await this.redisClient.hgetAsync([this.queriesDefKey(), queryKey]);
     return JSON.parse(query);
   }
 

@@ -1,6 +1,8 @@
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import type { QueryKey } from '@cubejs-backend/base-driver';
+import type { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
+import crypto from 'crypto';
+
 import { QueryQueue } from '../../src';
 import { processUidRE } from '../../src/orchestrator/utils';
 
@@ -23,7 +25,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     let processCancelPromises = [];
     let cancelledQuery;
 
-    const queue = new QueryQueue('test_query_queue', {
+    const tenantPrefix = crypto.randomBytes(6).toString('hex');
+
+    const queue = new QueryQueue(`${tenantPrefix}#test_query_queue`, {
       queryHandlers: {
         foo: async (query) => `${query[0]} bar`,
         delay: async (query, setCancelHandler) => {
@@ -116,7 +120,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(parseInt(result.find(f => f[0] === '3'), 10) % 10).toBeLessThan(2);
     });
 
-    test('timeout', async () => {
+    test('timeout - continue wait', async () => {
       const query = ['select * from 2'];
       let errorString = '';
 
@@ -133,7 +137,20 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           break;
         }
       }
+
       expect(errorString).toEqual(expect.stringContaining('timeout'));
+    });
+
+    test('timeout', async () => {
+      const query = ['select * from 3'];
+
+      await queue.executeInQueue('delay', query, { delay: 60 * 60 * 1000, result: '1', isJob: true });
+      await awaitProcessing();
+
+      expect(logger.mock.calls.length).toEqual(5);
+      // assert that query queue is able to get query def by query key
+      expect(logger.mock.calls[4][0]).toEqual('Cancelling query due to timeout');
+      expect(logger.mock.calls[3][0]).toEqual('Error while querying');
     });
 
     test('stage reporting', async () => {
@@ -317,24 +334,24 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       const processingId2 = await redisClient.getNextProcessingId();
       const processingId3 = await redisClient.getNextProcessingId();
 
-      const retrieve1 = await redisClient.retrieveForProcessing('activated1', processingId1);
+      const retrieve1 = await redisClient.retrieveForProcessing('activated1' as any, processingId1);
       console.log(retrieve1);
-      const retrieve2 = await redisClient2.retrieveForProcessing('activated2', processingId2);
+      const retrieve2 = await redisClient2.retrieveForProcessing('activated2' as any, processingId2);
       console.log(retrieve2);
-      console.log(await redisClient.freeProcessingLock('activated1', processingId1, retrieve1 && retrieve1[2].indexOf('activated1') !== -1));
-      const retrieve3 = await redisClient.retrieveForProcessing('activated2', processingId3);
+      console.log(await redisClient.freeProcessingLock('activated1' as any, processingId1, retrieve1 && retrieve1[2].indexOf('activated1' as any) !== -1));
+      const retrieve3 = await redisClient.retrieveForProcessing('activated2' as any, processingId3);
       console.log(retrieve3);
-      console.log(await redisClient.freeProcessingLock('activated2', processingId3, retrieve3 && retrieve3[2].indexOf('activated2') !== -1));
-      console.log(retrieve2[2].indexOf('activated2') !== -1);
-      console.log(await redisClient2.freeProcessingLock('activated2', processingId2, retrieve2 && retrieve2[2].indexOf('activated2') !== -1));
+      console.log(await redisClient.freeProcessingLock('activated2' as any, processingId3, retrieve3 && retrieve3[2].indexOf('activated2' as any) !== -1));
+      console.log(retrieve2[2].indexOf('activated2' as any) !== -1);
+      console.log(await redisClient2.freeProcessingLock('activated2' as any, processingId2, retrieve2 && retrieve2[2].indexOf('activated2' as any) !== -1));
 
-      const retrieve4 = await redisClient.retrieveForProcessing('activated2', await redisClient.getNextProcessingId());
+      const retrieve4 = await redisClient.retrieveForProcessing('activated2' as any, await redisClient.getNextProcessingId());
       console.log(retrieve4);
       expect(retrieve4[0]).toBe(1);
       expect(!!retrieve4[5]).toBe(true);
 
-      console.log(await redisClient.getQueryAndRemove('activated1'));
-      console.log(await redisClient.getQueryAndRemove('activated2'));
+      console.log(await redisClient.getQueryAndRemove('activated1' as any));
+      console.log(await redisClient.getQueryAndRemove('activated2' as any));
 
       await queue.queueDriver.release(redisClient);
       await queue.queueDriver.release(redisClient2);
