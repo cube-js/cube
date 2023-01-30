@@ -116,7 +116,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(parseInt(result.find(f => f[0] === '3'), 10) % 10).toBeLessThan(2);
     });
 
-    test('timeout', async () => {
+    test('timeout - continue wait', async () => {
       const query = ['select * from 2'];
       let errorString = '';
 
@@ -133,14 +133,20 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           break;
         }
       }
-      await awaitProcessing();
 
       expect(errorString).toEqual(expect.stringContaining('timeout'));
+    });
 
-      expect(logger.mock.calls.length).toEqual(6);
+    test('timeout', async () => {
+      const query = ['select * from 3'];
+
+      await queue.executeInQueue('delay', query, { delay: 60 * 60 * 1000, result: '1', isJob: true });
+      await awaitProcessing();
+
+      expect(logger.mock.calls.length).toEqual(5);
       // assert that query queue is able to get query def by query key
-      expect(logger.mock.calls[5][0]).toEqual('Cancelling query due to timeout');
-      expect(logger.mock.calls[4][0]).toEqual('Error while querying');
+      expect(logger.mock.calls[4][0]).toEqual('Cancelling query due to timeout');
+      expect(logger.mock.calls[3][0]).toEqual('Error while querying');
     });
 
     test('stage reporting', async () => {
