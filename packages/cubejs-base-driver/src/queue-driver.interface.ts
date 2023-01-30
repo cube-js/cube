@@ -2,10 +2,13 @@ export type QueryDef = unknown;
 export type QueryKey = (string | [string, any[]]) & {
   persistent?: true,
 };
+export interface QueryKeyHash extends String {
+  __type: 'QueryKeyHash'
+}
 
 export type AddToQueueResponse = [added: number, _b: any, _c: any, queueSize: number, addedToQueueTime: number];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
-export type RetrieveForProcessingResponse = [added: any, removed: any, active: string[], toProcess: any, def: QueryDef, lockAquired: boolean] | null;
+export type RetrieveForProcessingResponse = [added: any, removed: any, active: QueryKeyHash[], toProcess: any, def: QueryDef, lockAquired: boolean] | null;
 
 export interface AddToQueueQuery {
   isJob: boolean,
@@ -27,14 +30,14 @@ export interface QueueDriverOptions {
 }
 
 export interface QueueDriverConnectionInterface {
-  redisHash(queryKey: QueryKey): string;
+  redisHash(queryKey: QueryKey): QueryKeyHash;
   getResultBlocking(queryKey: QueryKey): Promise<unknown>;
   getResult(queryKey: QueryKey): Promise<any>;
   addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: any, queryHandler: any, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<string[]>;
   getActiveQueries(): Promise<string[]>;
-  getQueryDef(queryKey: QueryKey): Promise<QueryDef | null>;
+  getQueryDef(queryKey: QueryKeyHash): Promise<QueryDef | null>;
   // Queries which was added to queue, but was not processed and not needed
   getOrphanedQueries(): Promise<string[]>;
   // Queries which was not completed with old heartbeat
@@ -57,7 +60,7 @@ export interface QueueDriverConnectionInterface {
 }
 
 export interface QueueDriverInterface {
-  redisHash(queryKey: QueryKey): string;
+  redisHash(queryKey: QueryKey): QueryKeyHash;
   createConnection(): Promise<QueueDriverConnectionInterface>;
   release(connection: QueueDriverConnectionInterface): void;
 }

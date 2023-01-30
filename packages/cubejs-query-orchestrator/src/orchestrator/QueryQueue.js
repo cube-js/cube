@@ -318,6 +318,7 @@ export class QueryQueue {
       if (priority == null) {
         priority = 0;
       }
+
       if (!(priority >= -10000 && priority <= 10000)) {
         throw new Error('Priority should be between -10000 and 10000');
       }
@@ -330,8 +331,10 @@ export class QueryQueue {
         return this.parseResult(result);
       }
 
+      const queryKeyHash = this.redisHash(queryKey);
+
       if (query.forceBuild) {
-        const jobExists = await queueConnection.getQueryDef(queryKey);
+        const jobExists = await queueConnection.getQueryDef(queryKeyHash);
         if (jobExists) return null;
       }
 
@@ -363,7 +366,7 @@ export class QueryQueue {
 
       await this.reconcileQueue();
 
-      const queryDef = await queueConnection.getQueryDef(queryKey);
+      const queryDef = await queueConnection.getQueryDef(queryKeyHash);
       const [active, toProcess] = await queueConnection.getQueryStageState(true);
 
       if (queryDef) {
@@ -374,8 +377,8 @@ export class QueryQueue {
           requestId: options.requestId,
           activeQueryKeys: active,
           toProcessQueryKeys: toProcess,
-          active: active.indexOf(this.redisHash(queryKey)) !== -1,
-          queueIndex: toProcess.indexOf(this.redisHash(queryKey)),
+          active: active.indexOf(queryKeyHash) !== -1,
+          queueIndex: toProcess.indexOf(queryKeyHash),
           waitingForRequestId: queryDef.requestId
         });
       }

@@ -960,7 +960,7 @@ export class QueryCache {
   }
 
   public queryRedisKey(cacheKey): string {
-    return this.getKey('SQL_QUERY_RESULT', getCacheHash(cacheKey));
+    return this.getKey('SQL_QUERY_RESULT', getCacheHash(cacheKey) as any);
   }
 
   public async cleanup() {

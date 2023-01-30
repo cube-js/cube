@@ -7,20 +7,23 @@ import {
   RetrieveForProcessingResponse,
   QueueDriverOptions,
   AddToQueueQuery,
-  AddToQueueOptions, AddToQueueResponse, QueryKey,
+  AddToQueueOptions,
+  AddToQueueResponse,
+  QueryKey,
+  QueryKeyHash
 } from '@cubejs-backend/base-driver';
 import { getProcessUid } from '@cubejs-backend/shared';
 
 import { CubeStoreDriver } from './CubeStoreDriver';
 
-function hashQueryKey(queryKey: QueryKey) {
+function hashQueryKey(queryKey: QueryKey): QueryKeyHash {
   const hash = crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
 
   if (typeof queryKey === 'object' && queryKey.persistent) {
-    return `${hash}@${getProcessUid()}`;
+    return `${hash}@${getProcessUid()}` as any;
   }
 
-  return hash;
+  return hash as any;
 }
 
 class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
@@ -29,7 +32,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     protected readonly options: QueueDriverOptions,
   ) { }
 
-  public redisHash(queryKey: QueryKey): string {
+  public redisHash(queryKey: QueryKey): QueryKeyHash {
     return hashQueryKey(queryKey);
   }
 
@@ -170,7 +173,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return [active, toProcess, defs];
   }
 
-  public async getResult(queryKey: string): Promise<unknown> {
+  public async getResult(queryKey: QueryKey): Promise<unknown> {
     const rows = await this.driver.query('QUEUE RESULT ?', [
       this.prefixKey(this.redisHash(queryKey)),
     ]);
@@ -220,9 +223,9 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return payload;
   }
 
-  public async getQueryDef(queryKey: string): Promise<QueryDef | null> {
+  public async getQueryDef(queryKey: QueryKeyHash): Promise<QueryDef | null> {
     const rows = await this.driver.query('QUEUE GET ?', [
-      this.prefixKey(this.redisHash(queryKey))
+      this.prefixKey(queryKey)
     ]);
     if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'getQueryDef');
@@ -244,7 +247,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     // nothing to release
   }
 
-  public async retrieveForProcessing(queryKeyHashed: string, _processingId: string): Promise<RetrieveForProcessingResponse> {
+  public async retrieveForProcessing(queryKeyHashed: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
     const rows = await this.driver.query('QUEUE RETRIEVE CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(queryKeyHashed),
@@ -300,7 +303,7 @@ export class CubeStoreQueueDriver implements QueueDriverInterface {
 
   protected connection: CubeStoreDriver | null = null;
 
-  public redisHash(queryKey: QueryKey) {
+  public redisHash(queryKey: QueryKey): QueryKeyHash {
     return hashQueryKey(queryKey);
   }
 

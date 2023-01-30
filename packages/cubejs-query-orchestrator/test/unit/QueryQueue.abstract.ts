@@ -133,7 +133,14 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           break;
         }
       }
+      await awaitProcessing();
+
       expect(errorString).toEqual(expect.stringContaining('timeout'));
+
+      expect(logger.mock.calls.length).toEqual(6);
+      // assert that query queue is able to get query def by query key
+      expect(logger.mock.calls[5][0]).toEqual('Cancelling query due to timeout');
+      expect(logger.mock.calls[4][0]).toEqual('Error while querying');
     });
 
     test('stage reporting', async () => {
@@ -321,12 +328,12 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       console.log(retrieve1);
       const retrieve2 = await redisClient2.retrieveForProcessing('activated2', processingId2);
       console.log(retrieve2);
-      console.log(await redisClient.freeProcessingLock('activated1', processingId1, retrieve1 && retrieve1[2].indexOf('activated1') !== -1));
+      console.log(await redisClient.freeProcessingLock('activated1', processingId1, retrieve1 && retrieve1[2].indexOf('activated1' as any) !== -1));
       const retrieve3 = await redisClient.retrieveForProcessing('activated2', processingId3);
       console.log(retrieve3);
-      console.log(await redisClient.freeProcessingLock('activated2', processingId3, retrieve3 && retrieve3[2].indexOf('activated2') !== -1));
-      console.log(retrieve2[2].indexOf('activated2') !== -1);
-      console.log(await redisClient2.freeProcessingLock('activated2', processingId2, retrieve2 && retrieve2[2].indexOf('activated2') !== -1));
+      console.log(await redisClient.freeProcessingLock('activated2', processingId3, retrieve3 && retrieve3[2].indexOf('activated2' as any) !== -1));
+      console.log(retrieve2[2].indexOf('activated2' as any) !== -1);
+      console.log(await redisClient2.freeProcessingLock('activated2', processingId2, retrieve2 && retrieve2[2].indexOf('activated2' as any) !== -1));
 
       const retrieve4 = await redisClient.retrieveForProcessing('activated2', await redisClient.getNextProcessingId());
       console.log(retrieve4);

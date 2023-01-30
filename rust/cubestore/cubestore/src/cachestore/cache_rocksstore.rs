@@ -520,10 +520,16 @@ impl CacheStore for RocksCacheStore {
     async fn queue_truncate(&self) -> Result<(), CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
-                let queue_schema = QueueItemRocksTable::new(db_ref);
-                let rows = queue_schema.all_rows()?;
+                let queue_item_schema = QueueItemRocksTable::new(db_ref.clone());
+                let rows = queue_item_schema.all_rows()?;
                 for row in rows.iter() {
-                    queue_schema.delete(row.get_id(), batch_pipe)?;
+                    queue_item_schema.delete(row.get_id(), batch_pipe)?;
+                }
+
+                let queue_result_schema = QueueResultRocksTable::new(db_ref);
+                let rows = queue_result_schema.all_rows()?;
+                for row in rows.iter() {
+                    queue_result_schema.delete(row.get_id(), batch_pipe)?;
                 }
 
                 Ok(())
