@@ -43,16 +43,16 @@ export interface QueueDriverConnectionInterface {
   // Queries which was not completed with old heartbeat
   getStalledQueries(): Promise<string[]>;
   getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse>;
-  updateHeartBeat(queryKey: QueryKey): Promise<void>;
+  updateHeartBeat(hash: QueryKeyHash): Promise<void>;
   getNextProcessingId(): Promise<string | number>;
   // Trying to acquire a lock for processing a queue item, this method can return null when
   // multiple nodes tries to process the same query
-  retrieveForProcessing(queryKey: QueryKey, processingId: number | string): Promise<RetrieveForProcessingResponse>;
-  freeProcessingLock(queryKey: QueryKey, processingId: string | number, activated: unknown): Promise<void>;
-  optimisticQueryUpdate(queryKey: QueryKey, toUpdate, processingId): Promise<boolean>;
+  retrieveForProcessing(hash: QueryKeyHash, processingId: number | string): Promise<RetrieveForProcessingResponse>;
+  freeProcessingLock(hash: QueryKeyHash, processingId: string | number, activated: unknown): Promise<void>;
+  optimisticQueryUpdate(hash: QueryKeyHash, toUpdate, processingId): Promise<boolean>;
   cancelQuery(queryKey: QueryKey): Promise<QueryDef | null>;
-  getQueryAndRemove(queryKey: QueryKey): Promise<[QueryDef]>;
-  setResultAndRemoveQuery(queryKey: QueryKey, executionResult: any, processingId: any): Promise<unknown>;
+  getQueryAndRemove(hash: QueryKeyHash): Promise<[QueryDef]>;
+  setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: any, processingId: any): Promise<unknown>;
   release(): void;
   //
   getQueriesToCancel(): Promise<string[]>
