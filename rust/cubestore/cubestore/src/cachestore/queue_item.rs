@@ -75,11 +75,7 @@ pub struct QueueItem {
     pub(crate) expire: DateTime<Utc>,
 }
 
-impl RocksEntity for QueueItem {
-    fn version() -> u32 {
-        1
-    }
-}
+impl RocksEntity for QueueItem {}
 
 impl QueueItem {
     pub fn new(path: String, value: String, status: QueueItemStatus, priority: i64) -> Self {

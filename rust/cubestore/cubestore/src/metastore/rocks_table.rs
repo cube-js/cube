@@ -298,7 +298,13 @@ where
 }
 
 pub trait RocksEntity {
+    // Version of data/table fields which is used for data migration
     fn version() -> u32 {
+        1
+    }
+
+    // Version of the serialization format
+    fn value_version() -> u32 {
         1
     }
 }
@@ -399,7 +405,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             let table_info = self.deserialize_table_info(table_info.as_slice())?;
 
             if table_info.version != Self::T::version()
-                || table_info.value_version != self.value_version()
+                || table_info.value_version != Self::T::value_version()
             {
                 self.migrate_table(table_info)?
             }
@@ -411,7 +417,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                 .to_bytes(),
                 self.serialize_table_info(TableInfo {
                     version: Self::T::version(),
-                    value_version: self.value_version(),
+                    value_version: Self::T::value_version(),
                 })?
                 .as_slice(),
             )?;
@@ -450,10 +456,6 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             }
         }
         Ok(())
-    }
-
-    fn value_version(&self) -> u32 {
-        1
     }
 
     fn deserialize_table_info(&self, buffer: &[u8]) -> Result<TableInfo, CubeError> {
