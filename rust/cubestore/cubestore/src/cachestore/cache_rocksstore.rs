@@ -60,6 +60,7 @@ impl RocksCacheStoreDetails {
 
         populate_indexes!(CacheItemRocksTable);
         populate_indexes!(QueueItemRocksTable);
+        populate_indexes!(QueueResultRocksTable);
 
         CompactionPreloadedState::new(indexes)
     }
