@@ -3601,7 +3601,7 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
                 c.compaction_chunks_count_threshold = 100;
-                c.max_disk_space = 300_000;
+                c.max_disk_space = 3000;
                 c.select_workers = vec!["127.0.0.1:24308".to_string()];
                 c.metastore_bind_address = Some("127.0.0.1:25314".to_string());
                 c
@@ -3613,7 +3613,7 @@ mod tests {
                     .update_config(|mut c| {
                         c.worker_bind_address = Some("127.0.0.1:24308".to_string());
                         c.server_name = "127.0.0.1:24308".to_string();
-                        c.max_disk_space = 300_000;
+                        c.max_disk_space = 3000;
                         c.metastore_remote_address = Some("127.0.0.1:25314".to_string());
                         c.store_provider = FileStoreProvider::Filesystem {
                             remote_dir: Some(env::current_dir()
@@ -3631,7 +3631,7 @@ mod tests {
                             let mut file = File::create(path_1.clone()).unwrap();
 
                             file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
-                            for i in 0..100000
+                            for i in 0..50
                             {
                                 file.write_all(format!("{},\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23.123 UTC\n", i).as_bytes()).unwrap();
                             }
@@ -3640,7 +3640,7 @@ mod tests {
                             let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
 
                             file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
-                            for i in 0..100000
+                            for i in 0..50
                             {
                                 file.write_all(format!("{},San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n", i).as_bytes()).await.unwrap();
                             }
@@ -3682,7 +3682,7 @@ mod tests {
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
                 c.compaction_chunks_count_threshold = 100;
-                c.max_disk_space_per_worker = 6_000_000;
+                c.max_disk_space_per_worker = 3000;
                 c.select_workers = vec!["127.0.0.1:24309".to_string()];
                 c.metastore_bind_address = Some("127.0.0.1:25315".to_string());
                 c
@@ -3694,7 +3694,7 @@ mod tests {
                     .update_config(|mut c| {
                         c.worker_bind_address = Some("127.0.0.1:24309".to_string());
                         c.server_name = "127.0.0.1:24309".to_string();
-                        c.max_disk_space_per_worker = 6_000_000;
+                        c.max_disk_space_per_worker = 3000;
                         c.metastore_remote_address = Some("127.0.0.1:25315".to_string());
                         c.store_provider = FileStoreProvider::Filesystem {
                             remote_dir: Some(env::current_dir()
@@ -3712,7 +3712,7 @@ mod tests {
                             let mut file = File::create(path_1.clone()).unwrap();
 
                             file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
-                            for i in 0..100000
+                            for i in 0..50
                             {
                                 file.write_all(format!("{},\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23.123 UTC\n", i).as_bytes()).unwrap();
                             }
@@ -3721,7 +3721,7 @@ mod tests {
                             let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
 
                             file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
-                            for i in 0..100000
+                            for i in 0..50
                             {
                                 file.write_all(format!("{},San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n", i).as_bytes()).await.unwrap();
                             }
