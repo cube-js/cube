@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.56](https://github.com/cube-js/cube.js/compare/v0.31.55...v0.31.56) (2023-01-31)
+
+
+### Bug Fixes
+
+* (dimensions.type.ownedByCube = true) is not allowed if dynamic schemas outside of schema folder are used ([88b09bd](https://github.com/cube-js/cube.js/commit/88b09bd14e13a05599c9f433063832a17664ed92))
+
+
+
+
+
 ## [0.31.55](https://github.com/cube-js/cube.js/compare/v0.31.54...v0.31.55) (2023-01-26)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

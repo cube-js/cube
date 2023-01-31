@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.56](https://github.com/cube-js/cube.js/compare/v0.31.55...v0.31.56) (2023-01-31)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Correct cancellation handling ([#6087](https://github.com/cube-js/cube.js/issues/6087)) ([03089ce](https://github.com/cube-js/cube.js/commit/03089cebb5a932eb69abb637ef8b7998beac115c))
+
+
+### Features
+
+* **cubestore:** Max disk space limit ([#6084](https://github.com/cube-js/cube.js/issues/6084)) ([cc6003b](https://github.com/cube-js/cube.js/commit/cc6003b6a6df9744a6cf4aab833230fdca0a4d11))
+* **cubestore:** Max disk space limit per worker ([#6085](https://github.com/cube-js/cube.js/issues/6085)) ([ed2ca79](https://github.com/cube-js/cube.js/commit/ed2ca798b38d5496d4a92a4fe0227e6a25361037))
+
+
+
+
+
 ## [0.31.55](https://github.com/cube-js/cube.js/compare/v0.31.54...v0.31.55) (2023-01-26)
 
 

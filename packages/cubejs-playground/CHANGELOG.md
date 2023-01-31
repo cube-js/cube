@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.56](https://github.com/cube-js/cube.js/compare/v0.31.55...v0.31.56) (2023-01-31)
+
+
+### Bug Fixes
+
+* **playground:** filter nullish refs ([9732af6](https://github.com/cube-js/cube.js/commit/9732af6bfe2b3dad78c0b9e669ba1c6b8b4815dd))
+
+
+
+
+
 ## [0.31.52](https://github.com/cube-js/cube.js/compare/v0.31.51...v0.31.52) (2023-01-23)
 
 **Note:** Version bump only for package @cubejs-client/playground

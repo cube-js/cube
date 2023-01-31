@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.56](https://github.com/cube-js/cube.js/compare/v0.31.55...v0.31.56) (2023-01-31)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Correct cancellation handling ([#6087](https://github.com/cube-js/cube.js/issues/6087)) ([03089ce](https://github.com/cube-js/cube.js/commit/03089cebb5a932eb69abb637ef8b7998beac115c))
+
+
+
+
+
 ## [0.31.55](https://github.com/cube-js/cube.js/compare/v0.31.54...v0.31.55) (2023-01-26)
 
 

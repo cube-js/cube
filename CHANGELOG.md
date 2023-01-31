@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.56](https://github.com/cube-js/cube.js/compare/v0.31.55...v0.31.56) (2023-01-31)
+
+
+### Bug Fixes
+
+* (dimensions.type.ownedByCube = true) is not allowed if dynamic schemas outside of schema folder are used ([88b09bd](https://github.com/cube-js/cube.js/commit/88b09bd14e13a05599c9f433063832a17664ed92))
+* **cubesql:** Allow Thoughtspot `EXTRACT YEAR AS date` ([22d0ad9](https://github.com/cube-js/cube.js/commit/22d0ad967380b4ece695b567e77a216a16b3bf17))
+* **cubestore-driver:** Correct cancellation handling ([#6087](https://github.com/cube-js/cube.js/issues/6087)) ([03089ce](https://github.com/cube-js/cube.js/commit/03089cebb5a932eb69abb637ef8b7998beac115c))
+* **playground:** filter nullish refs ([9732af6](https://github.com/cube-js/cube.js/commit/9732af6bfe2b3dad78c0b9e669ba1c6b8b4815dd))
+
+
+### Features
+
+* **cubestore:** Max disk space limit ([#6084](https://github.com/cube-js/cube.js/issues/6084)) ([cc6003b](https://github.com/cube-js/cube.js/commit/cc6003b6a6df9744a6cf4aab833230fdca0a4d11))
+* **cubestore:** Max disk space limit per worker ([#6085](https://github.com/cube-js/cube.js/issues/6085)) ([ed2ca79](https://github.com/cube-js/cube.js/commit/ed2ca798b38d5496d4a92a4fe0227e6a25361037))
+
+
+
+
+
 ## [0.31.55](https://github.com/cube-js/cube.js/compare/v0.31.54...v0.31.55) (2023-01-26)
 
 
