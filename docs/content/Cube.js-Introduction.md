@@ -11,7 +11,7 @@ and application developers access data from modern data stores, organize it into
 consistent definitions, and deliver it to every application.
 
 <img
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-scheme.png"
+  src="https://ucarecdn.com/c0fd030c-bed9-44bd-a23d-08d754cf4780/"
   style="border: none"
   width="100%"
 />
