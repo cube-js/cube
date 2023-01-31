@@ -232,7 +232,8 @@ export class CompilerApi {
       dataSources.map(async (dataSource) => {
         try {
           await orchestratorApi.driverFactory(dataSource);
-          return dataSource;
+          const dbType = await this.getDbType(dataSource);
+          return { dataSource, dbType };
         } catch (err) {
           return null;
         }

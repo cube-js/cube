@@ -143,7 +143,7 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
 
   async dataSources() {
     return {
-      dataSources: ['default']
+      dataSources: [{ dataSource: 'default', dbType: 'postgres' }]
     };
   },
 }));

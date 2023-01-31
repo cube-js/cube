@@ -414,7 +414,11 @@ describe('index.test', () => {
       });
 
       expect(dataSources).toHaveProperty('dataSources');
-      expect(dataSources.dataSources).toEqual(['main']);
+      expect(dataSources.dataSources).toEqual([{
+        dataSource: 'main',
+        dbType: 'mysql',
+      }]);
+      
       expect(dataSourcesSpy).toHaveBeenCalled();
       dataSourcesSpy.mockClear();
     });

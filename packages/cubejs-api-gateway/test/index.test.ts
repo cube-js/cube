@@ -592,7 +592,7 @@ describe('API Gateway', () => {
           }
         }]
       },
-      { route: 'data-sources', successResult: { dataSources: ['default'] } },
+      { route: 'data-sources', successResult: { dataSources: [{ dataSource: 'default', dbType: 'postgres' }] } },
     ];
 
     testConfigs.forEach((config) => {
