@@ -33,6 +33,7 @@ macro_rules! rocks_table_impl {
         impl<'a> crate::metastore::BaseRocksTable for $rocks_table<'a> {
             fn migrate_table(
                 &self,
+                _batch: &mut rocksdb::WriteBatch,
                 table_info: crate::metastore::TableInfo,
             ) -> Result<(), crate::CubeError> {
                 Err(crate::CubeError::internal(format!(
@@ -310,7 +311,8 @@ pub trait RocksEntity {
 }
 
 pub trait BaseRocksTable {
-    fn migrate_table(&self, table_info: TableInfo) -> Result<(), CubeError>;
+    fn migrate_table(&self, batch: &mut WriteBatch, table_info: TableInfo)
+        -> Result<(), CubeError>;
 }
 
 pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
@@ -328,15 +330,14 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         D: Deserializer<'de>;
     fn indexes() -> Vec<Box<dyn BaseRocksSecondaryIndex<Self::T>>>;
 
-    fn migrate_table_by_truncate(&self) -> Result<(), CubeError> {
-        let mut batch = WriteBatch::default();
+    fn migrate_table_by_truncate(&self, mut batch: &mut WriteBatch) -> Result<(), CubeError> {
+        log::trace!("Truncating rows from {:?} table", self);
         self.delete_all_rows_from_table(Self::table_id(), &mut batch)?;
 
         for index in Self::indexes() {
+            log::trace!("Truncating rows from {:?} index", index);
             self.delete_all_rows_from_index(index.get_id(), &mut batch)?;
         }
-
-        self.db().write(batch)?;
 
         Ok(())
     }
@@ -407,7 +408,23 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             if table_info.version != Self::T::version()
                 || table_info.value_version != Self::T::value_version()
             {
-                self.migrate_table(table_info)?
+                let mut batch = WriteBatch::default();
+
+                self.migrate_table(&mut batch, table_info)?;
+
+                batch.put(
+                    &RowKey::TableInfo {
+                        table_id: Self::table_id(),
+                    }
+                    .to_bytes(),
+                    self.serialize_table_info(TableInfo {
+                        version: Self::T::version(),
+                        value_version: Self::T::value_version(),
+                    })?
+                    .as_slice(),
+                );
+
+                self.db().write(batch)?;
             }
         } else {
             self.db().put(

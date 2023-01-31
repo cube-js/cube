@@ -4,6 +4,7 @@ use crate::metastore::{
 use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::ts_seconds_option;
 use chrono::{DateTime, Duration, Utc};
+use rocksdb::WriteBatch;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -92,8 +93,12 @@ impl<'a> CacheItemRocksTable<'a> {
 }
 
 impl<'a> BaseRocksTable for CacheItemRocksTable<'a> {
-    fn migrate_table(&self, _table_info: TableInfo) -> Result<(), CubeError> {
-        self.migrate_table_by_truncate()
+    fn migrate_table(
+        &self,
+        batch: &mut WriteBatch,
+        _table_info: TableInfo,
+    ) -> Result<(), CubeError> {
+        self.migrate_table_by_truncate(batch)
     }
 }
 
