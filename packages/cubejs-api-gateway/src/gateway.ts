@@ -78,6 +78,7 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
+import { shouldAddLimit } from './helpers/sqlRunnerHelper';
 import {
   transformCube,
   transformMeasure,
@@ -1056,34 +1057,21 @@ class ApiGateway {
         requestId: context.requestId,
       };
 
-      // Determine SQL query type and add LIMIT clause if needed
-      const shouldAddLimit = (sql: string): Boolean => {
-        // TODO: Enhance the way we determine query type
-        const ddlRegex = /^(CREATE|ALTER|DROP|TRUNCATE)\b/i;
-        const dmlRegex = /^(INSERT|UPDATE|DELETE)\b/i;
-        const selectRegex = /^(SELECT|WITH)\b/i;
-      
-        if ((ddlRegex.test(sql)) || (dmlRegex.test(sql))) {
-          return false;
-        } else if (selectRegex.test(sql)) {
-          return true;
-        } else {
-          throw new UserError(
-            'Invalid SQL query'
-          );
-        }
-      };
+      const orchestratorApi = this.getAdapterApi(context);
 
       if (shouldAddLimit(query.query)) {
         if (
           !query.limit ||
           !Number.isInteger(query.limit) ||
-          query.limit > 50000 ||
-          query.limit < 1
+          query.limit < 0
         ) {
           throw new UserError(
-            'A user\'s query must contain limit query param and it must be positive number less than 50000.'
+            'A user\'s query must contain limit query param and it must be positive number'
           );
+        }
+
+        if (query.limit > getEnv('dbQueryDefaultLimit')) {
+          throw new UserError('The query limit has been exceeded');
         }
   
         if (
@@ -1095,20 +1083,15 @@ class ApiGateway {
           );
         }
         
-        const dbType = await this.getCompilerApi(context).getDbType(query.dataSource);
-
+        query.query = query.query.trim();
         if (query.query.charAt(query.query.length - 1) === ';') {
           query.query = query.query.slice(0, -1);
         }
 
-        // TODO: Move this logic to the driver
-        if (dbType === 'oracle') {
-          query.query = `SELECT * FROM (${query.query}) AS t WHERE ROWNUM <= ${query.limit}`;
-        } else if (dbType === 'mssql') {
-          query.query = `SELECT TOP ${query.limit} * FROM (${query.query}) AS t`;
-        } else {
-          query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
-        }
+        const driver = await orchestratorApi
+          .driverFactory(query.dataSource || 'default');
+
+        driver.wrapQueryWithLimit(query);
       }
       
       this.log(
@@ -1119,7 +1102,6 @@ class ApiGateway {
         context
       );
 
-      const orchestratorApi = this.getAdapterApi(context);
       const result = await orchestratorApi.executeQuery(query);
 
       if (result.data.length) {

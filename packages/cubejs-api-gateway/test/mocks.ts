@@ -208,6 +208,14 @@ export class AdapterApiMock {
     };
   }
 
+  public driverFactory() {
+    return {
+      wrapQueryWithLimit(query: { query: string; limit: number }) {
+        query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
+      },
+    };
+  }
+
   public addDataSeenSource() {
     return undefined;
   }

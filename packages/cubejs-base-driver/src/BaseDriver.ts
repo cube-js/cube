@@ -438,4 +438,8 @@ export abstract class BaseDriver implements DriverInterface {
   public nowTimestamp() {
     return Date.now();
   }
+
+  public wrapQueryWithLimit(query: { query: string, limit: number}) {
+    query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
+  }
 }
