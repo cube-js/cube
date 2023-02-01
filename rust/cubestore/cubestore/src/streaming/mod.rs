@@ -1479,11 +1479,13 @@ mod tests {
             let listener = services.cluster.job_result_listener();
 
             let _ = service
-                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `TIMESTAMP` timestamp) \
+                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` timestamp) \
                             WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE \
-                            WHERE  timestamp >= PARSE_TIMESTAMP(\\'1970-01-01T10:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            WHERE  TIMESTAMP >= PARSE_TIMESTAMP(\\'1970-01-01T10:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            TIMESTAMP < PARSE_TIMESTAMP(\\'1970-01-01T11:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
                             ') \
-                            unique key (`ANONYMOUSID`, `MESSAGEID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                            unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
                 .unwrap();
 
@@ -1497,19 +1499,19 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8400)])]);
 
             let result = service
                 .exec_query("SELECT min(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10 * 3600)])]);
 
             let result = service
                 .exec_query("SELECT max(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(13999)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(11 * 3600 + 600 - 1)])]);
         })
             .await;
     }
