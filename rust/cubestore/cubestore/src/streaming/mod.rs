@@ -911,11 +911,11 @@ mod tests {
     use crate::streaming::kafka::KafkaMessage;
     use crate::streaming::{KSqlQuery, KSqlQuerySchema, KsqlClient, KsqlResponse};
     use crate::TableId;
+    use chrono::{SecondsFormat, TimeZone, Utc};
     use sqlparser::ast::{BinaryOperator, Expr, SetExpr, Statement, Value};
     use sqlparser::parser::Parser;
     use sqlparser::tokenizer::Tokenizer;
     use tokio::time::timeout;
-    use chrono::{SecondsFormat, TimeZone, Utc};
 
     pub struct MockKsqlClient;
 
@@ -1070,7 +1070,10 @@ mod tests {
                         continue;
                     }
 
-                    let ts_string = Utc.timestamp_opt(i, 0).unwrap().to_rfc3339_opts(SecondsFormat::Millis, true);
+                    let ts_string = Utc
+                        .timestamp_opt(i, 0)
+                        .unwrap()
+                        .to_rfc3339_opts(SecondsFormat::Millis, true);
                     messages.push(KafkaMessage::MockMessage {
                         // Keys in kafka can have suffixes which contain arbitrary metadata like window size
                         key: Some(format!(

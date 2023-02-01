@@ -85,7 +85,7 @@ impl KafkaStreamingSource {
                         "Error while parsing `select_statement`: {}. Select statement ignored",
                         e
                     );
-                    
+
                     None
                 }
             }
