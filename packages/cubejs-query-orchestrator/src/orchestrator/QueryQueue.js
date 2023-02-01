@@ -1,6 +1,6 @@
 import R from 'ramda';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
-import { QueueDriverInterface } from '@cubejs-backend/base-driver';
+import { QueueDriverInterface, QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
@@ -139,7 +139,7 @@ export class QueryQueue {
   /**
    * Returns stream object which will be used to pipe data from data source.
    *
-   * @param {*} queryKeyHash
+   * @param {QueryKeyHash} queryKeyHash
    */
   getQueryStream(queryKeyHash) {
     if (!this.streams.queued.has(queryKeyHash)) {
@@ -453,6 +453,10 @@ export class QueryQueue {
   async shutdown() {
     if (this.reconcilePromise) {
       await this.reconcilePromise;
+
+      return true;
+    } else {
+      return false;
     }
   }
 
@@ -741,7 +745,7 @@ export class QueryQueue {
    * Processing query specified by the `queryKey`. This method incapsulate most
    * of the logic related with the queues updates, heartbeating, etc.
    *
-   * @param {string} queryKeyHashed
+   * @param {QueryKeyHash} queryKeyHashed
    * @return {Promise<{ result: undefined | Object, error: string | undefined }>}
    */
   async processQuery(queryKeyHashed) {
@@ -971,8 +975,8 @@ export class QueryQueue {
   /**
    * Returns hash sum of the specified `queryKey`.
    *
-   * @param {*} queryKey
-   * @returns {string}
+   * @param {QueryKey} queryKey
+   * @returns {QueryKeyHash}
    */
   redisHash(queryKey) {
     return this.queueDriver.redisHash(queryKey);

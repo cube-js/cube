@@ -61,12 +61,14 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     async function awaitProcessing() {
-      await queue.shutdown();
-      await Promise.all(processMessagePromises);
-      await Promise.all(processCancelPromises);
+      // process query can call reconcileQueue
+      while (await queue.shutdown() || processMessagePromises.length || processCancelPromises.length) {
+        await Promise.all(processMessagePromises);
+        processMessagePromises = [];
 
-      processMessagePromises = [];
-      processCancelPromises = [];
+        await Promise.all(processCancelPromises);
+        processCancelPromises = [];
+      }
     }
 
     afterEach(async () => {
@@ -211,7 +213,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('queue hash process persistent flag properly', () => {
-      const query = ['select * from table'];
+      const query: QueryKey = ['select * from table', []];
       const key1 = queue.redisHash(query);
       // @ts-ignore
       query.persistent = false;
@@ -250,7 +252,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     });
 
     test('removed before reconciled', async () => {
-      const query = ['select * from'];
+      const query: QueryKey = ['select * from', []];
       const key = queue.redisHash(query);
       await queue.processQuery(key);
       const result = await queue.executeInQueue('foo', key, query);

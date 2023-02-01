@@ -102,8 +102,8 @@ pub enum QueueCommand {
     },
     ToCancel {
         prefix: Ident,
+        heartbeat_timeout: Option<u32>,
         orphaned_timeout: Option<u32>,
-        stalled_timeout: Option<u32>,
     },
     List {
         prefix: Ident,
@@ -380,31 +380,31 @@ impl<'a> CubeStoreParser<'a> {
                 key: self.parser.parse_identifier()?,
             },
             "stalled" => {
-                let stalled_timeout = self.parse_integer("stalled timeout", false)?;
+                let heartbeat_timeout = Some(self.parse_integer("heartbeat timeout", false)?);
 
                 QueueCommand::ToCancel {
                     prefix: self.parser.parse_identifier()?,
                     orphaned_timeout: None,
-                    stalled_timeout: Some(stalled_timeout),
+                    heartbeat_timeout,
                 }
             }
             "orphaned" => {
-                let orphaned_timeout = self.parse_integer("orphaned timeout", false)?;
+                let orphaned_timeout = Some(self.parse_integer("orphaned timeout", false)?);
 
                 QueueCommand::ToCancel {
                     prefix: self.parser.parse_identifier()?,
-                    orphaned_timeout: Some(orphaned_timeout),
-                    stalled_timeout: None,
+                    heartbeat_timeout: None,
+                    orphaned_timeout,
                 }
             }
             "to_cancel" => {
-                let stalled_timeout = self.parse_integer("stalled timeout", false)?;
-                let orphaned_timeout = self.parse_integer("orphaned timeout", false)?;
+                let heartbeat_timeout = Some(self.parse_integer("heartbeat timeout", false)?);
+                let orphaned_timeout = Some(self.parse_integer("orphaned timeout", false)?);
 
                 QueueCommand::ToCancel {
                     prefix: self.parser.parse_identifier()?,
-                    orphaned_timeout: Some(stalled_timeout),
-                    stalled_timeout: Some(orphaned_timeout),
+                    heartbeat_timeout,
+                    orphaned_timeout,
                 }
             }
             "pending" => {
