@@ -194,8 +194,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     test('sequence', async () => {
       const p1 = queue.executeInQueue('delay', '111', { delay: 50, result: '1' }, 0);
       const p2 = delayFn(null, 50).then(() => queue.executeInQueue('delay', '112', { delay: 50, result: '2' }, 0));
-      const p3 = delayFn(null, 60).then(() => queue.executeInQueue('delay', '113', { delay: 50, result: '3' }, 0));
-      const p4 = delayFn(null, 70).then(() => queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0));
+      const p3 = delayFn(null, 75).then(() => queue.executeInQueue('delay', '113', { delay: 50, result: '3' }, 0));
+      const p4 = delayFn(null, 100).then(() => queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0));
 
       const result = await Promise.all([p1, p2, p3, p4]);
       expect(result).toEqual(['10', '21', '32', '43']);
@@ -210,8 +210,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
 
       let result = queue.executeInQueue('delay', '111', { delay: 800, result: '1' }, 0);
       delayFn(null, 50).then(() => queue.executeInQueue('delay', '112', { delay: 800, result: '2' }, 0)).catch(e => e);
-      delayFn(null, 60).then(() => queue.executeInQueue('delay', '113', { delay: 500, result: '3' }, 0)).catch(e => e);
-      delayFn(null, 70).then(() => queue.executeInQueue('delay', '114', { delay: 900, result: '4' }, 0)).catch(e => e);
+      delayFn(null, 75).then(() => queue.executeInQueue('delay', '113', { delay: 500, result: '3' }, 0)).catch(e => e);
+      delayFn(null, 100).then(() => queue.executeInQueue('delay', '114', { delay: 900, result: '4' }, 0)).catch(e => e);
 
       expect(await result).toBe('10');
       await queue.executeInQueue('delay', '112', { delay: 800, result: '2' }, 0);

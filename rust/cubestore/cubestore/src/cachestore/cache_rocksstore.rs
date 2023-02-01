@@ -288,6 +288,10 @@ impl RocksCacheStore {
             .filter(|item| {
                 if item.get_row().get_status() == &QueueItemStatus::Pending {
                     return if let Some(orphaned_timeout) = orphaned_timeout {
+                        if let Some(orphaned) = item.get_row().get_orphaned() {
+                            return if orphaned < &now { true } else { false };
+                        }
+
                         let elapsed = now - item.get_row().get_created().clone();
                         if elapsed.num_milliseconds() > orphaned_timeout as i64 {
                             true

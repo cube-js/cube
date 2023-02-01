@@ -232,6 +232,10 @@ impl QueueItem {
         &self.created
     }
 
+    pub fn get_orphaned(&self) -> &Option<DateTime<Utc>> {
+        &self.orphaned
+    }
+
     pub fn status_default() -> QueueItemStatus {
         QueueItemStatus::Pending
     }
