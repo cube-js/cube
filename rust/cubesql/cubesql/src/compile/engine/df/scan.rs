@@ -23,7 +23,7 @@ use datafusion::{
     },
 };
 use futures::Stream;
-use log::warn;
+use log::{debug, warn};
 
 use crate::{
     sql::AuthContextRef,
@@ -310,19 +310,28 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             )));
         }
 
-        one_shot_stream.data = Some(transform_response(
-            load_data(
-                request,
-                self.auth_context.clone(),
-                self.transport.clone(),
-                meta.clone(),
-                self.options.clone(),
-            )
-            .await?
-            .data,
+        let data = load_data(
+            request,
+            self.auth_context.clone(),
+            self.transport.clone(),
+            meta.clone(),
+            self.options.clone(),
+        )
+        .await;
+
+        stream_debug(format!("load_data: {:?}", &data).as_str());
+
+        let data = data?.data;
+
+        let data = transform_response(
+            data,
             one_shot_stream.schema.clone(),
             &one_shot_stream.member_fields,
-        )?);
+        );
+
+        stream_debug(format!("transform_response: {:?}", &data).as_str());
+
+        one_shot_stream.data = Some(data?);
 
         Ok(Box::pin(CubeScanStreamRouter::new(
             CubeScanMemoryStream::new(
@@ -754,6 +763,16 @@ fn transform_response(
     Ok(RecordBatch::try_new(schema.clone(), columns)?)
 }
 
+// TODO: Temporary debug solution
+pub fn stream_debug(str: &str) {
+    let stream_mode = std::env::var("CUBESQL_STREAM_MODE")
+        .ok()
+        .map(|v| v.parse::<bool>().unwrap())
+        .unwrap_or(true);
+    if stream_mode {
+        debug!("{}", str);
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
