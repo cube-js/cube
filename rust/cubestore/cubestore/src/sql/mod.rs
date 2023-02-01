@@ -1268,12 +1268,12 @@ impl SqlService for SqlServiceImpl {
                     }
                     QueueCommand::ToCancel {
                         prefix,
+                        heartbeat_timeout,
                         orphaned_timeout,
-                        stalled_timeout,
                     } => {
                         let rows = self
                             .cachestore
-                            .queue_to_cancel(prefix.value, orphaned_timeout, stalled_timeout)
+                            .queue_to_cancel(prefix.value, orphaned_timeout, heartbeat_timeout)
                             .await?;
 
                         let columns = vec![Column::new("id".to_string(), ColumnType::String, 0)];

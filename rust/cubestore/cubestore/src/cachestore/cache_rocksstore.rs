@@ -328,7 +328,7 @@ pub trait CacheStore: DIService + Send + Sync {
         &self,
         prefix: String,
         orphaned_timeout: Option<u32>,
-        stalled_timeout: Option<u32>,
+        heartbeat_timeout: Option<u32>,
     ) -> Result<Vec<IdRow<QueueItem>>, CubeError>;
     async fn queue_list(
         &self,
@@ -555,7 +555,7 @@ impl CacheStore for RocksCacheStore {
         &self,
         prefix: String,
         orphaned_timeout: Option<u32>,
-        stalled_timeout: Option<u32>,
+        heartbeat_timeout: Option<u32>,
     ) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
         self.store
             .read_operation(move |db_ref| {
@@ -568,22 +568,26 @@ impl CacheStore for RocksCacheStore {
 
                 let res = items.into_iter().filter(|item| {
                     if item.get_row().get_status() == &QueueItemStatus::Pending {
-                        if let Some(stalled_timeout) = stalled_timeout {
+                        return if let Some(orphaned_timeout) = orphaned_timeout {
                             let elapsed = now - item.get_row().get_created().clone();
-                            if elapsed.num_milliseconds() > stalled_timeout as i64 {
-                                return true;
+                            if elapsed.num_milliseconds() > orphaned_timeout as i64 {
+                                true
+                            } else {
+                                false
                             }
-                        }
+                        } else {
+                            false
+                        };
                     }
 
                     if item.get_row().get_status() == &QueueItemStatus::Active {
-                        if let Some(orphaned_timeout) = orphaned_timeout {
+                        if let Some(heartbeat_timeout) = heartbeat_timeout {
                             let elapsed = if let Some(heartbeat) = item.get_row().get_heartbeat() {
                                 now - heartbeat.clone()
                             } else {
                                 now - item.get_row().get_created().clone()
                             };
-                            if elapsed.num_milliseconds() > orphaned_timeout as i64 {
+                            if elapsed.num_milliseconds() > heartbeat_timeout as i64 {
                                 return true;
                             }
                         }
@@ -619,9 +623,7 @@ impl CacheStore for RocksCacheStore {
                 if priority_sort {
                     Ok(items
                         .into_iter()
-                        .sorted_by(|a, b| {
-                            b.get_row().get_priority().cmp(a.get_row().get_priority())
-                        })
+                        .sorted_by(|a, b| b.row.cmp(&a.row))
                         .collect())
                 } else {
                     Ok(items)
@@ -966,7 +968,7 @@ crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
 
 #[cfg(test)]
 mod tests {
-    use crate::cachestore::*;
+    use super::*;
     use crate::CubeError;
 
     #[tokio::test]

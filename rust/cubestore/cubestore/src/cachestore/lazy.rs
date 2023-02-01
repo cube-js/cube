@@ -220,11 +220,11 @@ impl CacheStore for LazyRocksCacheStore {
         &self,
         prefix: String,
         orphaned_timeout: Option<u32>,
-        stalled_timeout: Option<u32>,
+        heartbeat_timeout: Option<u32>,
     ) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
         self.init()
             .await?
-            .queue_to_cancel(prefix, orphaned_timeout, stalled_timeout)
+            .queue_to_cancel(prefix, orphaned_timeout, heartbeat_timeout)
             .await
     }
 
