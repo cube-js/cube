@@ -218,7 +218,7 @@ impl ContextProvider for TopicTableProvider {
                             ColumnarValue::Scalar(ScalarValue::Utf8(Some(_))) => {}
                             _ => {
                                 return Err(DataFusionError::Execution(
-                                    "Only scalar arguments are suported in PARSE_TIMESTAMP"
+                                    "Only scalar arguments are supported in PARSE_TIMESTAMP"
                                         .to_string(),
                                 ));
                             }
@@ -234,7 +234,7 @@ impl ContextProvider for TopicTableProvider {
                             }
                             _ => {
                                 return Err(DataFusionError::Execution(
-                                    "Only scalar arguments are suported in PARSE_TIMESTAMP"
+                                    "Only scalar arguments are supported in PARSE_TIMESTAMP"
                                         .to_string(),
                                 ));
                             }
@@ -256,7 +256,7 @@ impl ContextProvider for TopicTableProvider {
                             }
                             _ => {
                                 return Err(DataFusionError::Execution(
-                                    "Only scalar arguments are suported in PARSE_TIMESTAMP"
+                                    "Only scalar arguments are supported in PARSE_TIMESTAMP"
                                         .to_string(),
                                 ));
                             }
