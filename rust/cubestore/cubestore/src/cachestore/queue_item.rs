@@ -6,6 +6,7 @@ use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Duration, Utc};
 use rocksdb::WriteBatch;
+use std::cmp::Ordering;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -77,6 +78,22 @@ pub struct QueueItem {
 }
 
 impl RocksEntity for QueueItem {}
+
+impl Ord for QueueItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.priority == other.priority {
+            other.created.cmp(&self.created)
+        } else {
+            self.priority.cmp(&other.priority)
+        }
+    }
+}
+
+impl PartialOrd for QueueItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 impl QueueItem {
     pub fn new(path: String, value: String, status: QueueItemStatus, priority: i64) -> Self {
@@ -326,5 +343,84 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
 
     fn get_id(&self) -> IndexId {
         *self as IndexId
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::CubeError;
+    use itertools::Itertools;
+
+    #[test]
+    fn test_queue_item_sort() -> Result<(), CubeError> {
+        let priority0_1 =
+            QueueItem::new("1".to_string(), "1".to_string(), QueueItemStatus::Active, 0);
+        let priority0_2 =
+            QueueItem::new("2".to_string(), "2".to_string(), QueueItemStatus::Active, 0);
+        let priority0_3 =
+            QueueItem::new("3".to_string(), "3".to_string(), QueueItemStatus::Active, 0);
+        let priority10_4 = QueueItem::new(
+            "4".to_string(),
+            "4".to_string(),
+            QueueItemStatus::Active,
+            10,
+        );
+        let priority0_5 =
+            QueueItem::new("5".to_string(), "5".to_string(), QueueItemStatus::Active, 0);
+        let priority_n5_6 = QueueItem::new(
+            "6".to_string(),
+            "6".to_string(),
+            QueueItemStatus::Active,
+            -5,
+        );
+
+        assert_eq!(
+            vec![
+                priority0_1.clone(),
+                priority0_2.clone(),
+                priority0_3.clone(),
+                priority10_4.clone(),
+                priority_n5_6.clone(),
+                priority0_5.clone()
+            ]
+            .into_iter()
+            .sorted_by(|a, b| b.cmp(&a))
+            .map(|item| item.get_key().clone())
+            .collect::<Vec<String>>(),
+            vec![
+                "4".to_string(),
+                "1".to_string(),
+                "2".to_string(),
+                "3".to_string(),
+                "5".to_string(),
+                "6".to_string()
+            ]
+        );
+
+        assert_eq!(
+            vec![
+                priority10_4,
+                priority0_1,
+                priority0_5,
+                priority0_2,
+                priority0_3,
+                priority_n5_6
+            ]
+            .into_iter()
+            .sorted_by(|a, b| b.cmp(&a))
+            .map(|item| item.get_key().clone())
+            .collect::<Vec<String>>(),
+            vec![
+                "4".to_string(),
+                "1".to_string(),
+                "2".to_string(),
+                "3".to_string(),
+                "5".to_string(),
+                "6".to_string()
+            ]
+        );
+
+        Ok(())
     }
 }

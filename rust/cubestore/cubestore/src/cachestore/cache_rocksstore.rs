@@ -619,9 +619,7 @@ impl CacheStore for RocksCacheStore {
                 if priority_sort {
                     Ok(items
                         .into_iter()
-                        .sorted_by(|a, b| {
-                            b.get_row().get_priority().cmp(a.get_row().get_priority())
-                        })
+                        .sorted_by(|a, b| b.row.cmp(&a.row))
                         .collect())
                 } else {
                     Ok(items)
@@ -966,7 +964,7 @@ crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
 
 #[cfg(test)]
 mod tests {
-    use crate::cachestore::*;
+    use super::*;
     use crate::CubeError;
 
     #[tokio::test]
