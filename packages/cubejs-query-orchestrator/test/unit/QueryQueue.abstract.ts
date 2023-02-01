@@ -191,6 +191,16 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(results.map(r => parseInt(r[0], 10) - parseInt(results[0][0], 10))).toEqual([0, 1, 2]);
     });
 
+    test('sequence', async () => {
+      const p1 = queue.executeInQueue('delay', '111', { delay: 50, result: '1' }, 0);
+      const p2 = delayFn(null, 50).then(() => queue.executeInQueue('delay', '112', { delay: 50, result: '2' }, 0));
+      const p3 = delayFn(null, 60).then(() => queue.executeInQueue('delay', '113', { delay: 50, result: '3' }, 0));
+      const p4 = delayFn(null, 70).then(() => queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0));
+
+      const result = await Promise.all([p1, p2, p3, p4]);
+      expect(result).toEqual(['10', '21', '32', '43']);
+    });
+
     test('orphaned', async () => {
       for (let i = 1; i <= 4; i++) {
         await queue.executeInQueue('delay', `11${i}`, { delay: 50, result: `${i}` }, 0);

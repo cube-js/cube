@@ -1184,6 +1184,7 @@ impl SqlService for SqlServiceImpl {
                     QueueCommand::Add {
                         key,
                         priority,
+                        orphaned,
                         value,
                     } => {
                         let response = self
@@ -1193,6 +1194,7 @@ impl SqlService for SqlServiceImpl {
                                 value,
                                 QueueItem::status_default(),
                                 priority,
+                                orphaned,
                             ))
                             .await?;
 

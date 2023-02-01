@@ -236,6 +236,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "queue_multiple_result_blocking",
             queue_multiple_result_blocking,
         ),
+        t("queue_custom_orphaned", queue_custom_orphaned),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -6882,6 +6883,34 @@ async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) {
             ]),]
         );
     }
+}
+
+async fn queue_custom_orphaned(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 ORPHANED 60 "STANDALONE#queue:2" "payload1";"#)
+        .await
+        .unwrap();
+
+    tokio::time::sleep(Duration::new(1, 0)).await;
+
+    let res = service
+        .exec_query(r#"QUEUE TO_CANCEL 100 100 "STANDALONE#queue""#)
+        .await
+        .unwrap();
+    assert_eq!(
+        res.get_columns(),
+        &vec![Column::new("id".to_string(), ColumnType::String, 0),]
+    );
+
+    assert_eq!(
+        res.get_rows(),
+        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+    );
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
