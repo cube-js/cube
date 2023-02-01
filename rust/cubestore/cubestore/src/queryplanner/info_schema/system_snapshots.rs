@@ -1,8 +1,8 @@
 use crate::metastore::snapshot_info::SnapshotInfo;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
-use arrow::array::{ArrayRef, BooleanArray, StringArray};
-use arrow::datatypes::{DataType, Field};
+use arrow::array::{ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray};
+use arrow::datatypes::{DataType, Field, TimeUnit};
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -25,6 +25,21 @@ impl InfoSchemaTableDef for SystemSnapshotsTableDef {
                         snapshots
                             .iter()
                             .map(|row| format!("{}", row.id))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new(
+                    "created (Utc)",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Box::new(|snapshots| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        snapshots
+                            .iter()
+                            .map(|row| (row.id * 1000000) as i64)
                             .collect::<Vec<_>>(),
                     ))
                 }),
