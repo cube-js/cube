@@ -507,7 +507,7 @@ export class QueryCache {
           cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(await this.options.queueOptions(dataSource)),
+          ...(this.options.queueOptions ? await this.options.queueOptions(dataSource) : {}),
         }
       );
     }
@@ -973,9 +973,8 @@ export class QueryCache {
     return this.cacheDriver.testConnection();
   }
   
-  public async fetchSchema(dataSource: string, securityContext?: { [key: string]: any; }) {
-    const queryKey = { query: getCacheHash([dataSource, [securityContext]]) };
+  public async fetchSchema(dataSource: string) {
     const queue = await this.getQueue(dataSource);
-    return queue.executeQueryInQueue('query', queryKey, { tablesSchema: true });
+    return queue.executeQueryInQueue('query', [`Fetch schema for ${dataSource}`, []], { tablesSchema: true });
   }
 }

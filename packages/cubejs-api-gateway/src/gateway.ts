@@ -1182,7 +1182,7 @@ class ApiGateway {
    
       const schema = await orchestratorApi
         .getQueryOrchestrator()
-        .fetchSchema(query.dataSource, context?.securityContext);
+        .fetchSchema(query.dataSource);
 
       res({ data: schema });
     } catch (e) {

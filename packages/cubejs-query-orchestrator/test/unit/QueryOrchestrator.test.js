@@ -115,25 +115,6 @@ class MockDriver {
   capabilities() {
     return {};
   }
-  
-  async tablesSchema() {
-    return {
-      public: {
-        orders: [
-          {
-            name: 'id',
-            type: 'integer',
-            attributes: [],
-          },
-          {
-            name: 'user_id',
-            type: 'integer',
-            attributes: [],
-          },
-        ],
-      },
-    };
-  }
 }
 
 class ExternalMockDriver extends MockDriver {
@@ -1596,25 +1577,12 @@ describe('QueryOrchestrator', () => {
   });
 
   test('fetch table schema', async () => {
-    const promise = queryOrchestrator.fetchSchema('default');
-    const result = await promise;
-    expect(result).toEqual(
-      {
-        public: {
-          orders: [
-            {
-              name: 'id',
-              type: 'integer',
-              attributes: [],
-            },
-            {
-              name: 'user_id',
-              type: 'integer',
-              attributes: [],
-            },
-          ],
-        },
-      }
-    );
+    const queryCacheSpy = jest.spyOn(queryOrchestrator.queryCache, 'fetchSchema')
+      .mockImplementation(() => '');
+      
+    await queryOrchestrator.fetchSchema('default');
+
+    expect(queryCacheSpy.mock.calls.length).toEqual(1);
+    queryCacheSpy.mockRestore();
   });
 });

@@ -1,20 +1,64 @@
 import crypto from 'crypto';
 import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
+import { BaseDriver } from '@cubejs-backend/base-driver';
 
 import { QueryCache, QueryCacheOptions } from '../../src';
 
 export type QueryCacheTestOptions = QueryCacheOptions & {
-  beforeAll?: () => Promise<void>,
-  afterAll?: () => Promise<void>,
+  beforeAll?: () => Promise<void>;
+  afterAll?: () => Promise<void>;
 };
 
-export const QueryCacheTest = (name: string, options?: QueryCacheTestOptions) => {
-  describe(`QueryQueue${name}`, () => {
+class BaseDriverImplementedMock extends BaseDriver {
+  public constructor(
+    protected readonly data: { query: any; tablesSchema: any }
+  ) {
+    super();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  public async testConnection(): Promise<void> {}
+
+  public async query(_query, _values) {
+    return this.data.query;
+  }
+
+  public async tablesSchema() {
+    return this.data.tablesSchema;
+  }
+}
+
+export const QueryCacheTest = (
+  name: string,
+  options?: QueryCacheTestOptions
+) => {
+  describe(`QueryCache${name}`, () => {
+    const data = {
+      query: {},
+      tablesSchema: {
+        data: {
+          public: {
+            orders: [
+              {
+                name: 'id',
+                type: 'integer',
+                attributes: [],
+              },
+              {
+                name: 'user_id',
+                type: 'integer',
+                attributes: [],
+              },
+            ],
+          },
+        },
+      },
+    };
+
+    const driver = new BaseDriverImplementedMock(data);
     const cache = new QueryCache(
       crypto.randomBytes(16).toString('hex'),
-      jest.fn(() => {
-        throw new Error('It`s not implemented mock...');
-      }),
+      () => driver,
       jest.fn(),
       options,
     );
@@ -162,6 +206,11 @@ export const QueryCacheTest = (name: string, options?: QueryCacheTestOptions) =>
       expect(key4[3]).toBeUndefined();
       // @ts-ignore
       expect(key4.persistent).toEqual(false);
+    });
+
+    it('fetchSchema', async () => {
+      const res = await cache.fetchSchema('default');
+      expect(res).toEqual(data.tablesSchema);
     });
   });
 };

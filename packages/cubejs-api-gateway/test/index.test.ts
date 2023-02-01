@@ -614,7 +614,7 @@ describe('API Gateway', () => {
           }
         }]
       },
-      { route: 'data-sources', scope: ['sql-runner'], successResult: { dataSources: ['default'] } },
+      { route: 'data-sources', scope: ['sql-runner'], successResult: { dataSources: [{ dataSource: 'default', dbType: 'postgres' }] } },
       {
         route: 'db-schema',
         method: 'post',

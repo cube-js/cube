@@ -432,7 +432,7 @@ export class QueryOrchestrator {
     return this.preAggregations.updateRefreshEndReached();
   }
 
-  public async fetchSchema(dataSource: string, securityContext?: { [key: string]: any; }) {
-    return this.queryCache.fetchSchema(dataSource, securityContext);
+  public async fetchSchema(dataSource: string) {
+    return this.queryCache.fetchSchema(dataSource);
   }
 }
