@@ -911,6 +911,7 @@ mod tests {
     use crate::streaming::kafka::KafkaMessage;
     use crate::streaming::{KSqlQuery, KSqlQuerySchema, KsqlClient, KsqlResponse};
     use crate::TableId;
+    use chrono::{SecondsFormat, TimeZone, Utc};
     use sqlparser::ast::{BinaryOperator, Expr, SetExpr, Statement, Value};
     use sqlparser::parser::Parser;
     use sqlparser::tokenizer::Tokenizer;
@@ -1069,6 +1070,10 @@ mod tests {
                         continue;
                     }
 
+                    let ts_string = Utc
+                        .timestamp_opt(i, 0)
+                        .unwrap()
+                        .to_rfc3339_opts(SecondsFormat::Millis, true);
                     messages.push(KafkaMessage::MockMessage {
                         // Keys in kafka can have suffixes which contain arbitrary metadata like window size
                         key: Some(format!(
@@ -1076,7 +1081,7 @@ mod tests {
                             serde_json::json!({ "MESSAGEID": i.to_string() }).to_string()
                         )),
                         payload: Some(
-                            serde_json::json!({ "ANONYMOUSID": j.to_string(), "TIMESTAMP": i })
+                            serde_json::json!({ "ANONYMOUSID": j.to_string(), "FILTER_ID":i, "TIMESTAMP": ts_string })
                                 .to_string(),
                         ),
                         offset: i,
@@ -1397,6 +1402,7 @@ mod tests {
             })
                 .await
         }, async move |services| {
+            //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
             let service = services.sql_service;
 
             let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
@@ -1409,9 +1415,9 @@ mod tests {
             let listener = services.cluster.job_result_listener();
 
             let _ = service
-                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `TIMESTAMP` int) \
-                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE TIMESTAMP >= 10000 and TIMESTAMP < 14000') \
-                            unique key (`ANONYMOUSID`, `MESSAGEID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int) \
+                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE FILTER_ID >= 10000 and FILTER_ID < 14000') \
+                            unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`) INDEX by_anonymous(`ANONYMOUSID`, `FILTER_ID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
                 .unwrap();
 
@@ -1428,16 +1434,84 @@ mod tests {
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8000)])]);
 
             let result = service
-                .exec_query("SELECT min(TIMESTAMP) FROM test.events_by_type_1 ")
+                .exec_query("SELECT min(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
             let result = service
-                .exec_query("SELECT max(TIMESTAMP) FROM test.events_by_type_1 ")
+                .exec_query("SELECT max(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(13999)])]);
+        })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn streaming_filter_kafka_parse_timestamp() {
+        Config::test("streaming_filter_kafka_parse_timestamp").update_config(|mut c| {
+            c.stream_replay_check_interval_secs = 1;
+            c.compaction_in_memory_chunks_max_lifetime_threshold = 8;
+            c.partition_split_threshold = 1000000;
+            c.max_partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 100;
+            c.compaction_chunks_total_size_threshold = 100000;
+            c.stale_stream_timeout = 1;
+            c.wal_split_threshold = 16384;
+            c
+        }).start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
+                Arc::new(MockKafkaClient)
+            })
+                .await
+        }, async move |services| {
+            //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
+                .await
+                .unwrap();
+
+            let listener = services.cluster.job_result_listener();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` timestamp) \
+                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE \
+                            WHERE  TIMESTAMP >= PARSE_TIMESTAMP(\\'1970-01-01T10:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            TIMESTAMP < PARSE_TIMESTAMP(\\'1970-01-01T11:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            ') \
+                            unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            let wait = listener.wait_for_job_results(vec![
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/1".to_string())),
+            ]);
+            timeout(Duration::from_secs(15), wait).await.unwrap().unwrap();
+
+            let result = service
+                .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8400)])]);
+
+            let result = service
+                .exec_query("SELECT min(FILTER_ID) FROM test.events_by_type_1 ")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10 * 3600)])]);
+
+            let result = service
+                .exec_query("SELECT max(FILTER_ID) FROM test.events_by_type_1 ")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(11 * 3600 + 600 - 1)])]);
         })
             .await;
     }

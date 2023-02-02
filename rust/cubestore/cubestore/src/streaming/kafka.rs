@@ -7,10 +7,11 @@ use crate::streaming::{parse_json_payload_and_key, StreamingSource};
 use crate::table::{Row, TableValue};
 use crate::CubeError;
 use arrow::array::ArrayRef;
+use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::record_batch::RecordBatch;
-use arrow::{datatypes::Schema, datatypes::SchemaRef};
 use async_std::stream;
 use async_trait::async_trait;
+use chrono::DateTime;
 use datafusion::catalog::TableReference;
 use datafusion::cube_ext;
 use datafusion::datasource::datasource::Statistics;
@@ -19,11 +20,14 @@ use datafusion::error::DataFusionError;
 use datafusion::logical_plan::Expr as DExpr;
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::empty::EmptyExec;
+use datafusion::physical_plan::functions::Signature;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
+use datafusion::physical_plan::ColumnarValue;
 use datafusion::physical_plan::{collect, ExecutionPlan};
 use datafusion::prelude::ExecutionContext;
+use datafusion::scalar::ScalarValue;
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use futures::Stream;
@@ -85,6 +89,7 @@ impl KafkaStreamingSource {
                         "Error while parsing `select_statement`: {}. Select statement ignored",
                         e
                     );
+
                     None
                 }
             }
@@ -189,8 +194,79 @@ impl ContextProvider for TopicTableProvider {
         }
     }
 
-    fn get_function_meta(&self, _name: &str) -> Option<Arc<ScalarUDF>> {
-        None
+    fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
+        match name {
+            "parse_timestamp" | "PARSE_TIMESTAMP" => {
+                let meta = ScalarUDF {
+                    name: "PARSE_TIMESTAMP".to_string(),
+                    signature: Signature::Exact(vec![
+                        DataType::Utf8,
+                        DataType::Utf8,
+                        DataType::Utf8,
+                    ]),
+                    return_type: Arc::new(|_| {
+                        Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
+                    }),
+
+                    fun: Arc::new(move |inputs| {
+                        if inputs.len() != 3 {
+                            return Err(DataFusionError::Execution(
+                                "Expected 3 arguments in PARSE_TIMESTAMP".to_string(),
+                            ));
+                        }
+                        match &inputs[1] {
+                            ColumnarValue::Scalar(ScalarValue::Utf8(Some(_))) => {}
+                            _ => {
+                                return Err(DataFusionError::Execution(
+                                    "Only scalar arguments are supported in PARSE_TIMESTAMP"
+                                        .to_string(),
+                                ));
+                            }
+                        };
+                        match &inputs[2] {
+                            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => {
+                                if s.to_lowercase() != "utc" {
+                                    return Err(DataFusionError::Execution(
+                                        "Only UTC timezone supported in PARSE_TIMESTAMP"
+                                            .to_string(),
+                                    ));
+                                }
+                            }
+                            _ => {
+                                return Err(DataFusionError::Execution(
+                                    "Only scalar arguments are supported in PARSE_TIMESTAMP"
+                                        .to_string(),
+                                ));
+                            }
+                        };
+                        match &inputs[0] {
+                            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => {
+                                let ts = match DateTime::parse_from_rfc3339(s) {
+                                    Ok(ts) => ts,
+                                    Err(e) => {
+                                        return Err(DataFusionError::Execution(format!(
+                                            "Error while parsing timestamp: {}",
+                                            e
+                                        )));
+                                    }
+                                };
+                                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
+                                    Some(ts.timestamp_nanos()),
+                                )))
+                            }
+                            _ => {
+                                return Err(DataFusionError::Execution(
+                                    "Only scalar arguments are supported in PARSE_TIMESTAMP"
+                                        .to_string(),
+                                ));
+                            }
+                        }
+                    }),
+                };
+                Some(Arc::new(meta))
+            }
+            _ => None,
+        }
     }
 
     fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
