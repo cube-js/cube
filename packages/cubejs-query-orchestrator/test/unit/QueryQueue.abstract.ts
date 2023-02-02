@@ -222,6 +222,45 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0);
     });
 
+    test('orphaned with custom ttl', async () => {
+      const connection = await queue.queueDriver.createConnection();
+
+      try {
+        const priority = 10;
+        const time = new Date().getTime();
+        const keyScore = time + (10000 - priority) * 1E14;
+
+        expect(await connection.getOrphanedQueries()).toEqual([]);
+
+        let orphanedTimeout = 2;
+        await connection.addToQueue(keyScore, ['1', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+          stageQueryKey: '1',
+          requestId: '1',
+          orphanedTimeout,
+        });
+
+        expect(await connection.getOrphanedQueries()).toEqual([]);
+
+        orphanedTimeout = 60;
+        await connection.addToQueue(keyScore, ['2', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+          stageQueryKey: '2',
+          requestId: '2',
+          orphanedTimeout,
+        });
+
+        await pausePromise(2000);
+
+        expect(await connection.getOrphanedQueries()).toEqual([
+          connection.redisHash(['1', []])
+        ]);
+      } finally {
+        await connection.getQueryAndRemove(connection.redisHash(['1', []]));
+        await connection.getQueryAndRemove(connection.redisHash(['2', []]));
+
+        queue.queueDriver.release(connection);
+      }
+    });
+
     test('queue hash process persistent flag properly', () => {
       const query: QueryKey = ['select * from table', []];
       const key1 = queue.redisHash(query);
