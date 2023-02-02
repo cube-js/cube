@@ -37,7 +37,7 @@ the cube is extended.
 
 ```javascript
 cube(`BaseEvents`, {
-  sql: `select * from events`,
+  sql: `SELECT * FROM events`,
 
   joins: {
     Users: {
@@ -67,7 +67,7 @@ define only the specific dimensions – `productName` for product purchases and
 
 ```javascript
 cube(`ProductPurchases`, {
-  sql: `select * from product_purchases`,
+  sql: `SELECT * FROM product_purchases`,
   extends: BaseEvents,
 
   dimensions: {
@@ -79,7 +79,7 @@ cube(`ProductPurchases`, {
 });
 
 cube(`PageViews`, {
-  sql: `select * from page_views`,
+  sql: `SELECT * FROM page_views`,
   extends: BaseEvents,
 
   dimensions: {
@@ -97,9 +97,23 @@ If the base cube is using [`FILTER_PARAMS`][ref-schema-ref-cube-filter-params]
 in any `sql` property, then extending cubes can do one of two things:
 
 - Override the `sql` property in each target cube.
+  ```javascript
+  cube(`ProductPurchases`, {
+    sql: `SELECT * FROM events WHERE 
+           {$FILTER_PARAMS.ProductPurchases.timestamp.filter('time')}`,
+  ...
+  ```
 
 - Put all filters inside the base cube and reference all specific cubes filters
   using `AND`. The unused filters will be rendered to `1 = 1` in the SQL query.
+  ```javascript
+  cube(`BaseEvents`, {
+    sql: `SELECT * FROM events WHERE  
+              {$FILTER_PARAMS.BaseEvents.timestamp.filter('time')}
+          AND {$FILTER_PARAMS.ProductPurchases.timestamp.filter('time')}
+          AND {$FILTER_PARAMS.PageViews.timestamp.filter('time')}`,
+  ...
+  ```
 
 [mdn-js-objects]:
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
