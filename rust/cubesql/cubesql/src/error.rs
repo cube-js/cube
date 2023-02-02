@@ -53,6 +53,8 @@ impl CubeError {
     pub fn panic(error: Box<dyn Any + Send>) -> Self {
         if let Some(reason) = error.downcast_ref::<&str>() {
             CubeError::internal(format!("Unexpected panic. Reason: {}", reason))
+        } else if let Some(reason) = error.downcast_ref::<String>() {
+            CubeError::internal(format!("Unexpected panic. Reason: {}", reason))
         } else {
             CubeError::internal("Unexpected panic without reason".to_string())
         }
