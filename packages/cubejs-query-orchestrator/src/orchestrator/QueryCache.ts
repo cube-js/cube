@@ -507,7 +507,7 @@ export class QueryCache {
           cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(this.options.queueOptions ? await this.options.queueOptions(dataSource) : {}),
+          ...(await this.options.queueOptions(dataSource)),
         }
       );
     }
