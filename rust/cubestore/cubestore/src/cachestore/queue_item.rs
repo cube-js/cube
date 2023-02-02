@@ -3,7 +3,7 @@ use crate::metastore::{
 };
 use crate::table::{Row, TableValue};
 use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
-use chrono::serde::ts_seconds;
+use chrono::serde::{ts_seconds, ts_seconds_option};
 use chrono::{DateTime, Duration, Utc};
 use rocksdb::WriteBatch;
 use std::cmp::Ordering;
@@ -71,13 +71,19 @@ pub struct QueueItem {
     pub(crate) status: QueueItemStatus,
     #[serde(default)]
     priority: i64,
-    created: DateTime<Utc>,
-    heartbeat: Option<DateTime<Utc>>,
     #[serde(with = "ts_seconds")]
-    pub(crate) expire: DateTime<Utc>,
+    created: DateTime<Utc>,
+    #[serde(with = "ts_seconds_option")]
+    pub(crate) heartbeat: Option<DateTime<Utc>>,
+    #[serde(with = "ts_seconds_option")]
+    orphaned: Option<DateTime<Utc>>,
 }
 
-impl RocksEntity for QueueItem {}
+impl RocksEntity for QueueItem {
+    fn version() -> u32 {
+        2
+    }
+}
 
 impl Ord for QueueItem {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -96,13 +102,21 @@ impl PartialOrd for QueueItem {
 }
 
 impl QueueItem {
-    pub fn new(path: String, value: String, status: QueueItemStatus, priority: i64) -> Self {
+    pub fn new(
+        path: String,
+        value: String,
+        status: QueueItemStatus,
+        priority: i64,
+        orphaned: Option<u32>,
+    ) -> Self {
         let parts: Vec<&str> = path.rsplitn(2, ":").collect();
 
         let (prefix, key) = match parts.len() {
             2 => (Some(parts[1].to_string()), parts[0].to_string()),
             _ => (None, path),
         };
+
+        let created = Utc::now();
 
         QueueItem {
             prefix,
@@ -111,9 +125,13 @@ impl QueueItem {
             status,
             priority,
             extra: None,
-            created: Utc::now(),
             heartbeat: None,
-            expire: Utc::now() + Duration::days(1),
+            orphaned: if let Some(orphaned) = orphaned {
+                Some(created + Duration::seconds(orphaned as i64))
+            } else {
+                None
+            },
+            created,
         }
     }
 
@@ -212,6 +230,10 @@ impl QueueItem {
 
     pub fn get_created(&self) -> &DateTime<Utc> {
         &self.created
+    }
+
+    pub fn get_orphaned(&self) -> &Option<DateTime<Utc>> {
+        &self.orphaned
     }
 
     pub fn status_default() -> QueueItemStatus {
@@ -338,7 +360,11 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
     }
 
     fn get_expire(&self, row: &QueueItem) -> Option<DateTime<Utc>> {
-        Some(row.expire.clone())
+        if let Some(orphaned) = row.orphaned {
+            Some(orphaned.clone() + Duration::hours(1))
+        } else {
+            Some(row.get_created().clone() + Duration::hours(2))
+        }
     }
 
     fn get_id(&self) -> IndexId {
@@ -354,25 +380,47 @@ mod tests {
 
     #[test]
     fn test_queue_item_sort() -> Result<(), CubeError> {
-        let priority0_1 =
-            QueueItem::new("1".to_string(), "1".to_string(), QueueItemStatus::Active, 0);
-        let priority0_2 =
-            QueueItem::new("2".to_string(), "2".to_string(), QueueItemStatus::Active, 0);
-        let priority0_3 =
-            QueueItem::new("3".to_string(), "3".to_string(), QueueItemStatus::Active, 0);
+        let priority0_1 = QueueItem::new(
+            "1".to_string(),
+            "1".to_string(),
+            QueueItemStatus::Active,
+            0,
+            None,
+        );
+        let priority0_2 = QueueItem::new(
+            "2".to_string(),
+            "2".to_string(),
+            QueueItemStatus::Active,
+            0,
+            None,
+        );
+        let priority0_3 = QueueItem::new(
+            "3".to_string(),
+            "3".to_string(),
+            QueueItemStatus::Active,
+            0,
+            None,
+        );
         let priority10_4 = QueueItem::new(
             "4".to_string(),
             "4".to_string(),
             QueueItemStatus::Active,
             10,
+            None,
         );
-        let priority0_5 =
-            QueueItem::new("5".to_string(), "5".to_string(), QueueItemStatus::Active, 0);
+        let priority0_5 = QueueItem::new(
+            "5".to_string(),
+            "5".to_string(),
+            QueueItemStatus::Active,
+            0,
+            None,
+        );
         let priority_n5_6 = QueueItem::new(
             "6".to_string(),
             "6".to_string(),
             QueueItemStatus::Active,
             -5,
+            None,
         );
 
         assert_eq!(

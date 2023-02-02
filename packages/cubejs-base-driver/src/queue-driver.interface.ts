@@ -17,7 +17,8 @@ export interface AddToQueueQuery {
 
 export interface AddToQueueOptions {
   stageQueryKey: string,
-  requestId: string
+  requestId: string,
+  orphanedTimeout?: number,
 }
 
 export interface QueueDriverOptions {

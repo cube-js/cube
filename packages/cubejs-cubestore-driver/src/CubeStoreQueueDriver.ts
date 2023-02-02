@@ -59,11 +59,18 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       addedToQueueTime: new Date().getTime()
     };
 
-    const rows = await this.driver.query('QUEUE ADD PRIORITY ? ? ?', [
+    const values: (string | number)[] = [
       priority,
-      this.prefixKey(this.redisHash(queryKey)),
-      JSON.stringify(data)
-    ]);
+    ];
+
+    if (options.orphanedTimeout) {
+      values.push(options.orphanedTimeout);
+    }
+
+    values.push(this.prefixKey(this.redisHash(queryKey)));
+    values.push(JSON.stringify(data));
+
+    const rows = await this.driver.query(`QUEUE ADD PRIORITY ?${options.orphanedTimeout ? ' ORPHANED ?' : ''} ? ?`, values);
     if (rows && rows.length) {
       return [
         rows[0].added === 'true' ? 1 : 0,

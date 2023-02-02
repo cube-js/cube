@@ -29,7 +29,7 @@ use rocksdb::{Options, DB};
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
 use crate::table::{Row, TableValue};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
@@ -275,6 +275,50 @@ impl RocksCacheStore {
         let index_key =
             QueueItemIndexKey::ByPrefixAndStatus(prefix.clone().unwrap_or("".to_string()), status);
         queue_schema.count_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefixAndStatus)
+    }
+
+    fn filter_to_cancel(
+        now: DateTime<Utc>,
+        items: Vec<IdRow<QueueItem>>,
+        orphaned_timeout: Option<u32>,
+        heartbeat_timeout: Option<u32>,
+    ) -> Vec<IdRow<QueueItem>> {
+        items
+            .into_iter()
+            .filter(|item| {
+                if item.get_row().get_status() == &QueueItemStatus::Pending {
+                    return if let Some(orphaned_timeout) = orphaned_timeout {
+                        if let Some(orphaned) = item.get_row().get_orphaned() {
+                            return if orphaned < &now { true } else { false };
+                        }
+
+                        let elapsed = now - item.get_row().get_created().clone();
+                        if elapsed.num_milliseconds() > orphaned_timeout as i64 {
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+                }
+
+                if item.get_row().get_status() == &QueueItemStatus::Active {
+                    if let Some(heartbeat_timeout) = heartbeat_timeout {
+                        let elapsed = if let Some(heartbeat) = item.get_row().get_heartbeat() {
+                            now - heartbeat.clone()
+                        } else {
+                            now - item.get_row().get_created().clone()
+                        };
+                        if elapsed.num_milliseconds() > heartbeat_timeout as i64 {
+                            return true;
+                        }
+                    }
+                }
+
+                false
+            })
+            .collect()
     }
 }
 
@@ -564,39 +608,12 @@ impl CacheStore for RocksCacheStore {
                 let items =
                     queue_schema.get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?;
 
-                let now = Utc::now();
-
-                let res = items.into_iter().filter(|item| {
-                    if item.get_row().get_status() == &QueueItemStatus::Pending {
-                        return if let Some(orphaned_timeout) = orphaned_timeout {
-                            let elapsed = now - item.get_row().get_created().clone();
-                            if elapsed.num_milliseconds() > orphaned_timeout as i64 {
-                                true
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        };
-                    }
-
-                    if item.get_row().get_status() == &QueueItemStatus::Active {
-                        if let Some(heartbeat_timeout) = heartbeat_timeout {
-                            let elapsed = if let Some(heartbeat) = item.get_row().get_heartbeat() {
-                                now - heartbeat.clone()
-                            } else {
-                                now - item.get_row().get_created().clone()
-                            };
-                            if elapsed.num_milliseconds() > heartbeat_timeout as i64 {
-                                return true;
-                            }
-                        }
-                    }
-
-                    false
-                });
-
-                Ok(res.collect())
+                Ok(Self::filter_to_cancel(
+                    db_ref.start_time.clone(),
+                    items,
+                    orphaned_timeout,
+                    heartbeat_timeout,
+                ))
             })
             .await
     }
@@ -909,7 +926,7 @@ impl CacheStore for ClusterCacheStoreClient {
         &self,
         _prefix: String,
         _orphaned_timeout: Option<u32>,
-        _stalled_timeout: Option<u32>,
+        _heartbeat_timeout: Option<u32>,
     ) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_to_cancel was used.")
     }
@@ -986,5 +1003,128 @@ mod tests {
         RocksCacheStore::cleanup_test_cachestore("cache_incr");
 
         Ok(())
+    }
+
+    #[test]
+    fn test_filter_to_cancel() {
+        let now = Utc::now();
+        let item_pending_custom_orphaned = IdRow::new(
+            1,
+            QueueItem::new(
+                "1".to_string(),
+                "1".to_string(),
+                QueueItemStatus::Pending,
+                1,
+                Some(10),
+            ),
+        );
+        let item_pending_custom_orphaned_expired = IdRow::new(
+            2,
+            QueueItem::new(
+                "2".to_string(),
+                "2".to_string(),
+                QueueItemStatus::Pending,
+                1,
+                Some(1),
+            ),
+        );
+        let item_active_custom_orphaned = IdRow::new(
+            3,
+            QueueItem::new(
+                "3".to_string(),
+                "3".to_string(),
+                QueueItemStatus::Active,
+                1,
+                Some(10),
+            ),
+        );
+        let mut item_active_custom_orphaned_expired = IdRow::new(
+            4,
+            QueueItem::new(
+                "4".to_string(),
+                "4".to_string(),
+                QueueItemStatus::Active,
+                1,
+                Some(1),
+            ),
+        );
+
+        assert_eq!(
+            RocksCacheStore::filter_to_cancel(
+                now.clone(),
+                vec![
+                    item_pending_custom_orphaned.clone(),
+                    item_pending_custom_orphaned_expired.clone(),
+                    item_active_custom_orphaned.clone(),
+                    item_active_custom_orphaned_expired.clone()
+                ],
+                Some(1000),
+                None,
+            )
+            .iter()
+            .map(|row| row.id)
+            .collect::<Vec<u64>>()
+            .len(),
+            0
+        );
+
+        assert_eq!(
+            RocksCacheStore::filter_to_cancel(
+                now.clone(),
+                vec![
+                    item_pending_custom_orphaned.clone(),
+                    item_pending_custom_orphaned_expired.clone(),
+                    item_active_custom_orphaned.clone(),
+                    item_active_custom_orphaned_expired.clone()
+                ],
+                Some(1000),
+                Some(1000)
+            )
+            .iter()
+            .map(|row| row.id)
+            .collect::<Vec<u64>>()
+            .len(),
+            0
+        );
+
+        let now = now + chrono::Duration::seconds(2);
+
+        assert_eq!(
+            RocksCacheStore::filter_to_cancel(
+                now.clone(),
+                vec![
+                    item_pending_custom_orphaned.clone(),
+                    item_pending_custom_orphaned_expired.clone(),
+                    item_active_custom_orphaned.clone(),
+                    item_active_custom_orphaned_expired.clone()
+                ],
+                Some(1000),
+                None,
+            )
+            .iter()
+            .map(|row| row.id)
+            .collect::<Vec<u64>>(),
+            vec![2]
+        );
+
+        item_active_custom_orphaned_expired.row.heartbeat = Some(now.clone());
+
+        assert_eq!(
+            RocksCacheStore::filter_to_cancel(
+                now,
+                vec![
+                    item_pending_custom_orphaned.clone(),
+                    item_pending_custom_orphaned_expired.clone(),
+                    item_active_custom_orphaned.clone(),
+                    item_active_custom_orphaned_expired.clone()
+                ],
+                Some(1000),
+                Some(1000)
+            )
+            .iter()
+            .map(|row| row.id)
+            .collect::<Vec<u64>>(),
+            vec![2, 3]
+        );
     }
 }

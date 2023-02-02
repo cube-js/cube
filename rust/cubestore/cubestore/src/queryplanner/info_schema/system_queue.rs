@@ -93,6 +93,26 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                 }),
             ),
             (
+                Field::new(
+                    "orphaned",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    true,
+                ),
+                Box::new(|items| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        items
+                            .iter()
+                            .map(|row| {
+                                row.get_row()
+                                    .get_orphaned()
+                                    .as_ref()
+                                    .map(|v| v.timestamp_nanos())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
                 Field::new("value", DataType::Utf8, false),
                 Box::new(|items| {
                     Arc::new(StringArray::from_iter(

@@ -241,10 +241,13 @@ export class QueryQueue {
       }
       const time = new Date().getTime();
       const keyScore = time + (10000 - priority) * 1E14;
+
+      options.orphanedTimeout = query.orphanedTimeout;
       const orphanedTimeout = 'orphanedTimeout' in query
         ? query.orphanedTimeout
         : this.orphanedTimeout;
       const orphanedTime = time + (orphanedTimeout * 1000);
+
       const [added, _b, _c, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
         keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
@@ -341,8 +344,10 @@ export class QueryQueue {
       const time = new Date().getTime();
       const keyScore = time + (10000 - priority) * 1E14;
 
+      options.orphanedTimeout = query.orphanedTimeout;
       const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
       const orphanedTime = time + (orphanedTimeout * 1000);
+
       const [added, _b, _c, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
         keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );

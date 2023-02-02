@@ -94,6 +94,7 @@ pub enum CacheCommand {
 pub enum QueueCommand {
     Add {
         priority: i64,
+        orphaned: Option<u32>,
         key: Ident,
         value: String,
     },
@@ -350,8 +351,15 @@ impl<'a> CubeStoreParser<'a> {
                     0
                 };
 
+                let orphaned = if self.parse_custom_token(&"orphaned") {
+                    Some(self.parse_integer("orphaned", false)?)
+                } else {
+                    None
+                };
+
                 QueueCommand::Add {
                     priority,
+                    orphaned,
                     key: self.parser.parse_identifier()?,
                     value: self.parser.parse_literal_string()?,
                 }

@@ -191,6 +191,16 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(results.map(r => parseInt(r[0], 10) - parseInt(results[0][0], 10))).toEqual([0, 1, 2]);
     });
 
+    test('sequence', async () => {
+      const p1 = queue.executeInQueue('delay', '111', { delay: 50, result: '1' }, 0);
+      const p2 = delayFn(null, 50).then(() => queue.executeInQueue('delay', '112', { delay: 50, result: '2' }, 0));
+      const p3 = delayFn(null, 75).then(() => queue.executeInQueue('delay', '113', { delay: 50, result: '3' }, 0));
+      const p4 = delayFn(null, 100).then(() => queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0));
+
+      const result = await Promise.all([p1, p2, p3, p4]);
+      expect(result).toEqual(['10', '21', '32', '43']);
+    });
+
     test('orphaned', async () => {
       for (let i = 1; i <= 4; i++) {
         await queue.executeInQueue('delay', `11${i}`, { delay: 50, result: `${i}` }, 0);
@@ -200,8 +210,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
 
       let result = queue.executeInQueue('delay', '111', { delay: 800, result: '1' }, 0);
       delayFn(null, 50).then(() => queue.executeInQueue('delay', '112', { delay: 800, result: '2' }, 0)).catch(e => e);
-      delayFn(null, 60).then(() => queue.executeInQueue('delay', '113', { delay: 500, result: '3' }, 0)).catch(e => e);
-      delayFn(null, 70).then(() => queue.executeInQueue('delay', '114', { delay: 900, result: '4' }, 0)).catch(e => e);
+      delayFn(null, 75).then(() => queue.executeInQueue('delay', '113', { delay: 500, result: '3' }, 0)).catch(e => e);
+      delayFn(null, 100).then(() => queue.executeInQueue('delay', '114', { delay: 900, result: '4' }, 0)).catch(e => e);
 
       expect(await result).toBe('10');
       await queue.executeInQueue('delay', '112', { delay: 800, result: '2' }, 0);
@@ -210,6 +220,45 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await delayFn(null, 200);
       expect(cancelledQuery).toBe('114');
       await queue.executeInQueue('delay', '114', { delay: 50, result: '4' }, 0);
+    });
+
+    test('orphaned with custom ttl', async () => {
+      const connection = await queue.queueDriver.createConnection();
+
+      try {
+        const priority = 10;
+        const time = new Date().getTime();
+        const keyScore = time + (10000 - priority) * 1E14;
+
+        expect(await connection.getOrphanedQueries()).toEqual([]);
+
+        let orphanedTimeout = 2;
+        await connection.addToQueue(keyScore, ['1', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+          stageQueryKey: '1',
+          requestId: '1',
+          orphanedTimeout,
+        });
+
+        expect(await connection.getOrphanedQueries()).toEqual([]);
+
+        orphanedTimeout = 60;
+        await connection.addToQueue(keyScore, ['2', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+          stageQueryKey: '2',
+          requestId: '2',
+          orphanedTimeout,
+        });
+
+        await pausePromise(2000);
+
+        expect(await connection.getOrphanedQueries()).toEqual([
+          connection.redisHash(['1', []])
+        ]);
+      } finally {
+        await connection.getQueryAndRemove(connection.redisHash(['1', []]));
+        await connection.getQueryAndRemove(connection.redisHash(['2', []]));
+
+        queue.queueDriver.release(connection);
+      }
     });
 
     test('queue hash process persistent flag properly', () => {
