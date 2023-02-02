@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.58](https://github.com/cube-js/cube.js/compare/v0.31.57...v0.31.58) (2023-02-02)
+
+
+### Features
+
+* **cubesql:** Improve catching of panic's reason ([#6107](https://github.com/cube-js/cube.js/issues/6107)) ([c8cf300](https://github.com/cube-js/cube.js/commit/c8cf3007b5bcb4f0362e5e3721eccadf69bcea62))
+
+
+
+
+
 ## [0.31.56](https://github.com/cube-js/cube.js/compare/v0.31.55...v0.31.56) (2023-01-31)
 
 

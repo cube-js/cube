@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.58](https://github.com/cube-js/cube.js/compare/v0.31.57...v0.31.58) (2023-02-02)
+
+
+### Bug Fixes
+
+* **jdbc-driver:** streamQuery connection release ([#6108](https://github.com/cube-js/cube.js/issues/6108)) ([3426e6e](https://github.com/cube-js/cube.js/commit/3426e6e46a12aba2e85671cf22dcf4dd005d785c))
+
+
+
+
+
 ## [0.31.57](https://github.com/cube-js/cube.js/compare/v0.31.56...v0.31.57) (2023-02-02)
 
 **Note:** Version bump only for package @cubejs-backend/jdbc-driver

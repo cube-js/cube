@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.58](https://github.com/cube-js/cube.js/compare/v0.31.57...v0.31.58) (2023-02-02)
+
+
+### Features
+
+* **snowflake-sdk:** Security upgrade snowflake-sdk from 1.6.14 to 1.6.18 ([#6097](https://github.com/cube-js/cube.js/issues/6097)) ([1f10c8a](https://github.com/cube-js/cube.js/commit/1f10c8a7cf088328e4e9a30d74e34338709af9b1))
+
+
+
+
+
 ## [0.31.57](https://github.com/cube-js/cube.js/compare/v0.31.56...v0.31.57) (2023-02-02)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver

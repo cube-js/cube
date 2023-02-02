@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.58](https://github.com/cube-js/cube.js/compare/v0.31.57...v0.31.58) (2023-02-02)
+
+
+### Bug Fixes
+
+* **jdbc-driver:** streamQuery connection release ([#6108](https://github.com/cube-js/cube.js/issues/6108)) ([3426e6e](https://github.com/cube-js/cube.js/commit/3426e6e46a12aba2e85671cf22dcf4dd005d785c))
+
+
+### Features
+
+* **cubesql:** Improve catching of panic's reason ([#6107](https://github.com/cube-js/cube.js/issues/6107)) ([c8cf300](https://github.com/cube-js/cube.js/commit/c8cf3007b5bcb4f0362e5e3721eccadf69bcea62))
+* **cubestore:** Queue - support custom orphaned timeout ([#6090](https://github.com/cube-js/cube.js/issues/6090)) ([d6702ab](https://github.com/cube-js/cube.js/commit/d6702ab1d7c38111799edf9227e3aa53c51cc237))
+* **native:** Correct error handling for neon::channel.send ([#6106](https://github.com/cube-js/cube.js/issues/6106)) ([f71255a](https://github.com/cube-js/cube.js/commit/f71255abdae1d933101e0bc4002fd83373278067))
+* **snowflake-sdk:** Security upgrade snowflake-sdk from 1.6.14 to 1.6.18 ([#6097](https://github.com/cube-js/cube.js/issues/6097)) ([1f10c8a](https://github.com/cube-js/cube.js/commit/1f10c8a7cf088328e4e9a30d74e34338709af9b1))
+
+
+
+
+
 ## [0.31.57](https://github.com/cube-js/cube.js/compare/v0.31.56...v0.31.57) (2023-02-02)
 
 
