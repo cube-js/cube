@@ -155,7 +155,7 @@ Measures are traditionally only used in indexes if you plan to filter a measured
 The order in which columns are specified in the index is **very** important; suboptimal ordering can lead to diminished performance.
 To improve the performance of an index the main thing to consider is the order of the columns defined in it. The order of the columns should be defined in accordance with the [Index Selectivity](https://blog.toadworld.com/2018/09/05/unselective-indexes-selectivity).
 In a nutshell, index selectivity measures how many unique values a database has. An index is said to have a **higher** selectivity as the number of unique values goes up and a **lower** selectivity as the number of unique values goes down.
-Once we know the selectivity of the columns we'll be adding to the index, we need to place them from **LOWEST** to **HIGHEST** selectivity (this is probably contrary to what you've read about the topic in traditional row-based databases).
+Once we know the selectivity of the columns we'll be adding to the index, we need to place them from **lowest** to **highest** selectivity (this is probably contrary to what you've read about the topic in traditional row-based databases).
 
 **Example:**
 
