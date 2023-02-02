@@ -233,11 +233,11 @@ You run the following query on a regular basis, with the only difference between
 ```JSON
 {
   "measures": [
-    "ExampleCube.orderTotal"
+    "Orders.orderTotal"
   ],
   "timeDimensions": [
     {
-      "dimension": "ExampleCube.timestamp",
+      "dimension": "Orders.timestamp",
       "granularity": "hour",
       "dateRange": [
         "2022-12-14T06:00:00.000",
@@ -247,29 +247,29 @@ You run the following query on a regular basis, with the only difference between
   ],
   "order": [
     [
-      "ExampleCube.timestamp",
+      "Orders.timestamp",
       "asc"
     ]
   ],
   "filters": [
     {
-      "member": "ExampleCube.productCategory",
+      "member": "Orders.productCategory",
       "operator": "equals",
       "values": [
-        "Dummy1"
+        "Electronics"
       ]
     },
     {
-      "member": "ExampleCube.productName",
+      "member": "Orders.productName",
       "operator": "equals",
       "values": [
-        "Dummy2",
-        "Dummy3"
+        "Keyboard",
+        "Mouse"
       ]
     }
   ],
   "dimensions": [
-    "ExampleCube.zipCode"
+    "Orders.zipCode"
   ],
   "limit": 10000
 }
