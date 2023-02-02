@@ -1,4 +1,4 @@
-import { shouldAddLimit } from '../../src/helpers/sqlRunnerHelper';
+import { shouldAddLimit } from '../../src/helpers/shouldAddLimit';
 
 describe('shouldAddLimit', () => {
   test('returns false for CREATE query', () => {

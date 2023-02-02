@@ -78,7 +78,7 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
-import { shouldAddLimit } from './helpers/sqlRunnerHelper';
+import { shouldAddLimit } from './helpers/shouldAddLimit';
 import {
   transformCube,
   transformMeasure,
