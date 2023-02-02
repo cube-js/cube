@@ -19,7 +19,7 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@cube-dev/purple-banner": "^2.0.3",
+    "@cube-dev/purple-banner": "^2.0.5",
     "@cubejs-client/core": "^0.27.41",
     "@docsearch/react": "^3.3.0",
     "@percy/cli": "^1.0.0-beta.70",
