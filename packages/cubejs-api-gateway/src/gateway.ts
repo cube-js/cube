@@ -78,6 +78,7 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
+import { shouldAddLimit } from './helpers/shouldAddLimit';
 import {
   transformCube,
   transformMeasure,
@@ -1042,9 +1043,7 @@ class ApiGateway {
     const requestStarted = new Date();
     try {
       if (!query) {
-        throw new UserError(
-          'A user\'s query must contain a body'
-        );
+        throw new UserError('A user\'s query must contain a body');
       }
 
       if (!Array.isArray(query) && !query.query) {
@@ -1052,16 +1051,47 @@ class ApiGateway {
           'A user\'s query must contain at least one query param.'
         );
       }
-
+      
       query = {
         ...query,
-        requestId: context.requestId
+        requestId: context.requestId,
       };
 
-      if (query.resultFilter?.objectTypes && !Array.isArray(query.resultFilter.objectTypes)) {
-        throw new UserError(
-          'A query.resultFilter.objectTypes must be an array of strings'
-        );
+      const orchestratorApi = this.getAdapterApi(context);
+
+      if (shouldAddLimit(query.query)) {
+        if (
+          !query.limit ||
+          !Number.isInteger(query.limit) ||
+          query.limit < 0
+        ) {
+          throw new UserError(
+            'A user\'s query must contain limit query param and it must be positive number'
+          );
+        }
+
+        if (query.limit > getEnv('dbQueryDefaultLimit')) {
+          throw new UserError('The query limit has been exceeded');
+        }
+  
+        if (
+          query.resultFilter?.objectTypes &&
+          !Array.isArray(query.resultFilter.objectTypes)
+        ) {
+          throw new UserError(
+            'A query.resultFilter.objectTypes must be an array of strings'
+          );
+        }
+        
+        query.query = query.query.trim();
+        if (query.query.charAt(query.query.length - 1) === ';') {
+          query.query = query.query.slice(0, -1);
+        }
+
+        const driver = await orchestratorApi
+          .driverFactory(query.dataSource || 'default');
+
+        driver.wrapQueryWithLimit(query);
       }
       
       this.log(
@@ -1072,7 +1102,8 @@ class ApiGateway {
         context
       );
 
-      const result = await this.getAdapterApi(context).executeQuery(query);
+      const result = await orchestratorApi.executeQuery(query);
+
       if (result.data.length) {
         const objectLimit = Number(query.resultFilter?.objectLimit) || 100;
         const stringLimit = Number(query.resultFilter?.stringLimit) || 100;

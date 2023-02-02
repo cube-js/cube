@@ -556,7 +556,8 @@ describe('API Gateway', () => {
         method: 'post',
         successBody: {
           query: {
-            query: 'SELECT * FROM sql-runner',
+            query: 'SELECT * FROM sql-runner; ',
+            limit: 10000,
             resultFilter: {
               objectLimit: 2,
               stringLimit: 2,
@@ -582,11 +583,30 @@ describe('API Gateway', () => {
         }, {
           result: {
             status: 400,
+            error: 'A user\'s query must contain limit query param and it must be positive number'
+          },
+          body: { query: { query: 'SELECT * FROM sql-runner' } }
+        }, {
+          result: {
+            status: 400,
+            error: 'The query limit has been exceeded'
+          },
+          body: { query: { query: 'SELECT * FROM sql-runner', limit: 60000 } }
+        }, {
+          result: {
+            status: 400,
+            error: 'A user\'s query must contain limit query param and it must be positive number'
+          },
+          body: { query: { query: 'SELECT * FROM sql-runner', limit: -1 } }
+        }, {
+          result: {
+            status: 400,
             error: 'A query.resultFilter.objectTypes must be an array of strings'
           },
           body: {
             query: {
               query: 'SELECT * FROM sql-runner',
+              limit: 10000,
               resultFilter: {
                 objectTypes: 'text'
               },

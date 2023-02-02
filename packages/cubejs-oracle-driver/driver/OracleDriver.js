@@ -139,6 +139,10 @@ class OracleDriver extends BaseDriver {
   readOnly() {
     return true;
   }
+
+  wrapQueryWithLimit(query) {
+    query.query = `SELECT * FROM (${query.query}) AS t WHERE ROWNUM <= ${query.limit}`;
+  }
 }
 
 module.exports = OracleDriver;

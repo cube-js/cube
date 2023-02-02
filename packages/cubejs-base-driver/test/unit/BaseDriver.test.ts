@@ -56,4 +56,14 @@ describe('BaseDriver', () => {
       { name: 'string', type: 'string' }
     ]);
   });
+  
+  test('wrapQueryWithLimit wraps the query with a limit', () => {
+    const driver = new BaseDriverImplementedMock({});
+    const query = { query: 'SELECT * FROM users', limit: 10 };
+    driver.wrapQueryWithLimit(query);
+    expect(query).toEqual({
+      query: 'SELECT * FROM (SELECT * FROM users) AS t LIMIT 10',
+      limit: 10,
+    });
+  });
 });

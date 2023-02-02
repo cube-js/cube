@@ -181,6 +181,10 @@ class MSSqlDriver extends BaseDriver {
   readOnly() {
     return !!this.config.readOnly;
   }
+
+  wrapQueryWithLimit(query) {
+    query.query = `SELECT TOP ${query.limit} * FROM (${query.query}) AS t`;
+  }
 }
 
 module.exports = MSSqlDriver;
