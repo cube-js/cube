@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.57](https://github.com/cube-js/cube.js/compare/v0.31.56...v0.31.57) (2023-02-02)
+
+
+### Features
+
+* **cubejs-api-gateway:** Add scope check to sql runner ([#6053](https://github.com/cube-js/cube.js/issues/6053)) ([d79d3aa](https://github.com/cube-js/cube.js/commit/d79d3aae32ce185614a65912f1c8229128792c48))
+* **cubejs-server-core:** add dbType to dataSources ([#6089](https://github.com/cube-js/cube.js/issues/6089)) ([5c84467](https://github.com/cube-js/cube.js/commit/5c844677d841a65cb7eb3eadd36e69ed59881fd6))
+* **cubestore:** Cache/Queue - implement migrations (truncating) ([#6083](https://github.com/cube-js/cube.js/issues/6083)) ([e8daf5e](https://github.com/cube-js/cube.js/commit/e8daf5e70e947c04675e2acc6654deb9484e2497))
+* **cubestore:** Queue - correct sort over priority (+created) ([#6094](https://github.com/cube-js/cube.js/issues/6094)) ([bd489cd](https://github.com/cube-js/cube.js/commit/bd489cd7981dd94766f28ae4621fe993252d63c1))
+
+
+
+
+
 ## [0.31.56](https://github.com/cube-js/cube.js/compare/v0.31.55...v0.31.56) (2023-01-31)
 
 
