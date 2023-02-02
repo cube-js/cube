@@ -290,7 +290,14 @@ impl StreamingService for StreamingServiceImpl {
             let mut start_seq: Option<i64> = None;
             let mut end_seq: Option<i64> = None;
 
-            app_metrics::STREAMING_ROWS_READ.add(rows.len() as i64);
+            let server_name = self.config_obj.server_name();
+            let host_name = server_name.split(":").next().unwrap_or("undefined");
+            let tags = vec![
+                format!("cube_host:{}", host_name),
+                format!("location:{}", location),
+            ];
+
+            app_metrics::STREAMING_ROWS_READ.add_with_tags(rows.len() as i64, Some(&tags));
 
             for row in rows {
                 let row = row?;
@@ -312,7 +319,6 @@ impl StreamingService for StreamingServiceImpl {
                     x => panic!("Unexpected type for sequence column: {:?}", x),
                 }
             }
-            let seq_pointer = SeqPointer::new(start_seq, end_seq);
             let data = finish(builders);
             let data = source.apply_post_filter(data).await?;
 
@@ -352,7 +358,11 @@ impl StreamingService for StreamingServiceImpl {
                 }
             };
             let new_chunk_ids = new_chunk_ids?;
-            app_metrics::STREAMING_CHUNKS_READ.add(new_chunk_ids.len() as i64);
+            app_metrics::STREAMING_CHUNKS_READ
+                .add_with_tags(new_chunk_ids.len() as i64, Some(&tags));
+            if let Some(last_seq) = end_seq {
+                app_metrics::STREAMING_LASTOFFSET.report_with_tags(last_seq, Some(&tags));
+            }
             self.meta_store
                 .activate_chunks(table.get_id(), new_chunk_ids, replay_handle)
                 .await?;
