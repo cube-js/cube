@@ -33,6 +33,7 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_SNOWFLAKE_REGION`                    | The Snowflake region to use when connecting to the database                                                                                         | [A valid Snowflake region][snowflake-docs-regions]                     |    ❌    |                                    ✅                                    |
 | `CUBEJS_DB_SNOWFLAKE_WAREHOUSE`                 | The Snowflake warehouse to use when connecting to the database                                                                                      | [A valid Snowflake warehouse][snowflake-docs-warehouse] in the account |    ✅    |                                    ✅                                    |
 | `CUBEJS_DB_SNOWFLAKE_ROLE`                      | The Snowflake role to use when connecting to the database                                                                                           | [A valid Snowflake role][snowflake-docs-roles] in the account          |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_SNOWFLAKE_SCHEMA`                    | The Snowflake schema to use when connecting to the database                                                                                         | [A valid Snowflake schema][snowflake-docs-schema] in the account       |    ❌    |                                    ✅                                    |
 | `CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE` | If `true`, [keep the Snowflake connection alive indefinitely][snowflake-docs-connection-options]                                                    | `true`, `false`                                                        |    ❌    |                                    ✅                                    |
 | `CUBEJS_DB_NAME`                                | The name of the database to connect to                                                                                                              | A valid database name                                                  |    ✅    |                                    ✅                                    |
 | `CUBEJS_DB_USER`                                | The username used to connect to the database                                                                                                        | A valid database username                                              |    ✅    |                                    ✅                                    |
@@ -141,6 +142,8 @@ connections are made over HTTPS.
   https://docs.snowflake.com/en/user-guide/intro-regions.html
 [snowflake-docs-roles]:
   https://docs.snowflake.com/en/user-guide/security-access-control-overview.html#roles
+[snowflake-docs-schemas]:
+  https://docs.snowflake.com/en/user-guide/security-access-control-overview.html
 [snowflake-docs-approx-agg-fns]:
   https://docs.snowflake.com/en/sql-reference/functions/approx_count_distinct.html
 [snowflake-docs-warehouse]:

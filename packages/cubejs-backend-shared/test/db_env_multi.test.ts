@@ -1974,6 +1974,35 @@ describe('Multiple datasources', () => {
     );
   });
 
+  test('getEnv("snowflakeSchema")', () => {
+    process.env.CUBEJS_DB_SNOWFLAKE_SCHEMA = 'default1';
+    process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_SCHEMA = 'postgres1';
+    process.env.CUBEJS_DS_WRONG_DB_SNOWFLAKE_SCHEMA = 'wrong1';
+    expect(getEnv('snowflakeSchema', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('snowflakeSchema', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('snowflakeSchema', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_SNOWFLAKE_SCHEMA = 'default2';
+    process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_SCHEMA = 'postgres2';
+    process.env.CUBEJS_DS_WRONG_DB_SNOWFLAKE_SCHEMA = 'wrong2';
+    expect(getEnv('snowflakeSchema', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('snowflakeSchema', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('snowflakeSchema', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_SNOWFLAKE_SCHEMA;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_SCHEMA;
+    delete process.env.CUBEJS_DS_WRONG_DB_SNOWFLAKE_SCHEMA;
+    expect(getEnv('snowflakeSchema', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('snowflakeSchema', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('snowflakeSchema', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
   test('getEnv("snowflakeSessionKeepAlive")', () => {
     process.env.CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE = 'true';
     process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE = 'true';

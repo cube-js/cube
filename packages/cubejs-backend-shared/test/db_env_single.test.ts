@@ -1230,6 +1230,23 @@ describe('Single datasources', () => {
     expect(getEnv('snowflakeRole', { dataSource: 'wrong' })).toBeUndefined();
   });
 
+  test('getEnv("snowflakeSchema")', () => {
+    process.env.CUBEJS_DB_SNOWFLAKE_SCHEMA = 'default1';
+    expect(getEnv('snowflakeSchema', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('snowflakeSchema', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('snowflakeSchema', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_SNOWFLAKE_SCHEMA = 'default2';
+    expect(getEnv('snowflakeSchema', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('snowflakeSchema', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('snowflakeSchema', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_SNOWFLAKE_SCHEMA;
+    expect(getEnv('snowflakeSchema', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('snowflakeSchema', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('snowflakeSchema', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
   test('getEnv("snowflakeSessionKeepAlive")', () => {
     process.env.CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE = 'true';
     expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'default' })).toEqual(true);

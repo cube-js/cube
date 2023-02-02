@@ -130,6 +130,7 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
       { env: 'CUBEJS_DB_SNOWFLAKE_REGION', title: 'Region' },
       { env: 'CUBEJS_DB_SNOWFLAKE_WAREHOUSE', title: 'Warehouse' },
       { env: 'CUBEJS_DB_SNOWFLAKE_ROLE', title: 'Role' },
+      { env: 'CUBEJS_DB_SNOWFLAKE_SCHEMA', title: 'Schema' },
     ],
   },
   {
