@@ -163,28 +163,32 @@ pub fn call_js_with_stream_as_callback(
     let buffer = Arc::new(Buffer::new());
     let writer = buffer.clone();
 
-    channel.send(move |mut cx| {
-        // https://github.com/neon-bindings/neon/issues/672
-        let method = match Arc::try_unwrap(js_method) {
-            Ok(v) => v.into_inner(&mut cx),
-            Err(v) => v.as_ref().to_inner(&mut cx),
-        };
+    channel
+        .try_send(move |mut cx| {
+            // https://github.com/neon-bindings/neon/issues/672
+            let method = match Arc::try_unwrap(js_method) {
+                Ok(v) => v.into_inner(&mut cx),
+                Err(v) => v.as_ref().to_inner(&mut cx),
+            };
 
-        let stream = JsWriteStream { writer };
+            let stream = JsWriteStream { writer };
 
-        let this = cx.undefined();
-        let args: Vec<Handle<_>> = vec![
-            if let Some(q) = query {
-                cx.string(q).upcast::<JsValue>()
-            } else {
-                cx.null().upcast::<JsValue>()
-            },
-            stream.to_object(&mut cx)?.upcast::<JsValue>(),
-        ];
-        method.call(&mut cx, this, args)?;
+            let this = cx.undefined();
+            let args: Vec<Handle<_>> = vec![
+                if let Some(q) = query {
+                    cx.string(q).upcast::<JsValue>()
+                } else {
+                    cx.null().upcast::<JsValue>()
+                },
+                stream.to_object(&mut cx)?.upcast::<JsValue>(),
+            ];
+            method.call(&mut cx, this, args)?;
 
-        Ok(())
-    });
+            Ok(())
+        })
+        .map_err(|err| {
+            CubeError::internal(format!("Unable to send js call via channel, err: {}", err))
+        })?;
 
     Ok(buffer)
 }
