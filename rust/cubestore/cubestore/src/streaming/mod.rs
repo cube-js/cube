@@ -13,7 +13,7 @@ use crate::streaming::kafka::{KafkaClientService, KafkaStreamingSource};
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::decimal::Decimal;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
 use async_trait::async_trait;
@@ -290,6 +290,8 @@ impl StreamingService for StreamingServiceImpl {
             let mut start_seq: Option<i64> = None;
             let mut end_seq: Option<i64> = None;
 
+            app_metrics::STREAMING_ROWS_READ.add(rows.len() as i64);
+
             for row in rows {
                 let row = row?;
                 append_row(&mut builders, table_cols, &row);
@@ -349,8 +351,10 @@ impl StreamingService for StreamingServiceImpl {
                     Some(replay_handle.get_id())
                 }
             };
+            let new_chunk_ids = new_chunk_ids?;
+            app_metrics::STREAMING_CHUNKS_READ.add(new_chunk_ids.len() as i64);
             self.meta_store
-                .activate_chunks(table.get_id(), new_chunk_ids?, replay_handle)
+                .activate_chunks(table.get_id(), new_chunk_ids, replay_handle)
                 .await?;
 
             sealed = self.try_seal_table(&table).await?;

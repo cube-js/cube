@@ -30,6 +30,7 @@ use std::{
     sync::Arc,
 };
 
+use crate::app_metrics;
 use crate::cluster::{node_name_by_partition, Cluster};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -660,6 +661,7 @@ impl ChunkDataStore for ChunkStore {
     }
 
     async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError> {
+        self.report_in_memory_metrics().await?;
         let mut memory_chunks = self.memory_chunks.write().await;
         memory_chunks.insert(chunk_id, batch);
         Ok(())
@@ -681,6 +683,7 @@ impl ChunkDataStore for ChunkStore {
     }
 
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError> {
+        self.report_in_memory_metrics().await?;
         let mut memory_chunks = self.memory_chunks.write().await;
         memory_chunks.remove(&chunk_id);
         Ok(())
@@ -717,6 +720,17 @@ impl ChunkStore {
             self.remote_fs.local_file(&remote_path).await?,
             index.into_row(),
         ))
+    }
+    async fn report_in_memory_metrics(&self) -> Result<(), CubeError> {
+        let memory_chunks = self.memory_chunks.read().await;
+        let chunks_len = memory_chunks.len();
+        let chunks_rows = memory_chunks
+            .values()
+            .map(|b| b.num_rows() as i64)
+            .sum::<i64>();
+        app_metrics::IN_MEMORY_CHUNKS_COUNT.report(chunks_len as i64);
+        app_metrics::IN_MEMORY_CHUNKS_ROWS.report(chunks_rows);
+        Ok(())
     }
 }
 
