@@ -175,7 +175,7 @@ The pre-aggregation code would look as follows:
 
 ``` javascript
 cube('Orders', {
-    sql: `SELECT * FROM Orders;`,
+    sql: `SELECT * FROM Orders`,
     preAggregations: {
         main: {
             measures: [CUBE.orderTotal],
