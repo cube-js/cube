@@ -25,10 +25,10 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    amountByCreated: {
+    amount_by_created: {
       type: `rollup`,
       measures: [amount],
-      timeDimension: createdAt,
+      timeDimension: created_at,
       granularity: `month`,
       refreshKey: {
         every: `12 hour`,
@@ -47,9 +47,9 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    amountByCreated: {
+    amount_by_created: {
       measures: [amount],
-      timeDimension: createdAt,
+      timeDimension: created_at,
       granularity: `month`,
       refreshKey: {
         // every will default to `10 seconds` here
@@ -68,9 +68,9 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    amountByCreated: {
+    amount_by_created: {
       measures: [amount],
-      timeDimension: createdAt,
+      timeDimension: created_at,
       granularity: `month`,
       refreshKey: {
         every: `12 hour`,
@@ -126,10 +126,10 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    categoryAndDate: {
+    category_and_date: {
       measures: [Orders.count, revenue],
       dimensions: [category],
-      timeDimension: createdAt,
+      timeDimension: created_at,
       granularity: `day`,
       partitionGranularity: `month`,
       refreshKey: {
@@ -161,13 +161,13 @@ Once we know the selectivity of the columns we'll be adding to the index, we nee
 
 Suppose you have a pre-aggregation that has millions of rows with the following structure:
 
-| timestamp           | productName   | productCategory | zipCode | orderTotal |
-| ------------------- | ------------- | --------------- | ------- | ---------- |
-| 2023-01-01 10:00:00 | Plastic Chair | Furniture       | 88523   | 2000       |
-| 2023-01-01 10:00:00 | Keyboard      | Electronics     | 88523   | 1000       |
-| 2023-01-01 10:00:00 | Mouse         | Electronics     | 88523   | 800        |
-| 2023-01-01 11:00:00 | Plastic Chair | Furniture       | 88524   | 3000       |
-| 2023-01-01 11:00:00 | Keyboard      | Electronics     | 88524   | 2000       |
+| timestamp           | product_name   | product_category | zip_code | order_total |
+| ------------------- | -------------- | ---------------- | -------- | ----------- |
+| 2023-01-01 10:00:00 | Plastic Chair  | Furniture        | 88523    | 2000        |
+| 2023-01-01 10:00:00 | Keyboard       | Electronics      | 88523    | 1000        |
+| 2023-01-01 10:00:00 | Mouse          | Electronics      | 88523    | 800         |
+| 2023-01-01 11:00:00 | Plastic Chair  | Furniture        | 88524    | 3000        |
+| 2023-01-01 11:00:00 | Keyboard       | Electronics      | 88524    | 2000        |
 
 The pre-aggregation code would look as follows:
 
@@ -178,8 +178,8 @@ cube('Orders', {
     sql: `SELECT * FROM Orders`,
     preAggregations: {
         main: {
-            measures: [CUBE.orderTotal],
-            dimensions: [CUBE.productName, CUBE.productCategory, CUBE.zipCode],
+            measures: [CUBE.order_total],
+            dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
             timeDimension: CUBE.timestamp,
             granularity: `hour`,
             partitionGranularity: `day`,
@@ -206,8 +206,8 @@ cubes:
     sql: SELECT * FROM orders
     pre_aggregations:
       - name: main
-        measures: [CUBE.orderTotal]
-        dimensions: [CUBE.productName, CUBE.productCategory, CUBE.zipCode]
+        measures: [CUBE.order_total]
+        dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code]
         time_dimension: CUBE.timestamp
         granularity: hour
         partition_granularity: day
@@ -230,7 +230,7 @@ You run the following query on a regular basis, with the only difference between
 ```JSON
 {
   "measures": [
-    "Orders.orderTotal"
+    "Orders.order_total"
   ],
   "timeDimensions": [
     {
@@ -250,14 +250,14 @@ You run the following query on a regular basis, with the only difference between
   ],
   "filters": [
     {
-      "member": "Orders.productCategory",
+      "member": "Orders.product_category",
       "operator": "equals",
       "values": [
         "Electronics"
       ]
     },
     {
-      "member": "Orders.productName",
+      "member": "Orders.product_name",
       "operator": "equals",
       "values": [
         "Keyboard",
@@ -266,7 +266,7 @@ You run the following query on a regular basis, with the only difference between
     }
   ],
   "dimensions": [
-    "Orders.zipCode"
+    "Orders.zip_code"
   ],
   "limit": 10000
 }
@@ -282,8 +282,8 @@ cube('Orders', {
     sql: `SELECT * FROM Orders;`,
     preAggregations: {
         main: {
-            measures: [CUBE.orderTotal],
-            dimensions: [CUBE.productName, CUBE.productCategory, CUBE.zipCode],
+            measures: [CUBE.order_total],
+            dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
             timeDimension: CUBE.timestamp,
             granularity: `hour`,
             partitionGranularity: `day`,
@@ -301,8 +301,8 @@ cube('Orders', {
             },
             // New Index
             indexes: {
-                categoryProductNameZipCodeIndex: {
-                      columns: [CUBE.productCategory, CUBE.productName, CUBE.zipCode],
+                category_productname_zipcode_index: {
+                      columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code],
                 },
             }
         }
@@ -316,8 +316,8 @@ cubes:
     sql: SELECT * FROM orders
     pre_aggregations:
       - name: main
-        measures: [CUBE.orderTotal]
-        dimensions: [CUBE.productName, CUBE.productCategory, CUBE.zipCode]
+        measures: [CUBE.order_total]
+        dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code]
         time_dimension: CUBE.timestamp
         granularity: hour
         partition_granularity: day
@@ -333,14 +333,14 @@ cubes:
         # new index
         indexes:
           - name: category_productname_zipcode_index
-            columns: [CUBE.productCategory, CUBE.productName, CUBE.zipCode]
+            columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code]
 ```
 
 </CodeTabs>
 
-Then the data within `categoryProductNameZipCodeIndex` would look like:
+Then the data within `category_productname_zipcode_index` would look like:
 
-| productCategory | productName   | zipCode | timestamp           | orderTotal |
+| product_category | product_name   | zip_code | timestamp           | order_total |
 | --------------- | ------------- | ------- | ------------------- | ---------- |
 | Furniture       | Plastic Chair | 88523   | 2023-01-01 10:00:00 | 2000       |
 | Electronics     | Keyboard      | 88523   | 2023-01-01 10:00:00 | 1000       |
@@ -348,9 +348,9 @@ Then the data within `categoryProductNameZipCodeIndex` would look like:
 | Furniture       | Plastic Chair | 88524   | 2023-01-01 11:00:00 | 3000       |
 | Electronics     | Keyboard      | 88524   | 2023-01-01 11:00:00 | 2000       |
 
-The columns are ordered from **LOWEST** to **HIGHEST** selectivity.
+The columns are ordered from **lowest** to **highest** selectivity.
 We can expect there to be a lower number of product categories, hence a lower number of unique records resulting in a lower selectivity.
-Although zipCode may have lower or higher selectivity, the dimensions used to filter must come first than the dimensions in the GroupBy part of the query.
+Although `zip_code` may have lower or higher selectivity, the dimensions used to filter must come first than the dimensions in the GROUP BY part of the query.
 
 ### Aggregated indexes
 
@@ -365,8 +365,8 @@ cube('Orders', {
     sql: `SELECT * FROM Orders;`,
     preAggregations: {
         main: {
-            measures: [CUBE.orderTotal],
-            dimensions: [CUBE.productName, CUBE.productCategory, CUBE.zipCode],
+            measures: [CUBE.order_total],
+            dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
             timeDimension: CUBE.timestamp,
             granularity: `hour`,
             partitionGranularity: `day`,
@@ -383,12 +383,12 @@ cube('Orders', {
                 sql: `SELECT NOW()`,
             },
             indexes: {
-                categoryProductNameZipCodeIndex: {
-                    columns: [CUBE.productCategory, CUBE.productName, CUBE.zipCode],
+                category_productname_zipcode_index: {
+                    columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code],
                 },
                 // New Index
-                zipCodeIndex: {
-                    columns: [CUBE.zipCode],
+                zip_code_index: {
+                    columns: [CUBE.zip_code],
                     type: `aggregate`
                 }
             }
@@ -403,8 +403,8 @@ cubes:
     sql: SELECT * FROM orders
     pre_aggregations:
       - name: main
-        measures: [CUBE.orderTotal]
-        dimensions: [CUBE.productName, CUBE.productCategory, CUBE.zipCode]
+        measures: [CUBE.order_total]
+        dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code]
         time_dimension: CUBE.timestamp
         granularity: hour
         partition_granularity: day
@@ -419,10 +419,10 @@ cubes:
             sql: SELECT NOW()
         indexes:
           - name: category_productname_zipcode_index
-            columns: [CUBE.productCategory, CUBE.productName, CUBE.zipCode]
+            columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code]
           # new index
           - name: zip_code_index
-            columns: [CUBE.zipCode]
+            columns: [CUBE.zip_code]
             type: aggregate
 ```
 
@@ -430,7 +430,7 @@ cubes:
 
 And the data for `zip_code_index` would look like the following:
 
-| zipCode | orderTotal |
+| zip_code | order_total |
 | ------- | ---------- |
 | 88523   | 3800       |
 | 88524   | 5000       |
@@ -551,17 +551,17 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    ordersRollup: {
+    orders_rollup: {
       measures: [CUBE.count],
-      dimensions: [CUBE.userId, CUBE.status],
-      timeDimension: CUBE.createdAt,
+      dimensions: [CUBE.user_id, CUBE.status],
+      timeDimension: CUBE.created_at,
       granularity: `day`,
     },
   },
 
   joins: {
     Users: {
-      sql: `${CUBE.userId} = ${Users.id}`,
+      sql: `${CUBE.user_id} = ${Users.id}`,
       relationship: `belongsTo`
     },
   },
@@ -574,14 +574,14 @@ cube(`Users`, {
   ...,
 
   preAggregations: {
-    usersRollup: {
+    users_rollup: {
       dimensions: [CUBE.id, CUBE.name],
     },
   },
 });
 ```
 
-Before we continue, let's add an index to the `ordersRollup` pre-aggregation so
+Before we continue, let's add an index to the `orders_rollup` pre-aggregation so
 that the `rollupJoin` pre-aggregation can work correctly:
 
 ```javascript
@@ -589,11 +589,11 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    ordersRollup: {
+    orders_rollup: {
       ...,
       indexes: {
         userIndex: {
-          columns: [CUBE.userId],
+          columns: [CUBE.user_id],
         },
       },
     },
@@ -608,27 +608,27 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    ordersWithUsersRollup: {
+    orders_with_users_rollup: {
       type: `rollupJoin`,
       measures: [CUBE.count],
       dimensions: [Users.name],
-      timeDimension: CUBE.createdAt,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
-      rollups: [Users.usersRollup, CUBE.ordersRollup],
+      rollups: [Users.users_rollup, CUBE.orders_rollup],
     },
   },
 });
 ```
 
 With all of the above set up, making a query such as the following will now use
-`Orders.ordersRollup` and `Users.usersRollup`, avoiding a database request:
+`Orders.orders_rollup` and `Users.users_rollup`, avoiding a database request:
 
 ```json
 {
   "dimensions": ["Users.name"],
   "timeDimensions": [
     {
-      "dimension": "Orders.createdAt",
+      "dimension": "Orders.created_at",
       "dateRange": "This month"
     }
   ],
