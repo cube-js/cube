@@ -722,14 +722,28 @@ impl ChunkStore {
         ))
     }
     async fn report_in_memory_metrics(&self) -> Result<(), CubeError> {
+        let server_name = self.config.server_name();
+        let host_name = server_name.split(":").next().unwrap_or("undefined");
+        let tags = vec![format!("cube_host:{}", host_name)];
+
         let memory_chunks = self.memory_chunks.read().await;
         let chunks_len = memory_chunks.len();
         let chunks_rows = memory_chunks
             .values()
             .map(|b| b.num_rows() as i64)
             .sum::<i64>();
-        app_metrics::IN_MEMORY_CHUNKS_COUNT.report(chunks_len as i64);
-        app_metrics::IN_MEMORY_CHUNKS_ROWS.report(chunks_rows);
+        let chunks_memory = memory_chunks
+            .values()
+            .map(|b| {
+                b.columns()
+                    .iter()
+                    .map(|c| c.get_array_memory_size())
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+        app_metrics::IN_MEMORY_CHUNKS_COUNT.report_with_tags(chunks_len as i64, Some(&tags));
+        app_metrics::IN_MEMORY_CHUNKS_ROWS.report_with_tags(chunks_rows, Some(&tags));
+        app_metrics::IN_MEMORY_CHUNKS_MEMORY.report_with_tags(chunks_memory as i64, Some(&tags));
         Ok(())
     }
 }
