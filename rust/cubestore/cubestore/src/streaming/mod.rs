@@ -319,6 +319,11 @@ impl StreamingService for StreamingServiceImpl {
                     x => panic!("Unexpected type for sequence column: {:?}", x),
                 }
             }
+            let seq_pointer = SeqPointer::new(start_seq, end_seq);
+            let replay_handle = self
+                .meta_store
+                .create_replay_handle(table.get_id(), location_index, seq_pointer)
+                .await?;
             let data = finish(builders);
             let data = source.apply_post_filter(data).await?;
 
@@ -341,22 +346,6 @@ impl StreamingService for StreamingServiceImpl {
                 })
                 .collect();
 
-            let replay_handle = match table
-                .get_row()
-                .stream_offset()
-                .clone()
-                .unwrap_or(StreamOffset::Latest)
-            {
-                StreamOffset::Latest => None,
-                StreamOffset::Earliest => {
-                    let seq_pointer = SeqPointer::new(start_seq, end_seq);
-                    let replay_handle = self
-                        .meta_store
-                        .create_replay_handle(table.get_id(), location_index, seq_pointer)
-                        .await?;
-                    Some(replay_handle.get_id())
-                }
-            };
             let new_chunk_ids = new_chunk_ids?;
             app_metrics::STREAMING_CHUNKS_READ
                 .add_with_tags(new_chunk_ids.len() as i64, Some(&tags));
@@ -364,7 +353,7 @@ impl StreamingService for StreamingServiceImpl {
                 app_metrics::STREAMING_LASTOFFSET.report_with_tags(last_seq, Some(&tags));
             }
             self.meta_store
-                .activate_chunks(table.get_id(), new_chunk_ids, replay_handle)
+                .activate_chunks(table.get_id(), new_chunk_ids, Some(replay_handle.get_id()))
                 .await?;
 
             sealed = self.try_seal_table(&table).await?;
