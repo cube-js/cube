@@ -25,10 +25,10 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    amountByCreated: {
+    amount_by_created: {
       type: `rollup`,
       measures: [amount],
-      timeDimension: createdAt,
+      timeDimension: created_at,
       granularity: `month`,
       refreshKey: {
         every: `12 hour`,
@@ -47,9 +47,9 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    amountByCreated: {
+    amount_by_created: {
       measures: [amount],
-      timeDimension: createdAt,
+      timeDimension: created_at,
       granularity: `month`,
       refreshKey: {
         // every will default to `10 seconds` here
@@ -68,9 +68,9 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    amountByCreated: {
+    amount_by_created: {
       measures: [amount],
-      timeDimension: createdAt,
+      timeDimension: created_at,
       granularity: `month`,
       refreshKey: {
         every: `12 hour`,
@@ -126,10 +126,10 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    categoryAndDate: {
+    category_and_date: {
       measures: [Orders.count, revenue],
       dimensions: [category],
-      timeDimension: createdAt,
+      timeDimension: created_at,
       granularity: `day`,
       partitionGranularity: `month`,
       refreshKey: {
@@ -144,63 +144,297 @@ cube(`Orders`, {
 
 ## Using Indexes
 
-For larger pre-aggregations, performance can be significantly improved by adding
-an [index][ref-schema-ref-preaggs-index]. This is done by defining the `indexes`
-property for a pre-aggregation:
+### When to use indexes?
+Indexes are great when you filter large amounts of data across one or several dimension columns. You can read more about them
+[here][ref-schema-ref-preaggs-index].
 
-```typescript
-cube(`Orders`, {
-  ...,
+### Best Practices
+To maximize performance, you can introduce an index per type of query so the set of dimensions used in the query overlap as much as possible with the ones defined in the index.
+Measures are traditionally only used in indexes if you plan to filter a measured value and the cardinality of the possible values of the measure is low.
 
-  preAggregations: {
-    status: {
-      measures: [CUBE.count],
-      dimensions: [CUBE.status, Products.name, ProductCategories.name],
-      timeDimension: CUBE.createdAt,
-      granularity: `day`,
-      indexes: {
-        statusIndex: {
-          columns: [CUBE.status, Products.name],
-        },
-        aggregatedIndex: {
-          columns: [CUBE.status],
-          type: `aggregate`,
-        },
-      },
-    },
-  },
+The order in which columns are specified in the index is **very** important; suboptimal ordering can lead to diminished performance.
+To improve the performance of an index the main thing to consider is the order of the columns defined in it. The order of the columns should be defined in accordance with the [Index Selectivity](https://blog.toadworld.com/2018/09/05/unselective-indexes-selectivity).
+In a nutshell, index selectivity measures how many unique values a database has. An index is said to have a **higher** selectivity as the number of unique values goes up and a **lower** selectivity as the number of unique values goes down.
+Once we know the selectivity of the columns we'll be adding to the index, we need to place them from **lowest** to **highest** selectivity (this is probably contrary to what you've read about the topic in traditional row-based databases).
+
+**Example:**
+
+Suppose you have a pre-aggregation that has millions of rows with the following structure:
+
+| timestamp           | product_name   | product_category | zip_code | order_total |
+| ------------------- | -------------- | ---------------- | -------- | ----------- |
+| 2023-01-01 10:00:00 | Plastic Chair  | Furniture        | 88523    | 2000        |
+| 2023-01-01 10:00:00 | Keyboard       | Electronics      | 88523    | 1000        |
+| 2023-01-01 10:00:00 | Mouse          | Electronics      | 88523    | 800         |
+| 2023-01-01 11:00:00 | Plastic Chair  | Furniture        | 88524    | 3000        |
+| 2023-01-01 11:00:00 | Keyboard       | Electronics      | 88524    | 2000        |
+
+The pre-aggregation code would look as follows:
+
+<CodeTabs>
+
+``` javascript
+cube('Orders', {
+    sql: `SELECT * FROM Orders`,
+    preAggregations: {
+        main: {
+            measures: [CUBE.order_total],
+            dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
+            timeDimension: CUBE.timestamp,
+            granularity: `hour`,
+            partitionGranularity: `day`,
+            allowNonStrictDateRangeMatch: true,
+            refreshKey: {
+                every: `1 hour`,
+                updateWindow: `1 day`,
+                incremental: true
+            },
+            buildRangeStart: {
+                sql: `SELECT date_sub(NOW(), 365)`,
+            },
+            buildRangeEnd: {
+                sql: `SELECT NOW()`,
+            },
+        }
+    }
 });
 ```
 
-For example, if the pre-aggregated data looks like:
+``` yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM orders
+    pre_aggregations:
+      - name: main
+        measures: [CUBE.order_total]
+        dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code]
+        time_dimension: CUBE.timestamp
+        granularity: hour
+        partition_granularity: day
+        allowNonStrictDateRangeMatch: true
+        refresh_key:
+            every: 1 hour
+            update_window: 1 day
+            incremental: true
+        build_range_start:
+            sql: SELECT date_sub(NOW(), 365)
+        build_range_end:
+            sql: SELECT NOW()
+```
 
-| created_at | status     | products\_\_name | product_categories\_\_name | count |
-| ---------- | ---------- | ---------------- | -------------------------- | ----- |
-| 2022-08-01 | completed  | Plastic Chair    | Furniture                  | 4     |
-| 2022-08-01 | processing | Plastic Chair    | Furniture                  | 11    |
-| 2022-08-01 | shipped    | Plastic Chair    | Furniture                  | 2     |
-| 2022-08-01 | completed  | Keyboard         | Electronics                | 1     |
-| 2022-08-01 | processing | Keyboard         | Electronics                | 3     |
-| 2022-08-01 | shipped    | Keyboard         | Electronics                | 7     |
+</CodeTabs>
 
-Then the data within `statusIndex` would look like:
 
-| status     | products\_\_name | created_at | product_categories\_\_name | count |
-| ---------- | ---------------- | ---------- | -------------------------- | ----- |
-| completed  | Plastic Chair    | 2022-08-01 | Furniture                  | 4     |
-| processing | Plastic Chair    | 2022-08-01 | Furniture                  | 11    |
-| shipped    | Plastic Chair    | 2022-08-01 | Furniture                  | 2     |
-| completed  | Keyboard         | 2022-08-01 | Electronics                | 1     |
-| processing | Keyboard         | 2022-08-01 | Electronics                | 3     |
-| shipped    | Keyboard         | 2022-08-01 | Electronics                | 7     |
+You run the following query on a regular basis, with the only difference between queries being the filter values:
 
-And the data within `aggregatedIndex` would look like:
+```JSON
+{
+  "measures": [
+    "Orders.order_total"
+  ],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.timestamp",
+      "granularity": "hour",
+      "dateRange": [
+        "2022-12-14T06:00:00.000",
+        "2023-01-13T06:00:00.000"
+      ]
+    }
+  ],
+  "order": [
+    [
+      "Orders.timestamp",
+      "asc"
+    ]
+  ],
+  "filters": [
+    {
+      "member": "Orders.product_category",
+      "operator": "equals",
+      "values": [
+        "Electronics"
+      ]
+    },
+    {
+      "member": "Orders.product_name",
+      "operator": "equals",
+      "values": [
+        "Keyboard",
+        "Mouse"
+      ]
+    }
+  ],
+  "dimensions": [
+    "Orders.zip_code"
+  ],
+  "limit": 10000
+}
+```
 
-| status     | count |
-| ---------- | ----- |
-| completed  | 5     |
-| processing | 14    |
-| shipped    | 9     |
+After running this on a dataset with millions of records you find that it's taking a long time to run, so you decide to add an index to target this specific query.
+Taking into account the best practices mentioned previously you should define an index as follows:
+
+<CodeTabs>
+
+```javascript
+cube('Orders', {
+    sql: `SELECT * FROM Orders;`,
+    preAggregations: {
+        main: {
+            measures: [CUBE.order_total],
+            dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
+            timeDimension: CUBE.timestamp,
+            granularity: `hour`,
+            partitionGranularity: `day`,
+            allowNonStrictDateRangeMatch: true,
+            refreshKey: {
+                every: `1 hour`,
+                updateWindow: `1 day`,
+                incremental: true
+            },
+            buildRangeStart: {
+                sql: `SELECT date_sub(NOW(), 365)`,
+            },
+            buildRangeEnd: {
+                sql: `SELECT NOW()`,
+            },
+            // New Index
+            indexes: {
+                category_productname_zipcode_index: {
+                      columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code],
+                },
+            }
+        }
+    }
+});
+```
+
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM orders
+    pre_aggregations:
+      - name: main
+        measures: [CUBE.order_total]
+        dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code]
+        time_dimension: CUBE.timestamp
+        granularity: hour
+        partition_granularity: day
+        allowNonStrictDateRangeMatch: true
+        refresh_key:
+            every: 1 hour
+            update_window: 1 day
+            incremental: true
+        build_range_start:
+            sql: SELECT date_sub(NOW(), 365)
+        build_range_end:
+            sql: SELECT NOW()
+        # new index
+        indexes:
+          - name: category_productname_zipcode_index
+            columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code]
+```
+
+</CodeTabs>
+
+Then the data within `category_productname_zipcode_index` would look like:
+
+| product_category | product_name   | zip_code | timestamp           | order_total |
+| --------------- | ------------- | ------- | ------------------- | ---------- |
+| Furniture       | Plastic Chair | 88523   | 2023-01-01 10:00:00 | 2000       |
+| Electronics     | Keyboard      | 88523   | 2023-01-01 10:00:00 | 1000       |
+| Electronics     | Mouse         | 88523   | 2023-01-01 10:00:00 | 800        |
+| Furniture       | Plastic Chair | 88524   | 2023-01-01 11:00:00 | 3000       |
+| Electronics     | Keyboard      | 88524   | 2023-01-01 11:00:00 | 2000       |
+
+The columns are ordered from **lowest** to **highest** selectivity.
+We can expect there to be a lower number of product categories, hence a lower number of unique records resulting in a lower selectivity.
+Although `zip_code` may have lower or higher selectivity, the dimensions used to filter must come first than the dimensions in the GROUP BY part of the query.
+
+### Aggregated indexes
+
+Aggregated indexes be defined as well. You can read more about them [here][ref-schema-ref-preaggs-index].
+
+**Example:**
+
+<CodeTabs>
+
+```javascript
+cube('Orders', {
+    sql: `SELECT * FROM Orders;`,
+    preAggregations: {
+        main: {
+            measures: [CUBE.order_total],
+            dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
+            timeDimension: CUBE.timestamp,
+            granularity: `hour`,
+            partitionGranularity: `day`,
+            allowNonStrictDateRangeMatch: true,
+            refreshKey: {
+                every: `1 hour`,
+                updateWindow: `1 day`,
+                incremental: true
+            },
+            buildRangeStart: {
+                sql: `SELECT date_sub(NOW(), 365)`,
+            },
+            buildRangeEnd: {
+                sql: `SELECT NOW()`,
+            },
+            indexes: {
+                category_productname_zipcode_index: {
+                    columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code],
+                },
+                // New Index
+                zip_code_index: {
+                    columns: [CUBE.zip_code],
+                    type: `aggregate`
+                }
+            }
+        }
+    }
+});
+```
+
+```yaml
+cubes:
+  - name: Orders
+    sql: SELECT * FROM orders
+    pre_aggregations:
+      - name: main
+        measures: [CUBE.order_total]
+        dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code]
+        time_dimension: CUBE.timestamp
+        granularity: hour
+        partition_granularity: day
+        allowNonStrictDateRangeMatch: true
+        refresh_key:
+            every: 1 hour
+            update_window: 1 day
+            incremental: true
+        build_range_start:
+            sql: SELECT date_sub(NOW(), 365)
+        build_range_end:
+            sql: SELECT NOW()
+        indexes:
+          - name: category_productname_zipcode_index
+            columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code]
+          # new index
+          - name: zip_code_index
+            columns: [CUBE.zip_code]
+            type: aggregate
+```
+
+</CodeTabs>
+
+And the data for `zip_code_index` would look like the following:
+
+| zip_code | order_total |
+| ------- | ---------- |
+| 88523   | 3800       |
+| 88524   | 5000       |
+
 
 ## Inspecting Pre-Aggregations
 
@@ -317,17 +551,17 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    ordersRollup: {
+    orders_rollup: {
       measures: [CUBE.count],
-      dimensions: [CUBE.userId, CUBE.status],
-      timeDimension: CUBE.createdAt,
+      dimensions: [CUBE.user_id, CUBE.status],
+      timeDimension: CUBE.created_at,
       granularity: `day`,
     },
   },
 
   joins: {
     Users: {
-      sql: `${CUBE.userId} = ${Users.id}`,
+      sql: `${CUBE.user_id} = ${Users.id}`,
       relationship: `belongsTo`
     },
   },
@@ -340,14 +574,14 @@ cube(`Users`, {
   ...,
 
   preAggregations: {
-    usersRollup: {
+    users_rollup: {
       dimensions: [CUBE.id, CUBE.name],
     },
   },
 });
 ```
 
-Before we continue, let's add an index to the `ordersRollup` pre-aggregation so
+Before we continue, let's add an index to the `orders_rollup` pre-aggregation so
 that the `rollupJoin` pre-aggregation can work correctly:
 
 ```javascript
@@ -355,11 +589,11 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    ordersRollup: {
+    orders_rollup: {
       ...,
       indexes: {
         userIndex: {
-          columns: [CUBE.userId],
+          columns: [CUBE.user_id],
         },
       },
     },
@@ -374,27 +608,27 @@ cube(`Orders`, {
   ...,
 
   preAggregations: {
-    ordersWithUsersRollup: {
+    orders_with_users_rollup: {
       type: `rollupJoin`,
       measures: [CUBE.count],
       dimensions: [Users.name],
-      timeDimension: CUBE.createdAt,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
-      rollups: [Users.usersRollup, CUBE.ordersRollup],
+      rollups: [Users.users_rollup, CUBE.orders_rollup],
     },
   },
 });
 ```
 
 With all of the above set up, making a query such as the following will now use
-`Orders.ordersRollup` and `Users.usersRollup`, avoiding a database request:
+`Orders.orders_rollup` and `Users.users_rollup`, avoiding a database request:
 
 ```json
 {
   "dimensions": ["Users.name"],
   "timeDimensions": [
     {
-      "dimension": "Orders.createdAt",
+      "dimension": "Orders.created_at",
       "dateRange": "This month"
     }
   ],
