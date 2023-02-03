@@ -494,6 +494,8 @@ export class QueryCache {
           this.logger('Executing SQL', { ...req });
           if (req.useCsvQuery) {
             return this.csvQuery(client, req);
+          } else if (req.tablesSchema) {
+            return client.tablesSchema();
           } else {
             return client.query(req.query, req.values, req);
           }
@@ -969,5 +971,10 @@ export class QueryCache {
 
   public async testConnection() {
     return this.cacheDriver.testConnection();
+  }
+  
+  public async fetchSchema(dataSource: string) {
+    const queue = await this.getQueue(dataSource);
+    return queue.executeQueryInQueue('query', [`Fetch schema for ${dataSource}`, []], { tablesSchema: true });
   }
 }

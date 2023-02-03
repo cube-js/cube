@@ -2,13 +2,14 @@
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
-  constructor({ csvImport } = {}) {
+  constructor({ csvImport, schemaData } = {}) {
     this.tablesObj = [];
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
     this.csvImport = csvImport;
     this.now = new Date().getTime();
+    this.schemaData = schemaData;
   }
 
   get tables() {
@@ -115,6 +116,10 @@ class MockDriver {
   capabilities() {
     return {};
   }
+  
+  tablesSchema() {
+    return this.schemaData;
+  }
 }
 
 class ExternalMockDriver extends MockDriver {
@@ -193,10 +198,21 @@ describe('QueryOrchestrator', () => {
   let queryOrchestratorExternalRefresh = null;
   let queryOrchestratorDropWithoutTouch = null;
   let testCount = 1;
+  const schemaData = {
+    public: {
+      orders: [
+        {
+          name: 'id',
+          type: 'integer',
+          attributes: [],
+        },
+      ],
+    },
+  };
 
   beforeEach(() => {
     const mockDriverLocal = new MockDriver();
-    const fooMockDriverLocal = new MockDriver();
+    const fooMockDriverLocal = new MockDriver({ schemaData });
     const barMockDriverLocal = new MockDriver();
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
     const mockDriverUnloadWithoutTempTableSupportLocal = new MockDriverUnloadWithoutTempTableSupport();
@@ -1574,5 +1590,10 @@ describe('QueryOrchestrator', () => {
     }
     await Promise.all(promises);
     expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
+  });
+
+  test('fetch table schema', async () => {
+    const schema = await queryOrchestrator.fetchSchema('foo');
+    expect(schema).toEqual(schemaData);
   });
 });

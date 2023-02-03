@@ -381,6 +381,14 @@ class ApiGateway {
           });
         }
       );
+      
+      app.post('/cubejs-system/v1/db-schema', jsonParser, systemMiddlewares, (async (req: Request, res: Response) => {
+        await this.dbSchema({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -1145,6 +1153,43 @@ class ApiGateway {
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted
+      });
+    }
+  }
+
+  protected async dbSchema({ query, context, res }: {
+    query: {
+      dataSource: string;
+    };
+    context?: RequestContext;
+    res: ResponseResultFn;
+  }) {
+    const requestStarted = new Date();
+    try {
+      if (!query) {
+        throw new UserError(
+          'A user\'s query must contain a body'
+        );
+      }
+
+      if (!query.dataSource) {
+        throw new UserError(
+          'A user\'s query must contain dataSource.'
+        );
+      }
+
+      const orchestratorApi = await this.getAdapterApi(context);
+   
+      const schema = await orchestratorApi
+        .getQueryOrchestrator()
+        .fetchSchema(query.dataSource);
+
+      res({ data: schema });
+    } catch (e) {
+      this.handleError({ e,
+        context,
+        res,
+        requestStarted,
       });
     }
   }

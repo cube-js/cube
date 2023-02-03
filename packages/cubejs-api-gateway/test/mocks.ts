@@ -216,6 +216,27 @@ export class AdapterApiMock {
     };
   }
 
+  public getQueryOrchestrator() {
+    return {
+      fetchSchema: () => ({
+        other: {
+          orders: [
+            {
+              name: 'id',
+              type: 'integer',
+              attributes: [],
+            },
+            {
+              name: 'test_id',
+              type: 'integer',
+              attributes: [],
+            },
+          ],
+        },
+      })
+    };
+  }
+
   public addDataSeenSource() {
     return undefined;
   }

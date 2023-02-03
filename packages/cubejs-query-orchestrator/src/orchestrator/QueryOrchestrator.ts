@@ -431,4 +431,8 @@ export class QueryOrchestrator {
   public async updateRefreshEndReached() {
     return this.preAggregations.updateRefreshEndReached();
   }
+
+  public async fetchSchema(dataSource: string) {
+    return this.queryCache.fetchSchema(dataSource);
+  }
 }

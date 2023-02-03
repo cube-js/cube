@@ -615,6 +615,50 @@ describe('API Gateway', () => {
         }]
       },
       { route: 'data-sources', scope: ['sql-runner'], successResult: { dataSources: [{ dataSource: 'default', dbType: 'postgres' }] } },
+      {
+        route: 'db-schema',
+        method: 'post',
+        scope: ['sql-runner'],
+        successBody: {
+          query: {
+            dataSource: 'default',
+          }
+        },
+        successResult: {
+          data: {
+            other: {
+              orders: [
+                {
+                  name: 'id',
+                  type: 'integer',
+                  attributes: [],
+                },
+                {
+                  name: 'test_id',
+                  type: 'integer',
+                  attributes: [],
+                },
+              ],
+            },
+          },
+        },
+        wrongPayloads: [
+          {
+            result: {
+              status: 400,
+              error: 'A user\'s query must contain a body'
+            },
+            body: {}
+          },
+          {
+            result: {
+              status: 400,
+              error: 'A user\'s query must contain dataSource.'
+            },
+            body: { query: {} }
+          }
+        ]
+      },
     ];
 
     testConfigs.forEach((config) => {
