@@ -34,6 +34,7 @@ use self::{
     engine::{
         context::VariablesProvider,
         df::{
+            optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
             planner::CubeQueryPlanner,
             scan::{CubeScanNode, MemberField},
         },
@@ -1234,16 +1235,25 @@ WHERE `TABLE_SCHEMA` = '{}'",
             qtrace.set_df_plan(&plan);
         }
 
-        let projection_drop_out_optimizer = ProjectionDropOut::new();
-        // TODO: report an error when the plan can't be optimized
-        let optimized_plan = projection_drop_out_optimizer
-            .optimize(&plan, &OptimizerConfig::new())
-            .unwrap_or(plan);
-
-        //let optimized_plan = plan;
+        let mut optimized_plan = plan;
         // ctx.optimize(&plan).map_err(|err| {
         //    CompilationError::Internal(format!("Planning optimization error: {}", err))
         // })?;
+
+        let optimizer_config = OptimizerConfig::new();
+        let optimizers: Vec<Arc<dyn OptimizerRule + Sync + Send>> = vec![
+            Arc::new(ProjectionDropOut::new()),
+            Arc::new(FilterPushDown::new()),
+            Arc::new(SortPushDown::new()),
+            Arc::new(LimitPushDown::new()),
+        ];
+        for optimizer in optimizers {
+            // TODO: report an error when the plan can't be optimized
+            optimized_plan = optimizer
+                .optimize(&optimized_plan, &optimizer_config)
+                .unwrap_or(optimized_plan);
+        }
+
         if let Some(qtrace) = qtrace {
             qtrace.set_optimized_plan(&optimized_plan);
         }
@@ -16399,5 +16409,68 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_sigma_row_count_cross_join() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                count_25 "__Row Count",
+                datetrunc_8 "Second of Order Date",
+                cast_timestamp_to_datetime_10 "Order Date",
+                v_11 "Target Const"
+            FROM (
+                SELECT
+                    q1.datetrunc_8 datetrunc_8,
+                    q1.cast_timestamp_to_datetime_10 cast_timestamp_to_datetime_10,
+                    q1.v_11 v_11,
+                    q2.count_25 count_25
+                FROM (
+                    SELECT
+                        date_trunc('second', "order_date"::timestamptz) datetrunc_8,
+                        "order_date"::timestamptz cast_timestamp_to_datetime_10,
+                        1 v_11
+                    FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                ) q1
+                CROSS JOIN (
+                    SELECT count(1) count_25
+                    FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                ) q2
+                ORDER BY q1.datetrunc_8 ASC
+                LIMIT 10001
+            ) q5;
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scans = logical_plan
+            .find_cube_scans()
+            .iter()
+            .map(|cube| cube.request.clone())
+            .collect::<Vec<V1LoadRequestQuery>>();
+
+        assert!(cube_scans.contains(&V1LoadRequestQuery {
+            measures: Some(vec![]),
+            dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+            segments: Some(vec![]),
+            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                granularity: Some("second".to_string()),
+                date_range: None,
+            }]),
+            // Order and Limit and nearly pushed to CubeScan but the Projection
+            // before TableScan is a post-processing projection.
+            // Splitting such projections into two may be a good idea.
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+        }))
     }
 }
