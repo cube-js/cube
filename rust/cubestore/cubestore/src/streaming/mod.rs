@@ -1090,7 +1090,7 @@ mod tests {
             _password: &Option<String>,
             _use_ssl: bool,
             to_row: Arc<dyn Fn(KafkaMessage) -> Result<Option<Row>, CubeError> + Send + Sync>,
-        ) -> Result<(Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>), CubeError>
+        ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError>
         {
             let max_offset = 50000;
             let offset = match offset {
