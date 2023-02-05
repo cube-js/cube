@@ -249,6 +249,13 @@ impl StreamingService for StreamingServiceImpl {
             .get_index();
 
         let mut last_init_seq_check = SystemTime::now();
+        let mut round_trip_started: Option<SystemTime> = None;
+        let server_name = self.config_obj.server_name();
+        let host_name = server_name.split(":").next().unwrap_or("undefined");
+        let tags = vec![
+            format!("cube_host:{}", host_name),
+            format!("location:{}", location),
+        ];
 
         while !sealed {
             let new_rows = match tokio::time::timeout(
@@ -268,6 +275,16 @@ impl StreamingService for StreamingServiceImpl {
                     return Err(CubeError::user(format!("Stale stream timeout: {}", e)));
                 }
             };
+
+            if let Some(round_trip) = round_trip_started {
+                if let Ok(process_time) = round_trip.elapsed() {
+                    app_metrics::STREAMING_ROUNDTRIP_TIME
+                        .report_with_tags(process_time.as_millis() as i64, Some(&tags));
+                }
+            }
+
+            round_trip_started = Some(SystemTime::now());
+            let process_started = SystemTime::now();
 
             if last_init_seq_check.elapsed().unwrap().as_secs()
                 > self.config_obj.stream_replay_check_interval_secs()
@@ -290,14 +307,8 @@ impl StreamingService for StreamingServiceImpl {
             let mut start_seq: Option<i64> = None;
             let mut end_seq: Option<i64> = None;
 
-            let server_name = self.config_obj.server_name();
-            let host_name = server_name.split(":").next().unwrap_or("undefined");
-            let tags = vec![
-                format!("cube_host:{}", host_name),
-                format!("location:{}", location),
-            ];
-
             app_metrics::STREAMING_ROWS_READ.add_with_tags(rows.len() as i64, Some(&tags));
+            app_metrics::STREAMING_ROUNDTRIP_ROWS.report_with_tags(rows.len() as i64, Some(&tags));
 
             for row in rows {
                 let row = row?;
@@ -351,10 +362,18 @@ impl StreamingService for StreamingServiceImpl {
                 .add_with_tags(new_chunk_ids.len() as i64, Some(&tags));
             if let Some(last_seq) = end_seq {
                 app_metrics::STREAMING_LASTOFFSET.report_with_tags(last_seq, Some(&tags));
+                if let Some(lag) = source.calulate_lag(last_seq.clone()).await {
+                    app_metrics::STREAMING_LAG.report_with_tags(lag, Some(&tags));
+                }
             }
             self.meta_store
                 .activate_chunks(table.get_id(), new_chunk_ids, Some(replay_handle.get_id()))
                 .await?;
+
+            if let Ok(process_time) = process_started.elapsed() {
+                app_metrics::STREAMING_IMPORT_TIME
+                    .report_with_tags(process_time.as_millis() as i64, Some(&tags));
+            }
 
             sealed = self.try_seal_table(&table).await?;
         }
@@ -384,6 +403,10 @@ pub trait StreamingSource: Send + Sync {
 
     async fn apply_post_filter(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
         Ok(data)
+    }
+
+    async fn calulate_lag(&self, _current_seq: i64) -> Option<i64> {
+        None
     }
 
     fn validate_table_location(&self) -> Result<(), CubeError>;
@@ -1067,7 +1090,8 @@ mod tests {
             _password: &Option<String>,
             _use_ssl: bool,
             to_row: Arc<dyn Fn(KafkaMessage) -> Result<Option<Row>, CubeError> + Send + Sync>,
-        ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError> {
+        ) -> Result<(Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>), CubeError>
+        {
             let max_offset = 50000;
             let offset = match offset {
                 Offset::Beginning => 0,

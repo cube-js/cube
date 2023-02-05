@@ -29,3 +29,8 @@ pub static STREAMING_LASTOFFSET: Gauge = metrics::gauge("cs.streaming.lastoffset
 pub static IN_MEMORY_CHUNKS_COUNT: Gauge = metrics::gauge("cs.workers.in_memory_chunks)");
 pub static IN_MEMORY_CHUNKS_ROWS: Gauge = metrics::gauge("cs.workers.in_memory_chunks.rows)");
 pub static IN_MEMORY_CHUNKS_MEMORY: Gauge = metrics::gauge("cs.workers.in_memory_chunks.memory)");
+pub static STREAMING_IMPORT_TIME: Histogram = metrics::histogram("cs.streaming.import_time.ms");
+pub static STREAMING_ROUNDTRIP_TIME: Histogram =
+    metrics::histogram("cs.streaming.roundtrip_time.ms");
+pub static STREAMING_ROUNDTRIP_ROWS: Histogram = metrics::histogram("cs.streaming.roundtrip_rows");
+pub static STREAMING_LAG: Gauge = metrics::gauge("cs.streaming.lag");
