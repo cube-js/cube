@@ -4192,7 +4192,7 @@ pub async fn deactivate_table_on_corrupt_data_res<'a, T: 'static>(
 ) -> Result<(), CubeError> {
     if let Err(e) = &result {
         if e.is_corrupt_data() {
-            //Firstly check if partition exists in metastore now, because they could have been deleted due to compaction and similar thigs
+            //Firstly check if partition exists in metastore now, because they could have been deleted due to compaction and similar things
             match meta_store.get_partition(partition.get_id()).await {
                 Ok(_) => {}
                 Err(_) => {
