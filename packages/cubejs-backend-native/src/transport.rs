@@ -6,7 +6,7 @@ use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResp
 use cubesql::{
     di_service,
     sql::AuthContextRef,
-    transport::{CubeReadStream, LoadRequestMeta, MetaContext, TransportService},
+    transport::{CubeStreamReceiver, LoadRequestMeta, MetaContext, TransportService},
     CubeError,
 };
 use serde_derive::Serialize;
@@ -169,7 +169,7 @@ impl TransportService for NodeBridgeTransport {
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-    ) -> Result<Arc<dyn CubeReadStream>, CubeError> {
+    ) -> Result<CubeStreamReceiver, CubeError> {
         trace!("[transport] Request ->");
 
         let native_auth = ctx

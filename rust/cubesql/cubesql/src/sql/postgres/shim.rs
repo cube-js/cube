@@ -951,32 +951,20 @@ impl AsyncPostgresShim {
     ) -> Result<(), ConnectionError> {
         let cancel = self.session.state.begin_query(stmt.to_string());
 
-        tokio::select! {
-            _ = cancel.cancelled() => {
-                self.session.state.end_query();
+        let res = self
+            .process_simple_query(stmt, meta, cancel.clone(), qtrace)
+            .await;
+        self.session.state.end_query();
 
-                // We don't return error, because query can contains multiple statements
-                // then cancel request will cancel only one query
-                self.write(protocol::ErrorResponse::query_canceled()).await?;
-                if let Some(qtrace) = qtrace {
-                    qtrace.set_statement_error_message("Execution cancelled by user");
-                }
-
-                Ok(())
-            },
-            res = self.process_simple_query(stmt, meta, cancel.clone(), qtrace) => {
-                self.session.state.end_query();
-
-                if cancel.is_cancelled() {
-                    self.write(protocol::ErrorResponse::query_canceled()).await?;
-                    if let Some(qtrace) = qtrace {
-                        qtrace.set_statement_error_message("Execution cancelled by user");
-                    }
-                }
-
-                res
-            },
+        if cancel.is_cancelled() {
+            self.write(protocol::ErrorResponse::query_canceled())
+                .await?;
+            if let Some(qtrace) = qtrace {
+                qtrace.set_statement_error_message("Execution cancelled by user");
+            }
         }
+
+        res
     }
 
     pub async fn process_simple_query(

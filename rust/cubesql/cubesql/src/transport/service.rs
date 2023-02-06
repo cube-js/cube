@@ -6,7 +6,10 @@ use cubeclient::{
 
 use serde_derive::*;
 use std::{fmt::Debug, sync::Arc, time::Duration};
-use tokio::{sync::RwLock as RwLockAsync, time::Instant};
+use tokio::{
+    sync::{mpsc::Receiver, RwLock as RwLockAsync},
+    time::Instant,
+};
 
 use crate::{
     compile::MetaContext,
@@ -64,25 +67,10 @@ pub trait TransportService: Send + Sync + Debug {
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
-    ) -> Result<Arc<dyn CubeReadStream>, CubeError>;
+    ) -> Result<CubeStreamReceiver, CubeError>;
 }
 
-pub trait CubeReadStream: Send + Sync + Debug {
-    fn poll_next(&self) -> Result<Option<String>, CubeError>;
-
-    fn reject(&self);
-}
-
-#[derive(Debug)]
-pub struct CubeDummyStream {}
-
-impl CubeReadStream for CubeDummyStream {
-    fn poll_next(&self) -> Result<Option<String>, CubeError> {
-        panic!("CubeDummyStream.poll_next - can not be called");
-    }
-
-    fn reject(&self) {}
-}
+pub type CubeStreamReceiver = Receiver<Result<String, CubeError>>;
 
 #[derive(Debug)]
 struct MetaCacheBucket {
@@ -184,7 +172,7 @@ impl TransportService for HttpTransport {
         _query: V1LoadRequestQuery,
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
-    ) -> Result<Arc<dyn CubeReadStream>, CubeError> {
+    ) -> Result<CubeStreamReceiver, CubeError> {
         panic!("Does not work for standalone mode yet");
     }
 }
