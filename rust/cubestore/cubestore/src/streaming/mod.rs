@@ -352,7 +352,8 @@ impl StreamingService for StreamingServiceImpl {
                 .await?;
 
             if let Ok(time) = partition_started_at.elapsed() {
-                app_metrics::STREAMING_PARTITION_TIME.report(time.as_millis() as i64);
+                app_metrics::STREAMING_PARTITION_TIME
+                    .report_with_tags(time.as_millis() as i64, Some(&tags));
             }
 
             let upload_started_at = SystemTime::now();
@@ -367,7 +368,8 @@ impl StreamingService for StreamingServiceImpl {
                 .collect();
 
             if let Ok(time) = upload_started_at.elapsed() {
-                app_metrics::STREAMING_UPLOAD_TIME.report(time.as_millis() as i64);
+                app_metrics::STREAMING_UPLOAD_TIME
+                    .report_with_tags(time.as_millis() as i64, Some(&tags));
             }
 
             let new_chunk_ids = new_chunk_ids?;
