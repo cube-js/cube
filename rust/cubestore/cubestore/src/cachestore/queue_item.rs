@@ -280,6 +280,14 @@ impl<'a> QueueItemRocksTable<'a> {
 }
 
 impl<'a> BaseRocksTable for QueueItemRocksTable<'a> {
+    fn enable_delete_event(&self) -> bool {
+        false
+    }
+
+    fn enable_update_event(&self) -> bool {
+        false
+    }
+
     fn migrate_table(
         &self,
         batch: &mut WriteBatch,
