@@ -1111,8 +1111,7 @@ impl ChunkStore {
             remaining_rows = remaining_rows_again;
         }
 
-        let mut new_chunks = Vec::new();
-
+        let mut new_chunks_futures = Vec::new();
         for partition in partitions.into_iter() {
             let min = partition.get_row().get_min_val().as_ref();
             let max = partition.get_row().get_max_val().as_ref();
@@ -1144,15 +1143,22 @@ impl ChunkStore {
                     .collect::<Result<Vec<_>, _>>()?;
                 let columns = self.post_process_columns(index.clone(), columns).await?;
 
-                new_chunks.push(
-                    self.add_chunk_columns(index.clone(), partition, columns, in_memory)
-                        .await?,
-                );
+                new_chunks_futures.push(self.add_chunk_columns(
+                    index.clone(),
+                    partition,
+                    columns,
+                    in_memory,
+                ));
             }
             remaining_rows = next;
         }
 
         assert_eq!(remaining_rows.len(), 0);
+
+        let new_chunks = join_all(new_chunks_futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(new_chunks)
     }
@@ -1309,7 +1315,7 @@ impl ChunkStore {
         in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
         let mut rows = rows.0;
-        let mut new_chunks = Vec::new();
+        let mut futures = Vec::new();
         for index in indexes.iter() {
             let index_columns = index.get_row().columns();
             let index_columns_copy = index_columns.clone();
@@ -1321,12 +1327,16 @@ impl ChunkStore {
             .await?;
             let remapped = remapped?;
             rows = rows_again;
-            new_chunks.append(
-                &mut self
-                    .partition_rows(index.get_id(), remapped, in_memory)
-                    .await?,
-            );
+            futures.push(self.partition_rows(index.get_id(), remapped, in_memory));
         }
+
+        let new_chunks = join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
 
         Ok(new_chunks)
     }
