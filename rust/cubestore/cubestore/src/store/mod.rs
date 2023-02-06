@@ -1111,7 +1111,9 @@ impl ChunkStore {
             remaining_rows = remaining_rows_again;
         }
 
-        let mut new_chunks_futures = Vec::new();
+        let mut chunks_to_create = Vec::new();
+        let mut data_for_upload = Vec::new();
+        let key_size = index.get_row().sort_key_size() as usize;
         for partition in partitions.into_iter() {
             let min = partition.get_row().get_min_val().as_ref();
             let max = partition.get_row().get_max_val().as_ref();
@@ -1143,19 +1145,39 @@ impl ChunkStore {
                     .collect::<Result<Vec<_>, _>>()?;
                 let columns = self.post_process_columns(index.clone(), columns).await?;
 
-                new_chunks_futures.push(self.add_chunk_columns(
-                    index.clone(),
-                    partition,
-                    columns,
+                let (min, max) = min_max_values_from_data(&columns, key_size);
+                chunks_to_create.push(Chunk::new(
+                    partition.get_id(),
+                    columns[0].len(),
+                    min,
+                    max,
                     in_memory,
                 ));
+                data_for_upload.push((partition, columns))
             }
             remaining_rows = next;
         }
 
         assert_eq!(remaining_rows.len(), 0);
 
-        let new_chunks = join_all(new_chunks_futures)
+        let chunks = self.meta_store.insert_chunks(chunks_to_create).await?;
+        if chunks.len() != data_for_upload.len() {
+            return Err(CubeError::internal(format!(
+                "Chunks count {} don't match data_for_upload count {}",
+                chunks.len(),
+                data_for_upload.len()
+            )));
+        }
+
+        let futures = chunks
+            .into_iter()
+            .zip(data_for_upload.into_iter())
+            .map(|(chunk, (partition, columns))| {
+                self.upload_chunk_columns(chunk, index.clone(), partition, columns, in_memory)
+            })
+            .collect::<Vec<_>>();
+
+        let new_chunks = join_all(futures)
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
@@ -1249,6 +1271,52 @@ impl ChunkStore {
                     Ok(res.columns().to_vec())
                 }
             }
+        }
+    }
+
+    #[tracing::instrument(level = "trace", skip(self, chunk, index, partition, data))]
+    async fn upload_chunk_columns(
+        &self,
+        chunk: IdRow<Chunk>,
+        index: IdRow<Index>,
+        partition: IdRow<Partition>,
+        data: Vec<ArrayRef>,
+        in_memory: bool,
+    ) -> Result<ChunkUploadJob, CubeError> {
+        if in_memory {
+            trace!(
+                "New in memory chunk allocated during partitioning: {:?}",
+                chunk
+            );
+            let batch = RecordBatch::try_new(Arc::new(arrow_schema(&index.get_row())), data)?;
+            let node_name = self.cluster.node_name_by_partition(&partition);
+            let cluster = self.cluster.clone();
+
+            Ok(cube_ext::spawn(async move {
+                cluster
+                    .add_memory_chunk(&node_name, chunk.get_id(), batch)
+                    .await?;
+
+                Ok((chunk, None))
+            }))
+        } else {
+            trace!("New chunk allocated during partitioning: {:?}", chunk);
+            let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
+            let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
+            let local_file = scopeguard::guard(local_file, ensure_temp_file_is_dropped);
+            let local_file_copy = local_file.clone();
+            cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
+                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
+                parquet.write_data(&local_file_copy, data)?;
+                Ok(())
+            })
+            .await??;
+
+            let fs = self.remote_fs.clone();
+            Ok(cube_ext::spawn(async move {
+                let file_size = fs.upload_file(&local_file, &remote_path).await?;
+                Ok((chunk, Some(file_size)))
+            }))
         }
     }
 
