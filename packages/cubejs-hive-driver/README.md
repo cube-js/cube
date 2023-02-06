@@ -26,9 +26,10 @@ While the Cube Dev team is happy to review and accept future community contribut
 
 ### Using Docker
 
-1. Have docker installed and running
-2. Run `docker run -v "$PWD:/data" thrift thrift -o /data --gen js:node /data/TCLIService.thrift`
-3. Copy generated files to the idl directory of this repository.
+1. Download Hive Thrift definition for your version from https://github.com/apache/hive/blob/master/service-rpc/if/TCLIService.thrift.
+2. Have docker installed and running
+3. Run `docker run -v "$PWD:/data" thrift thrift -o /data --gen js:node /data/TCLIService.thrift`
+4. Copy generated files to the idl directory of this repository.
 
 ## License
 
