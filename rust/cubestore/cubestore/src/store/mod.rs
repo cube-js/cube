@@ -357,6 +357,7 @@ impl ChunkStore {
 
 #[async_trait]
 impl ChunkDataStore for ChunkStore {
+    #[tracing::instrument(level = "trace", skip(self, rows, columns))]
     async fn partition_data(
         &self,
         table_id: u64,
@@ -1081,6 +1082,7 @@ mod tests {
 pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
 
 impl ChunkStore {
+    #[tracing::instrument(level = "trace", skip(self, columns))]
     async fn partition_rows(
         &self,
         index_id: u64,
@@ -1141,6 +1143,7 @@ impl ChunkStore {
                     .map(|c| arrow::compute::take(c.as_ref(), &to_write, None))
                     .collect::<Result<Vec<_>, _>>()?;
                 let columns = self.post_process_columns(index.clone(), columns).await?;
+
                 new_chunks.push(
                     self.add_chunk_columns(index.clone(), partition, columns, in_memory)
                         .await?,
@@ -1154,6 +1157,7 @@ impl ChunkStore {
         Ok(new_chunks)
     }
 
+    #[tracing::instrument(level = "trace", skip(self, partition))]
     async fn check_node_disk_space(&self, partition: &IdRow<Partition>) -> Result<(), CubeError> {
         let max_disk_space = self.config.max_disk_space_per_worker();
         if max_disk_space == 0 {
@@ -1180,6 +1184,7 @@ impl ChunkStore {
     ///Post-processing of index columns chunk data before saving to parqet files.
     ///Suitable for pre-aggregaions and similar things
     ///`data` must be sorted in order of index columns
+    #[tracing::instrument(level = "trace", skip(self, index, data))]
     async fn post_process_columns(
         &self,
         index: IdRow<Index>,
@@ -1243,6 +1248,7 @@ impl ChunkStore {
 
     /// Processes data into parquet files in the current task and schedules an async file upload.
     /// Join the returned handle to wait for the upload to finish.
+    #[tracing::instrument(level = "trace", skip(self, index, partition, data))]
     async fn add_chunk_columns(
         &self,
         index: IdRow<Index>,
@@ -1294,6 +1300,7 @@ impl ChunkStore {
     }
 
     /// Returns a list of newly added chunks.
+    #[tracing::instrument(level = "trace", skip(self, indexes, rows, columns))]
     async fn build_index_chunks(
         &self,
         indexes: &[IdRow<Index>],

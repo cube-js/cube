@@ -30,7 +30,18 @@ pub static IN_MEMORY_CHUNKS_COUNT: Gauge = metrics::gauge("cs.workers.in_memory_
 pub static IN_MEMORY_CHUNKS_ROWS: Gauge = metrics::gauge("cs.workers.in_memory_chunks.rows)");
 pub static IN_MEMORY_CHUNKS_MEMORY: Gauge = metrics::gauge("cs.workers.in_memory_chunks.memory)");
 pub static STREAMING_IMPORT_TIME: Histogram = metrics::histogram("cs.streaming.import_time.ms");
+pub static STREAMING_PARTITION_TIME: Histogram =
+    metrics::histogram("cs.streaming.partition_time.ms");
+pub static STREAMING_UPLOAD_TIME: Histogram = metrics::histogram("cs.streaming.upload_time.ms");
 pub static STREAMING_ROUNDTRIP_TIME: Histogram =
     metrics::histogram("cs.streaming.roundtrip_time.ms");
 pub static STREAMING_ROUNDTRIP_ROWS: Histogram = metrics::histogram("cs.streaming.roundtrip_rows");
 pub static STREAMING_LAG: Gauge = metrics::gauge("cs.streaming.lag");
+
+pub static METASTORE_QUEUE: Gauge = metrics::gauge("cs.metastore.queue");
+pub static METASTORE_READ_OPERATION: Histogram =
+    metrics::histogram("cs.metastore.read_operation.ms");
+pub static METASTORE_WRITE_OPERATION: Histogram =
+    metrics::histogram("cs.metastore.write_operation.ms");
+pub static METASTORE_READ_OUT_QUEUE_OPERATION: Histogram =
+    metrics::histogram("cs.metastore.read_out_queue_operation.ms");

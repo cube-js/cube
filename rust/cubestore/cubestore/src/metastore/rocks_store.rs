@@ -4,7 +4,7 @@ use crate::metastore::{MetaStoreEvent, MetaStoreFs};
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::time_span::warn_long;
 
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use datafusion::cube_ext;
@@ -733,7 +733,6 @@ impl RocksStore {
                 }
             }
         }
-
         Ok(spawn_res)
     }
 

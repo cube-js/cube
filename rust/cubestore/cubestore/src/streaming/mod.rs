@@ -35,6 +35,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 #[cfg(debug_assertions)]
 use stream_debug::MockStreamingSource;
+use tracing::Instrument;
 use warp::hyper::body::Bytes;
 
 #[async_trait]
@@ -338,6 +339,7 @@ impl StreamingService for StreamingServiceImpl {
             let data = finish(builders);
             let data = source.apply_post_filter(data).await?;
 
+            let partition_started_at = SystemTime::now();
             let new_chunks = self
                 .chunk_store
                 .partition_data(
@@ -346,9 +348,16 @@ impl StreamingService for StreamingServiceImpl {
                     table.get_row().get_columns().as_slice(),
                     true,
                 )
+                .instrument(tracing::trace_span!("streaming_partition_data"))
                 .await?;
 
+            if let Ok(time) = partition_started_at.elapsed() {
+                app_metrics::STREAMING_PARTITION_TIME.report(time.as_millis() as i64);
+            }
+
+            let upload_started_at = SystemTime::now();
             let new_chunk_ids: Result<Vec<(u64, Option<u64>)>, CubeError> = join_all(new_chunks)
+                .instrument(tracing::trace_span!("streaming_upload_chunks"))
                 .await
                 .into_iter()
                 .map(|c| {
@@ -357,7 +366,12 @@ impl StreamingService for StreamingServiceImpl {
                 })
                 .collect();
 
+            if let Ok(time) = upload_started_at.elapsed() {
+                app_metrics::STREAMING_UPLOAD_TIME.report(time.as_millis() as i64);
+            }
+
             let new_chunk_ids = new_chunk_ids?;
+
             app_metrics::STREAMING_CHUNKS_READ
                 .add_with_tags(new_chunk_ids.len() as i64, Some(&tags));
             if let Some(last_seq) = end_seq {
