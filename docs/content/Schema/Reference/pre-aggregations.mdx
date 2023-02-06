@@ -221,9 +221,11 @@ to them.
 
 <WarningBox>
 
-Currently pre-aggregations of type `rollupJoin` do not support background
-refreshing. Setting [`scheduledRefresh`](#parameters-scheduled-refresh) to
-`true` will result in an error.
+`rollupJoin` is ephemeral pre-aggregation that relies on referenced rollups
+ when queries are executed. 
+Setting [`scheduledRefresh`](#parameters-scheduled-refresh) to `true` is 
+unnecessary for `rollupJoin` and will result in an error.
+Appropriate freshness controls should be set on referenced rollups instead.
 
 </WarningBox>
 
