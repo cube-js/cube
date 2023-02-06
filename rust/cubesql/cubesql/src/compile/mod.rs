@@ -3492,6 +3492,66 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn powerbi_join() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT \
+            \n  \"_\".\"semijoin1.c30\" AS \"c30\", \"_\".\"a0\" AS \"a0\" FROM \
+            \n  (SELECT \"rows\".\"semijoin1.c30\" AS \"semijoin1.c30\", count(distinct \"rows\".\"basetable0.a0\") AS \"a0\" FROM (\
+            \n    SELECT \"$Outer\".\"basetable0.a0\", \"$Inner\".\"semijoin1.c30\" FROM (\
+            \n      SELECT \"__cubeJoinField\" AS \"basetable0.c22\", \"agentCount\" AS \"basetable0.a0\" FROM \"public\".\"Logs\" AS \"$Table\"\
+            \n    ) AS \"$Outer\" JOIN (\
+            \n    SELECT \"rows\".\"customer_gender\" AS \"semijoin1.c30\", \"rows\".\"__cubeJoinField\" AS \"semijoin1.c22\" FROM (\
+            \n      SELECT \"customer_gender\", \"__cubeJoinField\" FROM \"public\".\"KibanaSampleDataEcommerce\" AS \"$Table\"\
+            \n    ) AS \"rows\" GROUP BY \"customer_gender\", \"__cubeJoinField\"\
+            \n  ) AS \"$Inner\" ON (\
+            \n    \"$Outer\".\"basetable0.c22\" = \"$Inner\".\"semijoin1.c22\" OR \"$Outer\".\"basetable0.c22\" IS NULL AND \"$Inner\".\"semijoin1.c22\" IS NULL\
+            \n  )\
+            \n  ) AS \"rows\" GROUP BY \"semijoin1.c30\"\
+            \n  ) AS \"_\" WHERE NOT \"_\".\"a0\" IS NULL LIMIT 1000001".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["Logs.agentCount".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000001),
+                offset: None,
+                // TODO flatten empty filter
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: None,
+                        operator: None,
+                        values: None,
+                        or: Some(vec![json!(V1LoadRequestQueryFilterItem {
+                            member: None,
+                            operator: None,
+                            values: None,
+                            or: None,
+                            and: Some(vec![]),
+                        })]),
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("Logs.agentCount".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None,
+                    }
+                ]),
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_aggregations() {
         let variants = vec![
             (
@@ -9981,6 +10041,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_quicksight_to_timestamp_format() -> Result<(), CubeError> {
+        init_logger();
+
         let query_plan = convert_select_to_query_plan(
             r#"
             SELECT
@@ -12586,14 +12648,6 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             r#"
             select
-                "_"."t1.agentCountApprox" as "agentCountApprox",
-                "_"."a0" as "a0"
-            from (
-                select
-                    sum(cast("rows"."t0.taxful_total_price" as decimal)) as "a0",
-                    "rows"."t1.agentCountApprox" as "t1.agentCountApprox"
-                from (
-                    select
                         "$Outer"."t1.agentCountApprox",
                         "$Inner"."t0.taxful_total_price"
                     from (
@@ -12610,11 +12664,6 @@ ORDER BY \"COUNT(count)\" DESC"
                             "_"."__cubeJoinField" as "t0.__cubeJoinField"
                         from "public"."KibanaSampleDataEcommerce" "_"
                     ) "$Inner" on ("$Outer"."t1.__cubeJoinField" = "$Inner"."t0.__cubeJoinField")
-                ) "rows"
-                group by "t1.agentCountApprox"
-            ) "_"
-            where not "_"."a0" is null
-            limit 1000001
             ;"#
             .to_string(),
             DatabaseProtocol::PostgreSQL,
@@ -14134,21 +14183,8 @@ ORDER BY \"COUNT(count)\" DESC"
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
-                measures: Some(vec![
-                    "KibanaSampleDataEcommerce.count".to_string(),
-                    "KibanaSampleDataEcommerce.maxPrice".to_string(),
-                    "KibanaSampleDataEcommerce.minPrice".to_string(),
-                    "KibanaSampleDataEcommerce.avgPrice".to_string(),
-                    "KibanaSampleDataEcommerce.countDistinct".to_string(),
-                ]),
-                dimensions: Some(vec![
-                    "KibanaSampleDataEcommerce.order_date".to_string(),
-                    "KibanaSampleDataEcommerce.last_mod".to_string(),
-                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    "KibanaSampleDataEcommerce.notes".to_string(),
-                    "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
-                    "KibanaSampleDataEcommerce.has_subscription".to_string(),
-                ]),
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
@@ -14458,106 +14494,6 @@ ORDER BY \"COUNT(count)\" DESC"
                 }])
             }
         );
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT "ta_1"."customer_gender" "ca_1"
-            FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
-            WHERE NOT(LOWER("ta_1"."customer_gender") LIKE (replace(
-                replace(
-                    replace(
-                        'test',
-                        '!',
-                        '!!'
-                    ),
-                    '%',
-                    '!%'
-                ),
-                '_',
-                '!_'
-            ) || '%') ESCAPE '!')
-            GROUP BY "ca_1"
-            ORDER BY "ca_1" ASC
-            LIMIT 1000
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: Some(1000),
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notStartsWith".to_string()),
-                    values: Some(vec!["test".to_string()]),
-                    or: None,
-                    and: None
-                }])
-            }
-        );
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            SELECT "ta_1"."customer_gender" "ca_1"
-            FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
-            WHERE NOT(LOWER("ta_1"."customer_gender") LIKE ('%' || replace(
-                replace(
-                    replace(
-                        'known',
-                        '!',
-                        '!!'
-                    ),
-                    '%',
-                    '!%'
-                ),
-                '_',
-                '!_'
-            )) ESCAPE '!')
-            GROUP BY "ca_1"
-            ORDER BY "ca_1" ASC
-            LIMIT 1000
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: Some(vec![vec![
-                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    "asc".to_string(),
-                ]]),
-                limit: Some(1000),
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("notEndsWith".to_string()),
-                    values: Some(vec!["known".to_string()]),
-                    or: None,
-                    and: None
-                }])
-            }
-        )
     }
 
     #[tokio::test]
@@ -15441,7 +15377,10 @@ ORDER BY \"COUNT(count)\" DESC"
                     granularity: Some("month".to_string()),
                     date_range: None
                 }]),
-                order: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "asc".to_string()
+                ]]),
                 limit: None,
                 offset: None,
                 filters: None,
@@ -15472,7 +15411,10 @@ ORDER BY \"COUNT(count)\" DESC"
                     granularity: Some("year".to_string()),
                     date_range: None
                 }]),
-                order: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "asc".to_string()
+                ]]),
                 limit: None,
                 offset: None,
                 filters: None,

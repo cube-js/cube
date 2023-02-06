@@ -3,11 +3,13 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr},
-            expr_column_name, AliasExprAlias, ChangeUserCube, ColumnExprColumn, DimensionName,
-            LiteralExprValue, LiteralMemberRelation, LogicalPlanLanguage, MeasureName, SegmentName,
-            TableScanSourceTableName, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
+            expr_column_name, AliasExprAlias, AllMembersAlias, AllMembersCube, ChangeUserCube,
+            ColumnExprColumn, DimensionName, LiteralExprValue, LiteralMemberRelation,
+            LogicalPlanLanguage, MeasureName, SegmentName, TableScanSourceTableName,
+            TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
     },
+    transport::V1CubeMetaExt,
     var_iter, CubeError,
 };
 use datafusion::{
@@ -184,6 +186,30 @@ impl LogicalPlanAnalysis {
                     None
                 }
             }
+            LogicalPlanLanguage::AllMembers(params) => {
+                if let Some((cube, alias)) = var_iter!(egraph[params[0]], AllMembersCube)
+                    .next()
+                    .zip(var_iter!(egraph[params[1]], AllMembersAlias).next())
+                {
+                    let cube = egraph
+                        .analysis
+                        .cube_context
+                        .meta
+                        .find_cube_with_name(&cube)?;
+                    for column in cube.get_columns().iter() {
+                        map.push((
+                            Some(format!("{}.{}", cube.name, column.get_name())),
+                            Expr::Column(Column {
+                                relation: Some(alias.to_string()),
+                                name: column.get_name().to_string(),
+                            }),
+                        ));
+                    }
+                    Some(map)
+                } else {
+                    None
+                }
+            }
             LogicalPlanLanguage::TimeDimension(params) => {
                 if let Some(_) = column_name(params[3]) {
                     let expr = original_expr(params[3])?;
@@ -290,6 +316,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::AliasExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::AnyExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[2], &mut vec)?;
@@ -343,6 +373,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::AggregateUDFExpr(params) => {
+                push_referenced_columns(params[1], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::AggregateFunctionExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
@@ -360,10 +394,12 @@ impl LogicalPlanAnalysis {
             LogicalPlanLanguage::SortExp(params)
             | LogicalPlanLanguage::AggregateGroupExpr(params)
             | LogicalPlanLanguage::AggregateAggrExpr(params)
+            | LogicalPlanLanguage::ProjectionExpr(params)
             | LogicalPlanLanguage::CaseExprWhenThenExpr(params)
             | LogicalPlanLanguage::CaseExprElseExpr(params)
             | LogicalPlanLanguage::CaseExprExpr(params)
             | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
+            | LogicalPlanLanguage::AggregateUDFExprArgs(params)
             | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
             | LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
                 for p in params.iter() {

@@ -55,6 +55,7 @@ impl RewriteRules for SplitRules {
                     ),
                     "?group_expr",
                     "?aggr_expr",
+                    "AggregateSplit:false",
                 ),
                 projection(
                     projection_expr(
@@ -75,8 +76,10 @@ impl RewriteRules for SplitRules {
                         ),
                         inner_aggregate_split_replacer("?group_expr", "?inner_aggregate_cube"),
                         inner_aggregate_split_replacer("?aggr_expr", "?inner_aggregate_cube"),
+                        "AggregateSplit:true",
                     ),
                     "?projection_alias",
+                    "ProjectionSplit:true",
                 ),
                 self.split_projection_aggregate(
                     "?alias_to_cube",
@@ -101,6 +104,7 @@ impl RewriteRules for SplitRules {
                         "?can_pushdown_join",
                     ),
                     "?alias",
+                    "ProjectionSplit:false",
                 ),
                 projection(
                     outer_projection_split_replacer("?expr", "?outer_projection_cube"),
@@ -118,8 +122,10 @@ impl RewriteRules for SplitRules {
                             "?can_pushdown_join",
                         ),
                         "?projection_alias",
+                        "ProjectionSplit:true",
                     ),
                     "?alias",
+                    "ProjectionSplit:true",
                 ),
                 self.split_projection_aggregate(
                     "?alias_to_cube",
@@ -144,6 +150,7 @@ impl RewriteRules for SplitRules {
                         "?can_pushdown_join",
                     ),
                     "?alias",
+                    "ProjectionSplit:false",
                 ),
                 projection(
                     "?outer_expr",
@@ -162,11 +169,14 @@ impl RewriteRules for SplitRules {
                                 "?can_pushdown_join",
                             ),
                             "?inner_projection_alias",
+                            "ProjectionSplit:true",
                         ),
                         group_expr_split_replacer("?expr", "?group_expr_cube"),
                         group_aggregate_split_replacer("?expr", "?group_aggregate_cube"),
+                        "AggregateSplit:true",
                     ),
                     "?alias",
+                    "ProjectionSplit:true",
                 ),
                 self.split_reaggregate_projection(
                     "?expr",
@@ -194,6 +204,7 @@ impl RewriteRules for SplitRules {
                     ),
                     "?group_expr",
                     "?aggr_expr",
+                    "AggregateSplit:false",
                 ),
                 aggregate(
                     aggregate(
@@ -210,9 +221,11 @@ impl RewriteRules for SplitRules {
                         ),
                         inner_aggregate_split_replacer("?group_expr", "?inner_aggregate_cube"),
                         inner_aggregate_split_replacer("?aggr_expr", "?inner_aggregate_cube"),
+                        "AggregateSplit:true",
                     ),
                     outer_aggregate_split_replacer("?group_expr", "?outer_aggregate_cube"),
                     outer_aggregate_split_replacer("?aggr_expr", "?outer_aggregate_cube"),
+                    "AggregateSplit:true",
                 ),
                 self.split_aggregate_aggregate(
                     "?alias_to_cube",
@@ -2414,11 +2427,13 @@ impl RewriteRules for SplitRules {
                         "?aggr_aggr_expr",
                         "?aggr_meta",
                     ),
+                    "AggregateSplit:true",
                 ),
                 aggregate(
                     "?cube_scan",
                     aggr_group_expr("?left", "?right"),
                     "?aggr_aggr_expr",
+                    "AggregateSplit:true",
                 ),
                 self.count_distinct_with_year_and_month_notification_handler(
                     vec![

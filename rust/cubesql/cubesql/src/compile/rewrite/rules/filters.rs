@@ -1,17 +1,17 @@
 use super::utils;
 use crate::{
     compile::{
-        engine::provider::CubeContext,
+        engine::{df::scan::MemberField::Literal, provider::CubeContext},
         rewrite::{
             analysis::{ConstantFolding, LogicalPlanAnalysis},
             between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
             column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail,
             cube_scan_members, dimension_expr, expr_column_name, filter,
             filter_cast_unwrap_replacer, filter_member, filter_op, filter_op_filters,
-            filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
-            is_null_expr, like_expr, limit, list_expr, literal_bool, literal_expr, literal_int,
-            literal_string, measure_expr, member_name_by_alias, negative_expr, not_expr,
-            projection, rewrite,
+            filter_op_filters_empty_tail, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
+            is_not_null_expr, is_null_expr, like_expr, limit, list_expr, literal_bool,
+            literal_expr, literal_int, literal_string, measure_expr, member_name_by_alias,
+            negative_expr, not_expr, projection, rewrite,
             rewriter::RewriteRules,
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_chain_rewrite,
@@ -139,8 +139,16 @@ impl RewriteRules for FilterRules {
             // TODO: Find a better solution how to drop filter node at all once
             rewrite(
                 "push-down-filter-projection",
-                filter(literal_bool(true), projection("?expr", "?input", "?alias")),
-                projection("?expr", filter(literal_bool(true), "?input"), "?alias"),
+                filter(
+                    literal_bool(true),
+                    projection("?expr", "?input", "?alias", "?projection_split"),
+                ),
+                projection(
+                    "?expr",
+                    filter(literal_bool(true), "?input"),
+                    "?alias",
+                    "?projection_split",
+                ),
             ),
             rewrite(
                 "swap-limit-filter",
@@ -183,8 +191,17 @@ impl RewriteRules for FilterRules {
             ),
             transforming_rewrite(
                 "limit-push-down-projection",
-                limit("?skip", "?fetch", projection("?expr", "?input", "?alias")),
-                projection("?expr", limit("?skip", "?fetch", "?input"), "?alias"),
+                limit(
+                    "?skip",
+                    "?fetch",
+                    projection("?expr", "?input", "?alias", "?projection_split"),
+                ),
+                projection(
+                    "?expr",
+                    limit("?skip", "?fetch", "?input"),
+                    "?alias",
+                    "?projection_split",
+                ),
                 self.push_down_limit_projection("?input"),
             ),
             // Limit to top node
@@ -208,6 +225,7 @@ impl RewriteRules for FilterRules {
                         ),
                     ),
                     "?alias",
+                    "?projection_split",
                 ),
                 limit(
                     "?limit_skip",
@@ -226,6 +244,7 @@ impl RewriteRules for FilterRules {
                             "?can_pushdown_join",
                         ),
                         "?alias",
+                        "?projection_split",
                     ),
                 ),
             ),
@@ -316,6 +335,43 @@ impl RewriteRules for FilterRules {
                 ),
                 change_user_member("?user"),
                 self.transform_change_user_eq("?column", "?literal", "?user"),
+            ),
+            transforming_rewrite(
+                "join-field-filter-eq",
+                filter_replacer(
+                    binary_expr(
+                        column_expr("?column_left"),
+                        "=",
+                        column_expr("?column_right"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_op_filters_empty_tail(),
+                self.transform_join_field(
+                    "?column_left",
+                    "?column_right",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            transforming_rewrite(
+                "join-field-filter-is-null",
+                filter_replacer(
+                    is_null_expr(column_expr("?column")),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_op_filters_empty_tail(),
+                self.transform_join_field_is_null(
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
             ),
             transforming_rewrite(
                 "in-filter-equal",
@@ -2704,6 +2760,86 @@ impl FilterRules {
                     );
 
                     return true;
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_join_field(
+        &self,
+        column_left_var: &'static str,
+        column_right_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_left_var = var!(column_left_var);
+        let column_right_var = var!(column_right_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+                if let Some((left_member_name, _)) = Self::filter_member_name(
+                    egraph,
+                    subst,
+                    &meta_context,
+                    alias_to_cube_var,
+                    column_left_var,
+                    members_var,
+                    &aliases,
+                ) {
+                    if left_member_name.ends_with(".__cubeJoinField") {
+                        if let Some((right_member_name, _)) = Self::filter_member_name(
+                            egraph,
+                            subst,
+                            &meta_context,
+                            alias_to_cube_var,
+                            column_right_var,
+                            members_var,
+                            &aliases,
+                        ) {
+                            if right_member_name.ends_with("__cubeJoinField") {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_join_field_is_null(
+        &self,
+        column_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = var!(column_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+                if let Some((left_member_name, _)) = Self::filter_member_name(
+                    egraph,
+                    subst,
+                    &meta_context,
+                    alias_to_cube_var,
+                    column_var,
+                    members_var,
+                    &aliases,
+                ) {
+                    if left_member_name.ends_with(".__cubeJoinField") {
+                        return true;
+                    }
                 }
             }
 
