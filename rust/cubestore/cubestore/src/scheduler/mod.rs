@@ -1101,7 +1101,7 @@ impl SchedulerImpl {
             .warmup_download(&node_name, path, p.get_row().file_size())
             .await;
 
-        deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, p).await;
+        deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, p, None).await;
 
         result
     }
