@@ -863,6 +863,11 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
     async fn get_index(&self, index_id: u64) -> Result<IdRow<Index>, CubeError>;
 
+    async fn get_index_with_active_partitions_out_of_queue(
+        &self,
+        index_id: u64,
+    ) -> Result<(IdRow<Index>, Vec<IdRow<Partition>>), CubeError>;
+
     async fn create_partitioned_index(
         &self,
         schema: String,
@@ -2910,6 +2915,28 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn get_index_with_active_partitions_out_of_queue(
+        &self,
+        index_id: u64,
+    ) -> Result<(IdRow<Index>, Vec<IdRow<Partition>>), CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            let index = IndexRocksTable::new(db_ref.clone()).get_row_or_not_found(index_id)?;
+            let rocks_partition = PartitionRocksTable::new(db_ref);
+
+            let partitions = rocks_partition
+                .get_rows_by_index(
+                    &PartitionIndexKey::ByIndexId(index.get_id()),
+                    &PartitionRocksIndex::IndexId,
+                )?
+                .into_iter()
+                .filter(|r| r.get_row().active)
+                .collect::<Vec<_>>();
+
+            Ok((index, partitions))
+        })
+        .await
+    }
+
     #[tracing::instrument(level = "trace", skip(self, key_columns))]
     async fn create_partitioned_index(
         &self,
@@ -3087,6 +3114,7 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    #[tracing::instrument(level = "trace", skip(self, chunks))]
     async fn insert_chunks(&self, chunks: Vec<Chunk>) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             let rocks_chunk = ChunkRocksTable::new(db_ref.clone());

@@ -1089,10 +1089,9 @@ impl ChunkStore {
         mut columns: Vec<ArrayRef>,
         in_memory: bool,
     ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
-        let index = self.meta_store.get_index(index_id).await?;
-        let partitions = self
+        let (index, partitions) = self
             .meta_store
-            .get_active_partitions_by_index_id(index_id)
+            .get_index_with_active_partitions_out_of_queue(index_id)
             .await?;
         let sort_key_size = index.get_row().sort_key_size() as usize;
 
