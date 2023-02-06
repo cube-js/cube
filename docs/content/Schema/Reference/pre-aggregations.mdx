@@ -207,6 +207,14 @@ version.
 
 </WarningBox>
 
+<WarningBox>
+
+Rollup join can be used only to join two tables, and one can't contain more than one partition so that the join can operate correctly.
+It means that at least one table should be less than 1M of rows.
+There's work in progress to remove those limitations.
+
+</WarningBox>
+
 Cube is capable of performing joins between pre-aggregations from different
 [data sources][ref-schema-ref-cube-datasource] to avoid making excessive queries
 to them.
