@@ -81,7 +81,7 @@ jobs:
           CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
           CUBESQL_REWRITE_ENGINE: true
           CUBESQL_REWRITE_TIMEOUT: 30
-        run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
+        run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml --release
       - name: Upload code coverage
         uses: codecov/codecov-action@v3
         with:
