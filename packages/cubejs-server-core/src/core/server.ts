@@ -691,14 +691,15 @@ export class CubejsServerCore {
    * @internal Please dont use this method directly, use refreshTimer
    */
   public handleScheduledRefreshInterval = async (options) => {
-    const contexts = (await this.options.scheduledRefreshContexts()).filter(
-      (context) => this.contextAcceptor.shouldAccept(this.migrateBackgroundContext(context)).accepted
-    );
-    if (contexts.length < 1) {
+    const allContexts = await this.options.scheduledRefreshContexts();
+    if (allContexts.length < 1) {
       this.logger('Refresh Scheduler Error', {
         error: 'At least one context should be returned by scheduledRefreshContexts'
       });
     }
+    const contexts = allContexts.filter(
+      (context) => this.contextAcceptor.shouldAccept(this.migrateBackgroundContext(context)).accepted
+    );
 
     const batchLimit = pLimit(this.options.scheduledRefreshBatchSize);
     return Promise.all(
