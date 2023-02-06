@@ -36,6 +36,8 @@ pub static STREAMING_UPLOAD_TIME: Histogram = metrics::histogram("cs.streaming.u
 pub static STREAMING_ROUNDTRIP_TIME: Histogram =
     metrics::histogram("cs.streaming.roundtrip_time.ms");
 pub static STREAMING_ROUNDTRIP_ROWS: Histogram = metrics::histogram("cs.streaming.roundtrip_rows");
+pub static STREAMING_ROUNDTRIP_CHUNKS: Histogram =
+    metrics::histogram("cs.streaming.roundtrip_chunks");
 pub static STREAMING_LAG: Gauge = metrics::gauge("cs.streaming.lag");
 
 pub static METASTORE_QUEUE: Gauge = metrics::gauge("cs.metastore.queue_size");

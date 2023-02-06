@@ -376,6 +376,8 @@ impl StreamingService for StreamingServiceImpl {
 
             app_metrics::STREAMING_CHUNKS_READ
                 .add_with_tags(new_chunk_ids.len() as i64, Some(&tags));
+            app_metrics::STREAMING_ROUNDTRIP_CHUNKS
+                .report_with_tags(new_chunk_ids.len() as i64, Some(&tags));
             if let Some(last_seq) = end_seq {
                 app_metrics::STREAMING_LASTOFFSET.report_with_tags(last_seq, Some(&tags));
                 if let Some(lag) = source.calulate_lag(last_seq.clone()).await {
