@@ -1121,9 +1121,11 @@ impl ChunkStore {
         data: Vec<ArrayRef>,
         in_memory: bool,
     ) -> Result<ChunkUploadJob, CubeError> {
+        let key_size = index.get_row().sort_key_size() as usize;
+        let (min, max) = min_max_values_from_data(&data, key_size);
         let chunk = self
             .meta_store
-            .create_chunk(partition.get_id(), data[0].len(), in_memory)
+            .create_chunk(partition.get_id(), data[0].len(), min, max, in_memory)
             .await?;
         if in_memory {
             trace!(
@@ -1191,6 +1193,20 @@ impl ChunkStore {
         }
 
         Ok(new_chunks)
+    }
+}
+
+fn min_max_values_from_data(data: &[ArrayRef], key_size: usize) -> (Option<Row>, Option<Row>) {
+    if data.is_empty() || data[0].is_empty() || key_size == 0 {
+        (None, None)
+    } else {
+        (
+            Some(Row::new(TableValue::from_columns(&data[0..key_size], 0))),
+            Some(Row::new(TableValue::from_columns(
+                &data[0..key_size],
+                data[0].len() - 1,
+            ))),
+        )
     }
 }
 

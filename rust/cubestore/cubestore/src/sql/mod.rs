@@ -3791,18 +3791,29 @@ mod tests {
             let p_3 = partitions.iter().find(|r| r.get_id() == 4).unwrap();
             let p_4 = partitions.iter().find(|r| r.get_id() == 5).unwrap();
             let new_partitions = vec![p_1, p_2, p_3, p_4];
-            println!("{:?}", new_partitions);
             let mut intervals_set = new_partitions.into_iter()
-                .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone()))
+                .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone(), p.get_row().get_min().clone(), p.get_row().get_max().clone()))
                 .collect::<Vec<_>>();
-            intervals_set.sort_by(|(min_a, _), (min_b, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
+            intervals_set.sort_by(|(min_a, _, _, _), (min_b, _, _, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
             let mut expected = vec![
-                (None, Some(Row::new(vec![TableValue::Int(2)]))),
-                (Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)]))),
-                (Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)]))),
-                (Some(Row::new(vec![TableValue::Int(27)])), None),
+                (
+                    None, Some(Row::new(vec![TableValue::Int(2)])),
+                    Some(Row::new(vec![TableValue::Null])), Some(Row::new(vec![TableValue::Int(1)]))
+                    ),
+                (
+                    Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)])),
+                    Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(5)]))
+                ),
+                (
+                    Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)])),
+                    Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(25)]))
+                ),
+                (
+                    Some(Row::new(vec![TableValue::Int(27)])), None,
+                    Some(Row::new(vec![TableValue::Int(27)])), Some(Row::new(vec![TableValue::Int(29)])),
+                ),
             ].into_iter().collect::<Vec<_>>();
-            expected.sort_by(|(min_a, _), (min_b, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
+            expected.sort_by(|(min_a, _, _, _), (min_b, _, _, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
             assert_eq!(intervals_set, expected);
 
             let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();
@@ -4125,8 +4136,7 @@ mod tests {
                 .exec_query("CREATE TABLE test.events_by_type_fail_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM (SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\')') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
                 .expect_err("Validation should fail");
-        })
-            .await;
+        }).await;
     }
 }
 

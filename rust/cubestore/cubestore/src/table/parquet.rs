@@ -324,6 +324,11 @@ mod tests {
                         TableValue::Null,
                         TableValue::String(format!("Foo {}", 0)),
                         TableValue::Null,
+                    ],
+                    vec![
+                        TableValue::Int(74),
+                        TableValue::String(format!("Foo {}", 74)),
+                        TableValue::String(format!("Boo {}", 74)),
                     ]
                 ),
                 (
@@ -332,7 +337,12 @@ mod tests {
                         TableValue::Int(75),
                         TableValue::String(format!("Foo {}", 75)),
                         TableValue::String(format!("Boo {}", 75)),
-                    ]
+                    ],
+                    vec![
+                        TableValue::Int(149),
+                        TableValue::String(format!("Foo {}", 149)),
+                        TableValue::String(format!("Boo {}", 149)),
+                    ],
                 )
             ]
         );
