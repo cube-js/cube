@@ -2,7 +2,7 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::sql::InlineTables;
 use crate::sql::SqlQueryContext;
 use crate::store::DataFrame;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use futures::Future;
 use log::trace;
 use std::collections::HashSet;
@@ -72,6 +72,11 @@ impl SqlResultCache {
         }
     }
 
+    pub async fn clear(&self) {
+        self.result_cache.lock().await.clear();
+        app_metrics::DATA_QUERIES_CACHE_SIZE.report(0);
+    }
+
     #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
     pub async fn get<F>(
         &self,
@@ -90,6 +95,8 @@ impl SqlResultCache {
             result_cache.get(&result_key).cloned()
         };
         if let Some(result) = cached_result {
+            app_metrics::DATA_QUERIES_CACHE_HIT.increment();
+
             trace!("Using result cache for '{}'", query);
             return Ok(result);
         }
@@ -101,6 +108,7 @@ impl SqlResultCache {
             if !cache.contains(&key) {
                 let (tx, rx) = watch::channel(None);
                 cache.put(key, rx);
+                app_metrics::DATA_QUERIES_CACHE_SIZE.report(cache.len() as i64);
                 (Some(tx), None)
             } else {
                 (None, cache.get(&key).cloned())
@@ -121,6 +129,7 @@ impl SqlResultCache {
                     let mut result_cache = self.result_cache.lock().await;
                     if !result_cache.contains(&result_key) {
                         result_cache.put(result_key.clone(), r.clone());
+                        app_metrics::DATA_QUERIES_CACHE_SIZE.report(result_cache.len() as i64);
                     }
                 }
                 Err(_) => {

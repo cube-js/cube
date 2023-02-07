@@ -57,8 +57,8 @@ use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{
-    CacheCommand, CubeStoreParser, MetastoreCommand, PartitionedIndexRef, QueueCommand,
-    RocksStoreName, SystemCommand,
+    CacheCommand, CubeStoreParser, DropCommand, MetastoreCommand, PartitionedIndexRef,
+    QueueCommand, RocksStoreName, SystemCommand,
 };
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
@@ -886,6 +886,18 @@ impl SqlService for SqlServiceImpl {
                     }
                     panic!("worker did not panic")
                 }
+                SystemCommand::Drop(command) => match command {
+                    DropCommand::DropQueryCache => {
+                        self.cache.clear().await;
+
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    DropCommand::DropAllCache => {
+                        self.cache.clear().await;
+
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                },
                 SystemCommand::Metastore(command) => match command {
                     MetastoreCommand::SetCurrent { id } => {
                         self.db.set_current_snapshot(id).await?;

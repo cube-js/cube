@@ -239,10 +239,17 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("queue_custom_orphaned", queue_custom_orphaned),
         t("limit_pushdown_group", limit_pushdown_group),
         t("limit_pushdown_group_order", limit_pushdown_group_order),
-        t("limit_pushdown_group_where_order", limit_pushdown_group_where_order),
+        t(
+            "limit_pushdown_group_where_order",
+            limit_pushdown_group_where_order,
+        ),
         t("limit_pushdown_without_group", limit_pushdown_without_group),
-        t("limit_pushdown_without_group_resort", limit_pushdown_without_group_resort),
+        t(
+            "limit_pushdown_without_group_resort",
+            limit_pushdown_without_group_resort,
+        ),
         t("limit_pushdown_unique_key", limit_pushdown_unique_key),
+        t("sys_drop_cache", sys_drop_cache),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -6231,8 +6238,13 @@ async fn build_range_end(service: Box<dyn SqlClient>) {
         ]
     );
 }
-async fn assert_limit_pushdown(service: &Box<dyn SqlClient>, query: &str, expected_index: Option<&str>, is_limit_expected: bool, is_tail_limit: bool) -> Result<Vec<Row>, String> {
-        
+async fn assert_limit_pushdown(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    expected_index: Option<&str>,
+    is_limit_expected: bool,
+    is_tail_limit: bool,
+) -> Result<Vec<Row>, String> {
     let res = service
         .exec_query(&format!("EXPLAIN ANALYZE {}", query))
         .await
@@ -6241,9 +6253,11 @@ async fn assert_limit_pushdown(service: &Box<dyn SqlClient>, query: &str, expect
         TableValue::String(s) => {
             println!("!! plan {}", s);
             if let Some(ind) = expected_index {
-
                 if s.find(ind).is_none() {
-                    return Err(format!("Expected index `{}` but it not found in the plan", ind));
+                    return Err(format!(
+                        "Expected index `{}` but it not found in the plan",
+                        ind
+                    ));
                 }
             }
             let expected_limit = if is_tail_limit {
@@ -6260,15 +6274,11 @@ async fn assert_limit_pushdown(service: &Box<dyn SqlClient>, query: &str, expect
                     return Err(format!("{} unexpected but found", expected_limit));
                 }
             }
-        },
-        _ => return Err("unexpected value".to_string())
-
+        }
+        _ => return Err("unexpected value".to_string()),
     };
 
-    let res = service
-        .exec_query(query)
-        .await
-        .unwrap();
+    let res = service.exec_query(query).await.unwrap();
     Ok(res.get_rows().clone())
 }
 
@@ -6489,7 +6499,7 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) {
             (12, 20),
             (12, 25)
             ",
-            )
+        )
         .await
         .unwrap();
     service
@@ -6503,7 +6513,7 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) {
             (22, 20),
             (22, 25),
             (23, 30)",
-            )
+        )
         .await
         .unwrap();
 
@@ -6514,16 +6524,21 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) {
                 union all
                 SELECT * FROM foo.pushdown2 
                 ) as `tb` GROUP BY 1 LIMIT 3",
-         None, false, false).await.unwrap();
+        None,
+        false,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(43)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(45)]),
-        Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(43)]),
+            Row::new(vec![TableValue::Int(12), TableValue::Int(45)]),
+            Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
         ]
-        );
+    );
 }
 
 async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
@@ -6548,7 +6563,7 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
             (12, 20, 1),
             (12, 25, 1)
             ",
-            )
+        )
         .await
         .unwrap();
     service
@@ -6562,195 +6577,351 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
             (22, 20, 1),
             (22, 25, 1),
             (23, 30, 1)",
-            )
+        )
         .await
         .unwrap();
 
-    let res = assert_limit_pushdown(&service, "SELECT a `aa`, b, SUM(n) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a `aa`, b, SUM(n) FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
-                ) as `tb` GROUP BY 1, 2 ORDER BY 1 LIMIT 3", 
-                Some("ind1"), 
-                true, false
-        )
-        .await.unwrap();
+                ) as `tb` GROUP BY 1, 2 ORDER BY 1 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(45), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(1)]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
         ]
-        ); 
-    
+    );
+
     // ===========================
 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, SUM(n) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(n) FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
-                ) as `tb` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 3", 
-                Some("ind1"),
-                true, false
-        )
-        .await.unwrap();
+                ) as `tb` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(45), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(1)]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
         ]
-        ); 
-    
+    );
+
     // ============================
 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, SUM(n) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(n) FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
-                ) as `tb` GROUP BY 1, 2 ORDER BY 2 LIMIT 3", 
-                Some("ind1"), false, false
-        )
-        .await.unwrap();
+                ) as `tb` GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(21), TableValue::Int(10), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(21), TableValue::Int(15), TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(2)]),
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(10),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(15),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
         ]
-        ); 
+    );
     //============================
 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, SUM(n) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(n) FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
-                ) as `tb` GROUP BY 1, 2 ORDER BY 1, 2 DESC LIMIT 3", 
-                Some("ind1"), false, false
-        )
-        .await.unwrap();
+                ) as `tb` GROUP BY 1, 2 ORDER BY 1, 2 DESC LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(45), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(25), TableValue::Int(1)]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(1)
+            ]),
         ]
-        ); 
+    );
     //============================
 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, SUM(n) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(n) FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
-                ) as `tb` GROUP BY 1, 2 ORDER BY 1 DESC, 2 DESC LIMIT 3", 
-                Some("ind1"), true, true
-        )
-        .await.unwrap();
+                ) as `tb` GROUP BY 1, 2 ORDER BY 1 DESC, 2 DESC LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(23), TableValue::Int(30), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(25), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(20), TableValue::Int(1)]),
+            Row::new(vec![
+                TableValue::Int(23),
+                TableValue::Int(30),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(25),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
         ]
-        ); 
+    );
     //============================
 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, SUM(n) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(n) FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
-                ) as `tb` GROUP BY 1, 2 ORDER BY 1 DESC LIMIT 3", 
-                Some("ind1"), true, true
-        )
-        .await.unwrap();
+                ) as `tb` GROUP BY 1, 2 ORDER BY 1 DESC LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(23), TableValue::Int(30), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(20), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(25), TableValue::Int(1)]),
+            Row::new(vec![
+                TableValue::Int(23),
+                TableValue::Int(30),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(25),
+                TableValue::Int(1)
+            ]),
         ]
-        ); 
+    );
 
     //============================
 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, n FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, n FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
-                ) as `tb` GROUP BY 1, 2,3 ORDER BY 1 DESC, 2 DESC, 3 DESC LIMIT 3", 
-                Some("default"), true, true
-        )
-        .await.unwrap();
+                ) as `tb` GROUP BY 1, 2,3 ORDER BY 1 DESC, 2 DESC, 3 DESC LIMIT 3",
+        Some("default"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(23), TableValue::Int(30), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(25), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(20), TableValue::Int(1)]),
+            Row::new(vec![
+                TableValue::Int(23),
+                TableValue::Int(30),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(25),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
         ]
-        ); 
+    );
 
     //============================
 
-    let res = assert_limit_pushdown(&service, "SELECT b, SUM(n) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT b, SUM(n) FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
-                ) as `tb` GROUP BY 1 ORDER BY 1 LIMIT 3", 
-                Some("ind2"), true, false
-        )
-        .await.unwrap();
+                ) as `tb` GROUP BY 1 ORDER BY 1 LIMIT 3",
+        Some("ind2"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(10),  TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(15),  TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(18),  TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(10), TableValue::Int(1)]),
+            Row::new(vec![TableValue::Int(15), TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(18), TableValue::Int(2)]),
         ]
-        ); 
+    );
     //
     //============================
 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, n FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, n FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
-                ) as `tb` GROUP BY 1, 2, 3 ORDER BY 1, 2 LIMIT 3", 
-                Some("default"), true, false
-        )
-        .await.unwrap();
+                ) as `tb` GROUP BY 1, 2, 3 ORDER BY 1, 2 LIMIT 3",
+        Some("default"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(45), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(1)]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
         ]
-        ); 
+    );
 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, n FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, n FROM (
                 SELECT * FROM foo.pushdown_group1 
                 union all
                 SELECT * FROM foo.pushdown_group2 
-                ) as `tb` GROUP BY 3, 1, 2 ORDER BY 1, 2 LIMIT 3", 
-                Some("default"), true, false
-        )
-        .await.unwrap();
+                ) as `tb` GROUP BY 3, 1, 2 ORDER BY 1, 2 LIMIT 3",
+        Some("default"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(45), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(1)]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
         ]
-        ); 
+    );
 }
 
 async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
@@ -6776,7 +6947,7 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
             (12, 25, 5),
             (12, 25, 6)
             ",
-            )
+        )
         .await
         .unwrap();
     service
@@ -6791,217 +6962,275 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
             (22, 20, 11),
             (22, 25, 12),
             (23, 30, 13)",
-            )
+        )
         .await
         .unwrap();
-    let res = assert_limit_pushdown(&service, "SELECT a, b, SUM(c) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(c) FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a = 12
-                GROUP BY 1, 2 ORDER BY 2 LIMIT 3", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(4)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(25), TableValue::Int(11)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(30), TableValue::Int(7)]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(11)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
         ]
-        ); 
+    );
     //======================
-    let res = assert_limit_pushdown(&service, "SELECT a, b, SUM(c) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(c) FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a = 12
-                GROUP BY 1, 2 ORDER BY 2 DESC LIMIT 3", 
-                Some("ind1"), true, true
-                )
-        .await
-        .unwrap();
+                GROUP BY 1, 2 ORDER BY 2 DESC LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(12), TableValue::Int(30), TableValue::Int(7)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(25), TableValue::Int(11)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(4)]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(11)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
         ]
-        ); 
+    );
     //==========================
-    let res = assert_limit_pushdown(&service, "SELECT a, c FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE b = 18
-                GROUP BY a, b, c ORDER BY a, c LIMIT 3", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                GROUP BY a, b, c ORDER BY a, c LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(3)]),
-        Row::new(vec![TableValue::Int(21), TableValue::Int(10)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(3)]),
+            Row::new(vec![TableValue::Int(21), TableValue::Int(10)]),
         ]
-        ); 
+    );
     //==========================
-    let res = assert_limit_pushdown(&service, "SELECT a, c FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE b = 18
-                GROUP BY a, b, c ORDER BY a DESC, c LIMIT 3", 
-                Some("ind1"), false, false
-                )
-        .await
-        .unwrap();
+                GROUP BY a, b, c ORDER BY a DESC, c LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(21), TableValue::Int(10)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(3)]),
+            Row::new(vec![TableValue::Int(21), TableValue::Int(10)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(3)]),
         ]
-        ); 
+    );
     //==========================
-    let res = assert_limit_pushdown(&service, "SELECT a, c FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE b = 18
-                GROUP BY a, b, c ORDER BY a DESC, c DESC LIMIT 3", 
-                Some("ind1"), true, true
-                )
-        .await
-        .unwrap();
+                GROUP BY a, b, c ORDER BY a DESC, c DESC LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(21), TableValue::Int(10)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(3)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(21), TableValue::Int(10)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(3)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(2)]),
         ]
-        ); 
+    );
     //
     //==========================
-    let res = assert_limit_pushdown(&service, "SELECT c FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a = 11 and b = 18
-                GROUP BY a, b, c ORDER BY c LIMIT 3", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                GROUP BY a, b, c ORDER BY c LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(3)]),
+            Row::new(vec![TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(3)]),
         ]
-        ); 
+    );
     //==========================
-    let res = assert_limit_pushdown(&service, "SELECT c FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a = 11 and b = 18
-                GROUP BY a, b, c ORDER BY c DESC LIMIT 3", 
-                Some("ind1"), true, true
-                )
-        .await
-        .unwrap();
+                GROUP BY a, b, c ORDER BY c DESC LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(3)]),
-        Row::new(vec![TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(3)]),
+            Row::new(vec![TableValue::Int(2)]),
         ]
-        ); 
+    );
     //==========================
-    let res = assert_limit_pushdown(&service, "SELECT c FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a = 11 and b = 18
-                GROUP BY b, a, c ORDER BY c LIMIT 3", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                GROUP BY b, a, c ORDER BY c LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(3)])
+            Row::new(vec![TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(3)])
         ]
-        ); 
+    );
     //
     //==========================
-    let res = assert_limit_pushdown(&service, "SELECT c FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a >= 11 and a < 12 and b = 18
-                GROUP BY a, b, c ORDER BY c LIMIT 3", 
-                Some("ind1"), false, false
-                )
-        .await
-        .unwrap();
+                GROUP BY a, b, c ORDER BY c LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(3)])
+            Row::new(vec![TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(3)])
         ]
-        ); 
-    
+    );
+
     //==========================
-    let res = assert_limit_pushdown(&service, "SELECT b FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT b FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE c = 11
-                GROUP BY b, c ORDER BY b LIMIT 3", 
-                Some("ind2"), true, false
-                )
-        .await
-        .unwrap();
+                GROUP BY b, c ORDER BY b LIMIT 3",
+        Some("ind2"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
-    assert_eq!(
-        res,
-        vec![
-        Row::new(vec![TableValue::Int(20)]),
-        ]
-        ); 
+    assert_eq!(res, vec![Row::new(vec![TableValue::Int(20)]),]);
 }
-
 
 async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA foo").await.unwrap();
@@ -7026,7 +7255,7 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
             (12, 25, 5),
             (12, 25, 6)
             ",
-            )
+        )
         .await
         .unwrap();
     service
@@ -7041,153 +7270,257 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
             (22, 20, 11),
             (22, 25, 12),
             (23, 30, 13)",
-            )
+        )
         .await
         .unwrap();
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a aaa, b bbbb, c FROM (
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a aaa, b bbbb, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a = 12
-                ORDER BY 2 LIMIT 4", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                ORDER BY 2 LIMIT 4",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(4)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(25), TableValue::Int(5)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(25), TableValue::Int(6)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(30), TableValue::Int(7)]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(5)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(6)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
         ]
-        ); 
-    
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, c FROM (
+    );
+
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
-                ORDER BY 3 LIMIT 3", 
-                Some("ind2"), true, false
-                )
-        .await
-        .unwrap();
+                ORDER BY 3 LIMIT 3",
+        Some("ind2"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(45), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(3)]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
         ]
-        ); 
+    );
     //
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, c FROM (
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
-                ORDER BY 3 DESC LIMIT 3", 
-                Some("ind2"), true, true
-                )
-        .await
-        .unwrap();
+                ORDER BY 3 DESC LIMIT 3",
+        Some("ind2"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(23), TableValue::Int(30), TableValue::Int(13)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(25), TableValue::Int(12)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(20), TableValue::Int(11)]),
+            Row::new(vec![
+                TableValue::Int(23),
+                TableValue::Int(30),
+                TableValue::Int(13)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(25),
+                TableValue::Int(12)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(11)
+            ]),
         ]
-        ); 
+    );
     //
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, c FROM (
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
-                ORDER BY 1, 2 LIMIT 3", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                ORDER BY 1, 2 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(2)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(3)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(45), TableValue::Int(1)]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
         ]
-        ); 
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, c FROM (
+    );
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
-                ORDER BY 1, 2 LIMIT 2 OFFSET 1", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                ORDER BY 1, 2 LIMIT 2 OFFSET 1",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(3)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(45), TableValue::Int(1)]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
         ]
-        ); 
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, c FROM (
+    );
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE b = 20
-                ORDER BY 1 LIMIT 3", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                ORDER BY 1 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(4)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(20), TableValue::Int(11)]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(11)
+            ]),
         ]
-        ); 
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, c FROM (
+    );
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE b = 20
-                ORDER BY 1, 3 LIMIT 3", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                ORDER BY 1, 3 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(4)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(20), TableValue::Int(11)]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(11)
+            ]),
         ]
-        ); 
+    );
 }
 async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA foo").await.unwrap();
@@ -7212,7 +7545,7 @@ async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
             (12, 25, 5),
             (12, 25, 6)
             ",
-            )
+        )
         .await
         .unwrap();
     service
@@ -7227,73 +7560,120 @@ async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
             (22, 20, 11),
             (22, 25, 12),
             (23, 30, 13)",
-            )
+        )
         .await
         .unwrap();
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a aaa, b bbbb, c FROM (
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a aaa, b bbbb, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a = 12
-                ORDER BY 2 desc LIMIT 4", 
-                Some("ind1"), true, true
-                )
-        .await
-        .unwrap();
+                ORDER BY 2 desc LIMIT 4",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(12), TableValue::Int(30), TableValue::Int(7)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(25), TableValue::Int(5)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(25), TableValue::Int(6)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(4)]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(5)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(6)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
         ]
-        ); 
+    );
 
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a aaa, b bbbb, c FROM (
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a aaa, b bbbb, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
-                ORDER BY 1 desc, 2 desc LIMIT 3", 
-                Some("ind1"), true, true
-                )
-        .await
-        .unwrap();
+                ORDER BY 1 desc, 2 desc LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(23), TableValue::Int(30), TableValue::Int(13)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(25), TableValue::Int(12)]),
-        Row::new(vec![TableValue::Int(22), TableValue::Int(20), TableValue::Int(11)]),
+            Row::new(vec![
+                TableValue::Int(23),
+                TableValue::Int(30),
+                TableValue::Int(13)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(25),
+                TableValue::Int(12)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(11)
+            ]),
         ]
-        ); 
+    );
     //
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, c FROM (
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
-                ORDER BY 2 LIMIT 2", 
-                Some("ind1"), false, false
-                )
-        .await
-        .unwrap();
+                ORDER BY 2 LIMIT 2",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(21), TableValue::Int(10), TableValue::Int(8)]),
-        Row::new(vec![TableValue::Int(21), TableValue::Int(15), TableValue::Int(9)]),
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(10),
+                TableValue::Int(8)
+            ]),
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(15),
+                TableValue::Int(9)
+            ]),
         ]
-        ); 
-    
+    );
 }
 async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA foo").await.unwrap();
@@ -7318,7 +7698,7 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
             (12, 25, 5, 5),
             (12, 25, 6, 6)
             ",
-            )
+        )
         .await
         .unwrap();
     service
@@ -7333,132 +7713,211 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
             (22, 20, 11, 11),
             (22, 25, 12, 12),
             (23, 30, 13, 13)",
-            )
+        )
         .await
         .unwrap();
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, c FROM (
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a = 12
-                ORDER BY 2 LIMIT 4", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                ORDER BY 2 LIMIT 4",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(4)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(25), TableValue::Int(6)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(30), TableValue::Int(7)]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(6)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
         ]
-        ); 
-    
-    // ==================================== 
-    let res = assert_limit_pushdown(&service, "SELECT a, b, c FROM (
+    );
+
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
-                ORDER BY 3 LIMIT 3", 
-                Some("ind1"), false, false
-                )
-        .await
-        .unwrap();
+                ORDER BY 3 LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(45), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(3)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(4)]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
         ]
-        ); 
+    );
     //==========================
-    let res = assert_limit_pushdown(&service, "SELECT c FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT c FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a = 11 and b = 18
-                GROUP BY b, a, c ORDER BY c LIMIT 3", 
-                Some("ind1"), false, false
-                )
-        .await
-        .unwrap();
+                GROUP BY b, a, c ORDER BY c LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
 
-    assert_eq!(
-        res,
-        vec![
-        Row::new(vec![TableValue::Int(3)])
-        ]
-        ); 
+    assert_eq!(res, vec![Row::new(vec![TableValue::Int(3)])]);
     //===========================
-    let res = assert_limit_pushdown(&service, "SELECT a, b, SUM(c) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(c) FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
                 WHERE a = 12
-                GROUP BY 1, 2 ORDER BY 2 LIMIT 3", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(4)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(25), TableValue::Int(6)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(30), TableValue::Int(7)]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(6)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
         ]
-        ); 
+    );
     //
     //===========================
-    let res = assert_limit_pushdown(&service, "SELECT a, b, SUM(c) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(c) FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
-                GROUP BY 1, 2 ORDER BY 2 LIMIT 3", 
-                Some("ind1"), false, false
-                )
-        .await
-        .unwrap();
+                GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(21), TableValue::Int(10), TableValue::Int(8)]),
-        Row::new(vec![TableValue::Int(21), TableValue::Int(15), TableValue::Int(9)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(3)]),
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(10),
+                TableValue::Int(8)
+            ]),
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(15),
+                TableValue::Int(9)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
         ]
-        ); 
+    );
     //===========================
-    let res = assert_limit_pushdown(&service, "SELECT a, b, SUM(c) FROM (
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(c) FROM (
                 SELECT * FROM foo.pushdown_where_group1 
                 union all
                 SELECT * FROM foo.pushdown_where_group2 
                 ) as `tb` 
-                GROUP BY 1, 2 ORDER BY 1 LIMIT 3", 
-                Some("ind1"), true, false
-                )
-        .await
-        .unwrap();
+                GROUP BY 1, 2 ORDER BY 1 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
         res,
         vec![
-        Row::new(vec![TableValue::Int(11), TableValue::Int(18), TableValue::Int(3)]),
-        Row::new(vec![TableValue::Int(11), TableValue::Int(45), TableValue::Int(1)]),
-        Row::new(vec![TableValue::Int(12), TableValue::Int(20), TableValue::Int(4)]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
         ]
-        ); 
+    );
 }
 
 async fn queue_full_workflow(service: Box<dyn SqlClient>) {
@@ -7950,6 +8409,15 @@ async fn queue_custom_orphaned(service: Box<dyn SqlClient>) {
         res.get_rows(),
         &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
     );
+}
+
+async fn sys_drop_cache(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"SYS DROP QUERY CACHE;"#)
+        .await
+        .unwrap();
+
+    service.exec_query(r#"SYS DROP CACHE;"#).await.unwrap();
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
