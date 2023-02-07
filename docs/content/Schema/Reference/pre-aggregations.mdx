@@ -1159,6 +1159,13 @@ cubes:
 
 ### <--{"id" : "Parameters"}--> buildRangeStart and buildRangeEnd
 
+<WarningBox>
+
+Currently `buildRangeStart` and `buildRangeEnd` doesn't have any effect on pre-aggregations without `partitionGranularity`.
+This behavior can be changed in future versions.
+
+</WarningBox>
+
 The build range defines what partitions should be built by a scheduled refresh.
 Data will **never** be queried beyond this range. By default, the build range is
 defined as the minimum and maximum values possible for the
@@ -1183,6 +1190,7 @@ cube(`Orders`, {
       measures: [CUBE.count],
       timeDimension: CUBE.created_at,
       granularity: `day`,
+      partitionGranularity: `month`,
       buildRangeStart: {
         sql: `SELECT NOW() - interval '300 day'`,
       },
@@ -1203,6 +1211,7 @@ cubes:
         measures: [CUBE.count]
         time_dimension: CUBE.created_at
         granularity: day
+        partitionGranularity: month
         build_range_start:
           sql: SELECT NOW() - interval '300 day'
         build_range_end:
