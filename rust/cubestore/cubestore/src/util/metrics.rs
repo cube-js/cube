@@ -31,9 +31,10 @@ pub enum Compatibility {
 pub fn init_metrics(
     bind_addr: impl ToSocketAddrs,
     server_addr: impl ToSocketAddrs,
-    c: Compatibility,
+    mode: Compatibility,
+    constant_tags: Vec<String>,
 ) {
-    global_sink::init(bind_addr, server_addr, c).unwrap()
+    global_sink::init(bind_addr, server_addr, mode, constant_tags).unwrap()
 }
 
 pub const fn counter(name: &'static str) -> Counter {
@@ -121,6 +122,7 @@ impl Metric {
 struct Sink {
     socket: UdpSocket,
     mode: Compatibility,
+    constant_tags: Vec<String>,
 }
 
 impl Sink {
@@ -128,11 +130,16 @@ impl Sink {
         bind_addr: impl ToSocketAddrs,
         addr: impl ToSocketAddrs,
         mode: Compatibility,
+        constant_tags: Vec<String>,
     ) -> Result<Sink, CubeError> {
         let socket = UdpSocket::bind(bind_addr)?;
         socket.connect(addr)?;
         socket.set_nonblocking(true)?;
-        Ok(Sink { socket, mode })
+        Ok(Sink {
+            socket,
+            mode,
+            constant_tags,
+        })
     }
 
     fn send(&self, m: &Metric, value: i64, tags: Option<&Vec<String>>) {
@@ -145,9 +152,24 @@ impl Sink {
             MetricType::Distribution => "d",
         };
         let data = format!("{}:{}|{}", m.name, value, kind);
-        let msg = match tags {
+
+        let tags_as_str = if self.constant_tags.len() > 0 {
+            if let Some(t) = tags {
+                Some(self.constant_tags.join(",") + "," + &t.join(","))
+            } else {
+                Some(self.constant_tags.join(","))
+            }
+        } else {
+            if let Some(t) = tags {
+                Some(t.join(","))
+            } else {
+                None
+            }
+        };
+
+        let msg = match tags_as_str {
             Some(t) => {
-                format!("{}|#{}", data, t.join(","))
+                format!("{}|#{}", data, t)
             }
             None => data,
         };
@@ -166,9 +188,10 @@ mod global_sink {
     pub fn init(
         bind_addr: impl ToSocketAddrs,
         server_addr: impl ToSocketAddrs,
-        c: Compatibility,
+        mode: Compatibility,
+        constant_tags: Vec<String>,
     ) -> Result<(), CubeError> {
-        let s = Sink::connect(bind_addr, server_addr, c)?;
+        let s = Sink::connect(bind_addr, server_addr, mode, constant_tags)?;
 
         let mut called = false;
         ONCE.call_once(|| {
