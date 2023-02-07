@@ -12648,6 +12648,14 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             r#"
             select
+                "_"."t1.agentCountApprox" as "agentCountApprox",
+                "_"."a0" as "a0"
+            from (
+                select
+                    sum(cast("rows"."t0.taxful_total_price" as decimal)) as "a0",
+                    "rows"."t1.agentCountApprox" as "t1.agentCountApprox"
+                from (
+                    select
                         "$Outer"."t1.agentCountApprox",
                         "$Inner"."t0.taxful_total_price"
                     from (
@@ -12664,6 +12672,11 @@ ORDER BY \"COUNT(count)\" DESC"
                             "_"."__cubeJoinField" as "t0.__cubeJoinField"
                         from "public"."KibanaSampleDataEcommerce" "_"
                     ) "$Inner" on ("$Outer"."t1.__cubeJoinField" = "$Inner"."t0.__cubeJoinField")
+                ) "rows"
+                group by "t1.agentCountApprox"
+            ) "_"
+            where not "_"."a0" is null
+            limit 1000001
             ;"#
             .to_string(),
             DatabaseProtocol::PostgreSQL,
@@ -14494,6 +14507,106 @@ ORDER BY \"COUNT(count)\" DESC"
                 }])
             }
         );
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT "ta_1"."customer_gender" "ca_1"
+            FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
+            WHERE NOT(LOWER("ta_1"."customer_gender") LIKE (replace(
+                replace(
+                    replace(
+                        'test',
+                        '!',
+                        '!!'
+                    ),
+                    '%',
+                    '!%'
+                ),
+                '_',
+                '!_'
+            ) || '%') ESCAPE '!')
+            GROUP BY "ca_1"
+            ORDER BY "ca_1" ASC
+            LIMIT 1000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(1000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("notStartsWith".to_string()),
+                    values: Some(vec!["test".to_string()]),
+                    or: None,
+                    and: None
+                }])
+            }
+        );
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT "ta_1"."customer_gender" "ca_1"
+            FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
+            WHERE NOT(LOWER("ta_1"."customer_gender") LIKE ('%' || replace(
+                replace(
+                    replace(
+                        'known',
+                        '!',
+                        '!!'
+                    ),
+                    '%',
+                    '!%'
+                ),
+                '_',
+                '!_'
+            )) ESCAPE '!')
+            GROUP BY "ca_1"
+            ORDER BY "ca_1" ASC
+            LIMIT 1000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(1000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("notEndsWith".to_string()),
+                    values: Some(vec!["known".to_string()]),
+                    or: None,
+                    and: None
+                }])
+            }
+        )
     }
 
     #[tokio::test]

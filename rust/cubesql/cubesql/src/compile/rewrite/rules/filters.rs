@@ -1,7 +1,7 @@
 use super::utils;
 use crate::{
     compile::{
-        engine::{df::scan::MemberField::Literal, provider::CubeContext},
+        engine::provider::CubeContext,
         rewrite::{
             analysis::{ConstantFolding, LogicalPlanAnalysis},
             between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,

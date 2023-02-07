@@ -17,7 +17,7 @@ use crate::{
     CubeError,
 };
 use datafusion::{logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner};
-use egg::{EGraph, Extractor, Id, Iteration, IterationData, Language, Rewrite, Runner, StopReason};
+use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner, StopReason};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, env, fs, sync::Arc, time::Duration};
 
