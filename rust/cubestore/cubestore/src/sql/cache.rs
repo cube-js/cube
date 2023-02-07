@@ -72,6 +72,10 @@ impl SqlResultCache {
         }
     }
 
+    pub async fn clear(&self) {
+        self.result_cache.lock().await.clear();
+    }
+
     #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
     pub async fn get<F>(
         &self,

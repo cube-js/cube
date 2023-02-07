@@ -145,8 +145,15 @@ pub enum SystemCommand {
     Compaction { store: Option<RocksStoreName> },
     KillAllJobs,
     Repartition { partition_id: u64 },
+    Drop(DropCommand),
     PanicWorker,
     Metastore(MetastoreCommand),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DropCommand {
+    DropQueryCache,
+    DropAllCache,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -315,6 +322,20 @@ impl<'a> CubeStoreParser<'a> {
                     var_name, x
                 )))
             }
+        }
+    }
+
+    pub fn parse_drop(&mut self) -> Result<Statement, ParserError> {
+        if self.parse_custom_token("query") && self.parse_custom_token("cache") {
+            Ok(Statement::System(SystemCommand::Drop(
+                DropCommand::DropQueryCache,
+            )))
+        } else if self.parse_custom_token("cache") {
+            Ok(Statement::System(SystemCommand::Drop(
+                DropCommand::DropAllCache,
+            )))
+        } else {
+            Err(ParserError::ParserError("Unknown drop command".to_string()))
         }
     }
 
@@ -490,6 +511,8 @@ impl<'a> CubeStoreParser<'a> {
             Ok(Statement::System(SystemCommand::Repartition {
                 partition_id: self.parse_integer("partition id", false)?,
             }))
+        } else if self.parse_custom_token("drop") {
+            self.parse_drop()
         } else if self.parse_custom_token("metastore") {
             self.parse_metastore()
         } else if self.parse_custom_token("panic") && self.parse_custom_token("worker") {
