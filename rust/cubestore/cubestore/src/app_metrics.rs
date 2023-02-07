@@ -43,7 +43,11 @@ pub static STREAMING_LAG: Gauge = metrics::gauge("cs.streaming.lag");
 pub static METASTORE_QUEUE: Gauge = metrics::gauge("cs.metastore.queue_size");
 pub static METASTORE_READ_OPERATION: Histogram =
     metrics::histogram("cs.metastore.read_operation.ms");
+pub static METASTORE_INNER_READ_OPERATION: Histogram =
+    metrics::histogram("cs.metastore.inner_read_operation.ms");
 pub static METASTORE_WRITE_OPERATION: Histogram =
     metrics::histogram("cs.metastore.write_operation.ms");
+pub static METASTORE_INNER_WRITE_OPERATION: Histogram =
+    metrics::histogram("cs.metastore.inner_write_operation.ms");
 pub static METASTORE_READ_OUT_QUEUE_OPERATION: Histogram =
     metrics::histogram("cs.metastore.read_out_queue_operation.ms");
