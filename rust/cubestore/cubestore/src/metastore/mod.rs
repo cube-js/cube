@@ -3855,7 +3855,9 @@ impl MetaStore for RocksMetaStore {
                 )?;
                 result.push((
                     replay_handle,
-                    chunks.iter().all(|c| !c.get_row().active() && c.get_row().uploaded()),
+                    chunks
+                        .iter()
+                        .all(|c| !c.get_row().active() && c.get_row().uploaded()),
                 ));
             }
             Ok(result)
