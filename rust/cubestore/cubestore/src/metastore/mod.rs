@@ -3803,10 +3803,11 @@ impl MetaStore for RocksMetaStore {
                     &ChunkRocksIndex::ReplayHandleId,
                 )?;
 
-                if chunks.iter().any(|c| c.get_row().active() || !c.get_row().uploaded()) {
+                let active_chunks = chunks.iter().filter(|c| c.get_row().active() || !c.get_row().uploaded()).collect::<Vec<_>>();
+                if !active_chunks.is_empty() {
                     return Err(CubeError::internal(format!(
-                        "Can't merge replay handle with chunks: {:?}",
-                        replay_handle
+                        "Can't merge replay handle with chunks: {:?}, {}",
+                        replay_handle, active_chunks[0].get_id()
                     )))
                 }
 
