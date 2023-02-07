@@ -206,7 +206,10 @@ impl SchedulerImpl {
         )
         .await
         {
-            error!("Error scheduling partitions compaction: {}", e);
+            error!(
+                "Error scheduling deactivation chunks without partitions: {}",
+                e
+            );
         }
 
         if let Err(e) = warn_long_fut(
