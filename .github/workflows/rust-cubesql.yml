@@ -210,6 +210,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Disable rustup update (issue workaround for Windows)
+        run: rustup set auto-self-update disable
+        if: contains(runner.os, 'windows')
+        shell: bash
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
