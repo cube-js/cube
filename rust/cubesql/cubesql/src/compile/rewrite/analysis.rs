@@ -37,6 +37,7 @@ pub struct LogicalPlanData {
     pub constant: Option<ConstantFolding>,
     pub constant_in_list: Option<Vec<ScalarValue>>,
     pub cube_reference: Option<String>,
+    pub is_empty_list: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -685,6 +686,31 @@ impl LogicalPlanAnalysis {
         }
     }
 
+    fn make_is_empty_list(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<bool> {
+        let is_empty_list = |id| egraph.index(id).data.is_empty_list.clone();
+        match enode {
+            LogicalPlanLanguage::FilterOpFilters(params) => {
+                if params.is_empty()
+                    || params.iter().all(|p| {
+                        if let Some(true) = is_empty_list(*p) {
+                            true
+                        } else {
+                            false
+                        }
+                    })
+                {
+                    Some(true)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     fn merge_option_field<T: Clone>(
         &mut self,
         a: &mut LogicalPlanData,
@@ -716,6 +742,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             constant: Self::make_constant(egraph, enode),
             constant_in_list: Self::make_constant_in_list(egraph, enode),
             cube_reference: Self::make_cube_reference(egraph, enode),
+            is_empty_list: Self::make_is_empty_list(egraph, enode),
         }
     }
 
@@ -728,6 +755,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         let (constant_in_list, b) = self.merge_option_field(a, b, |d| &mut d.constant_in_list);
         let (constant, b) = self.merge_option_field(a, b, |d| &mut d.constant);
         let (cube_reference, b) = self.merge_option_field(a, b, |d| &mut d.cube_reference);
+        let (is_empty_list, b) = self.merge_option_field(a, b, |d| &mut d.is_empty_list);
         let (column_name, _) = self.merge_option_field(a, b, |d| &mut d.column);
         original_expr
             | member_name_to_expr
@@ -737,6 +765,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | constant
             | cube_reference
             | column_name
+            | is_empty_list
     }
 
     fn modify(egraph: &mut EGraph<LogicalPlanLanguage, Self>, id: Id) {

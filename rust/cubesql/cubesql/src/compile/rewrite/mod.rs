@@ -1036,7 +1036,7 @@ fn order(member: impl Display, asc: impl Display) -> String {
 }
 
 fn filter_op(filters: impl Display, op: impl Display) -> String {
-    format!("(FilterOp {} FilterOpOp:{})", filters, op)
+    format!("(FilterOp {} {})", filters, op)
 }
 
 fn filter_op_filters(left: impl Display, right: impl Display) -> String {

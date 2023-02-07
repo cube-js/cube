@@ -3524,29 +3524,13 @@ ORDER BY \"COUNT(count)\" DESC"
                 order: None,
                 limit: Some(1000001),
                 offset: None,
-                // TODO flatten empty filter
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: None,
-                        operator: None,
-                        values: None,
-                        or: Some(vec![json!(V1LoadRequestQueryFilterItem {
-                            member: None,
-                            operator: None,
-                            values: None,
-                            or: None,
-                            and: Some(vec![]),
-                        })]),
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("Logs.agentCount".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None,
-                    }
-                ]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("Logs.agentCount".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                }]),
             }
         );
     }

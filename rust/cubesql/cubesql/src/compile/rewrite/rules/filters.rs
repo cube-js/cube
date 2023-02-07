@@ -348,7 +348,8 @@ impl RewriteRules for FilterRules {
                     "?members",
                     "?filter_aliases",
                 ),
-                filter_op_filters_empty_tail(),
+                // TODO worth introducing always true filter member
+                filter_op(filter_op_filters_empty_tail(), "FilterOpOp:and"),
                 self.transform_join_field(
                     "?column_left",
                     "?column_right",
@@ -365,7 +366,9 @@ impl RewriteRules for FilterRules {
                     "?members",
                     "?filter_aliases",
                 ),
-                filter_op_filters_empty_tail(),
+                // TODO worth introducing always true filter member
+                // TODO we might want actually return always false here in case actual check conflicts with previous rule
+                filter_op(filter_op_filters_empty_tail(), "FilterOpOp:and"),
                 self.transform_join_field_is_null(
                     "?column",
                     "?alias_to_cube",
@@ -694,7 +697,7 @@ impl RewriteRules for FilterRules {
                         filter_replacer("?left", "?alias_to_cube", "?members", "?filter_aliases"),
                         filter_replacer("?right", "?alias_to_cube", "?members", "?filter_aliases"),
                     ),
-                    "and",
+                    "FilterOpOp:and",
                 ),
             ),
             rewrite(
@@ -710,7 +713,7 @@ impl RewriteRules for FilterRules {
                         filter_replacer("?left", "?alias_to_cube", "?members", "?filter_aliases"),
                         filter_replacer("?right", "?alias_to_cube", "?members", "?filter_aliases"),
                     ),
-                    "or",
+                    "FilterOpOp:or",
                 ),
             ),
             // Unwrap lower for case-insensitive operators
@@ -2075,7 +2078,7 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-flatten-upper-and-left",
                 cube_scan_filters(
-                    filter_op(filter_op_filters("?left", "?right"), "and"),
+                    filter_op(filter_op_filters("?left", "?right"), "FilterOpOp:and"),
                     "?tail",
                 ),
                 cube_scan_filters(cube_scan_filters("?left", "?right"), "?tail"),
@@ -2084,7 +2087,7 @@ impl RewriteRules for FilterRules {
                 "filter-flatten-upper-and-right",
                 cube_scan_filters(
                     "?tail",
-                    filter_op(filter_op_filters("?left", "?right"), "and"),
+                    filter_op(filter_op_filters("?left", "?right"), "FilterOpOp:and"),
                 ),
                 cube_scan_filters("?tail", cube_scan_filters("?left", "?right")),
             ),
@@ -2098,10 +2101,58 @@ impl RewriteRules for FilterRules {
                 cube_scan_filters("?tail", filter_op_filters("?left", "?right")),
                 cube_scan_filters("?tail", cube_scan_filters("?left", "?right")),
             ),
-            filter_flatten_rewrite_left("or"),
-            filter_flatten_rewrite_right("or"),
-            filter_flatten_rewrite_left("and"),
-            filter_flatten_rewrite_right("and"),
+            rewrite(
+                "filter-flatten-op-left",
+                filter_op(
+                    filter_op_filters(filter_op("?filters", "?op"), "?tail"),
+                    "?op",
+                ),
+                filter_op(filter_op_filters("?filters", "?tail"), "?op"),
+            ),
+            rewrite(
+                "filter-flatten-op-right",
+                filter_op(
+                    filter_op_filters("?tail", filter_op("?filters", "?op")),
+                    "?op",
+                ),
+                filter_op(filter_op_filters("?tail", "?filters"), "?op"),
+            ),
+            transforming_rewrite(
+                "filter-flatten-empty-filter-op-left",
+                filter_op(
+                    filter_op_filters(filter_op("?filter_ops_filters", "?op"), "?tail"),
+                    "?outer_op",
+                ),
+                filter_op(
+                    filter_op_filters(filter_op_filters_empty_tail(), "?tail"),
+                    "?outer_op",
+                ),
+                self.is_empty_filter_ops_filters("?filter_ops_filters"),
+            ),
+            transforming_rewrite(
+                "filter-flatten-empty-filter-op-right",
+                filter_op(
+                    filter_op_filters("?tail", filter_op("?filter_ops_filters", "?op")),
+                    "?outer_op",
+                ),
+                filter_op(
+                    filter_op_filters("?tail", filter_op_filters_empty_tail()),
+                    "?outer_op",
+                ),
+                self.is_empty_filter_ops_filters("?filter_ops_filters"),
+            ),
+            transforming_rewrite(
+                "filter-flatten-empty-filter-op-left-cube-scan-filters",
+                cube_scan_filters(filter_op("?filter_ops_filters", "?op"), "?tail"),
+                cube_scan_filters(cube_scan_filters_empty_tail(), "?tail"),
+                self.is_empty_filter_ops_filters("?filter_ops_filters"),
+            ),
+            transforming_rewrite(
+                "filter-flatten-empty-filter-op-right-cube-scan-filters",
+                cube_scan_filters("?tail", filter_op("?filter_ops_filters", "?op")),
+                cube_scan_filters("?tail", cube_scan_filters_empty_tail()),
+                self.is_empty_filter_ops_filters("?filter_ops_filters"),
+            ),
             // TODO changes filter ordering which fail tests
             // rewrite(
             //     "filter-commute",
@@ -2115,7 +2166,7 @@ impl RewriteRules for FilterRules {
                         filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
                         filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
                     ),
-                    "and",
+                    "FilterOpOp:and",
                 ),
                 filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
                 self.merge_date_range("?date_range_start", "?date_range_end", "?date_range"),
@@ -2127,14 +2178,14 @@ impl RewriteRules for FilterRules {
                         filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
                         filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
                     ),
-                    "and",
+                    "FilterOpOp:and",
                 ),
                 filter_op(
                     filter_op_filters(
                         filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
                         filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
                     ),
-                    "and",
+                    "FilterOpOp:and",
                 ),
             ),
             rewrite(
@@ -3649,6 +3700,20 @@ impl FilterRules {
         }
     }
 
+    fn is_empty_filter_ops_filters(
+        &self,
+        filter_ops_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let filter_ops_var = var!(filter_ops_var);
+        move |egraph, subst| {
+            if let Some(true) = egraph[subst[filter_ops_var]].data.is_empty_list.clone() {
+                return true;
+            }
+
+            false
+        }
+    }
+
     fn merge_date_range(
         &self,
         date_range_start_var: &'static str,
@@ -3966,38 +4031,6 @@ impl FilterRules {
             true
         }
     }
-}
-
-fn filter_flatten_rewrite_left(
-    op: impl Display + Copy,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
-    rewrite(
-        &format!("filter-flatten-{}-left", op),
-        filter_op(
-            filter_op_filters(filter_op(filter_op_filters("?left", "?right"), op), "?tail"),
-            op,
-        ),
-        filter_op(
-            filter_op_filters(filter_op_filters("?left", "?right"), "?tail"),
-            op,
-        ),
-    )
-}
-
-fn filter_flatten_rewrite_right(
-    op: impl Display + Copy,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
-    rewrite(
-        &format!("filter-flatten-{}-right", op),
-        filter_op(
-            filter_op_filters("?tail", filter_op(filter_op_filters("?left", "?right"), op)),
-            op,
-        ),
-        filter_op(
-            filter_op_filters("?tail", filter_op_filters("?left", "?right")),
-            op,
-        ),
-    )
 }
 
 fn filter_unwrap_cast_push_down(
