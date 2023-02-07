@@ -313,6 +313,14 @@ pub trait RocksEntity {
 pub trait BaseRocksTable {
     fn migrate_table(&self, batch: &mut WriteBatch, table_info: TableInfo)
         -> Result<(), CubeError>;
+
+    fn enable_update_event(&self) -> bool {
+        true
+    }
+
+    fn enable_delete_event(&self) -> bool {
+        true
+    }
 }
 
 pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
@@ -687,10 +695,14 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let updated_row = self.update_row(row_id, serialized_row)?;
         batch_pipe.add_event(MetaStoreEvent::Update(Self::table_id(), row_id));
-        batch_pipe.add_event(self.update_event(
-            IdRow::new(row_id, old_row.clone()),
-            IdRow::new(row_id, new_row.clone()),
-        ));
+
+        if self.enable_update_event() {
+            batch_pipe.add_event(self.update_event(
+                IdRow::new(row_id, old_row.clone()),
+                IdRow::new(row_id, new_row.clone()),
+            ));
+        }
+
         batch_pipe.batch().put(updated_row.key, updated_row.val);
 
         let index_row = self.insert_index_row(&new_row, row_id)?;
@@ -724,7 +736,11 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     ) -> Result<IdRow<Self::T>, CubeError> {
         let deleted_row = self.delete_index_row(row.get_row(), row.get_id())?;
         batch_pipe.add_event(MetaStoreEvent::Delete(Self::table_id(), row.get_id()));
-        batch_pipe.add_event(self.delete_event(row.clone()));
+
+        if self.enable_delete_event() {
+            batch_pipe.add_event(self.delete_event(row.clone()));
+        }
+
         for row in deleted_row {
             batch_pipe.batch().delete(row.key);
         }

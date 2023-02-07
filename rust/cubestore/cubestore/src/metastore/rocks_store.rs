@@ -727,11 +727,14 @@ impl RocksStore {
 
         self.write_notify.notify_waiters();
 
-        for listener in self.listeners.read().await.clone().iter_mut() {
-            for event in events.iter() {
-                listener.send(event.clone())?;
+        if events.len() > 0 {
+            for listener in self.listeners.read().await.clone().iter_mut() {
+                for event in events.iter() {
+                    listener.send(event.clone())?;
+                }
             }
         }
+
         Ok(spawn_res)
     }
 
