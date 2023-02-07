@@ -75,6 +75,17 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
+        sqlRolling: {
+          type: 'sum',
+          sql: 'amount',
+          rollingWindow: {
+            trailing: {
+              sql: \`\${INTERVAL.dateField} >= (\${INTERVAL.startDate} - interval '1' day * \${CUBE.status})\`,
+              granularity: 'day'
+            },
+            offset: 'start'
+          }
+        },
         countDistinctApproxRolling: {
           type: 'countDistinctApprox',
           sql: 'id',
@@ -169,6 +180,10 @@ describe('SQL Generation', () => {
         questionMark: {
           sql: \`replace('some string question string???', 'string', 'with some ???')\`,
           type: \`string\`
+        },
+        status: {
+          sql: \`status\`,
+          type: \`number\`
         }
       }
     })
@@ -456,6 +471,8 @@ describe('SQL Generation', () => {
   });
 
   async function runQueryTest(q, expectedResult) {
+    await compiler.compile();
+    
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
     console.log(query.buildSqlAndParams());
@@ -665,6 +682,32 @@ describe('SQL Generation', () => {
     { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__count_rolling: '2' },
     { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__count_rolling: null },
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__count_rolling: null }
+  ]));
+
+  it('rolling sql', async () => runQueryTest({
+    measures: [
+      'visitors.sqlRolling'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'day',
+      dateRange: ['2017-01-01', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_day: '2017-01-01T00:00:00.000Z', visitors__sql_rolling: null },
+    { visitors__created_at_day: '2017-01-02T00:00:00.000Z', visitors__sql_rolling: null },
+    { visitors__created_at_day: '2017-01-03T00:00:00.000Z', visitors__sql_rolling: '100' },
+    { visitors__created_at_day: '2017-01-04T00:00:00.000Z', visitors__sql_rolling: null },
+    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__sql_rolling: '200' },
+    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__sql_rolling: '300' },
+    { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__sql_rolling: '1200' },
+    { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__sql_rolling: '900' },
+    { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__sql_rolling: null },
+    { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__sql_rolling: null }
   ]));
 
   it('sql utils', async () => runQueryTest({

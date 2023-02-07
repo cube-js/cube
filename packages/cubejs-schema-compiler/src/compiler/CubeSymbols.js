@@ -10,7 +10,8 @@ const CONTEXT_SYMBOLS = {
   USER_CONTEXT: 'securityContext',
   SECURITY_CONTEXT: 'securityContext',
   FILTER_PARAMS: 'filterParams',
-  SQL_UTILS: 'sqlUtils'
+  SQL_UTILS: 'sqlUtils',
+  INTERVAL: 'interval'
 };
 
 const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
