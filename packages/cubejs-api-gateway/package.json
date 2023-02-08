@@ -79,6 +79,7 @@
     ],
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
-    ]
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
   }
 }

@@ -37,8 +37,8 @@ const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 const FloatFilter = inputObjectType({
   name: 'FloatFilter',
   definition(t) {
-    t.float('equals');
-    t.float('notEquals');
+    t.list.float('equals');
+    t.list.float('notEquals');
     t.list.float('in');
     t.list.float('notIn');
     t.boolean('set');
@@ -52,12 +52,12 @@ const FloatFilter = inputObjectType({
 const StringFilter = inputObjectType({
   name: 'StringFilter',
   definition(t) {
-    t.string('equals');
-    t.string('notEquals');
+    t.list.string('equals');
+    t.list.string('notEquals');
     t.list.string('in');
     t.list.string('notIn');
-    t.string('contains');
-    t.string('notContains');
+    t.list.string('contains');
+    t.list.string('notContains');
     t.boolean('set');
   }
 });
@@ -65,8 +65,8 @@ const StringFilter = inputObjectType({
 const DateTimeFilter = inputObjectType({
   name: 'DateTimeFilter',
   definition(t) {
-    t.string('equals');
-    t.string('notEquals');
+    t.list.string('equals');
+    t.list.string('notEquals');
     t.list.string('in');
     t.list.string('notIn');
     t.list.string('inDateRange');
@@ -517,7 +517,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           const timeDimensions: any[] = [];
           let filters: any[] = [];
           const order: [string, 'asc' | 'desc'][] = [];
-
+       
           if (where) {
             filters = whereArgToQueryFilters(where);
           }
@@ -545,16 +545,6 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
               filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
             }
 
-            const inDateRangeFilters = {};
-            filters = filters.filter((f) => {
-              if (f.operator === 'inDateRange') {
-                inDateRangeFilters[f.member] = f.values;
-                return false;
-              }
-
-              return true;
-            });
-
             getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
               const memberName = memberNode.name.value;
               const memberType = getMemberType(normalizedMetaConfig, cubeName, memberName);
@@ -573,9 +563,6 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
                       timeDimensions.push({
                         dimension: key,
                         granularity: granularityName,
-                        ...(inDateRangeFilters[key] ? {
-                          dateRange: inDateRangeFilters[key],
-                        } : null)
                       });
                     }
                   });
@@ -598,26 +585,21 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             ...(renewQuery && { renewQuery }),
           };
 
-          // eslint-disable-next-line no-async-promise-executor
-          const results = await (new Promise<any>(async (resolve, reject) => {
-            try {
-              await apiGateway.load({
-                query,
-                queryType: QueryType.REGULAR_QUERY,
-                context: req.context,
-                res: (message) => {
-                  if (message.error) {
-                    reject(new Error(message.error));
-                  }
-                  resolve(message);
-                },
-                apiType: 'graphql',
-              });
-            } catch (e) {
-              reject(e);
-            }
-          }));
-
+          const results = await new Promise<any>((resolve, reject) => {
+            apiGateway.load({
+              query,
+              queryType: QueryType.REGULAR_QUERY,
+              context: req.context,
+              res: (message) => {
+                if (message.error) {
+                  reject(new Error(message.error));
+                }
+                resolve(message);
+              },
+              apiType: 'graphql',
+            }).catch(reject);
+          });
+          
           parseDates(results);
 
           return results.data.map(entry => R.toPairs(entry)
