@@ -150,6 +150,7 @@ impl SchedulerImpl {
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     pub async fn reconcile(&self) -> Result<(), CubeError> {
         if let Err(e) = warn_long_fut(
             "Removing orphaned jobs",
@@ -266,6 +267,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn schedule_all_pending_repartitions(&self) -> Result<(), CubeError> {
         let all_inactive_partitions_to_repartition = self
             .meta_store
@@ -278,6 +280,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn delete_created_but_not_written_partitions(&self) -> Result<(), CubeError> {
         let all_inactive_partitions = self.meta_store.all_just_created_partitions().await?;
 
@@ -293,6 +296,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn delete_middle_man_partitions(&self) -> Result<(), CubeError> {
         let all_inactive_partitions = self.meta_store.all_inactive_middle_man_partitions().await?;
 
@@ -317,6 +321,7 @@ impl SchedulerImpl {
     /// due to replay so we can safely remove it.
     /// Otherwise we just subtract it from resulting `SeqPointer` so freshly created `ReplayHandle`
     /// can't remove failed one.
+    #[tracing::instrument(level = "trace", skip(self))]
     pub async fn merge_replay_handles(&self) -> Result<(), CubeError> {
         fn is_newest_handle(handle: &IdRow<ReplayHandle>) -> bool {
             Utc::now()
@@ -411,6 +416,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn schedule_all_pending_compactions(&self) -> Result<(), CubeError> {
         let partition_compaction_candidates_id = self
             .meta_store
@@ -424,6 +430,7 @@ impl SchedulerImpl {
         }
         Ok(())
     }
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn deactivate_chunks_without_partitions(&self) -> Result<(), CubeError> {
         let chunks_without_partitions = self
             .meta_store
@@ -443,6 +450,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn remove_inactive_not_uploaded_chunks(&self) -> Result<(), CubeError> {
         let all_inactive_not_uploaded_chunks =
             self.meta_store.all_inactive_not_uploaded_chunks().await?;
@@ -464,6 +472,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn remove_inactive_chunks(&self) -> Result<(), CubeError> {
         // TODO we can do this reconciliation more rarely
         let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
@@ -509,24 +518,27 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     pub async fn reconcile_table_imports(&self) -> Result<(), CubeError> {
         // Using get_tables_with_path due to it's cached
         let tables = self.meta_store.get_tables_with_path(true).await?;
         for table in tables.iter() {
-            if table.table.get_row().is_ready() {
-                if let Some(locations) = table.table.get_row().locations() {
-                    for location in locations.iter() {
-                        if Table::is_stream_location(location) {
-                            let job = self
-                                .meta_store
-                                .get_job_by_ref(
-                                    RowKey::Table(TableId::Tables, table.table.get_id()),
-                                    JobType::TableImportCSV(location.to_string()),
-                                )
-                                .await?;
-                            if job.is_none() {
-                                self.schedule_table_import(table.table.get_id(), &[location])
+            if table.table.get_row().is_ready() && !table.table.get_row().sealed() {
+                if !table.table.get_row().sealed() {
+                    if let Some(locations) = table.table.get_row().locations() {
+                        for location in locations.iter() {
+                            if Table::is_stream_location(location) {
+                                let job = self
+                                    .meta_store
+                                    .get_job_by_ref(
+                                        RowKey::Table(TableId::Tables, table.table.get_id()),
+                                        JobType::TableImportCSV(location.to_string()),
+                                    )
                                     .await?;
+                                if job.is_none() {
+                                    self.schedule_table_import(table.table.get_id(), &[location])
+                                        .await?;
+                                }
                             }
                         }
                     }
@@ -536,6 +548,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn drop_not_ready_tables(&self) -> Result<(), CubeError> {
         // TODO config
         let not_ready_tables = self.meta_store.not_ready_tables(1800).await?;
@@ -545,6 +558,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn remove_orphaned_jobs(&self) -> Result<(), CubeError> {
         let orphaned_jobs = self
             .meta_store
@@ -989,6 +1003,7 @@ impl SchedulerImpl {
         self.cluster.schedule_repartition(p).await
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn schedule_table_import(
         &self,
         table_id: u64,
