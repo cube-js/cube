@@ -47,4 +47,6 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
   prestodb: [],
   trino: [],
   mssql: [],
+
+  hana: []
 };
