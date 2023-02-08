@@ -692,7 +692,9 @@ impl LogicalPlanAnalysis {
     ) -> Option<bool> {
         let is_empty_list = |id| egraph.index(id).data.is_empty_list.clone();
         match enode {
-            LogicalPlanLanguage::FilterOpFilters(params) => {
+            LogicalPlanLanguage::FilterOpFilters(params)
+            | LogicalPlanLanguage::CubeScanFilters(params)
+            | LogicalPlanLanguage::CubeScanOrder(params) => {
                 if params.is_empty()
                     || params.iter().all(|p| {
                         if let Some(true) = is_empty_list(*p) {

@@ -3536,6 +3536,59 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn powerbi_transitive_join() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT "_"."semijoin3.c98" AS "c98", "_"."a0" AS "a0" FROM (
+            SELECT "rows"."semijoin3.c98" AS "semijoin3.c98", sum(CAST("rows"."basetable2.a0" AS NUMERIC)) AS "a0" FROM 
+            (
+                SELECT "$Outer"."basetable2.a0", "$Inner"."semijoin3.c98" FROM (
+                    SELECT "__cubeJoinField" AS "basetable2.c95", "count" AS "basetable2.a0" FROM "public"."KibanaSampleDataEcommerce" AS "$Table"
+                ) AS "$Outer" JOIN (
+                    SELECT "rows"."semijoin1.c98" AS "semijoin3.c98", "rows"."basetable0.c108" AS "semijoin3.c95" FROM (
+                        SELECT "$Outer"."basetable0.c108", "$Inner"."semijoin1.c98" FROM (
+                            SELECT "rows"."__cubeJoinField" AS "basetable0.c108" FROM (
+                                SELECT "__cubeJoinField" FROM "public"."NumberCube" AS "$Table"
+                            ) AS "rows" GROUP BY "__cubeJoinField"
+                        ) AS "$Outer" JOIN (
+                            SELECT "rows"."content" AS "semijoin1.c98", "rows"."__cubeJoinField" AS "semijoin1.c108" FROM (
+                                SELECT "content", "__cubeJoinField" FROM "public"."Logs" AS "$Table"
+                            ) AS "rows" GROUP BY "content", "__cubeJoinField"
+                        ) AS "$Inner" ON (
+                            "$Outer"."basetable0.c108" = "$Inner"."semijoin1.c108" OR "$Outer"."basetable0.c108" IS NULL AND "$Inner"."semijoin1.c108" IS NULL
+                        )) AS "rows" GROUP BY "semijoin1.c98", "basetable0.c108"
+                    ) AS "$Inner" ON (
+                    "$Outer"."basetable2.c95" = "$Inner"."semijoin3.c95" OR "$Outer"."basetable2.c95" IS NULL AND "$Inner"."semijoin3.c95" IS NULL
+                )
+            ) AS "rows" GROUP BY "semijoin3.c98") AS "_" WHERE NOT "_"."a0" IS NULL LIMIT 1000001
+            "#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec!["Logs.content".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000001),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                }]),
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_aggregations() {
         let variants = vec![
             (
@@ -13698,7 +13751,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             r#"
             SELECT count(KibanaSampleDataEcommerce.count), Logs.read
-            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender limit 10) KibanaSampleDataEcommerce
+            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender) KibanaSampleDataEcommerce
             LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
             WHERE Logs.read
             GROUP BY 2
@@ -13720,7 +13773,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: Some(10),
+                limit: None,
                 offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
@@ -13749,7 +13802,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             r#"
             SELECT count(Ecommerce.count), Logs.r, extract(MONTH FROM Ecommerce.order_date)
-            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender limit 10) Ecommerce
+            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender) Ecommerce
             LEFT JOIN (SELECT read r, __cubeJoinField FROM Logs) Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
             LEFT JOIN (SELECT someNumber, __cubeJoinField from NumberCube) NumberC ON (Logs.__cubeJoinField = NumberC.__cubeJoinField)
             WHERE Logs.r
@@ -13776,7 +13829,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: Some(10),
+                limit: None,
                 offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
@@ -13805,7 +13858,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             r#"
             SELECT count(KibanaSampleDataEcommerce.count), Logs.read
-            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender limit 10) KibanaSampleDataEcommerce
+            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender) KibanaSampleDataEcommerce
             LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
             WHERE Logs.read
             GROUP BY 2
@@ -13827,7 +13880,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: Some(10),
+                limit: None,
                 offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
@@ -13856,7 +13909,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             r#"
             SELECT count(Ecommerce.count), Logs.read, extract(MONTH FROM Ecommerce.order_date)
-            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender limit 10) Ecommerce
+            FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender) Ecommerce
             LEFT JOIN Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
             LEFT JOIN (SELECT someNumber, __cubeJoinField from NumberCube) NumberC ON (Logs.__cubeJoinField = NumberC.__cubeJoinField)
             WHERE Logs.read
@@ -13883,7 +13936,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: Some(10),
+                limit: None,
                 offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
@@ -13912,7 +13965,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let logical_plan = convert_select_to_query_plan(
             r#"
             SELECT count(Ecommerce.count), Logs.r, Ecommerce.date
-            FROM (SELECT __cubeJoinField, count, order_date date FROM KibanaSampleDataEcommerce where customer_gender = 'female' limit 10) Ecommerce
+            FROM (SELECT __cubeJoinField, count, order_date date FROM KibanaSampleDataEcommerce where customer_gender = 'female') Ecommerce
             LEFT JOIN (select __cubeJoinField, read r from Logs) Logs ON (Ecommerce.__cubeJoinField = Logs.__cubeJoinField)
             WHERE (Logs.r IS NOT NULL) AND (Ecommerce.date BETWEEN timestamp with time zone '2022-06-13T12:30:00.000Z' AND timestamp with time zone '2022-06-29T12:30:00.000Z')
             GROUP BY 2, 3
@@ -13945,7 +13998,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: Some(10),
+                limit: None,
                 offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {

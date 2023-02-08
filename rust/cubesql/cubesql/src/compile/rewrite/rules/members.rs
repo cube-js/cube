@@ -3356,7 +3356,6 @@ impl MemberRules {
         let left_limit_var = var!(left_limit_var);
         let right_limit_var = var!(right_limit_var);
         let new_limit_var = var!(new_limit_var);
-        let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
             for left_alias_to_cube in
                 var_iter!(egraph[subst[left_alias_to_cube_var]], CubeScanAliasToCube).cloned()
@@ -3376,60 +3375,10 @@ impl MemberRules {
                                 continue;
                             }
 
-                            let right_has_joins =
-                                right_alias_to_cube.iter().any(|(_, right_cube_name)| {
-                                    left_alias_to_cube.iter().any(|(_, left_cube_name)| {
-                                        meta_context.cube_has_join(
-                                            right_cube_name,
-                                            left_cube_name.to_string(),
-                                        )
-                                    })
-                                });
-
-                            let left_filters = match var_list_iter!(
-                                egraph[subst[left_filters_var]],
-                                CubeScanFilters
-                            )
-                            .cloned()
-                            .find(|left_filters| !right_has_joins || left_filters.is_empty())
-                            {
-                                Some(filters) => filters,
-                                None => continue,
-                            };
-
-                            let right_filters = match var_list_iter!(
-                                egraph[subst[right_filters_var]],
-                                CubeScanFilters
-                            )
-                            .cloned()
-                            .find(|right_filters| right_has_joins || right_filters.is_empty())
-                            {
-                                Some(filters) => filters,
-                                None => continue,
-                            };
-
-                            let left_orders =
-                                match var_list_iter!(egraph[subst[left_order_var]], CubeScanOrder)
-                                    .cloned()
-                                    .find(|left_orders| !right_has_joins || left_orders.is_empty())
-                                {
-                                    Some(orders) => orders,
-                                    None => continue,
-                                };
-
-                            let right_orders =
-                                match var_list_iter!(egraph[subst[right_order_var]], CubeScanOrder)
-                                    .cloned()
-                                    .find(|right_orders| right_has_joins || right_orders.is_empty())
-                                {
-                                    Some(orders) => orders,
-                                    None => continue,
-                                };
-
                             let left_limit =
                                 match var_iter!(egraph[subst[left_limit_var]], CubeScanLimit)
                                     .cloned()
-                                    .find(|left_limit| !right_has_joins || !left_limit.is_some())
+                                    .next()
                                 {
                                     Some(limit) => limit,
                                     None => continue,
@@ -3438,11 +3387,16 @@ impl MemberRules {
                             let right_limit =
                                 match var_iter!(egraph[subst[right_limit_var]], CubeScanLimit)
                                     .cloned()
-                                    .find(|right_limit| right_has_joins || !right_limit.is_some())
+                                    .next()
                                 {
                                     Some(limit) => limit,
                                     None => continue,
                                 };
+
+                            // TODO handle the case when limit set on non multiplied cube. It's possible to push down the limit in this case.
+                            if left_limit.is_some() || right_limit.is_some() {
+                                continue;
+                            }
 
                             for left_aliases in
                                 var_iter!(egraph[subst[left_aliases_var]], CubeScanAliases).cloned()
@@ -3456,6 +3410,19 @@ impl MemberRules {
                                         .cloned()
                                 {
                                     if right_aliases.is_none() {
+                                        continue;
+                                    }
+
+                                    let is_left_order_empty = Some(true)
+                                        == egraph[subst[left_order_var]].data.is_empty_list.clone();
+
+                                    let is_right_order_empty = Some(true)
+                                        == egraph[subst[right_order_var]]
+                                            .data
+                                            .is_empty_list
+                                            .clone();
+
+                                    if !is_left_order_empty && !is_right_order_empty {
                                         continue;
                                     }
 
@@ -3477,22 +3444,14 @@ impl MemberRules {
                                             subst[right_members_var],
                                         ]));
 
-                                    subst.insert(
-                                        joined_members_var,
-                                        // egraph.add(LogicalPlanLanguage::MergedMembersReplacer([
-                                        //     joined_members,
-                                        // ])),
-                                        joined_members,
-                                    );
+                                    subst.insert(joined_members_var, joined_members);
 
                                     subst.insert(
                                         new_filters_var,
-                                        egraph.add(LogicalPlanLanguage::CubeScanFilters(
-                                            left_filters
-                                                .into_iter()
-                                                .chain(right_filters.into_iter())
-                                                .collect(),
-                                        )),
+                                        egraph.add(LogicalPlanLanguage::CubeScanFilters(vec![
+                                            subst[left_filters_var],
+                                            subst[right_filters_var],
+                                        ])),
                                     );
 
                                     subst.insert(
@@ -3510,29 +3469,20 @@ impl MemberRules {
                                         )),
                                     );
 
-                                    let limit = if right_has_joins {
-                                        right_limit
+                                    let orders = if is_left_order_empty {
+                                        subst[right_order_var]
                                     } else {
-                                        left_limit
-                                    };
-
-                                    let orders = if right_has_joins {
-                                        right_orders
-                                    } else {
-                                        left_orders
+                                        subst[left_order_var]
                                     };
 
                                     subst.insert(
                                         new_limit_var,
                                         egraph.add(LogicalPlanLanguage::CubeScanLimit(
-                                            CubeScanLimit(limit),
+                                            CubeScanLimit(None),
                                         )),
                                     );
 
-                                    subst.insert(
-                                        new_order_var,
-                                        egraph.add(LogicalPlanLanguage::CubeScanOrder(orders)),
-                                    );
+                                    subst.insert(new_order_var, orders);
 
                                     return true;
                                 }
