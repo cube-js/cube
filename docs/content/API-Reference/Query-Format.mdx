@@ -49,16 +49,16 @@ A Query has the following properties:
   [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.:
   `America/Los_Angeles`. The default value is `UTC`.
 - `renewQuery`: If `renewQuery` is set to `true`, Cube will renew all
-  [`refreshKey`][ref-schema-ref-preaggs-refreshkey] for queries and query
+  [`refresh_key`][ref-schema-ref-preaggs-refreshkey] for queries and query
   results in the foreground. However, if the
-  [`refreshKey`][ref-schema-ref-preaggs-refreshkey] (or
-  [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every]) doesn't
+  [`refresh_key`][ref-schema-ref-preaggs-refreshkey] (or
+  [`refresh_key.every`][ref-schema-ref-preaggs-refreshkey-every]) doesn't
   indicate that there's a need for an update this setting has no effect. The
   default value is `false`.
   > **NOTE**: Cube provides only eventual consistency guarantee. Using a small
-  > [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every] value together
-  > with `renewQuery` to achieve immediate consistency can lead to endless
-  > refresh loops and overall system instability.
+  > [`refresh_key.every`][ref-schema-ref-preaggs-refreshkey-every] value
+  > together with `renewQuery` to achieve immediate consistency can lead to
+  > endless refresh loops and overall system instability.
 - `ungrouped`: If `ungrouped` is set to `true` no `GROUP BY` statement will be
   added to the query. Instead, the raw results after filtering and joining will
   be returned without grouping. By default `ungrouped` queries require a primary
@@ -206,8 +206,8 @@ The opposite operator of `contains`. It supports multiple values.
 }
 ```
 
-This opertor adds `IS NULL` check to include `NULL` values unless you add `null`
-to `values`. For example:
+This operator adds `IS NULL` check to include `NULL` values unless you add
+`null` to `values`. For example:
 
 ```javascript
 {

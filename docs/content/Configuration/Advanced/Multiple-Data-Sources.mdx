@@ -23,19 +23,19 @@ variables exist as environment variables.
 ## Schema
 
 To configure multiple data sources, first explicitly declare a data source in
-some cubes by adding a `dataSource` property:
+some cubes by adding a `data_source` property:
 
 ```javascript
 cube('Orders', {
   ...,
 
-  dataSource: 'default',
+  data_source: 'default',
 });
 
 cube('OrdersFromOtherDataSource', {
   ...,
 
-  dataSource: 'datasource1',
+  data_source: 'datasource1',
 });
 ```
 

@@ -49,7 +49,7 @@ cube(`Orders`, {
   measures: {
     count: {
       type: `count`,
-      drillMembers: [id, createdAt],
+      drill_members: [id, createdAt],
     },
   },
 
@@ -62,7 +62,7 @@ cube(`Orders`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
 
     completedAt: {
@@ -96,7 +96,7 @@ might look something like:
 ```javascript
 cube(`Orders`, {
   // Same content as before, but including the following:
-  preAggregations: {
+  pre_aggregations: {
     orderStatuses: {
       dimensions: [status],
     },
@@ -123,10 +123,10 @@ pre-aggregation definition to the `Orders` schema:
 ```javascript
 cube(`Orders`, {
   // Same content as before, but including the following:
-  preAggregations: {
+  pre_aggregations: {
     ordersByCompletedAt: {
       measures: [count],
-      timeDimension: completedAt,
+      time_dimension: completedAt,
       granularity: `month`,
     },
   },
@@ -167,7 +167,7 @@ receives via the API. The process for selection is summarized below:
 
    - The pre-aggregation contains all dimensions, filter dimensions and leaf
      measures from the query
-   - The measures aren't multiplied ([via a `hasMany`
+   - The measures aren't multiplied ([via a `has_many`
      relation][ref-schema-joins-hasmany])
 
 3. If no, then check if
@@ -197,14 +197,14 @@ cube(`LineItems`, {
   joins: {
     Orders: {
       sql: `${CUBE}.order_id = ${Orders.id}`,
-      relationship: `belongsTo`,
+      relationship: `belongs_to`,
     },
   },
 
   measures: {
     count: {
       type: `count`,
-      drillMembers: [id, createdAt],
+      drill_members: [id, createdAt],
     },
   },
 
@@ -212,7 +212,7 @@ cube(`LineItems`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
 
     createdAt: {
@@ -409,7 +409,7 @@ cube(`LineItems`, {
       type: `countDistinctApprox`,
     },
   },
-  preAggregations: {
+  pre_aggregations: {
     myRollup: {
       ...,
       measures: [ CUBE.countDistinctProducts ],
@@ -425,7 +425,7 @@ To recap what we've learnt so far:
 
 - **Additive measures** are measures whose values can be added together
 
-- **Multiplied measures** are measures that define `hasMany` relations
+- **Multiplied measures** are measures that define `has_many` relations
 
 - **Leaf measures** are measures that do not reference any other measures in
   their definition
@@ -475,11 +475,11 @@ Some extra considerations for pre-aggregation selection:
   measures and dimensions of any cubes specified in the query are checked to
   find a matching `rollup`.
 
-- `rollup` pre-aggregations **always** have priority over `originalSql`. Thus,
-  if you have both `originalSql` and `rollup` defined, Cube will try to match
-  `rollup` pre-aggregations before trying to match `originalSql`. You can
+- `rollup` pre-aggregations **always** have priority over `original_sql`. Thus,
+  if you have both `original_sql` and `rollup` defined, Cube will try to match
+  `rollup` pre-aggregations before trying to match `original_sql`. You can
   instruct Cube to use the original SQL pre-aggregations by using
-  [`useOriginalSqlPreAggregations`][ref-schema-preaggs-origsql].
+  [`use_original_sql_pre_aggregations`][ref-schema-preaggs-origsql].
 
 [ref-caching-preaggs-cubestore]:
   /caching/using-pre-aggregations#pre-aggregations-storage

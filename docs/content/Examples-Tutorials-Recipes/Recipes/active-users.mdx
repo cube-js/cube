@@ -23,7 +23,7 @@ basic metrics. For example, the WAU to MAU ratio, which we can add by using
 already defined `weeklyActiveUsers` and `monthlyActiveUsers`.
 
 To calculate daily, weekly, or monthly active users we’re going to use the
-[`rollingWindow`](https://cube.dev/docs/schema/reference/measures#parameters-rolling-window)
+[`rolling_window`](https://cube.dev/docs/schema/reference/measures#parameters-rolling-window)
 measure parameter.
 
 ```javascript
@@ -34,7 +34,7 @@ cube(`ActiveUsers`, {
     monthlyActiveUsers: {
       sql: `user_id`,
       type: `countDistinct`,
-      rollingWindow: {
+      rolling_window: {
         trailing: `30 day`,
         offset: `start`,
       },
@@ -43,7 +43,7 @@ cube(`ActiveUsers`, {
     weeklyActiveUsers: {
       sql: `user_id`,
       type: `countDistinct`,
-      rollingWindow: {
+      rolling_window: {
         trailing: `7 day`,
         offset: `start`,
       },
@@ -52,7 +52,7 @@ cube(`ActiveUsers`, {
     dailyActiveUsers: {
       sql: `user_id`,
       type: `countDistinct`,
-      rollingWindow: {
+      rolling_window: {
         trailing: `1 day`,
         offset: `start`,
       },

@@ -56,18 +56,18 @@ LEFT JOIN organizations
   ON users.organization_id = organizations.id
 `,
 
-  preAggregations: {
+  pre_aggregations: {
     main: {
       dimensions: [CUBE.id, CUBE.organizationId]
-      timeDimension: CUBE.createdAt,
-      refreshKey: {
+      time_dimension: CUBE.createdAt,
+      refresh_key: {
         every: `1 day`,
         incremental: true,
       },
       granularity: `day`,
-      partitionGranularity: `month`,
-      buildRangeStart: { sql: `SELECT DATE('2021-01-01')` },
-      buildRangeEnd: { sql: `SELECT NOW()` },
+      partition_granularity: `month`,
+      build_range_start: { sql: `SELECT DATE('2021-01-01')` },
+      build_range_end: { sql: `SELECT NOW()` },
     },
   },
 
@@ -87,7 +87,7 @@ only applies the date range to the final result of the SQL query defined in
 
 In order to do the above, we'll "push down" the predicates to the inner SQL
 query using [`FILTER_PARAMS`][ref-schema-ref-cube-filterparam] in conjunction
-with the [`buildRangeStart` and `buildRangeStart`
+with the [`build_range_start` and `build_range_end`
 properties][ref-schema-ref-preagg-buildrange]:
 
 ```javascript
@@ -130,8 +130,8 @@ LEFT JOIN organizations
 By adding `FILTER_PARAMS` to the subquery inside the `sql` property, we now
 limit the initial size of the dataset by applying the filter as early as
 possible. When the pre-aggregations are incrementally built, the same filter is
-used to apply the build ranges as defined by `buildRangeStart` and
-`buildRangeEnd`.
+used to apply the build ranges as defined by `build_range_start` and
+`build_range_end`.
 
 [ref-schema-ref-preagg-buildrange]:
   /schema/reference/pre-aggregations#parameters-build-range-start-and-build-range-end

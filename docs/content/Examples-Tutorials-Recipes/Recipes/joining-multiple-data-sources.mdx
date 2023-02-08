@@ -56,7 +56,7 @@ First, we'll define
 pre-aggregations for `Products` and `Suppliers`.
 
 ```javascript
-preAggregations: {
+pre_aggregations: {
   productsRollup: {
     type: `rollup`,
     external: true,
@@ -70,7 +70,7 @@ preAggregations: {
 ```
 
 ```javascript
-preAggregations: {
+pre_aggregations: {
   suppliersRollup: {
     type: `rollup`,
     external: true,

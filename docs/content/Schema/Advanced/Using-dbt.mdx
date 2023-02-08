@@ -64,13 +64,13 @@ asyncModule(async () => {
 cube('GithubCommitStatsCommitsCached', {
   extends: GithubCommitStatsCommits,
 
-  preAggregations: {
+  pre_aggregations: {
     main: {
       measures: [commitsCount],
       dimensions: [authorDomain, authorName],
-      timeDimension: timestamp,
+      time_dimension: timestamp,
       granularity: 'day',
-      partitionGranularity: 'year',
+      partition_granularity: 'year',
     },
   },
 });

@@ -23,7 +23,7 @@ cube(`Users`, {
 
   joins: {
     Organizations: {
-      relationship: `belongsTo`,
+      relationship: `belongs_to`,
       sql: `${Users.organization_id} = ${Organizations.id}`,
     },
   },
@@ -39,7 +39,7 @@ cube(`Users`, {
     organization_id: {
       sql: `organization_id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
 
     created_at: {
@@ -118,7 +118,7 @@ cube(`Users`, {
   joins: {
     Contacts: {
       sql: `${CUBE}.contact_id = ${Contacts.id}`,
-      relationship: `hasOne`,
+      relationship: `has_one`,
     },
   },
 
@@ -133,13 +133,13 @@ cube(`Users`, {
 });
 
 cube(`Contacts`, {
-  sql: `select * from contacts`,
+  sql: `SELECT * FROM contacts`,
 
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
     name: {
       sql: `name`,

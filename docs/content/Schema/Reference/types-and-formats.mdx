@@ -84,7 +84,8 @@ cubes:
 
 ### <--{"id" : "Measure Types"}--> boolean
 
-The `boolean` measure type can be used to condense data into a single boolean value.
+The `boolean` measure type can be used to condense data into a single boolean
+value.
 
 The example below adds an `is_completed` measure which only returns `true` if
 **all** orders have the `completed` status:
@@ -180,7 +181,7 @@ writing raw SQL, Cube.js will properly calculate counts even if your query’s
 joins will produce row multiplication. You do not need to include a `sql`
 parameter for this type.
 
-`drillMembers` parameter is commonly used with type `count`. It allows users to
+`drill_members` parameter is commonly used with type `count`. It allows users to
 click on the measure in the UI and inspect individual records that make up a
 count. [Learn more about Drill Downs][ref-drilldowns].
 
@@ -189,10 +190,10 @@ count. [Learn more about Drill Downs][ref-drilldowns].
 ```javascript
 cube('Orders', {
   measures: {
-    numberOfUsers: {
+    number_of_users: {
       type: `count`,
       // optional
-      drillMembers: [id, name, email, company],
+      drill_members: [id, name, email, company],
     },
   },
 });
@@ -202,7 +203,7 @@ cube('Orders', {
 cubes:
   - name: Orders
     measures:
-      - name: numberOfUsers
+      - name: number_of_users
         type: count
         drill_members:
           - id

@@ -19,7 +19,7 @@ To implement column-based access, we will use supplier's email from a
 [`queryRewrite`](https://cube.dev/docs/security/context#using-query-rewrite)
 extension point to manage data access.
 
-We have `Products` and `Suppliers` cubes with a `hasOne` relationship from
+We have `Products` and `Suppliers` cubes with a `has_one` relationship from
 products to suppliers:
 
 ```javascript
@@ -28,7 +28,7 @@ cube(`Products`, {
 
   joins: {
     Suppliers: {
-      relationship: `belongsTo`,
+      relationship: `belongs_to`,
       sql: `${CUBE}.supplier_id = ${Suppliers.id}`,
     },
   },
@@ -48,7 +48,7 @@ cube(`Suppliers`, {
 
   dimensions: {
     id: {
-      primaryKey: true,
+      primary_key: true,
       sql: `id`,
       type: `string`,
     },

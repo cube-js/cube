@@ -80,8 +80,7 @@ WHERE
 cubes:
   - name: Orders
     sql: >
-      SELECT *
-      FROM
+      SELECT * FROM
         orders,
         line_items
       WHERE
@@ -100,18 +99,17 @@ Dimensions represent the properties of a **single** data point in the cube.
 
 ```javascript
 cube('Orders', {
-
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       // Here we explicitly let Cube know this field is the primary key
       // This is required for de-duplicating results when using joins
-      primaryKey: true
+      primary_key: true,
     },
     status: {
       sql: `status`,
-      type: `string`
+      type: `string`,
     },
   },
 });
@@ -142,20 +140,19 @@ represented as follows:
 
 ```javascript
 cube('LineItems', {
-
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       // Again, we explicitly let Cube know this field is the primary key
       // This is required for de-duplicating results when using joins
-      primaryKey: true
+      primary_key: true,
     },
 
     order_id: {
       sql: `order_id`,
       type: `number`,
-    }
+    },
   },
 });
 ```
@@ -196,7 +193,7 @@ cube('Orders', {
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`
+      type: `time`,
     },
 
     completed_at: {
@@ -228,7 +225,7 @@ cube('LineItems', {
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`
+      type: `time`,
     },
   },
 });
@@ -290,7 +287,7 @@ cube('LineItems', {
       type: `sum`,
     },
   },
-})
+});
 ```
 
 ```yaml
@@ -327,10 +324,9 @@ In the following example, we are left-joining the `LineItems` cube onto our
 
 ```javascript
 cube('Orders', {
-
   joins: {
     LineItems: {
-      relationship: `belongsTo`,
+      relationship: `belongs_to`,
       // Here we use the `CUBE` global to refer to the current cube,
       // so the following is equivalent to `Orders.id = LineItems.order_id`
       sql: `${CUBE}.id = ${LineItems.order_id}`,
@@ -346,7 +342,7 @@ cubes:
       - name: LineItems
         # Here we use the `CUBE` global to refer to the current cube,
         # so the following is equivalent to `Orders.id = LineItems.order_id`
-        sql: "{CUBE}.id = {LineItems.order_id}"
+        sql: '{CUBE}.id = {LineItems.order_id}'
         relationship: belongs_to
 ```
 
@@ -354,9 +350,9 @@ cubes:
 
 There are three kinds of join relationships:
 
-- `belongsTo`/`belongs_to`
-- `hasOne`/`has_one`
-- `hasMany`/`has_many`
+- `belongs_to`
+- `has_one`
+- `has_many`
 
 More information can be found in the [Joins reference
 documentation][ref-schema-ref-joins-types].
@@ -376,7 +372,7 @@ following:
 cube('Orders', {
   segments: {
     only_completed: {
-      sql: `${CUBE}.status = 'completed'`
+      sql: `${CUBE}.status = 'completed'`,
     },
   },
 });
@@ -396,17 +392,17 @@ cubes:
 
 Pre-aggregations are a powerful way of caching frequently-used, expensive
 queries and keeping the cache up-to-date on a periodic basis. Within a data
-schema, they are defined under the `preAggregations` property:
+schema, they are defined under the `pre_aggregations` property:
 
 <CodeTabs>
 
 ```javascript
 cube('Orders', {
-  preAggregations: {
+  pre_aggregations: {
     main: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
-      timeDimension: CUBE.created_at,
+      time_dimension: CUBE.created_at,
       granularity: 'day',
     },
   },

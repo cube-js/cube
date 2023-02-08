@@ -1,5 +1,5 @@
 ---
-title: Using originalSql and rollup Pre-aggregations Effectively
+title: Using original_sql and rollup Pre-aggregations Effectively
 permalink: /recipes/using-originalsql-and-rollups-effectively
 category: Examples & Tutorials
 subCategory: Query acceleration
@@ -14,10 +14,11 @@ pre-aggregation builds so that they don't have to re-run the SQL query.
 ## Configuration
 
 We can do this by creating a pre-aggregation of type
-[`originalSql`][ref-schema-ref-preaggs-type-origsql] on the source (also known
+[`original_sql`][ref-schema-ref-preaggs-type-origsql] on the source (also known
 as internal) database, and then configuring our existing `rollup`
-pre-aggregations to use the `originalSql` pre-aggregation with the
-[`useOriginalSqlPreAggregations` property][ref-schema-ref-preaggs-use-origsql].
+pre-aggregations to use the `original_sql` pre-aggregation with the
+[`use_original_sql_pre_aggregations`
+property][ref-schema-ref-preaggs-use-origsql].
 
 <WarningBox>
 
@@ -30,18 +31,18 @@ ensure that your database driver is not configured with `readOnly: true`.
 cube('Orders', {
   sql: `<YOUR_EXPENSIVE_SQL_QUERY HERE>`,
 
-  preAggregations: {
+  pre_aggregations: {
     base: {
-      type: `originalSql`,
+      type: `original_sql`,
       external: false,
     },
 
     main: {
       dimensions: [CUBE.id, CUBE.name],
       measures: [CUBE.count],
-      timeDimension: CUBE.createdAt,
+      time_dimension: CUBE.createdAt,
       granularity: `day`,
-      useOriginalSqlPreAggregations: true,
+      use_original_sql_pre_aggregations: true,
     },
   },
 

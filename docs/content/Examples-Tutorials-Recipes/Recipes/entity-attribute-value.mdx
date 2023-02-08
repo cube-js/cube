@@ -26,7 +26,7 @@ cube(`Users`, {
 
   joins: {
     Orders: {
-      relationship: 'hasMany',
+      relationship: 'has_many',
       sql: `${CUBE}.id = ${Orders.userId}`,
     },
   },

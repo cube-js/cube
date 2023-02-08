@@ -132,7 +132,7 @@ cube('Events', {
     anonymousId: {
       sql: `anonymous_id`,
       type: `number`,
-      primaryKey: true
+      primary_key: true
     },
 
     timestamp: {
@@ -143,7 +143,7 @@ cube('Events', {
     eventId: {
       sql: `event_id`,
       type: `number`,
-      primaryKey: true
+      primary_key: true
     },
 
     event: {
@@ -236,13 +236,13 @@ cube('Sessions', {
     anonymousId: {
       sql: `anonymous_id`,
       type: `number`,
-      primaryKey: true
+      primary_key: true
     },
 
     sessionID: {
       sql: `session_id`,
       type: `number`,
-      primaryKey: true
+      primary_key: true
     }
   }
 });
@@ -254,9 +254,9 @@ The next step is to identify the events contained within the session and the
 events ending the session. It’s required to get metrics such as session duration
 and events per session, or to identify sessions where specific events occurred
 (we’re going to use that for funnel analysis later on). We’re going to
-[declare join](/schema/reference/joins), that Events `belongsTo` Sessions and a
-specify condition, such as all users' events from session start (inclusive) till
-the start of the next session (exclusive) belong to that session.
+[declare a join](/schema/reference/joins), that Events `belongs_to` Sessions and
+a specify condition, such as all users' events from session start (inclusive)
+till the start of the next session (exclusive) belong to that session.
 
 ```javascript
 cube('Events', {
@@ -265,7 +265,7 @@ cube('Events', {
   // Add the joins block to the Events cube
   joins: {
     Sessions: {
-      relationship: `belongsTo`,
+      relationship: `belongs_to`,
       sql: `
         ${Events.anonymousId} = ${Sessions.anonymousId}
         AND ${Events.timestamp} >= ${Sessions.startAt}
@@ -277,7 +277,8 @@ cube('Events', {
 ```
 
 To determine the end of the session, we’re going to use the
-[`subQuery` feature](/schema/fundamentals/additional-concepts#subquery) in Cube.
+[`sub_query` feature](/schema/fundamentals/additional-concepts#subquery) in
+Cube.
 
 ```javascript
 cube('Events', {
@@ -301,7 +302,7 @@ cube('Sessions', {
     endRaw: {
       sql: `${Events.lastEventTimestamp}`,
       type: `time`,
-      subQuery: true,
+      sub_query: true,
       shown: false
     },
 
@@ -354,7 +355,7 @@ cube(`Identifies`, {
 
   dimensions: {
     id: {
-      primaryKey: true,
+      primary_key: true,
       sql: `user_id || '-' || anonymous_id`,
       type: `string`,
     },
@@ -382,7 +383,7 @@ cube('Sessions', {
   // Declare this joins block in the Sessions cube
   joins: {
     Identifies: {
-      relationship: `belongsTo`,
+      relationship: `belongs_to`,
       sql: `${Identifies.anonymousId} = ${Sessions.anonymousId}`
     }
   },
@@ -437,9 +438,9 @@ on top of it.
 
 ### <--{"id" : "More metrics for Sessions"}--> Number of Events per Session
 
-This one is super easy to add with a subQuery dimension. We just calculate count
-of Events, which we already have as a measure in the Events cube, as a dimension
-in the Sessions cube.
+This one is super easy to add with a `sub_query` dimension - we simply calculate
+the count of events (which we already have as a measure in the `Events` cube) as
+a dimension in the `Sessions` cube:
 
 ```javascript
 cube('Sessions', {
@@ -447,10 +448,10 @@ cube('Sessions', {
 
   // Add following dimensions to the Sessions cube
   dimensions: {
-    numberEvents: {
+    number_events: {
       sql: `${Events.count}`,
       type: `number`,
-      subQuery: true
+      sub_query: true
     }
   },
 });
@@ -572,7 +573,7 @@ cube('Events', {
 
   // Add this measure to the Events cube
   measures: {
-    formSubmittedCount: {
+    form_submitted_count: {
       sql: `event_id`,
       type: `count`,
       filters: [
@@ -583,7 +584,7 @@ cube('Events', {
 });
 ```
 
-Define a dimension `formSubmittedCount` on the Sessions using subQuery.
+Define a dimension `form_submitted_count` on the Sessions using `sub_query`:
 
 ```javascript
 cube('Sessions', {
@@ -591,16 +592,16 @@ cube('Sessions', {
 
   // Add this dimension to the Sessions cube
   dimensions: {
-    formSubmittedCount: {
-      sql: `${EventsWIP.formSubmittedCount}`,
+    form_submitted_count: {
+      sql: `${EventsWIP.form_submitted_count}`,
       type: `number`,
-      subQuery: true
+      sub_query: true
     }
   },
 });
 ```
 
-Create a measure to count only sessions where `formSubmittedCount` is greater
+Create a measure to count only sessions where `form_submitted_count` is greater
 than 0.
 
 ```javascript
@@ -613,7 +614,7 @@ cube('Sessions', {
       type: `count`,
       sql: `session_id`,
       filters: [
-        { sql: `${formSubmittedCount} > 0` }
+        { sql: `${form_submitted_count} > 0` }
       ]
     }
 
