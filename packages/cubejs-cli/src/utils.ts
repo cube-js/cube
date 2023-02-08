@@ -44,7 +44,7 @@ export async function event(opts: BaseEvent) {
       ...opts,
       cliVersion: loadCliManifest().version,
     });
-  } catch (e) {
+  } catch (e: any) {
     internalExceptions(e);
   }
 }

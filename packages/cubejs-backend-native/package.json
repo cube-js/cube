@@ -35,7 +35,7 @@
     "cargo-cp-artifact": "^0.1",
     "jest": "^26",
     "mysql2": "^2.3.3",
-    "typescript": "~4.1.5"
+    "typescript": "~4.9.5"
   },
   "dependencies": {
     "@cubejs-backend/cubesql": "^0.31.59",

@@ -43,6 +43,6 @@
   "devDependencies": {
     "@cubejs-backend/linter": "^0.31.0",
     "@types/snowflake-sdk": "^1.6.8",
-    "typescript": "~4.1.5"
+    "typescript": "~4.9.5"
   }
 }

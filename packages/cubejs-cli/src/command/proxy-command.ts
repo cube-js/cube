@@ -49,7 +49,7 @@ export async function proxyCommand(program: CommanderStatic, command: string) {
             // eslint-disable-next-line new-cap
             const CommandInstance: Command = new OriginalCommandPackage.default(process.argv.slice(3));
             await CommandInstance.run();
-          } catch (e) {
+          } catch (e: any) {
             displayError(e.stack || e.message);
           }
         });
