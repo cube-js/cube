@@ -136,7 +136,7 @@ In the example bellow we have the following file structure:
     └── Sales
         └── Orders.js
 ```
-Then in `utils.js` files we read the environment variable and expose it. We will default the environment variable to the value `dev`.
+Then in the `utils.js` file we read the environment variable and expose it. We will default the environment variable to the value `dev`.
 ```javascript
 // in utils.js
 const environment = typeof process.env.ENVIRONMENT === 'undefined' ? 'dev' : process.env.ENVIRONMENT.toLowerCase();
