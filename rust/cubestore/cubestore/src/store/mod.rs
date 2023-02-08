@@ -17,8 +17,8 @@ extern crate bincode;
 use bincode::{deserialize_from, serialize_into};
 
 use crate::metastore::{
-    deactivate_table_on_corrupt_data, table::Table, Chunk, Column, ColumnType, IdRow, Index,
-    IndexType, MetaStore, Partition, WAL,
+    deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, table::Table, Chunk,
+    Column, ColumnType, IdRow, Index, IndexType, MetaStore, Partition, WAL,
 };
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::table::{Row, TableValue};
@@ -1158,7 +1158,16 @@ impl ChunkStore {
             remaining_rows = next;
         }
 
-        assert_eq!(remaining_rows.len(), 0);
+        if !remaining_rows.is_empty() {
+            let error_message = format!("Error while insert data into index {:?}. {} rows of incoming data can't be assigned to any partitions. Probably paritition metadata is lost", index, remaining_rows.len());
+            deactivate_table_due_to_corrupt_data(
+                self.meta_store.clone(),
+                index.get_row().table_id(),
+                error_message.clone(),
+            )
+            .await?;
+            return Err(CubeError::internal(error_message));
+        }
 
         let chunks = self.meta_store.insert_chunks(chunks_to_create).await?;
         if chunks.len() != data_for_upload.len() {
