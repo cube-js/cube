@@ -849,18 +849,6 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Athena AWS session token.
-   */
-  athenaAwsSessionToken: ({
-    dataSource
-  }: {
-    dataSource: string,
-  }) => (
-    // TODO (buntarb): this name is a common. Deprecate and replace?
-    process.env[keyByDataSource('CUBEJS_AWS_SESSION_TOKEN', dataSource)]
-  ),
-
-  /**
    * Athena AWS region.
    */
   athenaAwsRegion: ({

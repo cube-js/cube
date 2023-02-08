@@ -30,7 +30,6 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   readOnly?: boolean
   accessKeyId?: string
   secretAccessKey?: string
-  sessionToken?: string
   workGroup?: string
   catalog?: string
   schema?: string
@@ -105,10 +104,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       config.secretAccessKey ||
       getEnv('athenaAwsSecret', { dataSource });
 
-    const sessionToken =
-      config.sessionToken ||
-      getEnv('athenaAwsSessionToken', { dataSource });
-
     const { schema, ...restConfig } = config;
 
     this.schema = schema ||
@@ -118,7 +113,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     this.config = {
       ...restConfig,
       credentials: accessKeyId && secretAccessKey
-        ? { accessKeyId, secretAccessKey, sessionToken }
+        ? { accessKeyId, secretAccessKey }
         : undefined,
       region:
         config.region ||
