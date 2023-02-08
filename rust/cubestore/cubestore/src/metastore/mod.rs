@@ -1052,11 +1052,11 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn all_replay_handles_to_merge(
         &self,
     ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError>;
-    async fn update_replay_handle_failed(
+    async fn update_replay_handle_failed_if_exists(
         &self,
         id: u64,
         failed: bool,
-    ) -> Result<IdRow<ReplayHandle>, CubeError>;
+    ) -> Result<(), CubeError>;
     async fn replace_replay_handles(
         &self,
         old_ids: Vec<u64>,
@@ -3767,17 +3767,18 @@ impl MetaStore for RocksMetaStore {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    async fn update_replay_handle_failed(
+    async fn update_replay_handle_failed_if_exists(
         &self,
         id: u64,
         failed: bool,
-    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+    ) -> Result<(), CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
-            Ok(ReplayHandleRocksTable::new(db_ref.clone()).update_with_fn(
-                id,
-                |h| h.set_failed_to_persist_chunks(failed),
-                batch_pipe,
-            )?)
+            let table = ReplayHandleRocksTable::new(db_ref.clone());
+            if table.get_row(id)?.is_some() {
+                table.update_with_fn(id, |h| h.set_failed_to_persist_chunks(failed), batch_pipe)?;
+            }
+
+            Ok(())
         })
         .await
     }

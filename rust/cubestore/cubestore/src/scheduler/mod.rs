@@ -433,10 +433,9 @@ impl SchedulerImpl {
         let mut ids = Vec::new();
         for chunk in chunks_without_partitions {
             if let Some(handle_id) = chunk.get_row().replay_handle_id() {
-                let _ = self
-                    .meta_store
-                    .update_replay_handle_failed(*handle_id, true)
-                    .await;
+                self.meta_store
+                    .update_replay_handle_failed_if_exists(*handle_id, true)
+                    .await?;
             }
             ids.push(chunk.get_id());
         }

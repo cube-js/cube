@@ -310,7 +310,7 @@ impl CompactionServiceImpl {
         for (failed_chunk, _) in failed {
             if let Some(handle_id) = failed_chunk.get_row().replay_handle_id() {
                 self.meta_store
-                    .update_replay_handle_failed(*handle_id, true)
+                    .update_replay_handle_failed_if_exists(*handle_id, true)
                     .await?;
             }
             deactivate_failed_chunk_ids.push(failed_chunk.get_id());
