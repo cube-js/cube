@@ -20,6 +20,7 @@ pub enum JobType {
     FinishMultiSplit,
     RepartitionChunk,
     InMemoryChunksCompaction,
+    NodeInMemoryChunksCompaction(/*node*/ String),
 }
 
 fn get_job_type_index(j: &JobType) -> u32 {
@@ -33,6 +34,7 @@ fn get_job_type_index(j: &JobType) -> u32 {
         JobType::FinishMultiSplit => 7,
         JobType::RepartitionChunk => 8,
         JobType::InMemoryChunksCompaction => 9,
+        JobType::NodeInMemoryChunksCompaction(_) => 10,
     }
 }
 
@@ -154,7 +156,7 @@ impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
                 buf.write_u32::<BigEndian>(get_job_type_index(job_type))
                     .unwrap();
                 match job_type {
-                    JobType::TableImportCSV(l) => {
+                    JobType::TableImportCSV(l) | JobType::NodeInMemoryChunksCompaction(l) => {
                         buf.write_u64::<BigEndian>(l.len() as u64).unwrap();
                         buf.write(l.as_bytes()).unwrap();
                     }

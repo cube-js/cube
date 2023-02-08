@@ -890,9 +890,25 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
+                    log::warn!(
+                        "JobType::InMemoryChunksCompaction is deprecated and should not be used"
+                    );
                     Ok(cube_ext::spawn(async move {
                         compaction_service
                             .compact_in_memory_chunks(partition_id)
+                            .await
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::NodeInMemoryChunksCompaction(_) => {
+                if let RowKey::Table(TableId::Tables, _) = job.row_reference() {
+                    let compaction_service = self.compaction_service.clone();
+                    let node_name = self.server_name.clone();
+                    Ok(cube_ext::spawn(async move {
+                        compaction_service
+                            .compact_node_in_memory_chunks(node_name)
                             .await
                     }))
                 } else {
