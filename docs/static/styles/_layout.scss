@@ -95,6 +95,54 @@ a {
   margin-bottom: 200px;
 }
 
+.titleWrapper {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 28px;
+  padding-top: 48px;
+  margin-bottom: 24px;
+  
+  @media screen and (max-width: 576px) {
+    flex-flow: column;
+    gap: 4px;
+  }
+  
+  h1 {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.releaseNotesMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .releaseDate {
+    font-family: inherit;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 30px;
+    color: $dark-04;
+  }
+  
+  .releaseLink {
+    font-family: inherit;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 30px;
+    text-decoration: none;
+    border-bottom: none !important;
+    color: $dark-04;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: $purple;
+    }
+  }
+}
+
 .searchBoxWrapper {
   display: flex;
   justify-content: flex-start;
