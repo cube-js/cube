@@ -865,6 +865,18 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         seconds_ago: i64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
+    async fn get_partitions_for_in_memory_compaction(
+        &self,
+        node: String,
+    ) -> Result<
+        Vec<(
+            IdRow<Partition>,
+            IdRow<Index>,
+            IdRow<Table>,
+            Vec<IdRow<Chunk>>,
+        )>,
+        CubeError,
+    >;
     async fn get_chunks_without_partition_created_seconds_ago(
         &self,
         seconds_ago: i64,
@@ -2316,6 +2328,7 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn get_partition_for_compaction(
         &self,
         partition_id: u64,
@@ -2852,6 +2865,63 @@ impl MetaStore for RocksMetaStore {
             }
 
             Ok(partitions)
+        })
+        .await
+    }
+    async fn get_partitions_for_in_memory_compaction(
+        &self,
+        node: String,
+    ) -> Result<
+        Vec<(
+            IdRow<Partition>,
+            IdRow<Index>,
+            IdRow<Table>,
+            Vec<IdRow<Chunk>>,
+        )>,
+        CubeError,
+    > {
+        let config = self.store.config.clone();
+        self.read_operation_out_of_queue(move |db_ref| {
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let mut partitions_map = HashMap::new();
+            for c in chunks_table.scan_all_rows()? {
+                let c = c?;
+                if c.get_row().active() && c.get_row().in_memory() {
+                    partitions_map
+                        .entry(c.get_row().get_partition_id())
+                        .or_insert(Vec::new())
+                        .push(c);
+                }
+            }
+
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+
+            let mut result = Vec::with_capacity(partitions_map.len());
+            let index_table = IndexRocksTable::new(db_ref.clone());
+            let table_table = TableRocksTable::new(db_ref.clone());
+
+            for (id, chunks) in partitions_map.into_iter() {
+                if let Some(partition) = partitions_table.get_row(id)? {
+                    if partition.get_row().is_active()
+                        && partition.get_row().multi_partition_id.is_none()
+                        && node_name_by_partition(config.as_ref(), &partition) == node
+                    {
+                        let index = index_table
+                            .get_row(partition.get_row().get_index_id())?
+                            .ok_or(CubeError::internal(format!(
+                                "Index {} is not found for partition: {}",
+                                partition.get_row().get_index_id(),
+                                id
+                            )))?;
+                        let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
+
+                        result.push((partition, index, table, chunks));
+                    }
+                }
+            }
+
+            Ok(result)
         })
         .await
     }

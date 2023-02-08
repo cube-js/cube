@@ -24,7 +24,7 @@ use futures::future::join_all;
 use futures_timer::Delay;
 use itertools::Itertools;
 use log::error;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::broadcast::Receiver;
@@ -44,6 +44,7 @@ pub struct SchedulerImpl {
     reconcile_loop: WorkerLoop,
     chunk_processing_loop: WorkerLoop,
     chunk_events_queue: Mutex<Vec<(SystemTime, u64)>>,
+    compaction_last_sended: Mutex<HashMap<String, SystemTime>>,
 }
 
 crate::di_service!(SchedulerImpl, []);
@@ -59,6 +60,15 @@ impl SchedulerImpl {
         let cancel_token = CancellationToken::new();
         let gc_queue = DeadlineQueue::new(config.gc_loop_interval(), cancel_token.clone());
 
+        let mut workers = config.select_workers().clone();
+        if workers.is_empty() {
+            workers.push(config.server_name().clone());
+        }
+        let workers = workers
+            .into_iter()
+            .map(|n| (n, SystemTime::now()))
+            .collect::<HashMap<_, _>>();
+
         Self {
             meta_store,
             cluster,
@@ -69,6 +79,7 @@ impl SchedulerImpl {
             gc_queue,
             reconcile_loop: WorkerLoop::new("Reconcile"),
             chunk_events_queue: Mutex::new(Vec::with_capacity(1000)),
+            compaction_last_sended: Mutex::new(workers),
             chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
         }
     }
@@ -507,10 +518,14 @@ impl SchedulerImpl {
             // TODO config
             .get_partitions_with_chunks_created_seconds_ago(60)
             .await?;
+        let mut nodes_for_in_memory_compactions = HashSet::new();
         for p in partition_compaction_candidates_id {
-            self.schedule_compaction_in_memory_chunks_if_needed(&p)
-                .await?;
+            let node_name = self.cluster.node_name_by_partition(&p);
+            nodes_for_in_memory_compactions.insert(node_name);
             self.schedule_compaction_if_needed(&p).await?;
+        }
+        for node in nodes_for_in_memory_compactions {
+            self.schedule_node_in_memory_compaction(node).await?;
         }
         Ok(())
     }
@@ -895,16 +910,12 @@ impl SchedulerImpl {
                 .get_partitions_out_of_queue(partition_ids)
                 .await?;
             let mut futures = Vec::with_capacity(partitions.len());
+            let mut nodes_for_in_memory_compactions = HashSet::new();
             for partition in partitions.into_iter() {
                 if partition.get_row().is_active() {
                     if *partition_ids_map.get(&partition.get_id()).unwrap_or(&false) {
-                        let self_to_move = self.clone();
-                        let partition_to_move = partition.clone();
-                        futures.push(cube_ext::spawn(async move {
-                            self_to_move
-                                .schedule_compaction_in_memory_chunks_if_needed(&partition_to_move)
-                                .await
-                        }));
+                        let node_name = self.cluster.node_name_by_partition(&partition);
+                        nodes_for_in_memory_compactions.insert(node_name);
                     }
                     let partition_to_move = partition.clone();
                     let self_to_move = self.clone();
@@ -924,6 +935,11 @@ impl SchedulerImpl {
                     }));
                 }
             }
+
+            for node in nodes_for_in_memory_compactions {
+                self.schedule_node_in_memory_compaction(node).await?;
+            }
+
             join_all(futures)
                 .await
                 .into_iter()
@@ -1188,6 +1204,36 @@ impl SchedulerImpl {
             self.cluster.notify_job_runner(node).await?;
         }
         Ok(())
+    }
+
+    pub async fn schedule_node_in_memory_compaction(&self, node: String) -> Result<(), CubeError> {
+        let mut compaction_last_sended = self.compaction_last_sended.lock().await;
+        if let Some(last_sended) = compaction_last_sended.get_mut(&node) {
+            if last_sended
+                .elapsed()
+                .ok()
+                .map_or(false, |d| d > Duration::from_secs(10))
+            {
+                let job = self
+                    .meta_store
+                    .add_job(Job::new(
+                        RowKey::Table(TableId::Tables, 0),
+                        JobType::NodeInMemoryChunksCompaction(node.clone()),
+                        node.clone(),
+                    ))
+                    .await?;
+                if job.is_some() {
+                    self.cluster.notify_job_runner(node).await?;
+                    *last_sended = SystemTime::now();
+                }
+            }
+            Ok(())
+        } else {
+            Err(CubeError::internal(format!(
+                "schedule_node_in_memory_compaction: undefined node {}",
+                node
+            )))
+        }
     }
 
     async fn schedule_partition_warmup(
