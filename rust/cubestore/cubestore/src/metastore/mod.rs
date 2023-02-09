@@ -3204,18 +3204,20 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip(self, chunks))]
     async fn insert_chunks(&self, chunks: Vec<Chunk>) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.write_operation(move |db_ref, batch_pipe| {
-            let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
-            let mut result = Vec::with_capacity(chunks.len());
+        let mut result = Vec::with_capacity(chunks.len());
 
-            for chunk in chunks.into_iter() {
-                let id_row = rocks_chunk.insert(chunk, batch_pipe)?;
-                result.push(id_row);
-            }
+        for chunk in chunks.into_iter() {
+            let id_row = self
+                .write_operation(move |db_ref, batch_pipe| {
+                    let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
+                    let id_row = rocks_chunk.insert(chunk, batch_pipe)?;
 
-            Ok(result)
-        })
-        .await
+                    Ok(id_row)
+                })
+                .await?;
+            result.push(id_row);
+        }
+        Ok(result)
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
