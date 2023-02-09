@@ -2980,7 +2980,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let rocks_partition = PartitionRocksTable::new(db_ref);
             // TODO iterate over range
             Ok(rocks_partition
