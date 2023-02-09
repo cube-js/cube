@@ -1084,14 +1084,24 @@ mod tests {
 pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
 
 impl ChunkStore {
-    #[tracing::instrument(level = "trace", skip(self, columns))]
     async fn partition_rows(
         &self,
         index_id: u64,
-        mut columns: Vec<ArrayRef>,
+        columns: Vec<ArrayRef>,
         in_memory: bool,
     ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
         let index = self.meta_store.get_index(index_id).await?;
+        self.partition_rows_for_index(&index, columns, in_memory)
+            .await
+    }
+    #[tracing::instrument(level = "trace", skip(self, columns))]
+    async fn partition_rows_for_index(
+        &self,
+        index: &IdRow<Index>,
+        mut columns: Vec<ArrayRef>,
+        in_memory: bool,
+    ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
+        let index_id = index.get_id();
         let partitions = self
             .meta_store
             .get_active_partitions_by_index_id(index_id)
@@ -1334,7 +1344,7 @@ impl ChunkStore {
             .await?;
             let remapped = remapped?;
             rows = rows_again;
-            futures.push(self.partition_rows(index.get_id(), remapped, in_memory));
+            futures.push(self.partition_rows_for_index(&index, remapped, in_memory));
         }
 
         let new_chunks = join_all(futures)
