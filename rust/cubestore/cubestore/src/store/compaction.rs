@@ -210,16 +210,9 @@ impl CompactionServiceImpl {
         let mut count = 0;
         let mut start = 0;
 
-        let ratio_threshold = self.config.compaction_in_memory_chunks_ratio_threshold();
-        let ratio_check_threshold = self
-            .config
-            .compaction_in_memory_chunks_ratio_check_threshold();
         for chunk in chunks.iter() {
             if count > 0 {
-                let chunk_size = chunk.get_row().get_row_count();
-                if (chunk_size > ratio_check_threshold && chunk_size > size * ratio_threshold)
-                    || size >= compaction_in_memory_chunks_size_limit
-                {
+                if size >= compaction_in_memory_chunks_size_limit {
                     if count > 1 {
                         compact_groups.push((start, start + count));
                         start = start + count;
