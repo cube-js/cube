@@ -3961,7 +3961,7 @@ impl MetaStore for RocksMetaStore {
     async fn all_replay_handles_to_merge(
         &self,
     ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let all_replay_handles = ReplayHandleRocksTable::new(db_ref.clone()).all_rows()?;
             let chunks_table = ChunkRocksTable::new(db_ref);
             let mut result = Vec::new();
