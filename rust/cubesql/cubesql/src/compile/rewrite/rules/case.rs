@@ -6,13 +6,14 @@ use crate::{
     compile::{
         engine::provider::CubeContext,
         rewrite::{
-            aggr_aggr_expr_empty_tail, case_expr_else_expr, case_expr_expr, case_expr_replacer,
-            case_expr_var_arg, case_expr_when_then_expr, case_expr_when_then_expr_empty_tail,
-            column_expr, cube_scan_members, group_aggregate_split_replacer,
-            group_expr_split_replacer, inner_aggregate_split_replacer, is_not_null_expr,
-            is_null_expr, literal_expr, member_replacer, outer_aggregate_split_replacer, rewrite,
-            rewriter::RewriteRules, transforming_rewrite, CaseExprReplacerAliasToCube,
-            InnerAggregateSplitReplacerAliasToCube, LogicalPlanAnalysis, LogicalPlanLanguage,
+            aggr_aggr_expr_empty_tail, aggr_group_expr, aggr_group_expr_empty_tail,
+            case_expr_else_expr, case_expr_expr, case_expr_replacer, case_expr_var_arg,
+            case_expr_when_then_expr, case_expr_when_then_expr_empty_tail, column_expr,
+            group_aggregate_split_replacer, group_expr_split_replacer,
+            inner_aggregate_split_replacer, is_not_null_expr, is_null_expr, literal_expr,
+            outer_aggregate_split_replacer, rewrite, rewriter::RewriteRules, transforming_rewrite,
+            CaseExprReplacerAliasToCube, InnerAggregateSplitReplacerAliasToCube,
+            LogicalPlanAnalysis, LogicalPlanLanguage,
         },
     },
     var, var_iter,
@@ -83,162 +84,87 @@ impl RewriteRules for CaseRules {
                 case_expr_replacer("?expr", "?alias_to_cube"),
             ),
             // Cube scan members pushdowns -- adds or drops members
+            // TODO replace aggr_group_expr with appropriate list type based InnerAggregateSplitReplacer type
             rewrite(
                 "case-expr-expr-push-down-cube-scan-members",
-                cube_scan_members(
-                    member_replacer(
-                        case_expr_replacer(
-                            case_expr_var_arg(
-                                case_expr_expr(Some("?expr".to_string())),
-                                "?when_then",
-                                "?else",
-                            ),
-                            "?case_alias_to_cube",
-                        ),
-                        "?member_alias_to_cube",
-                        "?aliases",
+                case_expr_replacer(
+                    case_expr_var_arg(
+                        case_expr_expr(Some("?expr".to_string())),
+                        "?when_then",
+                        "?else",
                     ),
-                    "?members_tail",
+                    "?case_alias_to_cube",
                 ),
-                cube_scan_members(
-                    member_replacer(
-                        case_expr_replacer("?expr", "?case_alias_to_cube"),
-                        "?member_alias_to_cube",
-                        "?aliases",
-                    ),
-                    cube_scan_members(
-                        member_replacer(
-                            case_expr_replacer(
-                                case_expr_var_arg(case_expr_expr(None), "?when_then", "?else"),
-                                "?case_alias_to_cube",
-                            ),
-                            "?member_alias_to_cube",
-                            "?aliases",
-                        ),
-                        "?members_tail",
+                aggr_group_expr(
+                    case_expr_replacer("?expr", "?case_alias_to_cube"),
+                    case_expr_replacer(
+                        case_expr_var_arg(case_expr_expr(None), "?when_then", "?else"),
+                        "?case_alias_to_cube",
                     ),
                 ),
             ),
             rewrite(
                 "case-expr-when-then-expr-push-down-cube-scan-members",
-                cube_scan_members(
-                    member_replacer(
-                        case_expr_replacer(
-                            case_expr_var_arg(
-                                case_expr_expr(None),
-                                case_expr_when_then_expr(
-                                    "?when",
-                                    case_expr_when_then_expr("?then", "?when_then_tail"),
-                                ),
-                                "?else",
-                            ),
-                            "?case_alias_to_cube",
+                case_expr_replacer(
+                    case_expr_var_arg(
+                        case_expr_expr(None),
+                        case_expr_when_then_expr(
+                            "?when",
+                            case_expr_when_then_expr("?then", "?when_then_tail"),
                         ),
-                        "?member_alias_to_cube",
-                        "?aliases",
+                        "?else",
                     ),
-                    "?members_tail",
+                    "?case_alias_to_cube",
                 ),
-                cube_scan_members(
-                    member_replacer(
-                        case_expr_replacer("?when", "?case_alias_to_cube"),
-                        "?member_alias_to_cube",
-                        "?aliases",
-                    ),
-                    cube_scan_members(
-                        member_replacer(
-                            case_expr_replacer("?then", "?case_alias_to_cube"),
-                            "?member_alias_to_cube",
-                            "?aliases",
-                        ),
-                        cube_scan_members(
-                            member_replacer(
-                                case_expr_replacer(
-                                    case_expr_var_arg(
-                                        case_expr_expr(None),
-                                        "?when_then_tail",
-                                        "?else",
-                                    ),
-                                    "?case_alias_to_cube",
-                                ),
-                                "?member_alias_to_cube",
-                                "?aliases",
-                            ),
-                            "?members_tail",
+                aggr_group_expr(
+                    case_expr_replacer("?when", "?case_alias_to_cube"),
+                    aggr_group_expr(
+                        case_expr_replacer("?then", "?case_alias_to_cube"),
+                        case_expr_replacer(
+                            case_expr_var_arg(case_expr_expr(None), "?when_then_tail", "?else"),
+                            "?case_alias_to_cube",
                         ),
                     ),
                 ),
             ),
             rewrite(
                 "case-expr-else-expr-push-down-cube-scan-members",
-                cube_scan_members(
-                    member_replacer(
-                        case_expr_replacer(
-                            case_expr_var_arg(
-                                case_expr_expr(None),
-                                case_expr_when_then_expr_empty_tail(),
-                                case_expr_else_expr(Some("?else".to_string())),
-                            ),
-                            "?case_alias_to_cube",
-                        ),
-                        "?member_alias_to_cube",
-                        "?aliases",
+                case_expr_replacer(
+                    case_expr_var_arg(
+                        case_expr_expr(None),
+                        case_expr_when_then_expr_empty_tail(),
+                        case_expr_else_expr(Some("?else".to_string())),
                     ),
-                    "?members_tail",
+                    "?case_alias_to_cube",
                 ),
-                cube_scan_members(
-                    member_replacer(
-                        case_expr_replacer("?else", "?case_alias_to_cube"),
-                        "?member_alias_to_cube",
-                        "?aliases",
-                    ),
-                    cube_scan_members(
-                        member_replacer(
-                            case_expr_replacer(
-                                case_expr_var_arg(
-                                    case_expr_expr(None),
-                                    case_expr_when_then_expr_empty_tail(),
-                                    case_expr_else_expr(None),
-                                ),
-                                "?case_alias_to_cube",
-                            ),
-                            "?member_alias_to_cube",
-                            "?aliases",
+                aggr_group_expr(
+                    case_expr_replacer("?else", "?case_alias_to_cube"),
+                    case_expr_replacer(
+                        case_expr_var_arg(
+                            case_expr_expr(None),
+                            case_expr_when_then_expr_empty_tail(),
+                            case_expr_else_expr(None),
                         ),
-                        "?members_tail",
+                        "?case_alias_to_cube",
                     ),
                 ),
             ),
             rewrite(
                 "case-empty-push-down-cube-scan-members",
-                cube_scan_members(
-                    member_replacer(
-                        case_expr_replacer(
-                            case_expr_var_arg(
-                                case_expr_expr(None),
-                                case_expr_when_then_expr_empty_tail(),
-                                case_expr_else_expr(None),
-                            ),
-                            "?case_alias_to_cube",
-                        ),
-                        "?member_alias_to_cube",
-                        "?aliases",
+                case_expr_replacer(
+                    case_expr_var_arg(
+                        case_expr_expr(None),
+                        case_expr_when_then_expr_empty_tail(),
+                        case_expr_else_expr(None),
                     ),
-                    "?members_tail",
+                    "?case_alias_to_cube",
                 ),
-                "?members_tail".to_string(),
+                aggr_group_expr_empty_tail(),
             ),
             rewrite(
                 "case-literal-push-down-cube-scan-members",
-                cube_scan_members(
-                    member_replacer(
-                        case_expr_replacer(literal_expr("?literal"), "?case_alias_to_cube"),
-                        "?member_alias_to_cube",
-                        "?aliases",
-                    ),
-                    "?members_tail",
-                ),
-                "?members_tail".to_string(),
+                case_expr_replacer(literal_expr("?literal"), "?case_alias_to_cube"),
+                aggr_group_expr_empty_tail(),
             ),
         ]
     }

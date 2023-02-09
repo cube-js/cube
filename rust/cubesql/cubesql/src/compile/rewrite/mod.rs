@@ -57,6 +57,7 @@ crate::plan_to_language! {
             input: Arc<LogicalPlan>,
             schema: DFSchemaRef,
             alias: Option<String>,
+            split: bool,
         },
         Filter {
             predicate: Expr,
@@ -72,6 +73,7 @@ crate::plan_to_language! {
             group_expr: Vec<Expr>,
             aggr_expr: Vec<Expr>,
             schema: DFSchemaRef,
+            split: bool,
         },
         Sort {
             exp: Vec<Expr>,
@@ -245,6 +247,10 @@ crate::plan_to_language! {
             aliases: Option<Vec<(String, String)>>,
             split: bool,
             can_pushdown_join: bool,
+        },
+        AllMembers {
+            cube: String,
+            alias: String,
         },
         Distinct {
             input: Arc<LogicalPlan>,
@@ -652,8 +658,13 @@ fn limit(skip: impl Display, fetch: impl Display, input: impl Display) -> String
     format!("(Limit {} {} {})", skip, fetch, input)
 }
 
-fn aggregate(input: impl Display, group: impl Display, aggr: impl Display) -> String {
-    format!("(Aggregate {} {} {})", input, group, aggr)
+fn aggregate(
+    input: impl Display,
+    group: impl Display,
+    aggr: impl Display,
+    split: impl Display,
+) -> String {
+    format!("(Aggregate {} {} {} {})", input, group, aggr, split)
 }
 
 fn aggr_aggr_expr(left: impl Display, right: impl Display) -> String {
@@ -838,8 +849,13 @@ fn literal_bool(literal_bool: bool) -> String {
     format!("(LiteralExpr LiteralExprValue:b:{})", literal_bool)
 }
 
-fn projection(expr: impl Display, input: impl Display, alias: impl Display) -> String {
-    format!("(Projection {} {} {})", expr, input, alias)
+fn projection(
+    expr: impl Display,
+    input: impl Display,
+    alias: impl Display,
+    split: impl Display,
+) -> String {
+    format!("(Projection {} {} {} {})", expr, input, alias, split)
 }
 
 fn sort(expr: impl Display, input: impl Display) -> String {
@@ -995,6 +1011,10 @@ fn cube_scan_members_empty_tail() -> String {
     format!("CubeScanMembers")
 }
 
+fn all_members(cube: impl Display, alias: impl Display) -> String {
+    format!("(AllMembers {} {})", cube, alias)
+}
+
 fn cube_scan_filters(left: impl Display, right: impl Display) -> String {
     format!("(CubeScanFilters {} {})", left, right)
 }
@@ -1016,11 +1036,15 @@ fn order(member: impl Display, asc: impl Display) -> String {
 }
 
 fn filter_op(filters: impl Display, op: impl Display) -> String {
-    format!("(FilterOp {} FilterOpOp:{})", filters, op)
+    format!("(FilterOp {} {})", filters, op)
 }
 
 fn filter_op_filters(left: impl Display, right: impl Display) -> String {
     format!("(FilterOpFilters {} {})", left, right)
+}
+
+fn filter_op_filters_empty_tail() -> String {
+    format!("FilterOpFilters")
 }
 
 fn filter_member(member: impl Display, op: impl Display, values: impl Display) -> String {

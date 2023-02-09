@@ -8,10 +8,10 @@ use crate::{
             column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail,
             cube_scan_members, dimension_expr, expr_column_name, filter,
             filter_cast_unwrap_replacer, filter_member, filter_op, filter_op_filters,
-            filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
-            is_null_expr, like_expr, limit, list_expr, literal_bool, literal_expr, literal_int,
-            literal_string, measure_expr, member_name_by_alias, negative_expr, not_expr,
-            projection, rewrite,
+            filter_op_filters_empty_tail, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
+            is_not_null_expr, is_null_expr, like_expr, limit, list_expr, literal_bool,
+            literal_expr, literal_int, literal_string, measure_expr, member_name_by_alias,
+            negative_expr, not_expr, projection, rewrite,
             rewriter::RewriteRules,
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_chain_rewrite,
@@ -139,8 +139,16 @@ impl RewriteRules for FilterRules {
             // TODO: Find a better solution how to drop filter node at all once
             rewrite(
                 "push-down-filter-projection",
-                filter(literal_bool(true), projection("?expr", "?input", "?alias")),
-                projection("?expr", filter(literal_bool(true), "?input"), "?alias"),
+                filter(
+                    literal_bool(true),
+                    projection("?expr", "?input", "?alias", "?projection_split"),
+                ),
+                projection(
+                    "?expr",
+                    filter(literal_bool(true), "?input"),
+                    "?alias",
+                    "?projection_split",
+                ),
             ),
             rewrite(
                 "swap-limit-filter",
@@ -183,8 +191,17 @@ impl RewriteRules for FilterRules {
             ),
             transforming_rewrite(
                 "limit-push-down-projection",
-                limit("?skip", "?fetch", projection("?expr", "?input", "?alias")),
-                projection("?expr", limit("?skip", "?fetch", "?input"), "?alias"),
+                limit(
+                    "?skip",
+                    "?fetch",
+                    projection("?expr", "?input", "?alias", "?projection_split"),
+                ),
+                projection(
+                    "?expr",
+                    limit("?skip", "?fetch", "?input"),
+                    "?alias",
+                    "?projection_split",
+                ),
                 self.push_down_limit_projection("?input"),
             ),
             // Limit to top node
@@ -208,6 +225,7 @@ impl RewriteRules for FilterRules {
                         ),
                     ),
                     "?alias",
+                    "?projection_split",
                 ),
                 limit(
                     "?limit_skip",
@@ -226,6 +244,7 @@ impl RewriteRules for FilterRules {
                             "?can_pushdown_join",
                         ),
                         "?alias",
+                        "?projection_split",
                     ),
                 ),
             ),
@@ -316,6 +335,46 @@ impl RewriteRules for FilterRules {
                 ),
                 change_user_member("?user"),
                 self.transform_change_user_eq("?column", "?literal", "?user"),
+            ),
+            transforming_rewrite(
+                "join-field-filter-eq",
+                filter_replacer(
+                    binary_expr(
+                        column_expr("?column_left"),
+                        "=",
+                        column_expr("?column_right"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                // TODO worth introducing always true filter member
+                filter_op(filter_op_filters_empty_tail(), "FilterOpOp:and"),
+                self.transform_join_field(
+                    "?column_left",
+                    "?column_right",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            transforming_rewrite(
+                "join-field-filter-is-null",
+                filter_replacer(
+                    is_null_expr(column_expr("?column")),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                // TODO worth introducing always true filter member
+                // TODO we might want actually return always false here in case actual check conflicts with previous rule
+                filter_op(filter_op_filters_empty_tail(), "FilterOpOp:and"),
+                self.transform_join_field_is_null(
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
             ),
             transforming_rewrite(
                 "in-filter-equal",
@@ -638,7 +697,7 @@ impl RewriteRules for FilterRules {
                         filter_replacer("?left", "?alias_to_cube", "?members", "?filter_aliases"),
                         filter_replacer("?right", "?alias_to_cube", "?members", "?filter_aliases"),
                     ),
-                    "and",
+                    "FilterOpOp:and",
                 ),
             ),
             rewrite(
@@ -654,7 +713,7 @@ impl RewriteRules for FilterRules {
                         filter_replacer("?left", "?alias_to_cube", "?members", "?filter_aliases"),
                         filter_replacer("?right", "?alias_to_cube", "?members", "?filter_aliases"),
                     ),
-                    "or",
+                    "FilterOpOp:or",
                 ),
             ),
             // Unwrap lower for case-insensitive operators
@@ -2019,7 +2078,7 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-flatten-upper-and-left",
                 cube_scan_filters(
-                    filter_op(filter_op_filters("?left", "?right"), "and"),
+                    filter_op(filter_op_filters("?left", "?right"), "FilterOpOp:and"),
                     "?tail",
                 ),
                 cube_scan_filters(cube_scan_filters("?left", "?right"), "?tail"),
@@ -2028,7 +2087,7 @@ impl RewriteRules for FilterRules {
                 "filter-flatten-upper-and-right",
                 cube_scan_filters(
                     "?tail",
-                    filter_op(filter_op_filters("?left", "?right"), "and"),
+                    filter_op(filter_op_filters("?left", "?right"), "FilterOpOp:and"),
                 ),
                 cube_scan_filters("?tail", cube_scan_filters("?left", "?right")),
             ),
@@ -2042,10 +2101,58 @@ impl RewriteRules for FilterRules {
                 cube_scan_filters("?tail", filter_op_filters("?left", "?right")),
                 cube_scan_filters("?tail", cube_scan_filters("?left", "?right")),
             ),
-            filter_flatten_rewrite_left("or"),
-            filter_flatten_rewrite_right("or"),
-            filter_flatten_rewrite_left("and"),
-            filter_flatten_rewrite_right("and"),
+            rewrite(
+                "filter-flatten-op-left",
+                filter_op(
+                    filter_op_filters(filter_op("?filters", "?op"), "?tail"),
+                    "?op",
+                ),
+                filter_op(filter_op_filters("?filters", "?tail"), "?op"),
+            ),
+            rewrite(
+                "filter-flatten-op-right",
+                filter_op(
+                    filter_op_filters("?tail", filter_op("?filters", "?op")),
+                    "?op",
+                ),
+                filter_op(filter_op_filters("?tail", "?filters"), "?op"),
+            ),
+            transforming_rewrite(
+                "filter-flatten-empty-filter-op-left",
+                filter_op(
+                    filter_op_filters(filter_op("?filter_ops_filters", "?op"), "?tail"),
+                    "?outer_op",
+                ),
+                filter_op(
+                    filter_op_filters(filter_op_filters_empty_tail(), "?tail"),
+                    "?outer_op",
+                ),
+                self.is_empty_filter_ops_filters("?filter_ops_filters"),
+            ),
+            transforming_rewrite(
+                "filter-flatten-empty-filter-op-right",
+                filter_op(
+                    filter_op_filters("?tail", filter_op("?filter_ops_filters", "?op")),
+                    "?outer_op",
+                ),
+                filter_op(
+                    filter_op_filters("?tail", filter_op_filters_empty_tail()),
+                    "?outer_op",
+                ),
+                self.is_empty_filter_ops_filters("?filter_ops_filters"),
+            ),
+            transforming_rewrite(
+                "filter-flatten-empty-filter-op-left-cube-scan-filters",
+                cube_scan_filters(filter_op("?filter_ops_filters", "?op"), "?tail"),
+                cube_scan_filters(cube_scan_filters_empty_tail(), "?tail"),
+                self.is_empty_filter_ops_filters("?filter_ops_filters"),
+            ),
+            transforming_rewrite(
+                "filter-flatten-empty-filter-op-right-cube-scan-filters",
+                cube_scan_filters("?tail", filter_op("?filter_ops_filters", "?op")),
+                cube_scan_filters("?tail", cube_scan_filters_empty_tail()),
+                self.is_empty_filter_ops_filters("?filter_ops_filters"),
+            ),
             // TODO changes filter ordering which fail tests
             // rewrite(
             //     "filter-commute",
@@ -2059,7 +2166,7 @@ impl RewriteRules for FilterRules {
                         filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
                         filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
                     ),
-                    "and",
+                    "FilterOpOp:and",
                 ),
                 filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
                 self.merge_date_range("?date_range_start", "?date_range_end", "?date_range"),
@@ -2071,14 +2178,14 @@ impl RewriteRules for FilterRules {
                         filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
                         filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
                     ),
-                    "and",
+                    "FilterOpOp:and",
                 ),
                 filter_op(
                     filter_op_filters(
                         filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
                         filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
                     ),
-                    "and",
+                    "FilterOpOp:and",
                 ),
             ),
             rewrite(
@@ -2704,6 +2811,86 @@ impl FilterRules {
                     );
 
                     return true;
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_join_field(
+        &self,
+        column_left_var: &'static str,
+        column_right_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_left_var = var!(column_left_var);
+        let column_right_var = var!(column_right_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+                if let Some((left_member_name, _)) = Self::filter_member_name(
+                    egraph,
+                    subst,
+                    &meta_context,
+                    alias_to_cube_var,
+                    column_left_var,
+                    members_var,
+                    &aliases,
+                ) {
+                    if left_member_name.ends_with(".__cubeJoinField") {
+                        if let Some((right_member_name, _)) = Self::filter_member_name(
+                            egraph,
+                            subst,
+                            &meta_context,
+                            alias_to_cube_var,
+                            column_right_var,
+                            members_var,
+                            &aliases,
+                        ) {
+                            if right_member_name.ends_with("__cubeJoinField") {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_join_field_is_null(
+        &self,
+        column_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = var!(column_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let meta_context = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+                if let Some((left_member_name, _)) = Self::filter_member_name(
+                    egraph,
+                    subst,
+                    &meta_context,
+                    alias_to_cube_var,
+                    column_var,
+                    members_var,
+                    &aliases,
+                ) {
+                    if left_member_name.ends_with(".__cubeJoinField") {
+                        return true;
+                    }
                 }
             }
 
@@ -3513,6 +3700,20 @@ impl FilterRules {
         }
     }
 
+    fn is_empty_filter_ops_filters(
+        &self,
+        filter_ops_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let filter_ops_var = var!(filter_ops_var);
+        move |egraph, subst| {
+            if let Some(true) = egraph[subst[filter_ops_var]].data.is_empty_list.clone() {
+                return true;
+            }
+
+            false
+        }
+    }
+
     fn merge_date_range(
         &self,
         date_range_start_var: &'static str,
@@ -3830,38 +4031,6 @@ impl FilterRules {
             true
         }
     }
-}
-
-fn filter_flatten_rewrite_left(
-    op: impl Display + Copy,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
-    rewrite(
-        &format!("filter-flatten-{}-left", op),
-        filter_op(
-            filter_op_filters(filter_op(filter_op_filters("?left", "?right"), op), "?tail"),
-            op,
-        ),
-        filter_op(
-            filter_op_filters(filter_op_filters("?left", "?right"), "?tail"),
-            op,
-        ),
-    )
-}
-
-fn filter_flatten_rewrite_right(
-    op: impl Display + Copy,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
-    rewrite(
-        &format!("filter-flatten-{}-right", op),
-        filter_op(
-            filter_op_filters("?tail", filter_op(filter_op_filters("?left", "?right"), op)),
-            op,
-        ),
-        filter_op(
-            filter_op_filters("?tail", filter_op_filters("?left", "?right")),
-            op,
-        ),
-    )
 }
 
 fn filter_unwrap_cast_push_down(
