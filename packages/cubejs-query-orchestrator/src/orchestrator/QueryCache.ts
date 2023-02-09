@@ -531,6 +531,10 @@ export class QueryCache {
         `SQL_QUERY_EXT_${this.redisPrefix}`,
         this.options.externalDriverFactory,
         (client, q) => {
+          if (q.tablesSchema) {
+            return client.tablesSchema();
+          }
+
           this.logger('Executing SQL', {
             ...q
           });
@@ -974,8 +978,8 @@ export class QueryCache {
     return this.cacheDriver.testConnection();
   }
   
-  public async fetchSchema(dataSource: string) {
-    const queue = await this.getQueue(dataSource);
+  public async fetchSchema(dataSource?: string, isExternalQuery?: boolean) {
+    const queue = !isExternalQuery ? await this.getQueue(dataSource) : await this.getExternalQueue();
     return queue.executeQueryInQueue('query', [`Fetch schema for ${dataSource}`, []], { tablesSchema: true });
   }
 }

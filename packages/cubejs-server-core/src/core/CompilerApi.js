@@ -240,6 +240,14 @@ export class CompilerApi {
       })
     );
 
+    if (orchestratorApi.options?.externalDriverFactory) {
+      dataSources.push({
+        dataSource: 'externalDb',
+        dbType: this.options.externalDbType || '',
+        isExternal: true,
+      });
+    }
+
     return {
       dataSources: dataSources.filter((source) => source),
     };

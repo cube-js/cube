@@ -181,6 +181,14 @@ export class AdapterApiMock {
 
   public $testOrchestratorConnectionsDone: boolean = false;
 
+  public options = {
+    externalDriverFactory: () => ({
+      wrapQueryWithLimit(query: { query: string; limit: number }) {
+        query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
+      },
+    })
+  };
+
   public async testConnection() {
     this.$testConnectionsDone = true;
 
