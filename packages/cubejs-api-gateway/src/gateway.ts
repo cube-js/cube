@@ -78,7 +78,7 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
-import { shouldAddLimit } from './helpers/shouldAddLimit';
+import { shouldAddLimit, isQueryAllowed } from './helpers/sqlQueryHandler';
 import {
   transformCube,
   transformMeasure,
@@ -382,13 +382,18 @@ class ApiGateway {
         }
       );
       
-      app.post('/cubejs-system/v1/db-schema', jsonParser, systemMiddlewares, (async (req: Request, res: Response) => {
-        await this.dbSchema({
-          query: req.body.query,
-          context: req.context,
-          res: this.resToResultFn(res),
-        });
-      }));
+      app.post(
+        '/cubejs-system/v1/db-schema',
+        jsonParser,
+        sqlRunnerMiddlewares,
+        async (req: Request, res: Response) => {
+          await this.dbSchema({
+            query: req.body.query,
+            context: req.context,
+            res: this.resToResultFn(res),
+          });
+        }
+      );
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -1078,7 +1083,7 @@ class ApiGateway {
           );
         }
 
-        if (query.limit > getEnv('dbQueryDefaultLimit')) {
+        if (query.limit > getEnv('dbQueryLimit')) {
           throw new UserError('The query limit has been exceeded');
         }
   
@@ -2129,6 +2134,14 @@ class ApiGateway {
           !req.context?.securityContext?.scope.includes('sql-runner'))
         ) {
           throw new CubejsHandlerError(403, 'Forbidden', 'Sql-runner scope is missing.');
+        }
+
+        if (
+          !getEnv('devMode') &&
+          req.body?.query?.query &&
+          !isQueryAllowed(req.body?.query?.query, req.context?.securityContext?.scope)
+        ) {
+          throw new CubejsHandlerError(403, 'Forbidden', 'No permission to execute this query');
         }
       },
       req,
