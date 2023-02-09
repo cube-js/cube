@@ -654,7 +654,7 @@ impl SchedulerImpl {
             if chunk.get_row().in_memory() {
                 let partition = self
                     .meta_store
-                    .get_partition(chunk.get_row().get_partition_id())
+                    .get_partition_out_of_queue(chunk.get_row().get_partition_id())
                     .await?;
                 let node_name = self.cluster.node_name_by_partition(&partition);
                 self.cluster

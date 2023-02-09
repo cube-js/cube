@@ -797,6 +797,10 @@ pub trait MetaStore: DIService + Send + Sync {
     fn partition_table(&self) -> PartitionMetaStoreTable;
     async fn create_partition(&self, partition: Partition) -> Result<IdRow<Partition>, CubeError>;
     async fn get_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
+    async fn get_partition_out_of_queue(
+        &self,
+        partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError>;
     async fn get_partition_for_compaction(
         &self,
         partition_id: u64,
@@ -2265,6 +2269,17 @@ impl MetaStore for RocksMetaStore {
     #[tracing::instrument(level = "trace", skip(self))]
     async fn get_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError> {
         self.read_operation(move |db_ref| {
+            PartitionRocksTable::new(db_ref).get_row_or_not_found(partition_id)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_partition_out_of_queue(
+        &self,
+        partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
             PartitionRocksTable::new(db_ref).get_row_or_not_found(partition_id)
         })
         .await

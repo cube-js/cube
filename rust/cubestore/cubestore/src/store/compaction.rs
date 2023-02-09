@@ -88,7 +88,7 @@ impl CompactionServiceImpl {
     }
 
     fn is_compaction_needed(&self, chunks: &Vec<IdRow<Chunk>>) -> bool {
-        let compaction_in_memory_chunks_count_threshold = 1;
+        let compaction_in_memory_chunks_count_threshold = 5;
         //self.config.compaction_in_memory_chunks_count_threshold();
 
         let oldest_insert_at = chunks
