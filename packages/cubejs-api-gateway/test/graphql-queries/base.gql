@@ -21,11 +21,15 @@ query CubeQuery {
 }
 
 query CubeQuery {
-  cube(where: { orders: { createdAt: { inDateRange: "This month" } } }) {
+  cube(
+    where: {
+      orders: { createdAt: { inDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
     orders(orderBy: { createdAt: asc }) {
       count
       createdAt {
-        day
+        value
       }
     }
   }
@@ -52,6 +56,43 @@ query CubeQuery {
       count
       createdAt {
         value
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { createdAt: { inDateRange: "This month" } } }) {
+    orders {
+      count
+      createdAt {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { createdAt: { inDateRange: "2 weeks ago to now" } } }) {
+    orders {
+      count
+      createdAt {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(
+    where: {
+      orders: { createdAt: { notInDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
+    orders {
+      count
+      createdAt {
+        day
       }
     }
   }

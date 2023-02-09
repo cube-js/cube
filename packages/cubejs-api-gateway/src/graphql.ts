@@ -152,7 +152,7 @@ function mapWhereValue(operator: string, value: any) {
     case 'notInDateRange':
       // This is a hack for named date ranges (e.g. "This year", "Today")
       // We should use enums in the future
-      if (value.length === 1 && !/^[0-9]/.test(value[0])) {
+      if (value.length === 1 && !/^\d\d\d\d-\d\d-\d\d/.test(value[0])) {
         return value[0].toString();
       }
 
@@ -544,6 +544,18 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             if (whereArg) {
               filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
             }
+            
+            // Relative date ranges such as "last quarter" can only be used in
+            // timeDimensions dateRange filter
+            const dateRangeFilters = {};
+            filters = filters.filter((f) => {
+              if (f.operator === 'inDateRange' && (typeof f.values === 'string' || f.values?.length === 1)) {
+                dateRangeFilters[f.member] = f.values;
+                return false;
+              }
+
+              return true;
+            });
 
             getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
               const memberName = memberNode.name.value;
@@ -563,6 +575,9 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
                       timeDimensions.push({
                         dimension: key,
                         granularity: granularityName,
+                        ...(dateRangeFilters[key] ? {
+                          dateRange: dateRangeFilters[key],
+                        } : null)
                       });
                     }
                   });
@@ -571,6 +586,15 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
                 }
               }
             });
+            
+            if (Object.keys(dateRangeFilters).length && !timeDimensions.length) {
+              Object.entries(dateRangeFilters).forEach(([dimension, dateRange]) => {
+                timeDimensions.push({
+                  dimension,
+                  dateRange
+                });
+              });
+            }
           });
 
           const query = {
