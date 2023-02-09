@@ -19,8 +19,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/* test/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
+    "lint": "eslint \"**/*.{ts,tsx}\"",
+    "lint:fix": "eslint --fix \"**/*.{ts,tsx}\""
   },
   "files": [
     "README.md",
@@ -79,6 +79,7 @@
     ],
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
-    ]
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
   }
 }

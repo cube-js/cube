@@ -37,8 +37,8 @@ const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 const FloatFilter = inputObjectType({
   name: 'FloatFilter',
   definition(t) {
-    t.float('equals');
-    t.float('notEquals');
+    t.list.float('equals');
+    t.list.float('notEquals');
     t.list.float('in');
     t.list.float('notIn');
     t.boolean('set');
@@ -52,12 +52,12 @@ const FloatFilter = inputObjectType({
 const StringFilter = inputObjectType({
   name: 'StringFilter',
   definition(t) {
-    t.string('equals');
-    t.string('notEquals');
+    t.list.string('equals');
+    t.list.string('notEquals');
     t.list.string('in');
     t.list.string('notIn');
-    t.string('contains');
-    t.string('notContains');
+    t.list.string('contains');
+    t.list.string('notContains');
     t.boolean('set');
   }
 });
@@ -65,8 +65,8 @@ const StringFilter = inputObjectType({
 const DateTimeFilter = inputObjectType({
   name: 'DateTimeFilter',
   definition(t) {
-    t.string('equals');
-    t.string('notEquals');
+    t.list.string('equals');
+    t.list.string('notEquals');
     t.list.string('in');
     t.list.string('notIn');
     t.list.string('inDateRange');
@@ -152,7 +152,7 @@ function mapWhereValue(operator: string, value: any) {
     case 'notInDateRange':
       // This is a hack for named date ranges (e.g. "This year", "Today")
       // We should use enums in the future
-      if (value.length === 1 && !/^[0-9]/.test(value[0])) {
+      if (value.length === 1 && !/^\d\d\d\d-\d\d-\d\d/.test(value[0])) {
         return value[0].toString();
       }
 
@@ -517,7 +517,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           const timeDimensions: any[] = [];
           let filters: any[] = [];
           const order: [string, 'asc' | 'desc'][] = [];
-
+       
           if (where) {
             filters = whereArgToQueryFilters(where);
           }
@@ -544,11 +544,13 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             if (whereArg) {
               filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
             }
-
-            const inDateRangeFilters = {};
+            
+            // Relative date ranges such as "last quarter" can only be used in
+            // timeDimensions dateRange filter
+            const dateRangeFilters = {};
             filters = filters.filter((f) => {
-              if (f.operator === 'inDateRange') {
-                inDateRangeFilters[f.member] = f.values;
+              if (f.operator === 'inDateRange' && (typeof f.values === 'string' || f.values?.length === 1)) {
+                dateRangeFilters[f.member] = f.values;
                 return false;
               }
 
@@ -573,8 +575,8 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
                       timeDimensions.push({
                         dimension: key,
                         granularity: granularityName,
-                        ...(inDateRangeFilters[key] ? {
-                          dateRange: inDateRangeFilters[key],
+                        ...(dateRangeFilters[key] ? {
+                          dateRange: dateRangeFilters[key],
                         } : null)
                       });
                     }
@@ -584,6 +586,15 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
                 }
               }
             });
+            
+            if (Object.keys(dateRangeFilters).length && !timeDimensions.length) {
+              Object.entries(dateRangeFilters).forEach(([dimension, dateRange]) => {
+                timeDimensions.push({
+                  dimension,
+                  dateRange
+                });
+              });
+            }
           });
 
           const query = {
@@ -598,26 +609,21 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             ...(renewQuery && { renewQuery }),
           };
 
-          // eslint-disable-next-line no-async-promise-executor
-          const results = await (new Promise<any>(async (resolve, reject) => {
-            try {
-              await apiGateway.load({
-                query,
-                queryType: QueryType.REGULAR_QUERY,
-                context: req.context,
-                res: (message) => {
-                  if (message.error) {
-                    reject(new Error(message.error));
-                  }
-                  resolve(message);
-                },
-                apiType: 'graphql',
-              });
-            } catch (e) {
-              reject(e);
-            }
-          }));
-
+          const results = await new Promise<any>((resolve, reject) => {
+            apiGateway.load({
+              query,
+              queryType: QueryType.REGULAR_QUERY,
+              context: req.context,
+              res: (message) => {
+                if (message.error) {
+                  reject(new Error(message.error));
+                }
+                resolve(message);
+              },
+              apiType: 'graphql',
+            }).catch(reject);
+          });
+          
           parseDates(results);
 
           return results.data.map(entry => R.toPairs(entry)
