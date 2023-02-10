@@ -2906,7 +2906,7 @@ impl MetaStore for RocksMetaStore {
             let mut partitions_map = HashMap::new();
             for c in chunks_table.scan_all_rows()? {
                 let c = c?;
-                if c.get_row().active() && c.get_row().in_memory() {
+                if c.get_row().in_memory() {
                     partitions_map
                         .entry(c.get_row().get_partition_id())
                         .or_insert(Vec::new())
