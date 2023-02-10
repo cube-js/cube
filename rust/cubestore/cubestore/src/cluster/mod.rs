@@ -128,6 +128,7 @@ pub trait Cluster: DIService + Send + Sync {
     ) -> Result<(), CubeError>;
 
     async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError>;
+    async fn free_deleted_memory_chunks(&self, node_name: &str) -> Result<(), CubeError>;
 
     fn job_result_listener(&self) -> JobResultListener;
 
@@ -435,6 +436,16 @@ impl Cluster for ClusterImpl {
         }
     }
 
+    async fn free_deleted_memory_chunks(&self, node_name: &str) -> Result<(), CubeError> {
+        let response = self
+            .send_or_process_locally(node_name, NetworkMessage::FreeDeletedMemoryChunks)
+            .await?;
+        match response {
+            NetworkMessage::FreeDeletedMemoryChunksResult(r) => r,
+            x => panic!("Unexpected result for add chunk: {:?}", x),
+        }
+    }
+
     fn job_result_listener(&self) -> JobResultListener {
         JobResultListener {
             receiver: self.meta_store_sender.subscribe(),
@@ -573,8 +584,21 @@ impl Cluster for ClusterImpl {
                 let res = chunk_store.free_memory_chunk(chunk_id).await;
                 NetworkMessage::FreeMemoryChunkResult(res)
             }
+            NetworkMessage::FreeDeletedMemoryChunks => {
+                let chunk_store = self
+                    .injector
+                    .upgrade()
+                    .unwrap()
+                    .get_service_typed::<dyn ChunkDataStore>()
+                    .await;
+                let res = chunk_store.free_deleted_memory_chunks().await;
+                NetworkMessage::FreeDeletedMemoryChunksResult(res)
+            }
             NetworkMessage::FreeMemoryChunkResult(_) => {
-                panic!("AddChunkResult sent to worker");
+                panic!("FreeMemoryChunkResult sent to worker");
+            }
+            NetworkMessage::FreeDeletedMemoryChunksResult(_) => {
+                panic!("FreeDeletedMemoryChunksResult sent to worker");
             }
             NetworkMessage::MetaStoreCall(_) | NetworkMessage::MetaStoreCallResult(_) => {
                 panic!("MetaStoreCall sent to worker");

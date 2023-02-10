@@ -44,10 +44,36 @@ pub struct SchedulerImpl {
     reconcile_loop: WorkerLoop,
     chunk_processing_loop: WorkerLoop,
     chunk_events_queue: Mutex<Vec<(SystemTime, u64)>>,
-    compaction_last_sended: Mutex<HashMap<String, SystemTime>>,
+    node_last_actions: Mutex<HashMap<String, LastNodeActionTimes>>,
 }
 
 crate::di_service!(SchedulerImpl, []);
+
+struct LastNodeActionTimes {
+    in_memory_compaction: SystemTime,
+    deleted_chunks_release: SystemTime,
+}
+
+impl LastNodeActionTimes {
+    pub fn new() -> Self {
+        Self {
+            in_memory_compaction: SystemTime::now(),
+            deleted_chunks_release: SystemTime::now(),
+        }
+    }
+    pub fn in_memory_compaction(&self) -> SystemTime {
+        self.in_memory_compaction.clone()
+    }
+    pub fn deleted_chunks_release(&self) -> SystemTime {
+        self.deleted_chunks_release.clone()
+    }
+    pub fn set_in_memory_compaction(&mut self, time: SystemTime) {
+        self.in_memory_compaction = time;
+    }
+    pub fn set_deleted_chunks_release(&mut self, time: SystemTime) {
+        self.deleted_chunks_release = time;
+    }
+}
 
 impl SchedulerImpl {
     pub fn new(
@@ -66,7 +92,7 @@ impl SchedulerImpl {
         }
         let workers = workers
             .into_iter()
-            .map(|n| (n, SystemTime::now()))
+            .map(|n| (n, LastNodeActionTimes::new()))
             .collect::<HashMap<_, _>>();
 
         Self {
@@ -79,7 +105,7 @@ impl SchedulerImpl {
             gc_queue,
             reconcile_loop: WorkerLoop::new("Reconcile"),
             chunk_events_queue: Mutex::new(Vec::with_capacity(1000)),
-            compaction_last_sended: Mutex::new(workers),
+            node_last_actions: Mutex::new(workers),
             chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
         }
     }
@@ -148,7 +174,7 @@ impl SchedulerImpl {
                 match self.meta_store.get_chunks_out_of_queue(chunk_ids).await {
                     Ok(chunks) => {
                         let ids = chunks
-                            .into_iter()
+                            .iter()
                             .filter_map(|c| {
                                 if c.get_row().active() {
                                     None
@@ -732,16 +758,7 @@ impl SchedulerImpl {
             tokio::fs::remove_file(file).await?;
         }
         if let MetaStoreEvent::DeleteChunk(chunk) = &event {
-            if chunk.get_row().in_memory() {
-                let partition = self
-                    .meta_store
-                    .get_partition_out_of_queue(chunk.get_row().get_partition_id())
-                    .await?;
-                let node_name = self.cluster.node_name_by_partition(&partition);
-                self.cluster
-                    .free_memory_chunk(&node_name, chunk.get_id())
-                    .await?;
-            } else if chunk.get_row().uploaded() {
+            if !chunk.get_row().in_memory() && chunk.get_row().uploaded() {
                 let file_name =
                     ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix());
                 let deadline = Instant::now()
@@ -880,6 +897,25 @@ impl SchedulerImpl {
 
             self.process_active_chunks(active_chunks).await?;
             self.process_inactive_chunks(inactive_chunks).await?;
+        }
+        let mut node_last_actions = self.node_last_actions.lock().await;
+        for (node, last_action) in node_last_actions.iter_mut() {
+            if last_action
+                .deleted_chunks_release()
+                .elapsed()
+                .ok()
+                .map_or(false, |d| d >= Duration::from_secs(2))
+            {
+                if let Err(e) = self.cluster.free_deleted_memory_chunks(&node).await {
+                    log::error!(
+                        "Error while trying release in memory chunks in node {}: {}",
+                        node,
+                        e
+                    );
+                } else {
+                    last_action.set_deleted_chunks_release(SystemTime::now());
+                }
+            }
         }
 
         Ok(())
@@ -1207,9 +1243,10 @@ impl SchedulerImpl {
     }
 
     pub async fn schedule_node_in_memory_compaction(&self, node: String) -> Result<(), CubeError> {
-        let mut compaction_last_sended = self.compaction_last_sended.lock().await;
-        if let Some(last_sended) = compaction_last_sended.get_mut(&node) {
-            if last_sended
+        let mut node_last_actions = self.node_last_actions.lock().await;
+        if let Some(last_action) = node_last_actions.get_mut(&node) {
+            if last_action
+                .in_memory_compaction()
                 .elapsed()
                 .ok()
                 .map_or(false, |d| d > Duration::from_secs(10))
@@ -1224,7 +1261,7 @@ impl SchedulerImpl {
                     .await?;
                 if job.is_some() {
                     self.cluster.notify_job_runner(node).await?;
-                    *last_sended = SystemTime::now();
+                    last_action.set_in_memory_compaction(SystemTime::now());
                 }
             }
             Ok(())
