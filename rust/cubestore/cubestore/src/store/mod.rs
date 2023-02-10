@@ -47,7 +47,7 @@ use itertools::Itertools;
 use log::trace;
 use mockall::automock;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
@@ -245,6 +245,7 @@ pub trait ChunkDataStore: DIService + Send + Sync {
     ) -> Result<(Vec<ArrayRef>, Vec<u64>), CubeError>;
     async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
+    async fn free_deleted_memory_chunks(&self) -> Result<(), CubeError>;
     async fn add_persistent_chunk(
         &self,
         index: IdRow<Index>,
@@ -686,6 +687,24 @@ impl ChunkDataStore for ChunkStore {
         self.report_in_memory_metrics().await?;
         let mut memory_chunks = self.memory_chunks.write().await;
         memory_chunks.remove(&chunk_id);
+        Ok(())
+    }
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn free_deleted_memory_chunks(&self) -> Result<(), CubeError> {
+        let existing_chunk_ids = self
+            .meta_store
+            .get_all_node_in_memory_chunks(self.cluster.server_name().to_string())
+            .await?
+            .into_iter()
+            .map(|c| c.get_id())
+            .collect::<HashSet<_>>();
+
+        {
+            let mut memory_chunks = self.memory_chunks.write().await;
+            memory_chunks.retain(|id, _| existing_chunk_ids.contains(id));
+        }
+
+        self.report_in_memory_metrics().await?;
         Ok(())
     }
 }

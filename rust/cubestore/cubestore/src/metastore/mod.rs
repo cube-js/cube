@@ -859,6 +859,10 @@ pub trait MetaStore: DIService + Send + Sync {
         )>,
         CubeError,
     >;
+    async fn get_all_node_in_memory_chunks(
+        &self,
+        node: String,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn get_chunks_without_partition_created_seconds_ago(
         &self,
         seconds_ago: i64,
@@ -2825,6 +2829,8 @@ impl MetaStore for RocksMetaStore {
         })
         .await
     }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn get_partitions_for_in_memory_compaction(
         &self,
         node: String,
@@ -2874,6 +2880,42 @@ impl MetaStore for RocksMetaStore {
                         let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
 
                         result.push((partition, index, table, chunks));
+                    }
+                }
+            }
+
+            Ok(result)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_all_node_in_memory_chunks(
+        &self,
+        node: String,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        let config = self.store.config.clone();
+        self.read_operation_out_of_queue(move |db_ref| {
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+
+            let mut partitions_map = HashMap::new();
+            for c in chunks_table.scan_all_rows()? {
+                let c = c?;
+                if c.get_row().active() && c.get_row().in_memory() {
+                    partitions_map
+                        .entry(c.get_row().get_partition_id())
+                        .or_insert(Vec::new())
+                        .push(c);
+                }
+            }
+
+            let mut result = Vec::new();
+
+            for (id, mut chunks) in partitions_map.into_iter() {
+                if let Some(partition) = partitions_table.get_row(id)? {
+                    if node_name_by_partition(config.as_ref(), &partition) == node {
+                        result.append(&mut chunks);
                     }
                 }
             }
