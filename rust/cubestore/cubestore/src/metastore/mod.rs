@@ -877,6 +877,10 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<Index>, CubeError>;
     async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError>;
     async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError>;
+    async fn get_table_indexes_out_of_queue(
+        &self,
+        table_id: u64,
+    ) -> Result<Vec<IdRow<Index>>, CubeError>;
     async fn get_active_partitions_by_index_id(
         &self,
         index_id: u64,
@@ -3033,6 +3037,19 @@ impl MetaStore for RocksMetaStore {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_table_indexes_out_of_queue(
+        &self,
+        table_id: u64,
+    ) -> Result<Vec<IdRow<Index>>, CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            let index_table = IndexRocksTable::new(db_ref);
+            Ok(index_table
+                .get_rows_by_index(&IndexIndexKey::TableId(table_id), &IndexRocksIndex::TableID)?)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn get_active_partitions_by_index_id(
         &self,
         index_id: u64,
@@ -3912,7 +3929,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         table_id: u64,
     ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             Ok(ReplayHandleRocksTable::new(db_ref).get_rows_by_index(
                 &ReplayHandleIndexKey::ByTableId(table_id),
                 &ReplayHandleRocksIndex::ByTableId,
