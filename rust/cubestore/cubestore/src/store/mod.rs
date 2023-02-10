@@ -366,7 +366,10 @@ impl ChunkDataStore for ChunkStore {
         columns: &[Column],
         in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
-        let indexes = self.meta_store.get_table_indexes(table_id).await?;
+        let indexes = self
+            .meta_store
+            .get_table_indexes_out_of_queue(table_id)
+            .await?;
         self.build_index_chunks(&indexes, rows.into(), columns, in_memory)
             .await
     }
