@@ -216,6 +216,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         return {
           exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
           csvFile: [],
+          types
         };
       }
 
@@ -244,6 +245,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         return {
           exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
           csvFile,
+          types
         };
       }
 
