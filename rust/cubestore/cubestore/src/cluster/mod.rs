@@ -128,7 +128,11 @@ pub trait Cluster: DIService + Send + Sync {
     ) -> Result<(), CubeError>;
 
     async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError>;
-    async fn free_deleted_memory_chunks(&self, node_name: &str) -> Result<(), CubeError>;
+    async fn free_deleted_memory_chunks(
+        &self,
+        node_name: &str,
+        chunk_ids: Vec<u64>,
+    ) -> Result<(), CubeError>;
 
     fn job_result_listener(&self) -> JobResultListener;
 
@@ -436,9 +440,16 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    async fn free_deleted_memory_chunks(&self, node_name: &str) -> Result<(), CubeError> {
+    async fn free_deleted_memory_chunks(
+        &self,
+        node_name: &str,
+        chunk_ids: Vec<u64>,
+    ) -> Result<(), CubeError> {
         let response = self
-            .send_or_process_locally(node_name, NetworkMessage::FreeDeletedMemoryChunks)
+            .send_or_process_locally(
+                node_name,
+                NetworkMessage::FreeDeletedMemoryChunks(chunk_ids),
+            )
             .await?;
         match response {
             NetworkMessage::FreeDeletedMemoryChunksResult(r) => r,
@@ -584,14 +595,14 @@ impl Cluster for ClusterImpl {
                 let res = chunk_store.free_memory_chunk(chunk_id).await;
                 NetworkMessage::FreeMemoryChunkResult(res)
             }
-            NetworkMessage::FreeDeletedMemoryChunks => {
+            NetworkMessage::FreeDeletedMemoryChunks(ids) => {
                 let chunk_store = self
                     .injector
                     .upgrade()
                     .unwrap()
                     .get_service_typed::<dyn ChunkDataStore>()
                     .await;
-                let res = chunk_store.free_deleted_memory_chunks().await;
+                let res = chunk_store.free_deleted_memory_chunks(ids).await;
                 NetworkMessage::FreeDeletedMemoryChunksResult(res)
             }
             NetworkMessage::FreeMemoryChunkResult(_) => {

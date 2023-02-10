@@ -522,7 +522,7 @@ impl SchedulerImpl {
             .iter()
             .partition(|c| c.get_row().in_memory());
 
-        if !in_memory_inactive.is_empty() {
+        /* if !in_memory_inactive.is_empty() {
             let seconds = self.config.in_memory_not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
             let ids = in_memory_inactive
@@ -537,7 +537,7 @@ impl SchedulerImpl {
                     })
                     .await?;
             }
-        }
+        } */
 
         if !persistent_inactive.is_empty() {
             let seconds = self.config.not_used_timeout();
@@ -826,24 +826,21 @@ impl SchedulerImpl {
             self.process_active_chunks(active_chunks).await?;
             self.process_inactive_chunks(inactive_chunks).await?;
         }
-        let mut node_last_actions = self.node_last_actions.lock().await;
-        for (node, last_action) in node_last_actions.iter_mut() {
-            if last_action
-                .deleted_chunks_release()
-                .elapsed()
-                .ok()
-                .map_or(false, |d| d >= Duration::from_secs(2))
-            {
-                if let Err(e) = self.cluster.free_deleted_memory_chunks(&node).await {
-                    log::error!(
-                        "Error while trying release in memory chunks in node {}: {}",
-                        node,
-                        e
-                    );
-                } else {
-                    last_action.set_deleted_chunks_release(SystemTime::now());
-                }
-            }
+
+        let seconds = self.config.in_memory_not_used_timeout();
+        let chunks_to_delete = self
+            .meta_store
+            .get_in_memory_chunks_deactivated_seconds_ago(seconds as i64)
+            .await?;
+        for (partition, chunks) in chunks_to_delete {
+            let ids = chunks.iter().map(|c| c.get_id()).collect::<Vec<_>>();
+            self.meta_store
+                .delete_chunks_without_checks(ids.clone())
+                .await?;
+            let node_name = self.cluster.node_name_by_partition(&partition);
+            self.cluster
+                .free_deleted_memory_chunks(&node_name, ids)
+                .await?;
         }
 
         Ok(())
@@ -924,7 +921,7 @@ impl SchedulerImpl {
             .filter(|c| !c.get_row().active())
             .partition(|c| c.get_row().in_memory());
 
-        if !in_memory_inactive.is_empty() {
+        /* if !in_memory_inactive.is_empty() {
             let seconds = self.config.in_memory_not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
             self.gc_loop
@@ -938,7 +935,7 @@ impl SchedulerImpl {
                     ),
                 })
                 .await?;
-        }
+        } */
         if !persistent_inactive.is_empty() {
             let seconds = self.config.not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
