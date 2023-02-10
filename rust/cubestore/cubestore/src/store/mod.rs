@@ -1167,11 +1167,15 @@ impl ChunkStore {
                     .collect::<Result<Vec<_>, _>>()?;
                 let columns = self.post_process_columns(index.clone(), columns).await?;
 
+                let rows = columns[0].len();
+                let in_memory_chunk = in_memory
+                    && (rows as u64) < self.config.compaction_in_memory_chunks_size_limit() / 2;
+
                 futures.push(self.add_chunk_columns(
                     index.clone(),
                     partition.clone(),
                     columns,
-                    in_memory,
+                    in_memory_chunk,
                 ));
             }
             remaining_rows = next;
