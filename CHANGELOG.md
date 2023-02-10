@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.60](https://github.com/cube-js/cube.js/compare/v0.31.59...v0.31.60) (2023-02-10)
+
+
+### Bug Fixes
+
+* GraphQL API date range filter ([#6138](https://github.com/cube-js/cube.js/issues/6138)) ([dc2ea8c](https://github.com/cube-js/cube.js/commit/dc2ea8cb430a6e013cfa32f42294ee6a7c4206b6))
+* **shared:** getProxySettings - use global configuration ([#6137](https://github.com/cube-js/cube.js/issues/6137)) ([e2ba5c1](https://github.com/cube-js/cube.js/commit/e2ba5c1962f2c57e79ce405c22209ab6890f400d))
+
+
+### Features
+
+* **cubesql:** Redesign member pushdown to support more advanced join… ([#6122](https://github.com/cube-js/cube.js/issues/6122)) ([3bb85e4](https://github.com/cube-js/cube.js/commit/3bb85e492056d73c28b3d006a95e0f9765e6e026))
+* **cubestore:** Disable MetastoreEvents for queue & cache ([#6126](https://github.com/cube-js/cube.js/issues/6126)) ([0fd20cb](https://github.com/cube-js/cube.js/commit/0fd20cb409703945fecc3620833b8d5cc683ca0e))
+* **cubestore:** Limit pushdown ([#5604](https://github.com/cube-js/cube.js/issues/5604)) ([f593ffe](https://github.com/cube-js/cube.js/commit/f593ffe686b9dfd40af9719226b583fc43f43648))
+* **cubestore:** Support SYS DROP QUERY CACHE + metrics ([#6131](https://github.com/cube-js/cube.js/issues/6131)) ([e8d2670](https://github.com/cube-js/cube.js/commit/e8d2670848656fa130bd76f2f98bca6b282143d3))
+
+
+
+
+
 ## [0.31.59](https://github.com/cube-js/cube.js/compare/v0.31.58...v0.31.59) (2023-02-06)
 
 

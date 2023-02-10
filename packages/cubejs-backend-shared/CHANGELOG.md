@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.60](https://github.com/cube-js/cube.js/compare/v0.31.59...v0.31.60) (2023-02-10)
+
+
+### Bug Fixes
+
+* **shared:** getProxySettings - use global configuration ([#6137](https://github.com/cube-js/cube.js/issues/6137)) ([e2ba5c1](https://github.com/cube-js/cube.js/commit/e2ba5c1962f2c57e79ce405c22209ab6890f400d))
+
+
+
+
+
 ## [0.31.57](https://github.com/cube-js/cube.js/compare/v0.31.56...v0.31.57) (2023-02-02)
 
 **Note:** Version bump only for package @cubejs-backend/shared

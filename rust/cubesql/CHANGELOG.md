@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.60](https://github.com/cube-js/cube.js/compare/v0.31.59...v0.31.60) (2023-02-10)
+
+
+### Features
+
+* **cubesql:** Redesign member pushdown to support more advanced join… ([#6122](https://github.com/cube-js/cube.js/issues/6122)) ([3bb85e4](https://github.com/cube-js/cube.js/commit/3bb85e492056d73c28b3d006a95e0f9765e6e026))
+
+
+
+
+
 ## [0.31.59](https://github.com/cube-js/cube.js/compare/v0.31.58...v0.31.59) (2023-02-06)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

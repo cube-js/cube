@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.60](https://github.com/cube-js/cube.js/compare/v0.31.59...v0.31.60) (2023-02-10)
+
+
+### Bug Fixes
+
+* GraphQL API date range filter ([#6138](https://github.com/cube-js/cube.js/issues/6138)) ([dc2ea8c](https://github.com/cube-js/cube.js/commit/dc2ea8cb430a6e013cfa32f42294ee6a7c4206b6))
+
+
+
+
+
 ## [0.31.59](https://github.com/cube-js/cube.js/compare/v0.31.58...v0.31.59) (2023-02-06)
 
 

@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.60](https://github.com/cube-js/cube.js/compare/v0.31.59...v0.31.60) (2023-02-10)
+
+
+### Features
+
+* **cubestore:** Disable MetastoreEvents for queue & cache ([#6126](https://github.com/cube-js/cube.js/issues/6126)) ([0fd20cb](https://github.com/cube-js/cube.js/commit/0fd20cb409703945fecc3620833b8d5cc683ca0e))
+* **cubestore:** Limit pushdown ([#5604](https://github.com/cube-js/cube.js/issues/5604)) ([f593ffe](https://github.com/cube-js/cube.js/commit/f593ffe686b9dfd40af9719226b583fc43f43648))
+* **cubestore:** Support SYS DROP QUERY CACHE + metrics ([#6131](https://github.com/cube-js/cube.js/issues/6131)) ([e8d2670](https://github.com/cube-js/cube.js/commit/e8d2670848656fa130bd76f2f98bca6b282143d3))
+
+
+
+
+
 ## [0.31.58](https://github.com/cube-js/cube.js/compare/v0.31.57...v0.31.58) (2023-02-02)
 
 
