@@ -727,9 +727,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                         row_id,
                     );
 
-                    batch_pipe
-                        .batch()
-                        .put(key.to_bytes(), new_index_value);
+                    batch_pipe.batch().put(key.to_bytes(), new_index_value);
                 }
             } else {
                 let old_key = RowKey::SecondaryIndex(
@@ -747,9 +745,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                     row_id,
                 );
 
-                batch_pipe
-                    .batch()
-                    .put(new_key.to_bytes(), new_index_value);
+                batch_pipe.batch().put(new_key.to_bytes(), new_index_value);
             }
         }
 
