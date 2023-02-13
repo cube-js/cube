@@ -1167,8 +1167,6 @@ impl ChunkStore {
                     .collect::<Result<Vec<_>, _>>()?;
                 let columns = self.post_process_columns(index.clone(), columns).await?;
 
-                let rows = columns[0].len();
-
                 futures.push(self.add_chunk_columns(
                     index.clone(),
                     partition.clone(),

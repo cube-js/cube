@@ -2896,49 +2896,66 @@ impl MetaStore for RocksMetaStore {
         CubeError,
     > {
         let config = self.store.config.clone();
-        self.read_operation_out_of_queue(move |db_ref| {
-            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+        let partitions = self
+            .read_operation_out_of_queue(move |db_ref| {
+                let partitions_table = PartitionRocksTable::new(db_ref.clone());
+                partitions_table.get_rows_by_index(
+                    &PartitionIndexKey::ByActive(true),
+                    &PartitionRocksIndex::Active,
+                )
+            })
+            .await?
+            .into_iter()
+            .filter(|p| {
+                p.get_row().multi_partition_id.is_none()
+                    && node_name_by_partition(config.as_ref(), &p) == node
+            })
+            .collect::<Vec<_>>();
 
-            let mut partitions_map = HashMap::new();
-            for c in chunks_table.scan_all_rows()? {
-                let c = c?;
-                if c.get_row().active() && c.get_row().in_memory() {
-                    partitions_map
-                        .entry(c.get_row().get_partition_id())
-                        .or_insert(Vec::new())
-                        .push(c);
-                }
-            }
+        let index_ids = partitions
+            .iter()
+            .map(|p| p.get_row().get_index_id())
+            .unique()
+            .collect::<Vec<_>>();
+        let mut indices = HashMap::new();
+        for index_id in index_ids {
+            let index = self.get_index(index_id).await?;
+            indices.insert(index_id, index);
+        }
 
-            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+        let table_ids = indices
+            .values()
+            .map(|i| i.get_row().table_id())
+            .unique()
+            .collect::<Vec<_>>();
+        let mut tables = HashMap::new();
+        for table_id in table_ids {
+            let table = self.get_table_by_id(table_id).await?;
+            tables.insert(table_id, table);
+        }
 
-            let mut result = Vec::with_capacity(partitions_map.len());
-            let index_table = IndexRocksTable::new(db_ref.clone());
-            let table_table = TableRocksTable::new(db_ref.clone());
+        let mut result = Vec::new();
 
-            for (id, chunks) in partitions_map.into_iter() {
-                if let Some(partition) = partitions_table.get_row(id)? {
-                    if partition.get_row().is_active()
-                        && partition.get_row().multi_partition_id.is_none()
-                        && node_name_by_partition(config.as_ref(), &partition) == node
-                    {
-                        let index = index_table
-                            .get_row(partition.get_row().get_index_id())?
-                            .ok_or(CubeError::internal(format!(
-                                "Index {} is not found for partition: {}",
-                                partition.get_row().get_index_id(),
-                                id
-                            )))?;
-                        let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
+        for p in partitions {
+            let chunks = self
+                .get_chunks_by_partition_out_of_queue(p.get_id(), false)
+                .await?;
+            let index = indices
+                .get(&p.get_row().get_index_id())
+                .ok_or(CubeError::internal(format!(
+                    "index {} not found",
+                    p.get_row().get_index_id()
+                )))?;
+            let table = tables
+                .get(&index.get_row().table_id())
+                .ok_or(CubeError::internal(format!(
+                    "table {} not found",
+                    index.get_row().table_id()
+                )))?;
+            result.push((p, index.clone(), table.clone(), chunks));
+        }
 
-                        result.push((partition, index, table, chunks));
-                    }
-                }
-            }
-
-            Ok(result)
-        })
-        .await
+        Ok(result)
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
