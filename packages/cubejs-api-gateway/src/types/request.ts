@@ -19,9 +19,10 @@ interface RequestContext {
   securityContext: any;
   requestId: string;
   signedWithPlaygroundAuthSecret?: boolean;
-  appName?: string,
-  protocol?: string,
-  apiType?: string,
+  appName?: string;
+  protocol?: string;
+  apiType?: string;
+  sqlRunnerShouldAddLimit?: boolean;
 }
 
 /**

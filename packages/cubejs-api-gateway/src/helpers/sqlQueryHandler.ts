@@ -1,6 +1,4 @@
-import { UserError } from '../UserError';
-
-export enum SQlRunnerQueryType {
+export enum SQLQueryType {
   Select = 'select',
   With = 'with',
   Create = 'create',
@@ -13,43 +11,54 @@ export enum SQlRunnerQueryType {
   Explain = 'explain',
 }
 
-const INVALID_QUERY_ERROR = 'Invalid SQL query';
+interface SQLRunnerQueryType {
+  type: SQLQueryType;
+  regex?: RegExp;
+  shouldAddLimit?: boolean;
+}
 
-// Determine SQL query type and add LIMIT clause if needed
-export const shouldAddLimit = (sql: string): Boolean => {
-  // select statements
-  const select = `^(${SQlRunnerQueryType.Select}|${SQlRunnerQueryType.With})\\b`;
-  if (new RegExp(select, 'i').test(sql)) {
-    return true;
+function createSQLRunnerQueryType({
+  type,
+}: SQLRunnerQueryType): SQLRunnerQueryType {
+  const regex: RegExp = new RegExp(`^(${type})\\b`, 'i');
+  let shouldAddLimit: boolean = false;
+
+  if (type === SQLQueryType.Select || type === SQLQueryType.With) {
+    shouldAddLimit = true;
   }
 
-  // the rest statements
-  const statements = Object.values(SQlRunnerQueryType).filter(
-    (s) => s !== SQlRunnerQueryType.Select && s !== SQlRunnerQueryType.With
-  );
+  return {
+    type,
+    regex,
+    shouldAddLimit,
+  };
+}
 
-  if (new RegExp(`^(${statements.join('|')})\\b`, 'i').test(sql)) {
-    return false;
+export function getSQLRunnerQueryType(sql: string): SQLRunnerQueryType | null {
+  const sqlRunnerQueryTypes: SQLRunnerQueryType[] = [];
+
+  for (const type of Object.values(SQLQueryType)) {
+    const option = createSQLRunnerQueryType({ type });
+    sqlRunnerQueryTypes.push(option);
   }
 
-  throw new UserError(INVALID_QUERY_ERROR);
-};
-
-// Determine particular SQL query type
-const getStatementType = (sql: string): string => {
-  for (const key of Object.keys(SQlRunnerQueryType)) {
-    if (new RegExp(`^(${key})\\b`, 'i').test(sql)) {
-      return SQlRunnerQueryType[key];
+  for (const queryType of sqlRunnerQueryTypes) {
+    if (queryType?.regex?.test(sql)) {
+      return queryType;
     }
   }
 
-  throw new UserError(INVALID_QUERY_ERROR);
-};
+  return null;
+}
 
-// check query string for scope permissions
-// an example scope with permissions: ['sql-runner-permissions:create,update,delete,select']
-export const isQueryAllowed = (query: string, scope: string[]): Boolean => {
-  const statementType = getStatementType(query);
+/**
+ * Checks query string for scope permissions.
+ * Example scope with permissions: ['sql-runner-permissions:insert,update,delete,select']
+ */
+export const isQueryAllowed = (
+  queryType: SQLRunnerQueryType,
+  scope: string[]
+): Boolean => {
   const permissionsString = scope.find((s: string) => s.startsWith('sql-runner-permissions:'));
 
   if (!permissionsString) {
@@ -63,7 +72,7 @@ export const isQueryAllowed = (query: string, scope: string[]): Boolean => {
 
   const permissions = p.split(',');
 
-  if (permissions.includes(statementType)) {
+  if (permissions.includes(queryType.type)) {
     return true;
   }
 

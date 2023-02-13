@@ -78,7 +78,7 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
-import { shouldAddLimit, isQueryAllowed } from './helpers/sqlQueryHandler';
+import { getSQLRunnerQueryType, isQueryAllowed } from './helpers/sqlQueryHandler';
 import {
   transformCube,
   transformMeasure,
@@ -1072,7 +1072,7 @@ class ApiGateway {
 
       const orchestratorApi = this.getAdapterApi(context);
 
-      if (shouldAddLimit(query.query)) {
+      if (context.sqlRunnerShouldAddLimit) {
         if (
           !query.limit ||
           !Number.isInteger(query.limit) ||
@@ -2136,12 +2136,18 @@ class ApiGateway {
           throw new CubejsHandlerError(403, 'Forbidden', 'Sql-runner scope is missing.');
         }
 
-        if (
-          !getEnv('devMode') &&
-          req.body?.query?.query &&
-          !isQueryAllowed(req.body?.query?.query, req.context?.securityContext?.scope)
-        ) {
-          throw new CubejsHandlerError(403, 'Forbidden', 'No permission to execute this query');
+        if (req.body?.query?.query && req.context) {
+          const sqlRunnerQueryType = getSQLRunnerQueryType(req.body?.query?.query);
+
+          if (!sqlRunnerQueryType) {
+            throw new UserError('This SQL query is not supported');
+          }
+
+          if (!isQueryAllowed(sqlRunnerQueryType, req.context?.securityContext?.scope)) {
+            throw new CubejsHandlerError(403, 'Forbidden', 'No permission to execute this query');
+          }
+
+          req.context.sqlRunnerShouldAddLimit = sqlRunnerQueryType.shouldAddLimit;
         }
       },
       req,
