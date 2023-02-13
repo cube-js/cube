@@ -297,7 +297,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       const key: QueryKey = ['select * from table', []];
       key.persistent = true;
 
-      queue.setQueryStream(key, {});
+      queue.createQueryStream(key, {});
 
       await queue.executeInQueue('stream', key, { }, 0);
       await awaitProcessing();

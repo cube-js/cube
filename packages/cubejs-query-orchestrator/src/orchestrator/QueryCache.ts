@@ -477,10 +477,13 @@ export class QueryCache {
     if (!persistent) {
       return queue.executeInQueue('query', cacheKey, _query, priority, opt);
     } else {
-      const stream = queue.setQueryStream(cacheKey, aliasNameToMember);
-      // we don't want to handle error here as we want it to bubble up
-      // to the api gateway
-      queue.executeInQueue('stream', cacheKey, _query, priority, opt);
+      const stream = queue.createQueryStream(cacheKey, aliasNameToMember);
+      // We don't want to handle error here as we want it to bubble up
+      // to the api gateway. We need to increase orphaned timeout as well.
+      queue.executeInQueue('stream', cacheKey, {
+        ..._query,
+        orphanedTimeout: 1200,
+      }, priority, opt);
       return stream;
     }
   }
@@ -590,47 +593,53 @@ export class QueryCache {
           return result;
         },
         stream: async (req, target) => {
-          let logged = false;
           queue.logger('Streaming SQL', { ...req });
-          const client = await clientFactory();
-          try {
-            const source = await client.streamQuery(req.query, req.values);
+          await (new Promise((resolve, reject) => {
+            let logged = false;
+            Promise
+              .all([clientFactory()])
+              .then(([client]) => client.streamQuery(req.query, req.values))
+              .then((source) => {
+                const cleanup = (error) => {
+                  if (!source.destroyed) {
+                    source.destroy(error);
+                  }
+                  if (!target.destroyed) {
+                    target.destroy(error);
+                  }
+                  if (!logged && source.destroyed && target.destroyed) {
+                    logged = true;
+                    if (error) {
+                      queue.logger('Streaming done with error', {
+                        query: req.query,
+                        query_values: req.values,
+                        error,
+                      });
+                      reject(error);
+                    } else {
+                      queue.logger('Streaming successfully completed', {
+                        requestId: req.requestId,
+                      });
+                      resolve(req.requestId);
+                    }
+                  }
+                };
 
-            const cleanup = (error) => {
-              if (!source.destroyed) {
-                source.destroy(error);
-              }
-              if (!target.destroyed) {
-                target.destroy(error);
-              }
-              if (!logged && source.destroyed && target.destroyed) {
-                logged = true;
-                if (error) {
-                  queue.logger('Streaming done with error', {
-                    query: req.query,
-                    query_values: req.values,
-                    error,
-                  });
-                } else {
-                  queue.logger('Streaming successfully completed', {
-                    requestId: req.requestId,
-                  });
-                }
-              }
-            };
-  
-            source.once('end', cleanup);
-            source.once('error', cleanup);
-            source.once('close', cleanup);
-  
-            target.once('end', cleanup);
-            target.once('error', cleanup);
-            target.once('close', cleanup);
-  
-            source.pipe(target);
-          } catch (e) {
-            target.emit('error', e);
-          }
+                source.once('end', cleanup);
+                source.once('error', cleanup);
+                source.once('close', cleanup);
+      
+                target.once('end', cleanup);
+                target.once('error', cleanup);
+                target.once('close', cleanup);
+      
+                source.pipe(target);
+              })
+              .catch((reason) => {
+                target.emit('error', reason);
+                throw reason;
+              });
+          }));
         },
       },
       cancelHandlers: {
@@ -639,7 +648,14 @@ export class QueryCache {
             await queue.handles[req.cancelHandler].cancel();
             delete queue.handles[req.cancelHandler];
           }
-        }
+        },
+        stream: async (req) => {
+          req.queryKey.persistent = true;
+          const queryKeyHash = queue.redisHash(req.queryKey);
+          if (queue.streams.has(queryKeyHash)) {
+            queue.streams.get(queryKeyHash).destroy();
+          }
+        },
       },
       logger: (msg, params) => options.logger(msg, params),
       ...options

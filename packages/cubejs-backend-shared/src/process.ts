@@ -11,3 +11,12 @@ const processUid = v5(v1(), v1()).toString();
 export function getProcessUid(): string {
   return processUid;
 }
+
+let i = 0;
+
+/**
+ * Returns unique for the process number.
+ */
+export function getNext(): number {
+  return i++;
+}
