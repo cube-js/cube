@@ -130,10 +130,7 @@ export class QueryQueue {
     /**
      * Persistent queries streams maps.
      */
-    this.streams = {
-      queued: new Map(),
-      processing: new Map(),
-    };
+    this.streams = new Map();
   }
 
   /**
@@ -142,26 +139,26 @@ export class QueryQueue {
    * @param {QueryKeyHash} queryKeyHash
    */
   getQueryStream(queryKeyHash) {
-    if (!this.streams.queued.has(queryKeyHash)) {
-      throw new Error(`Unable to find stream for persisted query with id: ${queryKeyHash}`);
+    if (!this.streams.has(queryKeyHash)) {
+      throw new Error(
+        `Unable to find the query stream ${queryKeyHash} for the process ${getProcessUid()}.`
+      );
     }
-
-    return this.streams.queued.get(queryKeyHash);
+    return this.streams.get(queryKeyHash);
   }
 
   /**
    * @param {*} queryKey
    * @param {{ [alias: string]: string }} aliasNameToMember
    */
-  setQueryStream(queryKey, aliasNameToMember) {
+  createQueryStream(queryKey, aliasNameToMember) {
     const key = this.redisHash(queryKey);
     const stream = new QueryStream({
       key,
-      maps: this.streams,
+      streams: this.streams,
       aliasNameToMember,
     });
-    this.streams.queued.set(key, stream);
-
+    this.streams.set(key, stream);
     return stream;
   }
 
@@ -802,10 +799,7 @@ export class QueryQueue {
           const handler = query?.queryHandler;
           switch (handler) {
             case 'stream':
-              await this.queryTimeout(
-                this.queryHandlers.stream(query.query, this.getQueryStream(queryKeyHashed))
-              );
-
+              await this.queryHandlers.stream(query.query, this.getQueryStream(queryKeyHashed));
               // CubeStore has special handling for null
               executionResult = null;
               break;
@@ -908,6 +902,14 @@ export class QueryQueue {
         }
 
         await this.reconcileQueue();
+      } else if (query?.queryHandler === 'stream') {
+        if (this.streams.has(queryKeyHashed)) {
+          this.getQueryStream(queryKeyHashed).debounce();
+        }
+        await queueConnection.freeProcessingLock(queryKeyHashed, processingId, activated);
+        setTimeout(() => {
+          this.reconcileQueue();
+        }, 5000);
       } else {
         this.logger('Skip processing', {
           processingId,
@@ -921,11 +923,6 @@ export class QueryQueue {
           activated,
           queryExists: !!query
         });
-        // closing stream
-        if (query?.queryHandler === 'stream') {
-          const stream = this.getQueryStream(queryKeyHashed);
-          stream.destroy();
-        }
         const currentProcessingId = await queueConnection.freeProcessingLock(queryKeyHashed, processingId, activated);
         if (currentProcessingId) {
           this.logger('Skipping free processing lock', {

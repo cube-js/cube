@@ -127,28 +127,29 @@ function wrapNativeFunctionWithStream(
         let streamResponse: any;
         try {
             streamResponse = await fn(JSON.parse(extra));
-            let chunk: object[] = [];
-            streamResponse.stream.on('data', (c: object) => {
-                chunk.push(c);
-                if (chunk.length >= chunkLength) {
-                    if (!writer.chunk(JSON.stringify(chunk))) {
-                        streamResponse.stream.destroy({
-                            stack: "Rejected by client"
-                        });
+            if (streamResponse) {
+                let chunk: object[] = [];
+                streamResponse.stream.on('data', (c: object) => {
+                    chunk.push(c);
+                    if (chunk.length >= chunkLength) {
+                        if (!writer.chunk(JSON.stringify(chunk))) {
+                            streamResponse.stream.destroy({
+                                stack: "Rejected by client"
+                            });
+                        }
+                        chunk = [];
                     }
-                    chunk = [];
-                }
-            });
-            streamResponse.stream.on('close', () => {
-                if (chunk.length > 0) {
-                    writer.chunk(JSON.stringify(chunk));
-                }
-                writer.end("");
-            });
-
-            streamResponse.stream.on('error', (err: any) => {
-                writer.reject(err.message || "Unknown JS exception");
-            });
+                });
+                streamResponse.stream.on('close', () => {
+                    if (chunk.length > 0) {
+                        writer.chunk(JSON.stringify(chunk));
+                    }
+                    writer.end("");
+                });
+                streamResponse.stream.on('error', (err: any) => {
+                    writer.reject(err.message || "Unknown JS exception");
+                });
+            }
         } catch (e: any) {
             if (!!streamResponse && !!streamResponse.stream) {
                 streamResponse.stream.destroy(e);

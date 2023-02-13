@@ -2,7 +2,7 @@
 import * as querystring from 'querystring';
 import crypto from 'crypto';
 
-import { getProcessUid } from '@cubejs-backend/shared';
+import { getProcessUid, getNext } from '@cubejs-backend/shared';
 import { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 
 function parseHostPort(addr: string): { host: string, port: number } {
@@ -193,14 +193,20 @@ export function getCacheHash(queryKey: QueryKey): QueryKeyHash {
     return queryKey as any;
   }
 
-  const hash = crypto
-    .createHash('md5')
-    .update(JSON.stringify(queryKey))
-    .digest('hex');
-
   if (typeof queryKey === 'object' && queryKey.persistent) {
-    return `${hash}@${getProcessUid()}` as any;
+    const k = (<Array<string>>queryKey);
+    if (k[k.length - 1].indexOf('request#') === -1) {
+      k.push(`request#${getNext()}@${getProcessUid()}`);
+    }
+    return `${crypto
+      .createHash('md5')
+      .update(JSON.stringify(k))
+      .digest('hex')
+    }@${getProcessUid()}` as any;
+  } else {
+    return crypto
+      .createHash('md5')
+      .update(JSON.stringify(queryKey))
+      .digest('hex') as any;
   }
-
-  return hash as any;
 }
