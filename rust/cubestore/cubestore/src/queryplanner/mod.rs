@@ -704,17 +704,13 @@ fn compute_workers(
 pub mod tests {
     use super::*;
 
-    use std::sync::Arc;
-
     use crate::queryplanner::serialized_plan::SerializedPlan;
-    use crate::queryplanner::MetaStoreSchemaProvider;
     use crate::sql::parser::{CubeStoreParser, Statement};
 
     use datafusion::execution::context::ExecutionContext;
     use datafusion::logical_plan::LogicalPlan;
     use datafusion::sql::parser::Statement as DFStatement;
     use datafusion::sql::planner::SqlToRel;
-    use mockall::predicate::*;
     use pretty_assertions::assert_eq;
 
     fn initial_plan(s: &str, ctx: MetaStoreSchemaProvider) -> LogicalPlan {
