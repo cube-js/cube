@@ -903,10 +903,17 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     }
 
     fn get_index_by_id(&self, secondary_index: u32) -> Box<dyn BaseRocksSecondaryIndex<Self::T>> {
-        Self::indexes()
+        let f = Self::indexes()
             .into_iter()
-            .find(|i| i.get_id() == secondary_index)
-            .unwrap()
+            .find(|i| i.get_id() == secondary_index);
+        if f.is_none() {
+            log::error!(
+                "!!!!! secondary index {} not found for metastore table {:?}",
+                secondary_index,
+                Self::table_id()
+            );
+        }
+        f.unwrap()
     }
 
     fn get_row_from_index(
