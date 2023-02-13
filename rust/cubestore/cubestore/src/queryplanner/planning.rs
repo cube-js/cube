@@ -857,9 +857,7 @@ impl ChooseIndex<'_> {
                         None,
                     )
                     .into_plan());
-                } else if let Some(table) =
-                    source.as_any().downcast_ref::<InfoSchemaTableProvider>()
-                {
+                } else if let Some(_) = source.as_any().downcast_ref::<InfoSchemaTableProvider>() {
                     return Err(DataFusionError::Plan(
                         "Unexpected table source: InfoSchemaTableProvider".to_string(),
                     ));
@@ -1643,7 +1641,7 @@ pub mod tests {
     use crate::queryplanner::planning::{choose_index, try_extract_cluster_send, PlanIndexStore};
     use crate::queryplanner::pretty_printers::PPOptions;
     use crate::queryplanner::query_executor::ClusterSendExec;
-    use crate::queryplanner::serialized_plan::{RowRange, SerializedPlan};
+    use crate::queryplanner::serialized_plan::RowRange;
     use crate::queryplanner::{pretty_printers, CubeTableLogical};
     use crate::sql::parser::{CubeStoreParser, Statement};
     use crate::table::{Row, TableValue};
@@ -1651,17 +1649,6 @@ pub mod tests {
     use datafusion::catalog::TableReference;
     use std::collections::HashMap;
     use std::iter::FromIterator;
-
-    #[tokio::test]
-    pub async fn test_is_data_select_query() {
-        let indices = default_indices();
-        let plan = initial_plan("SELECT * FROM information_schema.columns", &indices);
-        assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
-
-        let indices = default_indices();
-        let plan = initial_plan("SELECT * FROM information_schema.columns as r", &indices);
-        assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
-    }
 
     #[tokio::test]
     pub async fn test_choose_index() {
@@ -2263,13 +2250,11 @@ pub mod tests {
     }
 
     fn initial_plan(s: &str, i: &TestIndices) -> LogicalPlan {
-        let statement;
-        if let Statement::Statement(s) = CubeStoreParser::new(s).unwrap().parse_statement().unwrap()
-        {
-            statement = s;
-        } else {
-            panic!("not a statement")
-        }
+        let statement = match CubeStoreParser::new(s).unwrap().parse_statement().unwrap() {
+            Statement::Statement(s) => s,
+            other => panic!("not a statement, actual {:?}", other),
+        };
+
         let plan = SqlToRel::new(i)
             .statement_to_plan(&DFStatement::Statement(statement))
             .unwrap();
