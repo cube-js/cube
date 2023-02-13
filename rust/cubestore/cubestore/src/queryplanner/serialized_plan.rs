@@ -9,6 +9,7 @@ use crate::queryplanner::udfs::{
     aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
     CubeScalarUDFKind,
 };
+use crate::queryplanner::InfoSchemaTableProvider;
 use crate::table::Row;
 use crate::CubeError;
 use arrow::datatypes::DataType;
@@ -1184,9 +1185,12 @@ impl SerializedPlan {
             type Error = ();
 
             fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
-                if let LogicalPlan::TableScan { table_name, .. } = plan {
-                    let name_split = table_name.split(".").collect::<Vec<_>>();
-                    if name_split[0] != "information_schema" && name_split[0] != "system" {
+                if let LogicalPlan::TableScan { source, .. } = plan {
+                    if source
+                        .as_any()
+                        .downcast_ref::<InfoSchemaTableProvider>()
+                        .is_none()
+                    {
                         self.seen_data_scans = true;
                         return Ok(false);
                     }

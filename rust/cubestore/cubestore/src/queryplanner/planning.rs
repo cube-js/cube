@@ -49,7 +49,7 @@ use crate::queryplanner::serialized_plan::{
     IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
 };
 use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
-use crate::queryplanner::CubeTableLogical;
+use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::table::{cmp_same_types, Row};
 use crate::CubeError;
 use datafusion::logical_plan;
@@ -857,8 +857,14 @@ impl ChooseIndex<'_> {
                         None,
                     )
                     .into_plan());
+                } else if let Some(table) =
+                    source.as_any().downcast_ref::<InfoSchemaTableProvider>()
+                {
+                    return Err(DataFusionError::Plan(
+                        "Unexpected table source: InfoSchemaTableProvider".to_string(),
+                    ));
                 } else {
-                    panic!("Unexpected table source")
+                    return Err(DataFusionError::Plan("Unexpected table source".to_string()));
                 }
             }
             _ => return Ok(p),
@@ -1637,7 +1643,7 @@ pub mod tests {
     use crate::queryplanner::planning::{choose_index, try_extract_cluster_send, PlanIndexStore};
     use crate::queryplanner::pretty_printers::PPOptions;
     use crate::queryplanner::query_executor::ClusterSendExec;
-    use crate::queryplanner::serialized_plan::RowRange;
+    use crate::queryplanner::serialized_plan::{RowRange, SerializedPlan};
     use crate::queryplanner::{pretty_printers, CubeTableLogical};
     use crate::sql::parser::{CubeStoreParser, Statement};
     use crate::table::{Row, TableValue};
@@ -1645,6 +1651,17 @@ pub mod tests {
     use datafusion::catalog::TableReference;
     use std::collections::HashMap;
     use std::iter::FromIterator;
+
+    #[tokio::test]
+    pub async fn test_is_data_select_query() {
+        let indices = default_indices();
+        let plan = initial_plan("SELECT * FROM information_schema.columns", &indices);
+        assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
+
+        let indices = default_indices();
+        let plan = initial_plan("SELECT * FROM information_schema.columns as r", &indices);
+        assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
+    }
 
     #[tokio::test]
     pub async fn test_choose_index() {
