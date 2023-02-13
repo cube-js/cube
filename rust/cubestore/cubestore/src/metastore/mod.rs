@@ -2917,22 +2917,34 @@ impl MetaStore for RocksMetaStore {
             .map(|p| p.get_row().get_index_id())
             .unique()
             .collect::<Vec<_>>();
-        let mut indices = HashMap::new();
-        for index_id in index_ids {
-            let index = self.get_index(index_id).await?;
-            indices.insert(index_id, index);
-        }
+        let indices = self
+            .read_operation_out_of_queue(move |db_ref| {
+                let mut indices = HashMap::new();
+                let index_table = IndexRocksTable::new(db_ref);
+                for index_id in index_ids {
+                    let index = index_table.get_row_or_not_found(index_id)?;
+                    indices.insert(index_id, index);
+                }
+                Ok(indices)
+            })
+            .await?;
 
         let table_ids = indices
             .values()
             .map(|i| i.get_row().table_id())
             .unique()
             .collect::<Vec<_>>();
-        let mut tables = HashMap::new();
-        for table_id in table_ids {
-            let table = self.get_table_by_id(table_id).await?;
-            tables.insert(table_id, table);
-        }
+        let tables = self
+            .read_operation_out_of_queue(move |db_ref| {
+                let mut tables = HashMap::new();
+                let tables_table = TableRocksTable::new(db_ref);
+                for table_id in table_ids {
+                    let index = tables_table.get_row_or_not_found(table_id)?;
+                    tables.insert(table_id, index);
+                }
+                Ok(tables)
+            })
+            .await?;
 
         let mut result = Vec::new();
 
