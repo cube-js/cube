@@ -295,7 +295,9 @@ where
                     let result = match self.table.get_row(row_id) {
                         Ok(Some(row)) => Ok(row),
                         Ok(None) => {
+                            println!("!!!!! before rebuild {:?}, id: {}", self.table, self.index_id);
                             let index = self.table.get_index_by_id(self.index_id);
+                            println!("!!!!! after rebuild {:?}, id: {}", self.table, self.index_id);
                             match self.table.rebuild_index(&index) {
                                 Ok(_) => {
                                     Err(CubeError::internal(format!(
