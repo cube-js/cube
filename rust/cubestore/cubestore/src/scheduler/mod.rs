@@ -328,6 +328,10 @@ impl SchedulerImpl {
     async fn delete_created_but_not_written_partitions(&self) -> Result<(), CubeError> {
         let all_inactive_partitions = self.meta_store.all_just_created_partitions().await?;
 
+        log::info!(
+            "!!!! orphaned man sended to GC: {}",
+            all_inactive_partitions.len()
+        );
         for partition in all_inactive_partitions.iter() {
             let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
             self.gc_loop
@@ -342,6 +346,10 @@ impl SchedulerImpl {
 
     async fn delete_middle_man_partitions(&self) -> Result<(), CubeError> {
         let all_inactive_partitions = self.meta_store.all_inactive_middle_man_partitions().await?;
+        log::info!(
+            "!!!! middle man sended to GC: {}",
+            all_inactive_partitions.len()
+        );
 
         for partition in all_inactive_partitions.iter() {
             let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
@@ -1334,8 +1342,8 @@ impl DataGCLoop {
                             if t > Duration::from_millis(1000) {
                                 app_metrics::GC_QUEUE_SIZE
                                     .report_with_tags(pending_lock.0.len() as i64, Some(&tags));
+                                last_apm_sending = SystemTime::now();
                             }
-                            last_apm_sending = SystemTime::now();
                         }
                         task.task
                     } else {
