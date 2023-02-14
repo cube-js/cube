@@ -15,6 +15,8 @@ mod filter_by_key_range;
 mod flatten_union;
 pub mod info_schema;
 pub mod now;
+#[cfg(test)]
+mod test_utils;
 pub mod udfs;
 
 use crate::cachestore::CacheStore;
@@ -695,5 +697,55 @@ fn compute_workers(
             "no cluster send node found in plan".to_string(),
         )),
         Err(e) => Err(e),
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    use crate::queryplanner::serialized_plan::SerializedPlan;
+    use crate::sql::parser::{CubeStoreParser, Statement};
+
+    use datafusion::execution::context::ExecutionContext;
+    use datafusion::logical_plan::LogicalPlan;
+    use datafusion::sql::parser::Statement as DFStatement;
+    use datafusion::sql::planner::SqlToRel;
+    use pretty_assertions::assert_eq;
+
+    fn initial_plan(s: &str, ctx: MetaStoreSchemaProvider) -> LogicalPlan {
+        let statement = match CubeStoreParser::new(s).unwrap().parse_statement().unwrap() {
+            Statement::Statement(s) => s,
+            other => panic!("not a statement, actual {:?}", other),
+        };
+
+        let plan = SqlToRel::new(&ctx)
+            .statement_to_plan(&DFStatement::Statement(statement))
+            .unwrap();
+        ExecutionContext::new().optimize(&plan).unwrap()
+    }
+
+    fn get_test_execution_ctx() -> MetaStoreSchemaProvider {
+        MetaStoreSchemaProvider::new(
+            Arc::new(vec![]),
+            Arc::new(test_utils::MetaStoreMock {}),
+            Arc::new(test_utils::CacheStoreMock {}),
+            &vec![],
+        )
+    }
+
+    #[tokio::test]
+    pub async fn test_is_data_select_query() {
+        let plan = initial_plan(
+            "SELECT * FROM information_schema.columns",
+            get_test_execution_ctx(),
+        );
+        assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
+
+        let plan = initial_plan(
+            "SELECT * FROM information_schema.columns as r",
+            get_test_execution_ctx(),
+        );
+        assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
     }
 }
