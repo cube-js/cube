@@ -1,3 +1,4 @@
+use crate::app_metrics;
 use crate::cluster::{pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobStatus, JobType};
@@ -1321,8 +1322,13 @@ impl DataGCLoop {
                         .map(|current| current.deadline <= Instant::now())
                         .unwrap_or(false)
                     {
+                        let server_name = self.config.server_name();
+                        let host_name = server_name.split(":").next().unwrap_or("undefined");
+                        let tags = vec![format!("cube_host:{}", host_name)];
                         let task = pending_lock.0.pop().unwrap();
                         pending_lock.1.remove(&task.task);
+                        app_metrics::GC_QUEUE_SIZE
+                            .report_with_tags(pending_lock.0.len() as i64, Some(&tags));
                         task.task
                     } else {
                         continue;

@@ -53,3 +53,5 @@ pub static METASTORE_READ_OUT_QUEUE_OPERATION: Histogram =
 
 /// RemoteFs metrics
 pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.operations.core");
+
+pub static GC_QUEUE_SIZE: Gauge = metrics::histogram("cs.gc.queue_size");
