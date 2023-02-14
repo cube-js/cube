@@ -1305,6 +1305,8 @@ impl DataGCLoop {
                 _ = self.task_notify.notified() => {}
             };
 
+            let mut last_apm_sending = SystemTime::now();
+
             while self
                 .pending
                 .read()
@@ -1323,13 +1325,18 @@ impl DataGCLoop {
                         .map(|current| current.deadline <= Instant::now())
                         .unwrap_or(false)
                     {
-                        let server_name = self.config.server_name();
-                        let host_name = server_name.split(":").next().unwrap_or("undefined");
-                        let tags = vec![format!("cube_host:{}", host_name)];
                         let task = pending_lock.0.pop().unwrap();
                         pending_lock.1.remove(&task.task);
-                        app_metrics::GC_QUEUE_SIZE
-                            .report_with_tags(pending_lock.0.len() as i64, Some(&tags));
+                        if let Ok(t) = last_apm_sending.elapsed() {
+                            let server_name = self.config.server_name();
+                            let host_name = server_name.split(":").next().unwrap_or("undefined");
+                            let tags = vec![format!("cube_host:{}", host_name)];
+                            if t > Duration::from_millis(1000) {
+                                app_metrics::GC_QUEUE_SIZE
+                                    .report_with_tags(pending_lock.0.len() as i64, Some(&tags));
+                            }
+                            last_apm_sending = SystemTime::now();
+                        }
                         task.task
                     } else {
                         continue;
@@ -1337,7 +1344,6 @@ impl DataGCLoop {
                 };
 
                 log::trace!("Executing GCTask: {:?}", task);
-                log::info!("!!! Executing GCTask: {:?}", task);
 
                 match task {
                     GCTask::RemoveRemoteFile(remote_path) => {
