@@ -16,7 +16,7 @@ use std::fmt;
 use std::fmt::{Debug, Formatter};
 
 pub mod data;
-pub(crate) mod parquet;
+pub mod parquet;
 pub mod redistribute;
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug, Hash)]

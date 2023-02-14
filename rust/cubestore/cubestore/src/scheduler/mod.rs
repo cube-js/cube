@@ -36,7 +36,6 @@ pub struct SchedulerImpl {
     cluster: Arc<dyn Cluster>,
     remote_fs: Arc<dyn RemoteFs>,
     event_receiver: Mutex<Receiver<MetaStoreEvent>>,
-    cachestore_event_receiver: Mutex<Receiver<MetaStoreEvent>>,
     cancel_token: CancellationToken,
     gc_loop: Arc<DataGCLoop>,
     config: Arc<dyn ConfigObj>,
@@ -51,9 +50,8 @@ impl SchedulerImpl {
         cluster: Arc<dyn Cluster>,
         remote_fs: Arc<dyn RemoteFs>,
         event_receiver: Receiver<MetaStoreEvent>,
-        cachestore_event_receiver: Receiver<MetaStoreEvent>,
         config: Arc<dyn ConfigObj>,
-    ) -> SchedulerImpl {
+    ) -> Self {
         let cancel_token = CancellationToken::new();
         let gc_loop = DataGCLoop::new(
             meta_store.clone(),
@@ -61,12 +59,11 @@ impl SchedulerImpl {
             config.clone(),
             cancel_token.clone(),
         );
-        SchedulerImpl {
+        Self {
             meta_store,
             cluster,
             remote_fs,
             event_receiver: Mutex::new(event_receiver),
-            cachestore_event_receiver: Mutex::new(cachestore_event_receiver),
             cancel_token,
             gc_loop,
             config,
@@ -74,16 +71,13 @@ impl SchedulerImpl {
         }
     }
 
-    pub fn spawn_processing_loops(
-        scheduler: Arc<SchedulerImpl>,
-    ) -> Vec<JoinHandle<Result<(), CubeError>>> {
-        let scheduler2 = scheduler.clone();
-        let scheduler3 = scheduler.clone();
-        let scheduler4 = scheduler.clone();
+    pub fn spawn_processing_loops(self: Arc<Self>) -> Vec<JoinHandle<Result<(), CubeError>>> {
+        let scheduler2 = self.clone();
+        let scheduler3 = self.clone();
 
         vec![
             cube_ext::spawn(async move {
-                let gc_loop = scheduler.gc_loop.clone();
+                let gc_loop = self.gc_loop.clone();
                 gc_loop.run().await;
                 Ok(())
             }),
@@ -92,14 +86,10 @@ impl SchedulerImpl {
                 Ok(())
             }),
             cube_ext::spawn(async move {
-                scheduler3.run_cache_event_processor().await;
-                Ok(())
-            }),
-            cube_ext::spawn(async move {
-                scheduler4
+                scheduler3
                     .reconcile_loop
                     .process(
-                        scheduler4.clone(),
+                        scheduler3.clone(),
                         async move |_| Ok(Delay::new(Duration::from_secs(30)).await),
                         async move |s, _| s.reconcile().await,
                     )
@@ -137,31 +127,6 @@ impl SchedulerImpl {
                     error!("Error processing event {:?}: {}", event, e);
                 }
             });
-        }
-    }
-
-    async fn run_cache_event_processor(self: Arc<Self>) {
-        loop {
-            let mut event_receiver = self.cachestore_event_receiver.lock().await;
-            let _ = tokio::select! {
-                _ = self.cancel_token.cancelled() => {
-                    return;
-                }
-                event = event_receiver.recv() => {
-                    match event {
-                        Err(broadcast::error::RecvError::Lagged(messages)) => {
-                            error!("Scheduler is lagging on cache store event processing for {} messages", messages);
-                            continue;
-                        },
-                        Err(broadcast::error::RecvError::Closed) => {
-                            return;
-                        },
-                        Ok(event) => event,
-                    }
-                }
-            };
-
-            // Right now, it's used to free channel
         }
     }
 
