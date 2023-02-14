@@ -850,7 +850,7 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn get_in_memory_chunks_deactivated_seconds_ago(
         &self,
         seconds_ago: i64,
-    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
+    ) -> Result<Vec<(Option<IdRow<Partition>>, Vec<IdRow<Chunk>>)>, CubeError>;
     async fn get_partitions_for_in_memory_compaction(
         &self,
         node: String,
@@ -2752,9 +2752,7 @@ impl MetaStore for RocksMetaStore {
 
             let mut result = Vec::new();
 
-            let mut parts = 0;
             for partition in orphaned_partitions {
-                parts += 1;
                 let partition = partition?;
                 if !partitions_with_chunks.contains(&partition.get_id()) {
                     if let Some(parent_partition_id) = partition.get_row().parent_partition_id() {
@@ -2773,7 +2771,6 @@ impl MetaStore for RocksMetaStore {
                     }
                 }
             }
-            log::info!("!!! all inactive from middle {}", parts);
 
             Ok(result)
         })
@@ -2845,7 +2842,7 @@ impl MetaStore for RocksMetaStore {
     async fn get_in_memory_chunks_deactivated_seconds_ago(
         &self,
         seconds_ago: i64,
-    ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError> {
+    ) -> Result<Vec<(Option<IdRow<Partition>>, Vec<IdRow<Chunk>>)>, CubeError> {
         self.read_operation_out_of_queue(move |db_ref| {
             let chunks_table = ChunkRocksTable::new(db_ref.clone());
 
@@ -2875,9 +2872,7 @@ impl MetaStore for RocksMetaStore {
             let partitions_table = PartitionRocksTable::new(db_ref.clone());
 
             for (id, chunks) in partitions_map.into_iter() {
-                if let Some(partition) = partitions_table.get_row(id)? {
-                    result.push((partition, chunks));
-                }
+                result.push((partitions_table.get_row(id)?, chunks));
             }
 
             Ok(result)
