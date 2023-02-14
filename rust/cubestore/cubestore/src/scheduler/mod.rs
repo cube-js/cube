@@ -1249,7 +1249,7 @@ impl SchedulerImpl {
                 .in_memory_compaction()
                 .elapsed()
                 .ok()
-                .map_or(false, |d| d > Duration::from_secs(10))
+                .map_or(false, |d| d >= Duration::from_secs(5))
             {
                 let job = self
                     .meta_store
