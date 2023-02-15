@@ -4,6 +4,8 @@ pub mod transport;
 #[cfg(not(target_os = "windows"))]
 pub mod worker_pool;
 
+mod memory_compaction_runner;
+
 #[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 
@@ -48,6 +50,7 @@ use futures::{Future, Stream};
 use futures_timer::Delay;
 use itertools::Itertools;
 use log::{debug, error, info, warn};
+use memory_compaction_runner::MemoryCompactionRunner;
 use mockall::automock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -1125,6 +1128,15 @@ impl ClusterImpl {
             }));
         }
 
+        let memory_compaction_runner = MemoryCompactionRunner::new(
+            self.config_obj.clone(),
+            self.injector.upgrade().unwrap().get_service_typed().await,
+            self.server_name.clone(),
+            self.stop_token.clone(),
+        );
+        futures.push(MemoryCompactionRunner::spawn_processing_loop(
+            memory_compaction_runner.clone(),
+        ));
         let stop_token = self.stop_token.clone();
         let long_running_job_notify = self.long_running_job_notify.clone();
         let job_notify = self.job_notify.clone();

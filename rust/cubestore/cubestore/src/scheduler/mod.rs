@@ -464,14 +464,8 @@ impl SchedulerImpl {
             // TODO config
             .get_partitions_with_chunks_created_seconds_ago(60)
             .await?;
-        let mut nodes_for_in_memory_compactions = HashSet::new();
         for p in partition_compaction_candidates_id {
-            let node_name = self.cluster.node_name_by_partition(&p);
-            nodes_for_in_memory_compactions.insert(node_name);
             self.schedule_compaction_if_needed(&p).await?;
-        }
-        for node in nodes_for_in_memory_compactions {
-            self.schedule_node_in_memory_compaction(node).await?;
         }
         Ok(())
     }
@@ -874,13 +868,13 @@ impl SchedulerImpl {
                 .get_partitions_out_of_queue(partition_ids)
                 .await?;
             let mut futures = Vec::with_capacity(partitions.len());
-            let mut nodes_for_in_memory_compactions = HashSet::new();
+            //let mut nodes_for_in_memory_compactions = HashSet::new();
             for partition in partitions.into_iter() {
                 if partition.get_row().is_active() {
-                    if *partition_ids_map.get(&partition.get_id()).unwrap_or(&false) {
+                    /* if *partition_ids_map.get(&partition.get_id()).unwrap_or(&false) {
                         let node_name = self.cluster.node_name_by_partition(&partition);
                         nodes_for_in_memory_compactions.insert(node_name);
-                    }
+                    } */
                     let partition_to_move = partition.clone();
                     let self_to_move = self.clone();
                     futures.push(cube_ext::spawn(async move {
@@ -900,9 +894,9 @@ impl SchedulerImpl {
                 }
             }
 
-            for node in nodes_for_in_memory_compactions {
+            /* for node in nodes_for_in_memory_compactions {
                 self.schedule_node_in_memory_compaction(node).await?;
-            }
+            } */
 
             join_all(futures)
                 .await
@@ -1189,8 +1183,8 @@ impl SchedulerImpl {
                     .await?;
                 if job.is_some() {
                     self.cluster.notify_job_runner(node).await?;
-                    last_action.set_in_memory_compaction(SystemTime::now());
                 }
+                last_action.set_in_memory_compaction(SystemTime::now());
             }
             Ok(())
         } else {
