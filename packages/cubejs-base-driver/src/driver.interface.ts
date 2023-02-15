@@ -196,3 +196,15 @@ export interface DriverInterface {
 
   capabilities(): DriverCapabilities;
 }
+
+export interface InformationSchemaColumn {
+  // eslint-disable-next-line camelcase
+  table_schema: string;
+  // eslint-disable-next-line camelcase
+  table_name: string;
+  // eslint-disable-next-line camelcase
+  column_name: string;
+  // eslint-disable-next-line camelcase
+  data_type: string;
+  [key: string]: string
+}

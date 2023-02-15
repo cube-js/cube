@@ -32,18 +32,9 @@ import {
   TableColumnQueryResult,
   TableQueryResult,
   TableStructure,
-  DriverCapabilities
+  DriverCapabilities,
+  InformationSchemaColumn,
 } from './driver.interface';
-
-const sortByKeys = (unordered) => {
-  const ordered = {};
-
-  Object.keys(unordered).sort().forEach((key) => {
-    ordered[key] = unordered[key];
-  });
-
-  return ordered;
-};
 
 const DbTypeToGenericType = {
   'timestamp without time zone': 'timestamp',
@@ -262,24 +253,44 @@ export abstract class BaseDriver implements DriverInterface {
     return false;
   }
 
-  protected informationColumnsSchemaReducer(result, i) {
-    let schema = (result[i.table_schema] || {});
-    const tables = (schema[i.table_name] || []);
+  protected informationColumnsSchemaReducer(result, i: InformationSchemaColumn) {
+    if (!result[i.table_schema]) {
+      result[i.table_schema] = {};
+    }
 
-    tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
+    if (!result[i.table_schema][i.table_name]) {
+      result[i.table_schema][i.table_name] = [];
+    }
 
-    tables.sort();
-    schema[i.table_name] = tables;
-    schema = sortByKeys(schema);
-    result[i.table_schema] = schema;
+    result[i.table_schema][i.table_name].push({
+      name: i.column_name,
+      type: i.data_type,
+    });
 
-    return sortByKeys(result);
+    return result;
   }
 
-  public tablesSchema() {
-    const query = this.informationSchemaQuery();
+  protected informationColumnsSchemaSorter(data) {
+    return data
+      .map((i) => ({
+        ...i,
+        sortedKeyServiceField: `${i.table_schema}.${i.table_name}.${i.column_name}`,
+      }))
+      .sort((a, b) => a.sortedKeyServiceField.localeCompare(b.sortedKeyServiceField));
+  }
 
-    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+  public async tablesSchema() {
+    const query = this.informationSchemaQuery();
+    const data: InformationSchemaColumn[] = await this.query(query);
+    if (!data.length) {
+      return data;
+    }
+
+    return reduce(
+      this.informationColumnsSchemaReducer,
+      {},
+      this.informationColumnsSchemaSorter(data)
+    );
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<Array<unknown>> {

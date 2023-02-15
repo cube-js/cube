@@ -135,7 +135,11 @@ export class MaterializeDriver extends PostgresDriver {
     const version = await this.getMaterializeVersion();
     const query = this.informationSchemaQueryWithFilter(version);
 
-    return this.query(query, []).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    return this.query(query, []).then((data) => reduce(
+      this.informationColumnsSchemaReducer,
+      {},
+      this.informationColumnsSchemaSorter(data)
+    ));
   }
 
   protected async* asyncFetcher<R extends unknown>(conn: PoolClient, cursorId: string): AsyncGenerator<R> {
