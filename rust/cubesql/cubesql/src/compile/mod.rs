@@ -16763,4 +16763,84 @@ ORDER BY \"COUNT(count)\" DESC"
             filters: None,
         }))
     }
+
+    #[tokio::test]
+    async fn test_metabase_cast_column_to_date() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                CAST("public"."KibanaSampleDataEcommerce"."order_date" AS DATE) AS "order_date",
+                avg("public"."KibanaSampleDataEcommerce"."avgPrice") AS "avgPrice"
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE (
+                "public"."KibanaSampleDataEcommerce"."order_date" >= CAST((now() + (INTERVAL '-30 day')) AS DATE)
+                AND "public"."KibanaSampleDataEcommerce"."order_date" < CAST(now() AS DATE)
+                AND (
+                    "public"."KibanaSampleDataEcommerce"."notes" = 'note1'
+                    OR "public"."KibanaSampleDataEcommerce"."notes" = 'note2'
+                    OR "public"."KibanaSampleDataEcommerce"."notes" = 'note3'
+                )
+            )
+            GROUP BY CAST("public"."KibanaSampleDataEcommerce"."order_date" AS DATE)
+            ORDER BY CAST("public"."KibanaSampleDataEcommerce"."order_date" AS DATE) ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let end_date = chrono::Utc::now().date().naive_utc() - chrono::Duration::days(1);
+        let start_date = end_date - chrono::Duration::days(29);
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.avgPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: Some(json!(vec![
+                        format!("{}T00:00:00.000Z", start_date),
+                        format!("{}T23:59:59.999Z", end_date),
+                    ]))
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["note1".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["note2".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.notes".to_string()),
+                            operator: Some("equals".to_string()),
+                            values: Some(vec!["note3".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                    ]),
+                    and: None
+                }])
+            }
+        )
+    }
 }

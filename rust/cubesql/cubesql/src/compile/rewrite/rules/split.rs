@@ -13,11 +13,11 @@ use crate::{
             projection_expr, projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
             rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
             udf_expr, AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
-            BinaryExprOp, ColumnExprColumn, CubeScanAliasToCube, EventNotificationMeta,
-            GroupAggregateSplitReplacerAliasToCube, GroupExprSplitReplacerAliasToCube,
-            InnerAggregateSplitReplacerAliasToCube, LiteralExprValue, LogicalPlanLanguage,
-            OuterAggregateSplitReplacerAliasToCube, OuterProjectionSplitReplacerAliasToCube,
-            ProjectionAlias,
+            BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliasToCube,
+            EventNotificationMeta, GroupAggregateSplitReplacerAliasToCube,
+            GroupExprSplitReplacerAliasToCube, InnerAggregateSplitReplacerAliasToCube,
+            LiteralExprValue, LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
+            OuterProjectionSplitReplacerAliasToCube, ProjectionAlias, ScalarFunctionExprFun,
         },
     },
     transport::V1CubeMetaExt,
@@ -26,7 +26,7 @@ use crate::{
 use datafusion::{
     arrow::datatypes::DataType as ArrowDataType,
     logical_plan::{Column, DFSchema, Expr, Operator},
-    physical_plan::aggregates::AggregateFunction,
+    physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
 };
 use egg::{EGraph, Id, Rewrite, Subst, Var};
@@ -2041,26 +2041,35 @@ impl RewriteRules for SplitRules {
                 ),
             ),
             // Cast
-            rewrite(
+            transforming_chain_rewrite(
                 "split-push-down-cast-inner-replacer",
-                inner_aggregate_split_replacer(cast_expr("?expr", "?data_type"), "?cube"),
-                inner_aggregate_split_replacer("?expr", "?cube"),
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr("?inner_expr", "?data_type"),
+                )],
+                "?new_expr".to_string(),
+                self.transform_cast_inner("?expr", "?alias_to_cube", "?inner_expr", "?data_type", "?new_expr"),
             ),
-            rewrite(
+            transforming_chain_rewrite(
                 "split-push-down-cast-outer-replacer",
-                outer_projection_split_replacer(cast_expr("?expr", "?data_type"), "?cube"),
-                cast_expr(
-                    outer_projection_split_replacer("?expr", "?cube"),
-                    "?data_type",
-                ),
+                outer_projection_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr("?inner_expr", "?data_type"),
+                )],
+                "?new_expr".to_string(),
+                self.transform_cast_outer("?expr", "?alias_to_cube", "?inner_expr", "?data_type", "?new_expr", true),
             ),
-            rewrite(
+            transforming_chain_rewrite(
                 "split-push-down-cast-outer-aggr-replacer",
-                outer_aggregate_split_replacer(cast_expr("?expr", "?data_type"), "?cube"),
-                cast_expr(
-                    outer_aggregate_split_replacer("?expr", "?cube"),
-                    "?data_type",
-                ),
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr("?inner_expr", "?data_type"),
+                )],
+                "?new_expr".to_string(),
+                self.transform_cast_outer("?expr", "?alias_to_cube", "?inner_expr", "?data_type", "?new_expr", false),
             ),
             // Substring
             rewrite(
@@ -5563,6 +5572,212 @@ impl SplitRules {
             }
 
             return false;
+        }
+    }
+
+    fn transform_cast_inner(
+        &self,
+        expr_var: &'static str,
+        alias_to_cube_var: &'static str,
+        inner_expr_var: &'static str,
+        data_type_var: &'static str,
+        new_expr_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let expr_var = var!(expr_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let inner_expr_var = var!(inner_expr_var);
+        let data_type_var = var!(data_type_var);
+        let new_expr_var = var!(new_expr_var);
+        move |egraph, subst| {
+            let expr_id = subst[expr_var];
+            let res = egraph[expr_id]
+                .data
+                .original_expr
+                .as_ref()
+                .ok_or(CubeError::internal(format!(
+                    "Original expr wasn't prepared for {:?}",
+                    expr_id
+                )));
+
+            if let Ok(expr) = res {
+                let inner_expr_id = subst[inner_expr_var];
+                let res =
+                    egraph[inner_expr_id]
+                        .data
+                        .original_expr
+                        .as_ref()
+                        .ok_or(CubeError::internal(format!(
+                            "Original expr wasn't prepared for {:?}",
+                            inner_expr_id
+                        )));
+
+                if let Ok(inner_expr) = res {
+                    match inner_expr {
+                        Expr::Column(_) => {
+                            for data_type in
+                                var_iter!(egraph[subst[data_type_var]], CastExprDataType).cloned()
+                            {
+                                if data_type == ArrowDataType::Date32 {
+                                    // TODO unwrap
+                                    let name = expr.name(&DFSchema::empty()).unwrap();
+
+                                    let granularity_value_id = egraph.add(
+                                        LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                                            ScalarValue::Utf8(Some("day".to_string())),
+                                        )),
+                                    );
+                                    let granularity_id =
+                                        egraph.add(LogicalPlanLanguage::LiteralExpr([
+                                            granularity_value_id,
+                                        ]));
+                                    let date_trunc_args_empty_tail_id = egraph
+                                        .add(LogicalPlanLanguage::ScalarFunctionExprArgs(vec![]));
+                                    let date_trunc_args_column_id = egraph.add(
+                                        LogicalPlanLanguage::ScalarFunctionExprArgs(vec![
+                                            subst[inner_expr_var],
+                                            date_trunc_args_empty_tail_id,
+                                        ]),
+                                    );
+                                    let date_trunc_args_id =
+                                        egraph.add(LogicalPlanLanguage::ScalarFunctionExprArgs(
+                                            vec![granularity_id, date_trunc_args_column_id],
+                                        ));
+                                    let date_trunc_name_id =
+                                        egraph.add(LogicalPlanLanguage::ScalarFunctionExprFun(
+                                            ScalarFunctionExprFun(BuiltinScalarFunction::DateTrunc),
+                                        ));
+                                    let date_trunc_id =
+                                        egraph.add(LogicalPlanLanguage::ScalarFunctionExpr([
+                                            date_trunc_name_id,
+                                            date_trunc_args_id,
+                                        ]));
+                                    let alias_id = egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                                        AliasExprAlias(name),
+                                    ));
+                                    let alias_expr_id =
+                                        egraph.add(LogicalPlanLanguage::AliasExpr([
+                                            date_trunc_id,
+                                            alias_id,
+                                        ]));
+
+                                    subst.insert(new_expr_var, alias_expr_id);
+                                    return true;
+                                }
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+            }
+
+            subst.insert(
+                new_expr_var,
+                egraph.add(LogicalPlanLanguage::InnerAggregateSplitReplacer([
+                    subst[inner_expr_var],
+                    subst[alias_to_cube_var],
+                ])),
+            );
+            true
+        }
+    }
+
+    fn transform_cast_outer(
+        &self,
+        expr_var: &'static str,
+        alias_to_cube_var: &'static str,
+        inner_expr_var: &'static str,
+        data_type_var: &'static str,
+        new_expr_var: &'static str,
+        is_outer_projection: bool,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let expr_var = var!(expr_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let inner_expr_var = var!(inner_expr_var);
+        let data_type_var = var!(data_type_var);
+        let new_expr_var = var!(new_expr_var);
+        move |egraph, subst| {
+            let expr_id = subst[expr_var];
+            let res = egraph[expr_id]
+                .data
+                .original_expr
+                .as_ref()
+                .ok_or(CubeError::internal(format!(
+                    "Original expr wasn't prepared for {:?}",
+                    expr_id
+                )));
+
+            if let Ok(expr) = res {
+                let inner_expr_id = subst[inner_expr_var];
+                let res =
+                    egraph[inner_expr_id]
+                        .data
+                        .original_expr
+                        .as_ref()
+                        .ok_or(CubeError::internal(format!(
+                            "Original expr wasn't prepared for {:?}",
+                            inner_expr_id
+                        )));
+
+                if let Ok(inner_expr) = res {
+                    match inner_expr {
+                        Expr::Column(_) => {
+                            for data_type in
+                                var_iter!(egraph[subst[data_type_var]], CastExprDataType).cloned()
+                            {
+                                if data_type == ArrowDataType::Date32 {
+                                    // TODO unwrap
+                                    let name = expr.name(&DFSchema::empty()).unwrap();
+                                    let column = Column::from_name(name.to_string());
+
+                                    let column_id =
+                                        egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                            ColumnExprColumn(column),
+                                        ));
+                                    let column_expr_id =
+                                        egraph.add(LogicalPlanLanguage::ColumnExpr([column_id]));
+                                    let cast_expr_id = egraph.add(LogicalPlanLanguage::CastExpr([
+                                        column_expr_id,
+                                        subst[data_type_var],
+                                    ]));
+                                    let alias_id = egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                                        AliasExprAlias(name),
+                                    ));
+                                    let alias_expr_id =
+                                        egraph.add(LogicalPlanLanguage::AliasExpr([
+                                            cast_expr_id,
+                                            alias_id,
+                                        ]));
+
+                                    subst.insert(new_expr_var, alias_expr_id);
+                                    return true;
+                                }
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+            }
+
+            let split_replacer_id = if is_outer_projection {
+                egraph.add(LogicalPlanLanguage::OuterProjectionSplitReplacer([
+                    subst[inner_expr_var],
+                    subst[alias_to_cube_var],
+                ]))
+            } else {
+                egraph.add(LogicalPlanLanguage::OuterAggregateSplitReplacer([
+                    subst[inner_expr_var],
+                    subst[alias_to_cube_var],
+                ]))
+            };
+
+            subst.insert(
+                new_expr_var,
+                egraph.add(LogicalPlanLanguage::CastExpr([
+                    split_replacer_id,
+                    subst[data_type_var],
+                ])),
+            );
+            true
         }
     }
 }
