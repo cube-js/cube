@@ -59,9 +59,10 @@ use self::{
             create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
             create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
             create_position_udf, create_quarter_udf, create_regexp_substr_udf, create_second_udf,
-            create_session_user_udf, create_str_to_date_udf, create_time_format_udf,
-            create_timediff_udf, create_to_char_udf, create_to_date_udf, create_ucase_udf,
-            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
+            create_session_user_udf, create_sha1_udf, create_str_to_date_udf,
+            create_time_format_udf, create_timediff_udf, create_to_char_udf, create_to_date_udf,
+            create_ucase_udf, create_unnest_udtf, create_user_udf, create_version_udf,
+            create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -1172,6 +1173,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_position_udf());
         ctx.register_udf(create_date_to_timestamp_udf());
         ctx.register_udf(create_to_date_udf());
+        ctx.register_udf(create_sha1_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -4973,6 +4975,188 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_redshift_svv_table_info() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "redshift_svv_table_info",
+            execute_query(
+                "SELECT * FROM svv_table_info ORDER BY table_id ASC".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_redshift_stl_ddltext() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "redshift_stl_ddltext",
+            execute_query(
+                "SELECT * FROM stl_ddltext ORDER BY xid ASC, sequence ASC".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_redshift_stl_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "redshift_stl_query",
+            execute_query(
+                "SELECT * FROM stl_query ORDER BY query ASC".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_redshift_stl_querytext() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "redshift_stl_querytext",
+            execute_query(
+                "SELECT * FROM stl_querytext ORDER BY query ASC, sequence ASC".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_sha1_redshift() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "sha1_redshift",
+            execute_query(
+                "
+                SELECT
+                    relname,
+                    SHA1(relname) hash
+                FROM pg_class
+                ORDER BY oid ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_monte_carlo_table_introspection() -> Result<(), CubeError> {
+        // This query is used by Monte Carlo for introspection
+        insta::assert_snapshot!(
+            "monte_carlo_table_introspection",
+            execute_query(
+                r#"
+                SELECT
+                    "database",
+                    "table",
+                    "table_id",
+                    "schema",
+                    "size",
+                    "tbl_rows",
+                    "estimated_visible_rows"
+                FROM svv_table_info
+                WHERE (
+                    "database" = 'cubedb'
+                    AND "schema" = 'public'
+                    AND "table" = 'KibanaSampleDataEcommerce'
+                ) ORDER BY "table_id"
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_monte_carlo_ddl_introspection() -> Result<(), CubeError> {
+        // This query is used by Monte Carlo for introspection
+        insta::assert_snapshot!(
+            "monte_carlo_ddl_introspection",
+            execute_query(
+                r#"
+                SELECT
+                    SHA1(
+                        pg_user.usename
+                        || '-'
+                        || stl_ddltext.xid
+                        || '-'
+                        || stl_ddltext.pid
+                        || '-'
+                        || stl_ddltext.starttime
+                        || '-'
+                        || stl_ddltext.endtime
+                    ) as query,
+                    stl_ddltext.sequence,
+                    stl_ddltext.text,
+                    pg_user.usename,
+                    stl_ddltext.starttime,
+                    stl_ddltext.endtime
+                FROM stl_ddltext
+                INNER JOIN pg_user ON stl_ddltext.userid = pg_user.usesysid
+                WHERE
+                    endtime >= '2022-11-15 16:18:47.814515'
+                    AND endtime < '2022-11-15 16:31:47.814515'
+                ORDER BY 1, 2
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_monte_carlo_query_introspection() -> Result<(), CubeError> {
+        // This query is used by Monte Carlo for introspection
+        insta::assert_snapshot!(
+            "monte_carlo_query_introspection",
+            execute_query(
+                r#"
+                SELECT
+                    stl_query.query,
+                    stl_querytext.sequence,
+                    stl_querytext.text,
+                    stl_query.database,
+                    pg_user.usename,
+                    stl_query.starttime,
+                    stl_query.endtime,
+                    stl_query.aborted
+                FROM stl_query
+                INNER JOIN pg_user ON stl_query.userid = pg_user.usesysid
+                INNER JOIN stl_querytext USING (query)
+                WHERE
+                    endtime >= '2022-11-15 16:18:47.814515'
+                    AND endtime < '2022-11-15 16:31:47.814515'
+                    AND stl_querytext.userid > 1
+                ORDER BY 1, 2
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_literal_filter_simplify() -> Result<(), CubeError> {
         init_logger();
 
@@ -7130,6 +7314,20 @@ ORDER BY \"COUNT(count)\" DESC"
             "pgcatalog_pgstats_postgres",
             execute_query(
                 "SELECT * FROM pg_catalog.pg_stats".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pgcatalog_pguser_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pguser_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_user ORDER BY usesysid ASC".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?
