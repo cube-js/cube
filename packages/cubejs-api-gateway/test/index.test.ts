@@ -633,26 +633,6 @@ describe('API Gateway', () => {
           }
         }]
       },
-      {
-        route: 'sql-runner',
-        scope: ['sql-runner'],
-        method: 'post',
-        successBody: {
-          query: {
-            query: 'SELECT * FROM sql-runner; ',
-            external: true,
-            limit: 10000,
-            resultFilter: {
-              objectLimit: 2,
-              stringLimit: 2,
-              objectTypes: ['Buffer'],
-              limit: 1,
-              offset: 1,
-            },
-          }
-        },
-        successResult: { data: [{ string: 'st', number: 1, buffer: '[4', bufferTwo: 'Placeholder', object: '{"' }] },
-      },
       { route: 'data-sources', scope: ['sql-runner'], successResult: { dataSources: [{ dataSource: 'default', dbType: 'postgres' }] } },
       {
         route: 'db-schema',
@@ -692,7 +672,7 @@ describe('API Gateway', () => {
           {
             result: {
               status: 400,
-              error: 'A user\'s query must contain dataSource or be an external'
+              error: 'A user\'s query must contain dataSource.'
             },
             body: { query: {} }
           }
