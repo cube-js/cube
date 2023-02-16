@@ -138,6 +138,19 @@ by type. Valid values are:
 If `levels` is not specified, then only logs of type `info` and `error` will be
 sent.
 
+### Datadog
+
+Cube Cloud supports tagging logs using the [`ddtags` property][datadog-docs-api-send-logs]:
+
+```toml
+[sinks.datadog]
+type = "datadog_logs"
+ddtags = ["custom_tag_tag1" , "custom_tag_tag2"]
+default_api_key = "*****"
+compression = "gzip"
+```
+
 [cube-contact]: https://cube.dev/contact
+[datadog-docs-api-send-logs]: https://docs.datadoghq.com/api/latest/logs/#send-logs
 [vector]: https://vector.dev/
 [vector-docs-sinks]: https://vector.dev/docs/reference/configuration/sinks/
