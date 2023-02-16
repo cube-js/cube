@@ -386,11 +386,6 @@ class ApiGateway {
         this.requestLoggerMiddleware
       ];
 
-      const sqlRunnerMiddlewares = [
-        ...systemMiddlewares,
-        this.checkSqlRunnerScope,
-      ];
-
       app.get('/cubejs-system/v1/context', systemMiddlewares, this.createSystemContextHandler(this.basePath));
 
       app.get('/cubejs-system/v1/pre-aggregations', systemMiddlewares, (async (req, res) => {
@@ -454,12 +449,6 @@ class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
-
-      app.post(
-        '/cubejs-system/v1/pre-aggregations/jobs',
-        systemMiddlewares,
-        this.preAggregationsJobs.bind(this),
-      );
     }
 
     app.use(this.handleErrorMiddleware);
