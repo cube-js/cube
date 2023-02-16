@@ -2,7 +2,9 @@
 pub mod injection;
 pub mod processing_loop;
 
-use crate::cachestore::{CacheStore, ClusterCacheStoreClient, LazyRocksCacheStore};
+use crate::cachestore::{
+    CacheStore, CacheStoreSchedulerImpl, ClusterCacheStoreClient, LazyRocksCacheStore,
+};
 use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
@@ -56,7 +58,6 @@ use tokio::time::{timeout_at, Duration, Instant};
 pub struct CubeServices {
     pub injector: Arc<Injector>,
     pub sql_service: Arc<dyn SqlService>,
-    pub scheduler: Arc<SchedulerImpl>,
     pub rocks_meta_store: Option<Arc<RocksMetaStore>>,
     pub rocks_cache_store: Option<Arc<LazyRocksCacheStore>>,
     pub meta_store: Arc<dyn MetaStore>,
@@ -93,14 +94,17 @@ impl CubeServices {
 
     async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
         let mut futures = Vec::new();
+
         let cluster = self.cluster.clone();
         futures.push(cube_ext::spawn(async move {
             cluster.wait_processing_loops().await
         }));
+
         let remote_fs = self.injector.get_service_typed::<QueueRemoteFs>().await;
         futures.push(cube_ext::spawn(async move {
             QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
         }));
+
         if !self.cluster.is_select_worker() {
             let rocks_meta_store = self.rocks_meta_store.clone().unwrap();
             futures.push(cube_ext::spawn(async move {
@@ -121,8 +125,22 @@ impl CubeServices {
             }));
             started_rx.await?;
 
-            let scheduler = self.scheduler.clone();
-            futures.extend(SchedulerImpl::spawn_processing_loops(scheduler));
+            if self.injector.has_service_typed::<SchedulerImpl>().await {
+                let scheduler = self.injector.get_service_typed::<SchedulerImpl>().await;
+                futures.extend(scheduler.spawn_processing_loops());
+            }
+
+            if self
+                .injector
+                .has_service_typed::<CacheStoreSchedulerImpl>()
+                .await
+            {
+                let scheduler = self
+                    .injector
+                    .get_service_typed::<CacheStoreSchedulerImpl>()
+                    .await;
+                futures.extend(scheduler.spawn_processing_loops());
+            }
 
             if self.injector.has_service_typed::<MySqlServer>().await {
                 let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
@@ -184,6 +202,7 @@ impl CubeServices {
                 .stop_processing()
                 .await?;
         }
+
         if self.injector.has_service_typed::<HttpServer>().await {
             self.injector
                 .get_service_typed::<HttpServer>()
@@ -191,7 +210,24 @@ impl CubeServices {
                 .stop_processing()
                 .await;
         }
-        self.scheduler.stop_processing_loops()?;
+
+        if self.injector.has_service_typed::<SchedulerImpl>().await {
+            let scheduler = self.injector.get_service_typed::<SchedulerImpl>().await;
+            scheduler.stop_processing_loops()?;
+        }
+
+        if self
+            .injector
+            .has_service_typed::<CacheStoreSchedulerImpl>()
+            .await
+        {
+            let scheduler = self
+                .injector
+                .get_service_typed::<CacheStoreSchedulerImpl>()
+                .await;
+            scheduler.stop_processing_loops()?;
+        }
+
         stop_track_event_loop().await;
         stop_agent_event_loop().await;
         Ok(())
@@ -1115,7 +1151,7 @@ impl Config {
         self.local_dir().join("cachestore")
     }
 
-    async fn configure_remote_fs(&self) {
+    pub async fn configure_remote_fs(&self) {
         let config_obj_to_register = self.config_obj.clone();
         self.injector
             .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
@@ -1183,38 +1219,74 @@ impl Config {
         };
     }
 
-    async fn remote_fs(&self) -> Result<Arc<dyn RemoteFs + 'static>, CubeError> {
-        self.configure_remote_fs().await;
-        Ok(self.injector.get_service("original_remote_fs").await)
-    }
-
-    pub fn injector(&self) -> Arc<Injector> {
-        self.injector.clone()
-    }
-
-    pub async fn configure_injector(&self) {
-        self.configure_remote_fs().await;
-
-        self.injector
-            .register_typed_with_default::<dyn RemoteFs, QueueRemoteFs, _, _>(async move |i| {
-                QueueRemoteFs::new(
-                    i.get_service_typed::<dyn ConfigObj>().await,
-                    i.get_service("original_remote_fs").await,
-                )
-            })
-            .await;
-
-        let (metastore_event_sender, _) = broadcast::channel(8192); // TODO config
+    pub async fn configure_cache_store(&self) {
         let (cachestore_event_sender, _) = broadcast::channel(2048); // TODO config
-
-        let metastore_event_sender_to_move = metastore_event_sender.clone();
         let cachestore_event_sender_to_move = cachestore_event_sender.clone();
 
+        if uses_remote_metastore(&self.injector).await {
+            self.injector
+                .register_typed::<dyn CacheStore, _, _, _>(async move |_| {
+                    Arc::new(ClusterCacheStoreClient {})
+                })
+                .await;
+        } else {
+            self.injector
+                .register("cachestore_fs", async move |i| {
+                    // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                    let original_remote_fs = i.get_service("original_remote_fs").await;
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new(
+                        original_remote_fs,
+                        "cachestore",
+                        i.get_service_typed().await,
+                    );
+
+                    arc
+                })
+                .await;
+            let path = self.cache_store_path().to_str().unwrap().to_string();
+            self.injector
+                .register_typed_with_default::<dyn CacheStore, LazyRocksCacheStore, _, _>(
+                    async move |i| {
+                        let config = i.get_service_typed::<dyn ConfigObj>().await;
+                        let cachestore_fs = i.get_service("cachestore_fs").await;
+                        let cache_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                            LazyRocksCacheStore::load_from_dump(
+                                &Path::new(&path),
+                                dump_dir,
+                                cachestore_fs,
+                                config,
+                                vec![cachestore_event_sender],
+                            )
+                            .await
+                            .unwrap()
+                        } else {
+                            LazyRocksCacheStore::load_from_remote(
+                                &path,
+                                cachestore_fs,
+                                config,
+                                vec![cachestore_event_sender],
+                            )
+                            .await
+                            .unwrap()
+                        };
+                        cache_store
+                    },
+                )
+                .await;
+        }
+
         self.injector
-            .register_typed::<dyn ClusterTransport, _, _, _>(async move |i| {
-                ClusterTransportImpl::new(i.get_service_typed().await)
+            .register_typed::<CacheStoreSchedulerImpl, _, _, _>(async move |_i| {
+                Arc::new(CacheStoreSchedulerImpl::new(
+                    cachestore_event_sender_to_move.subscribe(),
+                ))
             })
             .await;
+    }
+
+    pub async fn configure_meta_store(&self) {
+        let (metastore_event_sender, _) = broadcast::channel(8192); // TODO config
+        let metastore_event_sender_to_move = metastore_event_sender.clone();
 
         if let Some(_) = self.config_obj.metastore_remote_address() {
             self.injector
@@ -1272,58 +1344,6 @@ impl Config {
                 .await;
         };
 
-        if uses_remote_metastore(&self.injector).await {
-            self.injector
-                .register_typed::<dyn CacheStore, _, _, _>(async move |_| {
-                    Arc::new(ClusterCacheStoreClient {})
-                })
-                .await;
-        } else {
-            self.injector
-                .register("cachestore_fs", async move |i| {
-                    // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                    let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new(
-                        original_remote_fs,
-                        "cachestore",
-                        i.get_service_typed().await,
-                    );
-
-                    arc
-                })
-                .await;
-            let path = self.cache_store_path().to_str().unwrap().to_string();
-            self.injector
-                .register_typed_with_default::<dyn CacheStore, LazyRocksCacheStore, _, _>(
-                    async move |i| {
-                        let config = i.get_service_typed::<dyn ConfigObj>().await;
-                        let cachestore_fs = i.get_service("cachestore_fs").await;
-                        let cache_store = if let Some(dump_dir) = config.clone().dump_dir() {
-                            LazyRocksCacheStore::load_from_dump(
-                                &Path::new(&path),
-                                dump_dir,
-                                cachestore_fs,
-                                config,
-                                vec![cachestore_event_sender],
-                            )
-                            .await
-                            .unwrap()
-                        } else {
-                            LazyRocksCacheStore::load_from_remote(
-                                &path,
-                                cachestore_fs,
-                                config,
-                                vec![cachestore_event_sender],
-                            )
-                            .await
-                            .unwrap()
-                        };
-                        cache_store
-                    },
-                )
-                .await;
-        }
-
         self.injector
             .register_typed::<dyn WALDataStore, _, _, _>(async move |i| {
                 WALStore::new(
@@ -1377,16 +1397,6 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<ConcurrencyLimits, _, _, _>(async move |i| {
-                Arc::new(ConcurrencyLimits::new(
-                    i.get_service_typed::<dyn ConfigObj>()
-                        .await
-                        .max_ingestion_data_frames(),
-                ))
-            })
-            .await;
-
-        self.injector
             .register_typed::<dyn ImportService, _, _, _>(async move |i| {
                 ImportServiceImpl::new(
                     i.get_service_typed().await,
@@ -1421,28 +1431,6 @@ impl Config {
             })
             .await;
 
-        self.injector
-            .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
-                QueryPlannerImpl::new(
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
-                )
-            })
-            .await;
-
-        self.injector
-            .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
-                QueryExecutorImpl::new(i.get_service_typed().await)
-            })
-            .await;
-
-        self.injector
-            .register_typed_with_default::<dyn TracingHelper, _, _, _>(async move |_| {
-                TracingHelperImpl::new()
-            })
-            .await;
-
         let cluster_meta_store_sender = metastore_event_sender_to_move.clone();
 
         self.injector
@@ -1467,6 +1455,67 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<SchedulerImpl, _, _, _>(async move |i| {
+                Arc::new(SchedulerImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    metastore_event_sender_to_move.subscribe(),
+                    i.get_service_typed().await,
+                ))
+            })
+            .await;
+    }
+
+    pub async fn configure_common(&self) {
+        self.injector
+            .register_typed_with_default::<dyn RemoteFs, QueueRemoteFs, _, _>(async move |i| {
+                QueueRemoteFs::new(
+                    i.get_service_typed::<dyn ConfigObj>().await,
+                    i.get_service("original_remote_fs").await,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn ClusterTransport, _, _, _>(async move |i| {
+                ClusterTransportImpl::new(i.get_service_typed().await)
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
+                QueryPlannerImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
+                QueryExecutorImpl::new(i.get_service_typed().await)
+            })
+            .await;
+
+        self.injector
+            .register_typed::<ConcurrencyLimits, _, _, _>(async move |i| {
+                Arc::new(ConcurrencyLimits::new(
+                    i.get_service_typed::<dyn ConfigObj>()
+                        .await
+                        .max_ingestion_data_frames(),
+                ))
+            })
+            .await;
+
+        self.injector
+            .register_typed_with_default::<dyn TracingHelper, _, _, _>(async move |_| {
+                TracingHelperImpl::new()
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn SqlService, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
                 SqlServiceImpl::new(
@@ -1485,19 +1534,6 @@ impl Config {
                     Duration::from_secs(c.import_job_timeout() * 2),
                     c.max_cached_queries(),
                 )
-            })
-            .await;
-
-        self.injector
-            .register_typed::<SchedulerImpl, _, _, _>(async move |i| {
-                Arc::new(SchedulerImpl::new(
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
-                    i.get_service_typed().await,
-                    metastore_event_sender_to_move.subscribe(),
-                    cachestore_event_sender_to_move.subscribe(),
-                    i.get_service_typed().await,
-                ))
             })
             .await;
 
@@ -1539,11 +1575,26 @@ impl Config {
         }
     }
 
+    async fn remote_fs(&self) -> Result<Arc<dyn RemoteFs + 'static>, CubeError> {
+        self.configure_remote_fs().await;
+        Ok(self.injector.get_service("original_remote_fs").await)
+    }
+
+    pub fn injector(&self) -> Arc<Injector> {
+        self.injector.clone()
+    }
+
+    pub async fn configure_injector(&self) {
+        self.configure_remote_fs().await;
+        self.configure_cache_store().await;
+        self.configure_meta_store().await;
+        self.configure_common().await;
+    }
+
     pub async fn cube_services(&self) -> CubeServices {
         CubeServices {
             injector: self.injector.clone(),
             sql_service: self.injector.get_service_typed().await,
-            scheduler: self.injector.get_service_typed().await,
             rocks_meta_store: if self.injector.has_service_typed::<RocksMetaStore>().await {
                 Some(self.injector.get_service_typed().await)
             } else {
