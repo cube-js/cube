@@ -6389,7 +6389,10 @@ async fn cache_compaction(service: Box<dyn SqlClient>) {
     );
 
     tokio::time::sleep(Duration::new(5, 0)).await;
-    service.exec_query("SYS COMPACTION 'cache';").await.unwrap();
+    service
+        .exec_query("SYS CACHESTORE COMPACTION;")
+        .await
+        .unwrap();
 
     let get_response = service
         .exec_query("CACHE GET 'my_prefix:my_key'")
