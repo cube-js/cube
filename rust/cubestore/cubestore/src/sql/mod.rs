@@ -197,6 +197,8 @@ impl SqlServiceImpl {
         max_cached_queries: usize,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
+            cachestore: CacheStoreSqlService::new(cachestore, query_planner.clone()),
+            cache: SqlResultCache::new(max_cached_queries),
             db,
             chunk_store,
             limits,
@@ -209,8 +211,6 @@ impl SqlServiceImpl {
             query_timeout,
             create_table_timeout,
             remote_fs,
-            cachestore: CacheStoreSqlService::new(cachestore),
-            cache: SqlResultCache::new(max_cached_queries),
         })
     }
 
