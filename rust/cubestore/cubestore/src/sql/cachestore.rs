@@ -1,5 +1,7 @@
 use crate::cachestore::{CacheItem, CacheStore, QueueItem};
 use crate::metastore::{Column, ColumnType};
+
+use crate::queryplanner::{QueryPlan, QueryPlanner};
 use crate::sql::parser::{
     CacheCommand, CacheStoreCommand, CubeStoreParser, QueueCommand,
     Statement as CubeStoreStatement, SystemCommand,
@@ -9,20 +11,26 @@ use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
+use datafusion::sql::parser::Statement as DFStatement;
 use log::debug;
+use sqlparser::ast::Statement;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::SystemTime;
 
 pub struct CacheStoreSqlService {
     cachestore: Arc<dyn CacheStore>,
+    query_planner: Arc<dyn QueryPlanner>,
 }
 
 crate::di_service!(CacheStoreSqlService, [SqlService]);
 
 impl CacheStoreSqlService {
-    pub fn new(cachestore: Arc<dyn CacheStore>) -> Self {
-        Self { cachestore }
+    pub fn new(cachestore: Arc<dyn CacheStore>, query_planner: Arc<dyn QueryPlanner>) -> Self {
+        Self {
+            cachestore,
+            query_planner,
+        }
     }
 
     pub async fn exec_system_command_with_context(
@@ -380,6 +388,25 @@ impl SqlService for CacheStoreSqlService {
         };
 
         match stmt {
+            CubeStoreStatement::Statement(Statement::Query(q)) => {
+                let logical_plan = self
+                    .query_planner
+                    .logical_plan(
+                        DFStatement::Statement(Statement::Query(q)),
+                        &ctx.inline_tables,
+                    )
+                    .await?;
+
+                match logical_plan {
+                    QueryPlan::Meta(logical_plan) => {
+                        app_metrics::META_QUERIES.increment();
+                        Ok(Arc::new(
+                            self.query_planner.execute_meta_plan(logical_plan).await?,
+                        ))
+                    }
+                    _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
+                }
+            }
             CubeStoreStatement::System(command) => match command {
                 SystemCommand::CacheStore(command) => {
                     self.exec_system_command_with_context(ctx, command).await
