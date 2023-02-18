@@ -752,13 +752,14 @@ export class DatabricksDriver extends JDBCDriver {
   private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[]) {
     await this.query(
       `
-      CREATE TABLE ${tableFullName}_csv_export
+      CREATE TABLE ${this.getUnloadExportTableName(tableFullName)}
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
       OPTIONS (escape = '"')
-      AS (${sql})
+      AS (${sql});
       `,
       params,
     );
+    await this.query(`DROP TABLE ${this.getUnloadExportTableName(tableFullName)};`, []);
   }
 
   /**
@@ -781,12 +782,24 @@ export class DatabricksDriver extends JDBCDriver {
   private async createExternalTableFromTable(tableFullName: string, columns: string) {
     await this.query(
       `
-      CREATE TABLE ${tableFullName}_csv_export
+      CREATE TABLE ${this.getUnloadExportTableName(tableFullName)}
       USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
       OPTIONS (escape = '"')
       AS SELECT ${columns} FROM ${tableFullName}
       `,
       [],
     );
+    await this.query(`DROP TABLE ${this.getUnloadExportTableName(tableFullName)};`, []);
+  }
+
+  /**
+   * Returns export table full name by table full name.
+   */
+  private getUnloadExportTableName(tableFullName: string): null | string {
+    const exportTable: string | string[] = tableFullName.split('.');
+    exportTable[exportTable.length - 1] = `csv_export_${
+      exportTable[exportTable.length - 1]
+    }`;
+    return exportTable.join('.');
   }
 }

@@ -1357,8 +1357,13 @@ export class PreAggregationLoader {
 
     return this.queryCache.withLock(lockKey, 60 * 5, async () => {
       this.logger('Dropping orphaned tables', queryOptions);
-      const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
-      const versionEntries = tablesToVersionEntries(this.preAggregation.preAggregationsSchema, actualTables);
+      const actualTables = await client.getTablesQuery(
+        this.preAggregation.preAggregationsSchema,
+      );
+      const versionEntries = tablesToVersionEntries(
+        this.preAggregation.preAggregationsSchema,
+        actualTables,
+      );
       const versionEntriesToSave = R.pipe<
         VersionEntry[],
         { [index: string]: VersionEntry[] },
@@ -1369,7 +1374,6 @@ export class PreAggregationLoader {
           R.toPairs,
           R.map(p => p[1][0])
         )(versionEntries);
-
       const structureVersionsToSave = R.pipe<
         VersionEntry[],
         VersionEntry[],
@@ -1378,7 +1382,10 @@ export class PreAggregationLoader {
         VersionEntry[]
         >(
           R.filter(
-            (v: VersionEntry) => new Date().getTime() - v.last_updated_at < this.structureVersionPersistTime * 1000
+            (v: VersionEntry) => (
+              new Date().getTime() - v.last_updated_at <
+              this.structureVersionPersistTime * 1000
+            )
           ),
           R.groupBy(v => `${v.table_name}_${v.structure_version}`),
           R.toPairs,
@@ -1386,20 +1393,18 @@ export class PreAggregationLoader {
         )(versionEntries);
 
       const refreshEndReached = await this.preAggregations.getRefreshEndReached();
-
-      const tablesToSave =
-        this.preAggregations.dropPreAggregationsWithoutTouch && refreshEndReached ?
-          (await this.preAggregations.tablesUsed()).concat(await this.preAggregations.tablesTouched()).concat([justCreatedTable]) :
-          (
-            (await this.preAggregations.tablesUsed())
-              .concat(structureVersionsToSave.map(v => this.targetTableName(v)))
-              .concat(versionEntriesToSave.map(v => this.targetTableName(v)))
-              .concat([justCreatedTable])
-          );
-
+      const toSave =
+        this.preAggregations.dropPreAggregationsWithoutTouch && refreshEndReached
+          ? (await this.preAggregations.tablesUsed())
+            .concat(await this.preAggregations.tablesTouched())
+            .concat([justCreatedTable])
+          : (await this.preAggregations.tablesUsed())
+            .concat(structureVersionsToSave.map(v => this.targetTableName(v)))
+            .concat(versionEntriesToSave.map(v => this.targetTableName(v)))
+            .concat([justCreatedTable]);
       const toDrop = actualTables
         .map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`)
-        .filter(t => tablesToSave.indexOf(t) === -1);
+        .filter(t => toSave.indexOf(t) === -1);
 
       await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table))));
       this.logger('Dropping orphaned tables completed', {
