@@ -195,6 +195,11 @@ jobs:
           chmod +x cross && sudo mv cross /usr/local/bin/cross
           cd rust/cubestore
           cross build --release --target=${{ matrix.target }}
+      - name: Brew update & install openssl@1.1
+        if: ${{ matrix.os == 'macos-11' }}
+        run: |
+          brew update
+          brew install openssl@1.1
       - name: Build with Cargo
         if: ${{ !matrix.cross }}
         run: |
