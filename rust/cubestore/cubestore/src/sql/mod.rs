@@ -1407,7 +1407,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 DataType::Custom(custom) => {
                     let custom_type_name = custom.to_string().to_lowercase();
                     match custom_type_name.as_str() {
-                        "mediumint" => ColumnType::Int,
+                        "tinyint" | "mediumint" => ColumnType::Int,
                         "bytes" => ColumnType::Bytes,
                         "varbinary" => ColumnType::Bytes,
                         "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
