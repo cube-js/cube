@@ -111,7 +111,7 @@ export interface ExternalDriverCompatibilities {
 }
 
 export interface DriverCapabilities extends ExternalDriverCompatibilities {
-  unloadWithoutTempTable?: true,
+  unloadWithoutTempTable?: boolean,
   streamingSource?: boolean,
 }
 
