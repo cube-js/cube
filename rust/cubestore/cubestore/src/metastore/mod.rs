@@ -81,6 +81,7 @@ use std::str::FromStr;
 
 use crate::cachestore::{CacheItem, QueueItem, QueueItemStatus, QueueResult, QueueResultAckEvent};
 use crate::remotefs::LocalDirRemoteFs;
+
 use snapshot_info::SnapshotInfo;
 use std::time::{Duration, SystemTime};
 use table::Table;
@@ -1060,8 +1061,13 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn set_current_snapshot(&self, snapshot_id: u128) -> Result<(), CubeError>;
 }
 
+#[cfg_attr(test, automock)]
+pub trait WrapperMetaStore: MetaStore + Send + Sync {}
+
 crate::di_service!(RocksMetaStore, [MetaStore]);
 crate::di_service!(MetaStoreRpcClient, [MetaStore]);
+#[cfg(test)]
+crate::di_service!(MockWrapperMetaStore, [MetaStore]);
 
 #[derive(Clone, Debug)]
 pub enum MetaStoreEvent {

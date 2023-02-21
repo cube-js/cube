@@ -32,6 +32,7 @@ use crate::table::{Row, TableValue};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use log::trace;
+
 use serde_derive::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -399,6 +400,9 @@ pub trait CacheStore: DIService + Send + Sync {
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
 }
+
+#[cfg_attr(test, automock)]
+pub trait WrapperCacheStore: CacheStore + Send + Sync {}
 
 #[async_trait]
 impl CacheStore for RocksCacheStore {
@@ -869,6 +873,8 @@ impl CacheStore for RocksCacheStore {
 
 crate::di_service!(RocksCacheStore, [CacheStore]);
 crate::di_service!(CacheStoreRpcClient, [CacheStore]);
+#[cfg(test)]
+crate::di_service!(MockWrapperCacheStore, [CacheStore]);
 
 pub struct ClusterCacheStoreClient {}
 

@@ -16,3 +16,6 @@ pub use lazy::LazyRocksCacheStore;
 pub use queue_item::{QueueItem, QueueItemStatus, QueueResultAckEvent};
 pub use queue_result::QueueResult;
 pub use scheduler::CacheStoreSchedulerImpl;
+
+#[cfg(test)]
+pub use cache_rocksstore::MockWrapperCacheStore;
