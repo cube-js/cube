@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.64](https://github.com/cube-js/cube.js/compare/v0.31.63...v0.31.64) (2023-02-21)
+
+
+### Bug Fixes
+
+* **cubejs-playground:** error overflow ([#6170](https://github.com/cube-js/cube.js/issues/6170)) ([b5f68bb](https://github.com/cube-js/cube.js/commit/b5f68bbc8c0091089bb2c43bcbcf44a9da8a7182))
+
+
+
+
+
 ## [0.31.63](https://github.com/cube-js/cube.js/compare/v0.31.62...v0.31.63) (2023-02-20)
 
 

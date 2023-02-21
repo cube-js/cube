@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.64](https://github.com/cube-js/cube.js/compare/v0.31.63...v0.31.64) (2023-02-21)
+
+
+### Features
+
+* **cubesql:** Remove unexpected clone (reduce memory consumption) ([#6185](https://github.com/cube-js/cube.js/issues/6185)) ([904556b](https://github.com/cube-js/cube.js/commit/904556b83e724e6b55e65afd9dbd077bb6c9ea99))
+
+
+
+
+
 ## [0.31.63](https://github.com/cube-js/cube.js/compare/v0.31.62...v0.31.63) (2023-02-20)
 
 
