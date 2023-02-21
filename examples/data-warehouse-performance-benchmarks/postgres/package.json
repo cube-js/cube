@@ -12,7 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@cubejs-client/core": "^0.28.10",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "pg": "^8.7.3"
   }
 }
