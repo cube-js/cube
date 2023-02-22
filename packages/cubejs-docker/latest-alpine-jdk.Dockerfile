@@ -1,3 +1,22 @@
+FROM node:16.19.1-alpine3.17 as builder
+
+WORKDIR /cube
+COPY . .
+
+RUN yarn policies set-version v1.22.5
+
+# Required for node-oracledb to buld on ARM64
+RUN apk update \
+    && apk add python3 gcc g++ make openjdk11-jdk \
+    && rm -rf /var/cache/apk/*
+
+ENV JAVA_HOME /usr/lib/jvm/default-jvm
+ENV PATH "$JAVA_HOME/bin:${PATH}"
+
+# We are copying root yarn.lock file to the context folder during the Publish GH
+# action. So, a process will use the root lock file here.
+RUN yarn install && yarn cache clean
+
 FROM node:16.19.1-alpine3.17
 
 ARG IMAGE_VERSION=unknown
@@ -5,7 +24,12 @@ ARG IMAGE_VERSION=unknown
 ENV CUBEJS_DOCKER_IMAGE_VERSION=$IMAGE_VERSION
 ENV CUBEJS_DOCKER_IMAGE_TAG=alpine
 
-RUN apk add rxvt-unicode
+RUN apk update \
+    && apk add openjdk11-jdk rxvt-unicode \
+    && rm -rf /var/cache/apk/*
+
+ENV JAVA_HOME /usr/lib/jvm/default-jvm
+ENV PATH "$JAVA_HOME/bin:${PATH}"
 
 ENV TERM rxvt-unicode
 ENV NODE_ENV production
@@ -15,19 +39,9 @@ COPY . .
 
 RUN yarn policies set-version v1.22.5
 
-# Required for node-oracledb to buld on ARM64
-RUN apk update \
-    && apk add python2 gcc g++ make cmake bash openjdk11-jdk \
-    && npm config set python /usr/bin/python2.7 \
-    && rm -rf /var/cache/apk/*
+WORKDIR /cube
 
-ENV JAVA_HOME /usr/lib/jvm/default-jvm
-ENV PATH "$JAVA_HOME/bin:${PATH}"
-
-# There is a problem with release process.
-# We are doing version bump without updating lock files for the docker package.
-#RUN yarn install --frozen-lockfile
-RUN yarn install && yarn cache clean
+COPY --from=builder /cube .
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules

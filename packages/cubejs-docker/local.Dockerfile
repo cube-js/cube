@@ -28,8 +28,7 @@ RUN yarn policies set-version v1.22.5
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \
-    && apt-get install -y python2 python3 gcc g++ make cmake \
-    && npm config set python /usr/bin/python2.7 \
+    && apt-get install -y python3 gcc g++ make cmake \
     && rm -rf /var/lib/apt/lists/*
 
 # We are copying root yarn.lock file to the context folder during the Publish GH
