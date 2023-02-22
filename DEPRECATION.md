@@ -154,7 +154,7 @@ const { CubejsServerCore } = require('@cubejs-backend/server-core');
 
 ### Absolute import for `@cubejs-backend/schema-compiler`
 
-**Deprecated in Release: v0.25.21**
+**Removed in Release: v0.32.0**
 
 Absolute imports are highly dependent on a path, and all API becomes public. We
 now provide a public API from the package directly.

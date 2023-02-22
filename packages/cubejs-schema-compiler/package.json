@@ -12,9 +12,7 @@
     "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "files": [
-    "dist/src",
-    "adapter",
-    "scaffolding"
+    "dist/src"
   ],
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
