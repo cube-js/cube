@@ -39,7 +39,7 @@ features:
 | Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                                           | v0.23.8    | June 2021 |
 | Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                                         | v0.23.11   | v0.26.0   |
 | Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                                              | v0.24.0    | June 2021 |
-| Deprecated | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator)                | v0.24.2    | v0.28.0   |
+| Deprecated | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator)                | v0.24.2    | v0.32.0   |
 | Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                                 | v0.25.0    | v0.25.0   |
 | Deprecated | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)                              | v0.25.4    | v0.30.0   |
 | Deprecated | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)                      | v0.25.21   | v0.32.0   |
@@ -102,7 +102,7 @@ microservices, if necessary).
 
 ### Absolute import for `@cubejs-backend/query-orchestrator`
 
-**Deprecated in Release: v0.24.2**
+**Removed in Release: v0.32.0**
 
 Absolute imports are highly dependent on a path, and all API becomes public. We
 now provide a public API from the package directly.
