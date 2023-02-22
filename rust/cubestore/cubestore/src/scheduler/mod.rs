@@ -464,6 +464,7 @@ impl SchedulerImpl {
             .get_partitions_with_chunks_created_seconds_ago(60)
             .await?;
         for p in partition_compaction_candidates_id {
+            let node_name = self.cluster.node_name_by_partition(&p);
             self.schedule_compaction_if_needed(&p).await?;
         }
         Ok(())
