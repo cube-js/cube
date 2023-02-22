@@ -6912,10 +6912,10 @@
     "@types/node" "*"
     form-data "^3.0.0"
 
-"@types/node@*", "@types/node@12.12.50", "@types/node@>=12.12.47", "@types/node@>=13.7.0", "@types/node@^10.17.55", "@types/node@^10.17.60", "@types/node@^12", "@types/node@^12.12.17", "@types/node@^14.14.35":
-  version "12.20.41"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-12.20.41.tgz#81d7734c5257da9f04354bd9084a6ebbdd5198a5"
-  integrity sha512-f6xOqucbDirG7LOzedpvzjP3UTmHttRou3Mosx3vL9wr9AIQGhcPgVnqa8ihpZYnxyM1rxeNCvTyukPKZtq10Q==
+"@types/node@*", "@types/node@12.12.50", "@types/node@>=12.12.47", "@types/node@>=13.7.0", "@types/node@^12", "@types/node@^12.12.17", "@types/node@^14":
+  version "14.18.36"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-14.18.36.tgz#c414052cb9d43fab67d679d5f3c641be911f5835"
+  integrity sha512-FXKWbsJ6a1hIrRxv+FoukuHnGTgEzKYGi7kilfMae96AL9UNkPFNWJEEYWzdRI9ooIkbr4AKldyuSTLql06vLQ==
 
 "@types/normalize-package-data@^2.4.0":
   version "2.4.1"

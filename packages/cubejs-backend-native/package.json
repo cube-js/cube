@@ -23,7 +23,7 @@
     "test:cargo": "cargo test"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "files": [
     "dist/js"
@@ -31,7 +31,7 @@
   "devDependencies": {
     "@cubejs-infra/node-pre-gyp-github": "^1.0.3",
     "@types/jest": "^26",
-    "@types/node": "^12",
+    "@types/node": "^14",
     "cargo-cp-artifact": "^0.1",
     "jest": "^26",
     "mysql2": "^2.3.3",

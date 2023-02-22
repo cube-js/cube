@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-base-driver"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -35,7 +35,7 @@
   "devDependencies": {
     "@cubejs-backend/linter": "^0.31.0",
     "@types/jest": "^26.0.15",
-    "@types/node": "^12",
+    "@types/node": "^14",
     "@types/ramda": "^0.27.32",
     "jest": "^26.6.3",
     "typescript": "~4.9.5"
