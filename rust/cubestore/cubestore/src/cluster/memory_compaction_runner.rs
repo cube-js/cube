@@ -9,25 +9,16 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 pub struct MemoryCompactionRunner {
-    config: Arc<dyn ConfigObj>,
     compaction_service: Arc<dyn CompactionService>,
     server_name: String,
-    stop_token: CancellationToken,
     run_loop: WorkerLoop,
 }
 
 impl MemoryCompactionRunner {
-    pub fn new(
-        config: Arc<dyn ConfigObj>,
-        compaction_service: Arc<dyn CompactionService>,
-        server_name: String,
-        stop_token: CancellationToken,
-    ) -> Arc<Self> {
+    pub fn new(compaction_service: Arc<dyn CompactionService>, server_name: String) -> Arc<Self> {
         Arc::new(Self {
-            config,
             compaction_service,
             server_name,
-            stop_token,
             run_loop: WorkerLoop::new("InMemoryCompaction"),
         })
     }
