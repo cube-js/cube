@@ -105,7 +105,8 @@ const driverNameToFolderNameMapper: Record<DriverType, string> = {
   'databricks-jdbc': 'databricks-jdbc',
   prestodb: 'postgresql',
   mssql: 'mssql',
-  trino: 'postgresql'
+  trino: 'postgresql',
+  oracle: 'oracle'
 };
 
 /**
