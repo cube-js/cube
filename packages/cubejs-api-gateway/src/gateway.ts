@@ -1954,7 +1954,7 @@ class ApiGateway {
     type VerifyTokenFn = (auth: string, secret: string) => Promise<object | string> | object | string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
-      algorithms: <JWTAlgorithm[] | undefined>options?.algorithms,
+      algorithms: <JWTAlgorithm[] | undefined>options?.algorithms || ['none'],
       issuer: options?.issuer,
       audience: options?.audience,
       subject: options?.subject,
