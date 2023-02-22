@@ -137,7 +137,7 @@ consider defining [`driverFactory`][self-driver-factory] to return a
 
 Either `String` or `Function` could be passed. Providing a `Function` allows to
 dynamically select a database type depending on the user's context. It is
-usually used in [Multitenancy Setup][ref-multitenancy].
+  usually used in [Multitenancy Setup][ref-multitenancy].
 
 If no option is passed, Cube.js will lookup for environment variable
 `CUBEJS_DB_TYPE` to resolve `dbType`.
@@ -176,7 +176,7 @@ module.exports = {
 
 Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
-[Multitenancy Applications][ref-multitenancy].
+  [Multitenancy Applications][ref-multitenancy].
 
 Called once per [`dataSource`][ref-schema-ref-datasource]. Can return a
 `Promise` which resolves to a `DriverConfig`. `DriverConfig` consists of a
@@ -451,8 +451,8 @@ module.exports = {
 <WarningBox>
 
 This is merely a refresh worker's heartbeat. It doesn't affect the freshness of
-pre-aggregations or refresh keys, nor how frequently Cube accesses the database. 
-Setting this value to `30s` doesn't mean pre-aggregations or in-memory cache would be refreshed every 30 seconds but instead refresh key is checked for freshness every 30 seconds in the background. 
+pre-aggregations or refresh keys, nor how frequently Cube accesses the database.
+Setting this value to `30s` doesn't mean pre-aggregations or in-memory cache would be refreshed every 30 seconds but instead refresh key is checked for freshness every 30 seconds in the background.
 Please consult the [cube `refreshKey` documentation][ref-schema-cube-ref-refresh-key] and [pre-aggregation `refreshKey` documentation][ref-pre-aggregations-refresh-key] on how to set data refresh intervals.
 
 </WarningBox>
@@ -837,7 +837,7 @@ module.exports = {
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_database
 [ref-caching-up-to-date]: /caching#keeping-cache-up-to-date
 [ref-development-mode]: /overview#development-mode
-[ref-multitenancy]: /multitenancy-setup
+  [ref-multitenancy]: /config/multitenancy
 [ref-rest-api]: /rest-api
 [ref-sql-api]: /backend/sql
 [ref-rest-api-sched-refresh]: /rest-api#v-1-run-scheduled-refresh
