@@ -27,8 +27,6 @@
   },
   "files": [
     "README.md",
-    "driver/*",
-    "orchestrator/*",
     "dist/src/*"
   ],
   "dependencies": {
