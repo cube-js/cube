@@ -29,6 +29,11 @@ const mvn = require('node-java-maven');
 
 let mvnPromise: Promise<void> | null = null;
 
+type JdbcStatement = {
+  setQueryTimeout: (t: number) => any,
+  execute: (q: string) => any,
+};
+
 const initMvn = (customClassPath: any) => {
   if (!mvnPromise) {
     mvnPromise = new Promise((resolve, reject) => {
@@ -121,20 +126,31 @@ export class JDBCDriver extends BaseDriver {
       },
       // @ts-expect-error Promise<Function> vs Promise<void>
       destroy: async (connection) => promisify(connection.close.bind(connection)),
-      validate: (connection) => {
-        const isValid = promisify(connection.isValid.bind(connection));
-        try {
-          return isValid(this.testConnectionTimeout() / 1000);
-        } catch (e) {
-          return false;
-        }
-      }
+      validate: async (connection) => (
+        new Promise((resolve) => {
+          const createStatement = promisify(connection.createStatement.bind(connection));
+          createStatement().then((statement: JdbcStatement) => {
+            const setQueryTimeout = promisify(statement.setQueryTimeout.bind(statement));
+            const execute = promisify(statement.execute.bind(statement));
+            setQueryTimeout(this.testConnectionTimeout() / 1000).then(() => {
+              const timer = setTimeout(() => {
+                resolve(false);
+              }, this.testConnectionTimeout());
+              execute('SELECT 1').then(() => {
+                clearTimeout(timer);
+                resolve(true);
+              }).catch(() => {
+                resolve(false);
+              });
+            }).catch(() => {
+              resolve(false);
+            });
+          });
+        })
+      )
     }, {
       min: 0,
-      max:
-        config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
-        8,
+      max: config.maxPoolSize || getEnv('dbMaxPoolSize', { dataSource }) || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

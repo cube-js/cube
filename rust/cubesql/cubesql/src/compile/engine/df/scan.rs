@@ -363,7 +363,6 @@ struct CubeScanOneShotStream {
     transport: Arc<dyn TransportService>,
     meta: LoadRequestMeta,
     options: CubeScanOptions,
-    fired: bool,
 }
 
 impl CubeScanOneShotStream {
@@ -385,20 +384,15 @@ impl CubeScanOneShotStream {
             transport,
             meta,
             options,
-            fired: false,
         }
     }
 
     fn poll_next(&mut self) -> Option<ArrowResult<RecordBatch>> {
-        if !self.fired {
-            self.fired = true;
-
-            if let Some(batch) = &self.data {
-                return Some(Ok(batch.clone()));
-            }
+        if let Some(batch) = self.data.take() {
+            Some(Ok(batch))
+        } else {
+            None
         }
-
-        None
     }
 }
 
@@ -581,7 +575,7 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
     let res =
         std::thread::spawn(move || handle.block_on(load_data(req, auth, transport, meta, options)))
             .join()
-            .map_err(|_| DataFusionError::Execution(format!("Can't load to steram")))?;
+            .map_err(|_| DataFusionError::Execution(format!("Can't load to stream")))?;
 
     one_shot_stream.data = Some(transform_response(
         res.unwrap().data,
