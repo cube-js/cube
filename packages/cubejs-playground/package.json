@@ -66,7 +66,7 @@
     "@cubejs-client/react": "^0.31.63",
     "@types/flexsearch": "^0.7.3",
     "@types/jest": "^26.0.20",
-    "@types/node": "^14.14.35",
+    "@types/node": "^14",
     "@types/react": "^17.0.3",
     "@types/react-beautiful-dnd": "^13.0.0",
     "@types/react-dom": "^17.0.2",

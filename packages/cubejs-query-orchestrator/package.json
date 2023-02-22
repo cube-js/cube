@@ -9,7 +9,7 @@
     "directory": "packages/cubejs-query-orchestrator"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -50,7 +50,7 @@
     "@types/generic-pool": "^3.1.9",
     "@types/ioredis": "^4.19.3",
     "@types/jest": "^26.0.15",
-    "@types/node": "^12",
+    "@types/node": "^14",
     "@types/ramda": "^0.27.32",
     "@types/redis": "^2.8.28",
     "@types/uuid": "^8.3.0",
