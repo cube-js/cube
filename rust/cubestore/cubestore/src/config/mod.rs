@@ -446,6 +446,8 @@ pub trait ConfigObj: DIService {
     fn max_disk_space_per_worker(&self) -> u64;
 
     fn disk_space_cache_duration_secs(&self) -> u64;
+
+    fn in_memory_chunks_compaction_period_ms(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -508,6 +510,7 @@ pub struct ConfigObjImpl {
     pub max_disk_space: u64,
     pub max_disk_space_per_worker: u64,
     pub disk_space_cache_duration_secs: u64,
+    pub in_memory_chunks_compaction_period_ms: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -731,6 +734,10 @@ impl ConfigObj for ConfigObjImpl {
     fn disk_space_cache_duration_secs(&self) -> u64 {
         self.disk_space_cache_duration_secs
     }
+
+    fn in_memory_chunks_compaction_period_ms(&self) -> u64 {
+        self.in_memory_chunks_compaction_period_ms
+    }
 }
 
 lazy_static! {
@@ -953,6 +960,7 @@ impl Config {
                     * 1024
                     * 1024,
                 disk_space_cache_duration_secs: 300,
+                in_memory_chunks_compaction_period_ms: 5000,
             }),
         }
     }
@@ -1027,6 +1035,7 @@ impl Config {
                 max_disk_space: 0,
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,
+                in_memory_chunks_compaction_period_ms: 200,
             }),
         }
     }

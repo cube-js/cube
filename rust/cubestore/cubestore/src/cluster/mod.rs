@@ -1129,8 +1129,10 @@ impl ClusterImpl {
         }
 
         let memory_compaction_runner = MemoryCompactionRunner::new(
+            self.config_obj.clone(),
             self.injector.upgrade().unwrap().get_service_typed().await,
             self.server_name.clone(),
+            self.stop_token.clone(),
         );
         futures.push(MemoryCompactionRunner::spawn_processing_loop(
             memory_compaction_runner.clone(),
