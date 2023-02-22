@@ -41,7 +41,7 @@ features:
 | Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                                              | v0.24.0    | June 2021 |
 | Deprecated | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator)                | v0.24.2    | v0.32.0   |
 | Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                                 | v0.25.0    | v0.25.0   |
-| Deprecated | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)                              | v0.25.4    | v0.30.0   |
+| Deprecated | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)                              | v0.25.4    | v0.32.0   |
 | Deprecated | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)                      | v0.25.21   | v0.32.0   |
 | Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                                     | v0.26.0    |           |
 | Removed    | [Node.js 10](#nodejs-10)                                                                                                          | v0.26.0    | v0.29.0   |
@@ -135,7 +135,7 @@ removing the `contextToDataSourceId` property completely.
 
 ### Absolute import for `@cubejs-backend/server-core`
 
-**Deprecated in Release: v0.25.4**
+**Removed in Release: v0.32.0**
 
 Absolute imports are highly dependent on a path, and all API becomes public. We
 now provide a public API from the package directly.
