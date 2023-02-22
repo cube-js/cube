@@ -15,7 +15,6 @@
   "types": "dist/src/index.d.ts",
   "files": [
     "README.md",
-    "core/*",
     "dist/src/*",
     "playground",
     "index.js"
