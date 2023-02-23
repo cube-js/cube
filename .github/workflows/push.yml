@@ -479,6 +479,8 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Install instant client for Oracle
+        uses: GoodManWEN/oracle-client-action@main
       - name: Build client
         run: yarn build
       - name: Lerna tsc
