@@ -53,6 +53,7 @@ features:
 | Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default) | v0.30.0    |           |
 | Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                   | v0.30.0    |           |
 | Deprecated | [`dbType`](#dbtype)                                                                                                               | v0.30.30   |           |
+| Deprecated | [Serverless Deployments](#serverless-deployments)                                                                                 | v0.31.64   |           |
 
 ### Node.js 8
 
@@ -327,10 +328,18 @@ recommend [using Cube Store as a solution][ref-caching-in-prod].
 
 [ref-caching-in-prod]: https://cube.dev/docs/caching/running-in-production
 
-### dbType
+### `dbType`
 
 **Deprecated in Release: v0.30.30**
 
 Using `dbType` is now deprecated, and we recommend using
 [`driverFactory`][self-driver-factory] to return a `DriverConfig` object
+instead.
+
+### Serverless Deployments
+
+**Deprecated in Release: v0.31.64**
+
+Using Serverless deployments with the `@cubejs-backend/serverless` package is
+now deprecated; we **strongly** recommend using Docker-based deployments
 instead.

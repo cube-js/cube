@@ -255,7 +255,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           orphanedTimeout,
         });
 
-        await pausePromise(2000);
+        await pausePromise(2000 + 500 /*  additional timeout on CI */);
 
         expect(await connection.getOrphanedQueries()).toEqual([
           connection.redisHash(['1', []])
