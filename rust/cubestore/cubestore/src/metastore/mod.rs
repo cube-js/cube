@@ -1112,7 +1112,7 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         old_ids: Vec<u64>,
         new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
-    ) -> Result<IdRow<ReplayHandle>, CubeError>;
+    ) -> Result<Option<IdRow<ReplayHandle>>, CubeError>;
 
     async fn get_tables_with_indexes(
         &self,
@@ -4081,7 +4081,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         old_ids: Vec<u64>,
         new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
-    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+    ) -> Result<Option<IdRow<ReplayHandle>>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             if old_ids.is_empty() {
                 return Err(CubeError::internal("Can't merge empty replay handles list".to_string()));
@@ -4118,8 +4118,14 @@ impl MetaStore for RocksMetaStore {
                 }
                 replay_handles.push(replay_handle);
             }
-            let new_replay_handle = ReplayHandle::new_from_seq_pointers(replay_handles[0].get_row().table_id(), new_seq_pointer);
-            let new_handle = table.insert(new_replay_handle, batch_pipe)?;
+            let new_handle = if let Some(_) = new_seq_pointer {
+                let new_replay_handle = ReplayHandle::new_from_seq_pointers(replay_handles[0].get_row().table_id(), new_seq_pointer);
+                Some(table.insert(new_replay_handle, batch_pipe)?)
+
+            } else {
+                None
+            };
+
             for handle in replay_handles.iter() {
                 table.delete(handle.get_id(), batch_pipe)?;
             }
