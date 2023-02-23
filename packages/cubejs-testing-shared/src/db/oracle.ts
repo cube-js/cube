@@ -1,6 +1,7 @@
 import { GenericContainer } from 'testcontainers';
-import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 import { isCI } from '@cubejs-backend/shared';
+
+import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
 type OracleStartOptions = DBRunnerContainerOptions & {
   version?: string,

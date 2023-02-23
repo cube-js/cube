@@ -2,7 +2,7 @@
 set -eo pipefail
 
 # Debug log for test containers
-export DEBUG=testcontainers*
+export DEBUG=testcontainers
 
 echo "::group::Oracle"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:oracle
