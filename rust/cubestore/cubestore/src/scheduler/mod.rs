@@ -407,10 +407,6 @@ impl SchedulerImpl {
             // TODO config
             .get_partitions_with_chunks_created_seconds_ago(60)
             .await?;
-        log::info!(
-            "schedule all pending compaction {}",
-            partition_compaction_candidates_id.len()
-        );
         for p in partition_compaction_candidates_id {
             self.schedule_compaction_in_memory_chunks_if_needed(&p)
                 .await?;
@@ -423,8 +419,6 @@ impl SchedulerImpl {
             .meta_store
             .get_chunks_without_partition_created_seconds_ago(60)
             .await?;
-        let clen = chunks_without_partitions.len();
-        log::info!("schedule deactivating chunks without partition {}", clen);
 
         let mut ids = Vec::new();
         for chunk in chunks_without_partitions {
@@ -436,10 +430,6 @@ impl SchedulerImpl {
             ids.push(chunk.get_id());
         }
         self.meta_store.deactivate_chunks_without_check(ids).await?;
-        log::info!(
-            "schedule deactivating chunks without partition  completed {}",
-            clen
-        );
         Ok(())
     }
 
@@ -468,7 +458,6 @@ impl SchedulerImpl {
         // TODO we can do this reconciliation more rarely
         let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
 
-        log::info!("send {} inactive chunks to GC", all_inactive_chunks.len());
         let (in_memory_inactive, persistent_inactive): (Vec<_>, Vec<_>) = all_inactive_chunks
             .iter()
             .partition(|c| c.get_row().in_memory());
@@ -752,7 +741,6 @@ impl SchedulerImpl {
         Ok(())
     }
 
-    #[tracing::instrument(level = "trace", skip(self))]
     async fn process_chunk_events(self: &Arc<Self>) -> Result<(), CubeError> {
         let ids = {
             let mut chunk_queue = self.chunk_events_queue.lock().await;
@@ -782,7 +770,6 @@ impl SchedulerImpl {
         Ok(())
     }
 
-    #[tracing::instrument(level = "trace", skip(self))]
     async fn process_active_chunks(
         self: &Arc<Self>,
         chunks: Vec<IdRow<Chunk>>,
@@ -847,7 +834,7 @@ impl SchedulerImpl {
 
         Ok(())
     }
-    #[tracing::instrument(level = "trace", skip(self))]
+
     async fn process_inactive_chunks(
         self: &Arc<Self>,
         chunks: Vec<IdRow<Chunk>>,
@@ -1144,7 +1131,6 @@ impl Ord for GCTimedTask {
 enum GCTask {
     RemoveRemoteFile(/*remote_path*/ String),
     DeleteChunks(/*chunk_ids*/ Vec<u64>),
-    DeleteChunk(/*chunk_id*/ u64),
     DeleteMiddleManPartition(/*partition_id*/ u64),
     DeletePartition(/*partition_id*/ u64),
 }
@@ -1248,29 +1234,7 @@ impl DataGCLoop {
                             );
                         }
                     }
-                    GCTask::DeleteChunk(chunk_id) => {
-                        if let Ok(chunk) = self.metastore.get_chunk(chunk_id).await {
-                            if !chunk.get_row().active() {
-                                log::trace!("Removing deactivated chunk {}", chunk_id);
-                                if let Err(e) = self.metastore.delete_chunk(chunk_id).await {
-                                    log::error!(
-                                        "Could not remove deactivated chunk ({}): {}",
-                                        chunk_id,
-                                        e
-                                    );
-                                }
-                            } else {
-                                log::trace!(
-                                    "Skipping removing of chunk {} because it was activated",
-                                    chunk_id
-                                );
-                            }
-                        } else {
-                            log::trace!("Skipping removing of deactivated chunk {} because it was already removed", chunk_id);
-                        }
-                    }
                     GCTask::DeleteChunks(chunk_ids) => {
-                        log::info!("Delete chunks: {}", chunk_ids.len());
                         match self.metastore.get_chunks_out_of_queue(chunk_ids).await {
                             Ok(chunks) => {
                                 let ids = chunks
@@ -1300,7 +1264,6 @@ impl DataGCLoop {
                                 );
                             }
                         }
-                        log::info!("Delete chunks completed");
                     }
                     GCTask::DeleteMiddleManPartition(partition_id) => {
                         if let Ok(true) = self
