@@ -1,5 +1,6 @@
 import { GenericContainer } from 'testcontainers';
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+import { isCI } from '@cubejs-backend/shared';
 
 type OracleStartOptions = DBRunnerContainerOptions & {
   version?: string,
@@ -12,7 +13,7 @@ export class OracleDBRunner extends DbRunnerAbstract {
     const container = new GenericContainer(`gvenzl/oracle-xe:${version}`)
       .withEnv('ORACLE_PASSWORD', 'test')
       .withExposedPorts(1521)
-      .withStartupTimeout(30 * 1000);
+      .withStartupTimeout((isCI() ? 60 : 15) * 1000);
 
     if (options.volumes) {
       // eslint-disable-next-line no-restricted-syntax
