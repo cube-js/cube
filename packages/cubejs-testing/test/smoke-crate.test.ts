@@ -4,7 +4,7 @@ import { afterAll, beforeAll, jest } from '@jest/globals';
 import { StartedTestContainer } from 'testcontainers';
 import { CrateDBRunner } from '@cubejs-backend/testing-shared';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
+import { DEFAULT_API_TOKEN, DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
 describe('crate', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -30,7 +30,7 @@ describe('crate', () => {
         schemaDir: 'postgresql/schema',
       }
     );
-    client = cubejs(async () => 'test', {
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
   });

@@ -1,4 +1,6 @@
-import { GenericContainer } from 'testcontainers';
+import { GenericContainer, Wait } from 'testcontainers';
+import { isCI } from '@cubejs-backend/shared';
+
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
 type OracleStartOptions = DBRunnerContainerOptions & {
@@ -11,8 +13,15 @@ export class OracleDBRunner extends DbRunnerAbstract {
 
     const container = new GenericContainer(`gvenzl/oracle-xe:${version}`)
       .withEnv('ORACLE_PASSWORD', 'test')
-      .withExposedPorts(1521)
-      .withStartupTimeout(30 * 1000);
+      .withHealthCheck({
+        test: 'healthcheck.sh',
+        interval: 2 * 1000,
+        timeout: 5 * 1000,
+        retries: 5,
+        startPeriod: (isCI() ? 45 : 15) * 1000
+      })
+      .withWaitStrategy(Wait.forHealthCheck())
+      .withExposedPorts(1521);
 
     if (options.volumes) {
       // eslint-disable-next-line no-restricted-syntax
