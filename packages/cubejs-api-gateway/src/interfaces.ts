@@ -38,6 +38,8 @@ import {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
+  ResponseResultFn,
+  QueryRequest
 } from './types/request';
 
 export {
@@ -62,6 +64,8 @@ export {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
+  ResponseResultFn,
+  QueryRequest,
 };
 
 /**
