@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.65](https://github.com/cube-js/cube.js/compare/v0.31.64...v0.31.65) (2023-02-23)
+
+
+### Bug Fixes
+
+* **oracle-driver:**  Release connection after query execution ([#5469](https://github.com/cube-js/cube.js/issues/5469)) ([ff1af78](https://github.com/cube-js/cube.js/commit/ff1af789c6326e25b3a341c4bae1829da95c36c1))
+
+
+
+
+
 ## [0.31.63](https://github.com/cube-js/cube.js/compare/v0.31.62...v0.31.63) (2023-02-20)
 
 **Note:** Version bump only for package @cubejs-backend/oracle-driver
