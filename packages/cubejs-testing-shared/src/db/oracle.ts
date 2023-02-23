@@ -1,4 +1,4 @@
-import { GenericContainer, Wait } from 'testcontainers';
+import { GenericContainer } from 'testcontainers';
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
 type OracleStartOptions = DBRunnerContainerOptions & {
