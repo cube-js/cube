@@ -626,7 +626,7 @@ impl MetaStore for MetaStoreMock {
         &self,
         _old_ids: Vec<u64>,
         _new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
-    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+    ) -> Result<Option<IdRow<ReplayHandle>>, CubeError> {
         panic!("MetaStore mock!")
     }
 
