@@ -5,7 +5,7 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { pausePromise } from '@cubejs-backend/shared';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
+import { DEFAULT_API_TOKEN, DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
 describe('oracle', () => {
   jest.setTimeout(60 * 5 * 100000);
@@ -32,7 +32,7 @@ describe('oracle', () => {
         schemaDir: 'oracle/schema',
       }
     );
-    client = cubejs(async () => 'test', {
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
   });

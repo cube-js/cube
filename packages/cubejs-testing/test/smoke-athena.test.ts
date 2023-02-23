@@ -3,7 +3,7 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, jest, expect } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
+import { DEFAULT_API_TOKEN, DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
 const delay = (t: number) => new Promise(resolve => setTimeout(() => resolve(null), t));
 
@@ -25,7 +25,7 @@ describe('athena', () => {
         schemaDir: 'postgresql/schema',
       }
     );
-    client = cubejs(async () => 'test', {
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
   });
