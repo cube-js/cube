@@ -165,7 +165,7 @@ export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTab
 export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
 
 export interface DriverInterface {
-  createSchemaIfNotExists(schemaName: string): Promise<any>;
+  createSchemaIfNotExists(schemaName: string): Promise<void>;
   uploadTableWithIndexes(
     table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], queryTracingObj: any, externalOptions: ExternalCreateTableOptions
   ): Promise<void>;

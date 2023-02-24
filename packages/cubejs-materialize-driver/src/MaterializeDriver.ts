@@ -66,14 +66,13 @@ export class MaterializeDriver extends PostgresDriver {
    * @param {string} schemaName
    * @return {Promise<Array<unknown>>}
    */
-  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
     const schemas = await this.query(
       `SHOW SCHEMAS WHERE name = '${schemaName}'`, []
     );
     if (schemas.length === 0) {
       await this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
     }
-    return [];
   }
 
   public async uploadTableWithIndexes(
