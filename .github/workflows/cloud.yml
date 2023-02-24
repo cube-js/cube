@@ -24,7 +24,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [ 14.x ]
+        node-version: [ 16.x ]
         db: [ 'athena', 'bigquery' ]
       fail-fast: false
 

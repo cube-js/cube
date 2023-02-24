@@ -203,7 +203,7 @@ jobs:
     strategy:
       matrix:
         # We dont need to test under all versions, we do it under linux
-        node-version: [14.x]
+        node-version: [16.x]
         os-version: [windows-2019, macos-11]
       fail-fast: false
 
