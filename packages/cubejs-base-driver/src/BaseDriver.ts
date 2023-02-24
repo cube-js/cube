@@ -179,10 +179,9 @@ export abstract class BaseDriver implements DriverInterface {
     ) {
       ssl = sslOptions.reduce(
         (agg, { name, envKey, canBeFile, validate }) => {
-          if (process.env[envKey]) {
-            const value = process.env[envKey];
-
-            if (validate(value)) {
+          const value = process.env[envKey];
+          if (value) {
+            if (validate && validate(value)) {
               return {
                 ...agg,
                 ...{ [name]: value }
@@ -282,16 +281,15 @@ export abstract class BaseDriver implements DriverInterface {
     return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
   }
 
-  public async createSchemaIfNotExists(schemaName: string): Promise<Array<unknown>> {
-    return this.query(
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
+    const schemas = await this.query(
       `SELECT schema_name FROM information_schema.schemata WHERE schema_name = ${this.param(0)}`,
       [schemaName]
-    ).then((schemas) => {
-      if (schemas.length === 0) {
-        return this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`);
-      }
-      return null;
-    });
+    );
+
+    if (schemas.length === 0) {
+      await this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`);
+    }
   }
 
   public getTablesQuery(schemaName: string) {
@@ -305,7 +303,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.query(loadSql, params, options);
   }
 
-  public dropTable(tableName: string, options?: unknown): Promise<unknown> {
+  public dropTable(tableName: string, options?: QueryOptions): Promise<unknown> {
     return this.query(`DROP TABLE ${tableName}`, [], options);
   }
 
