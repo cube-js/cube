@@ -20,10 +20,10 @@ jobs:
           toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
-      - name: Install Node.js 14.x
+      - name: Install Node.js 16.x
         uses: actions/setup-node@v3
         with:
-          node-version: 14.x
+          node-version: 16.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -35,9 +35,9 @@ jobs:
             node_modules
             rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-14.x-
+            ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Copy yarn.lock file
@@ -76,7 +76,7 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }}
     strategy:
       matrix:
-        node-version: [14]
+        node-version: [16]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         include:
           - target: aarch64-unknown-linux-gnu
@@ -155,7 +155,7 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [16.x]
         os-version: [windows-2019, macos-11]
       fail-fast: false
 

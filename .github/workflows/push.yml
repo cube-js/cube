@@ -120,10 +120,10 @@ jobs:
           toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
-      - name: Install Node.js 14.x
+      - name: Install Node.js 16.x
         uses: actions/setup-node@v3
         with:
-          node-version: 14.x
+          node-version: 16.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -135,9 +135,9 @@ jobs:
             node_modules
             rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-14.x-
+            ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
@@ -170,10 +170,10 @@ jobs:
           toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
-      - name: Install Node.js 14.x
+      - name: Install Node.js 16.x
         uses: actions/setup-node@v3
         with:
-          node-version: 14.x
+          node-version: 16.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -185,9 +185,9 @@ jobs:
             node_modules
             rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-14.x-
+            ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
@@ -228,7 +228,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [16.x]
       fail-fast: false
 
     steps:
@@ -309,7 +309,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [16.x]
       fail-fast: false
 
     steps:
@@ -377,7 +377,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [16.x]
         db: [
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
             'mysql-aurora-serverless', 'crate'
@@ -437,7 +437,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [ 14.x ]
+        node-version: [ 16.x ]
       fail-fast: false
 
     steps:
