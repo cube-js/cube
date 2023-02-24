@@ -9,10 +9,6 @@
     "rootDir": ".",
     "baseUrl": ".",
     "allowJs": true,
-    "noImplicitAny": false,
-    "strictNullChecks": true,
-    "strictFunctionTypes": false,
-    "strictBindCallApply": false,
-    "strictPropertyInitialization": false,
+    "noImplicitAny": false
   },
 }
