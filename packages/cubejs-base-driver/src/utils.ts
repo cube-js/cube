@@ -5,7 +5,7 @@ export type SaveCancelFn = <T>(promise: MaybeCancelablePromise<T>) => Promise<T>
 export function cancelCombinator(fn) {
   const cancelFnArray: CancelablePromiseCancel[] = [];
 
-  const saveCancelFn = (promise: MaybeCancelablePromise<any>) => {
+  const saveCancelFn: SaveCancelFn = (promise) => {
     if (promise.cancel) {
       cancelFnArray.push(promise.cancel);
     }
