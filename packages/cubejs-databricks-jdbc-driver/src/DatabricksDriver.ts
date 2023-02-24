@@ -19,7 +19,7 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import { DriverCapabilities, UnloadOptions, } from '@cubejs-backend/base-driver';
+import { DriverCapabilities, QueryOptions, UnloadOptions } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -337,7 +337,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * @override
    */
-  public dropTable(tableName: string, options?: unknown): Promise<unknown> {
+  public dropTable(tableName: string, options?: QueryOptions): Promise<unknown> {
     const tableFullName = `${
       this.config?.catalog ? `${this.config.catalog}.` : ''
     }${tableName}`;
@@ -380,7 +380,7 @@ export class DatabricksDriver extends JDBCDriver {
    * Execute create schema query.
    */
   public async createSchemaIfNotExists(schemaName: string) {
-    return this.query(
+    await this.query(
       `CREATE SCHEMA IF NOT EXISTS ${
         this.getSchemaFullName(schemaName)
       }`,

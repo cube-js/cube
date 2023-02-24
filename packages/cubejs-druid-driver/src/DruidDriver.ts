@@ -105,7 +105,7 @@ export class DruidDriver extends BaseDriver {
     `;
   }
 
-  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
     throw new Error('Unable to create schema, Druid does not support it');
   }
 
