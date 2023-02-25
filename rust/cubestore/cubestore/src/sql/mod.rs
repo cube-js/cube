@@ -3016,7 +3016,7 @@ mod tests {
                         .unwrap();
                 }
 
-                Delay::new(Duration::from_millis(500)).await;
+                Delay::new(Duration::from_millis(1500)).await;
 
                 let active_partitions = services
                     .meta_store
