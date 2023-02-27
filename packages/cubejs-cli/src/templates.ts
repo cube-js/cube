@@ -259,7 +259,7 @@ const templates: Record<string, Template> = {
       dev: 'cubejs-server',
     },
     files: {
-      cube: () => cubeJs,
+      'cube.js': () => cubeJs,
       'docker-compose.yml': dockerCompose,
       '.env': dotEnv,
       '.gitignore': () => gitIgnore,
