@@ -136,6 +136,7 @@ export class JDBCDriver extends BaseDriver {
             clearTimeout(timeout);
             resolve(valid);
           }).catch(() => {
+            clearTimeout(timeout);
             resolve(false);
           });
         })
