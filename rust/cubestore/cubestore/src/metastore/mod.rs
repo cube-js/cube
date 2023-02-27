@@ -4412,7 +4412,7 @@ mod tests {
     use super::table::AggregateColumn;
     use super::*;
     use crate::config::Config;
-    use crate::remotefs::LocalDirRemoteFs;
+    use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
     use futures_timer::Delay;
     use rocksdb::IteratorMode;
     use std::thread::sleep;
@@ -5450,6 +5450,87 @@ mod tests {
             fs::remove_dir_all(config.local_dir()).unwrap();
             fs::remove_dir_all(config.remote_dir()).unwrap();
         }
+    }
+
+    #[tokio::test]
+    async fn upload_logs_without_snapshots() {
+        let config = Config::test("upload_logs_without_snapshots");
+
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+
+        let services = config.configure().await;
+
+        services.start_processing_loops().await.unwrap();
+        let rocks_meta_store = services.rocks_meta_store.as_ref().unwrap();
+        let remote_fs = services
+            .injector
+            .get_service::<dyn RemoteFs>("original_remote_fs")
+            .await;
+        services
+            .meta_store
+            .create_schema("foo1".to_string(), false)
+            .await
+            .unwrap();
+        rocks_meta_store.run_upload().await.unwrap();
+        services
+            .meta_store
+            .create_schema("foo".to_string(), false)
+            .await
+            .unwrap();
+        rocks_meta_store.run_upload().await.unwrap();
+        let uploaded = remote_fs.list("metastore-").await.unwrap();
+        assert!(uploaded.is_empty());
+
+        rocks_meta_store.upload_check_point().await.unwrap();
+
+        services
+            .meta_store
+            .create_schema("bar".to_string(), false)
+            .await
+            .unwrap();
+
+        rocks_meta_store.run_upload().await.unwrap();
+
+        let uploaded = remote_fs.list("metastore-").await.unwrap();
+
+        let logs_uploaded = uploaded
+            .into_iter()
+            .filter(|n| n.contains("-logs"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(logs_uploaded.len(), 1);
+
+        rocks_meta_store.run_upload().await.unwrap();
+
+        let uploaded = remote_fs.list("metastore-").await.unwrap();
+
+        let logs_uploaded = uploaded
+            .into_iter()
+            .filter(|n| n.contains("-logs"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(logs_uploaded.len(), 1);
+
+        services
+            .meta_store
+            .create_schema("bar2".to_string(), false)
+            .await
+            .unwrap();
+
+        rocks_meta_store.run_upload().await.unwrap();
+
+        let uploaded = remote_fs.list("metastore-").await.unwrap();
+
+        let logs_uploaded = uploaded
+            .into_iter()
+            .filter(|n| n.contains("-logs"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(logs_uploaded.len(), 2);
+
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
     }
 
     #[tokio::test]
