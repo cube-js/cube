@@ -1065,6 +1065,7 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn debug_dump(&self, out_path: String) -> Result<(), CubeError>;
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
+    async fn healthcheck(&self) -> Result<(), CubeError>;
 
     async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError>;
     async fn set_current_snapshot(&self, snapshot_id: u128) -> Result<(), CubeError>;
@@ -3860,6 +3861,16 @@ impl MetaStore for RocksMetaStore {
 
             db_ref.db.compact_range(start, end);
 
+            Ok(())
+        })
+        .await?;
+
+        Ok(())
+    }
+
+    async fn healthcheck(&self) -> Result<(), CubeError> {
+        self.read_operation(move |_| {
+            // read_operation will call getSnapshot, which is enough to test that RocksDB works
             Ok(())
         })
         .await?;

@@ -160,11 +160,13 @@ pub enum DropCommand {
 pub enum MetaStoreCommand {
     SetCurrent { id: u128 },
     Compaction,
+    Healthcheck,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CacheStoreCommand {
     Compaction,
+    Healthcheck,
 }
 
 pub struct CubeStoreParser<'a> {
@@ -346,33 +348,35 @@ impl<'a> CubeStoreParser<'a> {
     }
 
     pub fn parse_cachestore(&mut self) -> Result<Statement, ParserError> {
-        if self.parse_custom_token("compaction") {
-            Ok(Statement::System(SystemCommand::CacheStore(
-                CacheStoreCommand::Compaction,
-            )))
+        let command = if self.parse_custom_token("compaction") {
+            CacheStoreCommand::Compaction
+        } else if self.parse_custom_token("healthcheck") {
+            CacheStoreCommand::Healthcheck
         } else {
-            Err(ParserError::ParserError(
+            return Err(ParserError::ParserError(
                 "Unknown cachestore command".to_string(),
-            ))
-        }
+            ));
+        };
+
+        Ok(Statement::System(SystemCommand::CacheStore(command)))
     }
 
     pub fn parse_metastore(&mut self) -> Result<Statement, ParserError> {
-        if self.parse_custom_token("set_current") {
-            Ok(Statement::System(SystemCommand::MetaStore(
-                MetaStoreCommand::SetCurrent {
-                    id: self.parse_integer("metastore snapshot id", false)?,
-                },
-            )))
+        let command = if self.parse_custom_token("set_current") {
+            MetaStoreCommand::SetCurrent {
+                id: self.parse_integer("metastore snapshot id", false)?,
+            }
         } else if self.parse_custom_token("compaction") {
-            Ok(Statement::System(SystemCommand::MetaStore(
-                MetaStoreCommand::Compaction,
-            )))
+            MetaStoreCommand::Compaction
+        } else if self.parse_custom_token("healthcheck") {
+            MetaStoreCommand::Healthcheck
         } else {
-            Err(ParserError::ParserError(
+            return Err(ParserError::ParserError(
                 "Unknown metastore command".to_string(),
-            ))
-        }
+            ));
+        };
+
+        Ok(Statement::System(SystemCommand::MetaStore(command)))
     }
 
     fn parse_queue(&mut self) -> Result<Statement, ParserError> {

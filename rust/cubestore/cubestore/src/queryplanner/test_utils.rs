@@ -651,6 +651,10 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn healthcheck(&self) -> Result<(), CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError> {
         panic!("MetaStore mock!")
     }
@@ -793,6 +797,10 @@ impl CacheStore for CacheStoreMock {
     }
 
     async fn compaction(&self) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn healthcheck(&self) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
 }
