@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.66](https://github.com/cube-js/cube.js/compare/v0.31.65...v0.31.66) (2023-02-27)
+
+
+### Features
+
+* **docker:** Use Debian (bullseye) for dev images ([#6202](https://github.com/cube-js/cube.js/issues/6202)) ([b4c922a](https://github.com/cube-js/cube.js/commit/b4c922a898e81df0bf3b4116c8ac51072ecc2382))
+
+
+
+
+
 ## [0.31.65](https://github.com/cube-js/cube.js/compare/v0.31.64...v0.31.65) (2023-02-23)
 
 **Note:** Version bump only for package @cubejs-backend/docker

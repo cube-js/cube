@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.66](https://github.com/cube-js/cube.js/compare/v0.31.65...v0.31.66) (2023-02-27)
+
+
+### Bug Fixes
+
+* databricks pre-aggregation errors ([#6207](https://github.com/cube-js/cube.js/issues/6207)) ([e7297f7](https://github.com/cube-js/cube.js/commit/e7297f735b64d3ce80ff4715c7b40ccee73cdb40))
+
+
+### Features
+
+* **cubestore:** Streaming ingestion optimizations ([#6198](https://github.com/cube-js/cube.js/issues/6198)) ([fb896ba](https://github.com/cube-js/cube.js/commit/fb896ba10bb2cbeacd14c7192a4a9b2d1e40abef))
+* **docker:** Use Debian (bullseye) for dev images ([#6202](https://github.com/cube-js/cube.js/issues/6202)) ([b4c922a](https://github.com/cube-js/cube.js/commit/b4c922a898e81df0bf3b4116c8ac51072ecc2382))
+
+
+
+
+
 ## [0.31.65](https://github.com/cube-js/cube.js/compare/v0.31.64...v0.31.65) (2023-02-23)
 
 
