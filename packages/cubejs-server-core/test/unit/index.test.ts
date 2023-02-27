@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
-import { withTimeout } from '@cubejs-backend/shared';
+import { SchemaFileRepository, withTimeout } from '@cubejs-backend/shared';
 
 import {
   CreateOptions,
   CubejsServerCore,
-  SchemaFileRepository,
   ServerCoreInitializedOptions
 } from '../../src';
 import { OptsHandler } from '../../src/core/OptsHandler';
