@@ -250,6 +250,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("limit_pushdown_unique_key", limit_pushdown_unique_key),
         t("sys_drop_cache", sys_drop_cache),
+        t("sys_metastore_healthcheck", sys_metastore_healthcheck),
+        t("sys_cachestore_healthcheck", sys_cachestore_healthcheck),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -8421,6 +8423,20 @@ async fn sys_drop_cache(service: Box<dyn SqlClient>) {
         .unwrap();
 
     service.exec_query(r#"SYS DROP CACHE;"#).await.unwrap();
+}
+
+async fn sys_metastore_healthcheck(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"SYS METASTORE HEALTHCHECK;"#)
+        .await
+        .unwrap();
+}
+
+async fn sys_cachestore_healthcheck(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"SYS CACHESTORE HEALTHCHECK;"#)
+        .await
+        .unwrap();
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
