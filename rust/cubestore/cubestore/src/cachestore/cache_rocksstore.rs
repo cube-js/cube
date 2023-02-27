@@ -398,6 +398,7 @@ pub trait CacheStore: DIService + Send + Sync {
 
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
+    async fn healthcheck(&self) -> Result<(), CubeError>;
 }
 
 #[async_trait]
@@ -865,6 +866,17 @@ impl CacheStore for RocksCacheStore {
 
         Ok(())
     }
+
+    async fn healthcheck(&self) -> Result<(), CubeError> {
+        self.store
+            .read_operation(move |_| {
+                // read_operation will call getSnapshot, which is enough to test that RocksDB works
+                Ok(())
+            })
+            .await?;
+
+        Ok(())
+    }
 }
 
 crate::di_service!(RocksCacheStore, [CacheStore]);
@@ -978,6 +990,10 @@ impl CacheStore for ClusterCacheStoreClient {
 
     async fn compaction(&self) -> Result<(), CubeError> {
         panic!("CacheStore cannot be used on the worker node! compaction was used.")
+    }
+
+    async fn healthcheck(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! healthcheck was used.")
     }
 }
 

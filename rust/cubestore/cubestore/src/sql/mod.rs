@@ -895,6 +895,10 @@ impl SqlService for SqlServiceImpl {
                         self.db.compaction().await?;
                         Ok(Arc::new(DataFrame::new(vec![], vec![])))
                     }
+                    MetaStoreCommand::Healthcheck => {
+                        self.db.healthcheck().await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
                 },
                 SystemCommand::CacheStore(command) => {
                     self.cachestore
