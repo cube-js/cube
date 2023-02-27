@@ -21,7 +21,7 @@ pub use rocks_table::*;
 use crate::cluster::node_name_by_partition;
 use async_trait::async_trait;
 use log::info;
-use rocksdb::{MergeOperands, Options, DB};
+use rocksdb::{BlockBasedOptions, Env, MergeOperands, Options, DB};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::{env, io::Cursor, sync::Arc};
@@ -67,7 +67,7 @@ use parquet::basic::{ConvertedType, Repetition};
 use parquet::{basic::Type, schema::types};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
-use rocksdb::backup::BackupEngineOptions;
+use rocksdb::backup::{BackupEngine, BackupEngineOptions};
 
 use schema::{SchemaRocksIndex, SchemaRocksTable};
 use smallvec::alloc::fmt::Formatter;
@@ -1127,15 +1127,17 @@ pub enum MetaStoreEvent {
 fn meta_store_merge(
     _new_key: &[u8],
     existing_val: Option<&[u8]>,
-    operands: &mut MergeOperands,
+    operands: &MergeOperands,
 ) -> Option<Vec<u8>> {
     let mut result: Vec<u8> = Vec::with_capacity(8);
     let mut counter = existing_val
         .map(|v| Cursor::new(v).read_u64::<BigEndian>().unwrap())
         .unwrap_or(0);
+
     for op in operands {
         counter += Cursor::new(op).read_u64::<BigEndian>().unwrap()
     }
+
     result.write_u64::<BigEndian>(counter).unwrap();
     Some(result)
 }
@@ -1148,6 +1150,15 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
         opts.create_if_missing(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
         opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
+
+        let mut block_opts = BlockBasedOptions::default();
+        // https://github.com/facebook/rocksdb/blob/v7.9.2/include/rocksdb/table.h#L524
+        // RocksDB 7.x uses a new format = 5, but our previous version if RocksDB has some issues with it
+        // Let force the usage of old format for 1 month to save an ability to revert releases
+        // todo(ovr): Migrate to 5
+        block_opts.set_format_version(2);
+
+        opts.set_block_based_table_factory(&block_opts);
 
         DB::open(&opts, path)
             .map_err(|err| CubeError::internal(format!("DB::open error for metastore: {}", err)))
@@ -3895,8 +3906,8 @@ impl MetaStore for RocksMetaStore {
 
     async fn debug_dump(&self, out_path: String) -> Result<(), CubeError> {
         self.read_operation(|db| {
-            let mut e =
-                rocksdb::backup::BackupEngine::open(&BackupEngineOptions::default(), out_path)?;
+            let opts = BackupEngineOptions::new(out_path)?;
+            let mut e = BackupEngine::open(&opts, &Env::new()?)?;
             Ok(e.create_new_backup_flush(db.db, true)?)
         })
         .await
@@ -4805,7 +4816,8 @@ mod tests {
             let iterator = meta_store.store.db.iterator(IteratorMode::Start);
 
             println!("Keys in db");
-            for (key, _) in iterator {
+            for kv_res in iterator {
+                let (key, _) = kv_res.unwrap();
                 println!("Key {:?}", RowKey::from_bytes(&key));
             }
 
