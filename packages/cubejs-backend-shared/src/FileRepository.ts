@@ -1,10 +1,10 @@
 import path from 'path';
 import fs from 'fs-extra';
-import R from 'ramda';
 
 export interface FileContent {
   fileName: string;
   content: string;
+  readOnly?: boolean;
 }
 
 export interface SchemaFileRepository {
@@ -41,7 +41,7 @@ export class FileRepository implements SchemaFileRepository {
 
     let result = await Promise.all(
       files
-        .filter(file => R.endsWith('.js', file) || R.endsWith('.yml', file) || R.endsWith('.yaml', file))
+        .filter(file => file.endsWith('.js') || file.endsWith('.yml') || file.endsWith('.yaml'))
         .map(async file => {
           const content = await fs.readFile(path.join(this.localPath(), file), 'utf-8');
 
@@ -70,7 +70,7 @@ export class FileRepository implements SchemaFileRepository {
 
     const files = await Promise.all(
       Object.keys(packageJson.dependencies).map(async module => {
-        if (R.endsWith('-schema', module)) {
+        if (module.endsWith('-schema')) {
           return this.readModuleFiles(path.join('node_modules', module));
         }
 
@@ -81,7 +81,7 @@ export class FileRepository implements SchemaFileRepository {
     return files.reduce((a, b) => a.concat(b));
   }
 
-  protected async readModuleFiles(modulePath: string) {
+  protected async readModuleFiles(modulePath: string): Promise<FileContent[]> {
     const files = await fs.readdir(modulePath);
 
     const result = await Promise.all(
@@ -90,7 +90,7 @@ export class FileRepository implements SchemaFileRepository {
         const stats = await fs.lstat(fileName);
         if (stats.isDirectory()) {
           return this.readModuleFiles(fileName);
-        } else if (R.endsWith('.js', file)) {
+        } else if (file.endsWith('.js')) {
           const content = await fs.readFile(fileName, 'utf-8');
           return [
             {
@@ -105,6 +105,6 @@ export class FileRepository implements SchemaFileRepository {
       })
     );
 
-    return result.reduce((a, b) => a.concat(b), []);
+    return result.reduce<FileContent[]>((a, b) => a.concat(b), []);
   }
 }
