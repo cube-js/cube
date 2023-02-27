@@ -174,10 +174,10 @@ export class JDBCDriver extends BaseDriver {
     try {
       connection = await this.pool._factory.create();
     } catch (e: any) {
-      err = e.message;
+      err = e.message || e;
     }
     if (err) {
-      throw new Error(err);
+      throw new Error(err.toString());
     } else {
       await this.pool._factory.destroy(connection);
     }

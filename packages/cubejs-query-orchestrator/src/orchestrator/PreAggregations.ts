@@ -2244,47 +2244,50 @@ export class PreAggregations {
 
   public async getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
-      this.queue[dataSource] = QueryCache.createQueue(
-        `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`,
-        () => this.driverFactory(dataSource),
-        (client, q) => {
-          const {
-            preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys, buildRangeEnd
-          } = q;
-          const loader = new PreAggregationLoader(
-            this.redisPrefix,
-            () => this.driverFactory(dataSource),
-            this.logger,
-            this.queryCache,
-            this,
-            preAggregation,
-            preAggregationsTablesToTempTables,
-            new PreAggregationLoadCache(
+      const queueOptions = await this.options.queueOptions(dataSource);
+      if (!this.queue[dataSource]) {
+        this.queue[dataSource] = QueryCache.createQueue(
+          `SQL_PRE_AGGREGATIONS_${this.redisPrefix}_${dataSource}`,
+          () => this.driverFactory(dataSource),
+          (client, q) => {
+            const {
+              preAggregation, preAggregationsTablesToTempTables, newVersionEntry, requestId, invalidationKeys, buildRangeEnd
+            } = q;
+            const loader = new PreAggregationLoader(
               this.redisPrefix,
               () => this.driverFactory(dataSource),
+              this.logger,
               this.queryCache,
               this,
-              {
-                requestId,
-                dataSource,
-              },
-            ),
-            { requestId, externalRefresh: this.externalRefresh, buildRangeEnd }
-          );
-          return loader.refresh(newVersionEntry, invalidationKeys, client);
-        },
-        {
-          concurrency: 1,
-          logger: this.logger,
-          cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-          redisPool: this.options.redisPool,
-          cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
-          // Centralized continueWaitTimeout that can be overridden in queueOptions
-          continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(await this.options.queueOptions(dataSource)),
-          getQueueEventsBus: this.getQueueEventsBus,
-        }
-      );
+              preAggregation,
+              preAggregationsTablesToTempTables,
+              new PreAggregationLoadCache(
+                this.redisPrefix,
+                () => this.driverFactory(dataSource),
+                this.queryCache,
+                this,
+                {
+                  requestId,
+                  dataSource,
+                },
+              ),
+              { requestId, externalRefresh: this.externalRefresh, buildRangeEnd }
+            );
+            return loader.refresh(newVersionEntry, invalidationKeys, client);
+          },
+          {
+            concurrency: 1,
+            logger: this.logger,
+            cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+            redisPool: this.options.redisPool,
+            cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
+            // Centralized continueWaitTimeout that can be overridden in queueOptions
+            continueWaitTimeout: this.options.continueWaitTimeout,
+            ...queueOptions,
+            getQueueEventsBus: this.getQueueEventsBus,
+          }
+        );
+      }
     }
     return this.queue[dataSource];
   }

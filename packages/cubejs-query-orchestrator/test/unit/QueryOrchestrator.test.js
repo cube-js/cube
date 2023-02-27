@@ -1,4 +1,5 @@
 /* globals jest, describe, beforeEach, afterEach, test, expect */
+import { Readable } from 'stream';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 
 class MockDriver {
@@ -120,6 +121,10 @@ class MockDriver {
   tablesSchema() {
     return this.schemaData;
   }
+
+  async streamQuery(sql) {
+    return Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)));
+  }
 }
 
 class ExternalMockDriver extends MockDriver {
@@ -195,6 +200,7 @@ describe('QueryOrchestrator', () => {
   let streamingSourceMockDriver = null;
   let externalMockDriver = null;
   let queryOrchestrator = null;
+  let queryOrchestrator2 = null;
   let queryOrchestratorExternalRefresh = null;
   let queryOrchestratorDropWithoutTouch = null;
   let testCount = 1;
@@ -237,11 +243,12 @@ describe('QueryOrchestrator', () => {
     };
     const logger =
       (msg, params) => console.log(new Date().toJSON(), msg, params);
-    const options = {
+    const options = (processUid) => ({
       externalDriverFactory: () => externalMockDriverLocal,
       queryCacheOptions: {
         queueOptions: () => ({
           concurrency: 2,
+          processUid,
         }),
       },
       preAggregationsOptions: {
@@ -249,26 +256,29 @@ describe('QueryOrchestrator', () => {
         queueOptions: () => ({
           executionTimeout: 2,
           concurrency: 2,
+          processUid,
         }),
         usedTablePersistTime: 1
       },
-    };
+    });
 
     queryOrchestrator =
-      new QueryOrchestrator(redisPrefix, driverFactory, logger, options);
+      new QueryOrchestrator(redisPrefix, driverFactory, logger, options('p1'));
+    queryOrchestrator2 =
+      new QueryOrchestrator(redisPrefix, driverFactory, logger, options('p2'));
     queryOrchestratorExternalRefresh =
       new QueryOrchestrator(redisPrefix, driverFactory, logger, {
-        ...options,
+        ...options('p1'),
         preAggregationsOptions: {
-          ...options.preAggregationsOptions,
+          ...options('p1').preAggregationsOptions,
           externalRefresh: true,
         },
       });
     queryOrchestratorDropWithoutTouch =
       new QueryOrchestrator(redisPrefix, driverFactory, logger, {
-        ...options,
+        ...options('p1'),
         preAggregationsOptions: {
-          ...options.preAggregationsOptions,
+          ...options('p1').preAggregationsOptions,
           dropPreAggregationsWithoutTouch: true,
         },
       });
@@ -1595,5 +1605,71 @@ describe('QueryOrchestrator', () => {
   test('fetch table schema', async () => {
     const schema = await queryOrchestrator.fetchSchema('foo');
     expect(schema).toEqual(schemaData);
+  });
+
+  test('streaming simple', async () => {
+    const query = (id) => ({
+      query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [],
+      requestId: 'streaming simple',
+      persistent: true,
+      aliasNameToMember: {
+        query: 'Foo.query'
+      }
+    });
+    await Promise.all([
+      queryOrchestrator.fetchQuery(query(1)),
+      queryOrchestrator.fetchQuery(query(2)),
+      queryOrchestrator.fetchQuery(query(3)),
+      queryOrchestrator.fetchQuery(query(4)),
+    ].map(async streamPromise => {
+      const stream = await streamPromise;
+      const data = await new Promise((resolve, reject) => {
+        stream.on('data', (row) => {
+          resolve(row);
+        });
+        stream.on('error', (err) => {
+          reject(err);
+        });
+      });
+      expect(data['Foo.query']).toMatch(/orders_d/);
+    }));
+  });
+
+  test('streaming two nodes', async () => {
+    const query = (id) => ({
+      query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
+      values: [],
+      cacheKeyQueries: {
+        queries: []
+      },
+      preAggregations: [],
+      requestId: 'streaming simple',
+      persistent: true,
+      aliasNameToMember: {
+        query: 'Foo.query'
+      }
+    });
+    await Promise.all([
+      queryOrchestrator.fetchQuery(query(1)),
+      queryOrchestrator.fetchQuery(query(2)),
+      queryOrchestrator2.fetchQuery(query(3)),
+      queryOrchestrator2.fetchQuery(query(4)),
+    ].map(async streamPromise => {
+      const stream = await streamPromise;
+      const data = await new Promise((resolve, reject) => {
+        stream.on('data', (row) => {
+          resolve(row);
+        });
+        stream.on('error', (err) => {
+          reject(err);
+        });
+      });
+      expect(data['Foo.query']).toMatch(/orders_d/);
+    }));
   });
 });

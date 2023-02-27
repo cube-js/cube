@@ -18,9 +18,14 @@ export class RedisQueueDriverConnection {
   }
 
   async getResultBlocking(queryKey) {
-    const resultListKey = this.resultListKey(queryKey);
-    if (!(await this.redisClient.hgetAsync([this.queriesDefKey(), this.redisHash(queryKey)]))) {
-      return this.getResult(queryKey);
+    return this.getResultBlockingByHash(this.redisHash(queryKey));
+  }
+
+  async getResultBlockingByHash(queryKeyHash) {
+    // Double redisHash apply is being used here
+    const resultListKey = this.resultListKey(queryKeyHash);
+    if (!(await this.redisClient.hgetAsync([this.queriesDefKey(), queryKeyHash]))) {
+      return this.getResult(queryKeyHash);
     }
     const result = await this.redisClient.brpopAsync([resultListKey, this.continueWaitTimeout]);
     if (result) {
@@ -362,7 +367,7 @@ export class RedisQueueDriverConnection {
  */
 export class RedisQueueDriver extends BaseQueueDriver {
   constructor(options) {
-    super();
+    super(options.processUid);
     this.redisPool = options.redisPool;
     this.options = options;
   }

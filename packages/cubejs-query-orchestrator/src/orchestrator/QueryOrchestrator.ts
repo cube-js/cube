@@ -9,6 +9,7 @@ import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
+import { QueryStream } from './QueryStream';
 
 export type CacheAndQueryDriverType = 'redis' | 'memory' | 'cubestore';
 
@@ -263,6 +264,11 @@ export class QueryOrchestrator {
       lastRefreshTimestamp,
       result.lastRefreshTime?.getTime()
     ]);
+
+    if (result instanceof QueryStream) {
+      // TODO do some wrapper object to provide metadata?
+      return result;
+    }
 
     return {
       ...result,

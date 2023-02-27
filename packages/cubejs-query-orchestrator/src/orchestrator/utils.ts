@@ -188,7 +188,8 @@ export const processUidRE = /^[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 /**
  * Returns query hash by specified `queryKey`.
  */
-export function getCacheHash(queryKey: QueryKey): QueryKeyHash {
+export function getCacheHash(queryKey: QueryKey, processUid?: string): QueryKeyHash {
+  processUid = processUid || getProcessUid();
   if (typeof queryKey === 'string' && queryKey.length < 256) {
     return queryKey as any;
   }
@@ -196,13 +197,13 @@ export function getCacheHash(queryKey: QueryKey): QueryKeyHash {
   if (typeof queryKey === 'object' && queryKey.persistent) {
     const k = (<Array<string>>queryKey);
     if (k[k.length - 1].indexOf('request#') === -1) {
-      k.push(`request#${getNext()}@${getProcessUid()}`);
+      k.push(`request#${getNext()}@${processUid}`);
     }
     return `${crypto
       .createHash('md5')
       .update(JSON.stringify(k))
       .digest('hex')
-    }@${getProcessUid()}` as any;
+    }@${processUid}` as any;
   } else {
     return crypto
       .createHash('md5')

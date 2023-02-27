@@ -1,3 +1,4 @@
+import { Readable } from 'stream';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import type { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
@@ -36,8 +37,15 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           await setCancelHandler(result);
           return delayFn(result, query.delay);
         },
-        stream: async () => {
+        stream: async (query, stream) => {
           streamCount++;
+          return new Promise((resolve, reject) => {
+            const readable = Readable.from([]);
+            readable.once('end', () => resolve(null));
+            readable.once('close', () => resolve(null));
+            readable.once('error', (err) => reject(err));
+            readable.pipe(stream);
+          });
         },
       },
       sendProcessMessageFn: async (queryKeyHashed) => {
@@ -296,15 +304,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     test('stream handler', async () => {
       const key: QueryKey = ['select * from table', []];
       key.persistent = true;
-
-      queue.createQueryStream(key, {});
-
-      await queue.executeInQueue('stream', key, { }, 0);
+      await queue.executeInQueue('stream', key, { aliasNameToMember: {} }, 0);
       await awaitProcessing();
 
       expect(streamCount).toEqual(1);
-      expect(logger.mock.calls.length).toEqual(3);
-      expect(logger.mock.calls[2][0]).toEqual('Performing query completed');
+      expect(logger.mock.calls[logger.mock.calls.length - 1][0]).toEqual('Performing query completed');
     });
 
     test('removed before reconciled', async () => {
