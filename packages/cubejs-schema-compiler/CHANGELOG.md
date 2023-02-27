@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.67](https://github.com/cube-js/cube.js/compare/v0.31.66...v0.31.67) (2023-02-27)
+
+
+### Bug Fixes
+
+* **schema-compiler:** skip empty YAML files ([b068f7f](https://github.com/cube-js/cube.js/commit/b068f7f4f44c8bede3d45aac8df4bc8b4f38912e))
+
+
+### Features
+
+* **cube-cli:** Schema validation command ([#6208](https://github.com/cube-js/cube.js/issues/6208)) ([1fc6490](https://github.com/cube-js/cube.js/commit/1fc64906e5e628437fb58d35feea8ab3aa5bfe06))
+
+
+
+
+
 ## [0.31.66](https://github.com/cube-js/cube.js/compare/v0.31.65...v0.31.66) (2023-02-27)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

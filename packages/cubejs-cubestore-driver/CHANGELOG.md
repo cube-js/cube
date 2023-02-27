@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.67](https://github.com/cube-js/cube.js/compare/v0.31.66...v0.31.67) (2023-02-27)
+
+
+### Bug Fixes
+
+* Reconcile streaming queries in case of cluster execution ([#6204](https://github.com/cube-js/cube.js/issues/6204)) ([dcf7866](https://github.com/cube-js/cube.js/commit/dcf78660bb07bb033665ac698e8b45af3565845b))
+
+
+
+
+
 ## [0.31.66](https://github.com/cube-js/cube.js/compare/v0.31.65...v0.31.66) (2023-02-27)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver
