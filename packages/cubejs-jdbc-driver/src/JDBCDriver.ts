@@ -128,23 +128,15 @@ export class JDBCDriver extends BaseDriver {
       destroy: async (connection) => promisify(connection.close.bind(connection)),
       validate: async (connection) => (
         new Promise((resolve) => {
-          const createStatement = promisify(connection.createStatement.bind(connection));
-          createStatement().then((statement: JdbcStatement) => {
-            const setQueryTimeout = promisify(statement.setQueryTimeout.bind(statement));
-            const execute = promisify(statement.execute.bind(statement));
-            setQueryTimeout(this.testConnectionTimeout() / 1000).then(() => {
-              const timer = setTimeout(() => {
-                resolve(false);
-              }, this.testConnectionTimeout());
-              execute('SELECT 1').then(() => {
-                clearTimeout(timer);
-                resolve(true);
-              }).catch(() => {
-                resolve(false);
-              });
-            }).catch(() => {
-              resolve(false);
-            });
+          const isValid = promisify(connection.isValid.bind(connection));
+          const timeout = setTimeout(() => {
+            resolve(false);
+          }, this.testConnectionTimeout());
+          isValid(0).then((valid: boolean) => {
+            clearTimeout(timeout);
+            resolve(valid);
+          }).catch(() => {
+            resolve(false);
           });
         })
       )
