@@ -754,7 +754,7 @@ export class DatabricksDriver extends JDBCDriver {
     try {
       await this.query(
         `
-        CREATE TABLE ${this.getUnloadExportTableName(tableFullName)}
+        CREATE TABLE ${tableFullName}
         USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
         OPTIONS (escape = '"')
         AS (${sql});
@@ -762,7 +762,7 @@ export class DatabricksDriver extends JDBCDriver {
         params,
       );
     } finally {
-      await this.query(`DROP TABLE IF EXISTS ${this.getUnloadExportTableName(tableFullName)};`, []);
+      await this.query(`DROP TABLE IF EXISTS ${tableFullName};`, []);
     }
   }
 
