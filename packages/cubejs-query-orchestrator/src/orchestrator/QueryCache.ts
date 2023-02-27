@@ -477,42 +477,41 @@ export class QueryCache {
     if (!persistent) {
       return queue.executeInQueue('query', cacheKey, _query, priority, opt);
     } else {
-      const stream = queue.createQueryStream(cacheKey, aliasNameToMember);
-      // We don't want to handle error here as we want it to bubble up
-      // to the api gateway. We need to increase orphaned timeout as well.
-      queue.executeInQueue('stream', cacheKey, {
+      return queue.executeInQueue('stream', cacheKey, {
         ..._query,
-        orphanedTimeout: 1200,
+        aliasNameToMember,
       }, priority, opt);
-      return stream;
     }
   }
 
   public async getQueue(dataSource = 'default') {
     if (!this.queue[dataSource]) {
-      this.queue[dataSource] = QueryCache.createQueue(
-        `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
-        () => this.driverFactory(dataSource),
-        (client, req) => {
-          this.logger('Executing SQL', { ...req });
-          if (req.useCsvQuery) {
-            return this.csvQuery(client, req);
-          } else if (req.tablesSchema) {
-            return client.tablesSchema();
-          } else {
-            return client.query(req.query, req.values, req);
+      const queueOptions = await this.options.queueOptions(dataSource);
+      if (!this.queue[dataSource]) {
+        this.queue[dataSource] = QueryCache.createQueue(
+          `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
+          () => this.driverFactory(dataSource),
+          (client, req) => {
+            this.logger('Executing SQL', { ...req });
+            if (req.useCsvQuery) {
+              return this.csvQuery(client, req);
+            } else if (req.tablesSchema) {
+              return client.tablesSchema();
+            } else {
+              return client.query(req.query, req.values, req);
+            }
+          },
+          {
+            logger: this.logger,
+            cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+            redisPool: this.options.redisPool,
+            cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
+            // Centralized continueWaitTimeout that can be overridden in queueOptions
+            continueWaitTimeout: this.options.continueWaitTimeout,
+            ...queueOptions,
           }
-        },
-        {
-          logger: this.logger,
-          cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-          redisPool: this.options.redisPool,
-          cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
-          // Centralized continueWaitTimeout that can be overridden in queueOptions
-          continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(await this.options.queueOptions(dataSource)),
-        }
-      );
+        );
+      }
     }
     return this.queue[dataSource];
   }
