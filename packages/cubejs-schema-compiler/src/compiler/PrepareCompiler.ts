@@ -28,7 +28,7 @@ export type PrepareCompilerOptions = {
   adapter?: string;
 };
 
-export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions) => {
+export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}) => {
   const cubeDictionary = new CubeDictionary();
   const cubeSymbols = new CubeSymbols();
   const cubeValidator = new CubeValidator(cubeSymbols);
@@ -79,7 +79,7 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
   };
 };
 
-export const compile = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}) => {
+export const compile = (repo: SchemaFileRepository, options?: PrepareCompilerOptions) => {
   const compilers = prepareCompiler(repo, options);
   return compilers.compiler.compile().then(
     () => compilers
