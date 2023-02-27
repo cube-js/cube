@@ -374,6 +374,8 @@ export class QueryQueue {
         });
       }
 
+      // Stream processing goes here under assumption there's no way of a stream close just after it was added to the `streams` map.
+      // Otherwise `streamStarted` event listener should go before the `reconcileQueue` call.
       if (queryHandler === 'stream') {
         const self = this;
         result = await new Promise((resolve) => {
@@ -819,9 +821,15 @@ export class QueryQueue {
               // eslint-disable-next-line no-case-declarations
               const queryStream = this.createQueryStream(queryKeyHashed, query.query?.aliasNameToMember);
 
-              await this.queryHandlers.stream(query.query, queryStream);
-              // CubeStore has special handling for null
-              executionResult = null;
+              try {
+                await this.queryHandlers.stream(query.query, queryStream);
+                // CubeStore has special handling for null
+                executionResult = null;
+              } finally {
+                if (this.streams.get(queryKeyHashed) === queryStream) {
+                  this.streams.delete(queryKeyHashed);
+                }
+              }
               break;
             default:
               executionResult = {
