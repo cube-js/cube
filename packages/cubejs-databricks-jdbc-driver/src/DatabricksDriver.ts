@@ -8,6 +8,7 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -750,16 +751,19 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.secret.key <aws-secret-key>`
    */
   private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[]) {
-    await this.query(
-      `
-      CREATE TABLE ${this.getUnloadExportTableName(tableFullName)}
-      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
-      OPTIONS (escape = '"')
-      AS (${sql});
-      `,
-      params,
-    );
-    await this.query(`DROP TABLE ${this.getUnloadExportTableName(tableFullName)};`, []);
+    try {
+      await this.query(
+        `
+        CREATE TABLE ${this.getUnloadExportTableName(tableFullName)}
+        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
+        OPTIONS (escape = '"')
+        AS (${sql});
+        `,
+        params,
+      );
+    } finally {
+      await this.query(`DROP TABLE IF EXISTS ${this.getUnloadExportTableName(tableFullName)};`, []);
+    }
   }
 
   /**
@@ -780,26 +784,49 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.secret.key <aws-secret-key>`
    */
   private async createExternalTableFromTable(tableFullName: string, columns: string) {
-    await this.query(
-      `
-      CREATE TABLE ${this.getUnloadExportTableName(tableFullName)}
-      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
-      OPTIONS (escape = '"')
-      AS SELECT ${columns} FROM ${tableFullName}
-      `,
-      [],
-    );
-    await this.query(`DROP TABLE ${this.getUnloadExportTableName(tableFullName)};`, []);
+    try {
+      await this.query(
+        `
+        CREATE TABLE ${this.getUnloadExportTableName(tableFullName)}
+        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
+        OPTIONS (escape = '"')
+        AS SELECT ${columns} FROM ${tableFullName}
+        `,
+        [],
+      );
+    } finally {
+      await this.query(`DROP TABLE IF EXISTS ${this.getUnloadExportTableName(tableFullName)};`, []);
+    }
   }
 
   /**
-   * Returns export table full name by table full name.
+   * Returns export table name (hash) by table full name.
    */
-  private getUnloadExportTableName(tableFullName: string): null | string {
-    const exportTable: string | string[] = tableFullName.split('.');
-    exportTable[exportTable.length - 1] = `csv_export_${
-      exportTable[exportTable.length - 1]
-    }`;
-    return exportTable.join('.');
+  private getUnloadExportTableName(tableFullName: string): string {
+    const table: string[] = tableFullName.split('.');
+    const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
+    const digestBuffer = crypto.createHash('md5').update(tableFullName).digest();
+
+    let result = '';
+    let residue = 0;
+    let shiftCounter = 0;
+
+    for (let i = 0; i < 5; i++) {
+      const byte = digestBuffer.readUInt8(i);
+      shiftCounter += 16;
+      // eslint-disable-next-line operator-assignment,no-bitwise
+      residue = (byte << (shiftCounter - 8)) | residue;
+      // eslint-disable-next-line no-bitwise
+      while (residue >> 5) {
+        result += hashCharset.charAt(residue % 32);
+        shiftCounter -= 5;
+        // eslint-disable-next-line operator-assignment,no-bitwise
+        residue = residue >> 5;
+      }
+    }
+    result += hashCharset.charAt(residue % 32);
+
+    table[table.length - 1] = result;
+    return table.join('.');
   }
 }
