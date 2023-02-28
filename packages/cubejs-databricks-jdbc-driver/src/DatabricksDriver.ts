@@ -754,7 +754,7 @@ export class DatabricksDriver extends JDBCDriver {
     try {
       await this.query(
         `
-        CREATE TABLE ${this.getUnloadExportTableName(tableFullName)}
+        CREATE TABLE ${tableFullName}
         USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
         OPTIONS (escape = '"')
         AS (${sql});
@@ -762,7 +762,7 @@ export class DatabricksDriver extends JDBCDriver {
         params,
       );
     } finally {
-      await this.query(`DROP TABLE IF EXISTS ${this.getUnloadExportTableName(tableFullName)};`, []);
+      await this.query(`DROP TABLE IF EXISTS ${tableFullName};`, []);
     }
   }
 
@@ -787,7 +787,7 @@ export class DatabricksDriver extends JDBCDriver {
     try {
       await this.query(
         `
-        CREATE TABLE ${this.getUnloadExportTableName(tableFullName)}
+        CREATE TABLE _${tableFullName}
         USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
         OPTIONS (escape = '"')
         AS SELECT ${columns} FROM ${tableFullName}
@@ -795,38 +795,7 @@ export class DatabricksDriver extends JDBCDriver {
         [],
       );
     } finally {
-      await this.query(`DROP TABLE IF EXISTS ${this.getUnloadExportTableName(tableFullName)};`, []);
+      await this.query(`DROP TABLE IF EXISTS _${tableFullName};`, []);
     }
-  }
-
-  /**
-   * Returns export table name (hash) by table full name.
-   */
-  private getUnloadExportTableName(tableFullName: string): string {
-    const table: string[] = tableFullName.split('.');
-    const hashCharset = 'abcdefghijklmnopqrstuvwxyz012345';
-    const digestBuffer = crypto.createHash('md5').update(tableFullName).digest();
-
-    let result = '';
-    let residue = 0;
-    let shiftCounter = 0;
-
-    for (let i = 0; i < 5; i++) {
-      const byte = digestBuffer.readUInt8(i);
-      shiftCounter += 16;
-      // eslint-disable-next-line operator-assignment,no-bitwise
-      residue = (byte << (shiftCounter - 8)) | residue;
-      // eslint-disable-next-line no-bitwise
-      while (residue >> 5) {
-        result += hashCharset.charAt(residue % 32);
-        shiftCounter -= 5;
-        // eslint-disable-next-line operator-assignment,no-bitwise
-        residue = residue >> 5;
-      }
-    }
-    result += hashCharset.charAt(residue % 32);
-
-    table[table.length - 1] = result;
-    return table.join('.');
   }
 }
