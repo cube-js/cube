@@ -1209,7 +1209,7 @@ dependencies = [
  "deadqueue",
  "deflate",
  "enum_primitive",
- "flatbuffers 0.7.0",
+ "flatbuffers 23.1.21",
  "flexbuffers",
  "futures 0.3.16",
  "futures-timer 3.0.2",
@@ -1571,16 +1571,6 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 
 [[package]]
 name = "flatbuffers"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbf606a9d6674ad82094652789cf69b0e6e598c2d3c9137c28970eec13f11644"
-dependencies = [
- "bitflags",
- "smallvec 1.8.0",
-]
-
-[[package]]
-name = "flatbuffers"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef4c5738bcd7fad10315029c50026f83c9da5e4a21f8ed66826f43e0e2bde5f6"
@@ -1588,6 +1578,16 @@ dependencies = [
  "bitflags",
  "smallvec 1.8.0",
  "thiserror",
+]
+
+[[package]]
+name = "flatbuffers"
+version = "23.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77f5399c2c9c50ae9418e522842ad362f61ee48b346ac106807bd355a8a7c619"
+dependencies = [
+ "bitflags",
+ "rustc_version 0.4.0",
 ]
 
 [[package]]
@@ -3179,7 +3179,7 @@ checksum = "f842b1982eb6c2fe34036a4fbfb06dd185a3f5c8edfaacdf7d1ea10b07de6252"
 dependencies = [
  "lock_api 0.3.4",
  "parking_lot_core 0.6.2",
- "rustc_version",
+ "rustc_version 0.2.3",
 ]
 
 [[package]]
@@ -3213,7 +3213,7 @@ dependencies = [
  "cloudabi",
  "libc",
  "redox_syscall 0.1.57",
- "rustc_version",
+ "rustc_version 0.2.3",
  "smallvec 0.6.14",
  "winapi 0.3.9",
 ]
@@ -4111,6 +4111,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 dependencies = [
  "semver 0.9.0",
+]
+
+[[package]]
+name = "rustc_version"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
+dependencies = [
+ "semver 1.0.6",
 ]
 
 [[package]]
