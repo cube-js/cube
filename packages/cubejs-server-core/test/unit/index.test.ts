@@ -32,7 +32,7 @@ const repositoryWithoutPreAggregations: SchemaFileRepository = {
       fileName: 'main.js', content: `
 cube('Bar', {
   sql: 'select * from bar',
-  
+
   measures: {
     count: {
       type: 'count'
@@ -61,7 +61,7 @@ const repositoryWithDataSource: SchemaFileRepository = {
   dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: `
 cube('Bar', {
   sql: 'select * from bar',
-  
+
   measures: {
     count: {
       type: 'count'
@@ -72,7 +72,7 @@ cube('Bar', {
       sql: 'timestamp',
       type: 'time'
     }
-  }, 
+  },
   dataSource: 'main'
 });
 ` }]),
@@ -124,7 +124,7 @@ describe('index.test', () => {
     };
 
     expect(() => new CubejsServerCore(options))
-      .toThrowError(/"compilerCacheSize" must be larger than or equal to 0/);
+      .toThrowError(/"compilerCacheSize" must be greater than or equal to 0/);
   });
 
   test('Should create instance of CubejsServerCore, orchestratorOptions as func', () => {
@@ -397,7 +397,7 @@ describe('index.test', () => {
       expect(dataSources.dataSources).toEqual([]);
     });
   });
-  
+
   describe('CompilerApi dataSources method', () => {
     const logger = jest.fn(() => {});
     const compilerApi = new CompilerApi(
