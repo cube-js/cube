@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.68](https://github.com/cube-js/cube.js/compare/v0.31.67...v0.31.68) (2023-02-28)
+
+
+### Bug Fixes
+
+* **cubestore:** Metastore logs are uploaded without the corresponding snapshot ([#6222](https://github.com/cube-js/cube.js/issues/6222)) ([cfa4b47](https://github.com/cube-js/cube.js/commit/cfa4b4780f0b1549544bf26e2fb843d69ccdc981))
+
+
+
+
+
 ## [0.31.67](https://github.com/cube-js/cube.js/compare/v0.31.66...v0.31.67) (2023-02-27)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

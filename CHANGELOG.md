@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.31.68](https://github.com/cube-js/cube.js/compare/v0.31.67...v0.31.68) (2023-02-28)
+
+
+### Bug Fixes
+
+* **cubestore:** Metastore logs are uploaded without the corresponding snapshot ([#6222](https://github.com/cube-js/cube.js/issues/6222)) ([cfa4b47](https://github.com/cube-js/cube.js/commit/cfa4b4780f0b1549544bf26e2fb843d69ccdc981))
+* **jdbc-driver, databricks-jdbc-driver:** clearTimeout on validate catch, temp table name ([#6220](https://github.com/cube-js/cube.js/issues/6220)) ([c2c7118](https://github.com/cube-js/cube.js/commit/c2c711815a32fa597fa70937a27a14cdc86cad1f))
+
+
+
+
+
 ## [0.31.67](https://github.com/cube-js/cube.js/compare/v0.31.66...v0.31.67) (2023-02-27)
 
 
