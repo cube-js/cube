@@ -838,7 +838,13 @@ impl StreamingSource for KSqlStreamingSource {
                             .as_ref()
                             .map(|o| match o {
                                 StreamOffset::Earliest => "earliest".to_string(),
-                                StreamOffset::Latest => "latest".to_string(),
+                                StreamOffset::Latest => {
+                                    if let Some(_) = initial_seq_value {
+                                        "earliest".to_string()
+                                    } else {
+                                        "latest".to_string()
+                                    }
+                                }
                             })
                             .unwrap_or("latest".to_string()),
                     },

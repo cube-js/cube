@@ -334,7 +334,7 @@ impl ChunkStore {
             meta_store,
             remote_fs,
             cluster,
-            config: config,
+            config,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
         };
@@ -357,7 +357,6 @@ impl ChunkStore {
 
 #[async_trait]
 impl ChunkDataStore for ChunkStore {
-    #[tracing::instrument(level = "trace", skip(self, rows, columns))]
     async fn partition_data(
         &self,
         table_id: u64,
@@ -1111,9 +1110,7 @@ impl ChunkStore {
             remaining_rows = remaining_rows_again;
         }
 
-        let mut chunks_to_create = Vec::new();
-        let mut data_for_upload = Vec::new();
-        let key_size = index.get_row().sort_key_size() as usize;
+        let mut futures = Vec::new();
         for partition in partitions.into_iter() {
             let min = partition.get_row().get_min_val().as_ref();
             let max = partition.get_row().get_max_val().as_ref();
@@ -1145,15 +1142,12 @@ impl ChunkStore {
                     .collect::<Result<Vec<_>, _>>()?;
                 let columns = self.post_process_columns(index.clone(), columns).await?;
 
-                let (min, max) = min_max_values_from_data(&columns, key_size);
-                chunks_to_create.push(Chunk::new(
-                    partition.get_id(),
-                    columns[0].len(),
-                    min,
-                    max,
+                futures.push(self.add_chunk_columns(
+                    index.clone(),
+                    partition.clone(),
+                    columns,
                     in_memory,
                 ));
-                data_for_upload.push((partition, columns))
             }
             remaining_rows = next;
         }
@@ -1169,23 +1163,6 @@ impl ChunkStore {
             return Err(CubeError::internal(error_message));
         }
 
-        let chunks = self.meta_store.insert_chunks(chunks_to_create).await?;
-        if chunks.len() != data_for_upload.len() {
-            return Err(CubeError::internal(format!(
-                "Chunks count {} don't match data_for_upload count {}",
-                chunks.len(),
-                data_for_upload.len()
-            )));
-        }
-
-        let futures = chunks
-            .into_iter()
-            .zip(data_for_upload.into_iter())
-            .map(|(chunk, (partition, columns))| {
-                self.upload_chunk_columns(chunk, index.clone(), partition, columns, in_memory)
-            })
-            .collect::<Vec<_>>();
-
         let new_chunks = join_all(futures)
             .await
             .into_iter()
@@ -1194,7 +1171,6 @@ impl ChunkStore {
         Ok(new_chunks)
     }
 
-    #[tracing::instrument(level = "trace", skip(self, partition))]
     async fn check_node_disk_space(&self, partition: &IdRow<Partition>) -> Result<(), CubeError> {
         let max_disk_space = self.config.max_disk_space_per_worker();
         if max_disk_space == 0 {
@@ -1221,7 +1197,6 @@ impl ChunkStore {
     ///Post-processing of index columns chunk data before saving to parqet files.
     ///Suitable for pre-aggregaions and similar things
     ///`data` must be sorted in order of index columns
-    #[tracing::instrument(level = "trace", skip(self, index, data))]
     async fn post_process_columns(
         &self,
         index: IdRow<Index>,
@@ -1283,7 +1258,6 @@ impl ChunkStore {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, chunk, index, partition, data))]
     async fn upload_chunk_columns(
         &self,
         chunk: IdRow<Chunk>,
@@ -1331,7 +1305,6 @@ impl ChunkStore {
 
     /// Processes data into parquet files in the current task and schedules an async file upload.
     /// Join the returned handle to wait for the upload to finish.
-    #[tracing::instrument(level = "trace", skip(self, index, partition, data))]
     async fn add_chunk_columns(
         &self,
         index: IdRow<Index>,
@@ -1383,7 +1356,6 @@ impl ChunkStore {
     }
 
     /// Returns a list of newly added chunks.
-    #[tracing::instrument(level = "trace", skip(self, indexes, rows, columns))]
     async fn build_index_chunks(
         &self,
         indexes: &[IdRow<Index>],

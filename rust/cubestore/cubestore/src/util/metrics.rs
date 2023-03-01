@@ -1,5 +1,6 @@
-        //! DogStatsD client to report metrics over UDP.
-    //!
+
+//! DogStatsD client to report metrics over UDP.
+//!
 //! Can operate in `statsd`-compatible mode, see [init_metrics].
 //!
 //! Applications should call [init_metrics] once during global init. To report metrics, create one
