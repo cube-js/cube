@@ -36,8 +36,6 @@
     "@babel/core": "^7.12.10",
     "@babel/generator": "^7.12.10",
     "@babel/parser": "^7.12.10",
-    "@babel/preset-env": "^7.12.10",
-    "@babel/standalone": "^7.12.10",
     "@babel/traverse": "^7.12.10",
     "@babel/types": "^7.12.12",
     "@cubejs-backend/shared": "^0.32.2",
