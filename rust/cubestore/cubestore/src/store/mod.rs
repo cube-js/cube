@@ -701,10 +701,17 @@ impl ChunkStore {
             )));
         }
         let file_size = chunk.get_row().file_size();
+        let chunk_id = chunk.get_id();
         let remote_path = ChunkStore::chunk_file_name(chunk);
         let result = self.remote_fs.download_file(&remote_path, file_size).await;
 
-        deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &partition).await;
+        deactivate_table_on_corrupt_data(
+            self.meta_store.clone(),
+            &result,
+            &partition,
+            Some(chunk_id),
+        )
+        .await;
 
         Ok((
             self.remote_fs.local_file(&remote_path).await?,
