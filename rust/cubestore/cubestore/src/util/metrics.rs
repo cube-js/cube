@@ -1,4 +1,3 @@
-
 //! DogStatsD client to report metrics over UDP.
 //!
 //! Can operate in `statsd`-compatible mode, see [init_metrics].
