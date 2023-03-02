@@ -15,7 +15,7 @@ RUN apt-get update \
 
 # We are copying root yarn.lock file to the context folder during the Publish GH
 # action. So, a process will use the root lock file here.
-RUN yarn install && yarn cache clean
+RUN yarn install --prod && yarn cache clean
 
 FROM node:16.19.1-bullseye-slim
 

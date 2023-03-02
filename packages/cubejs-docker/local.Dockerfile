@@ -35,7 +35,7 @@ RUN apt-get update \
 
 # We are copying root yarn.lock file to the context folder during the Publish GH
 # action. So, a process will use the root lock file here.
-RUN yarn install && yarn cache clean && yarn link:dev
+RUN yarn install --prod && yarn cache clean && yarn link:dev
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules

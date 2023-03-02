@@ -17,7 +17,7 @@ ENV PATH "$JAVA_HOME/bin:${PATH}"
 
 # We are copying root yarn.lock file to the context folder during the Publish GH
 # action. So, a process will use the root lock file here.
-RUN yarn install && yarn cache clean
+RUN yarn install --prod && yarn cache clean
 
 FROM node:16.19.1-alpine3.17
 
