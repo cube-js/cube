@@ -1,4 +1,4 @@
-FROM node:14.21.1-bullseye-slim AS base
+FROM node:16.19.1-bullseye-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -9,8 +9,7 @@ ENV CI=0
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
-       cmake python2 python3 gcc g++ make cmake openjdk-11-jdk-headless \
-    && npm config set python /usr/bin/python2.7 \
+       cmake python3 gcc g++ make cmake openjdk-11-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup

@@ -4179,8 +4179,11 @@ pub async fn deactivate_table_on_corrupt_data<'a, T: 'static>(
     meta_store: Arc<dyn MetaStore>,
     e: &'a Result<T, CubeError>,
     partition: &'a IdRow<Partition>,
+    chunk_id: Option<u64>,
 ) {
-    if let Err(e) = deactivate_table_on_corrupt_data_res::<T>(meta_store, e, partition).await {
+    if let Err(e) =
+        deactivate_table_on_corrupt_data_res::<T>(meta_store, e, partition, chunk_id).await
+    {
         log::error!("Error during deactivation of table on corrupt data: {}", e);
     }
 }
@@ -4189,9 +4192,34 @@ pub async fn deactivate_table_on_corrupt_data_res<'a, T: 'static>(
     meta_store: Arc<dyn MetaStore>,
     result: &'a Result<T, CubeError>,
     partition: &'a IdRow<Partition>,
+    chunk_id: Option<u64>,
 ) -> Result<(), CubeError> {
     if let Err(e) = &result {
         if e.is_corrupt_data() {
+            //Firstly check if chunk and partition exists in metastore now, because they could have been deleted due to compaction and similar things
+            if let Some(chunk_id) = chunk_id {
+                match meta_store.get_chunk(chunk_id).await {
+                    Ok(_) => {}
+                    Err(_) => {
+                        log::info!(
+                            "Chunk {} is no longer in metastore so deactivation is not required",
+                            chunk_id
+                        );
+                        return Ok(());
+                    }
+                };
+            } else {
+                match meta_store.get_partition(partition.get_id()).await {
+                    Ok(_) => {}
+                    Err(_) => {
+                        log::info!(
+                            "Partition {} is no longer in metastore so deactivation is not required",
+                            partition.get_id()
+                        );
+                        return Ok(());
+                    }
+                };
+            }
             let table_id = meta_store
                 .get_index(partition.get_row().get_index_id())
                 .await?

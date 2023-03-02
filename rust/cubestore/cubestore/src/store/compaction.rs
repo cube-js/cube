@@ -455,7 +455,8 @@ impl CompactionService for CompactionServiceImpl {
                 .remote_fs
                 .download_file(&f, partition.get_row().file_size())
                 .await;
-            deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &partition).await;
+            deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &partition, None)
+                .await;
             Some(result?)
         } else {
             None
