@@ -792,7 +792,7 @@ mod tests {
                 })
             }
 
-            fn load_stream(
+            async fn load_stream(
                 &self,
                 _query: V1LoadRequestQuery,
                 _ctx: AuthContextRef,
