@@ -39,7 +39,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install
@@ -119,7 +119,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install
@@ -204,7 +204,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install

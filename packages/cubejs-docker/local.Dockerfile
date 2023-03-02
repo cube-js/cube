@@ -24,7 +24,7 @@ COPY --from=build /cubejs /cube-build
 RUN cd /cube-build && yarn run link:dev
 COPY package.json.local package.json
 
-RUN yarn policies set-version v1.22.5
+RUN yarn policies set-version v1.22.19
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \

@@ -81,7 +81,7 @@ COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.
 COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
-RUN yarn policies set-version v1.22.5
+RUN yarn policies set-version v1.22.19
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.

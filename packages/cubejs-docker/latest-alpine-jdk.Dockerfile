@@ -3,7 +3,7 @@ FROM node:16.19.1-alpine3.17 as builder
 WORKDIR /cube
 COPY . .
 
-RUN yarn policies set-version v1.22.5
+RUN yarn policies set-version v1.22.19
 
 # Required for node-oracledb to buld on ARM64
 RUN apk update \
@@ -37,7 +37,7 @@ ENV NODE_ENV production
 WORKDIR /cube
 COPY . .
 
-RUN yarn policies set-version v1.22.5
+RUN yarn policies set-version v1.22.19
 
 WORKDIR /cube
 

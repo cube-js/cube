@@ -4,7 +4,7 @@ FROM node:16.19.1-bullseye-slim as builder
 WORKDIR /cube
 COPY . .
 
-RUN yarn policies set-version v1.22.5
+RUN yarn policies set-version v1.22.19
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \
@@ -33,7 +33,7 @@ RUN groupadd cube && useradd -ms /bin/bash -g cube cube \
 USER cube
 WORKDIR /cube
 
-RUN yarn policies set-version v1.22.5
+RUN yarn policies set-version v1.22.19
 
 ENV TERM rxvt-unicode
 ENV NODE_ENV production
