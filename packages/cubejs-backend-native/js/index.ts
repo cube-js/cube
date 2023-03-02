@@ -127,12 +127,14 @@ function wrapNativeFunctionWithStream(
         let streamResponse: any;
         try {
             streamResponse = await fn(JSON.parse(extra));
-            if (streamResponse) {
+            if (streamResponse && streamResponse.stream) {
+                writer.start();
                 let chunk: object[] = [];
                 streamResponse.stream.on('data', (c: object) => {
                     chunk.push(c);
                     if (chunk.length >= chunkLength) {
                         if (!writer.chunk(JSON.stringify(chunk))) {
+                            // TODO replace with actual stream and high watermark implementation
                             streamResponse.stream.destroy({
                                 stack: "Rejected by client"
                             });
@@ -147,14 +149,16 @@ function wrapNativeFunctionWithStream(
                     writer.end("");
                 });
                 streamResponse.stream.on('error', (err: any) => {
-                    writer.reject(err.message || "Unknown JS exception");
+                    writer.reject(err.message || err.toString());
                 });
+            } else {
+                throw new Error(`Expected stream but nothing returned`);
             }
         } catch (e: any) {
             if (!!streamResponse && !!streamResponse.stream) {
                 streamResponse.stream.destroy(e);
             }
-            writer.reject(e.message || "Unknown JS exception");
+            writer.reject(e.message || e.toString());
         }
     };
 };

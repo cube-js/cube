@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use cubesql::CubeError;
 #[cfg(build = "debug")]
@@ -8,11 +8,13 @@ use neon::prelude::*;
 use crate::utils::bind_method;
 
 use tokio::sync::mpsc::{channel as mpsc_channel, Receiver, Sender};
+use tokio::sync::oneshot;
 
 type Chunk = Result<String, CubeError>;
 
 pub struct JsWriteStream {
     sender: Sender<Chunk>,
+    ready_sender: Mutex<Option<oneshot::Sender<Result<(), CubeError>>>>,
 }
 
 impl Finalize for JsWriteStream {}
@@ -27,6 +29,10 @@ impl JsWriteStream {
         let chunk_fn = JsFunction::new(cx, js_stream_push_chunk)?;
         let chunk = bind_method(cx, chunk_fn, obj_this)?;
         obj.set(cx, "chunk", chunk)?;
+
+        let start_fn = JsFunction::new(cx, js_stream_start)?;
+        let start_stream = bind_method(cx, start_fn, obj_this)?;
+        obj.set(cx, "start", start_stream)?;
 
         let end_fn = JsFunction::new(cx, js_stream_end)?;
         let end_stream = bind_method(cx, end_fn, obj_this)?;
@@ -46,12 +52,23 @@ impl JsWriteStream {
         }
     }
 
+    fn start(&self) {
+        if let Some(ready_sender) = self.ready_sender.lock().unwrap().take() {
+            let _ = ready_sender.send(Ok(()));
+        }
+    }
+
     fn end(&self) {
         self.push_chunk("".to_string());
     }
 
     fn reject(&self, err: String) {
-        _ = self.sender.try_send(Err(CubeError::internal(err)));
+        if let Some(ready_sender) = self.ready_sender.lock().unwrap().take() {
+            let _ = ready_sender.send(Err(CubeError::internal(err.to_string())));
+        }
+        let _ = self
+            .sender
+            .try_send(Err(CubeError::internal(err.to_string())));
     }
 }
 
@@ -66,6 +83,18 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     let result = this.push_chunk(result.value(&mut cx));
 
     Ok(cx.boolean(result))
+}
+
+fn js_stream_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    #[cfg(build = "debug")]
+    trace!("JsWriteStream.start");
+
+    let this = cx
+        .this()
+        .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
+    this.start();
+
+    Ok(cx.undefined())
 }
 
 fn js_stream_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
@@ -89,11 +118,10 @@ fn js_stream_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     let result = cx.argument::<JsString>(0)?;
     this.reject(result.value(&mut cx));
-
     Ok(cx.undefined())
 }
 
-pub fn call_js_with_stream_as_callback(
+pub async fn call_js_with_stream_as_callback(
     channel: Arc<Channel>,
     js_method: Arc<Root<JsFunction>>,
     query: Option<String>,
@@ -105,6 +133,7 @@ pub fn call_js_with_stream_as_callback(
     let channel_size = 1_000_000 / chunk_size;
 
     let (sender, receiver) = mpsc_channel::<Chunk>(channel_size);
+    let (ready_sender, ready_receiver) = oneshot::channel();
 
     channel
         .try_send(move |mut cx| {
@@ -114,7 +143,10 @@ pub fn call_js_with_stream_as_callback(
                 Err(v) => v.as_ref().to_inner(&mut cx),
             };
 
-            let stream = JsWriteStream { sender };
+            let stream = JsWriteStream {
+                sender,
+                ready_sender: Mutex::new(Some(ready_sender)),
+            };
             let this = cx.undefined();
             let args: Vec<Handle<_>> = vec![
                 if let Some(q) = query {
@@ -131,6 +163,8 @@ pub fn call_js_with_stream_as_callback(
         .map_err(|err| {
             CubeError::internal(format!("Unable to send js call via channel, err: {}", err))
         })?;
+
+    ready_receiver.await??;
 
     Ok(receiver)
 }

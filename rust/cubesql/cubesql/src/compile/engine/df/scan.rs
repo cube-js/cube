@@ -295,9 +295,10 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         );
 
         if stream_mode {
-            let result =
-                self.transport
-                    .load_stream(self.request.clone(), self.auth_context.clone(), meta);
+            let result = self
+                .transport
+                .load_stream(self.request.clone(), self.auth_context.clone(), meta)
+                .await;
             let stream = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
             let main_stream =
                 CubeScanMemoryStream::new(stream, self.schema.clone(), self.member_fields.clone());

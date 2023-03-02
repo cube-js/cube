@@ -250,7 +250,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
             panic!("It's a fake transport");
         }
 
-        fn load_stream(
+        async fn load_stream(
             &self,
             _query: V1LoadRequestQuery,
             _ctx: AuthContextRef,

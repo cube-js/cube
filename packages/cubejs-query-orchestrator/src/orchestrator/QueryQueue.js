@@ -316,7 +316,7 @@ export class QueryQueue {
       // query (initialized by the /cubejs-system/v1/pre-aggregations/jobs
       // endpoint).
       let result = !query.forceBuild && await queueConnection.getResult(queryKey);
-      if (result) {
+      if (result && !result.streamResult) {
         return this.parseResult(result);
       }
 
@@ -824,7 +824,9 @@ export class QueryQueue {
               try {
                 await this.queryHandlers.stream(query.query, queryStream);
                 // CubeStore has special handling for null
-                executionResult = null;
+                executionResult = {
+                  streamResult: true
+                };
               } finally {
                 if (this.streams.get(queryKeyHashed) === queryStream) {
                   this.streams.delete(queryKeyHashed);
@@ -930,17 +932,16 @@ export class QueryQueue {
         }
 
         await this.reconcileQueue();
-      } else if (query?.queryHandler === 'stream') {
-        if (this.streams.has(queryKeyHashed)) {
-          this.getQueryStream(queryKeyHashed).debounce();
-        }
-        await queueConnection.freeProcessingLock(queryKeyHashed, processingId, activated);
-        const [active] = await queueConnection.getQueryStageState(true);
-        if (active) {
-          await Promise.race(active.map(keyHash => queueConnection.getResultBlockingByHash(keyHash)));
-          await this.reconcileQueue();
-        }
       } else {
+        // TODO Ideally streaming queries should reconcile queue here after waiting on open slot however in practice continue wait timeout reconciles faster CPU-wise
+        // if (query?.queryHandler === 'stream') {
+        //   const [active] = await queueConnection.getQueryStageState(true);
+        //   if (active && active.length > 0) {
+        //     await Promise.race(active.map(keyHash => queueConnection.getResultBlockingByHash(keyHash)));
+        //     await this.reconcileQueue();
+        //   }
+        // }
+
         this.logger('Skip processing', {
           processingId,
           queryKey: query && query.queryKey || queryKeyHashed,

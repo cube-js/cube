@@ -62,7 +62,7 @@ pub trait TransportService: Send + Sync + Debug {
         meta_fields: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError>;
 
-    fn load_stream(
+    async fn load_stream(
         &self,
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
@@ -167,7 +167,7 @@ impl TransportService for HttpTransport {
         Ok(response)
     }
 
-    fn load_stream(
+    async fn load_stream(
         &self,
         _query: V1LoadRequestQuery,
         _ctx: AuthContextRef,
