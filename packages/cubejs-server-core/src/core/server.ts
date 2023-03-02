@@ -801,6 +801,7 @@ export class CubejsServerCore {
         : {
           maxPoolSize:
             await CubejsServerCore.getDriverMaxPool(context, options),
+          testConnectionTimeout: options?.testConnectionTimeout,
         };
       opts.dataSource = assertDataSource(context.dataSource);
       return CubejsServerCore.createDriver(type, opts);

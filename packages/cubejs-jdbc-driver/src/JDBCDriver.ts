@@ -76,11 +76,26 @@ export class JDBCDriver extends BaseDriver {
 
   public constructor(
     config: Partial<JDBCDriverConfiguration> & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -130,13 +145,22 @@ export class JDBCDriver extends BaseDriver {
         new Promise((resolve) => {
           const isValid = promisify(connection.isValid.bind(connection));
           const timeout = setTimeout(() => {
+            if (this.logger) {
+              this.logger('Connection validation failed by timeout', {
+                testConnectionTimeout: this.testConnectionTimeout(),
+              });
+            }
             resolve(false);
           }, this.testConnectionTimeout());
           isValid(0).then((valid: boolean) => {
             clearTimeout(timeout);
+            if (!valid && this.logger) {
+              this.logger('Connection validation failed', {});
+            }
             resolve(valid);
-          }).catch(() => {
+          }).catch((e: { stack?: string }) => {
             clearTimeout(timeout);
+            this.databasePoolError(e);
             resolve(false);
           });
         })
