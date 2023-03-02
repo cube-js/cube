@@ -13,6 +13,8 @@ RUN apt-get update \
 # We are copying root yarn.lock file to the context folder during the Publish GH
 # action. So, a process will use the root lock file here.
 RUN yarn install && yarn cache clean
+# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
+RUN yarn config set network-timeout 120000 -g
 
 FROM node:16.19.1-bullseye-slim
 

@@ -82,6 +82,8 @@ COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-
 COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
 RUN yarn policies set-version v1.22.19
+# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
+RUN yarn config set network-timeout 120000 -g
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.

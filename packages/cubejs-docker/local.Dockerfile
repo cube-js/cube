@@ -25,6 +25,8 @@ RUN cd /cube-build && yarn run link:dev
 COPY package.json.local package.json
 
 RUN yarn policies set-version v1.22.19
+# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
+RUN yarn config set network-timeout 120000 -g
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \
