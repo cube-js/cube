@@ -22,8 +22,8 @@
     "/oclif.manifest.json"
   ],
   "bin": {
-    "cubejs-server": "./bin/server",
-    "cubejs-dev-server": "./bin/dev-server"
+    "cubejs-dev-server": "./bin/dev-server",
+    "cubejs-server": "./bin/server"
   },
   "cubejsCliVersion": ">=0.22",
   "scripts": {

@@ -1,6 +1,11 @@
 node_modules
-.yarn
-.yarnrc
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
 /.idea
 /.vscode
 newrelic_agent.log
