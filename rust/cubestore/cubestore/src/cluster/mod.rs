@@ -484,18 +484,28 @@ impl Cluster for ClusterImpl {
         let node_name = self.node_name_by_partition(&partition);
         let mut futures = Vec::new();
         if let Some(name) = partition.get_row().get_full_name(partition.get_id()) {
-            futures.push(self.warmup_download(&node_name, name, partition.get_row().file_size()));
+            futures.push(self.warmup_download_with_corruption_check(
+                &node_name,
+                name,
+                partition.get_row().file_size(),
+                &partition,
+                None,
+            ));
         }
         for chunk in chunks.iter() {
             let name = chunk.get_row().get_full_name(chunk.get_id());
-            futures.push(self.warmup_download(&node_name, name, chunk.get_row().file_size()));
+            futures.push(self.warmup_download_with_corruption_check(
+                &node_name,
+                name,
+                chunk.get_row().file_size(),
+                &partition,
+                Some(chunk.get_id()),
+            ));
         }
         let res = join_all(futures)
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>();
-
-        deactivate_table_on_corrupt_data(self.meta_store.clone(), &res, &partition).await;
 
         res?;
         Ok(())
@@ -1404,14 +1414,20 @@ impl ClusterImpl {
         let to_download = plan_node.files_to_download();
         let file_futures = to_download
             .iter()
-            .map(|(partition, remote, file_size)| {
+            .map(|(partition, remote, file_size, chunk_id)| {
                 let meta_store = self.meta_store.clone();
                 async move {
                     let res = self
                         .remote_fs
                         .download_file(remote, file_size.clone())
                         .await;
-                    deactivate_table_on_corrupt_data(meta_store, &res, &partition).await;
+                    deactivate_table_on_corrupt_data(
+                        meta_store,
+                        &res,
+                        &partition,
+                        chunk_id.clone(),
+                    )
+                    .await;
                     res
                 }
             })
@@ -1428,10 +1444,25 @@ impl ClusterImpl {
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter(),
             )
-            .map(|((_, remote_path, _), path)| (remote_path, path))
+            .map(|((_, remote_path, _, _), path)| (remote_path, path))
             .collect::<HashMap<_, _>>();
 
         Ok(remote_to_local_names)
+    }
+
+    async fn warmup_download_with_corruption_check(
+        &self,
+        node_name: &str,
+        remote_path: String,
+        expected_file_size: Option<u64>,
+        partition: &IdRow<Partition>,
+        chunk_id: Option<u64>,
+    ) -> Result<(), CubeError> {
+        let res = self
+            .warmup_download(&node_name, remote_path, expected_file_size)
+            .await;
+        deactivate_table_on_corrupt_data(self.meta_store.clone(), &res, partition, chunk_id).await;
+        res
     }
 
     pub async fn try_to_connect(&mut self) -> Result<(), CubeError> {
@@ -1669,7 +1700,8 @@ impl ClusterImpl {
                         c.get_row().file_size(),
                     )
                     .await;
-                deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &p).await;
+                // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
+                //       so they are not errors most of the time.
                 ack_error!(result);
             }
         }

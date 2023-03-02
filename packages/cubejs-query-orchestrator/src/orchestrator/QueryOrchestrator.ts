@@ -9,6 +9,7 @@ import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
+import { QueryStream } from './QueryStream';
 
 export type CacheAndQueryDriverType = 'redis' | 'memory' | 'cubestore';
 
@@ -67,12 +68,16 @@ export class QueryOrchestrator {
     this.redisPool = redisPool;
 
     const cubeStoreDriverFactory = cacheAndQueueDriver === 'cubestore' ? async () => {
-      const externalDriver = await externalDriverFactory();
-      if (externalDriver instanceof CubeStoreDriver) {
-        return externalDriver;
+      if (externalDriverFactory) {
+        const externalDriver = await externalDriverFactory();
+        if (externalDriver instanceof CubeStoreDriver) {
+          return externalDriver;
+        }
+
+        throw new Error('It`s not possible to use Cube Store as queue/cache driver without using it as external');
       }
 
-      throw new Error('It`s not possible to use CubeStore as queue & cache driver without using it as external');
+      throw new Error('Cube Store was specified as queue/cache driver. Please set CUBEJS_CUBESTORE_HOST and CUBEJS_CUBESTORE_PORT variables. Please see https://cube.dev/docs/deployment/production-checklist#set-up-cube-store to learn more.');
     } : undefined;
 
     this.queryCache = new QueryCache(
@@ -263,6 +268,11 @@ export class QueryOrchestrator {
       lastRefreshTimestamp,
       result.lastRefreshTime?.getTime()
     ]);
+
+    if (result instanceof QueryStream) {
+      // TODO do some wrapper object to provide metadata?
+      return result;
+    }
 
     return {
       ...result,

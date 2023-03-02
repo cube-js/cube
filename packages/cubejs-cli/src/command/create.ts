@@ -185,7 +185,7 @@ export function configureCreateCommand(program: CommanderStatic) {
       '-t, --template <template>',
       'App template. Options: docker (default), express, serverless, serverless-google.'
     )
-    .description('Create new Cube.js app')
+    .description('Create new Cube app')
     .action(
       (projectName, options) => create(projectName, options)
         .catch(e => displayError(e.stack || e, { projectName, dbType: options.dbType }))

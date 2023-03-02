@@ -20,3 +20,11 @@ let i = 0;
 export function getNext(): number {
   return i++;
 }
+
+export function isCI(): boolean {
+  if (process.env.GITHUB_EVENT_NAME) {
+    return true;
+  }
+
+  return false;
+}

@@ -223,8 +223,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return bigQueryTable.schema.fields.map((c: any) => ({ name: c.name, type: this.toGenericType(c.type) }));
   }
 
-  public async createSchemaIfNotExists(schemaName: string) {
-    return this.bigquery.dataset(schemaName).get({ autoCreate: true });
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
+    await this.bigquery.dataset(schemaName).get({ autoCreate: true });
   }
 
   public async isUnloadSupported() {

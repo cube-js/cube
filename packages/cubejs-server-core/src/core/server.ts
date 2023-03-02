@@ -9,13 +9,12 @@ import { ApiGateway, ApiGatewayOptions, UserBackgroundContext } from '@cubejs-ba
 import {
   CancelableInterval,
   createCancelableInterval, formatDuration, getAnonymousId,
-  getEnv, assertDataSource, getRealType, internalExceptions, track,
+  getEnv, assertDataSource, getRealType, internalExceptions, track, FileRepository, SchemaFileRepository,
 } from '@cubejs-backend/shared';
 
-import type { Application as ExpressApplication, NextFunction } from 'express';
+import type { Application as ExpressApplication } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
-import { FileRepository, SchemaFileRepository } from './FileRepository';
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';

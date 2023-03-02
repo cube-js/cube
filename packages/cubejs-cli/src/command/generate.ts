@@ -97,7 +97,7 @@ export function configureGenerateCommand(program: CommanderStatic) {
     .command('generate')
     .option('-t, --tables <tables>', 'Comma delimited list of tables to generate schema from', list)
     .option('-d, --dataSource <dataSource>', '', 'default')
-    .description('Generate Cube.js schema from DB tables schema')
+    .description('Generate Cube schema from DB tables schema')
     .action(
       (options) => generate(options)
         .catch(e => displayError(e.stack || e, { dbType: options.dbType }))

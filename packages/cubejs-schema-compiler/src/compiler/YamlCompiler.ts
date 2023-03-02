@@ -25,15 +25,19 @@ export class YamlCompiler {
   }
 
   public compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
+    if (!file.content.trim()) {
+      return;
+    }
+    
     const yamlObj = YAML.load(file.content);
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
-        yamlObj.cubes.forEach(({ name, ...cube }) => {
+        (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
           const transpiledFile = this.transpileAndPrepareJsFile(file, 'cube', { name, ...cube }, errorsReport);
           this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
         });
       } else if (key === 'views') {
-        yamlObj.views.forEach(({ name, ...cube }) => {
+        (yamlObj.views || []).forEach(({ name, ...cube }) => {
           const transpiledFile = this.transpileAndPrepareJsFile(file, 'view', { name, ...cube }, errorsReport);
           this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
         });

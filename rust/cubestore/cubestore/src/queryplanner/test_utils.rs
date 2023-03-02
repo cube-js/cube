@@ -651,11 +651,36 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn healthcheck(&self) -> Result<(), CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError> {
         panic!("MetaStore mock!")
     }
 
     async fn set_current_snapshot(&self, _snapshot_id: u128) -> Result<(), CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_chunks_out_of_queue(
+        &self,
+        _ids: Vec<u64>,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_partitions_out_of_queue(
+        &self,
+        _ids: Vec<u64>,
+    ) -> Result<Vec<IdRow<Partition>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn delete_chunks_without_checks(&self, _chunk_ids: Vec<u64>) -> Result<(), CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_chunks_without_partition_created_seconds_ago(
+        &self,
+        _seconds_ago: i64,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         panic!("MetaStore mock!")
     }
 }
@@ -772,6 +797,10 @@ impl CacheStore for CacheStoreMock {
     }
 
     async fn compaction(&self) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn healthcheck(&self) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
 }

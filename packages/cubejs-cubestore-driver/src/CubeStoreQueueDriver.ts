@@ -16,11 +16,12 @@ import { getProcessUid } from '@cubejs-backend/shared';
 
 import { CubeStoreDriver } from './CubeStoreDriver';
 
-function hashQueryKey(queryKey: QueryKey): QueryKeyHash {
+function hashQueryKey(queryKey: QueryKey, processUid?: string): QueryKeyHash {
+  processUid = processUid || getProcessUid();
   const hash = crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
 
   if (typeof queryKey === 'object' && queryKey.persistent) {
-    return `${hash}@${getProcessUid()}` as any;
+    return `${hash}@${processUid}` as any;
   }
 
   return hash as any;
@@ -33,7 +34,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   ) { }
 
   public redisHash(queryKey: QueryKey): QueryKeyHash {
-    return hashQueryKey(queryKey);
+    return hashQueryKey(queryKey, this.options.processUid);
   }
 
   protected prefixKey(queryKey: QueryKey): string {
@@ -275,9 +276,13 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async getResultBlocking(queryKey: string): Promise<QueryDef | null> {
+    return this.getResultBlockingByHash(this.redisHash(queryKey));
+  }
+
+  public async getResultBlockingByHash(queryKeyHash: QueryKeyHash): Promise<QueryDef | null> {
     const rows = await this.driver.query('QUEUE RESULT_BLOCKING ? ?', [
       this.options.continueWaitTimeout * 1000,
-      this.prefixKey(this.redisHash(queryKey)),
+      this.prefixKey(queryKeyHash),
     ]);
     if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'getResultBlocking');

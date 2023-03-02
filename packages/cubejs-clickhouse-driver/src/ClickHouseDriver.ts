@@ -355,8 +355,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return super.toGenericType(columnType);
   }
 
-  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
-    return this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`, []);
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
+    await this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`, []);
   }
 
   public getTablesQuery(schemaName: string) {

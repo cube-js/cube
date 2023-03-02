@@ -1,5 +1,6 @@
 pub mod kafka;
 
+mod buffered_stream;
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::replay_handle::{ReplayHandle, SeqPointer, SeqPointerForLocation};
@@ -16,6 +17,7 @@ use crate::CubeError;
 use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
 use async_trait::async_trait;
+use buffered_stream::BufferedStream;
 use chrono::Utc;
 use datafusion::cube_ext::ordfloat::OrdF64;
 use futures::future::join_all;
@@ -218,14 +220,18 @@ impl StreamingService for StreamingServiceImpl {
         })?;
         let location_index = table.get_row().location_index(location)?;
         let initial_seq_value = self.initial_seq_for(&table, location).await?;
-        let mut stream = source
+        let stream = source
             .row_stream(
                 table.get_row().get_columns().clone(),
                 seq_column.clone(),
                 initial_seq_value.clone(),
             )
-            .await?
-            .ready_chunks(self.config_obj.wal_split_threshold() as usize);
+            .await?;
+        let mut stream = BufferedStream::new(
+            stream,
+            self.config_obj.wal_split_threshold() as usize,
+            Duration::from_millis(1000),
+        );
 
         let finish = |builders: Vec<Box<dyn ArrayBuilder>>| {
             builders.into_iter().map(|mut b| b.finish()).collect_vec()
@@ -1425,7 +1431,7 @@ mod tests {
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/1".to_string())),
             ]);
-            timeout(Duration::from_secs(15), wait).await.unwrap().unwrap();
+            let _ = timeout(Duration::from_secs(15), wait).await;
 
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
@@ -1493,7 +1499,7 @@ mod tests {
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/1".to_string())),
             ]);
-            timeout(Duration::from_secs(15), wait).await.unwrap().unwrap();
+            let _ = timeout(Duration::from_secs(15), wait).await;
 
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")

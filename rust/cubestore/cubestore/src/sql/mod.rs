@@ -613,7 +613,7 @@ impl SqlServiceImpl {
                 tokio::fs::create_dir(&data_dir).await?;
                 log::debug!("Dumping data files to {:?}", data_dir);
                 // TODO: download in parallel.
-                for (_, f, size) in p.all_required_files() {
+                for (_, f, size, _) in p.all_required_files() {
                     let f = self.remote_fs.download_file(&f, size).await?;
                     let name = Path::new(&f).file_name().ok_or_else(|| {
                         CubeError::internal(format!("Could not get filename of '{}'", f))
@@ -893,6 +893,10 @@ impl SqlService for SqlServiceImpl {
                     }
                     MetaStoreCommand::Compaction => {
                         self.db.compaction().await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    MetaStoreCommand::Healthcheck => {
+                        self.db.healthcheck().await?;
                         Ok(Arc::new(DataFrame::new(vec![], vec![])))
                     }
                 },
@@ -1303,7 +1307,7 @@ impl SqlService for SqlServiceImpl {
                             context.inline_tables.into_iter().map(|i| i.id).collect(),
                         );
                         let mut mocked_names = HashMap::new();
-                        for (_, f, _) in worker_plan.files_to_download() {
+                        for (_, f, _, _) in worker_plan.files_to_download() {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
@@ -3016,7 +3020,7 @@ mod tests {
                         .unwrap();
                 }
 
-                Delay::new(Duration::from_millis(500)).await;
+                Delay::new(Duration::from_millis(1500)).await;
 
                 let active_partitions = services
                     .meta_store
