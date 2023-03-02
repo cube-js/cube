@@ -151,10 +151,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Install Yarn
-        run: npm install -g yarn
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -169,7 +165,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -178,7 +174,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Build native
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
@@ -226,8 +222,6 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
         run: npm install -g yarn
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -255,7 +249,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -264,7 +258,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Build native
         env:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true

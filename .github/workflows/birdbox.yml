@@ -55,9 +55,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -66,7 +64,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Build client
         run: yarn build
       - name: Lerna tsc
@@ -123,9 +121,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -134,7 +130,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Build client
         run: yarn build
       - name: Lerna tsc
@@ -192,9 +188,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -203,7 +197,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Lerna tsc
         run: yarn tsc
       - name: Birdbox

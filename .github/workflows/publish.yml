@@ -38,11 +38,9 @@ jobs:
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -51,7 +49,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Build Core Client libraries
         run: yarn build
       - name: Build other packages
@@ -118,11 +116,9 @@ jobs:
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Install Yarn
         run: npm install -g yarn
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -131,7 +127,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Build native
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
@@ -203,11 +199,9 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -216,7 +210,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Build native
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Upload artifact

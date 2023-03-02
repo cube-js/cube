@@ -80,9 +80,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -91,7 +89,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Lerna tsc
         run: yarn tsc
       - name: Build client
@@ -138,9 +136,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -149,7 +145,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: NPM lint
         run: yarn lint:npm
       - name: Lerna lint
@@ -188,9 +184,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -199,7 +193,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Check Yarn lock wasn't modified
         run: if [ "$(git status | grep nothing)x" = "x" ]; then echo "Non empty changeset after lerna bootstrap"; git status; exit 1; else echo "Nothing to commit. Proceeding"; fi;
       - name: Build Core Client libraries
@@ -258,9 +252,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -269,7 +261,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Redis Integration with Redis Driver
@@ -339,9 +331,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -350,7 +340,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Lerna tsc
         run: yarn tsc
       - uses: Swatinem/rust-cache@v1
@@ -411,9 +401,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -422,7 +410,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Integration tests for ${{ matrix.db }} matrix
@@ -467,9 +455,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -478,7 +464,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Install instant client for Oracle
         uses: GoodManWEN/oracle-client-action@main
       - name: Build client
@@ -597,9 +583,7 @@ jobs:
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-      - name: Yarn install
+      - name: Install node modules
         uses: nick-invision/retry@v2
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
@@ -608,7 +592,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: corepack npm ci
       - name: Build client
         run: yarn build
       - name: Lerna tsc
