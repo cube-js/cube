@@ -283,7 +283,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
-          version: v0.9.1
+          version: v0.10.3
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
@@ -303,6 +303,10 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+          # Workaround for yarn v1, it uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
+          config-inline: |
+            [worker.oci]
+              max-parallelism = 1
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
