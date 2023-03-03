@@ -259,9 +259,13 @@ export class JDBCDriver extends BaseDriver {
           ) => {
             if (err) reject(err);
             const rowsStream = new QueryStream(res.rows.next);
+            let connectionReleased = false;
             const cleanup = (e?: Error) => {
-              if (!rowsStream.destroyed) {
+              if (!connectionReleased) {
                 this.pool.release(conn);
+                connectionReleased = true;
+              }
+              if (!rowsStream.destroyed) {
                 rowsStream.destroy(e);
               }
             };
