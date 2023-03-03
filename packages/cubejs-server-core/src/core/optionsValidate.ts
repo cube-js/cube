@@ -129,7 +129,8 @@ const schemaOptions = Joi.object().keys({
         externalRefresh: Joi.boolean(),
         maxPartitions: Joi.number(),
       },
-      rollupOnlyMode: Joi.boolean()
+      rollupOnlyMode: Joi.boolean(),
+      testConnectionTimeout: Joi.number().min(0).integer(),
     })
   ),
   allowJsDuplicatePropsInSchema: Joi.boolean(),

@@ -121,13 +121,21 @@ const DbTypeValueMatcher = {
  * Base driver class.
  */
 export abstract class BaseDriver implements DriverInterface {
+  private testConnectionTimeoutValue = 10000;
+
   protected logger: any;
 
   /**
    * Class constructor.
    */
-  public constructor(_options = {}) {
-    //
+  public constructor(_options: {
+    /**
+     * Time to wait for a response from a connection after validation
+     * request before determining it as not valid. Default - 10000 ms.
+     */
+    testConnectionTimeout?: number,
+  } = {}) {
+    this.testConnectionTimeoutValue = _options.testConnectionTimeout || 10000;
   }
 
   protected informationSchemaQuery() {
@@ -312,7 +320,7 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   public testConnectionTimeout() {
-    return 10000;
+    return this.testConnectionTimeoutValue;
   }
 
   public async downloadTable(table: string, _options: ExternalDriverCompatibilities): Promise<DownloadTableMemoryData | DownloadTableCSVData> {

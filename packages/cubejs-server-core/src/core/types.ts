@@ -48,6 +48,7 @@ export interface OrchestratorOptions {
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
   rollupOnlyMode?: boolean;
+  testConnectionTimeout?: number;
 }
 
 export interface QueueInitedOptions {
@@ -76,6 +77,7 @@ export interface OrchestratorInitedOptions {
   redisPrefix?: string;
   redisPoolOptions?: RedisPoolOptions;
   rollupOnlyMode?: boolean;
+  testConnectionTimeout?: number;
 }
 
 export interface RequestContext {
@@ -130,6 +132,7 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 export type DriverOptions = {
   dataSource?: string,
   maxPoolSize?: number,
+  testConnectionTimeout?: number,
 };
 
 export type DriverConfig = {

@@ -687,6 +687,7 @@ describe('OptsHandler class', () => {
   test('must configure driver pool', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 
+    const testConnectionTimeout = 60000;
     const concurrency1 = 15;
     const concurrency2 = 25;
     let core;
@@ -709,14 +710,43 @@ describe('OptsHandler class', () => {
             concurrency: concurrency2,
           }),
         },
+        testConnectionTimeout,
       }),
     });
     opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
     driver = <any>(await core.resolveDriver(<DriverContext>{}, opts));
     
     expect(driver.pool.options.max).toEqual(2 * (concurrency1 + concurrency2));
+    expect(driver.testConnectionTimeout()).toEqual(testConnectionTimeout);
 
     // Case 2
+    core = new CubejsServerCoreExposed({
+      ...conf,
+      dbType: undefined,
+      driverFactory: () => ({
+        type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
+        testConnectionTimeout,
+      }),
+      orchestratorOptions: () => ({
+        queryCacheOptions: {
+          queueOptions: {
+            concurrency: concurrency1,
+          },
+        },
+        preAggregationsOptions: {
+          queueOptions: () => ({
+            concurrency: concurrency2,
+          }),
+        },
+      }),
+    });
+    opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+    driver = <any>(await core.resolveDriver(<DriverContext>{}));
+    
+    expect(driver.pool.options.max).toEqual(8);
+    expect(driver.testConnectionTimeout()).toEqual(testConnectionTimeout);
+
+    // Case 3
     core = new CubejsServerCoreExposed({
       ...conf,
       dbType: undefined,
@@ -738,6 +768,7 @@ describe('OptsHandler class', () => {
     driver = <any>(await core.resolveDriver(<DriverContext>{}));
     
     expect(driver.pool.options.max).toEqual(8);
+    expect(driver.testConnectionTimeout()).toEqual(10000);
   });
 
   test(
