@@ -80,8 +80,6 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -138,8 +136,6 @@ jobs:
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -188,8 +184,6 @@ jobs:
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -258,8 +252,6 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -339,8 +331,6 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -411,8 +401,6 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -467,8 +455,6 @@ jobs:
           key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -597,8 +583,6 @@ jobs:
           key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-workspace-main-16.x-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
