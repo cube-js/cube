@@ -98,6 +98,16 @@ type QueryOrderType =
   'asc' |
   'desc';
 
+/**
+ * Permission data type.
+ */
+type Permission =
+  'liveliness' |
+  'graphql' |
+  'meta' |
+  'data' |
+  'jobs';
+
 export {
   RequestType,
   ResultType,
@@ -109,4 +119,5 @@ export {
   FilterOperator,
   QueryTimeDimensionGranularity,
   QueryOrderType,
+  Permission,
 };
