@@ -593,7 +593,7 @@ impl MetaStore for MetaStoreMock {
     async fn create_replay_handle_from_seq_pointers(
         &self,
         _table_id: u64,
-        _seq_pointer: Option<Vec<Option<SeqPointer>>>,
+    _seq_pointer: Option<Vec<Option<SeqPointer>>>,
     ) -> Result<IdRow<ReplayHandle>, CubeError> {
         panic!("MetaStore mock!")
     }
@@ -692,6 +692,9 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
     async fn insert_chunks(&self, _chunks: Vec<Chunk>) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
         panic!("MetaStore mock!")
     }
 }
