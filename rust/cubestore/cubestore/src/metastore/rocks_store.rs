@@ -514,7 +514,7 @@ pub struct RocksStore {
     snapshot_uploaded: Arc<RwLock<bool>>,
     snapshots_upload_stopped: Arc<AsyncMutex<bool>>,
     pub(crate) cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
-    rw_loop_tx: std::sync::mpsc::SyncSender<
+    rw_loop_tx: tokio::sync::mpsc::Sender<
         Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
     >,
     _rw_loop_join_handle: Arc<AbortingJoinHandle<()>>,
@@ -557,20 +557,17 @@ impl RocksStore {
         let db = details.open_db(path)?;
         let db_arc = Arc::new(db);
 
-        let (rw_loop_tx, rw_loop_rx) = std::sync::mpsc::sync_channel::<
+        let (rw_loop_tx, mut rw_loop_rx) = tokio::sync::mpsc::channel::<
             Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
         >(32_768);
 
         let join_handle = cube_ext::spawn_blocking(move || loop {
-            match rw_loop_rx.recv() {
-                Ok(fun) => {
-                    if let Err(e) = fun() {
-                        log::error!("Error during read write loop execution: {}", e);
-                    }
+            if let Some(fun) = rw_loop_rx.blocking_recv() {
+                if let Err(e) = fun() {
+                    log::error!("Error during read write loop execution: {}", e);
                 }
-                Err(_) => {
-                    return;
-                }
+            } else {
+                return;
             }
         });
 
@@ -716,7 +713,7 @@ impl RocksStore {
 
             Ok(())
         }));
-        if let Err(e) = res {
+        if let Err(e) = res.await {
             log::error!("[{}] Error during read write loop send: {}", store_name, e);
         }
 
@@ -894,7 +891,7 @@ impl RocksStore {
 
             Ok(())
         }));
-        if let Err(e) = res {
+        if let Err(e) = res.await {
             log::error!("Error during read write loop send: {}", e);
         }
 
