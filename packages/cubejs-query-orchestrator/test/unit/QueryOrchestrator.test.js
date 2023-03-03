@@ -1654,11 +1654,18 @@ describe('QueryOrchestrator', () => {
         query: 'Foo.query'
       }
     });
+    const fetchLongPolling = (orchestrator, q) => orchestrator.fetchQuery(q).catch(e => {
+      console.log(e.toString());
+      if (e.toString().match(/Continue wait/)) {
+        return fetchLongPolling(orchestrator, q);
+      }
+      throw e;
+    });
     await Promise.all([
-      queryOrchestrator.fetchQuery(query(1)),
-      queryOrchestrator.fetchQuery(query(2)),
-      queryOrchestrator2.fetchQuery(query(3)),
-      queryOrchestrator2.fetchQuery(query(4)),
+      fetchLongPolling(queryOrchestrator, query(1)),
+      fetchLongPolling(queryOrchestrator, query(2)),
+      fetchLongPolling(queryOrchestrator2, query(3)),
+      fetchLongPolling(queryOrchestrator2, query(4)),
     ].map(async streamPromise => {
       const stream = await streamPromise;
       const data = await new Promise((resolve, reject) => {

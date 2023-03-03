@@ -66,9 +66,7 @@ impl JsWriteStream {
         if let Some(ready_sender) = self.ready_sender.lock().unwrap().take() {
             let _ = ready_sender.send(Err(CubeError::internal(err.to_string())));
         }
-        let _ = self
-            .sender
-            .try_send(Err(CubeError::internal(err.to_string())));
+        let _ = self.sender.try_send(Err(CubeError::internal(err)));
     }
 }
 
