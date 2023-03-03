@@ -118,7 +118,10 @@ class ApiGateway {
 
   public readonly checkAuthSystemFn: CheckAuthFn;
 
-  protected readonly contextToPermissionsFn: ContextToPermissionsFn;
+  protected readonly contextToPermFn: ContextToPermissionsFn;
+
+  protected readonly contextToPermDefFn: ContextToPermissionsFn =
+    async () => ['liveliness', 'graphql', 'meta', 'data'];
 
   protected readonly checkAuthMiddleware: CheckAuthMiddlewareFn;
 
@@ -156,7 +159,7 @@ class ApiGateway {
 
     this.checkAuthFn = this.createCheckAuthFn(options);
     this.checkAuthSystemFn = this.createCheckAuthSystemFn();
-    this.contextToPermissionsFn = this.createContextToPermissionsFn(options);
+    this.contextToPermFn = this.createContextToPermissionsFn(options);
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
       : this.checkAuth;
@@ -2193,7 +2196,7 @@ class ApiGateway {
         }
         return permissionsCache;
       }
-      : async () => ['liveliness', 'graphql', 'meta', 'data'];
+      : this.contextToPermDefFn;
   }
 
   protected async assertPermission(
@@ -2201,7 +2204,10 @@ class ApiGateway {
     securityContext?: any,
   ): Promise<void> {
     const permissions =
-      await this.contextToPermissionsFn(securityContext || {});
+      await this.contextToPermFn(
+        securityContext || {},
+        await this.contextToPermDefFn(),
+      );
     const permited = permissions.indexOf(permission) >= 0;
     if (!permited) {
       throw new CubejsHandlerError(

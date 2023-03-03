@@ -1055,7 +1055,7 @@ describe('OptsHandler class', () => {
     });
 
     const gateway = <any>core.apiGateway();
-    const permissions = await gateway.contextToPermissionsFn();
+    const permissions = await gateway.contextToPermFn();
     expect(permissions).toBeDefined();
     expect(Array.isArray(permissions)).toBeTruthy();
     expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data']);
@@ -1089,7 +1089,7 @@ describe('OptsHandler class', () => {
 
     const gateway = <any>core.apiGateway();
     expect(async () => {
-      await gateway.contextToPermissionsFn();
+      await gateway.contextToPermFn();
     }).rejects.toThrow(
       'A user-defined contextToPermissions function returns an inconsistent type.'
     );
@@ -1123,7 +1123,7 @@ describe('OptsHandler class', () => {
 
     const gateway = <any>core.apiGateway();
     expect(async () => {
-      await gateway.contextToPermissionsFn();
+      await gateway.contextToPermFn();
     }).rejects.toThrow(
       'A user-defined contextToPermissions function returns a wrong permission: job'
     );
@@ -1150,7 +1150,7 @@ describe('OptsHandler class', () => {
     });
 
     const gateway = <any>core.apiGateway();
-    const permissions = await gateway.contextToPermissionsFn();
+    const permissions = await gateway.contextToPermFn();
     expect(permissions).toBeDefined();
     expect(Array.isArray(permissions)).toBeTruthy();
     expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data', 'jobs']);
