@@ -22,7 +22,6 @@ pub static CACHE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.cac
 pub static QUEUE_QUERIES: Counter = metrics::counter("cs.sql.query.queue");
 pub static QUEUE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.queue.ms");
 
-/// Temporary for APM analysis
 pub static STREAMING_ROWS_READ: Counter = metrics::counter("cs.streaming.rows");
 pub static STREAMING_CHUNKS_READ: Counter = metrics::counter("cs.streaming.chunks");
 pub static STREAMING_LASTOFFSET: Gauge = metrics::gauge("cs.streaming.lastoffset");
