@@ -597,6 +597,7 @@ export class QueryCache {
             let logged = false;
             Promise
               .all([clientFactory()])
+              // TODO use stream method instead
               .then(([client]) => client.streamQuery(req.query, req.values))
               .then((source) => {
                 const cleanup = (error) => {
@@ -636,7 +637,7 @@ export class QueryCache {
               })
               .catch((reason) => {
                 target.emit('error', reason);
-                throw reason;
+                resolve(reason);
               });
           }));
         },

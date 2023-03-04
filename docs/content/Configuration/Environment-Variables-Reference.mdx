@@ -240,6 +240,18 @@ If `true`, enables development mode.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `false`               |
 
+## `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`
+
+If `true`, it enables dropping pre-aggregations that Refresh Worker doesn't touch within [`CUBEJS_TOUCH_PRE_AGG_TIMEOUT`](#cubejs-touch-pre-agg-timeout).
+Pre-aggregations are touched whenever those rebuilt or Refresh Worker checks its freshness.
+The first drop will be initiated when the Refresh Worker is able to check freshness for every `scheduledRefresh: true` pre-aggregation.
+If you have multiple Refresh Workers with different schema versions sharing the same Cube Store cluster, then touches from both refresh workers
+are respected.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`               |
+
 ## `CUBEJS_GH_API_TOKEN`
 
 A [GitHub Personal Access Token][gh-docs-pat] to avoid API rate limiting when
@@ -493,6 +505,15 @@ If `true`, then send telemetry to Cube.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
+
+## `CUBEJS_TOUCH_PRE_AGG_TIMEOUT`
+
+The number of seconds without a touch before pre-aggregation is considered orphaned and marked for removal.
+Please see [`CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`](#cubejs-touch-pre-agg-timeout) to learn more.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | 86400                  | 86400                 |
 
 ## `CUBEJS_WEB_SOCKETS`
 

@@ -27,7 +27,7 @@ use log::warn;
 
 use crate::{
     sql::AuthContextRef,
-    transport::{CubeDummyStream, CubeReadStream, LoadRequestMeta, TransportService},
+    transport::{CubeStreamReceiver, LoadRequestMeta, TransportService},
 };
 use chrono::{TimeZone, Utc};
 use datafusion::{
@@ -295,18 +295,18 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         );
 
         if stream_mode {
-            let result =
-                self.transport
-                    .load_stream(self.request.clone(), self.auth_context.clone(), meta);
+            let result = self
+                .transport
+                .load_stream(self.request.clone(), self.auth_context.clone(), meta)
+                .await;
             let stream = result.map_err(|err| DataFusionError::Execution(err.to_string()))?;
             let main_stream =
                 CubeScanMemoryStream::new(stream, self.schema.clone(), self.member_fields.clone());
 
             return Ok(Box::pin(CubeScanStreamRouter::new(
-                main_stream,
+                Some(main_stream),
                 one_shot_stream,
                 self.schema.clone(),
-                false,
             )));
         }
 
@@ -325,14 +325,9 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         )?);
 
         Ok(Box::pin(CubeScanStreamRouter::new(
-            CubeScanMemoryStream::new(
-                Arc::new(CubeDummyStream {}),
-                self.schema.clone(),
-                self.member_fields.clone(),
-            ),
+            None,
             one_shot_stream,
             self.schema.clone(),
-            true,
         )))
     }
 
@@ -397,69 +392,50 @@ impl CubeScanOneShotStream {
 }
 
 struct CubeScanMemoryStream {
-    stream: Arc<dyn CubeReadStream>,
+    receiver: CubeStreamReceiver,
     /// Schema representing the data
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
-    is_completed: bool,
 }
 
 impl CubeScanMemoryStream {
     pub fn new(
-        stream: Arc<dyn CubeReadStream>,
+        receiver: CubeStreamReceiver,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
     ) -> Self {
         Self {
-            stream,
+            receiver,
             schema,
             member_fields,
-            is_completed: false,
         }
     }
 
-    fn poll_next(&mut self) -> Option<ArrowResult<RecordBatch>> {
-        match self.stream.poll_next() {
-            Ok(chunk) => {
-                let chunk = parse_chunk(chunk, self.schema.clone(), &self.member_fields);
-                if chunk.is_none() {
-                    self.is_completed = true;
-                }
-
-                chunk
-            }
-            Err(err) => Some(Err(ArrowError::ComputeError(err.to_string()))),
-        }
-    }
-}
-
-impl Drop for CubeScanMemoryStream {
-    fn drop(&mut self) {
-        if !self.is_completed {
-            self.stream.reject();
-        }
+    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<ArrowResult<RecordBatch>>> {
+        self.receiver.poll_recv(cx).map(|poll| match poll {
+            Some(Ok(chunk)) => parse_chunk(chunk, self.schema.clone(), &self.member_fields),
+            Some(Err(err)) => Some(Err(ArrowError::ComputeError(err.to_string()))),
+            None => None,
+        })
     }
 }
 
 struct CubeScanStreamRouter {
-    main_stream: CubeScanMemoryStream,
+    main_stream: Option<CubeScanMemoryStream>,
     one_shot_stream: CubeScanOneShotStream,
     schema: SchemaRef,
-    one_shot_mode: bool,
 }
 
 impl CubeScanStreamRouter {
     pub fn new(
-        main_stream: CubeScanMemoryStream,
+        main_stream: Option<CubeScanMemoryStream>,
         one_shot_stream: CubeScanOneShotStream,
         schema: SchemaRef,
-        one_shot_mode: bool,
     ) -> Self {
         Self {
             main_stream,
             one_shot_stream,
             schema,
-            one_shot_mode,
         }
     }
 }
@@ -469,39 +445,31 @@ impl Stream for CubeScanStreamRouter {
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
-        _: &mut Context<'_>,
+        cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        if !self.one_shot_mode {
-            let mut chunk = self.main_stream.poll_next();
-            match &chunk {
-                Some(res) => match res {
-                    Err(ArrowError::ComputeError(err))
-                        if err
-                            .as_str()
-                            .contains("streamQuery() method is not implemented yet") =>
+        match &mut self.main_stream {
+            Some(main_stream) => {
+                let next = main_stream.poll_next(cx);
+                if let Poll::Ready(Some(Err(ArrowError::ComputeError(err)))) = &next {
+                    if err
+                        .as_str()
+                        .contains("streamQuery() method is not implemented yet")
                     {
                         warn!("{}", err);
 
-                        self.one_shot_mode = true;
+                        self.main_stream = None;
 
-                        match load_to_stream_sync(&mut self.one_shot_stream) {
-                            Ok(_) => {
-                                chunk = self.one_shot_stream.poll_next();
-                            }
-                            Err(e) => {
-                                chunk = Some(Err(e.into()));
-                            }
-                        }
+                        return Poll::Ready(match load_to_stream_sync(&mut self.one_shot_stream) {
+                            Ok(_) => self.one_shot_stream.poll_next(),
+                            Err(e) => Some(Err(e.into())),
+                        });
                     }
-                    _ => (),
-                },
-                None => (),
+                }
+
+                return next;
             }
-
-            return Poll::Ready(chunk);
+            None => Poll::Ready(self.one_shot_stream.poll_next()),
         }
-
-        Poll::Ready(self.one_shot_stream.poll_next())
     }
 }
 
@@ -587,22 +555,21 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
 }
 
 fn parse_chunk(
-    chunk: Option<String>,
+    chunk: String,
     schema: SchemaRef,
     member_fields: &Vec<MemberField>,
 ) -> Option<ArrowResult<RecordBatch>> {
-    let res = match chunk {
-        Some(chunk) => match serde_json::from_str::<Vec<serde_json::Value>>(&chunk) {
-            Ok(data) => match transform_response(data, schema, member_fields) {
-                Ok(batch) => Some(Ok(batch)),
-                Err(err) => Some(Err(err.into())),
-            },
-            Err(e) => Some(Err(e.into())),
-        },
-        None => None,
-    };
+    if chunk.is_empty() {
+        return None;
+    }
 
-    res
+    match serde_json::from_str::<Vec<serde_json::Value>>(&chunk) {
+        Ok(data) => match transform_response(data, schema, member_fields) {
+            Ok(batch) => Some(Ok(batch)),
+            Err(err) => Some(Err(err.into())),
+        },
+        Err(e) => Some(Err(e.into())),
+    }
 }
 
 fn transform_response(
@@ -754,7 +721,6 @@ mod tests {
     use crate::{
         compile::MetaContext,
         sql::{session::DatabaseProtocol, HttpAuthContext},
-        transport::CubeReadStream,
         CubeError,
     };
     use cubeclient::models::V1LoadResponse;
@@ -826,12 +792,12 @@ mod tests {
                 })
             }
 
-            fn load_stream(
+            async fn load_stream(
                 &self,
                 _query: V1LoadRequestQuery,
                 _ctx: AuthContextRef,
                 _meta_fields: LoadRequestMeta,
-            ) -> Result<Arc<dyn CubeReadStream>, CubeError> {
+            ) -> Result<CubeStreamReceiver, CubeError> {
                 panic!("It's a fake transport");
             }
         }

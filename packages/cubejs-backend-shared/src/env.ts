@@ -582,7 +582,7 @@ const variables: Record<string, (...args: any) => any> = {
    * Expire time for touch records
    */
   dropPreAggregationsWithoutTouch: (): boolean => get('CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
 
   /** ****************************************************************

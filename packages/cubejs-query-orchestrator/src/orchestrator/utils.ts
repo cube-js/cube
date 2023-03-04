@@ -195,13 +195,9 @@ export function getCacheHash(queryKey: QueryKey, processUid?: string): QueryKeyH
   }
 
   if (typeof queryKey === 'object' && queryKey.persistent) {
-    const k = (<Array<string>>queryKey);
-    if (k[k.length - 1].indexOf('request#') === -1) {
-      k.push(`request#${getNext()}@${processUid}`);
-    }
     return `${crypto
       .createHash('md5')
-      .update(JSON.stringify(k))
+      .update(JSON.stringify(queryKey))
       .digest('hex')
     }@${processUid}` as any;
   } else {

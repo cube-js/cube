@@ -1,82 +1,20 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use cubesql::{transport::CubeReadStream, CubeError};
+use cubesql::CubeError;
 #[cfg(build = "debug")]
 use log::trace;
 use neon::prelude::*;
 
 use crate::utils::bind_method;
 
-use std::sync::{Condvar, Mutex};
+use tokio::sync::mpsc::{channel as mpsc_channel, Receiver, Sender};
+use tokio::sync::oneshot;
 
-type JsWriter = Arc<Buffer>;
-type BufferChunk = Result<Option<String>, CubeError>;
-
-#[derive(Debug)]
-struct Buffer {
-    data: Mutex<Vec<BufferChunk>>,
-    data_cv: Condvar,
-    rejected: Mutex<bool>,
-}
-
-impl Buffer {
-    fn new() -> Self {
-        Self {
-            data: Mutex::new(vec![]),
-            data_cv: Condvar::new(),
-            rejected: Mutex::new(false),
-        }
-    }
-
-    fn push(&self, chunk: BufferChunk) -> bool {
-        if *self.rejected.lock().expect("Can't lock") {
-            return false;
-        }
-
-        let mut lock = self.data.lock().expect("Can't lock");
-        // TODO: check size
-        while lock.len() >= 100 {
-            lock = self.data_cv.wait(lock).expect("Can't wait");
-        }
-        lock.push(chunk);
-        self.data_cv.notify_one();
-
-        true
-    }
-
-    fn release(&self, err: String) {
-        let mut lock = self.rejected.lock().expect("Can't lock");
-        if *lock {
-            return;
-        }
-
-        *lock = true;
-
-        let mut lock = self.data.lock().expect("Can't lock");
-        *lock = vec![Err(CubeError::user(err))];
-        self.data_cv.notify_one();
-    }
-}
-
-impl CubeReadStream for Buffer {
-    fn poll_next(&self) -> BufferChunk {
-        let mut lock = self.data.lock().expect("Can't lock");
-        while lock.is_empty() {
-            lock = self.data_cv.wait(lock).expect("Can't wait");
-        }
-        let chunk = lock.drain(0..1).last().unwrap();
-        self.data_cv.notify_one();
-
-        chunk
-    }
-
-    fn reject(&self) {
-        self.release("rejected".to_string());
-    }
-}
+type Chunk = Result<String, CubeError>;
 
 pub struct JsWriteStream {
-    writer: JsWriter,
+    sender: Sender<Chunk>,
+    ready_sender: Mutex<Option<oneshot::Sender<Result<(), CubeError>>>>,
 }
 
 impl Finalize for JsWriteStream {}
@@ -92,6 +30,10 @@ impl JsWriteStream {
         let chunk = bind_method(cx, chunk_fn, obj_this)?;
         obj.set(cx, "chunk", chunk)?;
 
+        let start_fn = JsFunction::new(cx, js_stream_start)?;
+        let start_stream = bind_method(cx, start_fn, obj_this)?;
+        obj.set(cx, "start", start_stream)?;
+
         let end_fn = JsFunction::new(cx, js_stream_end)?;
         let end_stream = bind_method(cx, end_fn, obj_this)?;
         obj.set(cx, "end", end_stream)?;
@@ -104,15 +46,27 @@ impl JsWriteStream {
     }
 
     fn push_chunk(&self, chunk: String) -> bool {
-        self.writer.push(Ok(Some(chunk)))
+        match self.sender.try_send(Ok(chunk)) {
+            Err(_) => false,
+            Ok(_) => true,
+        }
+    }
+
+    fn start(&self) {
+        if let Some(ready_sender) = self.ready_sender.lock().unwrap().take() {
+            let _ = ready_sender.send(Ok(()));
+        }
     }
 
     fn end(&self) {
-        self.writer.push(Ok(None));
+        self.push_chunk("".to_string());
     }
 
     fn reject(&self, err: String) {
-        self.writer.release(err);
+        if let Some(ready_sender) = self.ready_sender.lock().unwrap().take() {
+            let _ = ready_sender.send(Err(CubeError::internal(err.to_string())));
+        }
+        let _ = self.sender.try_send(Err(CubeError::internal(err)));
     }
 }
 
@@ -127,6 +81,18 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     let result = this.push_chunk(result.value(&mut cx));
 
     Ok(cx.boolean(result))
+}
+
+fn js_stream_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    #[cfg(build = "debug")]
+    trace!("JsWriteStream.start");
+
+    let this = cx
+        .this()
+        .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
+    this.start();
+
+    Ok(cx.undefined())
 }
 
 fn js_stream_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
@@ -150,18 +116,22 @@ fn js_stream_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     let result = cx.argument::<JsString>(0)?;
     this.reject(result.value(&mut cx));
-
     Ok(cx.undefined())
 }
 
-pub fn call_js_with_stream_as_callback(
+pub async fn call_js_with_stream_as_callback(
     channel: Arc<Channel>,
     js_method: Arc<Root<JsFunction>>,
     query: Option<String>,
-) -> Result<Arc<dyn CubeReadStream>, CubeError> {
-    let channel = channel;
-    let buffer = Arc::new(Buffer::new());
-    let writer = buffer.clone();
+) -> Result<Receiver<Chunk>, CubeError> {
+    let chunk_size = std::env::var("CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK")
+        .ok()
+        .map(|v| v.parse::<usize>().unwrap())
+        .unwrap_or(8192);
+    let channel_size = 1_000_000 / chunk_size;
+
+    let (sender, receiver) = mpsc_channel::<Chunk>(channel_size);
+    let (ready_sender, ready_receiver) = oneshot::channel();
 
     channel
         .try_send(move |mut cx| {
@@ -171,8 +141,10 @@ pub fn call_js_with_stream_as_callback(
                 Err(v) => v.as_ref().to_inner(&mut cx),
             };
 
-            let stream = JsWriteStream { writer };
-
+            let stream = JsWriteStream {
+                sender,
+                ready_sender: Mutex::new(Some(ready_sender)),
+            };
             let this = cx.undefined();
             let args: Vec<Handle<_>> = vec![
                 if let Some(q) = query {
@@ -190,5 +162,7 @@ pub fn call_js_with_stream_as_callback(
             CubeError::internal(format!("Unable to send js call via channel, err: {}", err))
         })?;
 
-    Ok(buffer)
+    ready_receiver.await??;
+
+    Ok(receiver)
 }

@@ -61,6 +61,7 @@ export class OrchestratorApi {
    * @throw Error
    */
   public async streamQuery(query: QueryBody): Promise<stream.Writable> {
+    // TODO merge with fetchQuery
     return this.orchestrator.streamQuery(query);
   }
 

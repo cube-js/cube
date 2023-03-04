@@ -1550,7 +1550,7 @@ class ApiGateway {
   }> {
     const requestStarted = new Date();
     try {
-      this.log({ type: 'Streaming Query', query }, context);
+      this.log({ type: 'Load Request', query, streaming: true }, context);
       const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
       const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
       const q = {
@@ -1572,13 +1572,14 @@ class ApiGateway {
       };
       return _stream;
     } catch (e) {
+      // TODO handle error log
       this.log({
         type: 'Streaming Error',
         query,
         error: (<Error>e).message,
         duration: this.duration(requestStarted),
       }, context);
-      return null;
+      throw e;
     }
   }
 

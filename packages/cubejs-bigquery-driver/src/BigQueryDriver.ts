@@ -77,9 +77,17 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
