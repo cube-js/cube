@@ -74,7 +74,7 @@ describe('OptsHandler class', () => {
       dbType: undefined,
       driverFactory: undefined,
     });
-    
+
     expect(core.options.dbType).toBeDefined();
     expect(typeof core.options.dbType).toEqual('function');
     expect(await core.options.dbType({} as DriverContext))
@@ -160,7 +160,7 @@ describe('OptsHandler class', () => {
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
       }),
     });
-    
+
     expect(core.options.dbType).toBeDefined();
     expect(typeof core.options.dbType).toEqual('function');
     expect(await core.options.dbType({} as DriverContext))
@@ -180,7 +180,7 @@ describe('OptsHandler class', () => {
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
       }),
     });
-    
+
     expect(core.options.dbType).toBeDefined();
     expect(typeof core.options.dbType).toEqual('function');
     expect(await core.options.dbType({} as DriverContext))
@@ -200,7 +200,7 @@ describe('OptsHandler class', () => {
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
       }),
     });
-    
+
     expect(core.options.dbType).toBeDefined();
     expect(typeof core.options.dbType).toEqual('function');
     expect(await core.options.dbType({} as DriverContext))
@@ -220,7 +220,7 @@ describe('OptsHandler class', () => {
         type: <DatabaseType>process.env.CUBEJS_DB_TYPE,
       }),
     });
-    
+
     expect(core.options.dbType).toBeDefined();
     expect(typeof core.options.dbType).toEqual('function');
     expect(await core.options.dbType({} as DriverContext))
@@ -260,8 +260,7 @@ describe('OptsHandler class', () => {
       });
       await core.options.driverFactory(<DriverContext>{ dataSource: 'default' });
     }).rejects.toThrow(
-      'Invalid cube-server-core options: child "driverFactory" fails because ' +
-      '["driverFactory" must be a Function]'
+      'Invalid cube-server-core options: "driverFactory" must be of type function'
     );
 
     // Case 3 -- need to be restored after assertion will be restored.
@@ -303,8 +302,7 @@ describe('OptsHandler class', () => {
       });
       await core.options.dbType(<DriverContext>{ dataSource: 'default' });
     }).rejects.toThrow(
-      'Invalid cube-server-core options: child "dbType" fails because ' +
-      '["dbType" must be a string, "dbType" must be a Function]'
+      'Invalid cube-server-core options: "dbType" does not match any of the allowed types'
     );
 
     // Case 6
@@ -402,7 +400,7 @@ describe('OptsHandler class', () => {
     const opts = oapi.options;
     const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
     oapi.seenDataSources = ['default'];
-    
+
     expect(core.optsHandler.configuredForScheduledRefresh()).toBe(true);
     expect(opts.rollupOnlyMode).toBe(false);
     expect(opts.preAggregationsOptions.externalRefresh).toBe(false);
@@ -503,7 +501,7 @@ describe('OptsHandler class', () => {
       });
 
       const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
-      
+
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
       expect(await opts.queryCacheOptions.queueOptions()).toEqual({
@@ -533,7 +531,7 @@ describe('OptsHandler class', () => {
       });
 
       const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
-      
+
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
       expect(await opts.queryCacheOptions.queueOptions()).toEqual({
@@ -563,7 +561,7 @@ describe('OptsHandler class', () => {
       });
 
       const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
-      
+
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
       expect(await opts.queryCacheOptions.queueOptions()).toEqual({
@@ -593,7 +591,7 @@ describe('OptsHandler class', () => {
       });
 
       const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
-      
+
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
       expect(await opts.queryCacheOptions.queueOptions()).toEqual({
@@ -623,7 +621,7 @@ describe('OptsHandler class', () => {
       });
 
       const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
-      
+
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
       expect(await opts.queryCacheOptions.queueOptions()).toEqual({
@@ -667,7 +665,7 @@ describe('OptsHandler class', () => {
       });
 
       const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
-      
+
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
       expect(await opts.queryCacheOptions.queueOptions()).toEqual({
@@ -715,7 +713,7 @@ describe('OptsHandler class', () => {
     });
     opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
     driver = <any>(await core.resolveDriver(<DriverContext>{}, opts));
-    
+
     expect(driver.pool.options.max).toEqual(2 * (concurrency1 + concurrency2));
     expect(driver.testConnectionTimeout()).toEqual(testConnectionTimeout);
 
@@ -766,7 +764,7 @@ describe('OptsHandler class', () => {
     });
     opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
     driver = <any>(await core.resolveDriver(<DriverContext>{}));
-    
+
     expect(driver.pool.options.max).toEqual(8);
     expect(driver.testConnectionTimeout()).toEqual(10000);
   });

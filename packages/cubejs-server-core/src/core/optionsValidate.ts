@@ -1,4 +1,4 @@
-import Joi from '@hapi/joi';
+import Joi from 'joi';
 import DriverDependencies from './DriverDependencies';
 
 const schemaQueueOptions = Joi.object().keys({
@@ -152,7 +152,7 @@ const schemaOptions = Joi.object().keys({
 });
 
 export default (options: any) => {
-  const { error } = Joi.validate(options, schemaOptions, { abortEarly: false, });
+  const { error } = schemaOptions.validate(options, { abortEarly: false });
   if (error) {
     throw new Error(`Invalid cube-server-core options: ${error.message || error.toString()}`);
   }
