@@ -35,6 +35,7 @@ use datafusion::{
 use itertools::izip;
 use pg_srv::{PgType, PgTypeId};
 use regex::Regex;
+use sha1_smol::Sha1;
 
 use crate::{
     compile::engine::df::{
@@ -2934,6 +2935,36 @@ pub fn create_date_to_timestamp_udf() -> ScalarUDF {
             ],
             Volatility::Immutable,
         ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_sha1_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let strings = downcast_string_arg!(args[0], "str", i32);
+
+        let result = strings
+            .iter()
+            .map(|string| {
+                string.map(|string| {
+                    let mut hasher = Sha1::new();
+                    hasher.update(string.as_bytes());
+                    hasher.digest().to_string()
+                })
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "sha1",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
         &return_type,
         &fun,
     )

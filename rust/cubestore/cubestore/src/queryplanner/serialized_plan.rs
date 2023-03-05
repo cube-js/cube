@@ -9,6 +9,7 @@ use crate::queryplanner::udfs::{
     aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
     CubeScalarUDFKind,
 };
+use crate::queryplanner::InfoSchemaTableProvider;
 use crate::table::Row;
 use crate::CubeError;
 use arrow::datatypes::DataType;
@@ -1082,7 +1083,7 @@ impl SerializedPlan {
         &self.schema_snapshot.index_snapshots
     }
 
-    pub fn files_to_download(&self) -> Vec<(IdRow<Partition>, String, Option<u64>)> {
+    pub fn files_to_download(&self) -> Vec<(IdRow<Partition>, String, Option<u64>, Option<u64>)> {
         self.list_files_to_download(|id| {
             self.partition_ids_to_execute
                 .binary_search_by_key(&id, |(id, _)| *id)
@@ -1091,7 +1092,7 @@ impl SerializedPlan {
     }
 
     /// Note: avoid during normal execution, workers must filter the partitions they execute.
-    pub fn all_required_files(&self) -> Vec<(IdRow<Partition>, String, Option<u64>)> {
+    pub fn all_required_files(&self) -> Vec<(IdRow<Partition>, String, Option<u64>, Option<u64>)> {
         self.list_files_to_download(|_| true)
     }
 
@@ -1102,6 +1103,7 @@ impl SerializedPlan {
         IdRow<Partition>,
         /* file_name */ String,
         /* size */ Option<u64>,
+        /* chunk_id */ Option<u64>,
     )> {
         let indexes = self.index_snapshots();
 
@@ -1121,6 +1123,7 @@ impl SerializedPlan {
                         partition.partition.clone(),
                         file,
                         partition.partition.get_row().file_size(),
+                        None,
                     ));
                 }
 
@@ -1130,6 +1133,7 @@ impl SerializedPlan {
                             partition.partition.clone(),
                             chunk.get_row().get_full_name(chunk.get_id()),
                             chunk.get_row().file_size(),
+                            Some(chunk.get_id()),
                         ))
                     }
                 }
@@ -1184,9 +1188,12 @@ impl SerializedPlan {
             type Error = ();
 
             fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
-                if let LogicalPlan::TableScan { table_name, .. } = plan {
-                    let name_split = table_name.split(".").collect::<Vec<_>>();
-                    if name_split[0] != "information_schema" && name_split[0] != "system" {
+                if let LogicalPlan::TableScan { source, .. } = plan {
+                    if source
+                        .as_any()
+                        .downcast_ref::<InfoSchemaTableProvider>()
+                        .is_none()
+                    {
                         self.seen_data_scans = true;
                         return Ok(false);
                     }

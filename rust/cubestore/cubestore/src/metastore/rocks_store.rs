@@ -511,6 +511,7 @@ pub struct RocksStore {
     pub(crate) write_completed_notify: Arc<Notify>,
     last_upload_seq: Arc<RwLock<u64>>,
     last_check_seq: Arc<RwLock<u64>>,
+    snapshot_uploaded: Arc<RwLock<bool>>,
     snapshots_upload_stopped: Arc<AsyncMutex<bool>>,
     pub(crate) cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
     rw_loop_tx: std::sync::mpsc::SyncSender<
@@ -579,6 +580,7 @@ impl RocksStore {
             listeners: Arc::new(RwLock::new(listeners)),
             metastore_fs,
             last_checkpoint_time: Arc::new(RwLock::new(SystemTime::now())),
+            snapshot_uploaded: Arc::new(RwLock::new(false)),
             write_notify: Arc::new(Notify::new()),
             write_completed_notify: Arc::new(Notify::new()),
             last_upload_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
@@ -676,8 +678,6 @@ impl RocksStore {
         cube_ext::spawn_blocking(move || {
             let res = rw_loop_sender.send(Box::new(move || {
                 let db_span = warn_long("store write operation", Duration::from_millis(100));
-                let span = tracing::trace_span!("metastore write operation");
-                let span_holder = span.enter();
 
                 let mut batch = BatchPipe::new(db_to_send.as_ref());
                 let snapshot = db_to_send.snapshot();
@@ -713,7 +713,6 @@ impl RocksStore {
                     }
                 }
 
-                mem::drop(span_holder);
                 mem::drop(db_span);
 
                 Ok(())
@@ -769,13 +768,15 @@ impl RocksStore {
                 seq_numbers.iter().max().map(|v| *v),
             )
         };
-
         if max.is_some() {
-            let checkpoint_time = self.last_checkpoint_time.read().await;
-            let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
-            self.metastore_fs
-                .upload_log(&dir_name, min.unwrap(), &serializer)
-                .await?;
+            let snapshot_uploaded = self.snapshot_uploaded.read().await;
+            if *snapshot_uploaded {
+                let checkpoint_time = self.last_checkpoint_time.read().await;
+                let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
+                self.metastore_fs
+                    .upload_log(&dir_name, min.unwrap(), &serializer)
+                    .await?;
+            }
             let mut seq = self.last_upload_seq.write().await;
             *seq = max.unwrap();
             self.write_completed_notify.notify_waiters();
@@ -788,10 +789,9 @@ impl RocksStore {
         {
             info!("Uploading {} check point", self.details.get_name());
             self.upload_check_point().await?;
+            let mut check_seq = self.last_check_seq.write().await;
+            *check_seq = last_db_seq;
         }
-
-        let mut check_seq = self.last_check_seq.write().await;
-        *check_seq = last_db_seq;
 
         info!(
             "Persisting {} snapshot: done ({:?})",
@@ -816,6 +816,8 @@ impl RocksStore {
             self.metastore_fs
                 .upload_checkpoint(remote_path, checkpoint_path)
                 .await?;
+            let mut snapshot_uploaded = self.snapshot_uploaded.write().await;
+            *snapshot_uploaded = true;
             self.write_completed_notify.notify_waiters();
         }
         Ok(())
@@ -875,8 +877,6 @@ impl RocksStore {
         cube_ext::spawn_blocking(move || {
             let res = rw_loop_sender.send(Box::new(move || {
                 let db_span = warn_long("metastore read operation", Duration::from_millis(100));
-                let span = tracing::trace_span!("metastore read operation");
-                let span_holder = span.enter();
 
                 let snapshot = db_to_send.snapshot();
                 let res = f(DbTableRef {
@@ -893,7 +893,6 @@ impl RocksStore {
                     ))
                 })?;
 
-                mem::drop(span_holder);
                 mem::drop(db_span);
 
                 Ok(())

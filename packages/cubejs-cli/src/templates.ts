@@ -18,7 +18,7 @@ const indexJs = `const CubejsServer = require('@cubejs-backend/server');
 const server = new CubejsServer();
 
 server.listen().then(({ version, port }) => {
-  console.log(\`🚀 Cube.js server (\${version}) is listening on \${port}\`);
+  console.log(\`🚀 Cube server (\${version}) is listening on \${port}\`);
 }).catch(e => {
   console.error('Fatal error during server start: ');
   console.error(e.stack || e);
@@ -35,11 +35,11 @@ CUBEJS_API_SECRET=${env.apiSecret}
 CUBEJS_EXTERNAL_DEFAULT=true
 CUBEJS_SCHEDULED_REFRESH_DEFAULT=true`;
 
-const defaultDotEnvVars = env => `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
+const defaultDotEnvVars = env => `# Cube environment variables: https://cube.dev/docs/reference/environment-variables
 ${sharedDotEnvVars(env)}
 CUBEJS_WEB_SOCKETS=true`;
 
-const athenaDotEnvVars = env => `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
+const athenaDotEnvVars = env => `# Cube environment variables: https://cube.dev/docs/reference/environment-variables
 CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
 CUBEJS_AWS_SECRET=<YOUR ATHENA SECRET KEY HERE>
 CUBEJS_AWS_REGION=<AWS REGION STRING, e.g. us-east-1>
@@ -229,7 +229,7 @@ const ordersJs = `cube(\`Orders\`, {
 });
 `;
 
-const cubeJs = `// Cube.js configuration options: https://cube.dev/docs/config
+const cubeJs = `// Cube configuration options: https://cube.dev/docs/config
 /** @type{ import('@cubejs-backend/server-core').CreateOptions } */
 module.exports = {
 };
@@ -244,12 +244,12 @@ services:
     ports:
       # It's better to use random port binding for 4000/3000 ports
       # without it you will not able to start multiple projects inside docker
-      - 4000:4000  # Cube.js API and Developer Playground
+      - 4000:4000  # Cube API and Developer Playground
       - 3000:3000  # Dashboard app, if created
     env_file: .env
     volumes:
       - .:/cube/conf
-      # We ignore Cube.js deps, because they are built-in inside the official Docker image
+      # We ignore Cube deps, because they are built-in inside the official Docker image
       - .empty:/cube/conf/node_modules/@cubejs-backend/
 `;
 

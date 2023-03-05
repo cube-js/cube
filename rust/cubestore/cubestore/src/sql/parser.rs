@@ -142,12 +142,12 @@ pub enum QueueCommand {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SystemCommand {
-    Compaction { store: Option<RocksStoreName> },
     KillAllJobs,
     Repartition { partition_id: u64 },
     Drop(DropCommand),
     PanicWorker,
-    Metastore(MetastoreCommand),
+    MetaStore(MetaStoreCommand),
+    CacheStore(CacheStoreCommand),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -157,8 +157,16 @@ pub enum DropCommand {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum MetastoreCommand {
+pub enum MetaStoreCommand {
     SetCurrent { id: u128 },
+    Compaction,
+    Healthcheck,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CacheStoreCommand {
+    Compaction,
+    Healthcheck,
 }
 
 pub struct CubeStoreParser<'a> {
@@ -339,18 +347,36 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
-    pub fn parse_metastore(&mut self) -> Result<Statement, ParserError> {
-        if self.parse_custom_token("set_current") {
-            Ok(Statement::System(SystemCommand::Metastore(
-                MetastoreCommand::SetCurrent {
-                    id: self.parse_integer("metastore snapshot id", false)?,
-                },
-            )))
+    pub fn parse_cachestore(&mut self) -> Result<Statement, ParserError> {
+        let command = if self.parse_custom_token("compaction") {
+            CacheStoreCommand::Compaction
+        } else if self.parse_custom_token("healthcheck") {
+            CacheStoreCommand::Healthcheck
         } else {
-            Err(ParserError::ParserError(
+            return Err(ParserError::ParserError(
+                "Unknown cachestore command".to_string(),
+            ));
+        };
+
+        Ok(Statement::System(SystemCommand::CacheStore(command)))
+    }
+
+    pub fn parse_metastore(&mut self) -> Result<Statement, ParserError> {
+        let command = if self.parse_custom_token("set_current") {
+            MetaStoreCommand::SetCurrent {
+                id: self.parse_integer("metastore snapshot id", false)?,
+            }
+        } else if self.parse_custom_token("compaction") {
+            MetaStoreCommand::Compaction
+        } else if self.parse_custom_token("healthcheck") {
+            MetaStoreCommand::Healthcheck
+        } else {
+            return Err(ParserError::ParserError(
                 "Unknown metastore command".to_string(),
-            ))
-        }
+            ));
+        };
+
+        Ok(Statement::System(SystemCommand::MetaStore(command)))
     }
 
     fn parse_queue(&mut self) -> Result<Statement, ParserError> {
@@ -515,27 +541,10 @@ impl<'a> CubeStoreParser<'a> {
             self.parse_drop()
         } else if self.parse_custom_token("metastore") {
             self.parse_metastore()
+        } else if self.parse_custom_token("cachestore") {
+            self.parse_cachestore()
         } else if self.parse_custom_token("panic") && self.parse_custom_token("worker") {
             Ok(Statement::System(SystemCommand::PanicWorker))
-        } else if self.parse_custom_token("compaction") {
-            let store = if let Token::Word(w) = self.parser.peek_token() {
-                if w.value.eq_ignore_ascii_case("cache") {
-                    self.parser.next_token();
-                    Some(RocksStoreName::Cache)
-                } else if w.value.eq_ignore_ascii_case("meta") {
-                    self.parser.next_token();
-                    Some(RocksStoreName::Meta)
-                } else {
-                    return Err(ParserError::ParserError(format!(
-                        "Unknown store name, expected CACHE or META, found: {}",
-                        w
-                    )));
-                }
-            } else {
-                None
-            };
-
-            Ok(Statement::System(SystemCommand::Compaction { store }))
         } else {
             Err(ParserError::ParserError(
                 "Unknown system command".to_string(),
@@ -789,7 +798,7 @@ mod tests {
         let mut parser = CubeStoreParser::new(&query).unwrap();
         let res = parser.parse_statement().unwrap();
         match res {
-            Statement::System(SystemCommand::Metastore(MetastoreCommand::SetCurrent { id })) => {
+            Statement::System(SystemCommand::MetaStore(MetaStoreCommand::SetCurrent { id })) => {
                 assert_eq!(id, 1671235558783);
             }
             _ => {

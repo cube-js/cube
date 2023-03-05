@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { EventEmitter } from 'events';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
 import { QueueDriverInterface, QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
@@ -106,6 +107,8 @@ export class QueryQueue {
      */
     this.logger = options.logger || ((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
 
+    this.processUid = options.processUid || getProcessUid();
+
     const queueDriverOptions = {
       redisQueuePrefix: this.redisQueuePrefix,
       concurrency: this.concurrency,
@@ -114,7 +117,8 @@ export class QueryQueue {
       heartBeatTimeout: this.heartBeatInterval * 4,
       redisPool: options.redisPool,
       cubeStoreDriverFactory: options.cubeStoreDriverFactory,
-      getQueueEventsBus: options.getQueueEventsBus
+      getQueueEventsBus: options.getQueueEventsBus,
+      processUid: this.processUid,
     };
 
     /**
@@ -130,10 +134,12 @@ export class QueryQueue {
     /**
      * Persistent queries streams maps.
      */
-    this.streams = {
-      queued: new Map(),
-      processing: new Map(),
-    };
+    this.streams = new Map();
+
+    /**
+     * Notify streaming queries when streaming has been started and stream is available.
+     */
+    this.streamEvents = new EventEmitter();
   }
 
   /**
@@ -142,26 +148,22 @@ export class QueryQueue {
    * @param {QueryKeyHash} queryKeyHash
    */
   getQueryStream(queryKeyHash) {
-    if (!this.streams.queued.has(queryKeyHash)) {
-      throw new Error(`Unable to find stream for persisted query with id: ${queryKeyHash}`);
-    }
-
-    return this.streams.queued.get(queryKeyHash);
+    return this.streams.get(queryKeyHash);
   }
 
   /**
    * @param {*} queryKey
    * @param {{ [alias: string]: string }} aliasNameToMember
    */
-  setQueryStream(queryKey, aliasNameToMember) {
-    const key = this.redisHash(queryKey);
+  createQueryStream(queryKeyHash, aliasNameToMember) {
+    const key = queryKeyHash;
     const stream = new QueryStream({
       key,
-      maps: this.streams,
+      streams: this.streams,
       aliasNameToMember,
     });
-    this.streams.queued.set(key, stream);
-
+    this.streams.set(key, stream);
+    this.streamEvents.emit('streamStarted', queryKeyHash);
     return stream;
   }
 
@@ -185,32 +187,13 @@ export class QueryQueue {
     priority,
     options,
   ) {
-    switch (queryHandler) {
-      case 'stream':
-        return this.executeStreamInQueue(
-          queryHandler,
-          queryKey,
-          query,
-          priority,
-          options,
-        );
-      case 'query':
-        return this.executeQueryInQueue(
-          queryHandler,
-          queryKey,
-          query,
-          priority,
-          options,
-        );
-      default:
-        return this.executeQueryInQueue(
-          queryHandler,
-          queryKey,
-          query,
-          priority,
-          options,
-        );
-    }
+    return this.executeQueryInQueue(
+      queryHandler,
+      queryKey,
+      query,
+      priority,
+      options,
+    );
   }
 
   /**
@@ -312,6 +295,9 @@ export class QueryQueue {
         requestId: options.requestId,
         waitingForRequestId: queryDef.requestId
       });
+      if (queryHandler === 'stream') {
+        throw new Error('Streaming queries to Cube Store aren\'t supported');
+      }
       const result = await this.processQuerySkipQueue(queryDef);
       return this.parseResult(result);
     }
@@ -330,7 +316,7 @@ export class QueryQueue {
       // query (initialized by the /cubejs-system/v1/pre-aggregations/jobs
       // endpoint).
       let result = !query.forceBuild && await queueConnection.getResult(queryKey);
-      if (result) {
+      if (result && !result.streamResult) {
         return this.parseResult(result);
       }
 
@@ -388,9 +374,34 @@ export class QueryQueue {
         });
       }
 
-      // Result here won't be fetched for a jobed build query (initialized by
-      // the /cubejs-system/v1/pre-aggregations/jobs endpoint).
-      result = !query.isJob && await queueConnection.getResultBlocking(queryKey);
+      // Stream processing goes here under assumption there's no way of a stream close just after it was added to the `streams` map.
+      // Otherwise `streamStarted` event listener should go before the `reconcileQueue` call.
+      if (queryHandler === 'stream') {
+        const self = this;
+        result = await new Promise((resolve) => {
+          const onStreamStarted = (streamStartedHash) => {
+            if (streamStartedHash === queryKeyHash) {
+              resolve(self.getQueryStream(queryKeyHash));
+            }
+          };
+
+          setTimeout(() => {
+            self.streamEvents.removeListener('streamStarted', onStreamStarted);
+            resolve(null);
+          }, this.continueWaitTimeout * 1000);
+
+          self.streamEvents.addListener('streamStarted', onStreamStarted);
+          const stream = this.getQueryStream(this.redisHash(queryKey));
+          if (stream) {
+            self.streamEvents.removeListener('streamStarted', onStreamStarted);
+            resolve(stream);
+          }
+        });
+      } else {
+        // Result here won't be fetched for a jobed build query (initialized by
+        // the /cubejs-system/v1/pre-aggregations/jobs endpoint).
+        result = !query.isJob && await queueConnection.getResultBlocking(queryKey);
+      }
 
       // We don't want to throw the ContinueWaitError for a jobed build query.
       if (!query.isJob && !result) {
@@ -414,6 +425,10 @@ export class QueryQueue {
   parseResult(result) {
     if (!result) {
       return;
+    }
+    if (result instanceof QueryStream) {
+      // eslint-disable-next-line consistent-return
+      return result;
     }
     if (result.error) {
       throw new Error(result.error); // TODO
@@ -584,7 +599,7 @@ export class QueryQueue {
               if (subKeys.length === 1) {
                 // common queries
                 return true;
-              } else if (subKeys[1] === getProcessUid()) {
+              } else if (subKeys[1] === this.processUid) {
                 // current process persistent queries
                 return true;
               } else {
@@ -701,6 +716,7 @@ export class QueryQueue {
     let handler;
 
     try {
+      // TODO handle streams
       executionResult = {
         result: await this.queryTimeout(
           this.queryHandlers[query.queryHandler](
@@ -802,12 +818,20 @@ export class QueryQueue {
           const handler = query?.queryHandler;
           switch (handler) {
             case 'stream':
-              await this.queryTimeout(
-                this.queryHandlers.stream(query.query, this.getQueryStream(queryKeyHashed))
-              );
+              // eslint-disable-next-line no-case-declarations
+              const queryStream = this.createQueryStream(queryKeyHashed, query.query?.aliasNameToMember);
 
-              // CubeStore has special handling for null
-              executionResult = null;
+              try {
+                await this.queryHandlers.stream(query.query, queryStream);
+                // CubeStore has special handling for null
+                executionResult = {
+                  streamResult: true
+                };
+              } finally {
+                if (this.streams.get(queryKeyHashed) === queryStream) {
+                  this.streams.delete(queryKeyHashed);
+                }
+              }
               break;
             default:
               executionResult = {
@@ -909,6 +933,15 @@ export class QueryQueue {
 
         await this.reconcileQueue();
       } else {
+        // TODO Ideally streaming queries should reconcile queue here after waiting on open slot however in practice continue wait timeout reconciles faster CPU-wise
+        // if (query?.queryHandler === 'stream') {
+        //   const [active] = await queueConnection.getQueryStageState(true);
+        //   if (active && active.length > 0) {
+        //     await Promise.race(active.map(keyHash => queueConnection.getResultBlockingByHash(keyHash)));
+        //     await this.reconcileQueue();
+        //   }
+        // }
+
         this.logger('Skip processing', {
           processingId,
           queryKey: query && query.queryKey || queryKeyHashed,
@@ -921,11 +954,6 @@ export class QueryQueue {
           activated,
           queryExists: !!query
         });
-        // closing stream
-        if (query?.queryHandler === 'stream') {
-          const stream = this.getQueryStream(queryKeyHashed);
-          stream.destroy();
-        }
         const currentProcessingId = await queueConnection.freeProcessingLock(queryKeyHashed, processingId, activated);
         if (currentProcessingId) {
           this.logger('Skipping free processing lock', {

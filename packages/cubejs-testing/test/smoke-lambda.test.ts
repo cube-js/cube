@@ -7,7 +7,7 @@ import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG } from './smoke-tests';
+import { DEFAULT_API_TOKEN, DEFAULT_CONFIG } from './smoke-tests';
 
 const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
@@ -85,7 +85,7 @@ describe('lambda', () => {
         cubejsConfig: 'lambda/cube.js',
       }
     );
-    client = cubejs(async () => 'test', {
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
     postgres = new PostgresDriver({

@@ -1,6 +1,6 @@
 import R from 'ramda';
 import moment from 'moment';
-import Joi from '@hapi/joi';
+import Joi from 'joi';
 
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
@@ -68,13 +68,13 @@ const operators = [
 const oneFilter = Joi.object().keys({
   dimension: id,
   member: id,
-  operator: Joi.valid(operators).required(),
-  values: Joi.array().items(Joi.string().allow('', null), Joi.lazy(() => oneFilter))
+  operator: Joi.valid(...operators).required(),
+  values: Joi.array().items(Joi.string().allow('', null), Joi.link('...'))
 }).xor('dimension', 'member');
 
 const oneCondition = Joi.object().keys({
-  or: Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
-  and: Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
+  or: Joi.array().items(oneFilter, Joi.link('...').description('oneCondition schema')),
+  and: Joi.array().items(oneFilter, Joi.link('...').description('oneCondition schema')),
 }).xor('or', 'and');
 
 const querySchema = Joi.object().keys({
@@ -167,7 +167,7 @@ const validatePostRewrite = (query) => {
  * @returns {NormalizedQuery}
  */
 const normalizeQuery = (query) => {
-  const { error } = Joi.validate(query, querySchema);
+  const { error } = querySchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -246,7 +246,7 @@ const queryPreAggregationsSchema = Joi.object().keys({
 });
 
 const normalizeQueryPreAggregations = (query, defaultValues) => {
-  const { error } = Joi.validate(query, queryPreAggregationsSchema);
+  const { error } = queryPreAggregationsSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -272,7 +272,7 @@ const queryPreAggregationPreviewSchema = Joi.object().keys({
 });
 
 const normalizeQueryPreAggregationPreview = (query) => {
-  const { error } = Joi.validate(query, queryPreAggregationPreviewSchema);
+  const { error } = queryPreAggregationPreviewSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -286,7 +286,7 @@ const queryCancelPreAggregationPreviewSchema = Joi.object().keys({
 });
 
 const normalizeQueryCancelPreAggregations = query => {
-  const { error } = Joi.validate(query, queryCancelPreAggregationPreviewSchema);
+  const { error } = queryCancelPreAggregationPreviewSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }

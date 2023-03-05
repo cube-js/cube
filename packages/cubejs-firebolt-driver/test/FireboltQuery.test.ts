@@ -1,10 +1,10 @@
 import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
 import { FireboltQuery } from '../src/FireboltQuery';
 
-const prepareCompiler = (content: string, options: any[]) => originalPrepareCompiler({
+const prepareCompiler = (content: string) => originalPrepareCompiler({
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content }]),
-}, options);
+});
 
 describe('FireboltQuery', () => {
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
@@ -29,7 +29,6 @@ cube(\`sales\`, {
   }
 });
 `,
-    []
   );
 
   it('should use DATE_TRUNC for time granuality dimensions', () => compiler.compile().then(() => {

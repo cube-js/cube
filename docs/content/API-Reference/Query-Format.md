@@ -497,7 +497,11 @@ provides a convenient shortcut to pass a dimension and a filter as a
   `YYYY-MM-DDTHH:mm:ss.SSS` format. Values should always be local and in query
   `timezone`. Dates in `YYYY-MM-DD` format are also accepted. Such dates are
   padded to the start and end of the day if used in start and end of date range
-  interval accordingly. If only one date is specified it's equivalent to passing
+  interval accordingly.
+  Please note that for timestamp comparison, `>=` and `<=` operators are used.
+  It requires, for example, that the end date range date `2020-01-01` is padded 
+  to `2020-01-01T23:59:59.999`.
+  If only one date is specified it's equivalent to passing
   two of the same dates as a date range. You can also pass a string instead of
   array with relative date range, for example: `last quarter`, `last 360 days`,
   or `next 2 months`.

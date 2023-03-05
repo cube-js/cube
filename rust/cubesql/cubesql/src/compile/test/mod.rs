@@ -11,7 +11,7 @@ use crate::{
         session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
         ServerManager, Session, SessionManager, SqlAuthService,
     },
-    transport::{CubeReadStream, LoadRequestMeta, TransportService},
+    transport::{CubeStreamReceiver, LoadRequestMeta, TransportService},
     CubeError,
 };
 
@@ -250,12 +250,12 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
             panic!("It's a fake transport");
         }
 
-        fn load_stream(
+        async fn load_stream(
             &self,
             _query: V1LoadRequestQuery,
             _ctx: AuthContextRef,
             _meta_fields: LoadRequestMeta,
-        ) -> Result<Arc<dyn CubeReadStream>, CubeError> {
+        ) -> Result<CubeStreamReceiver, CubeError> {
             panic!("It's a fake transport");
         }
     }

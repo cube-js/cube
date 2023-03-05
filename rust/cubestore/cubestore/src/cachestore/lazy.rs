@@ -282,6 +282,10 @@ impl CacheStore for LazyRocksCacheStore {
     async fn compaction(&self) -> Result<(), CubeError> {
         self.init().await?.compaction().await
     }
+
+    async fn healthcheck(&self) -> Result<(), CubeError> {
+        self.init().await?.healthcheck().await
+    }
 }
 
 crate::di_service!(LazyRocksCacheStore, [CacheStore]);
