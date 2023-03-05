@@ -1084,10 +1084,9 @@ export class PreAggregations {
     const targetTimeDimensionsReferences = this.timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery);
     const targetMeasuresReferences = this.measureAliasesRenderedReference(preAggregationForQuery);
 
-    const columnsFor = (targetReferences, references, preAggregation) =>
-      Object.keys(targetReferences).map(
-        member => `${references[this.query.cubeEvaluator.pathFromArray([preAggregation.cube, member.split('.')[1]])]} ${targetReferences[member]}`
-      )
+    const columnsFor = (targetReferences, references, preAggregation) => Object.keys(targetReferences).map(
+      member => `${references[this.query.cubeEvaluator.pathFromArray([preAggregation.cube, member.split('.')[1]])]} ${targetReferences[member]}`
+    );
 
     const tables = preAggregationForQuery.referencedPreAggregations.map(preAggregation => {
       const dimensionsReferences = this.dimensionsRenderedReference(preAggregation);
