@@ -24,6 +24,8 @@ class CubejsServerCoreExposed extends CubejsServerCore {
 
   public contextToExternalDbType: ExternalDbTypeFn;
 
+  public apiGateway = super.apiGateway;
+
   public reloadEnvVariables = super.reloadEnvVariables;
 }
 
@@ -1033,4 +1035,124 @@ describe('OptsHandler class', () => {
       testDriverConnectionSpy.mockRestore();
     }
   );
+
+  test('must set default permissions if not specified', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.CUBEJS_DEV_MODE = 'false';
+    process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      apiSecret: '44b87d4309471e5d9d18738450db0e49',
+      scheduledRefreshTimer: false,
+      driverFactory: () => ({
+        type: 'postgres',
+        user: 'user',
+        password: 'password',
+        database: 'database',
+      }),
+      // contextToPermissions: async ()
+    });
+
+    const gateway = <any>core.apiGateway();
+    const permissions = await gateway.contextToPermissionsFn();
+    expect(permissions).toBeDefined();
+    expect(Array.isArray(permissions)).toBeTruthy();
+    expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data']);
+  });
+
+  test('must throw if contextToPermissions returns wrong type', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.CUBEJS_DEV_MODE = 'false';
+    process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
+
+    type Permission =
+      'liveliness' |
+      'graphql' |
+      'meta' |
+      'data' |
+      'jobs';
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      apiSecret: '44b87d4309471e5d9d18738450db0e49',
+      scheduledRefreshTimer: false,
+      driverFactory: () => ({
+        type: 'postgres',
+        user: 'user',
+        password: 'password',
+        database: 'database',
+      }),
+      contextToPermissions: async () => new Promise((resolve) => {
+        resolve('jobs' as unknown as Permission[]);
+      }),
+    });
+
+    const gateway = <any>core.apiGateway();
+    expect(async () => {
+      await gateway.contextToPermissionsFn();
+    }).rejects.toThrow(
+      'A user-defined contextToPermissions function returns an inconsistent type.'
+    );
+  });
+
+  test('must throw if contextToPermissions returns wrong permission value', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.CUBEJS_DEV_MODE = 'false';
+    process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
+
+    type Permission =
+      'liveliness' |
+      'graphql' |
+      'meta' |
+      'data' |
+      'jobs';
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      apiSecret: '44b87d4309471e5d9d18738450db0e49',
+      scheduledRefreshTimer: false,
+      driverFactory: () => ({
+        type: 'postgres',
+        user: 'user',
+        password: 'password',
+        database: 'database',
+      }),
+      contextToPermissions: async () => new Promise((resolve) => {
+        resolve(['liveliness', 'graphql', 'meta', 'data', 'job'] as unknown as Permission[]);
+      }),
+    });
+
+    const gateway = <any>core.apiGateway();
+    expect(async () => {
+      await gateway.contextToPermissionsFn();
+    }).rejects.toThrow(
+      'A user-defined contextToPermissions function returns a wrong permission: job'
+    );
+  });
+
+  test('must set permissions if specified', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.CUBEJS_DEV_MODE = 'false';
+    process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      apiSecret: '44b87d4309471e5d9d18738450db0e49',
+      scheduledRefreshTimer: false,
+      driverFactory: () => ({
+        type: 'postgres',
+        user: 'user',
+        password: 'password',
+        database: 'database',
+      }),
+      contextToPermissions: async () => new Promise((resolve) => {
+        resolve(['liveliness', 'graphql', 'meta', 'data', 'jobs']);
+      }),
+    });
+
+    const gateway = <any>core.apiGateway();
+    const permissions = await gateway.contextToPermissionsFn();
+    expect(permissions).toBeDefined();
+    expect(Array.isArray(permissions)).toBeTruthy();
+    expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data', 'jobs']);
+  });
 });

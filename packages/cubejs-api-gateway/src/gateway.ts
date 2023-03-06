@@ -273,7 +273,7 @@ class ApiGateway {
       });
     }));
 
-    app.post(`${this.basePath}/v1/sql`, userMiddlewares, (async (req, res) => {
+    app.post(`${this.basePath}/v1/sql`, jsonParser, userMiddlewares, (async (req, res) => {
       await this.sql({
         query: req.body.query,
         context: req.context,
@@ -509,8 +509,7 @@ class ApiGateway {
   }) {
     const requestStarted = new Date();
     try {
-      // TODO: should we enable this assert? This is breaking changes.
-      // await this.assertPermission('jobs', context.securityContext);
+      await this.assertPermission('jobs', context.securityContext);
       const refreshScheduler = this.refreshScheduler();
       res(await refreshScheduler.runScheduledRefresh(context, {
         ...this.parseQueryParam(queryingOptions || {}),
@@ -2171,8 +2170,29 @@ class ApiGateway {
   protected createContextToPermissionsFn(
     options: ApiGatewayOptions,
   ): ContextToPermissionsFn {
+    let permissionsCache;
     return options.contextToPermissions
-      ? options.contextToPermissions
+      ? async (securityContext?: any) => {
+        if (!permissionsCache) {
+          const permissions = options.contextToPermissions &&
+            await options.contextToPermissions(securityContext);
+          if (!permissions || !Array.isArray(permissions)) {
+            throw new Error(
+              'A user-defined contextToPermissions function returns an inconsistent type.'
+            );
+          } else {
+            permissions.forEach((p) => {
+              if (['liveliness', 'graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
+                throw new Error(
+                  `A user-defined contextToPermissions function returns a wrong permission: ${p}`
+                );
+              }
+            });
+          }
+          permissionsCache = permissions;
+        }
+        return permissionsCache;
+      }
       : async () => ['liveliness', 'graphql', 'meta', 'data'];
   }
 
@@ -2187,7 +2207,7 @@ class ApiGateway {
       throw new CubejsHandlerError(
         403,
         'Forbidden',
-        `Permission not allowed: ${permission}`
+        `Permission is not allowed: ${permission}`
       );
     }
   }
