@@ -266,17 +266,6 @@ impl RocksCacheStore {
             .await
     }
 
-    fn queue_count_by_prefix_and_status(
-        db_ref: DbTableRef,
-        prefix: &Option<String>,
-        status: QueueItemStatus,
-    ) -> Result<u64, CubeError> {
-        let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-        let index_key =
-            QueueItemIndexKey::ByPrefixAndStatus(prefix.clone().unwrap_or("".to_string()), status);
-        queue_schema.count_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefixAndStatus)
-    }
-
     fn filter_to_cancel(
         now: DateTime<Utc>,
         items: Vec<IdRow<QueueItem>>,
@@ -538,16 +527,17 @@ impl CacheStore for RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+                let pending = queue_schema.count_rows_by_index(
+                    &QueueItemIndexKey::ByPrefixAndStatus(
+                        item.get_prefix().clone().unwrap_or("".to_string()),
+                        QueueItemStatus::Pending,
+                    ),
+                    &QueueItemRocksIndex::ByPrefixAndStatus,
+                )?;
+
                 let index_key = QueueItemIndexKey::ByPath(item.get_path());
                 let id_row_opt = queue_schema
                     .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
-
-                let pending = Self::queue_count_by_prefix_and_status(
-                    db_ref,
-                    item.get_prefix(),
-                    QueueItemStatus::Pending,
-                )?;
-
                 let added = if id_row_opt.is_none() {
                     queue_schema.insert(item, batch_pipe)?;
 

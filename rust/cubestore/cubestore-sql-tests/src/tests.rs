@@ -8024,7 +8024,7 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             &vec![Row::new(vec![
                 TableValue::String("payload3".to_string()),
                 TableValue::Null,
-                TableValue::Int(5),
+                TableValue::Int(4),
                 TableValue::String("3".to_string()),
             ]),]
         );
