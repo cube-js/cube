@@ -30,6 +30,8 @@ declare module '@cubejs-client/react' {
     DateRange,
     UnaryOperator,
     BinaryOperator,
+    DeeplyReadonly,
+    QueryRecordType,
   } from '@cubejs-client/core';
 
   type CubeProviderProps = {
@@ -238,6 +240,8 @@ declare module '@cubejs-client/react' {
 
     meta: Meta | undefined;
     metaError?: Error | null;
+    richMetaError?: Error | null;
+    metaErrorStack?: string | null;
     isFetchingMeta: boolean;
     /**
      * Indicates whether the query is ready to be displayed or not
@@ -304,6 +308,12 @@ declare module '@cubejs-client/react' {
      * Used for chart type update
      */
     updateChartType: (chartType: ChartType) => void;
+
+    /**
+     * Used to set the initial query for this component. Note that adding this prop turns this into an
+     * uncontrolled component and will only be able to execute `dryRun` queries. To use this component
+     * as a controlled component, use `setQuery` instead.
+     */
     query: Query;
     validatedQuery: Query;
     refresh: () => void;
@@ -426,7 +436,16 @@ declare module '@cubejs-client/react' {
    * @order 1
    * @stickyTypes
    */
-  export function useCubeQuery<TData>(query: Query | Query[], options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
+  export function useCubeQuery<
+    TData,
+    TQuery extends DeeplyReadonly<Query | Query[]> = DeeplyReadonly<Query | Query[]>>(
+    query: TQuery,
+    options?: UseCubeQueryOptions,
+  ): UseCubeQueryResult<
+    unknown extends TData
+      ? QueryRecordType<TQuery>
+      : TData
+  >;
 
   type UseCubeQueryOptions = {
     /**
@@ -643,9 +662,11 @@ declare module '@cubejs-client/react' {
     sourceAxis: TSourceAxis;
     destinationAxis: TSourceAxis;
   };
+
   type PivotConfigExtraUpdateFields = {
     limit?: number;
   };
+
   type PivotConfigUpdater = {
     moveItem: (args: PivotConfigUpdaterArgs) => void;
     update: (pivotConfig: PivotConfig & PivotConfigExtraUpdateFields) => void;

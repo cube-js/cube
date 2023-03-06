@@ -136,6 +136,7 @@ impl Sink {
             MetricType::Distribution if self.mode == Compatibility::StatsD => "ms",
             MetricType::Distribution => "d",
         };
+
         // We deliberately choose to loose metric submissions on failures.
         // TODO: handle EWOULDBLOCK with background sends or at least internal failure counters.
         let _ = self

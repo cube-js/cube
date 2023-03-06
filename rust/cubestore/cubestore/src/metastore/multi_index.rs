@@ -5,15 +5,12 @@
 //! and guarantees that ordinary partitions that store the data have the same key range.
 //! Multi-partitioned are compacted and repartitioned by applying the same operation to ordinary
 //! partitions they own.
-use super::RocksTable;
 use crate::data_frame_from;
-use crate::metastore::{
-    BaseRocksSecondaryIndex, Column, IdRow, IndexId, MetaStoreEvent, RocksSecondaryIndex, TableId,
-};
+use crate::metastore::{Column, IdRow, IndexId, RocksEntity, RocksSecondaryIndex, TableId};
 use crate::rocks_table_impl;
 use crate::table::Row;
 use byteorder::{BigEndian, WriteBytesExt};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Cursor;
 use std::io::Write;
@@ -26,6 +23,8 @@ pub struct MultiIndex {
     key_columns: Vec<Column>
 }
 }
+
+impl RocksEntity for MultiIndex {}
 
 impl MultiIndex {
     pub fn new(schema_id: u64, name: String, key_columns: Vec<Column>) -> MultiIndex {
@@ -117,6 +116,8 @@ pub struct MultiPartition {
 }
 }
 
+impl RocksEntity for MultiPartition {}
+
 impl MultiPartition {
     // Note that roots are active by default.
     pub fn new_root(multi_index_id: u64) -> MultiPartition {
@@ -138,8 +139,8 @@ impl MultiPartition {
         max_row: Option<Row>,
     ) -> MultiPartition {
         MultiPartition {
-            multi_index_id: parent.row.multi_index_id,
-            parent_multi_partition_id: Some(parent.id),
+            multi_index_id: parent.get_row().multi_index_id,
+            parent_multi_partition_id: Some(parent.get_id()),
             min_row,
             max_row,
             total_row_count: 0,

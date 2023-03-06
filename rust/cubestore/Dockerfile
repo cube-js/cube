@@ -6,8 +6,8 @@ FROM rust:1.47-buster as builder
 # /build/arrow/rust/arrow/src/lib.rs:127:1
 # #![feature(specialization)]
 RUN rustup update && \
-    rustup default nightly-2021-07-04 && \
-    rustup component add --toolchain nightly-2021-07-04 rustfmt
+    rustup default nightly-2022-06-22 && \
+    rustup component add --toolchain nightly-2022-06-22 rustfmt
 
 RUN apt update \
 	&& apt upgrade -y \
@@ -15,7 +15,7 @@ RUN apt update \
 	&& wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
 	&& add-apt-repository "deb https://apt.llvm.org/buster/ llvm-toolchain-buster-12 main"  \
 	&& apt update \
-	&& apt install -y git llvm-12 clang-12 libclang-12-dev clang-12 \
+	&& apt install -y git llvm-12 clang-12 libclang-12-dev clang-12 cmake \
 	&& rm -rf /var/lib/apt/lists/*;
 
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-12 100

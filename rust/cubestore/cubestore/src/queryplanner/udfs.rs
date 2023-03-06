@@ -380,6 +380,11 @@ impl Accumulator for HllMergeAccumulator {
             )
             .into());
         }
+
+        // empty state is ok, this means an empty sketch.
+        if data.len() == 0 {
+            return Ok(());
+        }
         return self.merge_sketch(read_sketch(&data)?);
     }
 
@@ -433,6 +438,6 @@ impl HllMergeAccumulator {
     }
 }
 
-fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
+pub fn read_sketch(data: &[u8]) -> Result<Hll, DataFusionError> {
     return Hll::read(&data).map_err(|e| DataFusionError::Execution(e.message));
 }

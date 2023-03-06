@@ -9,7 +9,7 @@ export class CubeCheckDuplicatePropTranspiler implements TranspilerInterface {
     return {
       CallExpression: path => {
         // @ts-ignore @todo Unsafely?
-        if (path.node.callee.name === 'cube') {
+        if (path.node.callee.name === 'cube' || path.node.callee.name === 'view') {
           path.node.arguments.forEach(arg => {
             if (arg && arg.type === 'ObjectExpression') {
               this.checkExpression(arg, reporter);

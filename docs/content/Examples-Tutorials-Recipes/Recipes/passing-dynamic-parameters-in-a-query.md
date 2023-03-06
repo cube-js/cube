@@ -90,7 +90,7 @@ cube(`Users`, {
       sql: `city_filter`,
       type: `string`,
     },
-  }
+  },
 });
 ```
 
@@ -127,7 +127,7 @@ can get the ratio we wanted to achieve:
     'Users.totalNumberOfWomen': '259',
     'Users.numberOfPeopleOfAnyGenderInTheCity': '99',
     'Users.ratio': '0.38223938223938223938',
-  }
+  },
 ];
 ```
 

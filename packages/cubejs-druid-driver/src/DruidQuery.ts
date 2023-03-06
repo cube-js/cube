@@ -13,8 +13,10 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
 };
 
 class DruidFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param) {
-    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
+  public likeIgnoreCase(column, not, param, type: string) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 }
 
@@ -28,15 +30,7 @@ export class DruidQuery extends BaseQuery {
   }
 
   public convertTz(field: string) {
-    // TODO respect day light saving
-    const [hour, minute] = moment().tz(this.timezone).format('Z').split(':');
-    const minutes = parseInt(hour, 10) * 60 + parseInt(minute, 10);
-
-    if (minutes > 0) {
-      return `TIMESTAMPADD(MINUTES, ${minutes}, ${field})`;
-    }
-
-    return field;
+    return `CAST(TIME_FORMAT(${field}, 'yyyy-MM-dd HH:mm:ss', '${this.timezone}') AS TIMESTAMP)`;
   }
 
   public subtractInterval(date: string, interval: string) {

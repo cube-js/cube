@@ -5,3 +5,7 @@ upstream
 .cargo/config.toml
 dist
 node_modules
+.vscode
+/cubesql/egraph-debug
+egraph-debug
+/cubesql/debug-qtrace

@@ -4,11 +4,12 @@
   "scripts": {
     "ng": "ng",
     "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true ng serve",
-    "build": "SKIP_PREFLIGHT_CHECK=true ng build --prod",
+    "build": "cross-env SKIP_PREFLIGHT_CHECK=true ng build --prod",
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "ng e2e",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist/dashboard-app"
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy",
+    "deploy": "npm run preview -- --prod"
   },
   "private": true,
   "dependencies": {
@@ -22,6 +23,7 @@
     "@angular/platform-browser": "~10.1.5",
     "@angular/platform-browser-dynamic": "~10.1.5",
     "@angular/router": "~10.1.5",
+    "@cube-dev/example-wrapper": "^1.1.10",
     "@cubejs-client/core": "^0.21.1",
     "@cubejs-client/ngx": "^0.21.1",
     "chart.js": "^2.9.3",
@@ -32,17 +34,17 @@
     "zone.js": "~0.10.2"
   },
   "devDependencies": {
-    "cross-env": "^7.0.2",
     "@angular-devkit/build-angular": "~0.1001.6",
     "@angular/cli": "~10.1.6",
     "@angular/compiler-cli": "~10.1.5",
-    "@types/node": "^12.11.1",
     "@types/jasmine": "~3.5.0",
     "@types/jasminewd2": "~2.0.3",
+    "@types/node": "^12.11.1",
     "codelyzer": "^6.0.0",
+    "cross-env": "^7.0.2",
     "jasmine-core": "~3.6.0",
     "jasmine-spec-reporter": "~5.0.0",
-    "karma": "~5.0.0",
+    "karma": "~6.3.16",
     "karma-chrome-launcher": "~3.1.0",
     "karma-coverage-istanbul-reporter": "~3.0.2",
     "karma-jasmine": "~4.0.0",

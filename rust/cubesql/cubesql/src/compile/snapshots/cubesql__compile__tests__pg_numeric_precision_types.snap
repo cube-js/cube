@@ -1,0 +1,68 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT t.oid, information_schema._pg_numeric_precision(t.oid, 3) p\n                FROM pg_catalog.pg_type t\n                ORDER BY t.oid ASC;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------+-------+
+| oid   | p     |
++-------+-------+
+| 16    | NULL  |
+| 17    | NULL  |
+| 19    | NULL  |
+| 20    | 64    |
+| 21    | 16    |
+| 23    | 32    |
+| 25    | NULL  |
+| 26    | NULL  |
+| 27    | NULL  |
+| 83    | NULL  |
+| 700   | 24    |
+| 701   | 53    |
+| 790   | NULL  |
+| 869   | NULL  |
+| 1000  | NULL  |
+| 1001  | NULL  |
+| 1005  | NULL  |
+| 1007  | NULL  |
+| 1009  | NULL  |
+| 1016  | NULL  |
+| 1021  | NULL  |
+| 1022  | NULL  |
+| 1033  | NULL  |
+| 1034  | NULL  |
+| 1042  | NULL  |
+| 1043  | NULL  |
+| 1082  | NULL  |
+| 1083  | NULL  |
+| 1114  | NULL  |
+| 1184  | NULL  |
+| 1186  | NULL  |
+| 1266  | NULL  |
+| 1700  | 65535 |
+| 2249  | NULL  |
+| 2277  | NULL  |
+| 2283  | NULL  |
+| 3220  | NULL  |
+| 3500  | NULL  |
+| 3831  | NULL  |
+| 3904  | NULL  |
+| 3906  | NULL  |
+| 3908  | NULL  |
+| 3910  | NULL  |
+| 3912  | NULL  |
+| 3926  | NULL  |
+| 4451  | NULL  |
+| 4532  | NULL  |
+| 4533  | NULL  |
+| 4535  | NULL  |
+| 4536  | NULL  |
+| 12003 | NULL  |
+| 12047 | NULL  |
+| 13408 | NULL  |
+| 13410 | NULL  |
+| 18001 | NULL  |
+| 18002 | NULL  |
+| 18019 | NULL  |
+| 18020 | NULL  |
+| 18029 | NULL  |
+| 18030 | NULL  |
++-------+-------+

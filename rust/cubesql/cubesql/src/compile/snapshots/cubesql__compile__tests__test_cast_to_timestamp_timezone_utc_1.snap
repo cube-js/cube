@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select CAST ('2020-12-25 22:48:48.000' AS timestamptz)\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------------------------------------------------+
+| TimestampNanosecond(1608936528000000000, None) |
++------------------------------------------------+
+| 2020-12-25T22:48:48.000                        |
++------------------------------------------------+

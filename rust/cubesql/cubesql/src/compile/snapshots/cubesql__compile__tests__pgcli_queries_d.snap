@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"SELECT n.nspname as \"Schema\",\n                    c.relname as \"Name\",\n                    CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 't' THEN 'TOAST table' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as \"Type\",\n                    pg_catalog.pg_get_userbyid(c.relowner) as \"Owner\"\n                    FROM pg_catalog.pg_class c\n                    LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace\n                    LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam\n                    WHERE c.relkind IN ('r','p','v','m','S','f','')\n                    AND n.nspname <> 'pg_catalog'\n                    AND n.nspname !~ '^pg_toast'\n                    AND n.nspname <> 'information_schema'\n                    AND pg_catalog.pg_table_is_visible(c.oid)\n                \"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------+---------------------------+-------+-------+
+| Schema | Name                      | Type  | Owner |
++--------+---------------------------+-------+-------+
+| public | KibanaSampleDataEcommerce | table | ovr   |
+| public | Logs                      | table | ovr   |
+| public | NumberCube                | table | ovr   |
++--------+---------------------------+-------+-------+

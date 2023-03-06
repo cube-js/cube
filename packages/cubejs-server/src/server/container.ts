@@ -12,6 +12,7 @@ import {
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
+import { SystemOptions } from '@cubejs-backend/server-core';
 
 import {
   getMajorityVersion,
@@ -231,16 +232,14 @@ export class ServerContainer {
       configuration.scheduledRefreshTimer = false;
     }
 
-    const server = new CubejsServer(configuration, {
-      isCubeConfigEmpty
-    });
+    const server = this.createServer(configuration, { isCubeConfigEmpty });
 
     if (!embedded) {
       try {
         const { version, port } = await server.listen();
 
-        console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-      } catch (e) {
+        console.log(`🚀 Cube API server (${version}) is listening on ${port}`);
+      } catch (e: any) {
         console.error('Fatal error during server start: ');
         console.error(e.stack || e);
 
@@ -249,6 +248,10 @@ export class ServerContainer {
     }
 
     return server;
+  }
+
+  protected createServer(config: CreateOptions, systemOptions?: SystemOptions): CubejsServer {
+    return new CubejsServer(config, systemOptions);
   }
 
   public async lookupConfiguration(override: boolean = false): Promise<CreateOptions> {

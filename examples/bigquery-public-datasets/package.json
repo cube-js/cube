@@ -9,6 +9,6 @@
   "templateVersion": "0.25.32",
   "devDependencies": {
     "@cubejs-backend/bigquery-driver": "^0.26.38",
-    "@cubejs-backend/server": "^0.26.38"
+    "@cubejs-backend/server": "^0.30.34"
   }
 }

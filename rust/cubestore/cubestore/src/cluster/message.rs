@@ -17,6 +17,10 @@ pub enum NetworkMessage {
     Select(SerializedPlan),
     SelectResult(Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError>),
 
+    //Perform explain analyze of worker query part and return it pretty printed physical plan
+    ExplainAnalyze(SerializedPlan),
+    ExplainAnalyzeResult(Result<String, CubeError>),
+
     /// Select that sends results in batches. The immediate response is [SelectResultSchema],
     /// followed by a stream of [SelectResultBatch].
     SelectStart(SerializedPlan),
@@ -25,7 +29,7 @@ pub enum NetworkMessage {
     /// [None] indicates the end of the stream.
     SelectResultBatch(Result<Option<SerializedRecordBatchStream>, CubeError>),
 
-    WarmupDownload(/*remote_path*/ String),
+    WarmupDownload(/*remote_path*/ String, Option<u64>),
     WarmupDownloadResult(Result<(), CubeError>),
 
     AddMemoryChunk {

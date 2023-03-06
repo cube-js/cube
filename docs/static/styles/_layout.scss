@@ -95,9 +95,59 @@ a {
   margin-bottom: 200px;
 }
 
+.titleWrapper {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 28px;
+  padding-top: 48px;
+  margin-bottom: 24px;
+  
+  @media screen and (max-width: 576px) {
+    flex-flow: column;
+    gap: 4px;
+  }
+  
+  h1 {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.releaseNotesMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .releaseDate {
+    font-family: inherit;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 30px;
+    color: $dark-04;
+  }
+  
+  .releaseLink {
+    font-family: inherit;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 30px;
+    text-decoration: none;
+    border-bottom: none !important;
+    color: $dark-04;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: $purple;
+    }
+  }
+}
+
 .searchBoxWrapper {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
+  padding: 12px 20px;
+  width: 100%;
 }
 
 .searchBox {
@@ -351,13 +401,11 @@ span.group-header {
 }
 
 .menuWrapperHack {
-
-  margin-top: -40px;
   padding-top: 56px !important;
-
+  margin-top: -40px;
   @media screen and (max-width: 767px) {
-    margin-top: -118px;
-    padding-top: 118px !important;
+    padding-top: 70px !important;
+    margin-top: 0;
   }
 }
 
@@ -662,7 +710,8 @@ span.group-header {
 .header {
   background: #fff;
   padding: 0 1rem;
-  position: fixed;
+  position: sticky;
+  top: 0;
   z-index: 1;
   width: 100%;
   filter: drop-shadow(0px 0px 15px rgba(67, 67, 107, 0.1));
@@ -743,8 +792,6 @@ span.group-header {
 }
 
 .contentColumn {
-  margin-top: 64px;
-
   @media screen and (max-width: 767px) {
     overflow-x: hidden;
 
@@ -983,122 +1030,6 @@ section[type=h2] h2 {
 
     .ant-radio-button-wrapper::before {
       background-color: white !important;
-    }
-  }
-}
-
-
-:global {
-  .gettingStartedGrid {
-    @include card-grid;
-
-    .gettingStartedItem {
-      @include card-grid-item;
-
-      a {
-        border-bottom: none;
-      }
-
-      &.originalWidth {
-        width: calc(100% / 3);
-      }
-
-      &:nth-child(even) {
-        @include card-grid-item-adjacent;
-      }
-
-      &.gettingStartedItemSlim {
-        .gettingStartedItemContent {
-          min-height: unset;
-          text-align: center;;
-
-          .gettingStartedItemImage {
-            margin-right: 1.25rem;
-
-            > img {
-              margin: unset;
-            }
-          }
-
-          .gettingStartedItemImage,
-          .gettingStartedItemLink {
-            display: inline-block;
-          }
-        }
-      }
-
-      .gettingStartedItemContent {
-        @include card-grid-item-content;
-        margin: 1.5rem;
-
-        .gettingStartedItemImage {
-          @include card-grid-item-image;
-          position: unset;
-          display: flex;
-          justify-content: center;
-
-          > img {
-            box-shadow: none !important;
-            border: none;
-            max-height: 160px;
-          }
-        }
-
-        .gettingStartedItemLink {
-          @include card-grid-item-link;
-          margin-top: 0.5rem;
-          text-align: center;
-        }
-
-        .gettingStartedItemText {
-          @include card-grid-item-text;
-        }
-      }
-    }
-  }
-
-  .connectingToDatabaseGrid {
-    @include card-grid;
-
-    > .ant-row {
-      display: flex;
-      flex-flow: row wrap;
-    }
-
-    .connectingToDatabaseItem {
-      @include card-grid-item-without-width;
-
-      a {
-        border-bottom: none;
-      }
-
-      .connectingToDatabaseItemContent {
-        @include card-grid-item-content;
-        margin: 1.5rem;
-
-        .connectingToDatabaseItemImage {
-          @include card-grid-item-image;
-          position: unset;
-          display: flex;
-          justify-content: center;
-
-          > img {
-            box-shadow: none !important;
-            border: none;
-            max-height: 160px;
-          }
-        }
-
-        .connectingToDatabaseItemLink {
-          @include card-grid-item-link;
-          margin-top: 0.5rem;
-          text-align: center;
-        }
-
-        .connectingToDatabaseItemText {
-          @include card-grid-item-text;
-        }
-      }
     }
   }
 }

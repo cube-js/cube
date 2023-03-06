@@ -1,5 +1,9 @@
 /* eslint-disable no-restricted-syntax */
 import * as querystring from 'querystring';
+import crypto from 'crypto';
+
+import { getProcessUid, getNext } from '@cubejs-backend/shared';
+import { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 
 function parseHostPort(addr: string): { host: string, port: number } {
   if (addr.includes(':')) {
@@ -156,22 +160,50 @@ export function parseRedisUrl(url: Readonly<string>): RedisParsedResult {
   }
 
   if (url.startsWith('redis://')) {
-    return parseUrl(url.substr('redis://'.length), result, parseHostPartBasic);
+    return parseUrl(url.slice('redis://'.length), result, parseHostPartBasic);
   }
 
   if (url.startsWith('rediss://')) {
     result.ssl = true;
 
-    return parseUrl(url.substr('rediss://'.length), result, parseHostPartBasic);
+    return parseUrl(url.slice('rediss://'.length), result, parseHostPartBasic);
   }
 
   if (url.startsWith('redis+sentinel://')) {
-    return parseUrl(url.substr('redis+sentinel://'.length), result, parseHostPartSentinel);
+    return parseUrl(url.slice('redis+sentinel://'.length), result, parseHostPartSentinel);
   }
 
   if (url.startsWith('unix://')) {
-    return parseUnixUrl(url.substr('unix://'.length), result);
+    return parseUnixUrl(url.slice('unix://'.length), result);
   }
 
   return parseUrl(url, result, parseHostPartBasic);
+}
+
+/**
+ * Unique process ID regexp.
+ */
+export const processUidRE = /^[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}$/;
+
+/**
+ * Returns query hash by specified `queryKey`.
+ */
+export function getCacheHash(queryKey: QueryKey, processUid?: string): QueryKeyHash {
+  processUid = processUid || getProcessUid();
+  if (typeof queryKey === 'string' && queryKey.length < 256) {
+    return queryKey as any;
+  }
+
+  if (typeof queryKey === 'object' && queryKey.persistent) {
+    return `${crypto
+      .createHash('md5')
+      .update(JSON.stringify(queryKey))
+      .digest('hex')
+    }@${processUid}` as any;
+  } else {
+    return crypto
+      .createHash('md5')
+      .update(JSON.stringify(queryKey))
+      .digest('hex') as any;
+  }
 }

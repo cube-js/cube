@@ -7,11 +7,21 @@ union HttpCommand {
 table HttpMessage {
     message_id: uint;
     command: HttpCommand;
+    connection_id: string;
 }
 
 table HttpQuery {
     query: string;
     trace_obj: string;
+    inline_tables: [HttpTable];
+}
+
+table HttpTable {
+    name: string;
+    columns: [string];
+    types: [string];
+    // csv format to replicate the usual csv import path.
+    csv_rows: string;
 }
 
 table HttpError {

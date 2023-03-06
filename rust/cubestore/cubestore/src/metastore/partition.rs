@@ -1,15 +1,14 @@
-use super::{
-    BaseRocksSecondaryIndex, IndexId, Partition, RocksSecondaryIndex, RocksTable, TableId,
-};
-use crate::base_rocks_secondary_index;
-use crate::metastore::{IdRow, MetaStoreEvent};
+use super::{IndexId, Partition, RocksSecondaryIndex, TableId};
+use crate::metastore::IdRow;
 use crate::rocks_table_impl;
 use crate::table::Row;
+use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer};
+use std::fmt::Debug;
 
 impl Partition {
     pub fn new(
@@ -33,15 +32,18 @@ impl Partition {
                     .unwrap()
                     .to_lowercase(),
             ),
+            file_size: None,
+            min: None,
+            max: None,
         }
     }
 
     pub fn new_child(parent: &IdRow<Partition>, multi_partition_id: Option<u64>) -> Partition {
         Partition {
-            index_id: parent.row.index_id,
+            index_id: parent.get_row().index_id,
             min_value: None,
             max_value: None,
-            parent_partition_id: Some(parent.id),
+            parent_partition_id: Some(parent.get_id()),
             multi_partition_id,
             active: false,
             warmed_up: false,
@@ -52,6 +54,9 @@ impl Partition {
                     .unwrap()
                     .to_lowercase(),
             ),
+            file_size: None,
+            min: None,
+            max: None,
         }
     }
     pub fn get_min_val(&self) -> &Option<Row> {
@@ -60,6 +65,22 @@ impl Partition {
 
     pub fn get_max_val(&self) -> &Option<Row> {
         &self.max_value
+    }
+
+    pub fn get_min(&self) -> &Option<Row> {
+        &self.min
+    }
+
+    pub fn get_max(&self) -> &Option<Row> {
+        &self.max
+    }
+
+    pub fn get_min_or_lower_bound(&self) -> Option<&Row> {
+        self.get_min().as_ref().or(self.get_min_val().as_ref())
+    }
+
+    pub fn get_max_or_upper_bound(&self) -> Option<&Row> {
+        self.get_max().as_ref().or(self.get_max_val().as_ref())
     }
 
     pub fn get_full_name(&self, partition_id: u64) -> Option<String> {
@@ -96,12 +117,31 @@ impl Partition {
         min_value: Option<Row>,
         max_value: Option<Row>,
         main_table_row_count: u64,
+        min: Option<Row>,
+        max: Option<Row>,
     ) -> Partition {
         let mut p = self.clone();
         p.min_value = min_value;
         p.max_value = max_value;
         p.main_table_row_count = main_table_row_count;
+        p.min = min;
+        p.max = max;
         p
+    }
+
+    pub fn file_size(&self) -> Option<u64> {
+        self.file_size
+    }
+
+    pub fn set_file_size(&self, file_size: u64) -> Result<Self, CubeError> {
+        let mut p = self.clone();
+        if file_size == 0 {
+            return Err(CubeError::internal(format!(
+                "Received zero file size for partition"
+            )));
+        }
+        p.file_size = Some(file_size);
+        Ok(p)
     }
 
     pub fn get_index_id(&self) -> u64 {

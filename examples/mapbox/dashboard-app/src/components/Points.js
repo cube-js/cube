@@ -3,7 +3,7 @@ import { useCubeQuery } from "@cubejs-client/react";
 import { Col, Row, Slider, Tooltip } from "antd";
 import MapGL, { Source, Layer, NavigationControl } from 'react-map-gl';
 
-export default () => {
+const Points = () => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
@@ -93,7 +93,7 @@ export default () => {
           width='100%'
           height='100%'
           mapStyle='mapbox://styles/kalipsik/ckb2fyfqu123n1ilb5yi7uyns/'
-          mapboxApiAccessToken={process.env.REACT_APP_MAPBOX_KEY}
+          mapboxAccessToken={process.env.REACT_APP_MAPBOX_KEY}
         >
           <div className='mapbox__navi'>
             <NavigationControl />
@@ -137,3 +137,5 @@ export default () => {
       </Row>
     </React.Fragment>)
 }
+
+export default Points;

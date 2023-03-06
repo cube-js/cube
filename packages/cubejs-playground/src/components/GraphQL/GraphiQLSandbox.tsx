@@ -1,13 +1,11 @@
 import { Meta, Query } from '@cubejs-client/core';
 import { createGraphiQLFetcher } from '@graphiql/toolkit';
 import GraphiQL from 'graphiql';
-import gqlParser from 'prettier/parser-graphql';
-import { format } from 'prettier/standalone';
 import styled from 'styled-components';
 import { useMemo } from 'react';
 import 'graphiql/graphiql.min.css';
 
-import useDeepMemo from '../../hooks/deep-memo';
+import { useDeepMemo } from '../../hooks/deep-memo';
 import { metaToTypes } from '../../utils';
 import { CubeGraphQLConverter } from './CubeGraphQLConverter';
 import { useSecurityContext, useToken } from '../../hooks';
@@ -19,9 +17,14 @@ const Wrapper = styled.div`
   overflow: hidden;
 
   .graphiql-container {
+    box-sizing: initial;
+
+    * {
+      box-sizing: initial;
+    }
+
     .topBar {
       background: none;
-      padding: 24px 0 24px;
     }
 
     .docExplorerShow {
@@ -33,7 +36,7 @@ const Wrapper = styled.div`
     .CodeMirror-lines {
       background: white;
     }
-    
+
     .doc-explorer-title-bar {
       height: 50px;
     }
@@ -53,7 +56,7 @@ export default function GraphiQLSandbox({
 }: GraphiQLSandboxProps) {
   const { token: securityContextToken } = useSecurityContext();
   const playgroundToken = useToken();
-  
+
   const token = securityContextToken || playgroundToken;
 
   const fetcher = useMemo(() => {
@@ -78,16 +81,7 @@ export default function GraphiQLSandbox({
 
     try {
       const converter = new CubeGraphQLConverter(query, types);
-      const gqlQuery = converter.convert();
-
-      try {
-        return format(gqlQuery, {
-          parser: 'graphql',
-          plugins: [gqlParser],
-        });
-      } catch (_) {
-        return gqlQuery;
-      }
+      return converter.convert().replace('{', ' { ').replace('}', ' } ');
     } catch (error) {
       return `# ${error}\n`;
     }

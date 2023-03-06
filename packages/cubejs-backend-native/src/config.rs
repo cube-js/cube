@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use cubesql::{
     config::{Config, CubeServices},
-    mysql::SqlAuthService,
+    sql::SqlAuthService,
     transport::TransportService,
 };
 
@@ -13,11 +13,15 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
-    pub fn new(port: Option<u16>, nonce: Option<String>) -> NodeConfig {
+    pub fn new(port: Option<u16>, pg_port: Option<u16>, nonce: Option<String>) -> NodeConfig {
         let config = Config::default();
         let config = config.update_config(|mut c| {
             if let Some(p) = port {
                 c.bind_address = Some(format!("0.0.0.0:{}", p));
+            };
+
+            if let Some(p) = pg_port {
+                c.postgres_bind_address = Some(format!("0.0.0.0:{}", p));
             };
 
             if let Some(n) = nonce {
@@ -36,7 +40,8 @@ impl NodeConfig {
         auth: Arc<NodeBridgeAuthService>,
     ) -> CubeServices {
         let injector = self.config.injector();
-        self.config.configure_injector().await;
+
+        self.config.configure().await;
 
         injector
             .register_typed::<dyn TransportService, _, _, _>(async move |_| transport)

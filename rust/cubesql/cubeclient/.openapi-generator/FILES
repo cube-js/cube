@@ -3,6 +3,7 @@ src/lib.rs
 src/models/mod.rs
 src/models/v1_cube_meta.rs
 src/models/v1_cube_meta_dimension.rs
+src/models/v1_cube_meta_join.rs
 src/models/v1_cube_meta_measure.rs
 src/models/v1_cube_meta_segment.rs
 src/models/v1_error.rs

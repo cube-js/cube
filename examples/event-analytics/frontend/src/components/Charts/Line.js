@@ -19,7 +19,7 @@ import {
   RECHARTS_RESPONSIVE_WIDTH
 } from './helpers.js';
 
-export default ({ resultSet }) => (
+const LineComponent = ({ resultSet }) => (
   <ResponsiveContainer width={RECHARTS_RESPONSIVE_WIDTH} height={DASHBOARD_CHART_MIN_HEIGHT}>
     <LineChart data={format("x", resultSet.chartPivot(), resolveFormat(resultSet))}>
       <XAxis dataKey="x" minTickGap={20}/>
@@ -33,3 +33,5 @@ export default ({ resultSet }) => (
     </LineChart>
   </ResponsiveContainer>
 );
+
+export default LineComponent;

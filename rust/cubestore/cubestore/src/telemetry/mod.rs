@@ -1,3 +1,4 @@
+pub mod tracing;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{SecondsFormat, Utc};
@@ -9,6 +10,7 @@ use futures::{Sink, StreamExt};
 use futures_timer::Delay;
 use log::{Level, Log, Metadata, Record};
 use nanoid::nanoid;
+use reqwest::header::HeaderMap;
 use serde_json::{Map, Number, Value};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -20,50 +22,74 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 lazy_static! {
-    pub static ref SENDER: Arc<EventSender<HttpTelemetryTransport>> =
-        Arc::new(EventSender::new(HttpTelemetryTransport));
+    pub static ref SENDER: Arc<EventSender> = Arc::new(EventSender::new(Arc::new(
+        HttpTelemetryTransport::try_new("https://track.cube.dev/track".to_string(), None).unwrap()
+    )));
 }
 
 lazy_static! {
-    pub static ref AGENT_SENDER: tokio::sync::RwLock<Option<Arc<EventSender<WsTelemetryTransport>>>> =
+    pub static ref AGENT_SENDER: tokio::sync::RwLock<Option<Arc<EventSender>>> =
         tokio::sync::RwLock::new(None);
 }
 
-pub struct EventSender<T: TelemetryTransport> {
+pub struct EventSender {
     events: Mutex<Vec<Map<String, Value>>>,
     notify: Arc<Notify>,
     stopped: RwLock<bool>,
-    transport: T,
+    transport: Arc<dyn TelemetryTransport>,
 }
 
 #[async_trait]
-pub trait TelemetryTransport {
+pub trait TelemetryTransport: Sync + Send {
     async fn send_events(&self, to_send: Vec<Map<String, Value>>) -> Result<(), CubeError>;
 }
 
-pub struct HttpTelemetryTransport;
+#[derive(Debug)]
+pub struct HttpTelemetryTransport {
+    endpoint_url: String,
+    client: reqwest::Client,
+    headers: Option<HeaderMap>,
+}
+
+impl HttpTelemetryTransport {
+    pub fn try_new(endpoint_url: String, headers: Option<HeaderMap>) -> Result<Self, CubeError> {
+        let client = reqwest::ClientBuilder::new()
+            .use_rustls_tls()
+            .user_agent("cubestore")
+            .tcp_keepalive(Some(Duration::from_secs(30)))
+            .build()?;
+        Ok(Self {
+            endpoint_url,
+            client,
+            headers,
+        })
+    }
+}
 
 #[async_trait]
 impl TelemetryTransport for HttpTelemetryTransport {
     async fn send_events(&self, mut to_send: Vec<Map<String, Value>>) -> Result<(), CubeError> {
         let max_retries = 10usize;
         for retry in 0..max_retries {
-            let client = reqwest::ClientBuilder::new()
-                .use_rustls_tls()
-                .user_agent("cubestore")
-                .build()
-                .unwrap();
-
             let sent_at = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
             for event in to_send.iter_mut() {
                 event.insert("sentAt".to_string(), Value::String(sent_at.to_string()));
             }
 
-            let res = client
-                .post("https://track.cube.dev/track")
+            log::trace!("sending via http to {} :{:?}", self.endpoint_url, to_send);
+
+            let header_map = self
+                .headers
+                .as_ref()
+                .map_or_else(|| HeaderMap::new(), |m| m.to_owned());
+            let res = self
+                .client
+                .post(&self.endpoint_url)
+                .headers(header_map)
                 .json(&to_send)
                 .send()
                 .await?;
+
             if res.status() != 200 {
                 if retry < max_retries - 1 {
                     continue;
@@ -152,6 +178,7 @@ impl TelemetryTransport for WsTelemetryTransport {
                 "callbackId".to_string(),
                 Value::String(callback_id.to_string()),
             );
+            log::trace!("sending via ws to {} :{:?}", self.endpoint_url, message);
             let json = deflate_bytes_zlib(serde_json::to_vec(&message)?.as_slice());
 
             self.insert_callback(callback_id.to_string()).await;
@@ -240,9 +267,9 @@ impl TelemetryTransport for WsTelemetryTransport {
     }
 }
 
-impl<T: TelemetryTransport> EventSender<T> {
-    pub fn new(transport: T) -> EventSender<T> {
-        EventSender {
+impl EventSender {
+    pub fn new(transport: Arc<dyn TelemetryTransport>) -> Self {
+        Self {
             events: Mutex::new(Vec::new()),
             notify: Arc::new(Notify::new()),
             stopped: RwLock::new(false),
@@ -371,14 +398,40 @@ pub async fn stop_track_event_loop() {
 
 pub async fn init_agent_sender() {
     let agent_url = env::var("CUBESTORE_AGENT_ENDPOINT_URL").ok();
+    log::trace!("agent endpoint url: {:?}", agent_url);
     let mut agent_sender = AGENT_SENDER.write().await;
-    *agent_sender = agent_url.map(|endpoint_url| {
-        Arc::new(EventSender::new(WsTelemetryTransport {
-            endpoint_url,
-            socket: RwLock::new(None),
-            waiting_callbacks: RwLock::new(HashSet::new()),
-        }))
-    });
+    *agent_sender = if let Some(endpoint_url) = agent_url {
+        if let Ok(agent_url_object) = reqwest::Url::parse(endpoint_url.as_str()) {
+            match agent_url_object.scheme() {
+                "https" | "http" => {
+                    log::trace!("using http transport for agent enpoint");
+                    Some(Arc::new(EventSender::new(Arc::new(
+                        HttpTelemetryTransport::try_new(endpoint_url, None).unwrap(),
+                    ))))
+                }
+                "wss" => {
+                    log::trace!("using wss transport for agent enpoint");
+                    Some(Arc::new(EventSender::new(Arc::new(WsTelemetryTransport {
+                        endpoint_url,
+                        socket: RwLock::new(None),
+                        waiting_callbacks: RwLock::new(HashSet::new()),
+                    }))))
+                }
+                _ => {
+                    log::error!(
+                        "Telemetry endpoint {} with unsupported protocol",
+                        endpoint_url
+                    );
+                    None
+                }
+            }
+        } else {
+            log::error!("Can't parse telemetry endpoint {}", endpoint_url);
+            None
+        }
+    } else {
+        None
+    };
 }
 
 pub async fn start_agent_event_loop() {
@@ -386,7 +439,6 @@ pub async fn start_agent_event_loop() {
         sender.clone().send_loop().await;
     }
 }
-
 pub async fn stop_agent_event_loop() {
     if let Some(sender) = AGENT_SENDER.read().await.as_ref() {
         sender.clone().stop_loop().await;
@@ -404,11 +456,11 @@ impl ReportingLogger {
 }
 
 impl Log for ReportingLogger {
-    fn enabled(&self, metadata: &Metadata<'a>) -> bool {
+    fn enabled<'a>(&self, metadata: &Metadata<'a>) -> bool {
         self.logger.enabled(metadata)
     }
 
-    fn log(&self, record: &Record<'a>) {
+    fn log<'a>(&self, record: &Record<'a>) {
         if let Level::Error = record.metadata().level() {
             track_event_spawn(
                 "Cube Store Error".to_string(),
@@ -422,5 +474,49 @@ impl Log for ReportingLogger {
 
     fn flush(&self) {
         self.logger.flush()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
+
+    #[test]
+    fn test_http_telemetry_transport_try_new() {
+        let transport_without_headers =
+            HttpTelemetryTransport::try_new("http://transport_without_headers".to_string(), None)
+                .unwrap();
+
+        assert_eq!(
+            transport_without_headers.endpoint_url,
+            "http://transport_without_headers"
+        );
+        assert_eq!(transport_without_headers.headers, None);
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_str("token").unwrap());
+        headers.insert(
+            HeaderName::from_static("content-length"),
+            HeaderValue::from_str("10000").unwrap(),
+        );
+
+        let transport_with_headers = HttpTelemetryTransport::try_new(
+            "http://transport_with_header".to_string(),
+            Some(headers.clone()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            transport_with_headers.endpoint_url,
+            "http://transport_with_header"
+        );
+
+        assert_eq!(
+            format!("{:?}", transport_with_headers.headers.unwrap()),
+            Value::String(
+                "{\"authorization\": \"token\", \"content-length\": \"10000\"}".to_string()
+            )
+        );
     }
 }

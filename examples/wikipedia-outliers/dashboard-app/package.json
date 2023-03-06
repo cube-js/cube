@@ -1,0 +1,24 @@
+{
+  "name": "wikipedia-outliers",
+  "version": "1.0.0",
+  "license": "MIT",
+  "scripts": {
+    "dev": "parcel src/index.html",
+    "build": "parcel build src/index.html"
+  },
+  "devDependencies": {
+    "parcel": "^2.6.2",
+    "process": "^0.11.10"
+  },
+  "dependencies": {
+    "@cubejs-client/core": "^0.30.29",
+    "@cubejs-client/react": "^0.30.30",
+    "@nivo/calendar": "^0.79.1",
+    "@nivo/colors": "^0.79.1",
+    "@nivo/core": "^0.79.0",
+    "country-code-emoji": "^2.3.0",
+    "cube-example-wrapper": "^1.0.26",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

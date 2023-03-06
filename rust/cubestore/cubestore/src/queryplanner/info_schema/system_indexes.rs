@@ -1,5 +1,5 @@
-use crate::metastore::{IdRow, Index, MetaStore, MetaStoreTable};
-use crate::queryplanner::InfoSchemaTableDef;
+use crate::metastore::{IdRow, Index, MetaStoreTable};
+use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use arrow::array::{ArrayRef, StringArray, UInt64Array};
 use arrow::datatypes::{DataType, Field};
@@ -12,8 +12,8 @@ pub struct SystemIndexesTableDef;
 impl InfoSchemaTableDef for SystemIndexesTableDef {
     type T = IdRow<Index>;
 
-    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(meta_store.index_table().all_rows().await?))
+    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        Ok(Arc::new(ctx.meta_store.index_table().all_rows().await?))
     }
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {
@@ -88,6 +88,17 @@ impl InfoSchemaTableDef for SystemIndexesTableDef {
                         indexes
                             .iter()
                             .map(|row| row.get_row().multi_index_id())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("index_type", DataType::Utf8, false),
+                Box::new(|indexes| {
+                    Arc::new(StringArray::from(
+                        indexes
+                            .iter()
+                            .map(|row| format!("{:?}", row.get_row().get_type()))
                             .collect::<Vec<_>>(),
                     ))
                 }),

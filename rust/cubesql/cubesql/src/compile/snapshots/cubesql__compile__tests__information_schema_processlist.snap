@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4118
+expression: "execute_query(\"SELECT * FROM information_schema.processlist\".to_string()).await?"
+
+---
++----+------+-----------+----+---------+------+------------------------+------+
+| ID | USER | HOST      | DB | COMMAND | TIME | STATE                  | INFO |
++----+------+-----------+----+---------+------+------------------------+------+
+| 1  | ovr  | 127.0.0.1 | db | daemon  | 0    | Waiting on empty queue | NULL |
++----+------+-----------+----+---------+------+------------------------+------+

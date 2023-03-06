@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT `table_name`, `column_name`\n                FROM `information_schema`.`columns`\n                WHERE `data_type`='enum' AND `table_schema`='db'\".to_string(),\n            DatabaseProtocol::MySQL).await?"
+---
++------------+-------------+
+| TABLE_NAME | COLUMN_NAME |
++------------+-------------+
++------------+-------------+

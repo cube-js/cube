@@ -1,10 +1,11 @@
-use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, TableId};
+use super::{IndexId, RocksSecondaryIndex, TableId};
 use crate::base_rocks_secondary_index;
-use crate::metastore::{IdRow, MetaStoreEvent, RowKey};
+use crate::metastore::table::Table;
+use crate::metastore::{RocksEntity, RowKey};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::{Cursor, Write};
 
@@ -17,6 +18,8 @@ pub enum JobType {
     TableImportCSV(/*location*/ String),
     MultiPartitionSplit,
     FinishMultiSplit,
+    RepartitionChunk,
+    InMemoryChunksCompaction,
 }
 
 fn get_job_type_index(j: &JobType) -> u32 {
@@ -28,6 +31,8 @@ fn get_job_type_index(j: &JobType) -> u32 {
         JobType::TableImportCSV(_) => 5,
         JobType::MultiPartitionSplit => 6,
         JobType::FinishMultiSplit => 7,
+        JobType::RepartitionChunk => 8,
+        JobType::InMemoryChunksCompaction => 9,
     }
 }
 
@@ -47,6 +52,8 @@ pub struct Job {
     last_heart_beat: DateTime<Utc>,
     status: JobStatus,
 }
+
+impl RocksEntity for Job {}
 
 impl Job {
     pub fn new(row_reference: RowKey, job_type: JobType, shard: String) -> Job {
@@ -93,6 +100,13 @@ impl Job {
 
     pub fn completed(&self) -> Job {
         self.update_status(JobStatus::Completed)
+    }
+
+    pub fn is_long_term(&self) -> bool {
+        match &self.job_type {
+            JobType::TableImportCSV(location) if Table::is_stream_location(location) => true,
+            _ => false,
+        }
     }
 }
 

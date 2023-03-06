@@ -1,21 +1,24 @@
 use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::sql::InlineTables;
+use crate::sql::SqlQueryContext;
 use crate::store::DataFrame;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use futures::Future;
 use log::trace;
 use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::sync::{watch, RwLock};
+use tokio::sync::{watch, Mutex};
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub struct SqlResultCacheKey {
     query: String,
+    inline_tables: InlineTables,
     partition_ids: Vec<u64>,
     chunk_ids: Vec<u64>,
 }
 
 impl SqlResultCacheKey {
-    pub fn from_plan(query: &str, plan: &SerializedPlan) -> Self {
+    pub fn from_plan(query: &str, inline_tables: &InlineTables, plan: &SerializedPlan) -> Self {
         let mut partition_ids = HashSet::new();
         let mut chunk_ids = HashSet::new();
         for index in plan.index_snapshots().iter() {
@@ -32,44 +35,80 @@ impl SqlResultCacheKey {
         chunk_ids.sort();
         Self {
             query: query.to_string(),
+            inline_tables: (*inline_tables).clone(),
             partition_ids,
             chunk_ids,
         }
     }
 }
 
+#[derive(Clone, Hash, Eq, PartialEq, Debug)]
+pub struct SqlQueueCacheKey {
+    query: String,
+    inline_tables: InlineTables,
+}
+
+impl SqlQueueCacheKey {
+    pub fn from_query(query: &str, inline_tables: &InlineTables) -> Self {
+        Self {
+            query: query.to_string(),
+            inline_tables: (*inline_tables).clone(),
+        }
+    }
+}
+
 pub struct SqlResultCache {
-    cache: RwLock<
-        lru::LruCache<
-            SqlResultCacheKey,
-            watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>,
-        >,
+    queue_cache: Mutex<
+        lru::LruCache<SqlQueueCacheKey, watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>,
     >,
+    result_cache: Mutex<lru::LruCache<SqlResultCacheKey, Arc<DataFrame>>>,
 }
 
 impl SqlResultCache {
     pub fn new(capacity: usize) -> Self {
         Self {
-            cache: RwLock::new(lru::LruCache::new(capacity)),
+            queue_cache: Mutex::new(lru::LruCache::new(capacity)),
+            result_cache: Mutex::new(lru::LruCache::new(capacity)),
         }
     }
 
+    pub async fn clear(&self) {
+        self.result_cache.lock().await.clear();
+        app_metrics::DATA_QUERIES_CACHE_SIZE.report(0);
+    }
+
+    #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
     pub async fn get<F>(
         &self,
         query: &str,
+        context: SqlQueryContext,
         plan: SerializedPlan,
         exec: impl FnOnce(SerializedPlan) -> F,
     ) -> Result<Arc<DataFrame>, CubeError>
     where
         F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
     {
-        let key = SqlResultCacheKey::from_plan(query, &plan);
-        let (sender, mut receiver) = {
-            let key = key.clone();
-            let mut cache = self.cache.write().await;
+        let inline_tables = &context.inline_tables;
+        let result_key = SqlResultCacheKey::from_plan(query, inline_tables, &plan);
+        let cached_result = {
+            let mut result_cache = self.result_cache.lock().await;
+            result_cache.get(&result_key).cloned()
+        };
+        if let Some(result) = cached_result {
+            app_metrics::DATA_QUERIES_CACHE_HIT.increment();
+
+            trace!("Using result cache for '{}'", query);
+            return Ok(result);
+        }
+
+        let queue_key = SqlQueueCacheKey::from_query(query, inline_tables);
+        let (sender, receiver) = {
+            let key = queue_key.clone();
+            let mut cache = self.queue_cache.lock().await;
             if !cache.contains(&key) {
                 let (tx, rx) = watch::channel(None);
                 cache.put(key, rx);
+                app_metrics::DATA_QUERIES_CACHE_SIZE.report(cache.len() as i64);
                 (Some(tx), None)
             } else {
                 (None, cache.get(&key).cloned())
@@ -85,13 +124,36 @@ impl SqlResultCache {
                     e
                 );
             }
-            if result.is_err() {
-                trace!("Removing error result from cache");
-                self.cache.write().await.pop(&key);
+            match &result {
+                Ok(r) => {
+                    let mut result_cache = self.result_cache.lock().await;
+                    if !result_cache.contains(&result_key) {
+                        result_cache.put(result_key.clone(), r.clone());
+                        app_metrics::DATA_QUERIES_CACHE_SIZE.report(result_cache.len() as i64);
+                    }
+                }
+                Err(_) => {
+                    trace!("Removing error result from cache");
+                }
             }
+            self.queue_cache.lock().await.pop(&queue_key);
+
             return result;
         }
 
+        std::mem::drop(plan);
+        std::mem::drop(result_key);
+        std::mem::drop(context);
+
+        self.wait_for_queue(receiver, query).await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self, receiver))]
+    async fn wait_for_queue(
+        &self,
+        mut receiver: Option<watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>,
+        query: &str,
+    ) -> Result<Arc<DataFrame>, CubeError> {
         if let Some(receiver) = &mut receiver {
             loop {
                 receiver.changed().await?;
@@ -103,7 +165,6 @@ impl SqlResultCache {
                 }
             }
         }
-
         panic!("Unexpected state: wait receiver expected but cache was empty")
     }
 }
@@ -113,6 +174,7 @@ mod tests {
     use crate::queryplanner::serialized_plan::SerializedPlan;
     use crate::queryplanner::PlanningMeta;
     use crate::sql::cache::SqlResultCache;
+    use crate::sql::SqlQueryContext;
     use crate::store::DataFrame;
     use crate::table::{Row, TableValue};
     use crate::CubeError;
@@ -150,12 +212,33 @@ mod tests {
                 )])],
             ))
         };
+
         let futures = vec![
-            cache.get("SELECT 1", plan.clone(), exec.clone()),
-            cache.get("SELECT 2", plan.clone(), exec.clone()),
-            cache.get("SELECT 3", plan.clone(), exec.clone()),
-            cache.get("SELECT 1", plan.clone(), exec.clone()),
-            cache.get("SELECT 1", plan, exec),
+            cache.get(
+                "SELECT 1",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec.clone(),
+            ),
+            cache.get(
+                "SELECT 2",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec.clone(),
+            ),
+            cache.get(
+                "SELECT 3",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec.clone(),
+            ),
+            cache.get(
+                "SELECT 1",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec.clone(),
+            ),
+            cache.get("SELECT 1", SqlQueryContext::default(), plan, exec),
         ];
 
         let res = join_all(futures)

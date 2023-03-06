@@ -2,20 +2,33 @@ const native = require('../dist/js/index');
 const meta_fixture = require('./meta');
 
 (async () => {
-    const load = async (extra) => {
+    const load = async ({ request, session, query }) => {
       console.log('[js] load',  {
-        extra,
+        request,
+        session,
+        query ,
       });
 
-      throw new Error('Unsupported');
+      throw new Error('load is not implemented');
     };
 
-    const meta = async (extra) => {
+    const meta = async ({ request, session }) => {
         console.log('[js] meta',  {
-          extra
+          request,
+          session
         });
 
         return meta_fixture;
+    };
+
+    const stream = async ({ request, session, query }) => {
+      console.log('[js] stream',  {
+        request,
+        session,
+        query ,
+      });
+
+      throw new Error('stream is not implemented');
     };
 
     const checkAuth = async ({ request, user }) => {
@@ -26,38 +39,50 @@ const meta_fixture = require('./meta');
 
       if (user) {
         // without password
-        if (user == 'wp') {
+        if (user === 'wp') {
           return {
             password: null,
-            // securityContext: {}
+            superuser: false,
+          };
+        }
+
+        if (user === 'admin') {
+          return {
+            password: null,
+            superuser: true,
           };
         }
 
         return {
           password: 'test',
+          superuser: false,
         }
       }
 
       throw new Error('Please specify password');
     };
 
-    native.setLogLevel('trace');
+    native.setupLogger(
+      ({ event }) => console.log(event),
+      'trace',
+    );
 
-    const interface = await native.registerInterface({
+    const server = await native.registerInterface({
       // nonce: '12345678910111213141516'.substring(0, 20),
       checkAuth,
       load,
       meta,
+      stream,
     });
     console.log({
-      interface
+      server
     });
 
     process.on('SIGINT', async () => {
       console.log('SIGINT signal');
 
       try {
-        await native.shutdownInterface(interface);
+        await native.shutdownInterface(server);
       } catch (e) {
         console.log(e);
       } finally {

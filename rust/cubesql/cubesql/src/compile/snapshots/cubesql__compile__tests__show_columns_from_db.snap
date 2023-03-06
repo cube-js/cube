@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4118
+expression: "execute_query(\"show columns from KibanaSampleDataEcommerce from db like 'count';\".to_string()).await?"
+
+---
++-------+------+------+-----+---------+-------+
+| Field | Type | Null | Key | Default | Extra |
++-------+------+------+-----+---------+-------+
+| count | int  | NO   |     | NULL    |       |
++-------+------+------+-----+---------+-------+

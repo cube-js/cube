@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"WITH \\\"holistics__explore_60963d\\\" AS (\n                    SELECT\n                        1 AS \\\"dm_pu_ca_754b1e\\\",\n                        2 AS \\\"pu_n_fddcd1\\\"\n                    ), \\\"holistics__explore_edd38b\\\" AS (\n                    SELECT DISTINCT\n                        2 AS \\\"dm_pu_ca_754b1e\\\",\n                        1 AS \\\"pu_n_fddcd1\\\"\n                    )\n                    SELECT\n                        \\\"holistics__explore_60963d\\\".\\\"pu_n_fddcd1\\\" AS \\\"pu_n_fddcd1\\\",\n                        \\\"holistics__explore_edd38b\\\".\\\"dm_pu_ca_754b1e\\\" AS \\\"dm_pu_ca_754b1e\\\"\n                  FROM\n                    \\\"holistics__explore_60963d\\\"\n                    INNER JOIN \\\"holistics__explore_edd38b\\\" ON (\\\"holistics__explore_60963d\\\".\\\"dm_pu_ca_754b1e\\\" = \\\"holistics__explore_edd38b\\\".\\\"pu_n_fddcd1\\\");\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------+-----------------+
+| pu_n_fddcd1 | dm_pu_ca_754b1e |
++-------------+-----------------+
+| 2           | 2               |
++-------------+-----------------+

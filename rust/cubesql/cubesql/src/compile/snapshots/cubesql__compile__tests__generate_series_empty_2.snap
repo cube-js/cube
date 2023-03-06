@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT generate_series(1, 5, 0);\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------------------------+
+| generate_series(Int64(1),Int64(5),Int64(0)) |
++---------------------------------------------+
++---------------------------------------------+

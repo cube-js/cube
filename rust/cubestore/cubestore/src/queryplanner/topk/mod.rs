@@ -5,7 +5,7 @@ pub use execute::AggregateTopKExec;
 pub use plan::materialize_topk;
 pub use plan::plan_topk;
 
-use crate::queryplanner::serialized_plan::IndexSnapshot;
+use crate::queryplanner::planning::Snapshots;
 use arrow::compute::SortOptions;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
 use itertools::Itertools;
@@ -28,8 +28,9 @@ pub struct ClusterAggregateTopK {
     pub group_expr: Vec<Expr>,
     pub aggregate_expr: Vec<Expr>,
     pub order_by: Vec<SortColumn>,
+    pub having_expr: Option<Expr>,
     pub schema: DFSchemaRef,
-    pub snapshots: Vec<Vec<IndexSnapshot>>,
+    pub snapshots: Vec<Snapshots>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -84,14 +85,19 @@ impl UserDefinedLogicalNode for ClusterAggregateTopK {
     }
 
     fn expressions(&self) -> Vec<Expr> {
-        self.group_expr
+        let mut res = self
+            .group_expr
             .iter()
             .chain(&self.aggregate_expr)
             .cloned()
-            .collect_vec()
+            .collect_vec();
+        if self.having_expr.is_some() {
+            res.push(self.having_expr.clone().unwrap());
+        }
+        res
     }
 
-    fn fmt_for_explain(&self, f: &mut Formatter<'a>) -> std::fmt::Result {
+    fn fmt_for_explain<'a>(&self, f: &mut Formatter<'a>) -> std::fmt::Result {
         write!(
             f,
             "ClusterAggregateTopK, limit = {}, groupBy = {:?}, aggr = {:?}, sortBy = {:?}",
@@ -106,14 +112,21 @@ impl UserDefinedLogicalNode for ClusterAggregateTopK {
     ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
         let num_groups = self.group_expr.len();
         let num_aggs = self.aggregate_expr.len();
+        let num_having = if self.having_expr.is_some() { 1 } else { 0 };
         assert_eq!(inputs.len(), 1);
-        assert_eq!(exprs.len(), num_groups + num_aggs);
+        assert_eq!(exprs.len(), num_groups + num_aggs + num_having);
+        let having_expr = if self.having_expr.is_some() {
+            exprs.last().map(|p| p.clone())
+        } else {
+            None
+        };
         Arc::new(ClusterAggregateTopK {
             limit: self.limit,
             input: Arc::new(inputs[0].clone()),
             group_expr: Vec::from(&exprs[0..num_groups]),
             aggregate_expr: Vec::from(&exprs[num_groups..num_groups + num_aggs]),
             order_by: self.order_by.clone(),
+            having_expr,
             schema: self.schema.clone(),
             snapshots: self.snapshots.clone(),
         })

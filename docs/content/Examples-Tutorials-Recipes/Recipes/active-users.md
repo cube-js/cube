@@ -1,5 +1,5 @@
 ---
-title: Calculating Daily, Weekly, Monthly Active Users (DAU, WAU, MAU)
+title: Daily, Weekly, Monthly Active Users (DAU, WAU, MAU)
 permalink: /recipes/active-users
 category: Examples & Tutorials
 subCategory: Analytics
@@ -19,20 +19,20 @@ Daily, weekly, and monthly active users are commonly referred to as DAU, WAU,
 MAU. To get these metrics, we need to use a rolling time frame to calculate a
 daily count of how many users interacted with the product or website in the
 prior day, 7 days, or 30 days. Also, we can build other metrics on top of these
-basic metrics. For example, the WAU to MAU ratio, which we can add by using already
-defined `weeklyActiveUsers` and `monthlyActiveUsers`.
+basic metrics. For example, the WAU to MAU ratio, which we can add by using
+already defined `weeklyActiveUsers` and `monthlyActiveUsers`.
 
 To calculate daily, weekly, or monthly active users we’re going to use the
 [`rollingWindow`](https://cube.dev/docs/schema/reference/measures#parameters-rolling-window)
 measure parameter.
 
 ```javascript
-cube(`Users`, {
-  sql: `SELECT * FROM public.users`,
+cube(`ActiveUsers`, {
+  sql: `SELECT user_id, created_at FROM public.orders`,
 
   measures: {
     monthlyActiveUsers: {
-      sql: `id`,
+      sql: `user_id`,
       type: `countDistinct`,
       rollingWindow: {
         trailing: `30 day`,
@@ -41,7 +41,7 @@ cube(`Users`, {
     },
 
     weeklyActiveUsers: {
-      sql: `id`,
+      sql: `user_id`,
       type: `countDistinct`,
       rollingWindow: {
         trailing: `7 day`,
@@ -50,7 +50,7 @@ cube(`Users`, {
     },
 
     dailyActiveUsers: {
-      sql: `id`,
+      sql: `user_id`,
       type: `countDistinct`,
       rollingWindow: {
         trailing: `1 day`,
@@ -83,14 +83,14 @@ We should set a `timeDimensions` with the `dateRange`.
 curl cube:4000/cubejs-api/v1/load \
 'query={
   "measures": [
-    "Users.monthlyActiveUsers",
-    "Users.weeklyActiveUsers",
-    "Users.dailyActiveUsers",
-    "Users.wauToMau"
+    "ActiveUsers.monthlyActiveUsers",
+    "ActiveUsers.weeklyActiveUsers",
+    "ActiveUsers.dailyActiveUsers",
+    "ActiveUsers.wauToMau"
   ],
   "timeDimensions": [
     {
-      "dimension": "Users.createdAt",
+      "dimension": "ActiveUsers.createdAt",
       "dateRange": [
         "2020-01-01",
         "2020-12-31"
@@ -108,10 +108,10 @@ We got the data with our daily, weekly, and monthly active users.
 {
   "data": [
     {
-      "Users.monthlyActiveUsers": "22",
-      "Users.weeklyActiveUsers": "4",
-      "Users.dailyActiveUsers": "0",
-      "Users.wauToMau": "18.1818181818181818"
+      "ActiveUsers.monthlyActiveUsers": "22",
+      "ActiveUsers.weeklyActiveUsers": "4",
+      "ActiveUsers.dailyActiveUsers": "0",
+      "ActiveUsers.wauToMau": "18.1818181818181818"
     }
   ]
 }

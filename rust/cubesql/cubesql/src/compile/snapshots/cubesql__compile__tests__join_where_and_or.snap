@@ -1,0 +1,33 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT\n                    att.attname,\n                    att.attnum,\n                    cl.oid\n                FROM pg_attribute att\n                JOIN pg_class cl ON\n                    cl.oid = attrelid AND (\n                        cl.relkind = 's' OR\n                        cl.relkind = 'r'\n                    )\n                ORDER BY\n                    cl.oid ASC,\n                    att.attnum ASC\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------------------+--------+-------+
+| attname            | attnum | oid   |
++--------------------+--------+-------+
+| count              | 1      | 18000 |
+| maxPrice           | 2      | 18000 |
+| minPrice           | 3      | 18000 |
+| avgPrice           | 4      | 18000 |
+| countDistinct      | 5      | 18000 |
+| order_date         | 6      | 18000 |
+| last_mod           | 7      | 18000 |
+| customer_gender    | 8      | 18000 |
+| notes              | 9      | 18000 |
+| taxful_total_price | 10     | 18000 |
+| has_subscription   | 11     | 18000 |
+| is_male            | 12     | 18000 |
+| is_female          | 13     | 18000 |
+| __user             | 14     | 18000 |
+| __cubeJoinField    | 15     | 18000 |
+| agentCount         | 1      | 18018 |
+| agentCountApprox   | 2      | 18018 |
+| id                 | 3      | 18018 |
+| read               | 4      | 18018 |
+| content            | 5      | 18018 |
+| __user             | 6      | 18018 |
+| __cubeJoinField    | 7      | 18018 |
+| someNumber         | 1      | 18028 |
+| __user             | 2      | 18028 |
+| __cubeJoinField    | 3      | 18028 |
++--------------------+--------+-------+

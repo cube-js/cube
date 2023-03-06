@@ -5,11 +5,11 @@ const { CubejsServerCore } = require('@cubejs-backend/server-core');
 
 const processHandlers = {
   queryProcess: async ({ queryKey, dataSource }, orchestrator) => {
-    const queue = orchestrator.queryCache.getQueue(dataSource);
+    const queue = await orchestrator.queryCache.getQueue(dataSource);
     await queue.processQuery(queryKey);
   },
   queryCancel: async ({ query, dataSource }, orchestrator) => {
-    const queue = orchestrator.queryCache.getQueue(dataSource);
+    const queue = await orchestrator.queryCache.getQueue(dataSource);
     await queue.processCancel(query);
   },
   externalQueryProcess: async (queryKey, orchestrator) => {
@@ -21,11 +21,11 @@ const processHandlers = {
     await queue.processCancel(query);
   },
   preAggregationProcess: async ({ queryKey, dataSource }, orchestrator) => {
-    const queue = orchestrator.preAggregations.getQueue(dataSource);
+    const queue = await orchestrator.preAggregations.getQueue(dataSource);
     await queue.processQuery(queryKey);
   },
   preAggregationCancel: async ({ query, dataSource }, orchestrator) => {
-    const queue = orchestrator.preAggregations.getQueue(dataSource);
+    const queue = await orchestrator.preAggregations.getQueue(dataSource);
     await queue.processCancel(query);
   }
 };

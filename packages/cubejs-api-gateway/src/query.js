@@ -1,26 +1,21 @@
 import R from 'ramda';
 import moment from 'moment';
-import Joi from '@hapi/joi';
+import Joi from 'joi';
 
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
+import { QueryType } from './types/enums';
 
-export const QUERY_TYPE = {
-  REGULAR_QUERY: 'regularQuery',
-  COMPARE_DATE_RANGE_QUERY: 'compareDateRangeQuery',
-  BLENDING_QUERY: 'blendingQuery',
-};
-
-export const getQueryGranularity = (queries) => R.pipe(
+const getQueryGranularity = (queries) => R.pipe(
   R.map(({ timeDimensions }) => timeDimensions[0] && timeDimensions[0].granularity || null),
   R.filter(Boolean),
   R.uniq
 )(queries);
 
-export const getPivotQuery = (queryType, queries) => {
+const getPivotQuery = (queryType, queries) => {
   let [pivotQuery] = queries;
 
-  if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+  if (queryType === QueryType.BLENDING_QUERY) {
     pivotQuery = R.fromPairs(
       ['measures', 'dimensions'].map(
         (key) => [key, R.uniq(queries.reduce((memo, q) => memo.concat(q[key]), []))]
@@ -33,7 +28,7 @@ export const getPivotQuery = (queryType, queries) => {
       dimension: 'time',
       granularity
     }];
-  } else if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
+  } else if (queryType === QueryType.COMPARE_DATE_RANGE_QUERY) {
     pivotQuery.dimensions = ['compareDateRange'].concat(pivotQuery.dimensions || []);
   }
 
@@ -50,6 +45,10 @@ const operators = [
   'notEquals',
   'contains',
   'notContains',
+  'startsWith',
+  'notStartsWith',
+  'endsWith',
+  'notEndsWith',
   'in',
   'notIn',
   'gt',
@@ -69,13 +68,13 @@ const operators = [
 const oneFilter = Joi.object().keys({
   dimension: id,
   member: id,
-  operator: Joi.valid(operators).required(),
-  values: Joi.array().items(Joi.string().allow('', null), Joi.lazy(() => oneFilter))
+  operator: Joi.valid(...operators).required(),
+  values: Joi.array().items(Joi.string().allow('', null), Joi.link('...'))
 }).xor('dimension', 'member');
 
 const oneCondition = Joi.object().keys({
-  or: Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
-  and: Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
+  or: Joi.array().items(oneFilter, Joi.link('...').description('oneCondition schema')),
+  and: Joi.array().items(oneFilter, Joi.link('...').description('oneCondition schema')),
 }).xor('or', 'and');
 
 const querySchema = Joi.object().keys({
@@ -97,10 +96,12 @@ const querySchema = Joi.object().keys({
   ),
   segments: Joi.array().items(id),
   timezone: Joi.string(),
-  limit: Joi.number().integer().min(1).max(50000),
+  limit: Joi.number().integer().min(1),
   offset: Joi.number().integer().min(0),
+  total: Joi.boolean(),
   renewQuery: Joi.boolean(),
-  ungrouped: Joi.boolean()
+  ungrouped: Joi.boolean(),
+  responseFormat: Joi.valid('default', 'compact'),
 });
 
 const normalizeQueryOrder = order => {
@@ -147,7 +148,7 @@ const checkQueryFilters = (filter) => {
   return true;
 };
 
-export const validatePostRewrite = (query) => {
+const validatePostRewrite = (query) => {
   const validQuery = query.measures && query.measures.length ||
     query.dimensions && query.dimensions.length ||
     query.timeDimensions && query.timeDimensions.filter(td => !!td.granularity).length;
@@ -159,8 +160,14 @@ export const validatePostRewrite = (query) => {
   return query;
 };
 
-export const normalizeQuery = (query) => {
-  const { error } = Joi.validate(query, querySchema);
+/**
+ * Normalize incoming network query.
+ * @param {Query} query
+ * @throws {UserError}
+ * @returns {NormalizedQuery}
+ */
+const normalizeQuery = (query) => {
+  const { error } = querySchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -238,8 +245,8 @@ const queryPreAggregationsSchema = Joi.object().keys({
   }))
 });
 
-export const normalizeQueryPreAggregations = (query, defaultValues) => {
-  const { error } = Joi.validate(query, queryPreAggregationsSchema);
+const normalizeQueryPreAggregations = (query, defaultValues) => {
+  const { error } = queryPreAggregationsSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -259,12 +266,13 @@ const queryPreAggregationPreviewSchema = Joi.object().keys({
     last_updated_at: Joi.number(),
     naming_version: Joi.number(),
     structure_version: Joi.string(),
-    table_name: Joi.string()
+    table_name: Joi.string(),
+    build_range_end: Joi.string(),
   })
 });
 
-export const normalizeQueryPreAggregationPreview = (query) => {
-  const { error } = Joi.validate(query, queryPreAggregationPreviewSchema);
+const normalizeQueryPreAggregationPreview = (query) => {
+  const { error } = queryPreAggregationPreviewSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -277,11 +285,21 @@ const queryCancelPreAggregationPreviewSchema = Joi.object().keys({
   queryKeys: Joi.array().items(Joi.string())
 });
 
-export const normalizeQueryCancelPreAggregations = query => {
-  const { error } = Joi.validate(query, queryCancelPreAggregationPreviewSchema);
+const normalizeQueryCancelPreAggregations = query => {
+  const { error } = queryCancelPreAggregationPreviewSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
 
   return query;
+};
+
+export {
+  getQueryGranularity,
+  getPivotQuery,
+  validatePostRewrite,
+  normalizeQuery,
+  normalizeQueryPreAggregations,
+  normalizeQueryPreAggregationPreview,
+  normalizeQueryCancelPreAggregations,
 };

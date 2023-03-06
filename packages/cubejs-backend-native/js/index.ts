@@ -1,32 +1,60 @@
 import fs from 'fs';
 import path from 'path';
+// import { getEnv } from '@cubejs-backend/shared';
 
-export interface Request {
-    id: string
+export interface BaseMeta {
+    // postgres or mysql
+    protocol: string,
+    // always sql
+    apiType: string,
+    // Application name, for example Metabase
+    appName?: string,
+}
+
+export interface LoadRequestMeta extends BaseMeta {
+    // Security Context switching
+    changeUser?: string,
+}
+
+export interface Request<Meta> {
+    id: string,
+    meta: Meta,
+}
+
+export interface CheckAuthResponse {
+    password: string | null,
+    superuser: boolean
 }
 
 export interface CheckAuthPayload {
-    request: Request,
+    request: Request<undefined>,
     user: string|null
+}
+
+export interface SessionContext {
+    user: string | null,
+    superuser: boolean,
 }
 
 export interface LoadPayload {
-    request: Request,
-    user: string,
-    query: any
+    request: Request<LoadRequestMeta>,
+    session: SessionContext,
+    query: any,
 }
 
 export interface MetaPayload {
-    request: Request,
-    user: string|null
+    request: Request<undefined>,
+    session: SessionContext,
 }
 
 export type SQLInterfaceOptions = {
     port?: number,
+    pgPort?: number,
     nonce?: string,
-    checkAuth: (payload: CheckAuthPayload) => unknown | Promise<unknown>,
+    checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
     load: (payload: LoadPayload) => unknown | Promise<unknown>,
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
+    stream: (payload: LoadPayload) => unknown | Promise<unknown>,
 };
 
 function loadNative() {
@@ -51,8 +79,6 @@ export function isSupported(): boolean {
 function wrapNativeFunctionWithChannelCallback(
     fn: (extra: any) => unknown | Promise<unknown>
 ) {
-    const native = loadNative();
-
     return async (extra: any, channel: any) => {
         try {
             const result = await fn(JSON.parse(extra));
@@ -63,25 +89,86 @@ function wrapNativeFunctionWithChannelCallback(
                 });
             }
 
-            channel.resolve(JSON.stringify(result));
+            if (!result) {
+                channel.resolve("");
+            } else {
+                channel.resolve(JSON.stringify(result));
+            }
           } catch (e: any) {
-            channel.reject(e.message || 'Unknown JS exception');
+            if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+                console.debug("[js] channel.reject", {
+                    e
+                });
+            }
+            try {
+                channel.reject(e.message || 'Unknown JS exception');
+            } catch(e) {
+                if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+                    console.debug("[js] channel.reject exception", {
+                        e
+                    });
+                }
+            }
 
             // throw e;
-
-            console.debug("[js] channel.reject", {
-                e
-            });
           }
+    };
+};
+
+// TODO: Refactor - define classes
+function wrapNativeFunctionWithStream(
+    fn: (extra: any) => unknown | Promise<unknown>
+) {
+    const chunkLength = parseInt(
+        process.env.CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK || '8192',
+        10
+    );
+    return async (extra: any, writer: any) => {
+        let streamResponse: any;
+        try {
+            streamResponse = await fn(JSON.parse(extra));
+            if (streamResponse && streamResponse.stream) {
+                writer.start();
+                let chunk: object[] = [];
+                streamResponse.stream.on('data', (c: object) => {
+                    chunk.push(c);
+                    if (chunk.length >= chunkLength) {
+                        if (!writer.chunk(JSON.stringify(chunk))) {
+                            // TODO replace with actual stream and high watermark implementation
+                            streamResponse.stream.destroy({
+                                stack: "Rejected by client"
+                            });
+                        }
+                        chunk = [];
+                    }
+                });
+                streamResponse.stream.on('close', () => {
+                    if (chunk.length > 0) {
+                        writer.chunk(JSON.stringify(chunk));
+                    }
+                    writer.end("");
+                });
+                streamResponse.stream.on('error', (err: any) => {
+                    writer.reject(err.message || err.toString());
+                });
+            } else {
+                throw new Error(`Expected stream but nothing returned`);
+            }
+        } catch (e: any) {
+            if (!!streamResponse && !!streamResponse.stream) {
+                streamResponse.stream.destroy(e);
+            }
+            writer.reject(e.message || e.toString());
+        }
     };
 };
 
 type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
-export const setLogLevel = (level: LogLevel): void => {
+export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel): void => {
     const native = loadNative();
-    native.setLogLevel(level);
-};
+    native.setupLogger({logger: wrapNativeFunctionWithChannelCallback(logger), logLevel});
+}
 
 export type SqlInterfaceInstance = { __typename: 'sqlinterfaceinstance' };
 
@@ -102,12 +189,17 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
         throw new Error('options.meta must be a function');
     }
 
+    if (typeof options.stream != 'function') {
+        throw new Error('options.stream must be a function');
+    }
+
     const native = loadNative();
     return native.registerInterface({
         ...options,
         checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
         load: wrapNativeFunctionWithChannelCallback(options.load),
         meta: wrapNativeFunctionWithChannelCallback(options.meta),
+        stream: wrapNativeFunctionWithStream(options.stream),
     });
 };
 

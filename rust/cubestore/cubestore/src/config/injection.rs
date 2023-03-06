@@ -3,7 +3,6 @@ use std::any::{type_name, TypeId};
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::raw::TraitObject;
 use std::sync::{Arc, Weak};
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
@@ -153,6 +152,14 @@ impl Injector {
     }
 }
 
+// TODO: Better solution
+// Rust deprecated TraitObject, because core team thinking about chaning metalayer for traits
+// It's a hacky solution to unblock upgrade of rust
+pub struct TraitObject {
+    pub data: *mut (),
+    pub vtable: *mut (),
+}
+
 pub trait DIService: Send + Sync {
     fn downcast_ref(
         &self,
@@ -185,7 +192,7 @@ macro_rules! di_service (
                 target: core::any::TypeId,
                 type_name: &'static str,
                 arc: Arc<dyn $crate::config::injection::DIService>,
-            ) -> Result<core::raw::TraitObject, CubeError> {
+            ) -> Result<$crate::config::injection::TraitObject, CubeError> {
                 unsafe {
                     let ptr = Arc::into_raw(arc);
                     let arc = Arc::<Self>::from_raw(ptr as *const Self);
@@ -199,7 +206,7 @@ macro_rules! di_service (
                     if target == core::any::TypeId::of::<$ty>() {
                         let typ_arc: Arc<$ty> = arc;
                         let ptr = Arc::into_raw(typ_arc);
-                        return Ok(core::raw::TraitObject {
+                        return Ok($crate::config::injection::TraitObject {
                             data: ptr as *const _ as *mut (),
                             vtable: std::ptr::null_mut(),
                         });

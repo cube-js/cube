@@ -1,4 +1,4 @@
-import { Component, useEffect, FunctionComponent, lazy, Suspense } from 'react';
+import { Component, FunctionComponent, lazy, Suspense } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
@@ -12,22 +12,25 @@ import { Dropdown, Menu, Modal } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
 import styled from 'styled-components';
 import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
-import { QueryRenderer } from '@cubejs-client/react';
 import { ChartType, Meta, Query, ResultSet } from '@cubejs-client/core';
-import { format } from 'sql-formatter';
 
+import { FatalError } from './components/Error/FatalError';
 import { SectionRow } from './components';
-import { Button, Card, CubeLoader, FatalError } from './atoms';
+import { Button, Card, CubeLoader } from './atoms';
 import PrismCode from './PrismCode';
-import CachePane from './components/CachePane';
 import { playgroundAction } from './events';
 import { codeSandboxDefinition, copyToClipboard } from './utils';
 import DashboardSource from './DashboardSource';
 import { GraphQLIcon } from './shared/icons/GraphQLIcon';
+import { loadable } from './loadable';
 
-const GraphiQLSandbox = lazy(
+const GraphiQLSandbox = loadable(
   () => import('./components/GraphQL/GraphiQLSandbox')
 );
+
+const SqlQueryTab = loadable(() => import('./components/SqlQueryTab'));
+
+const CachePane = loadable(() => import('./components/CachePane'));
 
 const frameworkToTemplate = {
   react: 'create-react-app',
@@ -37,7 +40,7 @@ const frameworkToTemplate = {
 
 const StyledCard: any = styled(Card)`
   min-height: 420px;
-  
+
   .ant-card-head {
     position: sticky;
     top: 0;
@@ -78,7 +81,7 @@ const UnsupportedFrameworkPlaceholder: UnsupportedPlaceholder = ({
     >
       Vanilla JavaScript &nbsp;docs
     </a>
-    &nbsp;to see on how to use it with Cube.js.
+    &nbsp;to see on how to use it with Cube.
   </h2>
 );
 
@@ -141,6 +144,7 @@ type ChartContainerProps = {
 };
 
 type ChartContainerState = {
+  activeTab: string;
   sql: {
     loading: boolean;
     value?: string;
@@ -210,7 +214,7 @@ class ChartContainer extends Component<
   constructor(props) {
     super(props);
     this.state = {
-      showCode: false,
+      activeTab: 'chart',
       chartRendererError: null,
       sql: {
         loading: false,
@@ -224,7 +228,7 @@ class ChartContainer extends Component<
       codesandboxFiles,
       dependencies,
       redirectToDashboard,
-      showCode,
+      activeTab,
       addingToDashboard,
       chartRendererError,
       sql,
@@ -341,13 +345,11 @@ class ChartContainer extends Component<
             <Button
               data-testid="chart-btn"
               size="small"
-              type={!showCode ? 'primary' : 'default'}
+              type={activeTab === 'chart' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Chart');
-                this.setState({
-                  showCode: null,
-                });
+                this.setState({ activeTab: 'chart' });
               }}
             >
               Chart
@@ -356,12 +358,12 @@ class ChartContainer extends Component<
             <Button
               data-testid="json-query-btn"
               size="small"
-              type={showCode === 'query' ? 'primary' : 'default'}
+              type={activeTab === 'query' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Query');
                 this.setState({
-                  showCode: 'query',
+                  activeTab: 'query',
                 });
               }}
             >
@@ -372,11 +374,11 @@ class ChartContainer extends Component<
               data-testid="graphiql-btn"
               icon={<GraphQLIcon />}
               size="small"
-              type={showCode === 'graphiql' ? 'primary' : 'default'}
+              type={activeTab === 'graphiql' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show GraphiQL');
-                this.setState({ showCode: 'graphiql' });
+                this.setState({ activeTab: 'graphiql' });
               }}
             >
               GraphiQL
@@ -386,11 +388,11 @@ class ChartContainer extends Component<
               data-testid="code-btn"
               icon={<CodeOutlined />}
               size="small"
-              type={showCode === 'code' ? 'primary' : 'default'}
+              type={activeTab === 'code' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Code');
-                this.setState({ showCode: 'code' });
+                this.setState({ activeTab: 'code' });
               }}
             >
               Code
@@ -400,26 +402,26 @@ class ChartContainer extends Component<
               data-testid="sql-btn"
               icon={<QuestionCircleOutlined />}
               size="small"
-              type={showCode === 'sql' ? 'primary' : 'default'}
+              type={activeTab === 'generated-sql' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show SQL');
-                this.setState({ showCode: 'sql' });
+                this.setState({ activeTab: 'generated-sql' });
               }}
             >
-              SQL
+              Generated SQL
             </Button>
 
             <Button
               data-testid="cache-btn"
               icon={<SyncOutlined />}
               size="small"
-              type={showCode === 'cache' ? 'primary' : 'default'}
+              type={activeTab === 'cache' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
               onClick={() => {
                 playgroundAction('Show Cache');
                 this.setState({
-                  showCode: 'cache',
+                  activeTab: 'cache',
                 });
               }}
             >
@@ -493,57 +495,56 @@ class ChartContainer extends Component<
       if (frameworkItem?.placeholder) {
         const Placeholder = frameworkItem.placeholder;
         return <Placeholder framework={framework} />;
-      } else if (showCode === 'code') {
+      } else if (activeTab === 'code') {
         if (error) {
           return <FatalError error={error} />;
         }
 
         return <PrismCode code={codeExample} />;
-      } else if (showCode === 'query') {
+      } else if (activeTab === 'query') {
         return <PrismCode code={queryText} />;
-      } else if (showCode === 'sql') {
+      } else if (activeTab === 'generated-sql') {
         return (
-          <QueryRenderer
-            loadSql="only"
-            query={query}
-            render={({ sqlQuery, loadingState, error }) => {
-              if (error) {
-                return <FatalError error={error} />;
-              }
-
-              // in the case of a compareDateRange query the SQL will be the same
-              const [query] = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery];
-              const value = query && format(query.sql());
-
-              return (
-                <>
-                  <PrismCode code={value} />
-                  <SqlEmitter
-                    loading={loadingState.isLoading}
-                    sql={value}
-                    onChange={({ sql, loading }) => {
-                      this.setState({
-                        sql: {
-                          loading,
-                          value: sql,
-                        },
-                      });
-                    }}
-                  />
-                </>
-              );
-            }}
-          />
+          <Suspense
+            fallback={
+              <div style={{ height: 363 }}>
+                <CubeLoader />
+              </div>
+            }
+          >
+            <SqlQueryTab
+              query={query}
+              onChange={(sql) => {
+                this.setState({ sql });
+              }}
+            />
+          </Suspense>
         );
-      } else if (showCode === 'cache') {
-        return <CachePane query={query} />;
-      } else if (showCode === 'graphiql' && meta) {
-        if (!this.props.isGraphQLSupported) {
-          return <div>GraphQL API is supported since version 0.29.0</div>
-        }
-        
+      } else if (activeTab === 'cache') {
         return (
-          <Suspense fallback={<div style={{ height: 363 }}><CubeLoader /></div>}>
+          <Suspense
+            fallback={
+              <div style={{ height: 363 }}>
+                <CubeLoader />
+              </div>
+            }
+          >
+            <CachePane query={query} />
+          </Suspense>
+        );
+      } else if (activeTab === 'graphiql' && meta) {
+        if (!this.props.isGraphQLSupported) {
+          return <div>GraphQL API is supported since version 0.29.0</div>;
+        }
+
+        return (
+          <Suspense
+            fallback={
+              <div style={{ height: 363 }}>
+                <CubeLoader />
+              </div>
+            }
+          >
             <GraphiQLSandbox
               apiUrl={this.props.apiUrl}
               query={query}
@@ -553,12 +554,12 @@ class ChartContainer extends Component<
         );
       }
 
-      return render({ framework, error });
+      return null;
     };
 
     let title;
 
-    if (showCode === 'code') {
+    if (activeTab === 'code') {
       title = (
         <SectionRow style={{ alignItems: 'center' }}>
           <div>Code</div>
@@ -578,7 +579,7 @@ class ChartContainer extends Component<
           </Button>
         </SectionRow>
       );
-    } else if (showCode === 'query') {
+    } else if (activeTab === 'query') {
       title = (
         <SectionRow>
           <div>Query</div>
@@ -597,7 +598,7 @@ class ChartContainer extends Component<
           </Button>
         </SectionRow>
       );
-    } else if (showCode === 'sql') {
+    } else if (activeTab === 'generated-sql') {
       title = (
         <SectionRow>
           <div>SQL</div>
@@ -618,9 +619,9 @@ class ChartContainer extends Component<
           ) : null}
         </SectionRow>
       );
-    } else if (showCode === 'cache') {
+    } else if (activeTab === 'cache') {
       title = 'Cache';
-    } else if (showCode === 'graphiql') {
+    } else if (activeTab === 'graphiql') {
       title = 'GraphQL API';
     } else {
       title = 'Chart';
@@ -631,28 +632,14 @@ class ChartContainer extends Component<
     ) : (
       <StyledCard title={title} extra={extra}>
         {renderChart()}
+        {activeTab === 'chart' ? (
+          render({ framework, error })
+        ) : (
+          <div style={{ display: 'none' }}>{render({ framework, error })}</div>
+        )}
       </StyledCard>
     );
   }
-}
-
-type SqlEmitterOnChangeProps = {
-  sql?: string;
-  loading: boolean;
-};
-
-type SqlEmitterProps = {
-  loading: boolean;
-  sql?: string;
-  onChange: (props: SqlEmitterOnChangeProps) => void;
-};
-
-function SqlEmitter({ sql, loading, onChange }: SqlEmitterProps) {
-  useEffect(() => {
-    onChange({ sql, loading });
-  }, [sql, loading]);
-
-  return null;
 }
 
 export default withRouter(ChartContainer);

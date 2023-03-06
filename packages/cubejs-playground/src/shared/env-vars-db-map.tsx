@@ -2,6 +2,8 @@ import logoPostgres from '../img/db/postgres.svg';
 import logoMysql from '../img/db/mysql.svg';
 import logoAthena from '../img/db/athena.svg';
 import logoClickhouse from '../img/db/clickhouse.svg';
+import logoCrate from '../img/db/crate.svg';
+import logoFirebolt from '../img/db/firebolt.svg';
 import logoHive from '../img/db/hive.svg';
 import logoRedshift from '../img/db/redshift.svg';
 import logoPresto from '../img/db/presto.svg';
@@ -11,6 +13,8 @@ import logoMssql from '../img/db/mssql.svg';
 import logoBigquery from '../img/db/bigquery.svg';
 import logoMongodb from '../img/db/mongodb.svg';
 import logoDruid from '../img/db/druid.svg';
+import logoQuestdb from '../img/db/questdb.svg';
+import logoMaterialize from '../img/db/materialize.svg';
 
 const BASE_SERVER = [
   { env: 'CUBEJS_DB_HOST', title: 'Hostname' },
@@ -33,6 +37,9 @@ const envVarsDbMap = [
       { title: 'ClickHouse', driver: 'clickhouse', logo: logoClickhouse },
       { title: 'Hive/SparkSQL', driver: 'hive', logo: logoHive },
       { title: 'Oracle', driver: 'oracle', logo: logoOracle },
+      { title: 'QuestDB', driver: 'questdb', logo: logoQuestdb },
+      { title: 'Materialize', driver: 'materialize', logo: logoMaterialize },
+      { title: 'Crate', driver: 'crate', logo: logoCrate },
     ],
     settings: [...BASE_SERVER, DB_NAME, ...BASE_CRED],
   },
@@ -52,7 +59,7 @@ const envVarsDbMap = [
         driver: 'athena',
         logo: logoAthena,
         instructions: `
-Specify the AWS access and secret keys with the <a href="https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html" target="_blank">access necessary to run Athena queries</a>, 
+Specify the AWS access and secret keys with the <a href="https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html" target="_blank">access necessary to run Athena queries</a>,
 and the target AWS region and <a href="https://docs.aws.amazon.com/athena/latest/ug/querying.html" target="_blank">S3 output location</a> where query results are stored.
     `,
       },
@@ -89,6 +96,15 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
       { env: 'CUBEJS_DB_BQ_PROJECT_ID', title: 'Project ID' },
       { env: 'CUBEJS_DB_BQ_CREDENTIALS', title: 'Encoded Key File' },
     ],
+  },
+  {
+    databases: [{ title: 'Firebolt', driver: 'firebolt', logo: logoFirebolt }],
+    settings: [
+      ...BASE_CRED,
+      DB_NAME,
+      { env: 'CUBEJS_FIREBOLT_ACCOUNT', title: 'Account' },
+      { env: 'CUBEJS_FIREBOLT_ENGINE_NAME', title: 'Engine name' },
+    ]
   },
   {
     databases: [{ title: 'MongoDB', driver: 'mongobi', logo: logoMongodb }],

@@ -5,6 +5,7 @@
   "dependencies": {
     "@apollo/react-hooks": "^3.1.3",
     "@babel/core": "7.4.3",
+    "@cube-dev/example-wrapper": "^1.1.10",
     "@cubejs-client/core": "^0.11.2",
     "@cubejs-client/react": "^0.11.3",
     "@svgr/webpack": "4.1.0",
@@ -89,7 +90,8 @@
     "start": "node scripts/start.js",
     "build": "node scripts/build.js",
     "test": "node scripts/test.js",
-    "deploy": "npm run build && netlify deploy --prod --dir build"
+    "preview": "netlify deploy --dir build",
+    "deploy": "netlify deploy --prod --dir build"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -158,5 +160,8 @@
     "presets": [
       "react-app"
     ]
+  },
+  "devDependencies": {
+    "netlify-cli": "^10.8.0"
   }
 }

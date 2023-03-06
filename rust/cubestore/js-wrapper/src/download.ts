@@ -18,6 +18,7 @@ export function getBinaryPath() {
 
 async function fetchRelease(version: string) {
   const client = new Octokit({
+    auth: process.env.CUBEJS_GH_API_TOKEN,
     request: {
       agent: await getHttpAgentForProxySettings(),
     }
@@ -32,64 +33,39 @@ async function fetchRelease(version: string) {
   return data;
 }
 
-function parseInfoFromAssetName(assetName: string): { target: string, type: string, format: string } | null {
-  if (assetName.startsWith('cubestored-')) {
-    const fileName = assetName.slice('cubestored-'.length);
-    const targetAndType = fileName.slice(0, fileName.indexOf('.'));
-    const format = fileName.slice(fileName.indexOf('.') + 1);
-
-    if (targetAndType.endsWith('-shared')) {
-      return {
-        target: targetAndType.substr(0, targetAndType.length - '-shared'.length),
-        format,
-        type: 'shared'
-      };
-    }
-
-    return {
-      target: targetAndType,
-      format,
-      type: 'static'
-    };
-  }
-
-  return null;
-}
-
 export async function downloadBinaryFromRelease() {
   // eslint-disable-next-line global-require
   const { version } = require('../../package.json');
+  const cubestorePath = getCubeStorePath();
+  const currentTarget = getTarget();
 
-  const release = await fetchRelease(version);
-  if (release) {
-    if (release.assets.length === 0) {
-      throw new Error(
-        `There are no artifacts for Cube Store v${version}. Most probably it is still building. Please try again later.`
-      );
-    }
+  const url = `https://github.com/cube-js/cube.js/releases/download/v${version}/cubestored-${currentTarget}.tar.gz`;
 
-    const currentTarget = getTarget();
+  try {
+    await downloadAndExtractFile(url, {
+      cwd: cubestorePath,
+      showProgress: true,
+    });
+  } catch (e: any) {
+    if (e.toString().includes('Not Found')) {
+      const release = await fetchRelease(version);
+      if (release) {
+        if (release.assets.length === 0) {
+          throw new Error(
+            `There are no artifacts for Cube Store v${version}. Most probably it is still building. Please try again later.`
+          );
+        }
 
-    for (const asset of release.assets) {
-      const assetInfo = parseInfoFromAssetName(asset.name);
-      if (assetInfo && assetInfo.target === currentTarget
-        && assetInfo.type === 'static' && assetInfo.format === 'tar.gz'
-      ) {
-        const cubestorePath = getCubeStorePath();
-
-        return downloadAndExtractFile(asset.browser_download_url, {
-          cwd: cubestorePath,
-          showProgress: true,
-        });
+        throw new Error(
+          `Cube Store v${version} Artifact for ${currentTarget} doesn't exist. Most probably it is still building. Please try again later.`
+        );
+      } else {
+        throw new Error(
+          `Unable to find Cube Store release v${version}. Most probably it was removed.`
+        );
       }
+    } else {
+      throw e;
     }
-
-    throw new Error(
-      `Cube Store v${version} Artifact for ${process.platform} is not found. Most probably it is still building. Please try again later.`
-    );
   }
-
-  throw new Error(
-    `Unable to find Cube Store release v${version}. Most probably it was removed.`
-  );
 }

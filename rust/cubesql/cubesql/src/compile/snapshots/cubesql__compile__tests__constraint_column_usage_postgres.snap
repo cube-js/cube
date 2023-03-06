@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM information_schema.constraint_column_usage\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------+--------------+------------+-------------+--------------------+-------------------+-----------------+
+| table_catalog | table_schema | table_name | column_name | constraint_catalog | constraint_schema | constraint_name |
++---------------+--------------+------------+-------------+--------------------+-------------------+-----------------+
++---------------+--------------+------------+-------------+--------------------+-------------------+-----------------+

@@ -5,6 +5,7 @@ import { CompileError } from './CompileError';
 
 export interface CompilerErrorInterface {
   message: string;
+  plainMessage?: string
   fileName?: string;
   lineNumber?: string;
   position?: number;
@@ -12,6 +13,7 @@ export interface CompilerErrorInterface {
 
 export interface SyntaxErrorInterface {
   message: string;
+  plainMessage?: string
   loc: SourceLocation | null,
 }
 
@@ -54,7 +56,8 @@ export class ErrorReporter {
         message: e.message,
         highlightCode: true,
       });
-      const message = `Warning: ${e.message} in ${this.file.fileName}\n${codeFrame}`;
+      const plainMessage = `Warning: ${e.message} in ${this.file.fileName}`;
+      const message = `${plainMessage}\n${codeFrame}`;
 
       if (this.rootReporter().warnings.find(m => (m.message || m) === message)) {
         return;
@@ -62,6 +65,7 @@ export class ErrorReporter {
 
       this.rootReporter().warnings.push({
         message,
+        plainMessage,
         loc: e.loc,
       });
 
@@ -83,7 +87,8 @@ export class ErrorReporter {
         message: e.message,
         highlightCode: true,
       });
-      const message = `Syntax Error: ${e.message} in ${this.file.fileName}\n${codeFrame}`;
+      const plainMessage = `Syntax Error: ${e.message} in ${this.file.fileName}`;
+      const message = `${plainMessage}\n${codeFrame}`;
 
       if (this.rootReporter().errors.find(m => (m.message || m) === message)) {
         return;
@@ -91,6 +96,7 @@ export class ErrorReporter {
 
       this.rootReporter().errors.push({
         message,
+        plainMessage,
       });
     } else {
       if (this.rootReporter().errors.find(m => (m.message || m) === e.message)) {
@@ -125,7 +131,8 @@ export class ErrorReporter {
   public throwIfAny() {
     if (this.rootReporter().errors.length) {
       throw new CompileError(
-        this.rootReporter().errors.map((e) => e.message).join('\n')
+        this.rootReporter().errors.map((e) => e.message).join('\n'),
+        this.rootReporter().errors.map((e) => e.plainMessage).join('\n')
       );
     }
   }

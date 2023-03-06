@@ -15,7 +15,7 @@ declare module "@cubejs-client/core" {
     filters?: Filter[];
     timeDimensions?: TimeDimension[];
     segments?: IntrospectedSegmentName[];
-    limit?: number;
+    limit?: null | number;
     offset?: number;
     order?: IntrospectedTQueryOrderObject | IntrospectedTQueryOrderArray;
     timezone?: string;

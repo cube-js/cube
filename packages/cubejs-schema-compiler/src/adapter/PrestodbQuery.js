@@ -13,8 +13,10 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class PrestodbFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param) {
-    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('%', LOWER(${this.allocateParam(param)}) ,'%') ESCAPE '\\'`;
+  likeIgnoreCase(column, not, param, type) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}') ESCAPE '\\'`;
   }
 
   castParameter() {
@@ -39,7 +41,7 @@ export class PrestodbQuery extends BaseQuery {
   }
 
   timeStampCast(value) {
-    return `CAST(${value} as TIMESTAMP)`; // TODO
+    return `from_iso8601_timestamp(${value})`;
   }
 
   dateTimeCast(value) {
@@ -49,7 +51,7 @@ export class PrestodbQuery extends BaseQuery {
   convertTz(field) {
     const atTimezone = `${field} AT TIME ZONE '${this.timezone}'`;
     return this.timezone ?
-      `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${atTimezone})) AS TIMESTAMP)` :
+      `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${field})) AS TIMESTAMP)` :
       field;
   }
 

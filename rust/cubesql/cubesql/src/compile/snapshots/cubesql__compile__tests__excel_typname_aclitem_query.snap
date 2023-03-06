@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT\n                    typname as name,\n                    t.oid as oid,\n                    typtype as Type,\n                    typelem as TypeElement\n                FROM pg_type t\n                WHERE\n                    t.oid::varchar like '1034' and\n                    typtype::varchar like 'b' and\n                    typelem != 0\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------+------+------+-------------+
+| name     | oid  | Type | TypeElement |
++----------+------+------+-------------+
+| _aclitem | 1034 | b    | 1033        |
++----------+------+------+-------------+

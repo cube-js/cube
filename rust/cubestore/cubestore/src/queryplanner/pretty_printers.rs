@@ -1,5 +1,8 @@
 //! Presentation of query plans for use in tests.
 
+use bigdecimal::ToPrimitive;
+
+use datafusion::cube_ext::alias::LogicalAlias;
 use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::{LogicalPlan, PlanVisitor};
 use datafusion::physical_plan::filter::FilterExec;
@@ -9,23 +12,35 @@ use datafusion::physical_plan::hash_aggregate::{
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::limit::{GlobalLimitExec, LocalLimitExec};
 use datafusion::physical_plan::merge_join::MergeJoinExec;
-use datafusion::physical_plan::merge_sort::{MergeReSortExec, MergeSortExec};
+use datafusion::physical_plan::merge_sort::{
+    LastRowByUniqueKeyExec, MergeReSortExec, MergeSortExec,
+};
 use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::ExecutionPlan;
 use itertools::{repeat_n, Itertools};
 
-use crate::queryplanner::planning::{ClusterSendNode, WorkerExec};
-use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, CubeTableExec};
+use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
+use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
+use crate::queryplanner::planning::{ClusterSendNode, Snapshot, WorkerExec};
+use crate::queryplanner::query_executor::{
+    ClusterSendExec, CubeTable, CubeTableExec, InlineTableProvider,
+};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowRange};
+use crate::queryplanner::tail_limit::TailLimitExec;
 use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::topk::{AggregateTopKExec, SortColumn};
 use crate::queryplanner::CubeTableLogical;
 use datafusion::cube_ext::join::CrossJoinExec;
 use datafusion::cube_ext::joinagg::CrossJoinAggExec;
+use datafusion::cube_ext::rolling::RollingWindowAggExec;
+use datafusion::cube_ext::rolling::RollingWindowAggregate;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::Column;
+use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge::MergeExec;
+use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
+use datafusion::physical_plan::skip::SkipExec;
 use datafusion::physical_plan::union::UnionExec;
 
 #[derive(Default, Clone, Copy)]
@@ -162,7 +177,15 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                             "ClusterSend, indices: {:?}",
                             cs.snapshots
                                 .iter()
-                                .map(|is| is.iter().map(|i| i.index.get_id()).collect_vec())
+                                .map(|is| is
+                                    .iter()
+                                    .map(|s| match s {
+                                        Snapshot::Index(i) => i.index.get_id(),
+                                        Snapshot::Inline(i) => i.id,
+                                    }
+                                    .to_i64()
+                                    .map_or(-1, |i| i))
+                                    .collect_vec())
                                 .collect_vec()
                         )
                     } else if let Some(topk) = node.as_any().downcast_ref::<ClusterAggregateTopK>()
@@ -177,8 +200,19 @@ pub fn pp_plan_ext(p: &LogicalPlan, opts: &PPOptions) -> String {
                                 pp_sort_columns(topk.group_expr.len(), &topk.order_by)
                             );
                         }
+                        if self.opts.show_filters {
+                            if let Some(having) = &topk.having_expr {
+                                self.output += &format!(", having: {:?}", having)
+                            }
+                        }
+                    } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
+                        self.output += &format!("PanicWorker")
+                    } else if let Some(_) = node.as_any().downcast_ref::<RollingWindowAggregate>() {
+                        self.output += &format!("RollingWindowAggreagate");
+                    } else if let Some(alias) = node.as_any().downcast_ref::<LogicalAlias>() {
+                        self.output += &format!("LogicalAlias, alias: {}", alias.alias);
                     } else {
-                        panic!("unknown extension node");
+                        log::error!("unknown extension node")
                     }
                 }
                 LogicalPlan::Window { .. } | LogicalPlan::CrossJoin { .. } => {
@@ -219,6 +253,8 @@ fn pp_source(t: &dyn TableProvider) -> String {
         "CubeTableLogical".to_string()
     } else if let Some(t) = t.as_any().downcast_ref::<CubeTable>() {
         format!("CubeTable(index: {})", pp_index(t.index_snapshot()))
+    } else if let Some(t) = t.as_any().downcast_ref::<InlineTableProvider>() {
+        format!("InlineTableProvider(data: {} rows)", t.get_data().len())
     } else {
         panic!("unknown table provider");
     }
@@ -308,6 +344,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += &format!("LocalLimit, n: {}", l.limit());
         } else if let Some(l) = a.downcast_ref::<GlobalLimitExec>() {
             *out += &format!("GlobalLimit, n: {}", l.limit());
+        } else if let Some(l) = a.downcast_ref::<TailLimitExec>() {
+            *out += &format!("TailLimit, n: {}", l.limit);
         } else if let Some(f) = a.downcast_ref::<FilterExec>() {
             *out += "Filter";
             if o.show_filters {
@@ -340,12 +378,16 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                 "ClusterSend, partitions: [{}]",
                 cs.partitions
                     .iter()
-                    .map(|(_, ps)| {
+                    .map(|(_, (ps, inline))| {
                         let ps = ps
                             .iter()
                             .map(|(id, range)| format!("{}{}", id, pp_row_range(range)))
                             .join(", ");
-                        format!("[{}]", ps)
+                        if !inline.is_empty() {
+                            format!("[{}, inline: {}]", ps, inline.iter().join(", "))
+                        } else {
+                            format!("[{}]", ps)
+                        }
                     })
                     .join(", ")
             );
@@ -360,8 +402,15 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
                     pp_sort_columns(topk.key_len, &topk.order_by)
                 );
             }
+            if o.show_filters {
+                if let Some(having) = &topk.having {
+                    *out += &format!(", having: {}", having);
+                }
+            }
+        } else if let Some(_) = a.downcast_ref::<PanicWorkerExec>() {
+            *out += "PanicWorker";
         } else if let Some(_) = a.downcast_ref::<WorkerExec>() {
-            *out += "Worker";
+            *out += &format!("Worker");
         } else if let Some(_) = a.downcast_ref::<MergeExec>() {
             *out += "Merge";
         } else if let Some(_) = a.downcast_ref::<MergeSortExec>() {
@@ -385,8 +434,28 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             }
         } else if let Some(_) = a.downcast_ref::<UnionExec>() {
             *out += "Union";
+        } else if let Some(_) = a.downcast_ref::<FilterByKeyRangeExec>() {
+            *out += "FilterByKeyRange";
+        } else if let Some(p) = a.downcast_ref::<ParquetExec>() {
+            *out += &format!(
+                "ParquetScan, files: {}",
+                p.partitions()
+                    .iter()
+                    .map(|p| p.filenames.iter())
+                    .flatten()
+                    .join(",")
+            );
+        } else if let Some(_) = a.downcast_ref::<SkipExec>() {
+            *out += "SkipRows";
+        } else if let Some(_) = a.downcast_ref::<RollingWindowAggExec>() {
+            *out += "RollingWindowAgg";
+        } else if let Some(_) = a.downcast_ref::<LastRowByUniqueKeyExec>() {
+            *out += "LastRowByUniqueKey";
+        } else if let Some(_) = a.downcast_ref::<MemoryExec>() {
+            *out += "MemoryScan";
         } else {
-            panic!("unhandled ExecutionPlan: {:?}", p);
+            let to_string = format!("{:?}", p);
+            *out += &to_string.split(" ").next().unwrap_or(&to_string);
         }
 
         if o.show_output_hints {

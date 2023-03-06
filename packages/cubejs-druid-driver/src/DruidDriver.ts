@@ -1,15 +1,26 @@
-import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { getEnv } from '@cubejs-backend/shared';
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `DruidDriver` and related types declaration.
+ */
 
-import { DruidClient, DruidClientBaseConfiguration } from './DruidClient';
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
+import { BaseDriver, TableQueryResult } from '@cubejs-backend/base-driver';
+import { DruidClient, DruidClientBaseConfiguration, DruidClientConfiguration } from './DruidClient';
 import { DruidQuery } from './DruidQuery';
 
 export type DruidDriverConfiguration = DruidClientBaseConfiguration & {
-  url: string,
+  url?: string,
 };
 
+/**
+ * Druid driver class.
+ */
 export class DruidDriver extends BaseDriver {
-  protected readonly config: DruidDriverConfiguration;
+  protected readonly config: DruidClientConfiguration;
 
   protected readonly client: DruidClient;
 
@@ -17,30 +28,71 @@ export class DruidDriver extends BaseDriver {
     return DruidQuery;
   }
 
-  public constructor(config?: DruidDriverConfiguration) {
-    super();
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
 
-    let url = config?.url || process.env.CUBEJS_DB_URL;
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: DruidDriverConfiguration & {
+      /**
+       * Data source name.
+       */
+      dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
+      maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
+    } = {}
+  ) {
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
+    let url = config.url || getEnv('dbUrl', { dataSource });
+
     if (!url) {
-      const host = process.env.CUBEJS_DB_HOST;
-      const port = process.env.CUBEJS_DB_PORT;
-
+      const host = getEnv('dbHost', { dataSource });
+      const port = getEnv('dbPort', { dataSource });
       if (host && port) {
-        const protocol = getEnv('dbSsl') ? 'https' : 'http';
+        const protocol = getEnv('dbSsl', { dataSource })
+          ? 'https'
+          : 'http';
         url = `${protocol}://${host}:${port}`;
       } else {
         throw new Error('Please specify CUBEJS_DB_URL');
       }
     }
-
     this.config = {
       url,
-      user: config?.user || process.env.CUBEJS_DB_USER,
-      password: config?.password || process.env.CUBEJS_DB_PASS,
-      database: config?.database || process.env.CUBEJS_DB_NAME || config?.database || 'default',
+      user:
+        config.user ||
+        getEnv('dbUser', { dataSource }),
+      password:
+        config.password ||
+        getEnv('dbPass', { dataSource }),
+      database:
+        config.database ||
+        getEnv('dbName', { dataSource }) ||
+        'default',
       ...config,
     };
-
     this.client = new DruidClient(this.config);
   }
 
@@ -52,7 +104,7 @@ export class DruidDriver extends BaseDriver {
     //
   }
 
-  public async query(query: string, values: unknown[] = []): Promise<Array<unknown>> {
+  public async query<R = unknown>(query: string, values: unknown[] = []): Promise<Array<R>> {
     return this.client.query(query, this.normalizeQueryValues(values));
   }
 
@@ -68,12 +120,12 @@ export class DruidDriver extends BaseDriver {
     `;
   }
 
-  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
     throw new Error('Unable to create schema, Druid does not support it');
   }
 
   public async getTablesQuery(schemaName: string) {
-    return this.query('SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?', [
+    return this.query<TableQueryResult>('SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?', [
       schemaName
     ]);
   }

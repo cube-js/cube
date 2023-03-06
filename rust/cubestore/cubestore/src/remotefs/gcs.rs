@@ -122,7 +122,7 @@ impl RemoteFs for GCSRemoteFs {
         &self,
         temp_upload_path: &str,
         remote_path: &str,
-    ) -> Result<(), CubeError> {
+    ) -> Result<u64, CubeError> {
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
         let file = File::open(temp_upload_path).await?;
@@ -136,6 +136,10 @@ impl RemoteFs for GCSRemoteFs {
             "application/octet-stream",
         )
         .await?;
+
+        let size = fs::metadata(temp_upload_path).await?.len();
+        self.check_upload_file(remote_path, size).await?;
+
         let local_path = self.dir.as_path().join(remote_path);
         if Path::new(temp_upload_path) != local_path {
             fs::create_dir_all(local_path.parent().unwrap())
@@ -147,13 +151,17 @@ impl RemoteFs for GCSRemoteFs {
                         e
                     ))
                 })?;
-            fs::rename(&temp_upload_path, local_path).await?;
+            fs::rename(&temp_upload_path, local_path.clone()).await?;
         }
         info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
-        Ok(())
+        Ok(fs::metadata(local_path).await?.len())
     }
 
-    async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
+    async fn download_file(
+        &self,
+        remote_path: &str,
+        _expected_file_size: Option<u64>,
+    ) -> Result<String, CubeError> {
         let mut local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
         let downloads_dirs = local_dir.join("downloads");
@@ -234,6 +242,7 @@ impl RemoteFs for GCSRemoteFs {
                     .map(|obj| RemoteFile {
                         remote_path: leading_slash.replace(&obj.name, NoExpand("")).to_string(),
                         updated: obj.updated.clone(),
+                        file_size: obj.size,
                     })
                     .collect())
             })

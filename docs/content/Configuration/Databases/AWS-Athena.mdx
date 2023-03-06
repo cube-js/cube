@@ -14,7 +14,7 @@ permalink: /config/databases/aws-athena
 
 ### <--{"id" : "Setup"}--> Manual
 
-Add the following to a `.env` file in your Cube.js project:
+Add the following to a `.env` file in your Cube project:
 
 ```bash
 CUBEJS_DB_TYPE=athena
@@ -23,17 +23,21 @@ CUBEJS_AWS_SECRET=****************************************
 CUBEJS_AWS_REGION=us-east-1
 CUBEJS_AWS_S3_OUTPUT_LOCATION=s3://my-athena-output-bucket
 CUBEJS_AWS_ATHENA_WORKGROUP=primary
+CUBEJS_AWS_ATHENA_CATALOG=AwsDataCatalog
 ```
 
 ## Environment Variables
 
-| Environment Variable            | Description                                                       | Possible Values                                  | Required |
-| ------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------ | :------: |
-| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections             | A valid AWS Access Key ID                        |    ✅    |
-| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections         | A valid AWS Secret Access Key                    |    ✅    |
-| `CUBEJS_AWS_REGION`             | The AWS region of the Cube.js deployment                          | [A valid AWS region][aws-docs-regions]           |    ✅    |
-| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube.js deployment | A valid S3 path                                  |    ❌    |
-| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started     | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
+| Environment Variable            | Description                                                                         | Possible Values                                  | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------ | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections                               | A valid AWS Access Key ID                        |    ✅    |                                    ✅                                    |
+| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections                           | A valid AWS Secret Access Key                    |    ✅    |                                    ✅                                    |
+| `CUBEJS_AWS_REGION`             | The AWS region of the Cube deployment                                               | [A valid AWS region][aws-docs-regions]           |    ✅    |                                    ✅                                    |
+| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube deployment                      | A valid S3 path                                  |    ❌    |                                    ✅                                    |
+| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                       | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |                                    ✅                                    |
+| `CUBEJS_AWS_ATHENA_CATALOG`     | The name of the catalog to use by default                                           | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_SCHEMA`     | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation.                                           | A valid schema name    |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5` | A valid number                                   |    ❌    |                                    ❌                                    |
 
 ## Pre-Aggregation Feature Support
 
@@ -56,34 +60,55 @@ here][ref-caching-using-preaggs-build-strats].
 
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
-| Simple        |             ❌             |     ✅      |
-| Batching      |             -              |      -      |
-| Export Bucket |             -              |      -      |
+| Batching      |             ❌             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
 
-By default, AWS Athena uses a [simple][self-preaggs-simple] strategy to build
-pre-aggregations.
-
-### Simple
-
-No extra configuration is required to configure simple pre-aggregation builds
-for AWS Athena.
+By default, AWS Athena uses a [batching][self-preaggs-batching] strategy to
+build pre-aggregations.
 
 ### Batching
 
-AWS Athena does not support batching.
+No extra configuration is required to configure batching for AWS Athena.
 
 ### Export Bucket
 
-AWS Athena does not support export buckets.
+<WarningBox>
+
+AWS Athena **only** supports using AWS S3 for export buckets.
+
+</WarningBox>
+
+#### AWS S3
+
+For [improved pre-aggregation performance with large
+datasets][ref-caching-large-preaggs], enable export bucket functionality by
+configuring Cube with the following environment variables:
+
+<InfoBox>
+
+Ensure the AWS credentials are correctly configured in IAM to allow reads and
+writes to the export bucket in S3.
+
+</InfoBox>
+
+```bash
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
 
 ## SSL
 
-Cube.js does not require any additional configuration to enable SSL as AWS
-Athena connections are made over HTTPS.
+Cube does not require any additional configuration to enable SSL as AWS Athena
+connections are made over HTTPS.
 
 [aws-athena]: https://aws.amazon.com/athena
 [aws-athena-workgroup]:
   https://docs.aws.amazon.com/athena/latest/ug/workgroups-benefits.html
+[awsdatacatalog]:
+  https://docs.aws.amazon.com/athena/latest/ug/understanding-tables-databases-and-the-data-catalog.html
 [aws-s3]: https://aws.amazon.com/s3/
 [aws-docs-athena-access]:
   https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html
@@ -93,8 +118,11 @@ Athena connections are made over HTTPS.
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
 [aws-athena-docs-approx-agg-fns]:
   https://prestodb.io/docs/0.217/functions/aggregate.html#approximate-aggregate-functions
+[ref-caching-large-preaggs]: /caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-config-multiple-ds-decorating-env]:
+  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
 [ref-schema-ref-types-formats-countdistinctapprox]:
   /schema/reference/types-and-formats#count-distinct-approx
-[self-preaggs-simple]: #simple
+[self-preaggs-batching]: #batching

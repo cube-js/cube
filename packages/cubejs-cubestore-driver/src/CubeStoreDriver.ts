@@ -7,15 +7,17 @@ import csvWriter from 'csv-write-stream';
 import {
   BaseDriver,
   DownloadTableCSVData,
-  DownloadTableMemoryData, DriverInterface, IndexesSQL,
+  ExternalCreateTableOptions,
+  DownloadTableMemoryData, DriverInterface, IndexesSQL, CreateTableIndex,
   StreamTableData,
   StreamingSourceTableData,
-} from '@cubejs-backend/query-orchestrator';
+  QueryOptions,
+  ExternalDriverCompatibilities,
+} from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
-import { format as formatSql } from 'sqlstring';
+import { format as formatSql, escape } from 'sqlstring';
 import fetch from 'node-fetch';
 
-import { CubeStoreQuery } from './CubeStoreQuery';
 import { ConnectionConfig } from './types';
 import { WebSocketConnection } from './WebSocketConnection';
 
@@ -28,6 +30,18 @@ const GenericTypeToCubeStore: Record<string, string> = {
 type Column = {
   type: string;
   name: string;
+};
+
+type CreateTableOptions = {
+  streamOffset?: string;
+  inputFormat?: string
+  buildRangeEnd?: string
+  uniqueKey?: string
+  indexes?: string
+  files?: string[]
+  aggregations?: string
+  selectStatement?: string
+  sealAt?: string
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
@@ -57,8 +71,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     await this.query('SELECT 1', []);
   }
 
-  public async query(query: string, values: any[], queryTracingObj?: any) {
-    return this.connection.query(formatSql(query, values || []), { ...queryTracingObj, instance: getEnv('instanceId') });
+  public async query(query: string, values: any[], options?: QueryOptions) {
+    const { inlineTables, ...queryTracingObj } = options ?? {};
+    return this.connection.query(formatSql(query, values || []), inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
   }
 
   public async release() {
@@ -69,10 +84,70 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
   }
 
-  public getPrefixTablesQuery(schemaName, tablePrefixes) {
-    const prefixWhere = tablePrefixes.map(p => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
+  public createTableSqlWithOptions(tableName, columns, options: CreateTableOptions) {
+    let sql = this.createTableSql(tableName, columns);
+    const params: string[] = [];
+    const withEntries: string[] = [];
+
+    if (options.inputFormat) {
+      withEntries.push(`input_format = '${options.inputFormat}'`);
+    }
+    if (options.buildRangeEnd) {
+      withEntries.push(`build_range_end = '${options.buildRangeEnd}'`);
+    }
+    if (options.sealAt) {
+      withEntries.push(`seal_at = '${options.sealAt}'`);
+    }
+    if (options.selectStatement) {
+      withEntries.push(`select_statement = ${escape(options.selectStatement)}`);
+    }
+    if (options.streamOffset) {
+      withEntries.push(`stream_offset = '${options.streamOffset}'`);
+    }
+    if (withEntries.length > 0) {
+      sql = `${sql} WITH (${withEntries.join(', ')})`;
+    }
+    if (options.uniqueKey) {
+      sql = `${sql} UNIQUE KEY (${options.uniqueKey})`;
+    }
+    if (options.aggregations) {
+      sql = `${sql} ${options.aggregations}`;
+    }
+    if (options.indexes) {
+      sql = `${sql} ${options.indexes}`;
+    }
+    if (options.files) {
+      sql = `${sql} LOCATION ${options.files.map(() => '?').join(', ')}`;
+      params.push(...options.files);
+    }
+    return sql;
+  }
+
+  public createTableWithOptions(tableName: string, columns: Column[], options: CreateTableOptions, queryTracingObj: any) {
+    const sql = this.createTableSqlWithOptions(tableName, columns, options);
+    const params: string[] = [];
+
+    if (options.files) {
+      params.push(...options.files);
+    }
+
+    return this.query(sql, params, queryTracingObj).catch(e => {
+      e.message = `Error during create table: ${sql}: ${e.message}`;
+      throw e;
+    });
+  }
+
+  public async getTablesQuery(schemaName) {
     return this.query(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
+      `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
+      [schemaName]
+    );
+  }
+
+  public async getPrefixTablesQuery(schemaName, tablePrefixes) {
+    const prefixWhere = tablePrefixes.map(_ => 'table_name LIKE CONCAT(?, \'%\')').join(' OR ');
+    return this.query(
+      `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
       [schemaName].concat(tablePrefixes)
     );
   }
@@ -100,30 +175,43 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     return super.toColumnValue(value, genericType);
   }
 
-  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns?: string[], queryTracingObj?: any) {
-    const indexes =
-      indexesSql.map((s: any) => s.sql[0].replace(/^CREATE INDEX (.*?) ON (.*?) \((.*)$/, 'INDEX $1 ($3')).join(' ');
+  public async uploadTableWithIndexes(table: string, columns: Column[], tableData: any, indexesSql: IndexesSQL, uniqueKeyColumns: string[] | null, queryTracingObj?: any, externalOptions?: ExternalCreateTableOptions) {
+    const createTableIndexes = externalOptions?.createTableIndexes;
+    const aggregationsColumns = externalOptions?.aggregationsColumns;
+
+    const indexes = createTableIndexes && createTableIndexes.length ? createTableIndexes.map(this.createIndexString).join(' ') : '';
+
+    let hasAggregatingIndexes = false;
+    if (createTableIndexes && createTableIndexes.length) {
+      hasAggregatingIndexes = createTableIndexes.some((index) => index.type === 'aggregate');
+    }
+
+    const aggregations = hasAggregatingIndexes && aggregationsColumns && aggregationsColumns.length ? ` AGGREGATIONS (${aggregationsColumns.join(', ')})` : '';
 
     if (tableData.rowStream) {
-      await this.importStream(columns, tableData, table, indexes, queryTracingObj);
+      await this.importStream(columns, tableData, table, indexes, aggregations, queryTracingObj);
     } else if (tableData.csvFile) {
-      await this.importCsvFile(tableData, table, columns, indexes, queryTracingObj);
+      await this.importCsvFile(tableData, table, columns, indexes, aggregations, queryTracingObj);
     } else if (tableData.streamingSource) {
-      await this.importStreamingSource(columns, tableData, table, indexes, uniqueKeyColumns, queryTracingObj);
+      await this.importStreamingSource(columns, tableData, table, indexes, uniqueKeyColumns, queryTracingObj, externalOptions?.sealAt);
     } else if (tableData.rows) {
-      await this.importRows(table, columns, indexesSql, tableData, queryTracingObj);
+      await this.importRows(table, columns, indexes, aggregations, tableData, queryTracingObj);
     } else {
       throw new Error(`Unsupported table data passed to ${this.constructor}`);
     }
   }
 
-  private async importRows(table: string, columns: Column[], indexesSql: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
-    await this.createTable(table, columns);
+  private createIndexString(index: CreateTableIndex) {
+    const prefix = {
+      regular: '',
+      aggregate: 'AGGREGATE '
+    }[index.type] || '';
+    return `${prefix}INDEX ${index.indexName} (${index.columns.join(',')})`;
+  }
+
+  private async importRows(table: string, columns: Column[], indexesSql: any, aggregations: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
+    await this.createTableWithOptions(table, columns, { indexes: indexesSql, aggregations, buildRangeEnd: queryTracingObj?.buildRangeEnd }, queryTracingObj);
     try {
-      for (let i = 0; i < indexesSql.length; i++) {
-        const [query, params] = indexesSql[i].sql;
-        await this.query(query, params, queryTracingObj);
-      }
       const batchSize = 2000; // TODO make dynamic?
       for (let j = 0; j < Math.ceil(tableData.rows.length / batchSize); j++) {
         const currentBatchSize = Math.min(tableData.rows.length - j * batchSize, batchSize);
@@ -148,39 +236,40 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes, queryTracingObj?: any) {
+  private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes: any, aggregations: any, queryTracingObj?: any) {
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
-    const createTableSql = this.createTableSql(table, columns);
-
+    const options: CreateTableOptions = {
+      buildRangeEnd: queryTracingObj?.buildRangeEnd,
+      indexes,
+      aggregations
+    };
     if (files.length > 0) {
-      // eslint-disable-next-line no-unused-vars
-      const createTableSqlWithLocation = `${createTableSql} ${indexes} LOCATION ${files.map(() => '?').join(', ')}`;
-      return this.query(createTableSqlWithLocation, files, queryTracingObj).catch(e => {
-        e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
-        throw e;
-      });
+      options.inputFormat = tableData.csvNoHeader ? 'csv_no_header' : 'csv';
+      options.files = files;
     }
 
-    const createTableSqlWithoutLocation = `${createTableSql} ${indexes}`;
-    return this.query(createTableSqlWithoutLocation, [], queryTracingObj).catch(e => {
-      e.message = `Error during create table: ${createTableSqlWithoutLocation}: ${e.message}`;
-      throw e;
-    });
+    return this.createTableWithOptions(table, columns, options, queryTracingObj);
   }
 
-  private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes: string, queryTracingObj?: any) {
+  private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes: string, aggregations: string, queryTracingObj?: any) {
     const tempFiles: string[] = [];
     try {
       const pipelinePromises: Promise<any>[] = [];
       const filePromises: Promise<string>[] = [];
       let currentFileStream: { stream: NodeJS.WritableStream, tempFile: string } | null = null;
 
+      const options: CreateTableOptions = {
+        buildRangeEnd: queryTracingObj?.buildRangeEnd,
+        indexes,
+        aggregations
+      };
+
       const { baseUrl } = this;
       let fileCounter = 0;
 
-      const createTableSql = this.createTableSql(table, columns);
+      this.createTableSql(table, columns);
       // eslint-disable-next-line no-unused-vars
-      const createTableSqlWithoutLocation = `${createTableSql}${indexes ? ` ${indexes}` : ''}`;
+      const createTableSqlWithoutLocation = this.createTableSqlWithOptions(table, columns, options);
 
       const getFileStream = () => {
         if (!currentFileStream) {
@@ -220,7 +309,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       let rowCount = 0;
 
       const endStream = (chunk, encoding, callback) => {
-        const { stream, tempFile } = getFileStream();
+        const { stream } = getFileStream();
         currentFileStream = null;
         rowCount = 0;
         if (chunk) {
@@ -256,21 +345,17 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       await Promise.all(pipelinePromises);
 
       const files = await Promise.all(filePromises);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const sqlWithLocation = files.length ? `${createTableSqlWithoutLocation} LOCATION ${files.map(f => '?').join(', ')}` : createTableSqlWithoutLocation;
-      await this.query(
-        sqlWithLocation,
-        files.map(fileName => `temp://${fileName}`), queryTracingObj
-      ).catch(e => {
-        e.message = `Error during create table: ${sqlWithLocation}: ${e.message}`;
-        throw e;
-      });
+      if (files.length > 0) {
+        options.files = files.map(fileName => `temp://${fileName}`);
+      }
+
+      return this.createTableWithOptions(table, columns, options, queryTracingObj);
     } finally {
       await Promise.all(tempFiles.map(tempFile => unlink(tempFile)));
     }
   }
 
-  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns?: string[], queryTracingObj?: any) {
+  private async importStreamingSource(columns: Column[], tableData: StreamingSourceTableData, table: string, indexes: string, uniqueKeyColumns: string[] | null, queryTracingObj?: any, sealAt?: string) {
     if (!uniqueKeyColumns) {
       throw new Error('Older version of orchestrator is being used with newer version of Cube Store driver. Please upgrade cube.js.');
     }
@@ -283,21 +368,28 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       queryTracingObj
     );
 
-    const createTableSql = this.createTableSql(table, columns);
-    // eslint-disable-next-line no-unused-vars
-    const createTableSqlWithLocation = `${createTableSql} ${indexes} UNIQUE KEY (${uniqueKeyColumns.join(',')}) LOCATION ?`;
+    let locations = [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`];
 
-    await this.query(createTableSqlWithLocation, [`stream://${tableData.streamingSource.name}/${tableData.streamingTable}`], queryTracingObj).catch(e => {
-      e.message = `Error during create table: ${createTableSqlWithLocation}: ${e.message}`;
-      throw e;
-    });
+    if (tableData.partitions) {
+      locations = [];
+      for (let i = 0; i < tableData.partitions; i++) {
+        locations.push(`stream://${tableData.streamingSource.name}/${tableData.streamingTable}/${i}`);
+      }
+    }
+    
+    const options: CreateTableOptions = {
+      buildRangeEnd: queryTracingObj?.buildRangeEnd,
+      uniqueKey: uniqueKeyColumns.join(','),
+      indexes,
+      files: locations,
+      selectStatement: tableData.selectStatement,
+      streamOffset: tableData.streamOffset,
+      sealAt
+    };
+    return this.createTableWithOptions(table, columns, options, queryTracingObj);
   }
 
-  public static dialectClass() {
-    return CubeStoreQuery;
-  }
-
-  public capabilities() {
+  public capabilities(): ExternalDriverCompatibilities {
     return {
       csvImport: true,
       streamImport: true,

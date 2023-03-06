@@ -16,7 +16,7 @@ import { isCubeStoreSupported } from './utils';
         'which is not supported by Cube Store. Installation will be skipped.'
       );
     }
-  } catch (e) {
+  } catch (e: any) {
     await displayCLIError(e, 'Cube Store Installer');
   }
 })();

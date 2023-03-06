@@ -1,11 +1,15 @@
 /* eslint-disable no-restricted-syntax */
+import * as stream from 'stream';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
-import moment from 'moment';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
-import { getEnv, getRealType } from '@cubejs-backend/shared';
-
+import structuredClone from '@ungap/structured-clone';
+import {
+  getEnv,
+  getRealType,
+  QueryAlias,
+} from '@cubejs-backend/shared';
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -13,7 +17,47 @@ import type {
   RequestHandler,
   Response,
 } from 'express';
-
+import {
+  QueryType
+} from './types/strings';
+import {
+  QueryType as QueryTypeEnum, ResultType
+} from './types/enums';
+import {
+  RequestContext,
+  ExtendedRequestContext,
+  Request,
+  QueryRewriteFn,
+  SecurityContextExtractorFn,
+  ExtendContextFn,
+  ResponseResultFn,
+  QueryRequest,
+  PreAggsJobsRequest,
+  PreAggsSelector,
+  PreAggJob,
+  PreAggJobStatusItem,
+  PreAggJobStatusObject,
+  PreAggJobStatusResponse,
+} from './types/request';
+import {
+  CheckAuthInternalOptions,
+  JWTOptions,
+  CheckAuthFn,
+} from './types/auth';
+import {
+  Query,
+  NormalizedQuery,
+} from './types/query';
+import {
+  UserBackgroundContext,
+  ApiGatewayOptions,
+} from './types/gateway';
+import {
+  CheckAuthMiddlewareFn,
+  RequestLoggerMiddlewareFn,
+  ContextRejectionMiddlewareFn,
+  ContextAcceptorFn,
+} from './interfaces';
 import { getRequestIdFromRequest, requestParser } from './requestParser';
 import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
@@ -26,191 +70,28 @@ import {
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryPreAggregations,
-  QUERY_TYPE, validatePostRewrite,
+  validatePostRewrite,
 } from './query';
-import {
-  CheckAuthFn,
-  CheckAuthMiddlewareFn,
-  ExtendContextFn,
-  ExtendedRequestContext,
-  JWTOptions,
-  QueryRewriteFn,
-  Request,
-  RequestContext,
-  RequestLoggerMiddlewareFn,
-  SecurityContextExtractorFn,
-} from './interfaces';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 import { SQLServer } from './sql-server';
-
 import { makeSchema } from './graphql';
+import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
+import transformData from './helpers/transformData';
+import { shouldAddLimit } from './helpers/shouldAddLimit';
+import {
+  transformCube,
+  transformMeasure,
+  transformDimension,
+  transformSegment,
+  transformJoins,
+  transformPreAggregations,
+} from './helpers/transformMetaExtended';
 
-type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
-
-type MetaConfig = {
-  config: {
-    name: string,
-    title: string
-  }
-};
-
-type CheckAuthInternalOptions = {
-  isPlaygroundCheckAuth: boolean;
-};
-
-const toConfigMap = (metaConfig: MetaConfig[]) => R.fromPairs(
-  R.map((c) => [c.config.name, c.config], metaConfig)
-);
-
-const prepareAnnotation = (metaConfig: MetaConfig[], query: any) => {
-  const configMap = toConfigMap(metaConfig);
-
-  const annotation = (memberType) => (member) => {
-    const [cubeName, fieldName] = member.split('.');
-    const memberWithoutGranularity = [cubeName, fieldName].join('.');
-    const config = configMap[cubeName][memberType].find(m => m.name === memberWithoutGranularity);
-
-    if (!config) {
-      return undefined;
-    }
-
-    return [member, {
-      title: config.title,
-      shortTitle: config.shortTitle,
-      description: config.description,
-      type: config.type,
-      format: config.format,
-      meta: config.meta,
-      ...(memberType === 'measures' ? {
-        drillMembers: config.drillMembers,
-        drillMembersGrouped: config.drillMembersGrouped
-      } : {})
-    }];
-  };
-
-  const dimensions = (query.dimensions || []);
-  return {
-    measures: R.fromPairs((query.measures || []).map(annotation('measures')).filter(a => !!a)),
-    dimensions: R.fromPairs(dimensions.map(annotation('dimensions')).filter(a => !!a)),
-    segments: R.fromPairs((query.segments || []).map(annotation('segments')).filter(a => !!a)),
-    timeDimensions: R.fromPairs(
-      R.unnest(
-        (query.timeDimensions || [])
-          .filter(td => !!td.granularity)
-          .map(
-            td => [annotation('dimensions')(`${td.dimension}.${td.granularity}`)].concat(
-              // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
-              dimensions.indexOf(td.dimension) === -1 ? [annotation('dimensions')(td.dimension)] : []
-            ).filter(a => !!a)
-          )
-      )
-    ),
-  };
-};
-
-const transformValue = (value, type) => {
-  if (value && (type === 'time' || value instanceof Date)) { // TODO support for max time
-    return (value instanceof Date ? moment(value) : moment.utc(value)).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
-  }
-  return value && value.value ? value.value : value; // TODO move to sql adapter
-};
-
-const transformData = (aliasToMemberNameMap, annotation, data, query, queryType) => (data.map(r => {
-  const row = R.pipe(
-    // @ts-ignore
-    R.toPairs,
-    R.map(p => {
-      const memberName = aliasToMemberNameMap[p[0]];
-      const annotationForMember = annotation[memberName];
-
-      if (!annotationForMember) {
-        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.`);
-      }
-
-      const transformResult = [
-        memberName,
-        transformValue(p[1], annotationForMember.type)
-      ];
-
-      const path = memberName.split('.');
-
-      // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
-      const memberNameWithoutGranularity = [path[0], path[1]].join('.');
-      if (path.length === 3 && (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
-        return [
-          transformResult,
-          [
-            memberNameWithoutGranularity,
-            transformResult[1]
-          ]
-        ];
-      }
-
-      return [transformResult];
-    }),
-    // @ts-ignore
-    R.unnest,
-    R.fromPairs
-  // @ts-ignore
-  )(r);
-
-  // @ts-ignore
-  const [{ dimension, granularity, dateRange } = {}] = query.timeDimensions;
-
-  if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
-    return {
-      ...row,
-      compareDateRange: dateRange.join(' - ')
-    };
-  } else if (queryType === QUERY_TYPE.BLENDING_QUERY) {
-    return {
-      ...row,
-      [['time', granularity].join('.')]: row[[dimension, granularity].join('.')]
-    };
-  }
-
-  return row;
-}));
-
-export type UserBackgroundContext = {
-  // @deprecated Renamed to securityContext, please use securityContext.
-  authInfo?: any;
-  securityContext: any;
-};
-
-type BaseRequest = {
- context: RequestContext;
- res: ResponseResultFn
-};
-
-type QueryRequest = BaseRequest & {
-  query: Record<string, any> | Record<string, any>[];
-  queryType?: 'multi';
-  apiType?: 'sql' | 'graphql' | 'rest' | 'ws';
-};
-
-export interface ApiGatewayOptions {
-  standalone: boolean;
-  dataSourceStorage: any;
-  refreshScheduler: any;
-  scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
-  scheduledRefreshTimeZones?: String[];
-  basePath: string;
-  extendContext?: ExtendContextFn;
-  checkAuth?: CheckAuthFn;
-  // @deprecated Please use checkAuth
-  checkAuthMiddleware?: CheckAuthMiddlewareFn;
-  jwt?: JWTOptions;
-  requestLoggerMiddleware?: RequestLoggerMiddlewareFn;
-  queryRewrite?: QueryRewriteFn;
-  subscriptionStore?: any;
-  enforceSecurityChecks?: boolean;
-  playgroundAuthSecret?: string;
-  serverCoreVersion?: string;
-}
-
-export class ApiGateway {
+/**
+ * API gateway server class.
+ */
+class ApiGateway {
   protected readonly refreshScheduler: any;
 
   protected readonly scheduledRefreshContexts: ApiGatewayOptions['scheduledRefreshContexts'];
@@ -240,6 +121,10 @@ export class ApiGateway {
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
   protected readonly securityContextExtractor: SecurityContextExtractorFn;
+  
+  protected readonly contextRejectionMiddleware: ContextRejectionMiddlewareFn;
+
+  protected readonly wsContextAcceptor: ContextAcceptorFn;
 
   protected readonly releaseListeners: (() => any)[] = [];
 
@@ -272,12 +157,16 @@ export class ApiGateway {
       : this.checkAuth;
     this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
+    this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => next());
+    this.wsContextAcceptor = options.wsContextAcceptor || (() => ({ accepted: true }));
   }
 
   public initApp(app: ExpressApplication) {
     const userMiddlewares: RequestHandler[] = [
       this.checkAuthMiddleware,
       this.requestContextMiddleware,
+      this.contextRejectionMiddleware,
+      this.logNetworkUsage,
       this.requestLoggerMiddleware
     ];
 
@@ -288,9 +177,10 @@ export class ApiGateway {
       const compilerApi = this.getCompilerApi(req.context);
       let schema = compilerApi.getGraphQLSchema();
       if (!schema) {
-        const metaConfig = await compilerApi.metaConfig({
+        let metaConfig = await compilerApi.metaConfig({
           requestId: req.context.requestId,
         });
+        metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
         schema = makeSchema(metaConfig);
         compilerApi.setGraphQLSchema(schema);
       }
@@ -305,14 +195,12 @@ export class ApiGateway {
       })(req, res);
     });
 
-    app.use(this.logNetworkUsage);
-
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
-        queryType: req.query.queryType
+        queryType: req.query.queryType,
       });
     }));
 
@@ -343,11 +231,26 @@ export class ApiGateway {
       });
     }));
 
-    app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
-      await this.meta({
+    app.post(`${this.basePath}/v1/sql`, userMiddlewares, (async (req, res) => {
+      await this.sql({
+        query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res)
       });
+    }));
+
+    app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
+      if (req.query.hasOwnProperty('extended')) {
+        await this.metaExtended({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      } else {
+        await this.meta({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      }
     }));
 
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
@@ -378,6 +281,7 @@ export class ApiGateway {
       const systemMiddlewares: RequestHandler[] = [
         this.checkAuthSystemMiddleware,
         this.requestContextMiddleware,
+        this.contextRejectionMiddleware,
         this.requestLoggerMiddleware
       ];
 
@@ -444,6 +348,47 @@ export class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
+
+      app.post(
+        '/cubejs-system/v1/pre-aggregations/jobs',
+        systemMiddlewares,
+        this.preAggregationsJobs.bind(this),
+      );
+
+      const sqlRunnerMiddlewares = [...systemMiddlewares, this.checkSqlRunnerScope];
+
+      app.post(
+        '/cubejs-system/v1/sql-runner',
+        jsonParser,
+        sqlRunnerMiddlewares,
+        async (req: Request, res: Response) => {
+          await this.sqlRunner({
+            query: req.body.query,
+            context: req.context!,
+            res: this.resToResultFn(res),
+          });
+        }
+      );
+      
+      app.get(
+        '/cubejs-system/v1/data-sources',
+        jsonParser,
+        sqlRunnerMiddlewares,
+        async (req: Request, res: Response) => {
+          await this.dataSources({
+            context: req.context,
+            res: this.resToResultFn(res),
+          });
+        }
+      );
+      
+      app.post('/cubejs-system/v1/db-schema', jsonParser, systemMiddlewares, (async (req: Request, res: Response) => {
+        await this.dbSchema({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      }));
     }
 
     app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
@@ -466,7 +411,7 @@ export class ApiGateway {
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
-    return new SubscriptionServer(this, sendMessage, this.subscriptionStore);
+    return new SubscriptionServer(this, sendMessage, this.subscriptionStore, this.wsContextAcceptor);
   }
 
   protected duration(requestStarted) {
@@ -492,23 +437,72 @@ export class ApiGateway {
     }
   }
 
+  private filterVisibleItemsInMeta(_context: RequestContext, metaConfig: any) {
+    function visibilityFilter(item) {
+      // Hidden items shouldn't be accessible through API everywhere for consistency.
+      return item.isVisible;
+    }
+
+    return metaConfig
+      .map((cube) => ({
+        config: {
+          ...cube.config,
+          measures: cube.config.measures?.filter(visibilityFilter),
+          dimensions: cube.config.dimensions?.filter(visibilityFilter),
+          segments: cube.config.segments?.filter(visibilityFilter),
+        },
+      })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
+  }
+
   public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
-
-    function visibilityFilter(item) {
-      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
-    }
 
     try {
       const metaConfig = await this.getCompilerApi(context).metaConfig({
         requestId: context.requestId,
       });
-      const cubes = metaConfig
+      const cubes = this.filterVisibleItemsInMeta(context, metaConfig).map(cube => cube.config);
+      res({ cubes });
+    } catch (e) {
+      this.handleError({
+        e,
+        context,
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+
+    // TODO: test and remove this function.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    function visibilityFilter(item) {
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+    }
+
+    try {
+      const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
+        requestId: context.requestId,
+      });
+      const { metaConfig, cubeDefinitions } = metaConfigExtended;
+
+      const cubes = this.filterVisibleItemsInMeta(context, metaConfig)
         .map((meta) => meta.config)
         .map((cube) => ({
-          ...cube,
-          measures: cube.measures.filter(visibilityFilter),
-          dimensions: cube.dimensions.filter(visibilityFilter),
+          ...transformCube(cube, cubeDefinitions),
+          measures: cube.measures?.map((measure) => ({
+            ...transformMeasure(measure, cubeDefinitions),
+          })),
+          dimensions: cube.dimensions?.map((dimension) => ({
+            ...transformDimension(dimension, cubeDefinitions),
+          })),
+          segments: cube.segments?.map((segment) => ({
+            ...transformSegment(segment, cubeDefinitions),
+          })),
+          joins: transformJoins(cubeDefinitions[cube.name]?.joins),
+          preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
       res({ cubes });
     } catch (e) {
@@ -650,6 +644,358 @@ export class ApiGateway {
     }
   }
 
+  /**
+   * Entry point for the `/cubejs-system/v1/pre-aggregations/jobs` endpoint.
+   * Post object example:
+   * ```
+   * {
+   *   "action": "post",
+   *   "selector": {
+   *     "contexts": [
+   *       {"securityContext": {"tenant": "t1"}},
+   *       {"securityContext": {"tenant": "t2"}}
+   *     ],
+   *     "timezones": ["UTC"],
+   *     "dataSources": ["default"],
+   *     "cubes": ["Events"],
+   *     "preAggregations": ["Events.TemporaryData"]
+   *   }
+   * }
+   * // or
+   * {
+   *   "action": "get",
+   *   "tokens": [
+   *     "ec1232ea3356f04f8be313fecf3deb4d",
+   *     "48b75d5c466fa579c936dc451f498f69",
+   *     "76509837091396dc204abb1016c48e75",
+   *     "52264769f81f6ff62062a93d6f6fbdb2"
+   *   ]
+   * }
+   * // or
+   * {
+   *   "action": "get",
+   *   "resType": "object",
+   *   "tokens": [
+   *     "ec1232ea3356f04f8be313fecf3deb4d",
+   *     "48b75d5c466fa579c936dc451f498f69",
+   *     "76509837091396dc204abb1016c48e75",
+   *     "52264769f81f6ff62062a93d6f6fbdb2"
+   *   ]
+   * }
+   * ```
+   * TODO (buntarb): selector object validator.
+   */
+  private async preAggregationsJobs(req: Request, res: Response) {
+    const response = this.resToResultFn(res);
+    const started = new Date();
+    const context = <RequestContext>req.context;
+    const query = <PreAggsJobsRequest>req.body;
+    try {
+      let result;
+      switch (query.action) {
+        case 'post':
+          if (
+            !(<PreAggsSelector>query.selector).timezones ||
+            (<PreAggsSelector>query.selector).timezones.length === 0
+          ) {
+            throw new UserError(
+              'A user\'s selector must contain at least one time zone.'
+            );
+          }
+          if (
+            !(<PreAggsSelector>query.selector).contexts ||
+            (
+              <{securityContext: any}[]>(
+                <PreAggsSelector>query.selector
+              ).contexts
+            ).length === 0
+          ) {
+            throw new UserError(
+              'A user\'s selector must contain at least one context element.'
+            );
+          } else {
+            let e = false;
+            (<{securityContext: any}[]>(
+              <PreAggsSelector>query.selector
+            ).contexts).forEach((c) => {
+              if (!c.securityContext) e = true;
+            });
+            if (e) {
+              throw new UserError(
+                'Every context element must contain the ' +
+                '\'securityContext\' property.'
+              );
+            }
+          }
+          result = await this.preAggregationsJobsPOST(
+            context,
+            <PreAggsSelector>query.selector
+          );
+          if (result.length === 0) {
+            throw new UserError(
+              'A user\'s selector doesn\'t match any of the ' +
+              'pre-aggregations described by the Cube schemas.'
+            );
+          }
+          break;
+        case 'get':
+          result = await this.preAggregationsJobsGET(
+            context,
+            <string[]>query.tokens,
+            query.resType,
+          );
+          break;
+        default:
+          throw new Error(`The '${query.action}' action type doesn't supported.`);
+      }
+      response(result, { status: 200 });
+    } catch (e) {
+      this.handleError({ e, context, query, res: response, started });
+    }
+  }
+
+  /**
+   * Post pre-aggregations build jobs entry point.
+   */
+  private async preAggregationsJobsPOST(
+    context: RequestContext,
+    selector: PreAggsSelector,
+  ): Promise<string[]> {
+    let jobs: string[] = [];
+    if (!selector.contexts?.length) {
+      jobs = await this.postPreAggregationsBuildJobs(
+        context,
+        selector,
+      );
+    } else {
+      const promise = Promise.all(
+        selector.contexts.map(async (config) => {
+          const ctx = <RequestContext>{
+            ...context,
+            ...config,
+          };
+          const _jobs = await this.postPreAggregationsBuildJobs(
+            ctx,
+            selector,
+          );
+          return _jobs;
+        })
+      );
+      const resolve = await promise;
+      resolve.forEach((_jobs) => {
+        jobs = jobs.concat(_jobs);
+      });
+    }
+    return jobs;
+  }
+
+  /**
+   * Add pre-aggregations build job. Returns added jobs ids.
+   */
+  private async postPreAggregationsBuildJobs(
+    context: RequestContext,
+    selector: PreAggsSelector
+  ): Promise<string[]> {
+    const compiler = this.getCompilerApi(context);
+    const { timezones } = selector;
+    const preaggs = await compiler.preAggregations({
+      dataSources: selector.dataSources,
+      cubes: selector.cubes,
+      preAggregationIds: selector.preAggregations,
+    });
+    if (preaggs.length === 0) {
+      return [];
+    } else {
+      const jobs: string[] = await this
+        .refreshScheduler()
+        .postBuildJobs(
+          context,
+          {
+            metadata: undefined,
+            timezones,
+            preAggregations: preaggs.map(p => ({
+              id: p.id,
+              cacheOnly: undefined, // boolean
+              partitions: undefined, // string[]
+            })),
+            forceBuildPreAggregations: undefined,
+            throwErrors: false,
+          }
+        );
+      return jobs;
+    }
+  }
+
+  /**
+   * Get pre-aggregations build jobs entry point.
+   */
+  private async preAggregationsJobsGET(
+    context: RequestContext,
+    tokens: string[],
+    resType = 'array',
+  ): Promise<PreAggJobStatusResponse> {
+    const objResponse: PreAggJobStatusObject = {};
+    const selector: PreAggJob[] = await this
+      .refreshScheduler()
+      .getCachedBuildJobs(context, tokens);
+    const metaCache: Map<string, any> = new Map();
+    const promise: Promise<(PreAggJobStatusItem | undefined)[]> = Promise.all(
+      selector.map(async (selected, i) => {
+        const ctx = { ...context, ...selected.context };
+        const orchestrator = this.getAdapterApi(ctx);
+        const compiler = this.getCompilerApi(ctx);
+        const sel: PreAggsSelector = {
+          cubes: [selected.preagg.split('.')[0]],
+          preAggregations: [selected.preagg],
+          contexts: [selected.context],
+          timezones: [selected.timezone],
+          dataSources: [selected.dataSource],
+        };
+        if (
+          selected.status.indexOf('done') === 0 ||
+          selected.status.indexOf('failure') === 0
+        ) {
+          // returning from the cache
+          if (resType === 'object') {
+            objResponse[tokens[i]] = {
+              table: selected.target,
+              status: selected.status,
+              selector: sel,
+            };
+          } else {
+            return {
+              token: tokens[i],
+              table: selected.target,
+              status: selected.status,
+              selector: sel,
+            };
+          }
+        } else {
+          // checking the queue
+          const status = await this.getPreAggJobQueueStatus(
+            orchestrator,
+            selected,
+          );
+          if (status) {
+            // returning queued status
+            if (resType === 'object') {
+              objResponse[tokens[i]] = {
+                table: selected.target,
+                status,
+                selector: sel,
+              };
+            } else {
+              return {
+                token: tokens[i],
+                table: selected.target,
+                status,
+                selector: sel,
+              };
+            }
+          } else {
+            const key = JSON.stringify(ctx);
+            if (!metaCache.has(key)) {
+              metaCache.set(key, await compiler.metaConfigExtended(ctx));
+            }
+            // checking and fetching result status
+            const s = await this.getPreAggJobResultStatus(
+              ctx.requestId,
+              orchestrator,
+              compiler,
+              metaCache.get(key),
+              selected,
+              tokens[i],
+            );
+            if (resType === 'object') {
+              objResponse[tokens[i]] = {
+                table: selected.target,
+                status: s,
+                selector: sel,
+              };
+            } else {
+              return {
+                token: tokens[i],
+                table: selected.target,
+                status: s,
+                selector: sel,
+              };
+            }
+          }
+        }
+        return undefined;
+      })
+    );
+    const arrResponse: (PreAggJobStatusItem | undefined)[] = await promise;
+    return resType === 'object'
+      ? objResponse
+      : <PreAggJobStatusItem[]>arrResponse;
+  }
+
+  /**
+   * Returns PreAggJob status if it still in queue, false otherwose.
+   */
+  private async getPreAggJobQueueStatus(
+    orchestrator: any,
+    job: PreAggJob,
+  ): Promise<false | string> {
+    let inQueue = false;
+    let status: string = 'n/a';
+    const queuedList = await orchestrator.getPreAggregationQueueStates();
+    queuedList.forEach((item) => {
+      if (
+        item.queryHandler &&
+        item.queryHandler === 'query' &&
+        item.query &&
+        item.query.requestId === job.request &&
+        item.query.newVersionEntry.table_name === job.table &&
+        item.query.newVersionEntry.structure_version === job.structure &&
+        item.query.newVersionEntry.content_version === job.content &&
+        item.query.newVersionEntry.last_updated_at === job.updated
+      ) {
+        inQueue = true;
+        switch (<string>item.status[0]) {
+          case 'toProcess':
+            status = 'scheduled';
+            break;
+          case 'active':
+            status = 'processing';
+            break;
+          default:
+            status = <string>item.status[0];
+            break;
+        }
+      }
+    });
+    return inQueue ? status : false;
+  }
+
+  /**
+   * Returns PreAggJob execution status.
+   */
+  private async getPreAggJobResultStatus(
+    requestId: string,
+    orchestrator: any,
+    compiler: any,
+    metadata: any,
+    job: PreAggJob,
+    token: string,
+  ): Promise<string> {
+    const preaggs = await compiler.preAggregations();
+    const preagg = preaggs.filter(pa => pa.id === job.preagg)[0];
+    const cube = metadata.cubeDefinitions[preagg.cube];
+    const [, status]: [boolean, string] =
+      await orchestrator.isPartitionExist(
+        requestId,
+        preagg.preAggregation.external,
+        cube.dataSource,
+        compiler.preAggregationsSchema,
+        job.target,
+        job.key,
+        token,
+      );
+    return status;
+  }
+
   public async getPreAggregationsInQueue(
     { context, res }: { context: RequestContext, res: ResponseResultFn }
   ) {
@@ -682,30 +1028,215 @@ export class ApiGateway {
       });
     }
   }
+  
+  protected async dataSources({ context, res }: { context?: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
 
-  protected async getNormalizedQueries(query, context: RequestContext): Promise<any> {
+    try {
+      const orchestratorApi = await this.getAdapterApi(context);
+      const { dataSources } = await this.getCompilerApi(context).dataSources(orchestratorApi);
+
+      res({ dataSources });
+    } catch (e) {
+      this.handleError({
+        e,
+        context,
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  protected async sqlRunner({ query, context, res }: QueryRequest) {
+    const requestStarted = new Date();
+    try {
+      if (!query) {
+        throw new UserError('A user\'s query must contain a body');
+      }
+
+      if (!Array.isArray(query) && !query.query) {
+        throw new UserError(
+          'A user\'s query must contain at least one query param.'
+        );
+      }
+      
+      query = {
+        ...query,
+        requestId: context.requestId,
+      };
+
+      const orchestratorApi = this.getAdapterApi(context);
+
+      if (shouldAddLimit(query.query)) {
+        if (
+          !query.limit ||
+          !Number.isInteger(query.limit) ||
+          query.limit < 0
+        ) {
+          throw new UserError(
+            'A user\'s query must contain limit query param and it must be positive number'
+          );
+        }
+
+        if (query.limit > getEnv('dbQueryDefaultLimit')) {
+          throw new UserError('The query limit has been exceeded');
+        }
+  
+        if (
+          query.resultFilter?.objectTypes &&
+          !Array.isArray(query.resultFilter.objectTypes)
+        ) {
+          throw new UserError(
+            'A query.resultFilter.objectTypes must be an array of strings'
+          );
+        }
+        
+        query.query = query.query.trim();
+        if (query.query.charAt(query.query.length - 1) === ';') {
+          query.query = query.query.slice(0, -1);
+        }
+
+        const driver = await orchestratorApi
+          .driverFactory(query.dataSource || 'default');
+
+        driver.wrapQueryWithLimit(query);
+      }
+      
+      this.log(
+        {
+          type: 'Load SQL Runner Request',
+          query,
+        },
+        context
+      );
+
+      const result = await orchestratorApi.executeQuery(query);
+
+      if (result.data.length) {
+        const objectLimit = Number(query.resultFilter?.objectLimit) || 100;
+        const stringLimit = Number(query.resultFilter?.stringLimit) || 100;
+        const objectTypes = query.resultFilter?.objectTypes || [];
+        const limit = Number(query.resultFilter?.limit) || 20;
+        const offset = Number(query.resultFilter?.offset) || 0;
+        result.total = result.data.length;
+        result.offset = offset;
+        result.data = result.data.slice(offset, offset + limit);
+        result.data = result.data.map((row) => {
+          Object.keys(row).forEach((key) => {
+            if (
+              typeof row[key] === 'object' && row[key] !== null && row[key].type &&
+              (objectTypes.length === 0 || !objectTypes.includes(row[key].type))
+            ) {
+              row[key] = row[key].type;
+            } else if (typeof row[key] === 'object' && row[key] !== null) {
+              row[key] = JSON.stringify(row[key].data || row[key]).slice(0, objectLimit);
+            } else if (typeof row[key] === 'string') {
+              row[key] = row[key].slice(0, stringLimit);
+            }
+          });
+
+          return row;
+        });
+      }
+
+      this.log(
+        {
+          type: 'Load SQL Runner Request Success',
+          query,
+          duration: this.duration(requestStarted),
+          dbType: result.dbType,
+        },
+        context
+      );
+
+      res(result);
+    } catch (e) {
+      this.handleError({
+        e, context, query, res, requestStarted
+      });
+    }
+  }
+
+  protected async dbSchema({ query, context, res }: {
+    query: {
+      dataSource: string;
+    };
+    context?: RequestContext;
+    res: ResponseResultFn;
+  }) {
+    const requestStarted = new Date();
+    try {
+      if (!query) {
+        throw new UserError(
+          'A user\'s query must contain a body'
+        );
+      }
+
+      if (!query.dataSource) {
+        throw new UserError(
+          'A user\'s query must contain dataSource.'
+        );
+      }
+
+      const orchestratorApi = await this.getAdapterApi(context);
+   
+      const schema = await orchestratorApi
+        .getQueryOrchestrator()
+        .fetchSchema(query.dataSource);
+
+      res({ data: schema });
+    } catch (e) {
+      this.handleError({ e,
+        context,
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  /**
+   * Convert incoming query parameter (JSON fetched from the HTTP) to
+   * an array of query type and array of normalized queries.
+   */
+  protected async getNormalizedQueries(
+    query: Record<string, any> | Record<string, any>[],
+    context: RequestContext,
+    persistent = false,
+  ): Promise<[QueryType, NormalizedQuery[]]> {
     query = this.parseQueryParam(query);
-    let queryType = QUERY_TYPE.REGULAR_QUERY;
 
+    let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
     if (!Array.isArray(query)) {
       query = this.compareDateRangeTransformer(query);
       if (Array.isArray(query)) {
-        queryType = QUERY_TYPE.COMPARE_DATE_RANGE_QUERY;
+        queryType = QueryTypeEnum.COMPARE_DATE_RANGE_QUERY;
       }
     } else {
-      queryType = QUERY_TYPE.BLENDING_QUERY;
+      queryType = QueryTypeEnum.BLENDING_QUERY;
     }
 
     const queries = Array.isArray(query) ? query : [query];
-    const normalizedQueries = await Promise.all(
-      queries.map(async (currentQuery) => validatePostRewrite(await this.queryRewrite(normalizeQuery(currentQuery), context)))
+
+    const normalizedQueries: NormalizedQuery[] = await Promise.all(
+      queries.map(
+        async (currentQuery) => validatePostRewrite(
+          await this.queryRewrite(
+            normalizeQuery(currentQuery),
+            context
+          )
+        )
+      )
     );
+
+    normalizedQueries.forEach((q) => {
+      this.processQueryLimit(q, persistent);
+    });
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
     }
 
-    if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+    if (queryType === QueryTypeEnum.BLENDING_QUERY) {
       const queryGranularity = getQueryGranularity(normalizedQueries);
 
       if (queryGranularity.length > 1) {
@@ -717,6 +1248,29 @@ export class ApiGateway {
     }
 
     return [queryType, normalizedQueries];
+  }
+
+  /**
+   * Asserts query limit, sets the default value if neccessary.
+   *
+   * @throw {Error}
+   */
+  public processQueryLimit(query: NormalizedQuery, persistent = false): void {
+    const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
+      ? getEnv('dbQueryDefaultLimit')
+      : getEnv('dbQueryLimit');
+
+    if (!persistent) {
+      if (
+        typeof query.limit === 'number' &&
+        query.limit > getEnv('dbQueryLimit')
+      ) {
+        throw new Error('The query limit has been exceeded.');
+      }
+      query.limit = typeof query.limit === 'number'
+        ? query.limit
+        : def;
+    }
   }
 
   public async sql({ query, context, res }: QueryRequest) {
@@ -738,7 +1292,7 @@ export class ApiGateway {
         order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }) => [key, desc ? 'desc' : 'asc']))
       });
 
-      res(queryType === QUERY_TYPE.REGULAR_QUERY ?
+      res(queryType === QueryTypeEnum.REGULAR_QUERY ?
         { sql: toQuery(sqlQueries[0]) } :
         sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
     } catch (e) {
@@ -836,90 +1390,268 @@ export class ApiGateway {
     }
   }
 
-  public async load({ query, context, res, apiType = 'rest', ...props }: QueryRequest) {
+  /**
+   * Returns an array of sqlQuery objects for specified normalized
+   * queries.
+   * @internal
+   */
+  private async getSqlQueriesInternal(
+    context: RequestContext,
+    normalizedQueries: (NormalizedQuery)[],
+  ): Promise<Array<any>> {
+    const sqlQueries = await Promise.all(
+      normalizedQueries.map(
+        async (normalizedQuery, index) => {
+          const loadRequestSQLStarted = new Date();
+          const sqlQuery = await this.getCompilerApi(context)
+            .getSql(
+              this.coerceForSqlQuery(normalizedQuery, context)
+            );
+
+          this.log({
+            type: 'Load Request SQL',
+            duration: this.duration(loadRequestSQLStarted),
+            query: normalizedQueries[index],
+            sqlQuery
+          }, context);
+
+          return sqlQuery;
+        }
+      )
+    );
+    return sqlQueries;
+  }
+
+  /**
+   * Execute query and return adapter's result.
+   * @internal
+   */
+  private async getSqlResponseInternal(
+    context: RequestContext,
+    normalizedQuery: NormalizedQuery,
+    sqlQuery: any,
+  ) {
+    const queries = [{
+      ...sqlQuery,
+      query: sqlQuery.sql[0],
+      values: sqlQuery.sql[1],
+      continueWait: true,
+      renewQuery: normalizedQuery.renewQuery,
+      requestId: context.requestId,
+      context,
+      persistent: false,
+    }];
+    if (normalizedQuery.total) {
+      const normalizedTotal = structuredClone(normalizedQuery);
+      normalizedTotal.totalQuery = true;
+      normalizedTotal.limit = null;
+      normalizedTotal.rowLimit = null;
+      normalizedTotal.offset = null;
+      const [totalQuery] = await this.getSqlQueriesInternal(
+        context,
+        [normalizedTotal],
+      );
+      queries.push({
+        ...totalQuery,
+        query: totalQuery.sql[0],
+        values: totalQuery.sql[1],
+        continueWait: true,
+        renewQuery: normalizedTotal.renewQuery,
+        requestId: context.requestId,
+        context
+      });
+    }
+    const [response, total] = await Promise.all(
+      queries.map(async (query) => {
+        const res = await this
+          .getAdapterApi(context)
+          .executeQuery(query);
+        return res;
+      })
+    );
+    response.total = normalizedQuery.total
+      ? Number(total.data[0][QueryAlias.TOTAL_COUNT])
+      : undefined;
+    return response;
+  }
+
+  /**
+   * Convert adapter's result and other request paramters to a final
+   * result object.
+   * @internal
+   */
+  private getResultInternal(
+    context: RequestContext,
+    queryType: QueryType,
+    normalizedQuery: NormalizedQuery,
+    sqlQuery: any,
+    annotation: {
+      measures: {
+        [index: string]: unknown;
+      };
+      dimensions: {
+        [index: string]: unknown;
+      };
+      segments: {
+        [index: string]: unknown;
+      };
+      timeDimensions: {
+        [index: string]: unknown;
+      };
+    },
+    response: any,
+    responseType?: ResultType,
+  ) {
+    return {
+      query: normalizedQuery,
+      data: transformData(
+        sqlQuery.aliasNameToMember,
+        {
+          ...annotation.measures,
+          ...annotation.dimensions,
+          ...annotation.timeDimensions
+        } as { [member: string]: ConfigItem },
+        response.data,
+        normalizedQuery,
+        queryType,
+        responseType,
+      ),
+      lastRefreshTime: response.lastRefreshTime?.toISOString(),
+      ...(
+        getEnv('devMode') ||
+          context.signedWithPlaygroundAuthSecret
+          ? {
+            refreshKeyValues: response.refreshKeyValues,
+            usedPreAggregations: response.usedPreAggregations,
+            transformedQuery: sqlQuery.canUseTransformedQuery,
+            requestId: context.requestId,
+          }
+          : null
+      ),
+      annotation,
+      dataSource: response.dataSource,
+      dbType: response.dbType,
+      extDbType: response.extDbType,
+      external: response.external,
+      slowQuery: Boolean(response.slowQuery),
+      total: normalizedQuery.total ? response.total : null,
+    };
+  }
+
+  /**
+   * Returns stream object which will be used to stream results from
+   * the data source if applicable, returns `null` otherwise.
+   */
+  public async stream(context: RequestContext, query: Query): Promise<null | {
+    originalQuery: Query;
+    normalizedQuery: NormalizedQuery;
+    streamingQuery: unknown;
+    stream: stream.Writable;
+  }> {
+    const requestStarted = new Date();
+    try {
+      this.log({ type: 'Load Request', query, streaming: true }, context);
+      const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
+      const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
+      const q = {
+        ...sqlQuery,
+        query: sqlQuery.sql[0],
+        values: sqlQuery.sql[1],
+        continueWait: true,
+        renewQuery: false,
+        requestId: context.requestId,
+        context,
+        persistent: true,
+        forceNoCache: true,
+      };
+      const _stream = {
+        originalQuery: query,
+        normalizedQuery: normalizedQueries[0],
+        streamingQuery: q,
+        stream: await this.getAdapterApi(context).streamQuery(q),
+      };
+      return _stream;
+    } catch (e) {
+      // TODO handle error log
+      this.log({
+        type: 'Streaming Error',
+        query,
+        error: (<Error>e).message,
+        duration: this.duration(requestStarted),
+      }, context);
+      throw e;
+    }
+  }
+
+  /**
+   * Data queries APIs (`/load`, `/subscribe`) entry point. Used by
+   * `CubejsApi#load` and `CubejsApi#subscribe` methods to fetch the
+   * data.
+   */
+  public async load(request: QueryRequest) {
+    let query: Query | Query[] | undefined;
+    const {
+      context,
+      res,
+      apiType = 'rest',
+      ...props
+    } = request;
     const requestStarted = new Date();
 
     try {
-      query = this.parseQueryParam(query);
+      query = this.parseQueryParam(request.query);
+      let resType: ResultType = ResultType.DEFAULT;
+
+      if (!Array.isArray(query) && query.responseFormat) {
+        resType = query.responseFormat;
+      }
+
       this.log({
         type: 'Load Request',
         query
       }, context);
 
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      const [queryType, normalizedQueries] =
+        await this.getNormalizedQueries(query, context);
 
-      const [metaConfigResult, ...sqlQueries] = await Promise.all(
-        [
-          this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
-        ].concat(normalizedQueries.map(
-          async (normalizedQuery, index) => {
-            const loadRequestSQLStarted = new Date();
-            const sqlQuery = await this.getCompilerApi(context).getSql(
-              this.coerceForSqlQuery(normalizedQuery, context)
-            );
+      let metaConfigResult = await this
+        .getCompilerApi(context).metaConfig({
+          requestId: context.requestId
+        });
 
-            this.log({
-              type: 'Load Request SQL',
-              duration: this.duration(loadRequestSQLStarted),
-              query: normalizedQueries[index],
-              sqlQuery
-            }, context);
+      metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
 
-            return sqlQuery;
-          }
-        ))
-      );
+      const sqlQueries = await this
+        .getSqlQueriesInternal(context, normalizedQueries);
 
       let slowQuery = false;
-      const results = await Promise.all<any[]>(normalizedQueries.map(async (normalizedQuery, index) => {
-        const sqlQuery = sqlQueries[index];
-        const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
-        const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
 
-        const toExecute = {
-          ...sqlQuery,
-          query: sqlQuery.sql[0],
-          values: sqlQuery.sql[1],
-          continueWait: true,
-          renewQuery: normalizedQuery.renewQuery,
-          requestId: context.requestId,
-          context
-        };
+      const results = await Promise.all(
+        normalizedQueries.map(async (normalizedQuery, index) => {
+          slowQuery = slowQuery ||
+            Boolean(sqlQueries[index].slowQuery);
 
-        const response = await this.getAdapterApi(context).executeQuery(toExecute);
+          const annotation = prepareAnnotation(
+            metaConfigResult, normalizedQuery
+          );
 
-        const flattenAnnotation = {
-          ...annotation.measures,
-          ...annotation.dimensions,
-          ...annotation.timeDimensions
-        };
-
-        slowQuery = slowQuery || Boolean(response.slowQuery);
-
-        return {
-          query: normalizedQuery,
-          data: transformData(
-            aliasToMemberNameMap,
-            flattenAnnotation,
-            response.data,
+          const response = await this.getSqlResponseInternal(
+            context,
             normalizedQuery,
-            queryType
-          ),
-          lastRefreshTime: response.lastRefreshTime?.toISOString(),
-          ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
-            refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations,
-            transformedQuery: sqlQuery.canUseTransformedQuery,
-            requestId: context.requestId,
-          } : null),
-          annotation,
-          dataSource: response.dataSource,
-          dbType: response.dbType,
-          extDbType: response.extDbType,
-          external: response.external,
-          slowQuery: Boolean(response.slowQuery)
-        };
-      }));
+            sqlQueries[index],
+          );
+
+          return this.getResultInternal(
+            context,
+            queryType,
+            normalizedQuery,
+            sqlQueries[index],
+            annotation,
+            response,
+            resType,
+          );
+        })
+      );
 
       this.log(
         {
@@ -927,16 +1659,32 @@ export class ApiGateway {
           query,
           duration: this.duration(requestStarted),
           apiType,
-          isPlayground: Boolean(context.signedWithPlaygroundAuthSecret),
-          queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
-            .length,
-          queriesWithData: results.filter((r: any) => r.data?.length).length,
+          isPlayground: Boolean(
+            context.signedWithPlaygroundAuthSecret
+          ),
+          queries: results.length,
+          queriesWithPreAggregations:
+            results.filter(
+              (r: any) => Object.keys(
+                r.usedPreAggregations || {}
+              ).length
+            ).length,
+          queriesWithData:
+            results.filter((r: any) => r.data?.length).length,
+          dbType: results.map(r => r.dbType),
         },
-        context
+        context,
       );
 
-      if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
-        throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
+      if (
+        queryType !== QueryTypeEnum.REGULAR_QUERY &&
+        props.queryType == null
+      ) {
+        throw new UserError(
+          `'${queryType
+          }' query type is not supported by the client.` +
+          'Please update the client.'
+        );
       }
 
       if (props.queryType === 'multi') {
@@ -1021,14 +1769,14 @@ export class ApiGateway {
     return (message, { status }: { status?: number } = {}) => (status ? res.status(status).json(message) : res.json(message));
   }
 
-  protected parseQueryParam(query) {
+  protected parseQueryParam(query): Query | Query[] {
     if (!query || query === 'undefined') {
       throw new UserError('query param is required');
     }
     if (typeof query === 'string') {
       query = JSON.parse(query);
     }
-    return query;
+    return query as Query | Query[];
   }
 
   protected getCompilerApi(context) {
@@ -1056,7 +1804,7 @@ export class ApiGateway {
       authInfo: securityContext,
       signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
       requestId,
-      ...extensions
+      ...extensions,
     };
   }
 
@@ -1074,6 +1822,10 @@ export class ApiGateway {
   public handleError({
     e, context, query, res, requestStarted
   }: any) {
+    const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
+    
+    const plainError = e.plainMessages;
+    
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
@@ -1081,23 +1833,23 @@ export class ApiGateway {
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.message }, { status: e.status });
+      res({ error: e.message, stack: e.stack, requestId, plainError }, { status: e.status });
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
         query,
         error: e.message,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
       }, context);
-      res(e, { status: 200 });
+      res({ error: e.message || e.error.message || e.error.toString(), requestId }, { status: 200 });
     } else if (e.error) {
       this.log({
         type: 'Orchestrator error',
         query,
         error: e.error,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
       }, context);
-      res(e, { status: 400 });
+      res({ error: e.message || e.error.message || e.error.toString(), requestId }, { status: 400 });
     } else if (e.type === 'UserError') {
       this.log({
         type: e.type,
@@ -1108,7 +1860,10 @@ export class ApiGateway {
       res(
         {
           type: e.type,
-          error: e.message
+          error: e.message,
+          plainError,
+          stack: e.stack,
+          requestId
         },
         { status: 400 }
       );
@@ -1119,7 +1874,7 @@ export class ApiGateway {
         error: e.stack || e.toString(),
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.toString() }, { status: 500 });
+      res({ error: e.toString(), stack: e.stack, requestId, plainError, }, { status: 500 });
     }
   }
 
@@ -1272,9 +2027,9 @@ export class ApiGateway {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
           } else {
             this.log({
-              type: e.message,
+              type: (e as Error).message,
               token: auth,
-              error: e.stack || e.toString()
+              error: (e as Error).stack || (e as Error).toString()
             }, <any>req);
           }
         }
@@ -1339,16 +2094,20 @@ export class ApiGateway {
       if (next) {
         next();
       }
-    } catch (e) {
+    } catch (e: unknown) {
       if (e instanceof CubejsHandlerError) {
         res.status(e.status).json({ error: e.message });
-      } else {
+      } else if (e instanceof Error) {
         this.log({
           type: 'Auth Error',
           token,
           error: e.stack || e.toString()
         }, <any>req);
-        res.status(500).json({ error: e.toString() });
+
+        res.status(500).json({
+          error: e.toString(),
+          stack: e.stack
+        });
       }
     }
   }
@@ -1359,6 +2118,24 @@ export class ApiGateway {
 
   protected checkAuthSystemMiddleware: RequestHandler = async (req, res, next) => {
     await this.checkAuthWrapper(this.checkAuthSystemFn, req, res, next);
+  };
+  
+  protected checkSqlRunnerScope: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+    await this.checkAuthWrapper(
+      async () => {
+        if (
+          !getEnv('devMode') &&
+          (!req.context?.securityContext?.scope ||
+          !Array.isArray(req.context?.securityContext?.scope) ||
+          !req.context?.securityContext?.scope.includes('sql-runner'))
+        ) {
+          throw new CubejsHandlerError(403, 'Forbidden', 'Sql-runner scope is missing.');
+        }
+      },
+      req,
+      res,
+      next
+    );
   };
 
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
@@ -1383,12 +2160,14 @@ export class ApiGateway {
       type: 'Incoming network usage',
       service: 'api-http',
       bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
+      path: req.path,
     }, req.context);
     res.on('finish', () => {
       this.log({
         type: 'Outgoing network usage',
         service: 'api-http',
         bytes: Number(res.get('content-length')) || 0,
+        path: req.path,
       }, req.context);
     });
     if (next) {
@@ -1439,7 +2218,10 @@ export class ApiGateway {
       ...restParams,
       ...(!context ? undefined : {
         securityContext: context.securityContext,
-        requestId: context.requestId
+        requestId: context.requestId,
+        ...(!context.appName ? undefined : { appName: context.appName }),
+        ...(!context.protocol ? undefined : { protocol: context.protocol }),
+        ...(!context.apiType ? undefined : { apiType: context.apiType }),
       })
     });
   }
@@ -1462,6 +2244,14 @@ export class ApiGateway {
     };
   };
 
+  private logProbeError(e: any, type: string): void {
+    this.log({
+      type,
+      driverType: e.driverType,
+      error: (e as Error).stack || (e as Error).toString(),
+    });
+  }
+
   protected readiness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
 
@@ -1472,23 +2262,9 @@ export class ApiGateway {
         // todo: test other data sources
         orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
-      } catch (e) {
-        this.log({
-          type: 'Internal Server Error on readiness probe',
-          error: e.stack || e.toString(),
-        });
-
-        return this.healthResponse(res, 'DOWN');
-      }
-
-      try {
         await orchestratorApi.testOrchestratorConnections();
-      } catch (e) {
-        this.log({
-          type: 'Internal Server Error on readiness probe',
-          error: e.stack || e.toString(),
-        });
-
+      } catch (e: any) {
+        this.logProbeError(e, 'Internal Server Error on readiness probe');
         health = 'DOWN';
       }
     }
@@ -1501,24 +2277,10 @@ export class ApiGateway {
 
     try {
       await this.dataSourceStorage.testConnections();
-    } catch (e) {
-      this.log({
-        type: 'Internal Server Error on liveness probe',
-        error: e.stack || e.toString(),
-      });
-
-      return this.healthResponse(res, 'DOWN');
-    }
-
-    try {
       // @todo Optimize this moment?
       await this.dataSourceStorage.testOrchestratorConnections();
-    } catch (e) {
-      this.log({
-        type: 'Internal Server Error on liveness probe',
-        error: e.stack || e.toString(),
-      });
-
+    } catch (e: any) {
+      this.logProbeError(e, 'Internal Server Error on liveness probe');
       health = 'DOWN';
     }
 
@@ -1531,3 +2293,8 @@ export class ApiGateway {
     }
   }
 }
+export {
+  UserBackgroundContext,
+  ApiGatewayOptions,
+  ApiGateway,
+};

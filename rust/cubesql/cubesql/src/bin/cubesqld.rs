@@ -1,9 +1,10 @@
-use cubesql::config::{Config, CubeServices};
-use cubesql::telemetry::{track_event, ReportingLogger};
+use cubesql::{
+    config::{Config, CubeServices},
+    telemetry::{LocalReporter, ReportingLogger},
+};
 
 use log::Level;
 use simple_logger::SimpleLogger;
-use std::collections::HashMap;
 use std::env;
 
 use tokio::runtime::Builder;
@@ -24,15 +25,26 @@ fn main() {
     let logger = SimpleLogger::new()
         .with_level(Level::Error.to_level_filter())
         .with_module_level("cubeclient", log_level.to_level_filter())
-        .with_module_level("cubesql", log_level.to_level_filter());
-    ReportingLogger::init(Box::new(logger), log_level.to_level_filter()).unwrap();
+        .with_module_level("cubesql", log_level.to_level_filter())
+        .with_module_level("datafusion", Level::Warn.to_level_filter())
+        .with_module_level("pg_srv", log_level.to_level_filter());
+
+    // console_subscriber::init();
+
+    ReportingLogger::init(
+        Box::new(logger),
+        Box::new(LocalReporter::new()),
+        log_level.to_level_filter(),
+    )
+    .unwrap();
 
     let config = Config::default();
 
     let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
     runtime.block_on(async move {
-        let services = config.configure().await;
-        track_event("Cube SQL Start".to_string(), HashMap::new()).await;
+        config.configure().await;
+        let services = config.cube_services().await;
+        log::debug!("Cube SQL Start");
         stop_on_ctrl_c(&services).await;
         services.wait_processing_loops().await.unwrap();
     });

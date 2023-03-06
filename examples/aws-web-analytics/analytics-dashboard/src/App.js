@@ -7,7 +7,6 @@ import { QueryRenderer } from '@cubejs-client/react';
 import { Spin } from 'antd';
 import { Chart, Axis, Tooltip, Geom, Coord, Legend } from 'bizcharts';
 import moment from 'moment';
-import GithubCorner from 'react-github-corner';
 import { trackPageView } from './track';
 import PrismCode from './PrismCode';
 
@@ -16,7 +15,7 @@ const dateRange = [
   moment().format('YYYY-MM-DD'),
 ];
 
-const { Header, Footer, Sider, Content } = Layout;
+const { Content } = Layout;
 
 const renderChart = (resultSet) => (
   <Chart scale={{ category: { tickCount: 8 } }} height={400} data={resultSet.chartPivot()} forceFit>
@@ -183,11 +182,8 @@ class App extends Component {
   }
 
   render() {
-    return [
+    return (
       <Layout>
-          <Header>
-            <h2 style={{ color: '#fff' }}>AWS Web Analytics Dashboard</h2>
-          </Header>
           <Content style={{ padding: '25px', margin: '25px' }}>
             <Row type="flex" justify="space-around" align="top" gutter={24}>
               <Col span={24} lg={12}>
@@ -207,7 +203,7 @@ class App extends Component {
                     }}
                     cubejsApi={cubejs(API_KEY)}
                     render={({ resultSet }) => (
-                      resultSet && renderChart(resultSet) || (<Spin />)
+                      resultSet ? renderChart(resultSet) : (<Spin />)
                     )}
                   />
                 </Card>
@@ -229,7 +225,7 @@ class App extends Component {
                     }}
                     cubejsApi={cubejs(API_KEY)}
                     render={({ resultSet }) => (
-                      resultSet && renderChart(resultSet) || (<Spin />)
+                      resultSet ? renderChart(resultSet) : (<Spin />)
                     )}
                   />
                 </Card>
@@ -254,7 +250,7 @@ class App extends Component {
                     }}
                     cubejsApi={cubejs(API_KEY)}
                     render={({ resultSet }) => (
-                      resultSet && renderStackedBarChart(resultSet, "PageViews.userCount") || (<Spin />)
+                      resultSet ? renderStackedBarChart(resultSet, "PageViews.userCount") : (<Spin />)
                     )}
                   />
                 </Card>
@@ -278,14 +274,14 @@ class App extends Component {
                     }}
                     cubejsApi={cubejs(API_KEY)}
                     render={({ resultSet }) => (
-                      resultSet && renderPieChart(resultSet, "PageViews.userCount") || (<Spin />)
+                      resultSet ? renderPieChart(resultSet, "PageViews.userCount") : (<Spin />)
                     )}
                   />
                 </Card>
               </Col>
               <Col lg={12} span={24}>
                 <Card title="Architecture" style={{ marginBottom: '24px', textAlign: 'center' }}>
-                  <img src="./architecture.png" style={{ width: '100%', maxWidth: '500px' }}/>
+                  <img src="./architecture.png" style={{ width: '100%', maxWidth: '500px' }} alt="" />
                 </Card>
               </Col>
               <Col lg={12} span={24}>
@@ -303,16 +299,10 @@ class App extends Component {
                   <PrismCode code={schemaCode}/>
                 </Card>
               </Col>
-              <Col span={24} style={{ textAlign: 'center' }}>
-                <a href="https://statsbot.co/cubejs/">
-                  <img src='./powered-by-cubejs-color.svg' style={{ width: 200 }}/>
-                </a>
-              </Col>
             </Row>
           </Content>
-        </Layout>,
-        <GithubCorner size={120} href="https://github.com/statsbotco/cubejs-client/tree/master/examples/aws-web-analytics" />
-    ];
+        </Layout>
+    )
   }
 }
 

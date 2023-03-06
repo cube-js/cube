@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"show tables from db;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
+---
++---------------------------+
+| Tables_in_db              |
++---------------------------+
+| KibanaSampleDataEcommerce |
+| Logs                      |
+| NumberCube                |
++---------------------------+

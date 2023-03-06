@@ -22,8 +22,9 @@ use tokio::sync::{Mutex, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct RemoteFile {
-    remote_path: String,
-    updated: DateTime<Utc>,
+    pub remote_path: String,
+    pub updated: DateTime<Utc>,
+    pub file_size: u64,
 }
 
 impl RemoteFile {
@@ -58,13 +59,51 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
             .unwrap()
             .to_owned())
     }
+    /// Check existance and size of uploaded file. Raise error if file doesn't exists or has wrong
+    /// size
+    async fn check_upload_file(
+        &self,
+        remote_path: &str,
+        expected_size: u64,
+    ) -> Result<(), CubeError> {
+        match self.list_with_metadata(&remote_path).await {
+            Ok(list) => {
+                let list_res = list.iter().next().ok_or(CubeError::internal(
+                        format!("File {} can't be listed after upload. Either there's Cube Store cluster misconfiguration, or storage can't provide the required consistency.", remote_path),
+                        ));
+                match list_res {
+                    Ok(file) => {
+                        if file.file_size != expected_size {
+                            Err(CubeError::internal(format!(
+                                        "File sizes for {} doesn't match after upload. Expected to be {} but {} uploaded",
+                                        remote_path,
+                                        expected_size,
+                                        file.file_size
+                                        )))
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
 
     /// In addition to uploading this file to the remote filesystem, this function moves the file
     /// from `temp_upload_path` to `self.local_path(remote_path)` on the local file system.
-    async fn upload_file(&self, temp_upload_path: &str, remote_path: &str)
-        -> Result<(), CubeError>;
+    async fn upload_file(
+        &self,
+        temp_upload_path: &str,
+        remote_path: &str,
+    ) -> Result<u64, CubeError>;
 
-    async fn download_file(&self, remote_path: &str) -> Result<String, CubeError>;
+    async fn download_file(
+        &self,
+        remote_path: &str,
+        expected_file_size: Option<u64>,
+    ) -> Result<String, CubeError>;
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError>;
 
@@ -77,9 +116,17 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
     async fn local_file(&self, remote_path: &str) -> Result<String, CubeError>;
 }
 
+pub fn ensure_temp_file_is_dropped(path: String) {
+    if std::fs::metadata(path.clone()).is_ok() {
+        if let Err(e) = std::fs::remove_file(path) {
+            log::error!("Error during cleaning up temp file: {}", e);
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct LocalDirRemoteFs {
-    remote_dir_for_debug: Option<PathBuf>,
+    _remote_dir_for_debug: Option<PathBuf>,
     remote_dir: RwLock<Option<PathBuf>>,
     dir: PathBuf,
     dir_delete_mut: Mutex<()>,
@@ -88,7 +135,7 @@ pub struct LocalDirRemoteFs {
 impl LocalDirRemoteFs {
     pub fn new(remote_dir: Option<PathBuf>, dir: PathBuf) -> Arc<LocalDirRemoteFs> {
         Arc::new(LocalDirRemoteFs {
-            remote_dir_for_debug: remote_dir.clone(),
+            _remote_dir_for_debug: remote_dir.clone(),
             remote_dir: RwLock::new(remote_dir),
             dir,
             dir_delete_mut: Mutex::new(()),
@@ -97,7 +144,7 @@ impl LocalDirRemoteFs {
 
     pub fn new_noop(dir: PathBuf) -> Arc<LocalDirRemoteFs> {
         Arc::new(LocalDirRemoteFs {
-            remote_dir_for_debug: None,
+            _remote_dir_for_debug: None,
             remote_dir: RwLock::new(None),
             dir,
             dir_delete_mut: Mutex::new(()),
@@ -117,8 +164,10 @@ impl RemoteFs for LocalDirRemoteFs {
         &self,
         temp_upload_path: &str,
         remote_path: &str,
-    ) -> Result<(), CubeError> {
+    ) -> Result<u64, CubeError> {
+        let mut has_remote = false;
         if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
+            has_remote = true;
             debug!("Uploading {}", remote_path);
             let dest = remote_dir.as_path().join(remote_path);
             fs::create_dir_all(dest.parent().unwrap())
@@ -141,7 +190,13 @@ impl RemoteFs for LocalDirRemoteFs {
                     ))
                 })?;
         }
+        if has_remote {
+            let size = fs::metadata(&temp_upload_path).await?.len();
+            self.check_upload_file(&remote_path, size).await?;
+        }
+
         let local_path = self.dir.as_path().join(remote_path);
+
         if Path::new(temp_upload_path) != local_path {
             fs::create_dir_all(local_path.parent().unwrap())
                 .await
@@ -163,10 +218,14 @@ impl RemoteFs for LocalDirRemoteFs {
                     ))
                 })?;
         }
-        Ok(())
+        Ok(fs::metadata(local_path).await?.len())
     }
 
-    async fn download_file(&self, remote_path: &str) -> Result<String, CubeError> {
+    async fn download_file(
+        &self,
+        remote_path: &str,
+        _expected_file_size: Option<u64>,
+    ) -> Result<String, CubeError> {
         let mut local_file = self.dir.as_path().join(remote_path);
         let local_dir = local_file.parent().unwrap();
         let downloads_dir = local_dir.join("downloads");
@@ -264,10 +323,10 @@ impl LocalDirRemoteFs {
         async move { Self::remove_empty_paths(root, path).await }.boxed()
     }
 
-    async fn remove_empty_paths(root: PathBuf, path: PathBuf) -> Result<(), CubeError> {
+    pub async fn remove_empty_paths(root: PathBuf, path: PathBuf) -> Result<(), CubeError> {
         if let Some(parent_path) = path.parent() {
             let mut dir = fs::read_dir(parent_path).await?;
-            if dir.next_entry().await?.is_none() {
+            if !parent_path.starts_with("temp-uploads") && dir.next_entry().await?.is_none() {
                 fs::remove_dir(parent_path).await?;
             }
             if root != parent_path.to_path_buf() {
@@ -318,11 +377,220 @@ impl LocalDirRemoteFs {
                         result.push(RemoteFile {
                             remote_path: relative_name.to_string(),
                             updated: DateTime::from(metadata.modified()?),
+                            file_size: metadata.len(),
                         });
                     }
                 }
             }
         }
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::s3::S3RemoteFs;
+    use super::*;
+    use std::io::prelude::*;
+    use std::path::{Path, PathBuf};
+    use std::sync::Arc;
+    use std::{env, fs};
+    use uuid::Uuid;
+
+    #[derive(Clone)]
+    struct NameMaker {
+        prefix: String,
+    }
+
+    impl NameMaker {
+        pub fn new(prefix: String) -> Self {
+            Self { prefix }
+        }
+        pub fn name(&self, name: &str) -> String {
+            format!("{}{}", self.prefix, name)
+        }
+    }
+
+    fn get_test_local_dir(fs_name: &str) -> PathBuf {
+        env::current_dir()
+            .unwrap()
+            .join(".cubestore")
+            .join("fs-test")
+            .join(fs_name)
+    }
+
+    fn clear_test_dir(fs_name: &str) {
+        let _ = fs::remove_dir_all(get_test_local_dir(fs_name));
+    }
+
+    async fn create_and_upload_file(
+        remote_fs: &Arc<dyn RemoteFs>,
+        remote_file: &str,
+    ) -> Result<String, CubeError> {
+        let temp_upload_path = remote_fs.temp_upload_path(remote_file).await?;
+        let mut file = fs::File::create(&temp_upload_path).unwrap();
+        file.write_all(b"test").unwrap();
+        remote_fs
+            .upload_file(&temp_upload_path, remote_file)
+            .await?;
+
+        Ok(temp_upload_path)
+    }
+
+    async fn test_remote_filesystem(
+        remote_fs: Arc<dyn RemoteFs>,
+        local_dir: &Path,
+        name_maker: NameMaker,
+        download_test: bool,
+    ) {
+        assert_eq!(remote_fs.local_path().await, local_dir.to_str().unwrap());
+
+        let local_file = remote_fs.local_file("test.tst").await.ok().unwrap();
+        assert_eq!(local_file, local_dir.join("test.tst").to_str().unwrap());
+
+        let local_file_path = Path::new("test_dir")
+            .join("test.tst")
+            .to_str()
+            .unwrap()
+            .to_owned();
+        let local_file = remote_fs
+            .local_file(local_file_path.as_ref())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            local_file,
+            local_dir.join(local_file_path).to_str().unwrap()
+        );
+
+        assert!(local_dir.join("test_dir").is_dir());
+
+        let root_files = vec![name_maker.name("test-1.txt"), name_maker.name("test-2.txt")];
+        let subdir_files = vec![
+            name_maker.name("subdir/test-1.txt"),
+            name_maker.name("subdir/test-2.txt"),
+        ];
+
+        for filename in root_files.iter().chain(subdir_files.iter()) {
+            let temp_upload_path = create_and_upload_file(&remote_fs, filename).await.unwrap();
+
+            assert!(!Path::new(&temp_upload_path).is_file());
+            assert!(local_dir.join(filename).is_file());
+        }
+
+        let mut remote_list = remote_fs.list(&name_maker.name("test-")).await.unwrap();
+        remote_list.sort();
+        remote_list
+            .iter()
+            .zip(root_files.iter())
+            .for_each(|(list_name, origin_name)| {
+                assert_eq!(list_name, origin_name);
+            });
+
+        let mut remote_list = remote_fs.list(&name_maker.name("subdir/")).await.unwrap();
+        remote_list.sort();
+        remote_list
+            .iter()
+            .zip(subdir_files.iter())
+            .for_each(|(list_name, origin_name)| {
+                assert_eq!(list_name, origin_name);
+            });
+
+        let mut remote_list = remote_fs
+            .list_with_metadata(&name_maker.name("test"))
+            .await
+            .unwrap();
+
+        remote_list.sort_by(|a, b| a.remote_path().partial_cmp(b.remote_path()).unwrap());
+
+        remote_list
+            .iter()
+            .zip(root_files.iter())
+            .for_each(|(list_file, origin_name)| {
+                assert_eq!(&list_file.remote_path, origin_name);
+            });
+
+        if download_test {
+            root_files.iter().for_each(|filename| {
+                fs::remove_file(local_dir.join(filename)).unwrap();
+            });
+            fs::remove_dir_all(local_dir.join(name_maker.name("subdir"))).unwrap();
+
+            for filename in root_files.iter().chain(subdir_files.iter()) {
+                assert!(!local_dir.join(filename).is_file());
+                remote_fs.download_file(filename, None).await.unwrap();
+                assert!(local_dir.join(filename).is_file());
+            }
+        }
+
+        for filename in root_files.iter().chain(subdir_files.iter()) {
+            assert!(local_dir.join(filename).is_file());
+            assert_eq!(&remote_fs.list(filename).await.unwrap()[0], filename);
+
+            remote_fs.delete_file(filename).await.unwrap();
+
+            assert!(!local_dir.join(filename).is_file());
+            assert!(&remote_fs.list(filename).await.unwrap().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn local_dir() {
+        clear_test_dir("local");
+        let local_path = get_test_local_dir("local");
+        let remote_fs = LocalDirRemoteFs::new(None, local_path.clone());
+
+        let name_maker = NameMaker::new("".to_string());
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), false).await;
+
+        let local_upstream = get_test_local_dir("local-upstream");
+
+        clear_test_dir("local");
+        clear_test_dir("local-upstream");
+
+        let remote_fs = LocalDirRemoteFs::new(Some(local_upstream.clone()), local_path.clone());
+
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("local");
+        clear_test_dir("local-upstream");
+    }
+
+    #[tokio::test]
+    async fn aws_s3() {
+        if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
+            return;
+        }
+
+        let region = "us-west-2".to_string();
+        let bucket_name = "cube-store-ci-test".to_string();
+
+        clear_test_dir("aws_s3");
+        let local_path = get_test_local_dir("aws_s3");
+
+        let remote_fs = S3RemoteFs::new(
+            local_path.clone(),
+            region.clone(),
+            bucket_name.clone(),
+            None,
+        )
+        .unwrap();
+
+        let name_maker = NameMaker::new(Uuid::new_v4().to_string());
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("aws_s3");
+
+        let remote_fs = S3RemoteFs::new(
+            local_path.clone(),
+            region.clone(),
+            bucket_name.clone(),
+            Some("remotefs_test_subpathdir".to_string()),
+        )
+        .unwrap();
+
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("aws_s3");
     }
 }

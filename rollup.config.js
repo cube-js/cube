@@ -66,14 +66,6 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
       ],
     },
 
-    // minified browser-friendly UMD build
-    /* {
-      ...BASE_UMD_CONFIG,
-      output: [{ file: pkg.browserMin, format: "umd", name: "cubejs" }],
-      plugins: [...BASE_UMD_CONFIG.plugins, uglify()]
-    }, */
-
-    // // ES module (for bundlers) build.
     {
       ...baseConfig,
       plugins: [
@@ -115,7 +107,7 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
         }
       ],
     },
-    // // ES module (for bundlers) build.
+    // ES module (for bundlers) build.
     {
       ...baseConfig,
       plugins: [
@@ -123,29 +115,9 @@ const bundle = (name, globalName, { globals = {}, ...baseConfig }, umdConfig) =>
         babel({
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           exclude: 'node_modules/**',
-          babelHelpers: 'runtime',
           presets: [
             '@babel/preset-react',
             '@babel/preset-typescript',
-            [
-              '@babel/preset-env',
-              {
-                shippedProposals: true,
-                useBuiltIns: 'usage',
-                corejs: 3,
-              },
-            ],
-          ],
-          plugins: [
-            [
-              '@babel/plugin-transform-runtime',
-              {
-                corejs: false,
-                helpers: true,
-                regenerator: true,
-                useESModules: false,
-              },
-            ],
           ],
         }),
       ],

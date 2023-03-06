@@ -4,7 +4,7 @@ import { QueryRenderer } from '@cubejs-client/react';
 import { format } from 'sql-formatter';
 
 import PrismCode from '../PrismCode';
-import { FatalError } from '../atoms';
+import { FatalError } from './Error/FatalError';
 
 const CachePane = ({ query }) => (
   <QueryRenderer

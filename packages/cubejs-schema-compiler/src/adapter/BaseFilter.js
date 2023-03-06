@@ -66,9 +66,13 @@ export class BaseFilter extends BaseDimension {
   }
 
   path() {
-    return this.measure ?
-      this.query.cubeEvaluator.parsePath('measures', this.measure) :
-      this.query.cubeEvaluator.parsePath('dimensions', this.dimension);
+    if (this.measure) {
+      return this.query.cubeEvaluator.parsePath('measures', this.measure);
+    } else if (this.query.cubeEvaluator.isInstanceOfType('segments', this.dimension)) {
+      return this.query.cubeEvaluator.parsePath('segments', this.dimension);
+    } else {
+      return this.query.cubeEvaluator.parsePath('dimensions', this.dimension);
+    }
   }
 
   cube() {
@@ -155,15 +159,77 @@ export class BaseFilter extends BaseDimension {
   }
 
   containsWhere(column) {
-    return this.likeOr(column);
+    return this.likeOr(column, false, 'contains');
   }
 
   notContainsWhere(column) {
-    return this.likeOr(column, true);
+    return this.likeOr(column, true, 'contains');
   }
 
-  likeOr(column, not) {
-    return `${join(not ? ' AND ' : ' OR ', this.filterParams().map(p => this.likeIgnoreCase(column, not, p)))}${this.orIsNullCheck(column, not)}`;
+  /**
+   * Returns SQL statement for the `startsWith` filter.
+   * @param {string} column Column name.
+   * @returns string
+   */
+  startsWithWhere(column) {
+    return this.likeOr(column, false, 'starts');
+  }
+
+  /**
+   * Returns SQL statement for the `notStartsWith` filter.
+   * @param {string} column Column name.
+   * @returns string
+   */
+  notStartsWithWhere(column) {
+    return this.likeOr(column, true, 'starts');
+  }
+
+  /**
+   * Returns SQL statement for the `endsWith` filter.
+   * @param {string} column Column name.
+   * @returns string
+   */
+  endsWithWhere(column) {
+    return this.likeOr(column, false, 'ends');
+  }
+
+  /**
+   * Returns SQL statement for the `endsWith` filter.
+   * @param {string} column Column name.
+   * @returns string
+   */
+  notEndsWithWhere(column) {
+    return this.likeOr(column, true, 'ends');
+  }
+
+  /**
+   * Returns SQL filter statement (union with the logical OR) for the
+   * provided parameters.
+   * @param {string} column Column name.
+   * @param {boolean} not Flag to build NOT LIKE statement.
+   * @param {string} type Type of the condition (i.e. contains/
+   * startsWith/endsWith).
+   * @returns string
+   */
+  likeOr(column, not, type) {
+    type = type || 'contains';
+    return `${join(not ? ' AND ' : ' OR ', this.filterParams().map(
+      p => this.likeIgnoreCase(column, not, p, type)
+    ))}${this.orIsNullCheck(column, not)}`;
+  }
+
+  /**
+   * Returns SQL LIKE statement for specified parameters.
+   * @param {string} column Column name.
+   * @param {boolean} not Flag to build NOT LIKE statement.
+   * @param {*} param Value for statement.
+   * @param {string} type Type of the condition (i.e. contains/startsWith/endsWith).
+   * @returns string
+   */
+  likeIgnoreCase(column, not, param, type) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
+    return `${column}${not ? ' NOT' : ''} ILIKE ${p}${this.allocateParam(param)}${s}`;
   }
 
   orIsNullCheck(column, not) {
@@ -172,10 +238,6 @@ export class BaseFilter extends BaseDimension {
 
   shouldAddOrIsNull(not) {
     return not ? !this.valuesContainNull() : this.valuesContainNull();
-  }
-
-  likeIgnoreCase(column, not, param) {
-    return `${column}${not ? ' NOT' : ''} ILIKE '%' || ${this.allocateParam(param)} || '%'`;
   }
 
   allocateParam(param) {

@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 4288
+expression: "execute_query(\"SELECT \\\n                    @@GLOBAL.time_zone AS global_tz, \\\n                    @@system_time_zone AS system_tz, time_format(   timediff(      now(), convert_tz(now(), @@GLOBAL.time_zone, '+00:00')   ),   '%H:%i' ) AS 'offset'\n                \".to_string()).await?"
+
+---
++-----------+-----------+--------+
+| global_tz | system_tz | offset |
++-----------+-----------+--------+
+| SYSTEM    | UTC       | 00:00  |
++-----------+-----------+--------+

@@ -1,5 +1,5 @@
 use crate::config::processing_loop::ProcessingLoop;
-use crate::sql::{SqlQueryContext, SqlService};
+use crate::sql::{InlineTables, SqlQueryContext, SqlService};
 use crate::table::TableValue;
 use crate::util::time_span::warn_long;
 use crate::{metastore, CubeError};
@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use datafusion::cube_ext;
 use hex::ToHex;
 use log::{error, info, warn};
+use mockall::automock;
 use msql_srv::*;
 use std::convert::TryFrom;
 use std::io;
@@ -60,6 +61,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
             .exec_query_with_context(
                 SqlQueryContext {
                     user: self.user.clone(),
+                    inline_tables: InlineTables::new(),
                     trace_obj: None,
                 },
                 query,
@@ -229,6 +231,7 @@ impl MySqlServer {
     }
 }
 
+#[automock]
 #[async_trait]
 pub trait SqlAuthService: Send + Sync {
     async fn authenticate(&self, user: Option<String>) -> Result<Option<String>, CubeError>;

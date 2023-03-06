@@ -2,9 +2,9 @@ import dotenv from '@cubejs-backend/dotenv';
 
 import CubeCore, {
   CreateOptions as CoreCreateOptions,
-  CubejsServerCore,
   DatabaseType,
   DriverContext,
+  DriverOptions,
   SystemOptions
 } from '@cubejs-backend/server-core';
 import { getEnv, withTimeout } from '@cubejs-backend/shared';
@@ -48,9 +48,9 @@ type RequireOne<T, K extends keyof T> = {
 };
 
 export class CubejsServer {
-  protected readonly core: CubejsServerCore;
+  protected readonly core: CubeCore;
 
-  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort'>;
+  protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort'>;
 
   protected server: GracefulHttpServer | null = null;
 
@@ -65,18 +65,23 @@ export class CubejsServer {
       ...config,
       webSockets: config.webSockets || getEnv('webSockets'),
       sqlPort: config.sqlPort || getEnv('sqlPort'),
+      pgSqlPort: config.pgSqlPort || getEnv('pgSqlPort'),
       sqlNonce: config.sqlNonce || getEnv('sqlNonce'),
       http: {
         ...config.http,
         cors: {
           allowedHeaders: 'authorization,content-type,x-request-id',
-          ...config.http?.cors
-        }
+          ...config.http?.cors,
+        },
       },
     };
 
-    this.core = CubeCore.create(config, systemOptions);
+    this.core = this.createCoreInstance(config, systemOptions);
     this.server = null;
+  }
+
+  protected createCoreInstance(config: CreateOptions, systemOptions?: SystemOptions): CubeCore {
+    return new CubeCore(config, systemOptions);
   }
 
   public async listen(options: http.ServerOptions = {}) {
@@ -111,7 +116,7 @@ export class CubejsServer {
         this.socketServer.initServer(this.server);
       }
 
-      if (this.config.sqlPort) {
+      if (this.config.sqlPort || this.config.pgSqlPort) {
         this.sqlServer = this.core.initSQLServer();
         await this.sqlServer.init(this.config);
       }
@@ -125,7 +130,7 @@ export class CubejsServer {
         server: this.server,
         version
       };
-    } catch (e) {
+    } catch (e: any) {
       if (this.core.event) {
         await this.core.event('Dev Server Fatal Error', {
           error: (e.stack || e.message || e).toString()
@@ -173,7 +178,7 @@ export class CubejsServer {
       this.server = null;
 
       await this.core.releaseConnections();
-    } catch (e) {
+    } catch (e: any) {
       if (this.core.event) {
         await this.core.event('Dev Server Fatal Error', {
           error: (e.stack || e.message || e).toString()
@@ -184,8 +189,13 @@ export class CubejsServer {
     }
   }
 
-  public static createDriver(dbType: DatabaseType) {
-    return CubeCore.createDriver(dbType);
+  /**
+   * Create driver instance.
+   *
+   * TODO (buntarb): there is no usage of this method across the project.
+   */
+  public static createDriver(dbType: DatabaseType, opt: DriverOptions) {
+    return CubeCore.createDriver(dbType, opt);
   }
 
   public static driverDependencies(dbType: DatabaseType) {
@@ -243,7 +253,7 @@ export class CubejsServer {
       await timeoutKiller.cancel();
 
       return 0;
-    } catch (e) {
+    } catch (e: any) {
       console.error('Fatal error during server shutting down: ');
       console.error(e.stack || e);
 

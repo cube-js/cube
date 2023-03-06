@@ -1,10 +1,8 @@
-use super::{
-    BaseRocksSecondaryIndex, Column, Index, IndexId, RocksSecondaryIndex, RocksTable, TableId,
-};
-use crate::metastore::{IdRow, MetaStoreEvent};
+use super::{Column, Index, IndexId, IndexType, RocksSecondaryIndex, TableId};
+
 use crate::{rocks_table_impl, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer};
 use std::io::{Cursor, Write};
 
@@ -16,6 +14,7 @@ impl Index {
         sort_key_size: u64,
         partition_split_key_size: Option<u64>,
         multi_index_id: Option<u64>,
+        index_type: IndexType,
     ) -> Result<Index, CubeError> {
         if sort_key_size == 0 {
             return Err(CubeError::user(format!(
@@ -30,6 +29,7 @@ impl Index {
             sort_key_size,
             partition_split_key_size,
             multi_index_id,
+            index_type,
         })
     }
 
@@ -39,6 +39,10 @@ impl Index {
 
     pub fn get_name(&self) -> &String {
         &self.name
+    }
+
+    pub fn get_type(&self) -> IndexType {
+        self.index_type.clone()
     }
 
     pub fn columns(&self) -> &Vec<Column> {
@@ -60,6 +64,10 @@ impl Index {
 
     pub fn multi_index_id(&self) -> Option<u64> {
         self.multi_index_id
+    }
+
+    pub fn index_type_default() -> IndexType {
+        IndexType::Regular
     }
 }
 

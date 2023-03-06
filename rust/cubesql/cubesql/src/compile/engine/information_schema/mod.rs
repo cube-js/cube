@@ -1,7 +1,4 @@
-pub mod columns;
-pub mod key_column_usage;
-pub mod referential_constraints;
-pub mod schemata;
-pub mod statistics;
-pub mod tables;
-pub mod variables;
+pub mod mysql;
+pub mod postgres;
+pub mod redshift;
+pub mod utils;

@@ -1,0 +1,5 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"DISCARD TEMPORARY;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
+

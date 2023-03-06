@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::panic;
-use std::process::Child;
+use std::process::{Child, ExitStatus};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,15 +13,17 @@ use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tokio::runtime::Builder;
+use tokio::runtime::{Builder, Runtime};
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
+use crate::config::{Config, WorkerServices};
 use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
+use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -50,7 +52,7 @@ pub trait MessageProcessor<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
 >
 {
-    async fn process(args: T) -> Result<R, CubeError>;
+    async fn process(services: &WorkerServices, args: T) -> Result<R, CubeError>;
 }
 
 impl<
@@ -109,6 +111,35 @@ impl<
     }
 }
 
+struct ProcessHandleGuard {
+    handle: Child,
+}
+
+impl ProcessHandleGuard {
+    pub fn new(handle: Child) -> Self {
+        Self { handle }
+    }
+    pub fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
+        self.handle.try_wait()
+    }
+    pub fn is_alive(&mut self) -> bool {
+        self.handle.try_wait().map_or(false, |r| r.is_none())
+    }
+    pub fn kill(&mut self) {
+        if let Err(e) = self.handle.kill() {
+            error!("Error during kill: {:?}", e);
+        }
+    }
+}
+
+impl Drop for ProcessHandleGuard {
+    fn drop(&mut self) {
+        if self.is_alive() {
+            self.kill();
+        }
+    }
+}
+
 pub struct WorkerProcess<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -149,8 +180,8 @@ impl<
             let process = self.spawn_process();
 
             match process {
-                Ok((mut args_tx, mut res_rx, mut handle)) => {
-                    scopeguard::defer!(<WorkerProcess<T, R, P>>::kill(&mut handle));
+                Ok((mut args_tx, mut res_rx, handle)) => {
+                    let mut handle_guard = ProcessHandleGuard::new(handle);
                     loop {
                         let mut stopped_rx = self.stopped_rx.write().await;
                         let Message {
@@ -170,6 +201,35 @@ impl<
                                 message
                             }
                         };
+                        //Check if child process is killed
+                        match handle_guard.try_wait() {
+                            Ok(Some(_)) => {
+                                error!(
+                                    "Worker process is killed, reshedule message in another process"
+                                    );
+                                self.queue.push(Message {
+                                    message,
+                                    sender,
+                                    span,
+                                    dispatcher,
+                                });
+                                break;
+                            }
+                            Ok(None) => {}
+                            Err(_) => {
+                                error!(
+                                    "Can't read worker process status, reshedule message in another process"
+                                    );
+                                self.queue.push(Message {
+                                    message,
+                                    sender,
+                                    span,
+                                    dispatcher,
+                                });
+                                break;
+                            }
+                        }
+
                         let process_message_res_timeout = tokio::time::timeout(
                             self.timeout,
                             self.process_message(message, args_tx, res_rx),
@@ -209,12 +269,6 @@ impl<
                     error!("Can't start process: {}", e);
                 }
             }
-        }
-    }
-
-    fn kill(handle: &mut Child) {
-        if let Err(e) = handle.kill() {
-            error!("Error during kill: {:?}", e);
         }
     }
 
@@ -271,13 +325,29 @@ where
     P: MessageProcessor<T, R>,
 {
     let (rx, tx) = (a.args, a.results);
-    let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
+    let mut tokio_builder = Builder::new_multi_thread();
+    tokio_builder.enable_all();
+    tokio_builder.thread_name("cubestore-worker");
+    if let Ok(var) = std::env::var("CUBESTORE_EVENT_LOOP_WORKER_THREADS") {
+        tokio_builder.worker_threads(var.parse().unwrap());
+    }
+    let runtime = tokio_builder.build().unwrap();
+    worker_setup(&runtime);
     runtime.block_on(async move {
+        let config = Config::default();
+        config.configure_injector().await;
+        let services = config.worker_services().await;
+
         loop {
             let res = rx.recv();
             match res {
                 Ok(args) => {
-                    let send_res = tx.send(P::process(args).await);
+                    let result =
+                        match async_try_with_catch_unwind(P::process(&services, args)).await {
+                            Ok(result) => result,
+                            Err(panic) => Err(CubeError::from(panic)),
+                        };
+                    let send_res = tx.send(result);
                     if let Err(e) = send_res {
                         error!("Worker message send error: {:?}", e);
                         return 0;
@@ -290,6 +360,24 @@ where
             }
         }
     })
+}
+
+fn worker_setup(runtime: &Runtime) {
+    let startup = SELECT_WORKER_SETUP.read().unwrap();
+    if startup.is_some() {
+        startup.as_ref().unwrap()(runtime);
+    }
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_SETUP: std::sync::RwLock<Option<Box<dyn Fn(&Runtime) + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+pub fn register_select_worker_setup(f: fn(&Runtime)) {
+    let mut startup = SELECT_WORKER_SETUP.write().unwrap();
+    assert!(startup.is_none(), "select worker setup already registered");
+    *startup = Some(Box::new(f));
 }
 
 #[cfg(test)]
@@ -305,6 +393,7 @@ mod tests {
     use tokio::runtime::Builder;
 
     use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
+    use crate::config::WorkerServices;
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::util::respawn;
     use crate::CubeError;
@@ -319,6 +408,7 @@ mod tests {
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
     pub enum Message {
         Delay(u64),
+        Panic,
     }
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -330,11 +420,14 @@ mod tests {
 
     #[async_trait]
     impl MessageProcessor<Message, Response> for Processor {
-        async fn process(args: Message) -> Result<Response, CubeError> {
+        async fn process(_services: &WorkerServices, args: Message) -> Result<Response, CubeError> {
             match args {
                 Message::Delay(x) => {
                     Delay::new(Duration::from_millis(x)).await;
                     Ok(Response::Foo(x))
+                }
+                Message::Panic => {
+                    panic!("oops")
                 }
             }
         }
@@ -405,6 +498,25 @@ mod tests {
                     assert_eq!(f.await.unwrap(), Response::Foo(i * 300));
                 }
             }
+            pool.stop_workers().await.unwrap();
+        });
+    }
+
+    #[test]
+    fn test_panic() {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+
+        runtime.block_on(async move {
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(2000),
+            ));
+            let pool_to_move = pool.clone();
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
+            assert_eq!(
+                pool.process(Message::Panic).await,
+                Err(CubeError::panic("oops".to_string()))
+            );
             pool.stop_workers().await.unwrap();
         });
     }

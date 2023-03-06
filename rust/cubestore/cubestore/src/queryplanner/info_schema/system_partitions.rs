@@ -1,6 +1,6 @@
 use crate::metastore::partition::partition_file_name;
-use crate::metastore::{IdRow, MetaStore, MetaStoreTable, Partition};
-use crate::queryplanner::InfoSchemaTableDef;
+use crate::metastore::{IdRow, MetaStoreTable, Partition};
+use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use arrow::array::{ArrayRef, BooleanArray, StringArray, UInt64Array};
 use arrow::datatypes::{DataType, Field};
@@ -13,8 +13,8 @@ pub struct SystemPartitionsTableDef;
 impl InfoSchemaTableDef for SystemPartitionsTableDef {
     type T = IdRow<Partition>;
 
-    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(meta_store.partition_table().all_rows().await?))
+    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        Ok(Arc::new(ctx.meta_store.partition_table().all_rows().await?))
     }
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {
@@ -115,6 +115,36 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                 }),
             ),
             (
+                Field::new("min_row", DataType::Utf8, true),
+                Box::new(|partitions| {
+                    let min_array = partitions
+                        .iter()
+                        .map(|row| row.get_row().get_min().as_ref().map(|x| format!("{:?}", x)))
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        min_array
+                            .iter()
+                            .map(|v| v.as_ref().map(|v| v.as_str()))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("max_row", DataType::Utf8, true),
+                Box::new(|partitions| {
+                    let max_array = partitions
+                        .iter()
+                        .map(|row| row.get_row().get_max().as_ref().map(|x| format!("{:?}", x)))
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        max_array
+                            .iter()
+                            .map(|v| v.as_ref().map(|v| v.as_str()))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
                 Field::new("active", DataType::Boolean, true),
                 Box::new(|partitions| {
                     Arc::new(BooleanArray::from(
@@ -143,6 +173,17 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                         partitions
                             .iter()
                             .map(|row| row.get_row().main_table_row_count())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("file_size", DataType::UInt64, true),
+                Box::new(|partitions| {
+                    Arc::new(UInt64Array::from(
+                        partitions
+                            .iter()
+                            .map(|row| row.get_row().file_size())
                             .collect::<Vec<_>>(),
                     ))
                 }),

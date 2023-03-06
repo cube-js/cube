@@ -1,15 +1,24 @@
-import { setLogLevel, registerInterface, SqlInterfaceInstance } from '@cubejs-backend/native';
+import {
+  setupLogger,
+  registerInterface,
+  SqlInterfaceInstance,
+  Request as NativeRequest,
+  LoadRequestMeta,
+} from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
 import type { ApiGateway } from './gateway';
-import type { CheckSQLAuthFn } from './interfaces';
+import type { CheckSQLAuthFn, ExtendedRequestContext, CanSwitchSQLUserFn } from './interfaces';
 
 export type SQLServerOptions = {
   checkSqlAuth?: CheckSQLAuthFn,
+  canSwitchSqlUser?: CanSwitchSQLUserFn,
   sqlPort?: number,
+  pgSqlPort?: number,
   sqlNonce?: string,
   sqlUser?: string,
+  sqlSuperUser?: string,
   sqlPassword?: string,
 };
 
@@ -19,7 +28,8 @@ export class SQLServer {
   public constructor(
     protected readonly apiGateway: ApiGateway,
   ) {
-    setLogLevel(
+    setupLogger(
+      ({ event }) => apiGateway.log(event),
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
     );
   }
@@ -32,20 +42,25 @@ export class SQLServer {
     const checkSqlAuth: CheckSQLAuthFn = (options.checkSqlAuth && this.wrapCheckSqlAuthFn(options.checkSqlAuth))
       || this.createDefaultCheckSqlAuthFn(options);
 
+    const canSwitchSqlUser: CanSwitchSQLUserFn = options.canSwitchSqlUser
+      || this.createDefaultCanSwitchSqlUserFn(options);
+
     this.sqlInterfaceInstance = await registerInterface({
       port: options.sqlPort,
+      pgPort: options.pgSqlPort,
       nonce: options.sqlNonce,
       checkAuth: async ({ request, user }) => {
-        const { password } = await checkSqlAuth(request, user);
+        const { password, superuser } = await checkSqlAuth(request, user);
 
         // Strip securityContext to improve speed deserialization
         return {
-          password
+          password,
+          superuser: superuser || false,
         };
       },
-      meta: async ({ request, user }) => {
+      meta: async ({ request, session }) => {
         // @todo Store security context in native
-        const { securityContext } = await checkSqlAuth(request, user);
+        const { securityContext } = await checkSqlAuth(request, session.user);
         const context = await this.apiGateway.contextByReq(<any> request, securityContext, request.id);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -62,10 +77,23 @@ export class SQLServer {
           }
         });
       },
-      load: async ({ request, user, query }) => {
-        // @todo Store security context in native
-        const { securityContext } = await checkSqlAuth(request, user);
-        const context = await this.apiGateway.contextByReq(<any> request, securityContext, request.id);
+      load: async ({ request, session, query }) => {
+        let userForContext = session.user;
+
+        if (request.meta.changeUser && request.meta.changeUser !== session.user) {
+          const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
+          if (canSwitch) {
+            userForContext = request.meta.changeUser;
+          } else {
+            throw new Error(
+              `You cannot change security context via __user from ${session.user} to ${request.meta.changeUser}, because it's not allowed.`
+            );
+          }
+        }
+
+        // @todo Store security context in native for session's user, but not for switching
+        const current = await checkSqlAuth(request, userForContext);
+        const context = await this.contextByNativeReq(request, current.securityContext, request.id);
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
@@ -79,6 +107,33 @@ export class SQLServer {
               },
               apiType: 'sql',
             });
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
+      stream: async ({ request, session, query }) => {
+        let userForContext = session.user;
+
+        if (request.meta.changeUser && request.meta.changeUser !== session.user) {
+          const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
+          if (canSwitch) {
+            userForContext = request.meta.changeUser;
+          } else {
+            throw new Error(
+              `You cannot change security context via __user from ${session.user} to ${request.meta.changeUser}, because it's not allowed.`
+            );
+          }
+        }
+
+        // @todo Store security context in native for session's user, but not for switching
+        const current = await checkSqlAuth(request, userForContext);
+        const context = await this.contextByNativeReq(request, current.securityContext, request.id);
+
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise(async (resolve, reject) => {
+          try {
+            resolve(await this.apiGateway.stream(context, query));
           } catch (e) {
             reject(e);
           }
@@ -99,6 +154,18 @@ export class SQLServer {
       }
 
       return response;
+    };
+  }
+
+  protected createDefaultCanSwitchSqlUserFn(options: SQLServerOptions): CanSwitchSQLUserFn {
+    const superUser = options.sqlSuperUser || getEnv('sqlSuperUser');
+
+    return async (current: string | null, _user: string) => {
+      if (superUser) {
+        return current === superUser;
+      }
+
+      return false;
     };
   }
 
@@ -126,13 +193,22 @@ export class SQLServer {
 
     return async (req, user) => {
       if (allowedUser && user !== allowedUser) {
-        throw new Error('Incorrect user name or password');
+        throw new Error(`Incorrect user name "${user}" or password`);
       }
 
       return {
         password: allowedPassword,
         securityContext: {}
       };
+    };
+  }
+
+  protected async contextByNativeReq(req: NativeRequest<LoadRequestMeta>, securityContext, requestId: string): Promise<ExtendedRequestContext> {
+    const context = await this.apiGateway.contextByReq(<any> req, securityContext, requestId);
+
+    return {
+      ...context,
+      ...req.meta,
     };
   }
 

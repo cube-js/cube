@@ -1,3 +1,4 @@
+/* eslint-disable import/no-anonymous-default-export */
 import moment from 'moment';
 
 const dateRange = [

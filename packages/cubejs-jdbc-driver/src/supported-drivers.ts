@@ -1,4 +1,4 @@
-interface DriverOptionsInterface {
+export interface DriverOptionsInterface {
   driverClass: string;
   prepareConnectionQueries: string[];
   mavenDependency: Record<string, any>;

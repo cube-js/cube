@@ -1,4 +1,13 @@
-/* eslint-disable no-restricted-syntax */
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `ClickHouseDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import {
   BaseDriver,
   DownloadQueryResultsOptions,
@@ -6,8 +15,7 @@ import {
   DriverInterface,
   StreamOptions,
   StreamTableDataWithTypes,
-} from '@cubejs-backend/query-orchestrator';
-import { getEnv } from '@cubejs-backend/shared';
+} from '@cubejs-backend/base-driver';
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';
 import sqlstring from 'sqlstring';
@@ -47,27 +55,76 @@ interface ClickHouseDriverOptions {
   queryOptions?: object,
 }
 
+/**
+ * ClickHouse driver class.
+ */
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 5;
+  }
+
   protected readonly pool: Pool<any>;
 
   protected readonly readOnlyMode: boolean;
 
   protected readonly config: any;
 
-  public constructor(config: ClickHouseDriverOptions = {}) {
-    super();
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: ClickHouseDriverOptions & {
+      /**
+       * Data source name.
+       */
+      dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
+      maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
+    } = {},
+  ) {
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
 
     this.config = {
-      host: process.env.CUBEJS_DB_HOST,
-      port: process.env.CUBEJS_DB_PORT,
-      auth: process.env.CUBEJS_DB_USER || process.env.CUBEJS_DB_PASS ? `${process.env.CUBEJS_DB_USER}:${process.env.CUBEJS_DB_PASS}` : '',
-      protocol: getEnv('dbSsl') ? 'https:' : 'http:',
+      host: getEnv('dbHost', { dataSource }),
+      port: getEnv('dbPort', { dataSource }),
+      auth:
+        getEnv('dbUser', { dataSource }) ||
+        getEnv('dbPass', { dataSource })
+          ? `${
+            getEnv('dbUser', { dataSource })
+          }:${
+            getEnv('dbPass', { dataSource })
+          }`
+          : '',
+      protocol: getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:',
       queryOptions: {
-        database: process.env.CUBEJS_DB_NAME || config && config.database || 'default'
+        database:
+          getEnv('dbName', { dataSource }) ||
+          config && config.database ||
+          'default'
       },
       ...config
     };
-    this.readOnlyMode = process.env.CUBEJS_DB_CLICKHOUSE_READONLY === 'true';
+    this.readOnlyMode =
+      getEnv('clickhouseReadOnly', { dataSource }) === 'true';
     this.pool = genericPool.createPool({
       create: async () => new ClickHouse({
         ...this.config,
@@ -87,7 +144,10 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       destroy: () => Promise.resolve()
     }, {
       min: 0,
-      max: 8,
+      max:
+        config.maxPoolSize ||
+        getEnv('dbMaxPoolSize', { dataSource }) ||
+        8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
@@ -134,7 +194,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public readOnly() {
-    return !!this.config.readOnly || this.readOnlyMode;
+    return (this.config.readOnly != null || this.readOnlyMode) ?
+      (!!this.config.readOnly || this.readOnlyMode) :
+      true;
   }
 
   public async query(query: string, values: unknown[]) {
@@ -295,7 +357,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
      * Nullable(DateTime('UTC'))
      */
     if (columnType.includes('(')) {
-      const types = columnType.toLowerCase().match(/([a-z']+)/g);
+      const types = columnType.toLowerCase().match(/([a-z0-9']+)/g);
       if (types) {
         for (const type of types) {
           if (type in ClickhouseTypeToGeneric) {
@@ -308,8 +370,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return super.toGenericType(columnType);
   }
 
-  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
-    return this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`, []);
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
+    await this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`, []);
   }
 
   public getTablesQuery(schemaName: string) {

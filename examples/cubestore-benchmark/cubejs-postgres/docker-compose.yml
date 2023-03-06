@@ -7,11 +7,14 @@ services:
       - 4002:4000
       - 3002:3000
     environment:
+      - CUBEJS_REFRESH_WORKER=false
+      - CUBEJS_ROLLUP_ONLY=true
+      # - CUBEJS_DEV_MODE=true
+
       - CUBEJS_DB_TYPE=bigquery
-      # TODO: Fill in the values below
-      - CUBEJS_DB_BQ_PROJECT_ID=
-      - CUBEJS_DB_BQ_CREDENTIALS=
-      - CUBEJS_DB_BQ_EXPORT_BUCKET=
+      - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
+      - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
+      - CUBEJS_DB_EXPORT_BUCKET=${CUBEJS_DB_EXPORT_BUCKET}
 
       - CUBEJS_EXT_DB_TYPE=postgres
       - CUBEJS_EXT_DB_HOST=postgres
@@ -33,12 +36,12 @@ services:
   refresh_worker:
     image: cubejs/cube:latest
     environment:
-      - CUBEJS_SCHEDULED_REFRESH_TIMER=true
+      - CUBEJS_REFRESH_WORKER=true
+
       - CUBEJS_DB_TYPE=bigquery
-      # TODO: Fill in the values below
-      - CUBEJS_DB_BQ_PROJECT_ID=
-      - CUBEJS_DB_BQ_CREDENTIALS=
-      - CUBEJS_DB_BQ_EXPORT_BUCKET=
+      - CUBEJS_DB_BQ_PROJECT_ID=${CUBEJS_DB_BQ_PROJECT_ID}
+      - CUBEJS_DB_BQ_CREDENTIALS=${CUBEJS_DB_BQ_CREDENTIALS}
+      - CUBEJS_DB_EXPORT_BUCKET=${CUBEJS_DB_EXPORT_BUCKET}
 
       - CUBEJS_EXT_DB_TYPE=postgres
       - CUBEJS_EXT_DB_HOST=postgres

@@ -31,7 +31,7 @@ cube(`Users`, {
       sql: `state`,
       type: `string`,
     },
-  }
+  },
 });
 ```
 
@@ -64,7 +64,7 @@ dropdown on the dashboard:
   },
   {
     'Users.city': 'Mountain View',
-  }
+  },
 ];
 ```
 

@@ -1,5 +1,6 @@
 ---
-title: Overview
+title: Security Overview
+menuTitle: Overview
 permalink: /security
 category: Authentication & Authorization
 menuOrder: 1
@@ -129,11 +130,11 @@ Cube.js has out-of-the-box support for the following identity providers:
 <InfoBox>
 
 If you don't see your identity provider listed, please let us know with a post
-under the [Ideas category on our Discourse forum][link-discourse-ideas].
+on our [Slack][link-slack]. 
 
 </InfoBox>
 
-[link-discourse-ideas]: https://forum.cube.dev/c/ideas/12
+[link-slack]: https://slack.cube.dev/
 [ref-jwt-auth0]: /security/jwt/auth0
 [ref-jwt-aws-cognito]: /security/jwt/aws-cognito
 
@@ -157,7 +158,7 @@ module.exports = {
 
 Or configure the same using environment variables:
 
-```dotenv
+```bash
 CUBEJS_JWT_KEY='<JWK_AS_STRING>'
 ```
 
@@ -182,7 +183,7 @@ module.exports = {
 
 Or configure the same using environment variables:
 
-```dotenv
+```bash
 CUBEJS_JWK_URL='<URL_TO_JWKS_JSON>'
 ```
 
@@ -204,7 +205,7 @@ module.exports = {
 
 Using environment variables:
 
-```dotenv
+```bash
 CUBEJS_JWT_AUDIENCE='<AUDIENCE_FROM_IDENTITY_PROVIDER>'
 CUBEJS_JWT_ISSUER='<ISSUER_FROM_IDENTITY_PROVIDER>'
 CUBEJS_JWT_SUBJECT='<SUBJECT_FROM_IDENTITY_PROVIDER>'

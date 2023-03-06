@@ -16,7 +16,7 @@ export function detectLibc() {
     if (status === 0) {
       return 'gnu';
     }
-  } catch (e) {
+  } catch (e: any) {
     internalExceptions(e);
   }
 

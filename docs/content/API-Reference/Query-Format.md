@@ -19,8 +19,8 @@ ex: `Stories.time.month`.
 Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`,
 `quarter` and `year`.
 
-The Cube.js client also accepts an array of queries. By default it will be
-treated as a [Data Blending](/recipes/data-blending) query.
+The Cube client also accepts an array of queries. By default, it will be treated
+as a Data Blending query type.
 
 ## Query Properties
 
@@ -41,24 +41,24 @@ A Query has the following properties:
 - `order`: An object, where the keys are measures or dimensions to order by and
   their corresponding values are either `asc` or `desc`. The order of the fields
   to order on is based on the order of the keys in the object.
-- `timezone`: All time based calculations performed within Cube.js are
+- `timezone`: All time based calculations performed within Cube are
   timezone-aware. This property is applied to all time dimensions during
   aggregation and filtering. It isn't applied to the time dimension referenced
   in a `dimensions` query property unless granularity or date filter is
   specified. Using this property you can set your desired timezone in
   [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.:
   `America/Los_Angeles`. The default value is `UTC`.
-- `renewQuery`: If `renewQuery` is set to `true`, Cube.js will renew all
+- `renewQuery`: If `renewQuery` is set to `true`, Cube will renew all
   [`refreshKey`][ref-schema-ref-preaggs-refreshkey] for queries and query
   results in the foreground. However, if the
   [`refreshKey`][ref-schema-ref-preaggs-refreshkey] (or
   [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every]) doesn't
   indicate that there's a need for an update this setting has no effect. The
   default value is `false`.
-  > **NOTE**: Cube.js provides only eventual consistency guarantee. Using a
-  > small [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every] value
-  > together with `renewQuery` to achieve immediate consistency can lead to
-  > endless refresh loops and overall system instability.
+  > **NOTE**: Cube provides only eventual consistency guarantee. Using a small
+  > [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every] value together
+  > with `renewQuery` to achieve immediate consistency can lead to endless
+  > refresh loops and overall system instability.
 - `ungrouped`: If `ungrouped` is set to `true` no `GROUP BY` statement will be
   added to the query. Instead, the raw results after filtering and joining will
   be returned without grouping. By default `ungrouped` queries require a primary
@@ -67,7 +67,7 @@ A Query has the following properties:
   measures without aggregation and time dimensions will be truncated as usual
   however not grouped by.
 
-```js
+```javascript
 {
   measures: ['Stories.count'],
   dimensions: ['Stories.category'],
@@ -93,7 +93,7 @@ A Query has the following properties:
 
 ### <--{"id" : "Query Properties"}--> Default order
 
-If the `order` property is not specified in the query, Cube.js sorts results by
+If the `order` property is not specified in the query, Cube sorts results by
 default using the following rules:
 
 - The first time dimension with granularity, ascending. If no time dimension
@@ -103,10 +103,10 @@ default using the following rules:
 
 ### <--{"id" : "Query Properties"}--> Alternative order format
 
-Also you can control the ordering of the `order` specification, Cube.js support
+Also you can control the ordering of the `order` specification, Cube support
 alternative order format - array of tuples:
 
-```js
+```javascript
 {
   ...,
   order: [
@@ -153,7 +153,7 @@ Use it when you need an exact match. It supports multiple values.
 - Applied to measures.
 - Dimension types: `string`, `number`, `time`.
 
-```js
+```javascript
 {
   member: "Users.country",
   operator: "equals",
@@ -168,7 +168,7 @@ The opposite operator of `equals`. It supports multiple values.
 - Applied to measures.
 - Dimension types: `string`, `number`, `time`.
 
-```js
+```javascript
 {
   member: "Users.country",
   operator: "notEquals",
@@ -178,17 +178,17 @@ The opposite operator of `equals`. It supports multiple values.
 
 ### <--{"id" : "Filters Operators"}--> contains
 
-The `contains` filter acts as a wildcard case insensitive `LIKE` operator. In
+The `contains` filter acts as a wildcard case-insensitive `LIKE` operator. In
 the majority of SQL backends it uses `ILIKE` operator with values being
 surrounded by `%`. It supports multiple values.
 
 - Dimension types: `string`.
 
-```js
+```json
 {
-  member: "Posts.title",
-  operator: "contains",
-  values: ["serverless", "aws"]
+  "member": "Posts.title",
+  "operator": "contains",
+  "values": ["serverless", "aws"]
 }
 ```
 
@@ -198,10 +198,53 @@ The opposite operator of `contains`. It supports multiple values.
 
 - Dimension types: `string`.
 
-```js
+```javascript
 {
   member: "Posts.title",
   operator: "notContains",
+  values: ["ruby"]
+}
+```
+
+This opertor adds `IS NULL` check to include `NULL` values unless you add `null` to `values`.
+For example:
+
+```javascript
+{
+  member: "Posts.title",
+  operator: "notContains",
+  values: ["ruby", null]
+}
+```
+
+### <--{"id" : "Filters Operators"}--> startsWith
+
+The `startsWith` filter acts as a case-insensitive `LIKE` operator with a
+wildcard at the beginning. In the majority of SQL backends, it uses the `ILIKE`
+operator with `%` at the start of each value. It supports multiple values.
+
+- Dimension types: `string`.
+
+```javascript
+{
+  member: "Posts.title",
+  operator: "startsWith",
+  values: ["ruby"]
+}
+```
+
+### <--{"id" : "Filters Operators"}--> endsWith
+
+The `endsWith` filter acts as a case-insensitive `LIKE` operator with a wildcard
+at the end. In the majority of SQL backends, it uses the `ILIKE` operator with
+`%` at the end of each value. It supports multiple values.
+
+- Dimension types: `string`.
+
+```javascript
+{
+  member: "Posts.title",
+  operator: "endsWith",
   values: ["ruby"]
 }
 ```
@@ -214,7 +257,7 @@ of type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```js
+```javascript
 {
   member: "Posts.upvotesCount",
   operator: "gt",
@@ -230,7 +273,7 @@ or dimensions of type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```js
+```javascript
 {
   member: "Posts.upvotesCount",
   operator: "gte",
@@ -246,7 +289,7 @@ type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```js
+```javascript
 {
   member: "Posts.upvotesCount",
   operator: "lt",
@@ -262,7 +305,7 @@ dimensions of type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```js
+```javascript
 {
   member: "Posts.upvotesCount",
   operator: "lte",
@@ -278,7 +321,7 @@ don't need to pass `values` for this operator.
 - Applied to measures.
 - Dimension types: `number`, `string`, `time`.
 
-```js
+```javascript
 {
   member: "Posts.authorName",
   operator: "set"
@@ -293,7 +336,7 @@ An opposite to the `set` operator. It checks whether the value of the member
 - Applied to measures.
 - Dimension types: `number`, `string`, `time`.
 
-```js
+```javascript
 {
   member: "Posts.authorName",
   operator: "notSet"
@@ -301,6 +344,18 @@ An opposite to the `set` operator. It checks whether the value of the member
 ```
 
 ### <--{"id" : "Filters Operators"}--> inDateRange
+
+<WarningBox>
+
+From a pre-aggregation standpoint, `inDateRange` filter is applied as a generic
+filter. All pre-aggregation granularity matching rules aren't applied in this
+case. It feels like pre-aggregation isn't matched. However, pre-aggregation is
+just missing the filtered time dimension in
+[dimensions][ref-schema-ref-preaggs-dimensions] list. If you want date range
+filter to match [timeDimension][ref-schema-ref-preaggs-time-dimension] please
+use [timeDimensions](#time-dimensions-format) `dateRange` instead.
+
+</WarningBox>
 
 The operator `inDateRange` is used to filter a time dimension into a specific
 date range. The values must be an array of dates with the following format
@@ -312,7 +367,7 @@ There is a convient way to use date filters with grouping -
 
 - Dimension types: `time`.
 
-```js
+```javascript
 {
   member: "Posts.time",
   operator: "inDateRange",
@@ -322,12 +377,22 @@ There is a convient way to use date filters with grouping -
 
 ### <--{"id" : "Filters Operators"}--> notInDateRange
 
+<WarningBox>
+
+From a pre-aggregation standpoint, `notInDateRange` filter is applied as a
+generic filter. All pre-aggregation granularity matching rules aren't applied in
+this case. It feels like pre-aggregation isn't matched. However, pre-aggregation
+is just missing the filtered time dimension in
+[dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
+
 An opposite operator to `inDateRange`, use it when you want to exclude specific
 dates. The values format is the same as for `inDateRange`.
 
 - Dimension types: `time`.
 
-```js
+```javascript
 {
   member: "Posts.time",
   operator: "notInDateRange",
@@ -337,12 +402,22 @@ dates. The values format is the same as for `inDateRange`.
 
 ### <--{"id" : "Filters Operators"}--> beforeDate
 
+<WarningBox>
+
+From a pre-aggregation standpoint, `beforeDate` filter is applied as a generic
+filter. All pre-aggregation granularity matching rules aren't applied in this
+case. It feels like pre-aggregation isn't matched. However, pre-aggregation is
+just missing the filtered time dimension in
+[dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
+
 Use it when you want to retreive all results before some specific date. The
 values should be an array of one element in `YYYY-MM-DD` format.
 
 - Dimension types: `time`.
 
-```js
+```javascript
 {
   member: "Posts.time",
   operator: "beforeDate",
@@ -352,11 +427,21 @@ values should be an array of one element in `YYYY-MM-DD` format.
 
 ### <--{"id" : "Filters Operators"}--> afterDate
 
+<WarningBox>
+
+From a pre-aggregation standpoint, `afterDate` filter is applied as a generic
+filter. All pre-aggregation granularity matching rules aren't applied in this
+case. It feels like pre-aggregation isn't matched. However, pre-aggregation is
+just missing the filtered time dimension in
+[dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
+
 The same as `beforeDate`, but is used to get all results after a specific date.
 
 - Dimension types: `time`.
 
-```js
+```javascript
 {
   member: "Posts.time",
   operator: "afterDate",
@@ -372,7 +457,7 @@ only one of the following properties:
 - `or` An array with one or more filters or other logical operators
 - `and` An array with one or more filters or other logical operators
 
-```js
+```javascript
 {
   or: [
     {
@@ -403,7 +488,7 @@ only one of the following properties:
 
 ## Time Dimensions Format
 
-Since grouping and filtering by a time dimension is quite a common case, Cube.js
+Since grouping and filtering by a time dimension is quite a common case, Cube
 provides a convenient shortcut to pass a dimension and a filter as a
 `timeDimension` property.
 
@@ -412,18 +497,22 @@ provides a convenient shortcut to pass a dimension and a filter as a
   `YYYY-MM-DDTHH:mm:ss.SSS` format. Values should always be local and in query
   `timezone`. Dates in `YYYY-MM-DD` format are also accepted. Such dates are
   padded to the start and end of the day if used in start and end of date range
-  interval accordingly. If only one date is specified it's equivalent to passing
+  interval accordingly.
+  Please note that for timestamp comparison, `>=` and `<=` operators are used.
+  It requires, for example, that the end date range date `2020-01-01` is padded 
+  to `2020-01-01T23:59:59.999`.
+  If only one date is specified it's equivalent to passing
   two of the same dates as a date range. You can also pass a string instead of
   array with relative date range, for example: `last quarter`, `last 360 days`,
   or `next 2 months`.
 - `compareDateRange`: An array of date ranges to compare a measure change over
   previous period
 - `granularity`: A granularity for a time dimension. It supports the following
-  values `second`, `minute`, `hour`, `day`, `week`, `month`, `quarter` `year`. If you pass
-  `null` to the granularity, Cube.js will only perform filtering by a specified
-  time dimension, without grouping.
+  values `second`, `minute`, `hour`, `day`, `week`, `month`, `quarter` `year`.
+  If you pass `null` to the granularity, Cube.js will only perform filtering by
+  a specified time dimension, without grouping.
 
-```js
+```javascript
 {
   measures: ['Stories.count'],
   timeDimensions: [{
@@ -439,7 +528,7 @@ metric performed over a period in the past and how it performs now. You can pass
 two or more date ranges where each of them is in the same format as a
 `dateRange`
 
-```js
+```javascript
 // ...
 const resultSet = cubejsApi.load({
   measures: ['Stories.count'],
@@ -457,7 +546,7 @@ const resultSet = cubejsApi.load({
 You can also set a relative `dateRange`, e.g. `today`, `yesterday`, `tomorrow`,
 `last year`, `next month`, or `last 6 months`.
 
-```js
+```javascript
 {
   measures: ['Stories.count'],
   timeDimensions: [{
@@ -472,7 +561,7 @@ Be aware that e.g. `Last 7 days` or `Next 2 weeks` do not include the current
 date. If you need the current date also you can use `from N days ago to now` or
 `from now to N days from now`.
 
-```js
+```javascript
 {
   measures: ['Stories.count'],
   timeDimensions: [{
@@ -487,3 +576,7 @@ date. If you need the current date also you can use `from N days ago to now` or
   /schema/reference/pre-aggregations#parameters-refresh-key
 [ref-schema-ref-preaggs-refreshkey-every]:
   /schema/reference/pre-aggregations#parameters-refresh-key-every
+[ref-schema-ref-preaggs-dimensions]:
+  /schema/reference/pre-aggregations#parameters-dimensions
+[ref-schema-ref-preaggs-time-dimension]:
+  /schema/reference/pre-aggregations#parameters-time-dimension

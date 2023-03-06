@@ -11,8 +11,16 @@ enum ColumnType {
 export enum MemberType {
   Measure = 'measure',
   Dimension = 'dimension',
-  None = 'none'
+  None = 'none',
 }
+
+export type Dimension = {
+  name: string;
+  types: any[];
+  title: string;
+  isPrimaryKey?: boolean;
+  type?: any;
+};
 
 export type TableName = string | [string, string];
 
@@ -22,9 +30,9 @@ export type CubeDescriptorMember = {
   name: string;
   title: string;
   memberType: MemberType;
-  type: string;
+  type?: string;
   types: string[];
-  isId: boolean;
+  isId?: boolean;
   included?: boolean;
   isPrimaryKey?: boolean;
 };
@@ -38,11 +46,22 @@ type Join = {
 };
 
 export type CubeDescriptor = {
-  cube: string,
-  tableName: TableName,
-  table: string
+  cube: string;
+  tableName: TableName;
+  table: string;
   schema: string;
   members: CubeDescriptorMember[];
+  joins: Join[];
+};
+
+export type TableSchema = {
+  cube: string;
+  tableName: TableName;
+  schema: any;
+  table: any;
+  measures: any[];
+  dimensions: Dimension[];
+  drillMembers?: Dimension[];
   joins: Join[];
 };
 
@@ -57,7 +76,7 @@ const MEASURE_DICTIONARY = [
   'qty',
   'quantity',
   'duration',
-  'value'
+  'value',
 ];
 
 const DRILL_MEMBERS_DICTIONARY = [
@@ -74,7 +93,7 @@ const DRILL_MEMBERS_DICTIONARY = [
   'timestamp',
   'city',
   'country',
-  'date'
+  'date',
 ];
 
 const idRegex = '_id$|id$';
@@ -91,19 +110,50 @@ export class ScaffoldingSchema {
   public constructor(
     private readonly dbSchema: DatabaseSchema,
     private readonly options: ScaffoldingSchemaOptions = {}
-  ) {
+  ) {}
+
+  public resolveTableName(tableName: TableName) {
+    let tableParts;
+    if (Array.isArray(tableName)) {
+      tableParts = tableName;
+    } else {
+      tableParts = tableName.match(/(["`].*?["`]|[^`".]+)+(?=\s*|\s*$)/g);
+    }
+
+    if (tableParts.length === 2) {
+      this.resolveTableDefinition(tableName);
+      return tableName;
+    } else if (tableParts.length === 1 && typeof tableName === 'string') {
+      const schema = Object.keys(this.dbSchema).find(
+        (tableSchema) => this.dbSchema[tableSchema][tableName] ||
+          this.dbSchema[tableSchema][inflection.tableize(tableName)]
+      );
+      if (!schema) {
+        throw new UserError(`Can't find any table with '${tableName}' name`);
+      }
+      if (this.dbSchema[schema][tableName]) {
+        return `${schema}.${tableName}`;
+      }
+      if (this.dbSchema[schema][inflection.tableize(tableName)]) {
+        return `${schema}.${inflection.tableize(tableName)}`;
+      }
+    }
+
+    throw new UserError(
+      'Table names should be in <table> or <schema>.<table> format'
+    );
   }
 
   public cubeDescriptors(tableNames: TableName[]): CubeDescriptor[] {
     const cubes = this.generateForTables(tableNames);
 
     function member(type: MemberType) {
-      return (value: CubeDescriptorMember) => ({
+      return (value: Omit<CubeDescriptorMember, 'memberType'>) => ({
         memberType: type,
         ...R.pick(['name', 'title', 'types', 'isPrimaryKey', 'included', 'isId'], value)
       });
     }
-
+    
     return cubes.map((cube) => ({
       cube: cube.cube,
       tableName: cube.tableName,
@@ -154,11 +204,11 @@ export class ScaffoldingSchema {
     return this.dbSchema[schema][table];
   }
 
-  protected tableSchema(tableName: TableName, includeJoins: boolean) {
+  protected tableSchema(tableName: TableName, includeJoins: boolean): TableSchema {
     const [schema, table] = this.parseTableName(tableName);
     const tableDefinition = this.resolveTableDefinition(tableName);
     const dimensions = this.dimensions(tableDefinition);
-
+    
     return {
       cube: inflection.camelize(table),
       tableName,
@@ -184,9 +234,9 @@ export class ScaffoldingSchema {
     return schemaAndTable;
   }
 
-  protected dimensions(tableDefinition) {
+  protected dimensions(tableDefinition): Dimension[] {
     return this.dimensionColumns(tableDefinition).map(column => {
-      const res: any = {
+      const res: Dimension = {
         name: column.name,
         types: [column.columnType || this.columnType(column)],
         title: inflection.titleize(column.name),
@@ -275,12 +325,12 @@ export class ScaffoldingSchema {
       .filter(R.identity));
   }
 
-  protected drillMembers(dimensions) {
+  protected drillMembers(dimensions: Dimension[]) {
     return dimensions.filter(d => this.fromDrillMembersDictionary(d));
   }
 
   protected fromDrillMembersDictionary(dimension) {
-    return !!DRILL_MEMBERS_DICTIONARY.find(word => dimension.name.toLowerCase().indexOf(word) !== -1);
+    return !!DRILL_MEMBERS_DICTIONARY.find(word => dimension.name.toLowerCase().includes(word));
   }
 
   protected timeColumnIndex(column): number {

@@ -14,16 +14,29 @@ The `joins` parameter declares a block to define relationships between cubes. It
 allows users to access and compare fields from two or more cubes at the same
 time.
 
+<CodeTabs>
+
 ```javascript
 cube('MyCube', {
   joins: {
     TargetCubeName: {
-      relationship: `belongsTo` || `hasMany` || `hasOne`,
+      relationship: `belongsTo` || `hasMany` || `hasOne` || `belongs_to` || `has_many` || `has_one`,
       sql: `SQL ON clause`,
     },
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: MyCube
+    joins:
+      - name: TargetCubeName
+        relationship: belongsTo || hasMany || hasOne
+        sql: SQL ON clause
+```
+
+</CodeTabs>
 
 All joins are generated as `LEFT JOIN`. The cube which defines the join serves
 as a main table, and any cubes referenced inside the `joins` property are used
@@ -34,22 +47,43 @@ The semantics of `INNER JOIN` can be achieved with additional filtering. For
 example, a simple check of whether the column value `IS NOT NULL` by using [set
 filter][ref-restapi-query-filter-op-set] satisfies this requirement.
 
+There's also no way to define `FULL OUTER JOIN` and `RIGHT OUTER JOIN` for the
+sake of join modeling simplicity. To get `RIGHT OUTER JOIN` semantics just
+define join [from other side of relationship][ref-schema-fundamentals-join-dir].
+The `FULL OUTER JOIN` can be built inside cube [sql][ref-schema-cube-sql]
+parameter. Quite frequently, `FULL OUTER JOIN` is used to solve [Data
+Blending][ref-schema-data-blenging] or similar problems. In that case, it's best
+practice to have a separate cube for such an operation.
+
 ## Naming
 
 The name of a join should match the [name of the external
 cube][ref-schema-cube-naming]. For example when a `Products` cube is being
 joined on to an `Orders` cube, we would define the join as follows:
 
+<CodeTabs>
+
 ```javascript
 cube('Orders', {
   joins: {
     Products: {
       relationship: `belongsTo`,
-      sql: `${CUBE.id} = Products.orderId`,
+      sql: `${CUBE.id} = ${Products.orderId}`,
     },
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: Orders
+    joins:
+      - name: Products
+        relationship: belongs_to
+        sql: '{CUBE.id} = {Products.order_id}'
+```
+
+</CodeTabs>
 
 ## Parameters
 
@@ -57,7 +91,7 @@ cube('Orders', {
 
 `relationship` enables you to describe the join relationship between joined
 cubes. It’s important to properly define the type of relationship in order for
-Cube.js to accurately calculate measures. The relationship does not need to be
+Cube to accurately calculate measures. The relationship does not need to be
 defined on both cubes, but the definition can affect the [join
 direction][ref-schema-fundamentals-join-dir].
 
@@ -81,16 +115,29 @@ This relationship indicates that the one row in the cube can match only one row
 in the joined cube. For example, in a model containing users and user profiles,
 the users cube would have the following join:
 
+<CodeTabs>
+
 ```javascript
 cube('Users', {
   joins: {
     Profile: {
       relationship: `hasOne`,
-      sql: `${Users}.id = ${Profile}.user_id`,
+      sql: `${CUBE}.id = ${Profile.user_id}`,
     },
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: Users
+    joins:
+      - name: Profile
+        relationship: has_one
+        sql: '{Users}.id = {Profile.user_id}'
+```
+
+</CodeTabs>
 
 #### hasMany
 
@@ -100,16 +147,29 @@ relationship. This relationship indicates that the one row in the cube can match
 many rows in the joined cube. For example, in a model containing authors and
 books, the authors cube would have the following join:
 
+<CodeTabs>
+
 ```javascript
 cube('Authors', {
   joins: {
     Books: {
       relationship: `hasMany`,
-      sql: `${Authors}.id = ${Books}.author_id`,
+      sql: `${CUBE}.id = ${Books.author_id}`,
     },
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: Authors
+    joins:
+      - name: Books
+        relationship: has_many
+        sql: "{Authors}.id = {Books.author_id}"
+```
+
+</CodeTabs>
 
 #### belongsTo
 
@@ -120,22 +180,37 @@ matches a row in the joined instance, while the joined instance can have many
 rows in the declaring cube. For example, in a model containing orders and
 customers, the orders cube would have the following join:
 
+<CodeTabs>
+
 ```javascript
 cube('Orders', {
   joins: {
     Customers: {
       relationship: `belongsTo`,
-      sql: `${Orders}.customer_id = ${Customers}.id`,
+      sql: `${CUBE}.customer_id = ${Customers.id}`,
     },
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: Orders
+    joins:
+      - name: Customers
+        relationship: belongsTo
+        sql: "{Orders}.customer_id = {Customers.id}"
+```
+
+</CodeTabs>
 
 ### <--{"id" : "Parameters"}--> sql
 
 `sql` is necessary to indicate a related column between cubes. It is important
 to properly specify a matching column when creating joins. Take a look at the
 example below:
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -144,24 +219,37 @@ cube('Orders', {
       relationship: `belongsTo`,
       // The `customer_id` field on `Orders` corresponds to the
       // `id` field on `Customers`
-      sql: `${Orders}.customer_id = ${Customers}.id`,
+      sql: `${CUBE}.customer_id = ${Customers.id}`,
     },
   },
 });
 ```
 
+```yaml
+cubes:
+  - name: Orders
+    joins:
+      - name: Customers
+        relationship: belongs_to
+        sql: "{Orders}.customer_id = {Customers.id}"
+```
+
+</CodeTabs>
+
 ## Setting a Primary Key
 
 In order for a join to work, it is necessary to define a `primaryKey` as
-specified below. It is a requirement when a join is defined so that Cube.js can
+specified below. It is a requirement when a join is defined so that Cube can
 handle row multiplication issues.
 
 Let's imagine you want to calculate `Order Amount` by `Order Item Product Name`.
 In this case, `Order` rows will be multiplied by the `Order Item` join due to
-the `hasMany` relationship. In order to produce correct results, Cube.js will
+the `hasMany` relationship. In order to produce correct results, Cube will
 select distinct primary keys from `Order` first and then will join these primary
 keys with `Order` to get the correct `Order Amount` sum result. Please note that
 `primaryKey` should be defined in the `dimensions` section.
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -175,12 +263,26 @@ cube('Orders', {
 });
 ```
 
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: customer_id
+        sql: id
+        type: number
+        primary_key: true
+```
+
+</CodeTabs>
+
 <InfoBox>
 
 Setting `primaryKey` to `true` will change the default value of the `shown`
 parameter to `false`. If you still want `shown` to be `true` — set it manually.
 
 </InfoBox>
+
+<CodeTabs>
 
 ```javascript
 cube('Orders', {
@@ -195,6 +297,19 @@ cube('Orders', {
 });
 ```
 
+```yaml
+cubes:
+  - name: Orders
+    dimensions:
+      - name: customer_id
+        sql: id
+        type: number
+        primary_key: true
+        shown: true
+```
+
+</CodeTabs>
+
 If you don't have a single column in a cube's table that can act as a primary
 key, you can create a composite primary key as shown below.
 
@@ -204,6 +319,8 @@ The example uses Postgres string concatenation; note that SQL may be different
 depending on your database.
 
 </WarningBox>
+
+<CodeTabs>
 
 ```javascript
 cube('Users', {
@@ -217,6 +334,18 @@ cube('Users', {
 });
 ```
 
+```yaml
+cubes:
+  - name: Users
+    dimensions:
+      - name: id
+        sql:  "{CUBE}.user_id || '-' || {CUBE}.signup_week || '-' || {CUBE}.activity_week"
+        type: string
+        primary_key: true
+```
+
+</CodeTabs>
+
 ## CUBE reference
 
 When you have several joined cubes, you should accurately use columns’ names to
@@ -224,6 +353,8 @@ avoid any mistakes. One way to make no mistakes is to use the `${CUBE}`
 reference. It allows you to specify columns’ names in cubes without any
 ambiguity. During the implementation of the query, this reference will be used
 as an alias for a basic cube. Take a look at the following example:
+
+<CodeTabs>
 
 ```javascript
 cube('Users', {
@@ -236,21 +367,33 @@ cube('Users', {
 });
 ```
 
+```yaml
+cubes:
+  - name: Users
+    dimensions:
+      - name: name
+        sql: "{CUBE}.name"
+        type: string
+```
+
+</CodeTabs>
+
 ## Transitive joins
 
 <WarningBox>
 
-Join graph is directed and `A-B` join is different from `B-A`.
-[Learn more about it here][ref-schema-fundamentals-join-dir].
+Join graph is directed and `A-B` join is different from `B-A`. [Learn more about
+it here][ref-schema-fundamentals-join-dir].
 
 </WarningBox>
 
-Cube.js automatically takes care of transitive joins. For example if you have
-the following schema:
+Cube automatically takes care of transitive joins. For example if you have the
+following schema:
+
+<CodeTabs>
 
 ```javascript
 cube(`A`, {
-  // ...
   joins: {
     B: {
       sql: `${A}.b_id = ${B}.id`,
@@ -266,7 +409,6 @@ cube(`A`, {
 });
 
 cube(`B`, {
-  // ...
   joins: {
     C: {
       sql: `${B}.c_id = ${C}.id`,
@@ -276,8 +418,6 @@ cube(`B`, {
 });
 
 cube(`C`, {
-  // ...
-
   dimensions: {
     category: {
       sql: `category`,
@@ -286,6 +426,30 @@ cube(`C`, {
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: A
+    joins:
+      - name: B
+        sql: "{A}.b_id = {B}.id"
+        relationship: belongs_to
+    measures:
+      - name: count
+        type: count
+  - name: B
+    joins:
+      - name: C
+        sql: "{B}.c_id = {C}.id"
+        relationship: belongs_to
+  - name: C
+    dimensions:
+      - name: category
+        sql: category
+        type: string
+```
+
+</CodeTabs>
 
 and the following query:
 
@@ -296,7 +460,7 @@ and the following query:
 }
 ```
 
-Joins `A-B` and `B-C` will be resolved automatically. Cube.js uses [Dijkstra
+Joins `A-B` and `B-C` will be resolved automatically. Cube uses [Dijkstra
 algorithm][wiki-djikstra-alg] to find join path between cubes given requested
 members.
 
@@ -304,4 +468,6 @@ members.
 [ref-schema-cube-naming]: /schema/reference/cube#naming
 [ref-schema-fundamentals-join-dir]:
   /schema/fundamentals/joins#directions-of-joins
+[ref-schema-cube-sql]: /schema/reference/cube#parameters-sql
+[ref-schema-data-blenging]: /schema/advanced/data-blending#data-blending
 [wiki-djikstra-alg]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm

@@ -2,14 +2,21 @@
 
 ## Setting up
 
-* Update `cubejs-cubestore/docker-compose.yml` and `cubejs-postgres/docker-compose.yml` with data source credentials (see `TODO` comments)
+* Create a configuraton file with your BigQuery credentials, e.g.
+```shell
+$ cat <<EOF > ~/.env.bigquery
+CUBEJS_DB_BQ_PROJECT_ID=...
+CUBEJS_DB_EXPORT_BUCKET=...
+CUBEJS_DB_BQ_CREDENTIALS=...
+EOF
+```
 * Update `cubejs-cubestore/schema` and `cubejs-postgres/schema` with relevant data schema that matches your data source
 * Update `loadtest/queries.js` with relevant queries
 
 ## Running
 
-* Go to `cubejs-cubestore` and run `docker-compose -p cubejs-cubestore up`
-* Go to `cubejs-postgres` and run `docker-compose -p cubejs-postgres up`
-* Go to `loadtest` and run `npm install`
-* Then, start the relay server using `npm start`
-* Then, run the load test using `RPS=<requests per second> DURATION=<duration, seconds>s npm test` (e.g., `RPS=10 DURATION=10s npm test`)
+* Run `env $(cat ~/.env.bigquery | xargs) docker-compose -p cubejs-cubestore -f cubejs-cubestore/docker-compose.yml up`
+* Run `env $(cat ~/.env.bigquery | xargs) docker-compose -p cubejs-postgres -f cubejs-postgres/docker-compose.yml up`
+* Go to `loadtest` and run `yarn install`
+* Then, start the relay server using `yarn start`
+* Then, run the load test using `RPS=<requests per second> DURATION=<duration, seconds>s yarn test` (e.g., `RPS=5 DURATION=10s yarn test`)

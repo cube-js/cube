@@ -14,6 +14,10 @@ const operators = {
     { name: 'notEquals', title: 'does not equal' },
     { name: 'set', title: 'is set' },
     { name: 'notSet', title: 'is not set' },
+    { name: 'startsWith', title: 'starts with' },
+    { name: 'notStartsWith', title: 'does not start with' },
+    { name: 'endsWith', title: 'ends with' },
+    { name: 'notEndsWith', title: 'does not end with' },
   ],
   number: [
     { name: 'equals', title: 'equals' },

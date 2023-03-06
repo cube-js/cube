@@ -9,14 +9,14 @@ menuOrder: 1
 
 ### <--{"id" : "Prerequisites"}--> Base path
 
-REST API is used to communicate with Cube.js backend. All requests are prefixed
+REST API is used to communicate with Cube backend. All requests are prefixed
 with **basePath** described in
-[Backend Server Core](@cubejs-backend-server-core). By default it's
+[Backend Server Core](@cubejs-backend-server-core). By default, it is set to
 `/cubejs-api`.
 
 ### <--{"id" : "Prerequisites"}--> Authentication
 
-Cube.js uses API tokens to authorize requests and also for passing additional
+Cube uses API tokens to authorize requests and also for passing additional
 security context, which can be used in the
 [`queryRewrite`][ref-config-queryrewrite] property in your [`cube.js`
 configuration file][ref-config-js].
@@ -39,27 +39,37 @@ curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
 
 ### <--{"id" : "Prerequisites"}--> Continue wait
 
-If the request takes too long to be processed, Cube.js Backend responds with
-`{ "error": "Continue wait" }` and 200 status code. To get the data requested,
-simply retry your request a bit later.
+If the request takes too long to be processed, Cube Backend responds with
+`{ "error": "Continue wait" }` and 200 status code. This is how the long polling
+mechanism in Cube is implemented. Clients should continuously retry the same
+query in a loop until they get a successful result. Subsequent calls to the Cube
+endpoints are idempotent and don't lead to scheduling new database queries if
+not required by `refreshKey`. Also, receiving `Continue wait` doesn't mean the
+database query has been canceled, and it's actually still being processed by the
+Cube. Database queries that weren't started and are no longer waited by the
+client's long polling loop will be marked as orphaned and removed from the
+querying queue.
 
 Possible reasons of **Continue wait**:
 
-- The query requested is heavy and it takes some time for the database to
-  process it.
-- There are many queries requested and Cube.js backend queues them to save
-  database from overloading.
+- The query requested is heavy, and it takes some time for the database to
+  process it. Clients should wait for its completion, continuously sending the
+  same REST API request. [continueWaitTimeout](config#queue-options) can be
+  adjusted in order to change the time Cube waits before returning
+  `Continue wait` message.
+- There are many queries requested and Cube backend queues them to save database
+  from overloading.
 
 ### <--{"id" : "Prerequisites"}--> Error Handling
 
-Cube.js REST API has basic errors and HTTP Error codes for all requests.
+Cube REST API has basic errors and HTTP Error codes for all requests.
 
 | Status | Error response                 | Description                                                                                          |
 | ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | 400    | Error message                  | General error. It may be a database error, timeout, or other issue. Check error message for details. |
 | 403    | Authorization header isn't set | You didn't provide an auth token. Provide a valid API Token or disable authorization.                |
 | 403    | Invalid token                  | The auth token provided is not valid. It may be expired or have invalid signature.                   |
-| 500    | Error message                  | Cube.js internal server error. Check error message for details.                                      |
+| 500    | Error message                  | Cube internal server error. Check error message for details.                                         |
 
 ### <--{"id" : "Prerequisites"}--> Request Span Annotation
 
@@ -71,20 +81,45 @@ should be unique for each separate request. `spanId` should define user
 interaction span such us `Continue wait` retry cycle and it's value shouldn't
 change during one single interaction.
 
+### <--{"id" : "Prerequisites"}--> Pagination
+
+Cube supports paginated requests for the `/v1/load` endpoint by including
+[`limit` and `offset` parameters][ref-api-ref-query-format] in the query. For
+example, the following query will retrieve rows 101-200 from the `Orders` cube:
+
+```json
+{
+  "dimensions": ["Orders.status"],
+  "measures": ["Orders.count"],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.createdAt",
+      "dateRange": "last year",
+      "granularity": "day"
+    }
+  ],
+  "limit": 100,
+  "offset": 100
+}
+```
+
+[ref-api-ref-query-format]: /query-format#query-properties
+
 ## API Reference
 
 ### <--{"id" : "API Reference"}--> /v1/load
 
 Get the data for a query.
 
-| Parameter | Description                                |
-| --------- | ------------------------------------------ |
-| query     | URL encoded Cube.js [Query](/query-format) |
+| Parameter   | Description                                                                                                           |
+| ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `query`     | Either a single URL encoded Cube [Query](/query-format), or an array of queries                                       |
+| `queryType` | If multiple queries are passed in `query` for [data blending][ref-recipes-data-blending], this must be set to `multi` |
 
 Response
 
 - `query` - The query passed via params. It can be an array of queries and in
-  such case it will be treated as a [Data Blending](/recipes/data-blending)
+  such case it will be treated as a [Data Blending][ref-recipes-data-blending]
   query.
 - `data` - Formatted dataset of query results.
 - `annotation` - Metadata for query. Contains descriptions for all query items.
@@ -105,10 +140,9 @@ curl \
 # Request with http method POST
 # Use POST to fix problem with query length limits
 curl \
- -X POST
+ -X POST  \
  -H "Content-Type: application/json" \
  -H "Authorization: EXAMPLE-API-TOKEN" \
- -G \
  --data '{"query": {"measures":["Users.count"]}}' \
  http://localhost:4000/cubejs-api/v1/load
 ```
@@ -158,18 +192,18 @@ values.
 
 ### <--{"id" : "API Reference"}--> /v1/sql
 
-Get the SQL Code generated by Cube.js to be executed in the database.
+Get the SQL Code generated by Cube to be executed in the database.
 
-| Parameter | Description                               |
-| --------- | ----------------------------------------- |
-| query     | URLencoded Cube.js [Query](/query-format) |
+| Parameter | Description                            |
+| --------- | -------------------------------------- |
+| query     | URLencoded Cube [Query](/query-format) |
 
 Response
 
 - `sql` - JSON Object with the following properties
   - `sql` - Formatted SQL query with parameters
   - `order` - Order fields and direction used in SQL query
-  - `cacheKeyQueries` - Key names and TTL of Cube.js data cache
+  - `cacheKeyQueries` - Key names and TTL of Cube data cache
   - `preAggregations` - SQL queries used to build pre-aggregation tables
 
 Example request:
@@ -279,8 +313,7 @@ Example response:
 
 ### <--{"id" : "API Reference"}--> /v1/run-scheduled-refresh
 
-Trigger scheduled refresh run to refresh pre-aggregations. Use it in serverless
-deployments.
+Trigger a scheduled refresh run to refresh pre-aggregations.
 
 <WarningBox>
 
@@ -294,9 +327,9 @@ as orphaned, and they will be removed from the queue.
 Learn more about
 [scheduled refresh here](/caching/pre-aggregations/getting-started#keeping-pre-aggregations-up-to-date).
 
-| Parameter       | Description                                                                  |
-| --------------- | ---------------------------------------------------------------------------- |
-| queryingOptions | Optional URL encoded Cube.js [Query](/query-format) options such as timezone |
+| Parameter       | Description                                                               |
+| --------------- | ------------------------------------------------------------------------- |
+| queryingOptions | Optional URL encoded Cube [Query](/query-format) options such as timezone |
 
 Empty object response if scheduled successfully.
 
@@ -308,6 +341,231 @@ curl \
  -G \
  --data-urlencode 'queryingOptions={"timezone":"UTC"}' \
  http://localhost:4000/cubejs-api/v1/run-scheduled-refresh
+```
+
+### <--{"id" : "API Reference"}--> /cubejs-system/v1/pre-aggregations/jobs
+
+Submit pre-aggregation build jobs and retrieve their refresh status.
+
+#### Submitting a job
+
+| Parameter                  | Description                                                        | Required |
+| -------------------------- | ------------------------------------------------------------------ | -------- |
+| `action`                   | Submitting a job requires using the `post` action                  | ✅       |
+| `selector.contexts`        | An array of contexts to use                                        | ✅       |
+| `selector.timezones`       | An array of timezones to use                                       | ❌       |
+| `selector.datasources`     | An array of data source names of the pre-aggregation to build      | ❌       |
+| `selector.cubes`           | An array of cube names which contain the pre-aggregations to build | ❌       |
+| `selector.preAggregations` | An array of pre-aggregation names to build                         | ❌       |
+
+To submit a job, send a `POST` request with a payload including the `action` and
+`selector` properties. The response will include the `jobId` of the submitted
+job.
+
+Example request:
+
+```bash
+curl \
+ -d '{"action": "post", "selector": { "preAggregations": ["Orders.ordersByStatus"]}}' \
+ -H "Authorization: EXAMPLE-API-TOKEN" \
+ -X POST \
+ https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
+```
+
+Example response:
+
+```json
+[
+  "e9a6a0c55885cea5371348500ce7d7dc",
+  "d1329b6c8d152e734fc4dcf7307b1b58",
+  "6f4ea38373663fffc4334a576574845b",
+  "ea903b10634b2f3141b35a2529870e89"
+]
+```
+
+#### Retrieving statuses for a job
+
+| Parameter | Description                                                                              | Required |
+| --------- | ---------------------------------------------------------------------------------------- | -------- |
+| `action`  | Retrieving a job requires using the `get` action                                         | ✅       |
+| `resType` | If `object` is specified, the response is returned as an JSON object instead of an array | ❌       |
+| `tokens`  | An array of strings representing pre-aggregation build jobs                              | ✅       |
+
+To retrieve the status of a previously submitted job, send a `POST` request with
+a `tokens` property.
+
+Example request:
+
+```bash
+curl \
+ -d '{"action": "get", "tokens": ["e9a6a0c55885cea5371348500ce7d7dc","d1329b6c8d152e734fc4dcf7307b1b58","6f4ea38373663fffc4334a576574845b","ea903b10634b2f3141b35a2529870e89"]}' \
+ -H "Authorization: EXAMPLE-API-TOKEN" \
+ -X POST \
+ https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
+```
+
+Example response:
+
+```json
+[
+  {
+    "token": "e9a6a0c55885cea5371348500ce7d7dc",
+    "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
+    "status": "processing",
+    "selector": {
+      "cubes": ["Orders"],
+      "preAggregations": ["Orders.categoryAndDate"],
+      "contexts": [
+        {
+          "securityContext": {
+            "tenant": "tenant_1"
+          }
+        }
+      ],
+      "timezones": ["UTC"],
+      "dataSources": ["default"]
+    }
+  },
+  {
+    "token": "d1329b6c8d152e734fc4dcf7307b1b58",
+    "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
+    "status": "processing",
+    "selector": {
+      "cubes": ["Orders"],
+      "preAggregations": ["Orders.categoryAndDate"],
+      "contexts": [
+        {
+          "securityContext": {
+            "tenant": "tenant_1"
+          }
+        }
+      ],
+      "timezones": ["America/Los_Angeles"],
+      "dataSources": ["default"]
+    }
+  },
+  {
+    "token": "6f4ea38373663fffc4334a576574845b",
+    "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
+    "status": "missing_partition",
+    "selector": {
+      "cubes": ["Orders"],
+      "preAggregations": ["Orders.categoryAndDate"],
+      "contexts": [
+        {
+          "securityContext": {
+            "tenant": "tenant_2"
+          }
+        }
+      ],
+      "timezones": ["UTC"],
+      "dataSources": ["default"]
+    }
+  },
+  {
+    "token": "ea903b10634b2f3141b35a2529870e89",
+    "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
+    "status": "missing_partition",
+    "selector": {
+      "cubes": ["Orders"],
+      "preAggregations": ["Orders.categoryAndDate"],
+      "contexts": [
+        {
+          "securityContext": {
+            "tenant": "tenant_2"
+          }
+        }
+      ],
+      "timezones": ["America/Los_Angeles"],
+      "dataSources": ["default"]
+    }
+  }
+]
+```
+
+Example request with `resType: object`:
+
+```bash
+curl \
+ -d '{"action": "get", "resType": "object", "tokens": ["e9a6a0c55885cea5371348500ce7d7dc","d1329b6c8d152e734fc4dcf7307b1b58","6f4ea38373663fffc4334a576574845b","ea903b10634b2f3141b35a2529870e89"]}' \
+ -H "Authorization: EXAMPLE-API-TOKEN" \
+ -X POST \
+ https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
+```
+
+Example response with `resType: object`:
+
+```json
+{
+  "e9a6a0c55885cea5371348500ce7d7dc": {
+    "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
+    "status": "processing",
+    "selector": {
+      "cubes": ["Orders"],
+      "preAggregations": ["Orders.categoryAndDate"],
+      "contexts": [
+        {
+          "securityContext": {
+            "tenant": "tenant_1"
+          }
+        }
+      ],
+      "timezones": ["UTC"],
+      "dataSources": ["default"]
+    }
+  },
+  "d1329b6c8d152e734fc4dcf7307b1b58": {
+    "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
+    "status": "processing",
+    "selector": {
+      "cubes": ["Orders"],
+      "preAggregations": ["Orders.categoryAndDate"],
+      "contexts": [
+        {
+          "securityContext": {
+            "tenant": "tenant_1"
+          }
+        }
+      ],
+      "timezones": ["America/Los_Angeles"],
+      "dataSources": ["default"]
+    }
+  },
+  "6f4ea38373663fffc4334a576574845b": {
+    "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
+    "status": "missing_partition",
+    "selector": {
+      "cubes": ["Orders"],
+      "preAggregations": ["Orders.categoryAndDate"],
+      "contexts": [
+        {
+          "securityContext": {
+            "tenant": "tenant_2"
+          }
+        }
+      ],
+      "timezones": ["UTC"],
+      "dataSources": ["default"]
+    }
+  },
+  "ea903b10634b2f3141b35a2529870e89": {
+    "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
+    "status": "missing_partition",
+    "selector": {
+      "cubes": ["Orders"],
+      "preAggregations": ["Orders.categoryAndDate"],
+      "contexts": [
+        {
+          "securityContext": {
+            "tenant": "tenant_2"
+          }
+        }
+      ],
+      "timezones": ["America/Los_Angeles"],
+      "dataSources": ["default"]
+    }
+  }
+}
 ```
 
 ### <--{"id" : "API Reference"}--> /readyz
@@ -399,3 +657,5 @@ Keep-Alive: timeout=5
 
 {"health":"DOWN"}
 ```
+
+[ref-recipes-data-blending]: /recipes/data-blending

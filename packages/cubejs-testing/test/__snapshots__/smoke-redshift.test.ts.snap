@@ -1,0 +1,25 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`redshift (S3 key_id/secret) query measure: query 1`] = `
+Array [
+  Object {
+    "Orders.totalAmount": "1700",
+  },
+]
+`;
+
+exports[`redshift (unload arn) query measure: query 1`] = `
+Array [
+  Object {
+    "Orders.totalAmount": "1700",
+  },
+]
+`;
+
+exports[`redshift query measure: query 1`] = `
+Array [
+  Object {
+    "Orders.totalAmount": "1700",
+  },
+]
+`;

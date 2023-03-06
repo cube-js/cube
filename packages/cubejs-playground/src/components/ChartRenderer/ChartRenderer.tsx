@@ -2,18 +2,20 @@ import { PlaySquareOutlined } from '@ant-design/icons';
 import type { ChartType, PivotConfig, Query } from '@cubejs-client/core';
 import { ResultSet } from '@cubejs-client/core';
 import { Alert, Typography } from 'antd';
-import { RefObject, useContext, useEffect, useRef } from 'react';
+import { RefObject, useContext, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import styled from 'styled-components';
 import { CubeContext } from '@cubejs-client/react';
 
-import { Button, CubeLoader, FatalError } from '../../atoms';
+import { FatalError } from '../../components/Error/FatalError';
+import { Button, CubeLoader } from '../../atoms';
 import { UIFramework } from '../../types';
 import { QueryStatus } from '../PlaygroundQueryBuilder/components/PlaygroundQueryBuilder';
 import {
   useChartRendererState,
   useChartRendererStateMethods,
 } from '../QueryTabs/ChartRendererStateProvider';
+import { useWindowSize } from '../../hooks';
 
 const { Text } = Typography;
 
@@ -99,6 +101,18 @@ export default function ChartRenderer({
   onRunButtonClick,
 }: ChartRendererProps) {
   const { cubejsApi } = useContext(CubeContext);
+  const [containerSize, setContainerSize] = useState('auto');
+
+  useWindowSize(); // triggers the following useEffect() on window size change
+
+  useEffect(() => {
+    if (iframeRef?.current) {
+      const container = iframeRef?.current;
+      const height = window.innerHeight - container.getBoundingClientRect().y - 40;
+
+      setContainerSize(`${height}px`);
+    }
+  }); // no deps, it's better to re-check position on every render
 
   const {
     isChartRendererReady,
@@ -208,7 +222,7 @@ export default function ChartRenderer({
   const slowQueryMsg = slowQuery
     ? 'This query takes more than 5 seconds to execute. Please consider using pre-aggregations to improve its performance. '
     : slowQueryFromCache
-    ? "This query takes more than 5 seconds to execute. It was served from the cache because Cube.js wasn't able to renew it in less than 5 seconds. Please consider using pre-aggregations to improve its performance. "
+    ? "This query takes more than 5 seconds to execute. It was served from the cache because Cube wasn't able to renew it in less than 5 seconds. Please consider using pre-aggregations to improve its performance. "
     : '';
 
   return (
@@ -229,6 +243,7 @@ export default function ChartRenderer({
             id={`iframe-${queryId}`}
             data-testid="chart-renderer"
             ref={iframeRef}
+            style={{ height: containerSize }}
             title="Chart renderer"
             src={`/chart-renderers/${framework}/index.html#queryId=${queryId}`}
           />

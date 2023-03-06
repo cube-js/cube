@@ -16,9 +16,6 @@ const WORKER_PORTS: [u16; 2] = [51337, 51338];
 
 #[cfg(not(target_os = "windows"))]
 fn main() {
-    // Prepare workers.
-    Config::configure_worker_services();
-
     respawn::register_handler(multiproc_child_main::<ClusterSqlTest>);
     respawn::init(); // TODO: logs in worker processes.
 
@@ -106,6 +103,10 @@ impl WorkerProc<WorkerArgs> for WorkerFn {
                 c.server_name = format!("localhost:{}", WORKER_PORTS[id]);
                 c.worker_bind_address = Some(c.server_name.clone());
                 c.metastore_remote_address = Some(format!("localhost:{}", METASTORE_PORT));
+                c.select_workers = WORKER_PORTS
+                    .iter()
+                    .map(|p| format!("localhost:{}", p))
+                    .collect();
                 c
             })
             .start_test_worker(|_| async move {

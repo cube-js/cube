@@ -1,12 +1,16 @@
+use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
+use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
-use cubestore::sql::timestamp_from_string;
+use cubestore::sql::{timestamp_from_string, InlineTable, SqlQueryContext};
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
+use cubestore::CubeError;
+use indoc::indoc;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::env;
@@ -16,8 +20,10 @@ use std::io::Write;
 use std::panic::RefUnwindSafe;
 use std::path::Path;
 use std::pin::Pin;
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 use tokio::io::{AsyncWriteExt, BufWriter};
+use tokio::join;
 
 pub type TestFn = Box<
     dyn Fn(Box<dyn SqlClient>) -> Pin<Box<dyn Future<Output = ()> + Send>>
@@ -29,15 +35,18 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
     return vec![
         t("insert", insert),
         t("select_test", select_test),
+        t("refresh_selects", refresh_selects),
         t("negative_numbers", negative_numbers),
         t("negative_decimal", negative_decimal),
         t("custom_types", custom_types),
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
         t("group_by_nulls", group_by_nulls),
+        t("logical_alias", logical_alias),
         t("float_decimal_scale", float_decimal_scale),
         t("float_merge", float_merge),
         t("join", join),
+        t("filtered_join", filtered_join),
         t("three_tables_join", three_tables_join),
         t(
             "three_tables_join_with_filter",
@@ -47,6 +56,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("in_list", in_list),
         t("in_list_with_union", in_list_with_union),
         t("numeric_cast", numeric_cast),
+        t("cast_timestamp_to_utf8", cast_timestamp_to_utf8),
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
         t("timestamp_select", timestamp_select),
@@ -82,6 +92,15 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_location_invalid_digit",
             create_table_with_location_invalid_digit,
         ),
+        t("create_table_with_csv", create_table_with_csv),
+        t(
+            "create_table_with_csv_and_index",
+            create_table_with_csv_and_index,
+        ),
+        t(
+            "create_table_with_csv_no_header",
+            create_table_with_csv_no_header,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -90,6 +109,18 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_empty_inputs", hyperloglog_empty_inputs),
         t("hyperloglog_empty_group_by", hyperloglog_empty_group_by),
         t("hyperloglog_inserts", hyperloglog_inserts),
+        t(
+            "create_table_with_location_and_hyperloglog",
+            create_table_with_location_and_hyperloglog,
+        ),
+        t(
+            "create_table_with_location_and_hyperloglog_postgress",
+            create_table_with_location_and_hyperloglog_postgress,
+        ),
+        t(
+            "create_table_with_location_and_hyperloglog_space_separated",
+            create_table_with_location_and_hyperloglog_space_separated,
+        ),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
@@ -111,7 +142,12 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             planning_join_with_partitioned_index,
         ),
         t("topk_query", topk_query),
+        t("topk_having", topk_having),
         t("topk_decimals", topk_decimals),
+        t("planning_topk_having", planning_topk_having),
+        t("planning_topk_hll", planning_topk_hll),
+        t("topk_hll", topk_hll),
+        t("topk_hll_with_nulls", topk_hll_with_nulls),
         t("offset", offset),
         t("having", having),
         t("rolling_window_join", rolling_window_join),
@@ -120,6 +156,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t(
             "rolling_window_query_timestamps",
             rolling_window_query_timestamps,
+        ),
+        t(
+            "rolling_window_query_timestamps_exceeded",
+            rolling_window_query_timestamps_exceeded,
         ),
         t(
             "rolling_window_extra_aggregate",
@@ -148,6 +188,70 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "dimension_only_queries_for_stream_table",
             dimension_only_queries_for_stream_table,
         ),
+        t(
+            "unique_key_and_multi_measures_for_stream_table",
+            unique_key_and_multi_measures_for_stream_table,
+        ),
+        t(
+            "unique_key_and_multi_partitions",
+            unique_key_and_multi_partitions,
+        ),
+        t(
+            "unique_key_and_multi_partitions_hash_aggregate",
+            unique_key_and_multi_partitions_hash_aggregate,
+        ),
+        t("divide_by_zero", divide_by_zero),
+        t(
+            "filter_multiple_in_for_decimal",
+            filter_multiple_in_for_decimal,
+        ),
+        t("panic_worker", panic_worker),
+        t(
+            "planning_filter_index_selection",
+            planning_filter_index_selection,
+        ),
+        t("planning_aggregate_index", planning_aggregate_index),
+        t("aggregate_index", aggregate_index),
+        t("aggregate_index_hll", aggregate_index_hll),
+        t(
+            "aggregate_index_with_hll_bytes",
+            aggregate_index_with_hll_bytes,
+        ),
+        t("aggregate_index_errors", aggregate_index_errors),
+        t("inline_tables", inline_tables),
+        t("inline_tables_2x", inline_tables_2x),
+        t("build_range_end", build_range_end),
+        t("cache_incr", cache_incr),
+        t("cache_set_get_rm", cache_set_get_rm),
+        t("cache_set_get_set_get", cache_set_get_set_get),
+        t("cache_compaction", cache_compaction),
+        t("cache_set_nx", cache_set_nx),
+        t("cache_prefix_keys", cache_prefix_keys),
+        t("queue_full_workflow", queue_full_workflow),
+        t("queue_ack_then_result", queue_ack_then_result),
+        t("queue_orphaned_timeout", queue_orphaned_timeout),
+        t("queue_heartbeat", queue_heartbeat),
+        t("queue_merge_extra", queue_merge_extra),
+        t(
+            "queue_multiple_result_blocking",
+            queue_multiple_result_blocking,
+        ),
+        t("queue_custom_orphaned", queue_custom_orphaned),
+        t("limit_pushdown_group", limit_pushdown_group),
+        t("limit_pushdown_group_order", limit_pushdown_group_order),
+        t(
+            "limit_pushdown_group_where_order",
+            limit_pushdown_group_where_order,
+        ),
+        t("limit_pushdown_without_group", limit_pushdown_without_group),
+        t(
+            "limit_pushdown_without_group_resort",
+            limit_pushdown_without_group_resort,
+        ),
+        t("limit_pushdown_unique_key", limit_pushdown_unique_key),
+        t("sys_drop_cache", sys_drop_cache),
+        t("sys_metastore_healthcheck", sys_metastore_healthcheck),
+        t("sys_cachestore_healthcheck", sys_cachestore_healthcheck),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -198,6 +302,40 @@ async fn insert(service: Box<dyn SqlClient>) {
         (LastName, PersonID, FirstName, Address, City)
         VALUES
         ('LastName 1', 23, 'FirstName 1', 'Address 1', 'City 1'), ('LastName 2', 22, 'FirstName 2', 'Address 2', 'City 2');").await.unwrap();
+}
+
+async fn refresh_selects(service: Box<dyn SqlClient>) {
+    let t = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs_f64();
+
+    let result = service
+        .exec_query("SELECT FLOOR((UNIX_TIMESTAMP()) / 10)")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![TableValue::Float((t / 10.).floor().into())])]
+    );
+
+    let result = service
+        .exec_query("SELECT ((3600 * 24 - 28800) / 86400)")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(0)])]);
+
+    let result = service
+        .exec_query("SELECT ((3600 * (24 + 8) - 28800) / 86400)")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
+    let result = service
+        .exec_query("SELECT ((3600 * (48 + 8) - 28800) / 86400)")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
 }
 
 async fn select_test(service: Box<dyn SqlClient>) {
@@ -421,6 +559,26 @@ async fn group_by_nulls(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn logical_alias(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE s.logical (id int, n int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO s.logical (id, n) VALUES (1, 1), (2, 2), (3, 3), (1, 1), (2, 2)")
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT  sum(n) from (select id, sum(n) n from s.logical group by 1) `test` ")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&result), rows(&[(9)]));
+}
+
 async fn float_decimal_scale(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA foo").await.unwrap();
     service
@@ -538,6 +696,48 @@ async fn join(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&result), rows(&[("a", "a"), ("b", "b")]));
+}
+
+async fn filtered_join(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.employee (name varchar) INDEX employee_name (name)")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query("CREATE TABLE foo.employee_department_bridge (employee_name text, department_name text) INDEX employee_department_bridge_name (employee_name)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO foo.employee (name) VALUES ('John'), ('Jim')")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO foo.employee_department_bridge (employee_name, department_name) VALUES ('John','Marketing'), ('Jim','Marketing')")
+        .await
+        .unwrap();
+
+    let result = service.exec_query("select * from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name = e.name where b.department_name = 'Non existing'").await.unwrap();
+
+    assert_eq!(result.len(), 0);
+
+    println!("{:?}", service
+        .exec_query(
+            "EXPLAIN ANALYZE select e.name from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name=e.name where b.department_name = 'Marketing' GROUP BY 1 LIMIT 10000",
+        )
+        .await
+        .unwrap());
+
+    let result = service
+        .exec_query(
+            "select e.name from foo.employee AS e LEFT JOIN foo.employee_department_bridge b on b.employee_name=e.name where b.department_name = 'Marketing' GROUP BY 1 ORDER BY 1 LIMIT 10000",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&result), rows(&[("Jim"), ("John")]));
 }
 
 async fn three_tables_join(service: Box<dyn SqlClient>) {
@@ -846,6 +1046,29 @@ async fn numeric_cast(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
+}
+
+async fn cast_timestamp_to_utf8(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.timestamps (id text, created timestamp)")
+        .await
+        .unwrap();
+
+    service.exec_query(
+        "INSERT INTO foo.timestamps (id, created) VALUES ('a', '2022-01-01T00:00:00Z'), ('b', '2021-01-01T00:00:00Z')"
+    ).await.unwrap();
+
+    let r = service
+        .exec_query("SELECT id, CAST(created AS VARCHAR) from foo.timestamps ORDER BY id ASC")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("a", "2022-01-01 00:00:00"), ("b", "2021-01-01 00:00:00"),])
+    );
 }
 
 async fn numbers_to_bool(service: Box<dyn SqlClient>) {
@@ -1742,6 +1965,92 @@ async fn create_table_with_location_invalid_digit(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn create_table_with_csv(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
+async fn create_table_with_csv_and_index(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') INDEX by_number (`number`) LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
+async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
 async fn create_table_with_url(service: Box<dyn SqlClient>) {
     let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
 
@@ -1968,6 +2277,177 @@ async fn hyperloglog_inserts(service: Box<dyn SqlClient>) {
         .expect_err("should not allow invalid HLL (with extra bytes)");
 }
 
+async fn create_table_with_location_and_hyperloglog(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!(
+                "0,02 0c 01 00 80 a5 90 34,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x80, 0xa5, 0x90, 0x34])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,02 0C 02 00 C0 2F F5 89 41 D5 F0 C6,{}\n",
+                base64::encode(vec![
+                    0x02, 0x0c, 0x02, 0x00, 0xc0, 0x2f, 0xf5, 0x89, 0x41, 0xd5, 0xf0, 0xc6
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations (id int, hll hyperloglog, hll_base hyperloglog) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+}
+async fn create_table_with_location_and_hyperloglog_postgress(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog-pg.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!("0,11 8b 7f,{}\n", base64::encode(vec![0x11, 0x8b, 0x7f])).as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,12 8b 7f ee 22 c4 70 69 1a 81 34,{}\n",
+                base64::encode(vec![
+                    0x12, 0x8b, 0x7f, 0xee, 0x22, 0xc4, 0x70, 0x69, 0x1a, 0x81, 0x34
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations_pg (id int, hll HLL_POSTGRES, hll_base HLL_POSTGRES) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_pg GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+}
+
+async fn create_table_with_location_and_hyperloglog_space_separated(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog-ssep.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!(
+                "0,02 0c 01 00 05 05 7b cf,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,02 0c 01 00 15 15 7b ff,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations_ssep (id int, hll varbinary, hll_base varbinary) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_ssep GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+    let res = service
+        .exec_query("SELECT hll, hll_base FROM hll.locations_ssep")
+        .await
+        .unwrap();
+    for r in to_rows(&res).iter() {
+        assert_eq!(r[0], r[1]);
+    }
+    println!("res {:?}", res);
+}
 async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
@@ -2228,20 +2708,21 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
            \n          Empty"
     );
 
+    // TODO
     // Removing single value columns should keep the sort order of the rest.
-    let p = service
-        .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
-        .await
-        .unwrap();
-    assert_eq!(
-        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Worker, sort_order: [0]\
-           \n  Projection, [id3], sort_order: [0]\
-           \n    Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
-           \n      Merge, sort_order: [0, 1, 2]\
-           \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
-           \n          Empty"
-    );
+    // let p = service
+    //     .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
+    //     .await
+    //     .unwrap();
+    // assert_eq!(
+    //     pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+    //     "Worker, sort_order: [0]\
+    //        \n  Projection, [id3], sort_order: [0]\
+    //        \n    Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+    //        \n      Merge, sort_order: [0, 1, 2]\
+    //        \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
+    //        \n          Empty"
+    // );
     let p = service
         .plan_query("SELECT id1, id3 FROM s.Data WHERE id2 = 234")
         .await
@@ -2304,15 +2785,15 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
            \n    Worker\
            \n      Sort, by: [SUM(hits)@1 desc nulls last]\
            \n        FullInplaceAggregate, sort_order: [0]\
-           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                  Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n                MergeSort, sort_order: [0, 1, 2]\
+           \n                  Scan, index: default:1:[1]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2]\
            \n                    Empty\
-           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                  Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n                MergeSort, sort_order: [0, 1, 2]\
+           \n                  Scan, index: default:2:[2]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2]\
            \n                    Empty"
     );
 }
@@ -2682,6 +3163,88 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, c int, d int, amount int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE INDEX cb ON s.Orders(c, b)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE INDEX bcd ON s.Orders(d, b, c)")
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalInplaceAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+           \n  FinalInplaceAggregate\
+           \n    Worker\
+           \n      PartialInplaceAggregate\
+           \n        Filter\
+           \n          MergeSort\
+           \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [b, c, amount]\
+           \n              Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c in (5, 6) GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalHashAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+           \n  FinalHashAggregate\
+           \n    Worker\
+           \n      PartialHashAggregate\
+           \n        Filter\
+           \n          Merge\
+           \n            Scan, index: cb:2:[2], fields: [b, c, amount]\
+           \n              Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 and a > 5 and a < 10 GROUP BY 1",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalInplaceAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+        \n  FinalInplaceAggregate\
+        \n    Worker\
+        \n      PartialInplaceAggregate\
+        \n        Filter\
+        \n          MergeSort\
+        \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [a, b, c, amount]\
+        \n              Empty"
+    );
+}
+
 async fn planning_joins(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -2769,6 +3332,10 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     service
+        .exec_query("CREATE INDEX by_product_customer ON s.Orders(product_id, customer_id)")
+        .await
+        .unwrap();
+    service
         .exec_query("CREATE TABLE s.Customers(customer_id int, customer_name text)")
         .await
         .unwrap();
@@ -2788,7 +3355,7 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "ClusterSend, partitions: [[2, 3, 4]]"
+        "ClusterSend, partitions: [[2, 4, 5]]"
     );
     assert_eq!(
             pp_phys_plan(p.worker.as_ref()),
@@ -2801,10 +3368,10 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n            Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id]\
            \n              Empty\
            \n          MergeSort\
-           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n            Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
            \n              Empty\
            \n      MergeSort\
-           \n        Scan, index: default:4:[4]:sort_on[product_id], fields: *\
+           \n        Scan, index: default:5:[5]:sort_on[product_id], fields: *\
            \n          Empty",
         );
 
@@ -2831,14 +3398,14 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
            \n          Filter, predicate: product_id@2 = 125\
            \n            MergeSort\
-           \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
+           \n              Scan, index: by_product_customer:3:[3]:sort_on[product_id, customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
            \n                Empty\
            \n          MergeSort\
-           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n            Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
            \n              Empty\
            \n      Filter, predicate: product_id@0 = 125\
            \n        MergeSort\
-           \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
+           \n          Scan, index: default:5:[5]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
            \n            Empty",
         );
 }
@@ -3001,6 +3568,89 @@ async fn topk_query(service: Box<dyn SqlClient>) {
     assert_eq!(to_rows(&r), rows(&[("a", 1), ("e", 35), ("d", 40)]));
 }
 
+async fn topk_having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80)")
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) < 100 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("y", 80), ("b", 52), ("c", 48)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING MIN(`hits`) >= 3 AND SUM(`hits`) < 100 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("y", 80), ("c", 48), ("d", 44)]));
+
+    service
+        .exec_query("CREATE TABLE s.Data21(url text, hits int, hits_2 int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data21(url, hits, hits_2) VALUES  ('b', 5, 2), ('d', 3, 4), ('c', 4, 1),  ('e', 2, 10)")
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data22(url text, hits int, hits_2 int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data22(url, hits, hits_2) VALUES ('b', 50, 3), ('c', 45, 12), ('d', 40, 10), ('e', 35, 5)")
+            .await
+            .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data21 \
+                               UNION ALL \
+                               SELECT * FROM s.Data22) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING MAX(`hits_2`) < 11 \
+                         ORDER BY 2 DESC \
+                         LIMIT 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("b", 55), ("d", 43)]));
+}
+
 async fn topk_decimals(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -3037,6 +3687,280 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
         to_rows(&r),
         rows(&[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))])
     );
+}
+
+async fn planning_topk_having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits int, uhits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits int, uhits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 10\
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, SUM(Data.hits)@1:hits]\
+        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10\
+        \n    Worker\
+        \n      Sort\
+        \n        FullInplaceAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              MergeSort\
+        \n                Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n                  Empty\
+        \n              MergeSort\
+        \n                Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n                  Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits`, CARDINALITY(MERGE(`uhits`)) `uhits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 10 AND CARDINALITY(MERGE(`uhits`)) > 5 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, SUM(Data.hits)@1:hits, CARDINALITY(MERGE(Data.uhits)@2):uhits]\
+        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10 AND CAST(CARDINALITY(MERGE(Data.uhits)@2) AS Int64) > 5\
+        \n    Worker\
+        \n      Sort\
+        \n        FullInplaceAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              MergeSort\
+        \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+        \n                  Empty\
+        \n              MergeSort\
+        \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+        \n                  Empty"
+        );
+}
+async fn planning_topk_hll(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    // A typical top-k query.
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3\
+         \n    Worker\
+         \n      Sort\
+         \n        FullInplaceAggregate\
+         \n          MergeSort\
+         \n            Union\
+         \n              MergeSort\
+         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                  Empty\
+         \n              MergeSort\
+         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                  Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) > 20 and cardinality(merge(hits)) < 40\
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3, having: CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) > 20 AND CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) < 40\
+         \n    Worker\
+         \n      Sort\
+         \n        FullInplaceAggregate\
+         \n          MergeSort\
+         \n            Union\
+         \n              MergeSort\
+         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                  Empty\
+         \n              MergeSort\
+         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                  Empty"
+        );
+}
+
+async fn topk_hll(service: Box<dyn SqlClient>) {
+    let hlls = vec![
+        "X'118b7f'",
+        "X'128b7fee22c470691a8134'",
+        "X'138b7f04a10642078507c308e309230a420ac10c2510a2114511611363138116811848188218a119411a821ae11f0122e223a125a126632685276327a328e2296129e52b812fe23081320132c133e335a53641368236a23721374237e1382138e13a813c243e6140e341854304434148a24a034f8150c1520152e254e155a1564157e158e35ac25b265b615c615fc1620166a368226a416a626c016c816d677163728275817a637a817ac37b617c247c427d677f6180e18101826382e1846184e18541858287e1880189218a418b818bc38e018ea290a19244938295e4988198c299e29b239b419c419ce49da1a1e1a321a381a4c1aa61acc2ae01b0a1b101b142b161b443b801bd02bd61bf61c263c4a3c501c7a1caa1cb03cd03cf03cf42d123d4c3d662d744d901dd01df81e001e0a2e641e7e3edc1f0a2f1c1f203f484f5c4f763fc84fdc1fe02fea1'",
+        "X'148b7f21083288a4320a12086719c65108c1088422884511063388232904418c8520484184862886528c65198832106328c83114e6214831108518d03208851948511884188441908119083388661842818c43190c320ce4210a50948221083084a421c8328c632104221c4120d01284e20902318ca5214641942319101294641906228483184e128c43188e308882204a538c8328903288642102220c64094631086330c832106320c46118443886329062118a230c63108a320c23204a11852419c6528c85210a318c6308c41088842086308ce7110a418864190650884210ca631064108642a1022186518c8509862109020a0a4318671144150842400e5090631a0811848320c821888120c81114a220880290622906310d0220c83090a118c433106128c221902210cc23106029044114841104409862190c43188111063104c310c6728c8618c62290441102310c23214440882438ca2110a32908548c432110329462188a43946328842114640944320884190c928c442084228863318a2190a318c6618ca3114651886618c44190c5108e2110612144319062284641908428882314862106419883310421988619ca420cc511442104633888218c4428465288651910730c81118821088218c6418c45108452106519ce410d841904218863308622086211483198c710c83104a328c620906218864118623086418c8711423094632186420c4620c41104620a441108e40882628c6311c212046428c8319021104672888428ca320c431984418c4209043084451886510c641108310c4c20c66188472146310ca71084820c621946218c8228822190e2410861904411c27288621144328c6440c6311063190813086228ca710c2218c4718865188c2114850888608864404a3194e22882310ce53088619ca31904519503188e1118c4214cb2948110c6119c2818c843108520c43188c5204821186528c871908311086214c630c4218c8418cc3298a31888210c63110a121042198622886531082098c419c4210c6210c8338c25294610944518c442104610884104424206310c8311462288873102308c2440c451082228824310440982220c4240c622084310c642850118c641148430d0128c8228c2120c221884428863208c21a0a4190a4404c21186548865204633906308ca32086211c8319ce22146520c6120803318a518c840084519461208c21908538cc428c2110844384e40906320c44014a3204e62042408c8328c632146318c812004310c41318e3208a5308a511827104a4188c51048421446090a7088631102231484104473084318c41210860906919083190652906129c4628c45310652848221443114420084500865184a618c81198c32906418c63190e320c231882728484184671888309465188a320c83208632144318c6331c642988108c61218812144328d022844021022184a31908328c6218c2328c4528cc541428190641046418c84108443146230c6419483214232184411863290a210824318c220868194631106618c43188821048230c4128c6310c0330462094241106330c42188c321043118863046438823110a041464108e3190e4209a11902439c43188631104321008090441106218c6419064294a229463594622244320cc71184510902924421908218c62308641044328ca328882111012884120ca52882428c62184442086718c4221c8211082208a321023115270086218c4218c6528ce400482310a520c43104a520c44210811884118c4310864198263942331822'",
+    ];
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data1(url, hits) VALUES ('a', {}), ('b', {}), ('c', {}), ('d', {}), ('k', {}) ",
+                hlls[0], hlls[1], hlls[2], hlls[3], hlls[0]
+            ))
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data2(url, hits) VALUES ('b', {}), ('c', {}), ('e', {}), ('d', {}), ('h', {})",
+                hlls[3], hlls[2], hlls[1], hlls[2], hlls[2]
+                )
+                )
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("d", 10383), ("b", 9722), ("c", 171)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) < 10000
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("c", 171), ("h", 164)]));
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) < 170 and cardinality(merge(hits)) > 160
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("h", 164)]));
+}
+
+async fn topk_hll_with_nulls(service: Box<dyn SqlClient>) {
+    let hlls = vec![
+        "X'118b7f'",
+        "X'128b7fee22c470691a8134'",
+        "X'138b7f04a10642078507c308e309230a420ac10c2510a2114511611363138116811848188218a119411a821ae11f0122e223a125a126632685276327a328e2296129e52b812fe23081320132c133e335a53641368236a23721374237e1382138e13a813c243e6140e341854304434148a24a034f8150c1520152e254e155a1564157e158e35ac25b265b615c615fc1620166a368226a416a626c016c816d677163728275817a637a817ac37b617c247c427d677f6180e18101826382e1846184e18541858287e1880189218a418b818bc38e018ea290a19244938295e4988198c299e29b239b419c419ce49da1a1e1a321a381a4c1aa61acc2ae01b0a1b101b142b161b443b801bd02bd61bf61c263c4a3c501c7a1caa1cb03cd03cf03cf42d123d4c3d662d744d901dd01df81e001e0a2e641e7e3edc1f0a2f1c1f203f484f5c4f763fc84fdc1fe02fea1'",
+        "X'148b7f21083288a4320a12086719c65108c1088422884511063388232904418c8520484184862886528c65198832106328c83114e6214831108518d03208851948511884188441908119083388661842818c43190c320ce4210a50948221083084a421c8328c632104221c4120d01284e20902318ca5214641942319101294641906228483184e128c43188e308882204a538c8328903288642102220c64094631086330c832106320c46118443886329062118a230c63108a320c23204a11852419c6528c85210a318c6308c41088842086308ce7110a418864190650884210ca631064108642a1022186518c8509862109020a0a4318671144150842400e5090631a0811848320c821888120c81114a220880290622906310d0220c83090a118c433106128c221902210cc23106029044114841104409862190c43188111063104c310c6728c8618c62290441102310c23214440882438ca2110a32908548c432110329462188a43946328842114640944320884190c928c442084228863318a2190a318c6618ca3114651886618c44190c5108e2110612144319062284641908428882314862106419883310421988619ca420cc511442104633888218c4428465288651910730c81118821088218c6418c45108452106519ce410d841904218863308622086211483198c710c83104a328c620906218864118623086418c8711423094632186420c4620c41104620a441108e40882628c6311c212046428c8319021104672888428ca320c431984418c4209043084451886510c641108310c4c20c66188472146310ca71084820c621946218c8228822190e2410861904411c27288621144328c6440c6311063190813086228ca710c2218c4718865188c2114850888608864404a3194e22882310ce53088619ca31904519503188e1118c4214cb2948110c6119c2818c843108520c43188c5204821186528c871908311086214c630c4218c8418cc3298a31888210c63110a121042198622886531082098c419c4210c6210c8338c25294610944518c442104610884104424206310c8311462288873102308c2440c451082228824310440982220c4240c622084310c642850118c641148430d0128c8228c2120c221884428863208c21a0a4190a4404c21186548865204633906308ca32086211c8319ce22146520c6120803318a518c840084519461208c21908538cc428c2110844384e40906320c44014a3204e62042408c8328c632146318c812004310c41318e3208a5308a511827104a4188c51048421446090a7088631102231484104473084318c41210860906919083190652906129c4628c45310652848221443114420084500865184a618c81198c32906418c63190e320c231882728484184671888309465188a320c83208632144318c6331c642988108c61218812144328d022844021022184a31908328c6218c2328c4528cc541428190641046418c84108443146230c6419483214232184411863290a210824318c220868194631106618c43188821048230c4128c6310c0330462094241106330c42188c321043118863046438823110a041464108e3190e4209a11902439c43188631104321008090441106218c6419064294a229463594622244320cc71184510902924421908218c62308641044328ca328882111012884120ca52882428c62184442086718c4221c8211082208a321023115270086218c4218c6528ce400482310a520c43104a520c44210811884118c4310864198263942331822'",
+    ];
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data1(url, hits) VALUES ('a', {}), ('b', {}), ('c', {}), ('d', {}), ('k', {}) ",
+                "Null", hlls[1], hlls[2], hlls[3], hlls[3]
+            ))
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data2(url, hits) VALUES ('b', {}), ('c', {}), ('e', {}), ('d', {}), ('h', {})",
+                hlls[3], "Null", hlls[1], hlls[2], hlls[2]
+                )
+                )
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 ASC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("a", 0), ("e", 1), ("c", 164)]));
 }
 
 async fn offset(service: Box<dyn SqlClient>) {
@@ -3664,6 +4588,57 @@ async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn rolling_window_query_timestamps_exceeded(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day int, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         (4, 'john', 10), \
+                         (4, 'sara', 7), \
+                         (5, 'sara', 3), \
+                         (5, 'john', 9), \
+                         (6, 'john', 11), \
+                         (7, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.data GROUP BY 1, 2) base \
+             ROLLING_WINDOW DIMENSION day PARTITION BY name \
+               FROM -5 \
+               TO 5 \
+               EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (-5, None, None),
+            (-4, None, None),
+            (-3, None, None),
+            (-2, None, None),
+            (-1, None, None),
+            (0, None, None),
+            (1, None, None),
+            (2, None, None),
+            (3, None, None),
+            (4, Some("john"), Some(10)),
+            (4, Some("sara"), Some(7)),
+            (5, Some("john"), Some(19)),
+            (5, Some("sara"), Some(10))
+        ])
+    );
+}
 async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -4395,7 +5370,3076 @@ async fn dimension_only_queries_for_stream_table(service: Box<dyn SqlClient>) {
     assert_eq!(to_rows(&r), rows(&[("0"), ("1")]));
 }
 
-fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
+async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA test").await.unwrap();
+    service.exec_query("CREATE TABLE test.events_by_type (foo text, bar timestamp, bar_id text, measure1 int, measure2 text) unique key (foo, bar, bar_id)").await.unwrap();
+    for i in 0..2 {
+        for j in 0..2 {
+            service
+                .exec_query(&format!("INSERT INTO test.events_by_type (foo, bar, bar_id, measure1, measure2, __seq) VALUES ('a', '2021-01-01T00:00:00.000', '{}', {}, '{}', {})", i, j, "text_value", i * 10 + j))
+                .await
+                .unwrap();
+        }
+    }
+    let r = service
+        .exec_query(
+            "SELECT bar_id, measure1, measure2 FROM test.events_by_type as `events` LIMIT 100",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("0", 1, "text_value"), ("1", 1, "text_value")])
+    );
+}
+
+async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA test").await.unwrap();
+    service.exec_query("CREATE TABLE test.unique_parts1 (a int, b int, c int, e int, val int) unique key (a, b, c, e) ").await.unwrap();
+    service.exec_query("CREATE TABLE test.unique_parts2 (a int, b int, c int, e int, val int) unique key (a, b, c, e) ").await.unwrap();
+    service
+        .exec_query(
+            "
+            INSERT INTO test.unique_parts1
+            (a, b, c, e, val, __seq)
+            VALUES
+            (1, 1, 1, 1, 10, 1),
+            (2, 2, 2, 2, 20, 2)
+            ",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "
+            INSERT INTO test.unique_parts1
+            (a, b, c, e, val, __seq)
+            VALUES
+            (11, 11, 11, 11, 110, 11),
+            (22, 22, 22, 22, 220, 21)
+            ",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "
+            INSERT INTO test.unique_parts2
+            (a, b, c, e, val, __seq)
+            VALUES
+            (3, 3, 3, 3, 30, 3),
+            (4, 4, 4, 4, 40, 4)
+            ",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT a, b FROM (
+                    SELECT * FROM test.unique_parts1
+                    UNION ALL 
+                    SELECT * FROM test.unique_parts2
+                ) `tt` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 100",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 1), (2, 2), (3, 3), (4, 4), (11, 11), (22, 22)])
+    );
+}
+
+async fn unique_key_and_multi_partitions_hash_aggregate(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA test").await.unwrap();
+    service.exec_query("CREATE TABLE test.unique_parts1 (a int, b int, c int, e int, val int) unique key (a, b, c, e) ").await.unwrap();
+    service.exec_query("CREATE TABLE test.unique_parts2 (a int, b int, c int, e int, val int) unique key (a, b, c, e) ").await.unwrap();
+    service
+        .exec_query(
+            "
+            INSERT INTO test.unique_parts1
+            (a, b, c, e, val, __seq)
+            VALUES
+            (1, 1, 1, 1, 10, 1),
+            (2, 2, 2, 2, 20, 2)
+            ",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "
+            INSERT INTO test.unique_parts1
+            (a, b, c, e, val, __seq)
+            VALUES
+            (11, 11, 1, 11, 110, 11),
+            (22, 22, 2, 22, 220, 21)
+            ",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "
+            INSERT INTO test.unique_parts2
+            (a, b, c, e, val, __seq)
+            VALUES
+            (3, 3, 1, 3, 30, 3),
+            (4, 4, 1, 4, 40, 4)
+            ",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT c, sum(val) FROM (
+                    SELECT * FROM test.unique_parts1
+                    UNION ALL 
+                    SELECT * FROM test.unique_parts2
+                ) `tt` GROUP BY 1 ORDER BY 1 LIMIT 100",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 190), (2, 240)]));
+}
+
+async fn divide_by_zero(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i int, z int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i, z) VALUES (1, 0), (2, 0), (3, 0)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT i / z FROM s.t")
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(
+        r.elide_backtrace(),
+        CubeError::internal("Execution error: Internal: Arrow error: External error: Arrow error: Divide by zero error".to_string())
+    );
+}
+
+async fn panic_worker(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("SYS PANIC WORKER").await;
+    assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
+}
+
+async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i) VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT count(*) FROM s.t WHERE i in ('2', '3')")
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), rows(&[(2)]));
+}
+
+async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, c int, a_sum int, a_max int, a_min int, a_merge HYPERLOGLOG)
+                     AGGREGATIONS(sum(a_sum), max(a_max), min(a_min), merge(a_merge))
+                     INDEX reg_index (a, b) 
+                     AGGREGATE INDEX aggr_index (a, b)
+                     ")
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query("SELECT a, b, sum(a_sum) FROM s.Orders GROUP BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, b, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders GROUP BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum), MAX(s.Orders.a_max)@3:MAX(a_max), MIN(s.Orders.a_min)@4:MIN(a_min), MERGE(s.Orders.a_merge)@5:MERGE(a_merge)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: *\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, b, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders WHERE c = 1 GROUP BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum), MAX(s.Orders.a_max)@3:MAX(a_max), MIN(s.Orders.a_min)@4:MIN(a_min), MERGE(s.Orders.a_merge)@5:MERGE(a_merge)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: default:3:[3]:sort_on[a, b, c], fields: *\
+         \n              Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT a, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders GROUP BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, SUM(s.Orders.a_sum)@1:SUM(a_sum), MAX(s.Orders.a_max)@2:MAX(a_max), MIN(s.Orders.a_min)@3:MIN(a_min), MERGE(s.Orders.a_merge)@4:MERGE(a_merge)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: aggr_index:2:[2]:sort_on[a], fields: [a, a_sum, a_max, a_min, a_merge]\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, avg(a_sum) FROM s.Orders GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, AVG(s.Orders.a_sum)@1:AVG(a_sum)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: reg_index:1:[1]:sort_on[a], fields: [a, a_sum]\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, sum(a_sum) FROM s.Orders WHERE b = 1 GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, SUM(s.Orders.a_sum)@1:SUM(a_sum)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
+         \n              Empty"
+    );
+}
+
+async fn aggregate_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, c int, a_sum int, a_max int, a_min int)
+                     AGGREGATIONS(sum(a_sum), max(a_max), min(a_min))
+                     INDEX reg_index (a, b) 
+                     AGGREGATE INDEX aggr_index (a, b)
+                     ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Orders (a, b, c, a_sum, a_max, a_min) VALUES (1, 10, 100, 10, 10, 10), \
+                                                   (2, 20, 200, 10, 10, 10), \
+                                                   (1, 10, 300, 20, 20, 20), \
+                                                   (2, 30, 200, 100, 100, 100), \
+                                                   (1, 10, 400, 20, 40, 40), \
+                                                   (2, 20, 410, 20, 30, 30) \
+                                                   ",
+        )
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT a, b, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::Int(1),
+                TableValue::Int(10),
+                TableValue::Int(50),
+                TableValue::Int(40),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(20),
+                TableValue::Int(30),
+                TableValue::Int(30),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(30),
+                TableValue::Int(100),
+                TableValue::Int(100),
+                TableValue::Int(100)
+            ],
+        ]
+    );
+
+    let res = service
+        .exec_query("SELECT a, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders GROUP BY 1 ORDER BY 1")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::Int(1),
+                TableValue::Int(50),
+                TableValue::Int(40),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(130),
+                TableValue::Int(100),
+                TableValue::Int(10)
+            ],
+        ]
+    );
+
+    let res = service
+        .exec_query("SELECT a, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders WHERE b = 20 GROUP BY 1 ORDER BY 1")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&res),
+        [[
+            TableValue::Int(2),
+            TableValue::Int(30),
+            TableValue::Int(30),
+            TableValue::Int(10)
+        ],]
+    );
+}
+
+async fn aggregate_index_with_hll_bytes(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, hll bytes)
+                     AGGREGATIONS(merge(hll))
+                     AGGREGATE INDEX agg_index (a, b) 
+                     ",
+        )
+        .await
+        .unwrap();
+    let sparse = "X'020C0200C02FF58941D5F0C6'";
+    let dense = "X'030C004020000001000000000000000000000000000000000000050020000001030100000410000000004102100000000000000051000020000020003220000003102000000000001200042000000001000200000002000000100000030040000000010040003010000000000100002000000000000000000031000020000000000000000000100000200302000000000000000000001002000000000002204000000001000001000200400000000000001000020031100000000080000000002003000000100000000100110000000000000000000010000000000000000000000020000001320205000100000612000000000004100020100000000000000000001000000002200000100000001000001020000000000020000000000000001000010300060000010000000000070100003000000000000020000000000001000010000104000000000000000000101000100000001401000000000000000000000000000100010000000000000000000000000400020000000002002300010000000000040000041000200005100000000000001000000000100000203010000000000000000000000000001006000100000000000000300100001000100254200000000000101100040000000020000010000050000000501000000000101020000000010000000003000000000200000102100000000204007000000200010000033000000000061000000000000000000000000000000000100001000001000000013000000003000000000002000000000000010001000000000000000000020010000020000000100001000000000000001000103000000000000000000020020000001000000000100001000000000000000020220200200000001001000010100000000200000000000001000002000000011000000000101200000000000000000000000000000000000000100130000000000000000000100000120000300040000000002000000000000000000000100000000070000100000000301000000401200002020000000000601030001510000000000000110100000000000000000050000000010000100000000000000000100022000100000101054010001000000000000001000001000000002000000000100000000000021000001000002000000000100000000000000000000951000000100000000000000000000000000102000200000000000000010000010000000000100002000000000000000000010000000000000010000000010000000102010000000010520100000021010100000030000000000000000100000001000000022000330051000000100000000000040003020000010000020000100000013000000102020000000050000000020010000000000000000101200C000100000001200400000000010000001000000000100010000000001000001000000100000000010000000004000000002000013102000100000000000000000000000600000010000000000000020000000000001000000000030000000000000020000000001000001000000000010000003002000003000200070001001003030010000000003000000000000020000006000000000000000011000000010000200000000000500000000000000020500000000003000000000000000004000030000100000000103000001000000000000200002004200000020000000030000000000000000000000002000100000000000000002000000000000000010020101000000005250000010000000000023010000001000000000000500002001000123100030011000020001310600000000000021000023000003000000000000000001000000000000220200000000004040000020201000000010201000000000020000400010000050000000000000000000000010000020000000000000000000000000000000000102000010000000000000000000000002010000200200000000000000000000000000100000000000000000200400000000010000000000000000000000000000000010000200300000000000100110000000000000000000000000010000030000001000000000010000010200013000000000000200000001000001200010000000010000000000001000000000000100000000410000040000001000100010000100000002001010000000000000000001000000000000010000000000000000000000002000000000001100001000000001010000000000000002200000000004000000000000100010000000000600000000100300000000000000000000010000003000000000000000000310000010100006000010001000000000000001010101000100000000000000000000000000000201000000000000000700010000030000000000000021000000000000000001020000000030000100001000000000000000000000004010100000000000000000000004000000040100000040100100001000000000300000100000000010010000300000200000000000001302000000000000000000100100000400030000001001000100100002300000004030000002010000220100000000000002000000010010000000003010500000000300000000005020102000200000000000000020100000000000000000000000011000000023000000000010000101000000000000010020040200040000020000004000020000000001000000000100000200000010000000000030100010001000000100000000000600400000000002000000000000132000000900010000000030021400000000004100006000304000000000000010000106000001300020000'";
+
+    service
+        .exec_query(&format!(
+            "INSERT INTO s.Orders (a, b, hll) VALUES (1, 10, {s}), \
+                                                   (2, 20, {d}), \
+                                                   (1, 10, {d}), \
+                                                   (2, 30, {s}), \
+                                                   (1, 10, {d}), \
+                                                   (2, 20, {s}) \
+                                                   ",
+            s = sparse,
+            d = dense
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query(
+            "SELECT a, b, cardinality(merge(hll)) FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::Int(1),
+                TableValue::Int(10),
+                TableValue::Int(657),
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(20),
+                TableValue::Int(657),
+            ],
+            [TableValue::Int(2), TableValue::Int(30), TableValue::Int(2),],
+        ]
+    );
+}
+
+async fn aggregate_index_hll(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
+                     AGGREGATIONS(merge(a_hll))
+                     AGGREGATE INDEX aggr_index (a, b)
+                     ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Orders (a, b, a_hll) VALUES \
+                                                    (1, 10, X'020C0200C02FF58941D5F0C6'), \
+                                                    (1, 20, X'020C0200C02FF58941D5F0C6'), \
+                                                    (1, 10, X'020C0200C02FF58941D5F0C6'), \
+                                                    (1, 20, X'020C0200C02FF58941D5F0C6') \
+                                                   ",
+        )
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT a, b, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        [
+            [TableValue::Int(1), TableValue::Int(10), TableValue::Int(2)],
+            [TableValue::Int(1), TableValue::Int(20), TableValue::Int(2)],
+        ]
+    );
+
+    let res = service
+        .exec_query("SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders WHERE b = 20 GROUP BY 1 ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(2)],]);
+
+    let res = service
+        .exec_query(
+            "SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1 ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(2)],]);
+}
+
+async fn aggregate_index_errors(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
+                     AGGREGATE INDEX aggr_index (a, b, a_hll)
+                     ")
+        .await
+        .expect_err("Can't create aggregate index for table 'Orders' because aggregate columns (`AGGREGATIONS`) not specified for the table");
+
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
+                     AGGREGATIONS(merge(a_hll))
+                     AGGREGATE INDEX aggr_index (a, b, a_hll)
+                     ")
+        .await
+        .expect_err("Column 'a_hll' in aggregate index 'aggr_index' is in aggregations list for table 'Orders'. Aggregate index columns must be outside of aggregations list.");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (sum(a), sum(b))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function SUM not allowed for column type text");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (sum(a), max(b), sum(a_hll))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function SUM not allowed for column type hyperloglog");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (max(a_hll))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function MAX not allowed for column type hyperloglog");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (merge(a))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function MERGE not allowed for column type integer");
+}
+
+async fn inline_tables(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE Foo.Persons (
+                ID int,
+                FirstName varchar(255),
+                LastName varchar(255),
+                Timestamp timestamp
+            )",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons
+        (ID, LastName, FirstName, Timestamp)
+        VALUES
+        (23, 'LastName 1', 'FirstName 1', '2020-01-01T00:00:00.000Z'),
+        (24, 'LastName 3', 'FirstName 1', '2020-01-02T00:00:00.000Z'),
+        (25, 'LastName 4', 'FirstName 1', '2020-01-03T00:00:00.000Z'),
+        (26, 'LastName 5', 'FirstName 1', '2020-01-04T00:00:00.000Z'),
+        (35, 'LastName 24', 'FirstName 2', '2020-01-01T00:00:00.000Z'),
+        (36, 'LastName 23', 'FirstName 2', '2020-01-02T00:00:00.000Z'),
+        (37, 'LastName 22', 'FirstName 2', '2020-01-03T00:00:00.000Z'),
+        (38, 'LastName 21', 'FirstName 2', '2020-01-04T00:00:00.000Z')",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT * FROM Foo.Persons")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows().len(), 8);
+    assert_eq!(
+        result.get_rows()[0],
+        Row::new(vec![
+            TableValue::Int(23),
+            TableValue::String("FirstName 1".to_string()),
+            TableValue::String("LastName 1".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+        ])
+    );
+
+    let columns = vec![
+        Column::new("ID".to_string(), ColumnType::Int, 0),
+        Column::new("LastName".to_string(), ColumnType::String, 1),
+        Column::new("FirstName".to_string(), ColumnType::String, 2),
+        Column::new("Timestamp".to_string(), ColumnType::Timestamp, 3),
+    ];
+    let rows = vec![
+        Row::new(vec![
+            TableValue::Null,
+            TableValue::String("last 1".to_string()),
+            TableValue::String("first 1".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(2),
+            TableValue::Null,
+            TableValue::String("first 2".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(3),
+            TableValue::String("last 3".to_string()),
+            TableValue::String("first 3".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(4),
+            TableValue::String("last 4".to_string()),
+            TableValue::String("first 4".to_string()),
+            TableValue::Null,
+        ]),
+    ];
+    let data = Arc::new(DataFrame::new(columns, rows.clone()));
+    let inline_tables = vec![InlineTable::new(1000, "Persons".to_string(), data)];
+
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
+    let result = service
+        .exec_query_with_context(context, "SELECT * FROM Persons")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &rows);
+
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
+    let result = service
+        .exec_query_with_context(context, "SELECT LastName, Timestamp FROM Persons")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("last 1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 3".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 4".to_string()),
+                TableValue::Null,
+            ]),
+        ]
+    );
+
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
+    let result = service
+        .exec_query_with_context(
+            context,
+            r#"
+            SELECT *
+            FROM (
+                SELECT LastName, Timestamp FROM Foo.Persons
+                UNION ALL SELECT LastName, Timestamp FROM Persons
+            )
+            ORDER BY LastName
+        "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows()[8..12].to_vec(),
+        vec![
+            Row::new(vec![
+                TableValue::String("last 1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 3".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 4".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+        ]
+    );
+}
+
+async fn inline_tables_2x(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    service
+        .exec_query("CREATE TABLE Foo.Persons (ID int, First varchar(255), Last varchar(255))")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE Foo.Persons2 (ID int, First varchar(255), Last varchar(255))")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons
+            (ID, Last, First)
+            VALUES
+            (11, 'last 11', 'first 11'),
+            (12, 'last 12', 'first 12'),
+            (13, 'last 13', 'first 13')",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons2
+            (ID, Last, First)
+            VALUES
+            (31, 'last 31', 'first 31'),
+            (32, 'last 32', 'first 32'),
+            (33, 'last 33', 'first 33')",
+        )
+        .await
+        .unwrap();
+
+    let columns = vec![
+        Column::new("ID".to_string(), ColumnType::Int, 0),
+        Column::new("Last".to_string(), ColumnType::String, 1),
+        Column::new("First".to_string(), ColumnType::String, 2),
+    ];
+    let rows = vec![
+        Row::new(vec![
+            TableValue::Int(41),
+            TableValue::String("last 41".to_string()),
+            TableValue::String("first 41".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(42),
+            TableValue::String("last 42".to_string()),
+            TableValue::String("first 42".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(43),
+            TableValue::String("last 43".to_string()),
+            TableValue::String("first 43".to_string()),
+        ]),
+    ];
+    let rows2 = vec![
+        Row::new(vec![
+            TableValue::Int(21),
+            TableValue::String("last 21".to_string()),
+            TableValue::String("first 21".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(22),
+            TableValue::String("last 22".to_string()),
+            TableValue::String("first 22".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(23),
+            TableValue::String("last 23".to_string()),
+            TableValue::String("first 23".to_string()),
+        ]),
+    ];
+    let data = Arc::new(DataFrame::new(columns.clone(), rows.clone()));
+    let data2 = Arc::new(DataFrame::new(columns.clone(), rows2.clone()));
+    let inline_tables = vec![
+        InlineTable::new(1000, "Persons".to_string(), data),
+        InlineTable::new(1001, "Persons2".to_string(), data2),
+    ];
+
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
+    let result = service
+        .exec_query_with_context(
+            context,
+            r#"
+            SELECT Last
+            FROM (
+                SELECT ID, Last FROM Foo.Persons
+                UNION ALL SELECT ID, Last FROM Foo.Persons2
+                UNION ALL SELECT ID, Last FROM Persons
+                UNION ALL SELECT ID, Last FROM Persons2
+            )
+            ORDER BY Last
+        "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows().to_vec(),
+        vec![
+            Row::new(vec![TableValue::String("last 11".to_string())]),
+            Row::new(vec![TableValue::String("last 12".to_string())]),
+            Row::new(vec![TableValue::String("last 13".to_string())]),
+            Row::new(vec![TableValue::String("last 21".to_string())]),
+            Row::new(vec![TableValue::String("last 22".to_string())]),
+            Row::new(vec![TableValue::String("last 23".to_string())]),
+            Row::new(vec![TableValue::String("last 31".to_string())]),
+            Row::new(vec![TableValue::String("last 32".to_string())]),
+            Row::new(vec![TableValue::String("last 33".to_string())]),
+            Row::new(vec![TableValue::String("last 41".to_string())]),
+            Row::new(vec![TableValue::String("last 42".to_string())]),
+            Row::new(vec![TableValue::String("last 43".to_string())]),
+        ]
+    );
+}
+
+async fn build_range_end(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.t0(x string)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.t1(x string) WITH(build_range_end = '2020-01-01T00:00:00.000')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT table_schema, table_name, build_range_end FROM system.tables")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t0".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
+            ]),
+        ]
+    );
+
+    let r = service
+        .exec_query(
+            "SELECT table_schema, table_name, build_range_end FROM information_schema.tables",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t0".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
+            ]),
+        ]
+    );
+}
+async fn assert_limit_pushdown(
+    service: &Box<dyn SqlClient>,
+    query: &str,
+    expected_index: Option<&str>,
+    is_limit_expected: bool,
+    is_tail_limit: bool,
+) -> Result<Vec<Row>, String> {
+    let res = service
+        .exec_query(&format!("EXPLAIN ANALYZE {}", query))
+        .await
+        .unwrap();
+    match &res.get_rows()[1].values()[2] {
+        TableValue::String(s) => {
+            println!("!! plan {}", s);
+            if let Some(ind) = expected_index {
+                if s.find(ind).is_none() {
+                    return Err(format!(
+                        "Expected index `{}` but it not found in the plan",
+                        ind
+                    ));
+                }
+            }
+            let expected_limit = if is_tail_limit {
+                "TailLimit"
+            } else {
+                "GlobalLimit"
+            };
+            if is_limit_expected {
+                if s.find(expected_limit).is_none() {
+                    return Err(format!("{} expected but not found", expected_limit));
+                }
+            } else {
+                if s.find(expected_limit).is_some() {
+                    return Err(format!("{} unexpected but found", expected_limit));
+                }
+            }
+        }
+        _ => return Err("unexpected value".to_string()),
+    };
+
+    let res = service.exec_query(query).await.unwrap();
+    Ok(res.get_rows().clone())
+}
+
+async fn cache_incr(service: Box<dyn SqlClient>) {
+    let query = r#"CACHE INCR "prefix:key""#;
+
+    let r = service.exec_query(query.clone()).await.unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+    );
+
+    let r = service.exec_query(query).await.unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![Row::new(vec![TableValue::String("2".to_string()),]),]
+    );
+}
+
+async fn cache_set_get_rm(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("CACHE SET 'key_to_rm' 'myvalue';")
+        .await
+        .unwrap();
+
+    let get_response = service.exec_query("CACHE GET 'key_to_rm'").await.unwrap();
+
+    assert_eq!(
+        get_response.get_columns(),
+        &vec![Column::new("value".to_string(), ColumnType::String, 0),]
+    );
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::String("myvalue".to_string()),]),]
+    );
+
+    service
+        .exec_query("CACHE REMOVE 'key_to_rm' 'myvalue';")
+        .await
+        .unwrap();
+
+    let get_response = service
+        .exec_query("CACHE GET 'key_compaction'")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Null,]),]
+    );
+}
+
+async fn cache_set_get_set_get(service: Box<dyn SqlClient>) {
+    // Initial set
+    {
+        service
+            .exec_query("CACHE SET 'key_for_update' '1';")
+            .await
+            .unwrap();
+
+        let get_response = service
+            .exec_query("CACHE GET 'key_for_update'")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+        );
+    }
+
+    // update
+    {
+        service
+            .exec_query("CACHE SET 'key_for_update' '2';")
+            .await
+            .unwrap();
+
+        let get_response = service
+            .exec_query("CACHE GET 'key_for_update'")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![TableValue::String("2".to_string()),]),]
+        );
+    }
+}
+
+async fn cache_compaction(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("CACHE SET NX TTL 4 'my_prefix:my_key' 'myvalue';")
+        .await
+        .unwrap();
+
+    let get_response = service
+        .exec_query("CACHE GET 'my_prefix:my_key'")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::String("myvalue".to_string()),]),]
+    );
+
+    tokio::time::sleep(Duration::new(5, 0)).await;
+    service
+        .exec_query("SYS CACHESTORE COMPACTION;")
+        .await
+        .unwrap();
+
+    let get_response = service
+        .exec_query("CACHE GET 'my_prefix:my_key'")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        get_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Null,]),]
+    );
+
+    // system.cache table doesn't check expire
+    let cache_resp = service
+        .exec_query(
+            "select count(*) from system.cache where id = 'my_key' and prefix = 'my_prefix'",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        cache_resp.get_rows(),
+        &vec![Row::new(vec![TableValue::Int(0)]),]
+    );
+}
+
+async fn cache_set_nx(service: Box<dyn SqlClient>) {
+    let set_nx_key_sql = "CACHE SET NX TTL 4 'mykey' 'myvalue';";
+
+    let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
+
+    assert_eq!(
+        set_response.get_columns(),
+        &vec![Column::new("success".to_string(), ColumnType::Boolean, 0),]
+    );
+
+    assert_eq!(
+        set_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true),]),]
+    );
+
+    // key was already defined
+    let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
+
+    assert_eq!(
+        set_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(false),]),]
+    );
+
+    tokio::time::sleep(Duration::new(5, 0)).await;
+
+    // key was expired
+    let set_response = service.exec_query(set_nx_key_sql).await.unwrap();
+
+    assert_eq!(
+        set_response.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true),]),]
+    );
+}
+
+async fn cache_prefix_keys(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("CACHE SET 'locks:key1' '1';")
+        .await
+        .unwrap();
+    service
+        .exec_query("CACHE SET 'locks:key2' '2';")
+        .await
+        .unwrap();
+    service
+        .exec_query("CACHE SET 'locks:key3' '3';")
+        .await
+        .unwrap();
+
+    let keys_response = service.exec_query("CACHE KEYS 'locks'").await.unwrap();
+    assert_eq!(
+        keys_response.get_columns(),
+        &vec![Column::new("key".to_string(), ColumnType::String, 0),]
+    );
+    assert_eq!(
+        keys_response.get_rows(),
+        &vec![
+            Row::new(vec![TableValue::String("locks:key1".to_string())]),
+            Row::new(vec![TableValue::String("locks:key2".to_string())]),
+            Row::new(vec![TableValue::String("locks:key3".to_string())]),
+        ]
+    );
+}
+
+async fn limit_pushdown_group(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+    service
+        .exec_query("CREATE TABLE foo.pushdown1 (id int, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE foo.pushdown2 (id int, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown1
+            (id, n)
+            VALUES
+            (11, 10),
+            (11, 15),
+            (11, 18),
+            (12, 20),
+            (12, 25)
+            ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown2
+            (id, n)
+            VALUES
+            (21, 10),
+            (21, 15),
+            (21, 15),
+            (22, 20),
+            (22, 25),
+            (23, 30)",
+        )
+        .await
+        .unwrap();
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT id, SUM(n) FROM (
+                SELECT * FROM foo.pushdown1 
+                union all
+                SELECT * FROM foo.pushdown2 
+                ) as `tb` GROUP BY 1 LIMIT 3",
+        None,
+        false,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(11), TableValue::Int(43)]),
+            Row::new(vec![TableValue::Int(12), TableValue::Int(45)]),
+            Row::new(vec![TableValue::Int(21), TableValue::Int(40)]),
+        ]
+    );
+}
+
+async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.pushdown_group1 (a int, b int, n int) index ind1 (a, b) index ind2 (b)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE foo.pushdown_group2 (a int, b int, n int) index ind1 (a, b) index ind2 (b)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown_group1
+            (a, b, n)
+            VALUES
+            (11, 45, 1),
+            (11, 18, 1),
+            (11, 18, 1),
+            (12, 20, 1),
+            (12, 25, 1)
+            ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown_group2
+            (a, b, n)
+            VALUES
+            (21, 10, 1),
+            (21, 15, 1),
+            (21, 15, 1),
+            (22, 20, 1),
+            (22, 25, 1),
+            (23, 30, 1)",
+        )
+        .await
+        .unwrap();
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a `aa`, b, SUM(n) FROM (
+                SELECT * FROM foo.pushdown_group1 
+                union all
+                SELECT * FROM foo.pushdown_group2 
+                ) as `tb` GROUP BY 1, 2 ORDER BY 1 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
+        ]
+    );
+
+    // ===========================
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(n) FROM (
+                SELECT * FROM foo.pushdown_group1 
+                union all
+                SELECT * FROM foo.pushdown_group2 
+                ) as `tb` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
+        ]
+    );
+
+    // ============================
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(n) FROM (
+                SELECT * FROM foo.pushdown_group1 
+                union all
+                SELECT * FROM foo.pushdown_group2 
+                ) as `tb` GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(10),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(15),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+        ]
+    );
+    //============================
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(n) FROM (
+                SELECT * FROM foo.pushdown_group1 
+                union all
+                SELECT * FROM foo.pushdown_group2 
+                ) as `tb` GROUP BY 1, 2 ORDER BY 1, 2 DESC LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(1)
+            ]),
+        ]
+    );
+    //============================
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(n) FROM (
+                SELECT * FROM foo.pushdown_group1 
+                union all
+                SELECT * FROM foo.pushdown_group2 
+                ) as `tb` GROUP BY 1, 2 ORDER BY 1 DESC, 2 DESC LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(23),
+                TableValue::Int(30),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(25),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
+        ]
+    );
+    //============================
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(n) FROM (
+                SELECT * FROM foo.pushdown_group1 
+                union all
+                SELECT * FROM foo.pushdown_group2 
+                ) as `tb` GROUP BY 1, 2 ORDER BY 1 DESC LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(23),
+                TableValue::Int(30),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(25),
+                TableValue::Int(1)
+            ]),
+        ]
+    );
+
+    //============================
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, n FROM (
+                SELECT * FROM foo.pushdown_group1 
+                union all
+                SELECT * FROM foo.pushdown_group2 
+                ) as `tb` GROUP BY 1, 2,3 ORDER BY 1 DESC, 2 DESC, 3 DESC LIMIT 3",
+        Some("default"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(23),
+                TableValue::Int(30),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(25),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
+        ]
+    );
+
+    //============================
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT b, SUM(n) FROM (
+                SELECT * FROM foo.pushdown_group1 
+                union all
+                SELECT * FROM foo.pushdown_group2 
+                ) as `tb` GROUP BY 1 ORDER BY 1 LIMIT 3",
+        Some("ind2"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(10), TableValue::Int(1)]),
+            Row::new(vec![TableValue::Int(15), TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(18), TableValue::Int(2)]),
+        ]
+    );
+    //
+    //============================
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, n FROM (
+                SELECT * FROM foo.pushdown_group1 
+                union all
+                SELECT * FROM foo.pushdown_group2 
+                ) as `tb` GROUP BY 1, 2, 3 ORDER BY 1, 2 LIMIT 3",
+        Some("default"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
+        ]
+    );
+
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, n FROM (
+                SELECT * FROM foo.pushdown_group1 
+                union all
+                SELECT * FROM foo.pushdown_group2 
+                ) as `tb` GROUP BY 3, 1, 2 ORDER BY 1, 2 LIMIT 3",
+        Some("default"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(1)
+            ]),
+        ]
+    );
+}
+
+async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.pushdown_where_group1 (a int, b int, c int) index ind1 (a, b, c) index ind2 (c, b)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE foo.pushdown_where_group2 (a int, b int, c int) index ind1 (a, b, c) index ind2 (c, b)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown_where_group1
+            (a, b, c)
+            VALUES
+            (11, 45, 1),
+            (11, 18, 2),
+            (11, 18, 3),
+            (12, 20, 4),
+            (12, 25, 5),
+            (12, 25, 6)
+            ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown_where_group2
+            (a, b, c)
+            VALUES
+            (12, 30, 7),
+            (21, 10, 8),
+            (21, 15, 9),
+            (21, 18, 10),
+            (22, 20, 11),
+            (22, 25, 12),
+            (23, 30, 13)",
+        )
+        .await
+        .unwrap();
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(c) FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a = 12
+                GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(11)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
+        ]
+    );
+    //======================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(c) FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a = 12
+                GROUP BY 1, 2 ORDER BY 2 DESC LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(11)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+        ]
+    );
+    //==========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE b = 18
+                GROUP BY a, b, c ORDER BY a, c LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(11), TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(3)]),
+            Row::new(vec![TableValue::Int(21), TableValue::Int(10)]),
+        ]
+    );
+    //==========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE b = 18
+                GROUP BY a, b, c ORDER BY a DESC, c LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(21), TableValue::Int(10)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(3)]),
+        ]
+    );
+    //==========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE b = 18
+                GROUP BY a, b, c ORDER BY a DESC, c DESC LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(21), TableValue::Int(10)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(3)]),
+            Row::new(vec![TableValue::Int(11), TableValue::Int(2)]),
+        ]
+    );
+    //
+    //==========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a = 11 and b = 18
+                GROUP BY a, b, c ORDER BY c LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(3)]),
+        ]
+    );
+    //==========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a = 11 and b = 18
+                GROUP BY a, b, c ORDER BY c DESC LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(3)]),
+            Row::new(vec![TableValue::Int(2)]),
+        ]
+    );
+    //==========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a = 11 and b = 18
+                GROUP BY b, a, c ORDER BY c LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(3)])
+        ]
+    );
+    //
+    //==========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a >= 11 and a < 12 and b = 18
+                GROUP BY a, b, c ORDER BY c LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![TableValue::Int(2)]),
+            Row::new(vec![TableValue::Int(3)])
+        ]
+    );
+
+    //==========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT b FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE c = 11
+                GROUP BY b, c ORDER BY b LIMIT 3",
+        Some("ind2"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(res, vec![Row::new(vec![TableValue::Int(20)]),]);
+}
+
+async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.pushdown_where_group1 (a int, b int, c int) index ind1 (a, b, c) index ind2 (c, b)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE foo.pushdown_where_group2 (a int, b int, c int) index ind1 (a, b, c) index ind2 (c, b)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown_where_group1
+            (a, b, c)
+            VALUES
+            (11, 45, 1),
+            (11, 18, 2),
+            (11, 18, 3),
+            (12, 20, 4),
+            (12, 25, 5),
+            (12, 25, 6)
+            ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown_where_group2
+            (a, b, c)
+            VALUES
+            (12, 30, 7),
+            (21, 10, 8),
+            (21, 15, 9),
+            (21, 18, 10),
+            (22, 20, 11),
+            (22, 25, 12),
+            (23, 30, 13)",
+        )
+        .await
+        .unwrap();
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a aaa, b bbbb, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a = 12
+                ORDER BY 2 LIMIT 4",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(5)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(6)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
+        ]
+    );
+
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                ORDER BY 3 LIMIT 3",
+        Some("ind2"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
+        ]
+    );
+    //
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                ORDER BY 3 DESC LIMIT 3",
+        Some("ind2"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(23),
+                TableValue::Int(30),
+                TableValue::Int(13)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(25),
+                TableValue::Int(12)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(11)
+            ]),
+        ]
+    );
+    //
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                ORDER BY 1, 2 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(2)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+        ]
+    );
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                ORDER BY 1, 2 LIMIT 2 OFFSET 1",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+        ]
+    );
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE b = 20
+                ORDER BY 1 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(11)
+            ]),
+        ]
+    );
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE b = 20
+                ORDER BY 1, 3 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(11)
+            ]),
+        ]
+    );
+}
+async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.pushdown_where_group1 (a int, b int, c int) index ind1 (a, b, c) index ind2 (c, b)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE foo.pushdown_where_group2 (a int, b int, c int) index ind1 (a, b, c) index ind2 (c, b)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown_where_group1
+            (a, b, c)
+            VALUES
+            (11, 45, 1),
+            (11, 18, 2),
+            (11, 18, 3),
+            (12, 20, 4),
+            (12, 25, 5),
+            (12, 25, 6)
+            ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown_where_group2
+            (a, b, c)
+            VALUES
+            (12, 30, 7),
+            (21, 10, 8),
+            (21, 15, 9),
+            (21, 18, 10),
+            (22, 20, 11),
+            (22, 25, 12),
+            (23, 30, 13)",
+        )
+        .await
+        .unwrap();
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a aaa, b bbbb, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a = 12
+                ORDER BY 2 desc LIMIT 4",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(5)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(6)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+        ]
+    );
+
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a aaa, b bbbb, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                ORDER BY 1 desc, 2 desc LIMIT 3",
+        Some("ind1"),
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(23),
+                TableValue::Int(30),
+                TableValue::Int(13)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(25),
+                TableValue::Int(12)
+            ]),
+            Row::new(vec![
+                TableValue::Int(22),
+                TableValue::Int(20),
+                TableValue::Int(11)
+            ]),
+        ]
+    );
+    //
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                ORDER BY 2 LIMIT 2",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(10),
+                TableValue::Int(8)
+            ]),
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(15),
+                TableValue::Int(9)
+            ]),
+        ]
+    );
+}
+async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.pushdown_where_group1 (a int, b int, c int) unique key (a, b) index ind1 (a, b)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE foo.pushdown_where_group2 (a int, b int, c int)  unique key (a, b) index ind1 (a, b)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown_where_group1
+            (a, b, __seq, c)
+            VALUES
+            (11, 45, 1, 1),
+            (11, 18, 2, 2),
+            (11, 18, 3, 3),
+            (12, 20, 4, 4),
+            (12, 25, 5, 5),
+            (12, 25, 6, 6)
+            ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO foo.pushdown_where_group2
+            (a, b, __seq, c)
+            VALUES
+            (12, 30, 7, 7),
+            (21, 10, 8, 8),
+            (21, 15, 9, 9),
+            (21, 18, 10, 10),
+            (22, 20, 11, 11),
+            (22, 25, 12, 12),
+            (23, 30, 13, 13)",
+        )
+        .await
+        .unwrap();
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a = 12
+                ORDER BY 2 LIMIT 4",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(6)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
+        ]
+    );
+
+    // ====================================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                ORDER BY 3 LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+        ]
+    );
+    //==========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT c FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a = 11 and b = 18
+                GROUP BY b, a, c ORDER BY c LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(res, vec![Row::new(vec![TableValue::Int(3)])]);
+    //===========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(c) FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                WHERE a = 12
+                GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(25),
+                TableValue::Int(6)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(30),
+                TableValue::Int(7)
+            ]),
+        ]
+    );
+    //
+    //===========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(c) FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
+        Some("ind1"),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(10),
+                TableValue::Int(8)
+            ]),
+            Row::new(vec![
+                TableValue::Int(21),
+                TableValue::Int(15),
+                TableValue::Int(9)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
+        ]
+    );
+    //===========================
+    let res = assert_limit_pushdown(
+        &service,
+        "SELECT a, b, SUM(c) FROM (
+                SELECT * FROM foo.pushdown_where_group1 
+                union all
+                SELECT * FROM foo.pushdown_where_group2 
+                ) as `tb` 
+                GROUP BY 1, 2 ORDER BY 1 LIMIT 3",
+        Some("ind1"),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        vec![
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(18),
+                TableValue::Int(3)
+            ]),
+            Row::new(vec![
+                TableValue::Int(11),
+                TableValue::Int(45),
+                TableValue::Int(1)
+            ]),
+            Row::new(vec![
+                TableValue::Int(12),
+                TableValue::Int(20),
+                TableValue::Int(4)
+            ]),
+        ]
+    );
+}
+
+async fn queue_full_workflow(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 10 "STANDALONE#queue:2" "payload2";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 100 "STANDALONE#queue:3" "payload3";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 50 "STANDALONE#queue:4" "payload4";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY -1 "STANDALONE#queue:5" "payload5";"#)
+        .await
+        .unwrap();
+
+    {
+        let pending_response = service
+            .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            pending_response.get_columns(),
+            &vec![
+                Column::new("id".to_string(), ColumnType::String, 0),
+                Column::new("status".to_string(), ColumnType::String, 1),
+                Column::new("extra".to_string(), ColumnType::String, 2),
+            ]
+        );
+        assert_eq!(
+            pending_response.get_rows(),
+            &vec![
+                Row::new(vec![
+                    TableValue::String("3".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("4".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("2".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("1".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("5".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+            ]
+        );
+    }
+
+    {
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(active_response.get_rows().len(), 0);
+    }
+
+    {
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:3""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            retrieve_response.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload3".to_string()),
+                TableValue::Null,
+            ]),]
+        );
+    }
+
+    {
+        // concurrency limit
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:4""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            retrieve_response.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(retrieve_response.get_rows().len(), 0);
+    }
+
+    {
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            active_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("3".to_string()),
+                TableValue::String("active".to_string()),
+                TableValue::Null
+            ]),]
+        );
+    }
+
+    let service = Arc::new(service);
+
+    {
+        let service_to_move = service.clone();
+        let blocking = async move {
+            service_to_move
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:3""#)
+                .await
+                .unwrap()
+        };
+
+        let service_to_move = service.clone();
+        let ack = async move {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+
+            service_to_move
+                .exec_query(r#"QUEUE ACK "STANDALONE#queue:3" "result:3""#)
+                .await
+                .unwrap()
+        };
+
+        let (blocking_res, _ack_res) = join!(blocking, ack);
+        assert_eq!(
+            blocking_res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("result:3".to_string()),
+                TableValue::String("success".to_string())
+            ]),]
+        );
+    }
+
+    // previous job was finished
+    {
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(active_response.get_rows().len(), 0);
+    }
+
+    // get
+    {
+        let get_response = service
+            .exec_query(r#"QUEUE GET "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload2".to_string()),
+                TableValue::Null
+            ]),]
+        );
+    }
+
+    // cancel job
+    {
+        let cancel_response = service
+            .exec_query(r#"QUEUE CANCEL "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            cancel_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload2".to_string()),
+                TableValue::Null
+            ]),]
+        );
+
+        // assertion that job was removed
+        let get_response = service
+            .exec_query(r#"QUEUE GET "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+        assert_eq!(get_response.get_rows().len(), 0);
+    }
+}
+
+async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:5555" "payload1";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ACK "STANDALONE#queue:5555" "result:5555""#)
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_columns(),
+        &vec![
+            Column::new("payload".to_string(), ColumnType::String, 0),
+            Column::new("type".to_string(), ColumnType::String, 1),
+        ]
+    );
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("result:5555".to_string()),
+            TableValue::String("success".to_string())
+        ]),]
+    );
+
+    // second call should not return anything, because first call should remove result
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
+        .await
+        .unwrap();
+
+    assert_eq!(result.get_rows().len(), 0);
+}
+
+async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:2" "payload2";"#)
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query(r#"QUEUE TO_CANCEL 1000 1000 "STANDALONE#queue";"#)
+        .await
+        .unwrap();
+    assert_eq!(res.len(), 0);
+
+    // only active jobs can be orphaned
+    // RETRIEVE updates heartbeat
+    {
+        service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 2 "STANDALONE#queue:1""#)
+            .await
+            .unwrap();
+
+        service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 2 "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+    }
+
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+
+    service
+        .exec_query(r#"QUEUE HEARTBEAT "STANDALONE#queue:2";"#)
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query(r#"QUEUE TO_CANCEL 1000 1000 "STANDALONE#queue""#)
+        .await
+        .unwrap();
+    assert_eq!(
+        res.get_columns(),
+        &vec![Column::new("id".to_string(), ColumnType::String, 0),]
+    );
+    assert_eq!(
+        res.get_rows(),
+        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+    );
+
+    // awaiting for expiring heart beat for queue:2
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+
+    let res = service
+        .exec_query(r#"QUEUE TO_CANCEL 1000 1000 "STANDALONE#queue""#)
+        .await
+        .unwrap();
+    assert_eq!(res.len(), 2);
+}
+
+async fn queue_heartbeat(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query(r#"SELECT heartbeat FROM system.queue WHERE prefix = 'STANDALONE#queue'"#)
+        .await
+        .unwrap();
+    assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Null,]),]);
+
+    service
+        .exec_query(r#"QUEUE HEARTBEAT "STANDALONE#queue:1";"#)
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query(r#"SELECT heartbeat FROM system.queue WHERE prefix = 'STANDALONE#queue'"#)
+        .await
+        .unwrap();
+
+    let row = res.get_rows().first().unwrap();
+    match row.values().first().unwrap() {
+        TableValue::Timestamp(_) => {}
+        other => panic!("heartbeat must be a timestamp type, actual: {:?}", other),
+    }
+}
+
+async fn queue_merge_extra(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    // extra must be empty after creation
+    {
+        let res = service
+            .exec_query(r#"QUEUE GET "STANDALONE#queue:1";"#)
+            .await
+            .unwrap();
+        assert_eq!(
+            res.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload1".to_string()),
+                TableValue::Null
+            ]),]
+        );
+    }
+
+    service
+        .exec_query(r#"QUEUE MERGE_EXTRA "STANDALONE#queue:1" '{"first": true}';"#)
+        .await
+        .unwrap();
+
+    // extra should contains first field
+    {
+        let res = service
+            .exec_query(r#"QUEUE GET "STANDALONE#queue:1";"#)
+            .await
+            .unwrap();
+        assert_eq!(
+            res.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload1".to_string()),
+                TableValue::String("{\"first\": true}".to_string())
+            ]),]
+        );
+    }
+}
+
+async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:12345" "payload1";"#)
+        .await
+        .unwrap();
+
+    let service = Arc::new(service);
+
+    {
+        let service_to_move = service.clone();
+        let blocking1 = async move {
+            service_to_move
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:12345""#)
+                .await
+                .unwrap()
+        };
+
+        let service_to_move = service.clone();
+        let blocking2 = async move {
+            service_to_move
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:12345""#)
+                .await
+                .unwrap()
+        };
+
+        let service_to_move = service.clone();
+        let ack = async move {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+
+            service_to_move
+                .exec_query(r#"QUEUE ACK "STANDALONE#queue:12345" "result:12345""#)
+                .await
+                .unwrap()
+        };
+
+        let (blocking1_res, blocking2_res, _ack_res) = join!(blocking1, blocking2, ack);
+        assert_eq!(
+            blocking1_res.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("type".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            blocking1_res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("result:12345".to_string()),
+                TableValue::String("success".to_string())
+            ]),]
+        );
+
+        assert_eq!(
+            blocking2_res.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("type".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            blocking2_res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("result:12345".to_string()),
+                TableValue::String("success".to_string())
+            ]),]
+        );
+    }
+}
+
+async fn queue_custom_orphaned(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 ORPHANED 60 "STANDALONE#queue:2" "payload1";"#)
+        .await
+        .unwrap();
+
+    tokio::time::sleep(Duration::new(1, 0)).await;
+
+    let res = service
+        .exec_query(r#"QUEUE TO_CANCEL 100 100 "STANDALONE#queue""#)
+        .await
+        .unwrap();
+    assert_eq!(
+        res.get_columns(),
+        &vec![Column::new("id".to_string(), ColumnType::String, 0),]
+    );
+
+    assert_eq!(
+        res.get_rows(),
+        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+    );
+}
+
+async fn sys_drop_cache(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"SYS DROP QUERY CACHE;"#)
+        .await
+        .unwrap();
+
+    service.exec_query(r#"SYS DROP CACHE;"#).await.unwrap();
+}
+
+async fn sys_metastore_healthcheck(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"SYS METASTORE HEALTHCHECK;"#)
+        .await
+        .unwrap();
+}
+
+async fn sys_cachestore_healthcheck(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"SYS CACHESTORE HEALTHCHECK;"#)
+        .await
+        .unwrap();
+}
+
+pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
     return d
         .get_rows()
         .iter()

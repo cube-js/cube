@@ -13,8 +13,10 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class ClickHouseFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param) {
-    return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('%', lower(${this.allocateParam(param)}), '%')`;
+  likeIgnoreCase(column, not, param, type) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('${p}', lower(${this.allocateParam(param)}), '${s}')`;
   }
 
   castParameter() {
@@ -160,12 +162,19 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   primaryKeyCount(cubeName, distinct) {
-    const primaryKeySql = this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName);
+    const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
+    const primaryKeySql = primaryKeys.length > 1 ?
+      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) :
+      this.primaryKeySql(primaryKeys[0], cubeName);
     if (distinct) {
       return `uniqExact(${primaryKeySql})`;
     } else {
       return `count(${primaryKeySql})`;
     }
+  }
+
+  castToString(sql) {
+    return `CAST(${sql} as STRING)`;
   }
 
   seriesSql(timeDimension) {

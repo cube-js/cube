@@ -1,6 +1,6 @@
 use crate::metastore::chunks::chunk_file_name;
-use crate::metastore::{Chunk, IdRow, MetaStore, MetaStoreTable};
-use crate::queryplanner::InfoSchemaTableDef;
+use crate::metastore::{Chunk, IdRow, MetaStoreTable};
+use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use arrow::array::{ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array};
 use arrow::datatypes::{DataType, Field, TimeUnit};
@@ -13,8 +13,8 @@ pub struct SystemChunksTableDef;
 impl InfoSchemaTableDef for SystemChunksTableDef {
     type T = IdRow<Chunk>;
 
-    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(meta_store.chunks_table().all_rows().await?))
+    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        Ok(Arc::new(ctx.meta_store.chunks_table().all_rows().await?))
     }
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {
@@ -45,6 +45,17 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                         chunks
                             .iter()
                             .map(|row| row.get_row().get_partition_id())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("replay_handle_id", DataType::UInt64, false),
+                Box::new(|chunks| {
+                    Arc::new(UInt64Array::from(
+                        chunks
+                            .iter()
+                            .map(|row| row.get_row().replay_handle_id().clone())
                             .collect::<Vec<_>>(),
                     ))
                 }),
@@ -109,6 +120,87 @@ impl InfoSchemaTableDef for SystemChunksTableDef {
                                     .as_ref()
                                     .map(|t| t.timestamp_nanos())
                             })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new(
+                    "oldest_insert_at",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Box::new(|chunks| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        chunks
+                            .iter()
+                            .map(|row| {
+                                row.get_row()
+                                    .oldest_insert_at()
+                                    .as_ref()
+                                    .map(|t| t.timestamp_nanos())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new(
+                    "deactivated_at",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Box::new(|chunks| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        chunks
+                            .iter()
+                            .map(|row| {
+                                row.get_row()
+                                    .deactivated_at()
+                                    .as_ref()
+                                    .map(|t| t.timestamp_nanos())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("file_size", DataType::UInt64, true),
+                Box::new(|chunks| {
+                    Arc::new(UInt64Array::from(
+                        chunks
+                            .iter()
+                            .map(|row| row.get_row().file_size())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("min_row", DataType::Utf8, true),
+                Box::new(|chunks| {
+                    let min_array = chunks
+                        .iter()
+                        .map(|row| row.get_row().min().as_ref().map(|x| format!("{:?}", x)))
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        min_array
+                            .iter()
+                            .map(|v| v.as_ref().map(|v| v.as_str()))
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("max_row", DataType::Utf8, true),
+                Box::new(|chunks| {
+                    let max_array = chunks
+                        .iter()
+                        .map(|row| row.get_row().max().as_ref().map(|x| format!("{:?}", x)))
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        max_array
+                            .iter()
+                            .map(|v| v.as_ref().map(|v| v.as_str()))
                             .collect::<Vec<_>>(),
                     ))
                 }),

@@ -6,7 +6,7 @@ use datafusion::physical_plan::ExecutionPlan;
 
 /// Recursively applies a transformation on each node and rewrites the plan. The plan is traversed
 /// bottom-up, top-down information can be propagated via context, see [PlanRewriter] for details.
-pub fn rewrite_plan<R: PlanRewriter>(
+pub fn rewrite_plan<'a, R: PlanRewriter>(
     p: &'a LogicalPlan,
     ctx: &'a R::Context,
     f: &'a mut R,

@@ -1,25 +1,18 @@
-import React, { useState } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
-import { makeStyles, useTheme } from '@material-ui/styles';
-import { useMediaQuery } from '@material-ui/core';
+import { makeStyles } from '@material-ui/styles';
 
-import { Sidebar, Topbar } from './components';
+import palette from '../../theme/palette';
+import { Sidebar } from './components';
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles(() => ({
   root: {
-    paddingTop: 56,
-    height: '100%',
-    [theme.breakpoints.up('sm')]: {
-      paddingTop: 64,
-    },
+    backgroundColor: palette.primary.light,
+    position: 'relative',
   },
   shiftContent: {
     paddingLeft: 240,
-  },
-  content: {
-    height: '100%',
-    minHeight: 'calc(100vh - 64px)',
   },
 }));
 
@@ -27,22 +20,7 @@ const Main = (props) => {
   const { children } = props;
 
   const classes = useStyles();
-  const theme = useTheme();
-  const isDesktop = useMediaQuery(theme.breakpoints.up('lg'), {
-    defaultMatches: true,
-  });
-
-  const [openSidebar, setOpenSidebar] = useState(false);
-
-  const handleSidebarOpen = () => {
-    setOpenSidebar(true);
-  };
-
-  const handleSidebarClose = () => {
-    setOpenSidebar(false);
-  };
-
-  const shouldOpenSidebar = isDesktop ? true : openSidebar;
+  const isDesktop = true;
 
   return (
     <div
@@ -51,8 +29,7 @@ const Main = (props) => {
         [classes.shiftContent]: isDesktop,
       })}
     >
-      <Topbar onSidebarOpen={handleSidebarOpen} />
-      <Sidebar onClose={handleSidebarClose} open={shouldOpenSidebar} variant={isDesktop ? 'persistent' : 'temporary'} />
+      <Sidebar onClose={() => {}} open variant={isDesktop ? 'persistent' : 'temporary'} />
       <main className={classes.content}>{children}</main>
     </div>
   );

@@ -1,3 +1,5 @@
+import { Options } from 'generic-pool';
+
 export type JDBCDriverConfiguration = {
   database: string,
   dbType: string,
@@ -5,4 +7,6 @@ export type JDBCDriverConfiguration = {
   drivername: string,
   customClassPath?: string,
   properties: Record<string, any>,
+  poolOptions?: Options;
+  prepareConnectionQueries?: string[];
 };

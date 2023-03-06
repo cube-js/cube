@@ -11,6 +11,7 @@ import cx from 'classnames';
 import kebabCase from 'lodash/kebabCase';
 import get from 'lodash/get';
 import last from 'lodash/last';
+import dayjs from 'dayjs';
 import { renameCategory } from '../rename-category';
 
 import 'katex/dist/katex.min.css';
@@ -41,6 +42,9 @@ import ScrollSpyH2 from '../components/Headers/ScrollSpyH2';
 import ScrollSpyH3 from '../components/Headers/ScrollSpyH3';
 import MyH2 from '../components/Headers/MyH2';
 import MyH3 from '../components/Headers/MyH3';
+import { ParameterTable } from '../components/ReferenceDocs/ParameterTable';
+import { Snippet, SnippetGroup } from '../components/Snippets/SnippetGroup';
+import { CodeTabs } from '../components/CodeTabs';
 
 const MyH4: React.FC<{ children: string }> = ({ children }) => {
   return (<h4 id={kebabCase(children)} name={kebabCase(children)}>{children}</h4>);
@@ -57,9 +61,13 @@ const components = {
   GitHubCodeBlock,
   CubeQueryResultSet,
   GitHubFolderLink,
+  ParameterTable,
+  SnippetGroup,
+  Snippet,
   h2: ScrollSpyH2,
   h3: ScrollSpyH3,
   h4: MyH4,
+  CodeTabs,
 };
 
 const MDX = (props) => (
@@ -169,7 +177,7 @@ class DocTemplate extends Component<Props, State> {
     const rawNodes = ReactHtmlParser(stringElement);
     const sectionTags: Section[] = [
       {
-        id: 'top',
+        id: kebabCase(title),
         type: 'h1',
         className: styles.topSection,
         nodes: [
@@ -183,8 +191,8 @@ class DocTemplate extends Component<Props, State> {
       },
     ];
 
-    let currentParentID: string;
-    let currentID = 'top';
+    let currentParentID = kebabCase(title);
+    let currentID: string;
 
     rawNodes.forEach((item) => {
       let linkedHTag;
@@ -239,19 +247,26 @@ class DocTemplate extends Component<Props, State> {
           [styles.postClearSection]: isPreviousSectionClearable,
         });
 
-        // anchors like 'h2-h3'
+        let elementId = item.props.children[0];
+        let elementTitle = item.props.children[0];
+        // Handle code-block H2 headers
+        if (Array.isArray(item.props.children) && item.props.children.length === 1 && typeof item.props.children[0] !== 'string') {
+          elementId = item.props.children[0].props.children[0];
+        }
+        // Handle code-block H3 headers with custom ID prefix
+        if (Array.isArray(item.props.children) && item.props.children.length > 1) {
+          elementId = item.props.children[1].props.children[0];
+        }
+
+        currentID = kebabCase(elementId);
+
         if (item.type === 'h2') {
           prevSection.className = cx(prevSection.className, {
             [styles.lastSection]: true,
             [styles.clearSection]: isPreviousSectionClearable,
           });
 
-          currentID = kebabCase(item.props.children[0]);
           currentParentID = currentID;
-        } else if (!!currentParentID) {
-          currentID = kebabCase(item.props.children[0]);
-        } else {
-          currentID = kebabCase(item.props.children[0]);
         }
 
         sectionTags.push({
@@ -261,7 +276,7 @@ class DocTemplate extends Component<Props, State> {
               : currentID,
           type: item.type,
           nodes: [],
-          title: item.props.children[0],
+          title: elementTitle,
           className,
         });
 
@@ -275,7 +290,7 @@ class DocTemplate extends Component<Props, State> {
               type: 'link',
               className: styles.hTagIcon,
             }),
-            item.props.children[0]
+            elementId
           )
         );
       }
@@ -299,10 +314,33 @@ class DocTemplate extends Component<Props, State> {
 
     return (
       <div>
-        <Helmet title={`${frontmatter.title} | Cube.js Docs`} />
+        <Helmet>
+          <title>{`${frontmatter.title} | Cube Docs`}</title>
+          <meta name="description" content={`${frontmatter.title} | Documentation for working with Cube, the open-source analytics framework`}></meta>
+        </Helmet>
         <div className={styles.docContentWrapper}>
-          <div className={styles.docContent}>
-            <h1 name="top">{frontmatter.title}</h1>
+          <div className={cx(styles.docContent, 'docContent')}>
+            <div className={styles.titleWrapper}>
+              <h1 id={kebabCase(frontmatter.title)}>{frontmatter.title}</h1>
+              {frontmatter.releaseDate && frontmatter.releaseLink && (
+                <div className={styles.releaseNotesMeta}>
+                  <time
+                    dateTime={frontmatter.releaseDate}
+                    className={styles.releaseDate}
+                  >
+                    {dayjs(frontmatter.releaseDate).format('MMM DD, YYYY')}
+                  </time>
+                  <a
+                    className={styles.releaseLink}
+                    href={frontmatter.releaseLink}
+                    rel="noopener"
+                    target="_blank"
+                  >
+                    <Icon type="github" /> GitHub
+                  </a>
+                </div>
+              )}
+            </div>
             <MDX {...this.props} />
             {!isDisableFeedbackBlock && (
               <FeedbackBlock page={frontmatter.permalink} />
@@ -328,6 +366,8 @@ export const pageQuery = graphql`
         category
         frameworkOfChoice
         isDisableFeedbackBlock
+        releaseDate
+        releaseLink
       }
     }
   }

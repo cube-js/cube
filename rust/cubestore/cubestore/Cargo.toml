@@ -2,7 +2,7 @@
 name = "cubestore"
 version = "0.1.0"
 authors = ["Cube Dev, Inc."]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 description = "Cube.js pre-aggregation storage layer"
 documentation = "https://cube.dev/docs"
@@ -17,7 +17,7 @@ libc = { version = "0.2.97", optional = true }
 base64 = "0.13.0"
 bumpalo = "3.6.1"
 tokio = { version = "1.0", features = ["full", "rt"] }
-warp = { git = 'https://github.com/seanmonstar/warp', version = "0.3.0" }
+warp = { version = "0.3.3" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "a65390c81ffcc34eac2bd35c837c5683d44ec1e0" }
 serde_derive = "1.0.115"
 serde = "1.0.115"
@@ -33,13 +33,13 @@ csv = "1.1.3"
 bytes = "0.5.4"
 serde_json = "1.0.56"
 futures = "0.3.5"
-smallvec = "1.4.0"
+smallvec = "1.8.0"
 flexbuffers = "0.1.1"
 byteorder = "1.3.4"
 log = "=0.4.11"
 simple_logger = "1.7.0"
 async-trait = "0.1.36"
-actix-rt = "1.1.1"
+actix-rt = "2.7.0"
 regex = "1.3.9"
 rocksdb = { version = "0.16.0", default-features = false, features = ["bzip2"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
@@ -73,7 +73,7 @@ tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
 mysql_common = "0.26.0"
-flatbuffers = "0.7.0"
+flatbuffers = "23.1.21"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
 tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
@@ -85,6 +85,20 @@ url = "2.2.2"
 pin-project = "1.0.8"
 tokio-tungstenite = { version = "0.16.0", features = ["native-tls"] }
 deflate = "1.0.0"
+indoc = "1.0"
+rdkafka = { version = "0.29.0" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rdkafka = { version = "0.29.0", features = ["ssl", "gssapi", "cmake-build"] }
+sasl2-sys = { version = "0.1.6", features = ["vendored"] }
+
+# TODO support ssl for windows
+[target.'cfg(target_os = "windows")'.dependencies]
+rdkafka = { version = "0.29.0", features = ["cmake-build"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rdkafka = { version = "0.29.0", features = ["ssl", "gssapi"] }
+sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"

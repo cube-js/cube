@@ -38,7 +38,7 @@ const options = [
   }
 ];
 
-export default () => {
+const Choropleth = () => {
   const [viewport, setViewport] = useState({
     latitude: 34,
     longitude: 5,
@@ -95,7 +95,7 @@ export default () => {
         width="100%"
         height="100%"
         mapStyle="mapbox://styles/kalipsik/ckb2fyfqu123n1ilb5yi7uyns"
-        mapboxApiAccessToken={process.env.REACT_APP_MAPBOX_KEY}
+        mapboxAccessToken={process.env.REACT_APP_MAPBOX_KEY}
       >
         <div className="mapbox__navi">
           <NavigationControl />
@@ -108,3 +108,5 @@ export default () => {
     </div>
   );
 };
+
+export default Choropleth;

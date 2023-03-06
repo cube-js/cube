@@ -1,10 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
 
-body {
+.examples__container {
   margin: 0;
   font-family: 'DM Sans', sans-serif;
   font-feature-settings: 'ss03' on;
   font-feature-settings: 'ss04' on;
+  background-color: #f3f3fb;
+}
+
+.ant-popover-disabled-compatible-wrapper {
+  pointer-events: none;
 }
 
 ::selection {
@@ -87,16 +92,6 @@ body {
 .examples__title {
   display: flex;
   align-items: center;
-}
-
-.examples__nav h1 {
-  color: #d5d5e2;
-  font-size: 16px;
-  line-height: 26px;
-  letter-spacing: 0.02em;
-  align-self: center;
-  font-weight: normal;
-  margin: 0 0 0 20px;
 }
 
 .highcharts-title {

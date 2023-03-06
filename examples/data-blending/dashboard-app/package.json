@@ -6,6 +6,7 @@
     "@ant-design/compatible": "^1.0.4",
     "@ant-design/icons": "^4.2.1",
     "@apollo/react-hooks": "^3.1.5",
+    "@cube-dev/example-wrapper": "^1.1.10",
     "@cubejs-client/core": "^0.20.0",
     "@cubejs-client/react": "^0.20.6",
     "@cubejs-client/ws-transport": "^0.20.0",
@@ -21,7 +22,7 @@
     "graphql": "^15.3.0",
     "graphql-tag": "^2.10.3",
     "graphql-tools": "^5.0.0",
-    "highcharts": "^8.1.2",
+    "highcharts": "^9.0.0",
     "highcharts-react-official": "^3.0.0",
     "moment": "^2.27.0",
     "prop-types": "^15.7.2",
@@ -30,17 +31,18 @@
     "react-dom": "^16.13.1",
     "react-grid-layout": "^0.18.3",
     "react-resizable": "^1.10.1",
-    "react-scripts": "3.4.4"
+    "react-scripts": "^4.0.0"
   },
   "devDependencies": {
     "cross-env": "^7.0.2"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true react-scripts start",
-    "build": "SKIP_PREFLIGHT_CHECK=true react-scripts build",
+    "build": "cross-env SKIP_PREFLIGHT_CHECK=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build"
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy",
+    "deploy": "npm run preview -- --prod"
   },
   "eslintConfig": {
     "extends": "react-app"

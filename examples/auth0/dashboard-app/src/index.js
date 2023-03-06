@@ -6,8 +6,15 @@ import * as serviceWorker from "./serviceWorker";
 import { HashRouter as Router, Route } from "react-router-dom";
 import { Auth0Provider } from "@auth0/auth0-react";
 import DashboardPage from "./pages/DashboardPage";
+import createExampleWrapper from "@cube-dev/example-wrapper";
 import config from './auth_config';
 import history from './history';
+
+const exampleDescription = {
+  title: "Cube + Auth0",
+};
+
+createExampleWrapper(exampleDescription);
 
 const onRedirectCallback = (appState) => {
   history.push(

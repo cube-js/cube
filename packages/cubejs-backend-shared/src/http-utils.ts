@@ -8,6 +8,7 @@ import fs from 'fs';
 import * as os from 'os';
 import crypto from 'crypto';
 import * as path from 'path';
+import { gunzipSync } from 'zlib';
 
 import { internalExceptions } from './errors';
 import { getHttpAgentForProxySettings } from './proxy';
@@ -87,7 +88,7 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
 
   try {
     mkdirpSync(cwd);
-  } catch (e) {
+  } catch (e: any) {
     internalExceptions(e);
   }
 
@@ -102,9 +103,16 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
 
   try {
     fs.unlinkSync(savedFilePath);
-  } catch (e) {
+  } catch (e: any) {
     internalExceptions(e);
   }
 
   bar.stop();
+}
+
+export async function downloadAndGunzip(url: string): Promise<string> {
+  const response = await fetch(url);
+  const gz = await response.arrayBuffer();
+  const buffer = await gunzipSync(gz);
+  return buffer.toString();
 }

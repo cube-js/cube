@@ -97,7 +97,7 @@ describe('Schema Testing', () => {
     expect(cubeEvaluator.preAggregationsForCube('CubeA')).toEqual({
       main: {
         external: false,
-        scheduledRefresh: false,
+        scheduledRefresh: true,
         timeDimensionReference: expect.any(Function),
         partitionGranularity: 'month',
         type: 'originalSql',
@@ -109,8 +109,8 @@ describe('Schema Testing', () => {
         },
       },
       countCreatedAt: {
-        external: false,
-        scheduledRefresh: false,
+        external: true,
+        scheduledRefresh: true,
         granularity: 'day',
         measureReferences: expect.any(Function),
         timeDimensionReference: expect.any(Function),
@@ -125,8 +125,8 @@ describe('Schema Testing', () => {
       },
       countCreatedAtWithoutReferences: {
         // because preview
-        external: false,
-        scheduledRefresh: false,
+        external: true,
+        scheduledRefresh: true,
         granularity: 'day',
         measureReferences: expect.any(Function),
         timeDimensionReference: expect.any(Function),

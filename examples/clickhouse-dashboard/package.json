@@ -8,7 +8,7 @@
   "template": "docker",
   "templateVersion": "0.25.32",
   "devDependencies": {
-    "@cubejs-backend/clickhouse-driver": "^0.26.16",
-    "@cubejs-backend/server": "^0.26.16"
+    "@cubejs-backend/clickhouse-driver": "^0.30.7",
+    "@cubejs-backend/server": "^0.30.7"
   }
 }

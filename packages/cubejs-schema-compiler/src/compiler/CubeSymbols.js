@@ -1,5 +1,6 @@
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
+import { camelize } from 'inflection';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
@@ -44,32 +45,46 @@ export class CubeSymbols {
   }
 
   createCube(cubeDefinition) {
+    let measures;
+    let dimensions;
+    let segments;
     const cubeObject = Object.assign({
       allDefinitions(type) {
-        let superDefinitions = {};
-
         if (cubeDefinition.extends) {
-          superDefinitions = super.allDefinitions(type);
+          return {
+            ...super.allDefinitions(type),
+            ...cubeDefinition[type]
+          };
+        } else {
+          // TODO We probably do not need this shallow copy
+          return { ...cubeDefinition[type] };
         }
-
-        return Object.assign({}, superDefinitions, cubeDefinition[type]);
       },
       get measures() {
-        return this.allDefinitions('measures');
+        if (!measures) {
+          measures = this.allDefinitions('measures');
+        }
+        return measures;
       },
       set measures(v) {
         // Dont allow to modify
       },
 
       get dimensions() {
-        return this.allDefinitions('dimensions');
+        if (!dimensions) {
+          dimensions = this.allDefinitions('dimensions');
+        }
+        return dimensions;
       },
       set dimensions(v) {
         // Dont allow to modify
       },
 
       get segments() {
-        return this.allDefinitions('segments');
+        if (!segments) {
+          segments = this.allDefinitions('segments');
+        }
+        return segments;
       },
       set segments(v) {
         // Dont allow to modify
@@ -103,12 +118,18 @@ export class CubeSymbols {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }
 
+    this.camelCaseTypes(cube.joins);
+    this.camelCaseTypes(cube.measures);
+    this.camelCaseTypes(cube.dimensions);
+    this.camelCaseTypes(cube.segments);
+    this.camelCaseTypes(cube.preAggregations);
+
     if (cube.preAggregations) {
       this.transformPreAggregations(cube.preAggregations);
     }
 
     return Object.assign(
-      { cubeName: () => cube.name },
+      { cubeName: () => cube.name, cubeObj: () => cube },
       cube.measures || {},
       cube.dimensions || {},
       cube.segments || {},
@@ -116,20 +137,54 @@ export class CubeSymbols {
     );
   }
 
+  camelCaseTypes(obj) {
+    if (!obj) {
+      return;
+    }
+    // eslint-disable-next-line no-restricted-syntax
+    for (const member of Object.values(obj)) {
+      if (member.type && member.type.indexOf('_') !== -1) {
+        member.type = camelize(member.type, true);
+      }
+      if (member.relationship && member.relationship.indexOf('_') !== -1) {
+        member.relationship = camelize(member.relationship, true);
+      }
+    }
+  }
+
   transformPreAggregations(preAggregations) {
     // eslint-disable-next-line no-restricted-syntax
     for (const preAggregation of Object.values(preAggregations)) {
-      // Rollup is a default type for pre-aggregations
-      if (!preAggregation.type) {
-        preAggregation.type = 'rollup';
-      }
+      // We don't want to set the defaults for the empty pre-aggs because
+      // we want to throw instead.
+      if (Object.keys(preAggregation).length > 0) {
+        // Rollup is a default type for pre-aggregations
+        if (!preAggregation.type) {
+          preAggregation.type = 'rollup';
+        }
 
-      if (preAggregation.scheduledRefresh === undefined) {
-        preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
-      }
+        if (preAggregation.scheduledRefresh === undefined && preAggregation.type !== 'rollupJoin' && preAggregation.type !== 'rollupLambda') {
+          preAggregation.scheduledRefresh = getEnv('scheduledRefreshDefault');
+        }
 
-      if (preAggregation.external === undefined) {
-        preAggregation.external = ['rollup', 'rollupJoin'].includes(preAggregation.type) && getEnv('externalDefault');
+        if (preAggregation.external === undefined && preAggregation.type !== 'rollupLambda') {
+          preAggregation.external =
+            // TODO remove rollupJoin from this list and update validation
+            ['rollup', 'rollupJoin'].includes(preAggregation.type) &&
+            getEnv('externalDefault');
+        }
+
+        if (preAggregation.indexes) {
+          this.transformPreAggregationIndexes(preAggregation.indexes);
+        }
+      }
+    }
+  }
+
+  transformPreAggregationIndexes(indexes) {
+    for (const index of Object.values(indexes)) {
+      if (!index.type) {
+        index.type = 'regular';
       }
     }
   }
@@ -144,6 +199,16 @@ export class CubeSymbols {
         res = res.fn.apply(null, res.memberNames.map((id) => nameResolver(id.trim())));
       }
       return res;
+    } finally {
+      this.resolveSymbolsCallContext = oldContext;
+    }
+  }
+
+  withSymbolsCallContext(func, context) {
+    const oldContext = this.resolveSymbolsCallContext;
+    this.resolveSymbolsCallContext = context;
+    try {
+      return func();
     } finally {
       this.resolveSymbolsCallContext = oldContext;
     }
@@ -164,8 +229,13 @@ export class CubeSymbols {
     return this.funcArgumentsValues[funcDefinition];
   }
 
+  joinHints() {
+    const { joinHints } = this.resolveSymbolsCallContext || {};
+    return joinHints;
+  }
+
   resolveSymbol(cubeName, name) {
-    const { sqlResolveFn, contextSymbols } = this.resolveSymbolsCallContext || {};
+    const { sqlResolveFn, contextSymbols, collectJoinHints } = this.resolveSymbolsCallContext || {};
     if (CONTEXT_SYMBOLS[name]) {
       // always resolves if contextSymbols aren't passed for transpile step
       const symbol = contextSymbols && contextSymbols[CONTEXT_SYMBOLS[name]] || {};
@@ -176,13 +246,19 @@ export class CubeSymbols {
 
     let cube = this.isCurrentCube(name) && this.symbols[cubeName] || this.symbols[name];
     if (sqlResolveFn && cube) {
-      cube = this.cubeReferenceProxy(this.isCurrentCube(name) ? cubeName : name);
+      cube = this.cubeReferenceProxy(
+        this.isCurrentCube(name) ? cubeName : name,
+        collectJoinHints ? [] : undefined
+      );
     }
 
     return cube || (this.symbols[cubeName] && this.symbols[cubeName][name]);
   }
 
-  cubeReferenceProxy(cubeName) {
+  cubeReferenceProxy(cubeName, joinHints) {
+    if (joinHints) {
+      joinHints = joinHints.concat(cubeName);
+    }
     const self = this;
     return new Proxy({}, {
       get: (v, propertyName) => {
@@ -197,9 +273,18 @@ export class CubeSymbols {
           }
           return undefined;
         }
-        const { sqlResolveFn, cubeAliasFn, query } = self.resolveSymbolsCallContext || {};
+        const { sqlResolveFn, cubeAliasFn, query, cubeReferencesUsed } = self.resolveSymbolsCallContext || {};
         if (propertyName === 'toString') {
-          return () => cubeAliasFn && cubeAliasFn(cube.cubeName()) || cube.cubeName();
+          return () => {
+            if (query) {
+              query.pushCubeNameForCollectionIfNecessary(cube.cubeName());
+              query.pushJoinHints(joinHints);
+            }
+            if (cubeReferencesUsed) {
+              cubeReferencesUsed.push(cube.cubeName());
+            }
+            return cubeAliasFn && cubeAliasFn(cube.cubeName()) || cube.cubeName();
+          };
         }
         if (propertyName === 'sql') {
           return () => query.cubeSql(cube.cubeName());
@@ -208,10 +293,18 @@ export class CubeSymbols {
           return true;
         }
         if (cube[propertyName]) {
-          return { toString: () => sqlResolveFn(cube[propertyName], cubeName, propertyName) };
+          return {
+            toString: () => this.withSymbolsCallContext(
+              () => sqlResolveFn(cube[propertyName], cubeName, propertyName),
+              { ...this.resolveSymbolsCallContext, joinHints },
+            ),
+          };
+        }
+        if (self.symbols[propertyName]) {
+          return this.cubeReferenceProxy(propertyName, joinHints);
         }
         if (typeof propertyName === 'string') {
-          throw new UserError(`${cubeName}.${propertyName} cannot be resolved`);
+          throw new UserError(`${cubeName}.${propertyName} cannot be resolved. There's no such member or cube.`);
         }
         return undefined;
       }

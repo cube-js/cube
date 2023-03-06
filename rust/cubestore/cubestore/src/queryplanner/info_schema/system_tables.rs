@@ -1,6 +1,5 @@
 use crate::metastore::table::TablePath;
-use crate::metastore::MetaStore;
-use crate::queryplanner::InfoSchemaTableDef;
+use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use arrow::array::{ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array};
 use arrow::datatypes::{DataType, Field, TimeUnit};
@@ -13,8 +12,8 @@ pub struct SystemTablesTableDef;
 impl InfoSchemaTableDef for SystemTablesTableDef {
     type T = TablePath;
 
-    async fn rows(&self, meta_store: Arc<dyn MetaStore>) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        meta_store.get_tables_with_path(true).await
+    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        ctx.meta_store.get_tables_with_path(true).await
     }
 
     fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {
@@ -140,6 +139,18 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                 }),
             ),
             (
+                Field::new("aggregate_columns", DataType::Utf8, true),
+                Box::new(|tables| {
+                    let aggregates = tables
+                        .iter()
+                        .map(|row| format!("{:?}", row.table.get_row().aggregate_columns()))
+                        .collect::<Vec<_>>();
+                    Arc::new(StringArray::from(
+                        aggregates.iter().map(|v| v.as_str()).collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
                 Field::new("seq_column_index", DataType::Utf8, true),
                 Box::new(|tables| {
                     let seq_columns = tables
@@ -186,6 +197,76 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                                     .created_at()
                                     .as_ref()
                                     .map(|t| t.timestamp_nanos())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new(
+                    "build_range_end",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Box::new(|tables| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        tables
+                            .iter()
+                            .map(|row| {
+                                row.table
+                                    .get_row()
+                                    .build_range_end()
+                                    .as_ref()
+                                    .map(|t| t.timestamp_nanos())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new(
+                    "seal_at",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Box::new(|tables| {
+                    Arc::new(TimestampNanosecondArray::from(
+                        tables
+                            .iter()
+                            .map(|row| {
+                                row.table
+                                    .get_row()
+                                    .seal_at()
+                                    .as_ref()
+                                    .map(|t| t.timestamp_nanos())
+                            })
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("sealed", DataType::Boolean, false),
+                Box::new(|tables| {
+                    Arc::new(BooleanArray::from(
+                        tables
+                            .iter()
+                            .map(|row| row.table.get_row().sealed())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
+            (
+                Field::new("select_statement", DataType::Utf8, false),
+                Box::new(|tables| {
+                    Arc::new(StringArray::from(
+                        tables
+                            .iter()
+                            .map(|row| {
+                                row.table
+                                    .get_row()
+                                    .select_statement()
+                                    .as_ref()
+                                    .map(|t| t.as_str())
                             })
                             .collect::<Vec<_>>(),
                     ))

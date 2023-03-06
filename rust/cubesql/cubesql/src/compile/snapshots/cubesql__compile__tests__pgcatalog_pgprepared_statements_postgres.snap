@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 7597
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_prepared_statements\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------+-----------+--------------+-----------------+----------+---------------+--------------+
+| name | statement | prepare_time | parameter_types | from_sql | generic_plans | custom_plans |
++------+-----------+--------------+-----------------+----------+---------------+--------------+
++------+-----------+--------------+-----------------+----------+---------------+--------------+
