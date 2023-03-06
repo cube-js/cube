@@ -8,7 +8,23 @@ export interface QueryKeyHash extends String {
 
 export type AddToQueueResponse = [added: number, _b: any, _c: any, queueSize: number, addedToQueueTime: number];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
-export type RetrieveForProcessingResponse = [added: any, removed: any, active: QueryKeyHash[], toProcess: any, def: QueryDef, lockAquired: boolean] | null;
+export type RetrieveForProcessingSuccess = [
+  added: any /** todo(ovr): Remove, useless */,
+  removed: any /** todo(ovr): Remove, useless */,
+  active: QueryKeyHash[],
+  pending: number,
+  def: QueryDef,
+  lockAquired: true
+];
+export type RetrieveForProcessingFail = [
+  added: any /** todo(ovr): Remove, useless */,
+  removed: any /** todo(ovr): Remove, useless */,
+  active: QueryKeyHash[],
+  pending: number,
+  def: null,
+  lockAquired: false
+];
+export type RetrieveForProcessingResponse = RetrieveForProcessingSuccess | RetrieveForProcessingFail | null;
 
 export interface AddToQueueQuery {
   isJob: boolean,
