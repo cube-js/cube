@@ -129,6 +129,7 @@ pub enum QueueCommand {
     Retrieve {
         key: Ident,
         concurrency: u32,
+        extended: bool,
     },
     Result {
         key: Ident,
@@ -493,6 +494,8 @@ impl<'a> CubeStoreParser<'a> {
                 }
             }
             "retrieve" => {
+                // for backward compatibility
+                let extended = self.parse_custom_token("extended");
                 let concurrency = if self.parse_custom_token(&"concurrency") {
                     self.parse_integer("concurrency", false)?
                 } else {
@@ -501,6 +504,7 @@ impl<'a> CubeStoreParser<'a> {
 
                 QueueCommand::Retrieve {
                     key: self.parser.parse_identifier()?,
+                    extended,
                     concurrency,
                 }
             }
