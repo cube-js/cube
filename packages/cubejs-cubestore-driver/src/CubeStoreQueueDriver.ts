@@ -256,19 +256,20 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async retrieveForProcessing(queryKeyHashed: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
+    // TODO(ovr): Enable extended
     const rows = await this.driver.query('QUEUE RETRIEVE CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(queryKeyHashed),
     ]);
     if (rows && rows.length) {
       const addedCount = 1;
-      const active = [queryKeyHashed];
-      const toProcess = 0;
+      const active = (rows[0].active || queryKeyHashed /* backward compatibility for old Cube Store */).split(',');
+      const pending = parseInt(rows[0].pending || '0' /* backward compatibility for old Cube Store */, 10);
       const lockAcquired = true;
       const def = this.decodeQueryDefFromRow(rows[0], 'retrieveForProcessing');
 
       return [
-        addedCount, null, active, toProcess, def, lockAcquired
+        addedCount, null, active, pending, def, lockAcquired
       ];
     }
 

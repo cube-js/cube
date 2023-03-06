@@ -6579,6 +6579,13 @@
   dependencies:
     "@types/node" "*"
 
+"@types/csv-write-stream@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@types/csv-write-stream/-/csv-write-stream-2.0.0.tgz#44dcabe9d85c0196c7fd6ffb8033658451ff9dcc"
+  integrity sha512-lAqCgs4614VpX/+U7BuR/SiEHdpet5ufc8cdjuQjhA7VVREJAT4LHKNUvAss9jf6eHH400yHhOEWbFP0RZPYrA==
+  dependencies:
+    "@types/node" "*"
+
 "@types/data-api-client@^1.2.1":
   version "1.2.3"
   resolved "https://registry.yarnpkg.com/@types/data-api-client/-/data-api-client-1.2.3.tgz#31694580015493fac8f3f3528e3a7f0a41c1741d"
