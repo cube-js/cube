@@ -1,4 +1,6 @@
-use crate::cachestore::{CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueResultResponse};
+use crate::cachestore::{
+    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueResultResponse, QueueRetrieveResponse,
+};
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::multi_index::{MultiIndex, MultiPartition};
 use crate::metastore::replay_handle::{ReplayHandle, SeqPointer};
@@ -772,7 +774,7 @@ impl CacheStore for CacheStoreMock {
         &self,
         _key: String,
         _allow_concurrency: u32,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    ) -> Result<QueueRetrieveResponse, CubeError> {
         panic!("CacheStore mock!")
     }
 

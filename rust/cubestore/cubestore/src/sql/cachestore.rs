@@ -295,25 +295,25 @@ impl CacheStoreSqlService {
                     true,
                 )
             }
-            QueueCommand::Retrieve { key, concurrency } => {
+            QueueCommand::Retrieve {
+                key,
+                concurrency,
+                extended,
+            } => {
                 let result = self
                     .cachestore
                     .queue_retrieve(key.value, concurrency)
                     .await?;
-
-                let rows = if let Some(result) = result {
-                    vec![result.into_row().into_queue_retrieve_row()]
-                } else {
-                    vec![]
-                };
 
                 (
                     Arc::new(DataFrame::new(
                         vec![
                             Column::new("payload".to_string(), ColumnType::String, 0),
                             Column::new("extra".to_string(), ColumnType::String, 1),
+                            Column::new("pending".to_string(), ColumnType::Int, 2),
+                            Column::new("active".to_string(), ColumnType::String, 3),
                         ],
-                        rows,
+                        result.into_queue_retrieve_rows(extended),
                     )),
                     true,
                 )

@@ -783,7 +783,7 @@ export class QueryQueue {
       const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
 
       if (retrieveResult) {
-        [insertedCount, _removedCount, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+        [insertedCount /** todo(ovr): Remove */, _removedCount/** todo(ovr): Remove */, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
       }
 
       const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;

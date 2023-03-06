@@ -13,6 +13,6 @@ pub use cache_rocksstore::{
     QueueResultResponse, RocksCacheStore,
 };
 pub use lazy::LazyRocksCacheStore;
-pub use queue_item::{QueueItem, QueueItemStatus, QueueResultAckEvent};
+pub use queue_item::{QueueItem, QueueItemStatus, QueueResultAckEvent, QueueRetrieveResponse};
 pub use queue_result::QueueResult;
 pub use scheduler::CacheStoreSchedulerImpl;
