@@ -509,7 +509,7 @@ provides a convenient shortcut to pass a dimension and a filter as a
   previous period
 - `granularity`: A granularity for a time dimension. It supports the following
   values `second`, `minute`, `hour`, `day`, `week`, `month`, `quarter` `year`.
-  If you pass `null` to the granularity, Cube.js will only perform filtering by
+  If you pass `null` to the granularity, Cube will only perform filtering by
   a specified time dimension, without grouping.
 
 ```javascript
