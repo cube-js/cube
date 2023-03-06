@@ -514,21 +514,19 @@ impl SchedulerImpl {
         let tables = self.meta_store.get_tables_with_path(true).await?;
         for table in tables.iter() {
             if table.table.get_row().is_ready() && !table.table.get_row().sealed() {
-                if !table.table.get_row().sealed() {
-                    if let Some(locations) = table.table.get_row().locations() {
-                        for location in locations.iter() {
-                            if Table::is_stream_location(location) {
-                                let job = self
-                                    .meta_store
-                                    .get_job_by_ref(
-                                        RowKey::Table(TableId::Tables, table.table.get_id()),
-                                        JobType::TableImportCSV(location.to_string()),
-                                    )
+                if let Some(locations) = table.table.get_row().locations() {
+                    for location in locations.iter() {
+                        if Table::is_stream_location(location) {
+                            let job = self
+                                .meta_store
+                                .get_job_by_ref(
+                                    RowKey::Table(TableId::Tables, table.table.get_id()),
+                                    JobType::TableImportCSV(location.to_string()),
+                                )
+                                .await?;
+                            if job.is_none() {
+                                self.schedule_table_import(table.table.get_id(), &[location])
                                     .await?;
-                                if job.is_none() {
-                                    self.schedule_table_import(table.table.get_id(), &[location])
-                                        .await?;
-                                }
                             }
                         }
                     }
