@@ -228,6 +228,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("cache_set_nx", cache_set_nx),
         t("cache_prefix_keys", cache_prefix_keys),
         t("queue_full_workflow", queue_full_workflow),
+        t("queue_retrieve_extended", queue_retrieve_extended),
         t("queue_ack_then_result", queue_ack_then_result),
         t("queue_orphaned_timeout", queue_orphaned_timeout),
         t("queue_heartbeat", queue_heartbeat),
@@ -8014,6 +8015,8 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             &vec![
                 Column::new("payload".to_string(), ColumnType::String, 0),
                 Column::new("extra".to_string(), ColumnType::String, 1),
+                Column::new("pending".to_string(), ColumnType::Int, 2),
+                Column::new("active".to_string(), ColumnType::String, 3),
             ]
         );
         assert_eq!(
@@ -8021,6 +8024,8 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             &vec![Row::new(vec![
                 TableValue::String("payload3".to_string()),
                 TableValue::Null,
+                TableValue::Int(4),
+                TableValue::String("3".to_string()),
             ]),]
         );
     }
@@ -8036,6 +8041,8 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             &vec![
                 Column::new("payload".to_string(), ColumnType::String, 0),
                 Column::new("extra".to_string(), ColumnType::String, 1),
+                Column::new("pending".to_string(), ColumnType::Int, 2),
+                Column::new("active".to_string(), ColumnType::String, 3),
             ]
         );
         assert_eq!(retrieve_response.get_rows().len(), 0);
@@ -8131,6 +8138,99 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             .await
             .unwrap();
         assert_eq!(get_response.get_rows().len(), 0);
+    }
+}
+
+async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:2" "payload2";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:3" "payload3";"#)
+        .await
+        .unwrap();
+
+    {
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:1""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            retrieve_response.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+                Column::new("pending".to_string(), ColumnType::Int, 2),
+                Column::new("active".to_string(), ColumnType::String, 3),
+            ]
+        );
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload1".to_string()),
+                TableValue::Null,
+                TableValue::Int(2),
+                TableValue::String("1".to_string()),
+            ]),]
+        );
+    }
+
+    {
+        // concurrency limit
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE EXTENDED CONCURRENCY 1 "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            retrieve_response.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+                Column::new("pending".to_string(), ColumnType::Int, 2),
+                Column::new("active".to_string(), ColumnType::String, 3),
+            ]
+        );
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Int(2),
+                TableValue::String("1".to_string()),
+            ]),]
+        );
+    }
+
+    {
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE EXTENDED CONCURRENCY 2 "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            retrieve_response.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+                Column::new("pending".to_string(), ColumnType::Int, 2),
+                Column::new("active".to_string(), ColumnType::String, 3),
+            ]
+        );
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload2".to_string()),
+                TableValue::Null,
+                TableValue::Int(1),
+                TableValue::String("1,2".to_string()),
+            ]),]
+        );
     }
 }
 

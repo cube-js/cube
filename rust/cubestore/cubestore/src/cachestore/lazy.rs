@@ -1,4 +1,5 @@
 use crate::cachestore::cache_rocksstore::QueueAddResponse;
+use crate::cachestore::queue_item::QueueRetrieveResponse;
 use crate::cachestore::{
     CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueResultResponse, RocksCacheStore,
 };
@@ -252,7 +253,7 @@ impl CacheStore for LazyRocksCacheStore {
         &self,
         key: String,
         allow_concurrency: u32,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    ) -> Result<QueueRetrieveResponse, CubeError> {
         self.init()
             .await?
             .queue_retrieve(key, allow_concurrency)

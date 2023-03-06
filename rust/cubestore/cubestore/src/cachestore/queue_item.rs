@@ -63,7 +63,7 @@ impl ToString for QueueItemStatus {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueItem {
     prefix: Option<String>,
-    key: String,
+    pub(crate) key: String,
     // Immutable field
     value: String,
     extra: Option<String>,
@@ -102,6 +102,15 @@ impl PartialOrd for QueueItem {
 }
 
 impl QueueItem {
+    pub fn parse_path(path: String) -> (Option<String>, String) {
+        let parts: Vec<&str> = path.rsplitn(2, ":").collect();
+
+        match parts.len() {
+            2 => (Some(parts[1].to_string()), parts[0].to_string()),
+            _ => (None, path),
+        }
+    }
+
     pub fn new(
         path: String,
         value: String,
@@ -109,13 +118,7 @@ impl QueueItem {
         priority: i64,
         orphaned: Option<u32>,
     ) -> Self {
-        let parts: Vec<&str> = path.rsplitn(2, ":").collect();
-
-        let (prefix, key) = match parts.len() {
-            2 => (Some(parts[1].to_string()), parts[0].to_string()),
-            _ => (None, path),
-        };
-
+        let (prefix, key) = QueueItem::parse_path(path);
         let created = Utc::now();
 
         QueueItem {
@@ -259,6 +262,70 @@ impl QueueItem {
         }
 
         Ok(new)
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub enum QueueRetrieveResponse {
+    Success {
+        item: QueueItem,
+        pending: u64,
+        active: Vec<String>,
+    },
+    LockFailed {
+        pending: u64,
+        active: Vec<String>,
+    },
+    NotEnoughConcurrency {
+        pending: u64,
+        active: Vec<String>,
+    },
+    NotFound {
+        pending: u64,
+        active: Vec<String>,
+    },
+}
+
+impl QueueRetrieveResponse {
+    pub fn into_queue_retrieve_rows(self, extended: bool) -> Vec<Row> {
+        match self {
+            QueueRetrieveResponse::Success {
+                item,
+                pending,
+                active,
+            } => vec![Row::new(vec![
+                TableValue::String(item.value),
+                if let Some(extra) = item.extra {
+                    TableValue::String(extra)
+                } else {
+                    TableValue::Null
+                },
+                TableValue::Int(pending as i64),
+                if active.len() > 0 {
+                    TableValue::String(active.join(","))
+                } else {
+                    TableValue::Null
+                },
+            ])],
+            QueueRetrieveResponse::LockFailed { pending, active }
+            | QueueRetrieveResponse::NotEnoughConcurrency { pending, active }
+            | QueueRetrieveResponse::NotFound { pending, active } => {
+                if extended {
+                    vec![Row::new(vec![
+                        TableValue::Null,
+                        TableValue::Null,
+                        TableValue::Int(pending as i64),
+                        if active.len() > 0 {
+                            TableValue::String(active.join(","))
+                        } else {
+                            TableValue::Null
+                        },
+                    ])]
+                } else {
+                    vec![]
+                }
+            }
+        }
     }
 }
 
