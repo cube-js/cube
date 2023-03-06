@@ -178,6 +178,12 @@ impl From<rocksdb::Error> for CubeError {
     }
 }
 
+impl From<flatbuffers::InvalidFlatbuffer> for CubeError {
+    fn from(v: flatbuffers::InvalidFlatbuffer) -> Self {
+        CubeError::from_debug_error(v)
+    }
+}
+
 impl From<std::io::Error> for CubeError {
     fn from(v: std::io::Error) -> Self {
         CubeError::from_error(v)
