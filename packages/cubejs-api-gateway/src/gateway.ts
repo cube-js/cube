@@ -2278,9 +2278,17 @@ class ApiGateway {
   };
 
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-    req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
-    if (next) {
-      next();
+    try {
+      req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
+      if (next) {
+        next();
+      }
+    } catch (e) {
+      if (next) {
+        next(e);
+      } else {
+        throw e;
+      }
     }
   };
 
