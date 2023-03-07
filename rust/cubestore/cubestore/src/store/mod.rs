@@ -17,8 +17,8 @@ extern crate bincode;
 use bincode::{deserialize_from, serialize_into};
 
 use crate::metastore::{
-    deactivate_table_on_corrupt_data, table::Table, Chunk, Column, ColumnType, IdRow, Index,
-    IndexType, MetaStore, Partition, WAL,
+    deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, table::Table, Chunk,
+    Column, ColumnType, IdRow, Index, IndexType, MetaStore, Partition, WAL,
 };
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::table::{Row, TableValue};
@@ -30,6 +30,7 @@ use std::{
     sync::Arc,
 };
 
+use crate::app_metrics;
 use crate::cluster::{node_name_by_partition, Cluster};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -333,7 +334,7 @@ impl ChunkStore {
             meta_store,
             remote_fs,
             cluster,
-            config: config,
+            config,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
         };
@@ -660,6 +661,7 @@ impl ChunkDataStore for ChunkStore {
     }
 
     async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError> {
+        self.report_in_memory_metrics().await?;
         let mut memory_chunks = self.memory_chunks.write().await;
         memory_chunks.insert(chunk_id, batch);
         Ok(())
@@ -681,6 +683,7 @@ impl ChunkDataStore for ChunkStore {
     }
 
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError> {
+        self.report_in_memory_metrics().await?;
         let mut memory_chunks = self.memory_chunks.write().await;
         memory_chunks.remove(&chunk_id);
         Ok(())
@@ -717,6 +720,31 @@ impl ChunkStore {
             self.remote_fs.local_file(&remote_path).await?,
             index.into_row(),
         ))
+    }
+    async fn report_in_memory_metrics(&self) -> Result<(), CubeError> {
+        let server_name = self.config.server_name();
+        let host_name = server_name.split(":").next().unwrap_or("undefined");
+        let tags = vec![format!("cube_host:{}", host_name)];
+
+        let memory_chunks = self.memory_chunks.read().await;
+        let chunks_len = memory_chunks.len();
+        let chunks_rows = memory_chunks
+            .values()
+            .map(|b| b.num_rows() as i64)
+            .sum::<i64>();
+        let chunks_memory = memory_chunks
+            .values()
+            .map(|b| {
+                b.columns()
+                    .iter()
+                    .map(|c| c.get_array_memory_size())
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+        app_metrics::IN_MEMORY_CHUNKS_COUNT.report_with_tags(chunks_len as i64, Some(&tags));
+        app_metrics::IN_MEMORY_CHUNKS_ROWS.report_with_tags(chunks_rows, Some(&tags));
+        app_metrics::IN_MEMORY_CHUNKS_MEMORY.report_with_tags(chunks_memory as i64, Some(&tags));
+        Ok(())
     }
 }
 
@@ -1053,6 +1081,7 @@ mod tests {
 pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
 
 impl ChunkStore {
+    #[tracing::instrument(level = "trace", skip(self, columns))]
     async fn partition_rows(
         &self,
         index_id: u64,
@@ -1081,8 +1110,7 @@ impl ChunkStore {
             remaining_rows = remaining_rows_again;
         }
 
-        let mut new_chunks = Vec::new();
-
+        let mut futures = Vec::new();
         for partition in partitions.into_iter() {
             let min = partition.get_row().get_min_val().as_ref();
             let max = partition.get_row().get_max_val().as_ref();
@@ -1113,15 +1141,32 @@ impl ChunkStore {
                     .map(|c| arrow::compute::take(c.as_ref(), &to_write, None))
                     .collect::<Result<Vec<_>, _>>()?;
                 let columns = self.post_process_columns(index.clone(), columns).await?;
-                new_chunks.push(
-                    self.add_chunk_columns(index.clone(), partition, columns, in_memory)
-                        .await?,
-                );
+
+                futures.push(self.add_chunk_columns(
+                    index.clone(),
+                    partition.clone(),
+                    columns,
+                    in_memory,
+                ));
             }
             remaining_rows = next;
         }
 
-        assert_eq!(remaining_rows.len(), 0);
+        if !remaining_rows.is_empty() {
+            let error_message = format!("Error while insert data into index {:?}. {} rows of incoming data can't be assigned to any partitions. Probably paritition metadata is lost", index, remaining_rows.len());
+            deactivate_table_due_to_corrupt_data(
+                self.meta_store.clone(),
+                index.get_row().table_id(),
+                error_message.clone(),
+            )
+            .await?;
+            return Err(CubeError::internal(error_message));
+        }
+
+        let new_chunks = join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(new_chunks)
     }
@@ -1274,7 +1319,7 @@ impl ChunkStore {
         in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
         let mut rows = rows.0;
-        let mut new_chunks = Vec::new();
+        let mut futures = Vec::new();
         for index in indexes.iter() {
             let index_columns = index.get_row().columns();
             let index_columns_copy = index_columns.clone();
@@ -1286,12 +1331,16 @@ impl ChunkStore {
             .await?;
             let remapped = remapped?;
             rows = rows_again;
-            new_chunks.append(
-                &mut self
-                    .partition_rows(index.get_id(), remapped, in_memory)
-                    .await?,
-            );
+            futures.push(self.partition_rows(index.get_id(), remapped, in_memory));
         }
+
+        let new_chunks = join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
 
         Ok(new_chunks)
     }

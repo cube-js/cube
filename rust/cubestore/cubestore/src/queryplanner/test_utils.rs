@@ -622,11 +622,11 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
-    async fn update_replay_handle_failed(
+    async fn update_replay_handle_failed_if_exists(
         &self,
         _id: u64,
         _failed: bool,
-    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+    ) -> Result<(), CubeError> {
         panic!("MetaStore mock!")
     }
 
@@ -683,6 +683,15 @@ impl MetaStore for MetaStoreMock {
         &self,
         _seconds_ago: i64,
     ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_index_with_active_partitions_out_of_queue(
+        &self,
+        _index_id: u64,
+    ) -> Result<(IdRow<Index>, Vec<IdRow<Partition>>), CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn insert_chunks(&self, _chunks: Vec<Chunk>) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         panic!("MetaStore mock!")
     }
 }

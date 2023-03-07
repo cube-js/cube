@@ -863,6 +863,11 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
     async fn get_index(&self, index_id: u64) -> Result<IdRow<Index>, CubeError>;
 
+    async fn get_index_with_active_partitions_out_of_queue(
+        &self,
+        index_id: u64,
+    ) -> Result<(IdRow<Index>, Vec<IdRow<Partition>>), CubeError>;
+
     async fn create_partitioned_index(
         &self,
         schema: String,
@@ -927,6 +932,7 @@ pub trait MetaStore: DIService + Send + Sync {
         max: Option<Row>,
         in_memory: bool,
     ) -> Result<IdRow<Chunk>, CubeError>;
+    async fn insert_chunks(&self, chunks: Vec<Chunk>) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn get_chunk(&self, chunk_id: u64) -> Result<IdRow<Chunk>, CubeError>;
     async fn get_chunks_out_of_queue(&self, ids: Vec<u64>) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn get_partitions_out_of_queue(
@@ -1046,11 +1052,11 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn all_replay_handles_to_merge(
         &self,
     ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError>;
-    async fn update_replay_handle_failed(
+    async fn update_replay_handle_failed_if_exists(
         &self,
         id: u64,
         failed: bool,
-    ) -> Result<IdRow<ReplayHandle>, CubeError>;
+    ) -> Result<(), CubeError>;
     async fn replace_replay_handles(
         &self,
         old_ids: Vec<u64>,
@@ -2909,6 +2915,28 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    async fn get_index_with_active_partitions_out_of_queue(
+        &self,
+        index_id: u64,
+    ) -> Result<(IdRow<Index>, Vec<IdRow<Partition>>), CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            let index = IndexRocksTable::new(db_ref.clone()).get_row_or_not_found(index_id)?;
+            let rocks_partition = PartitionRocksTable::new(db_ref);
+
+            let partitions = rocks_partition
+                .get_rows_by_index(
+                    &PartitionIndexKey::ByIndexId(index.get_id()),
+                    &PartitionRocksIndex::IndexId,
+                )?
+                .into_iter()
+                .filter(|r| r.get_row().active)
+                .collect::<Vec<_>>();
+
+            Ok((index, partitions))
+        })
+        .await
+    }
+
     #[tracing::instrument(level = "trace", skip(self, key_columns))]
     async fn create_partitioned_index(
         &self,
@@ -3082,6 +3110,22 @@ impl MetaStore for RocksMetaStore {
             let id_row = rocks_chunk.insert(chunk, batch_pipe)?;
 
             Ok(id_row)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self, chunks))]
+    async fn insert_chunks(&self, chunks: Vec<Chunk>) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        self.write_operation(move |db_ref, batch_pipe| {
+            let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
+            let mut result = Vec::with_capacity(chunks.len());
+
+            for chunk in chunks.into_iter() {
+                let id_row = rocks_chunk.insert(chunk, batch_pipe)?;
+                result.push(id_row);
+            }
+
+            Ok(result)
         })
         .await
     }
@@ -3723,17 +3767,18 @@ impl MetaStore for RocksMetaStore {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    async fn update_replay_handle_failed(
+    async fn update_replay_handle_failed_if_exists(
         &self,
         id: u64,
         failed: bool,
-    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+    ) -> Result<(), CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
-            Ok(ReplayHandleRocksTable::new(db_ref.clone()).update_with_fn(
-                id,
-                |h| h.set_failed_to_persist_chunks(failed),
-                batch_pipe,
-            )?)
+            let table = ReplayHandleRocksTable::new(db_ref.clone());
+            if table.get_row(id)?.is_some() {
+                table.update_with_fn(id, |h| h.set_failed_to_persist_chunks(failed), batch_pipe)?;
+            }
+
+            Ok(())
         })
         .await
     }
@@ -3759,10 +3804,11 @@ impl MetaStore for RocksMetaStore {
                     &ChunkRocksIndex::ReplayHandleId,
                 )?;
 
-                if !chunks.is_empty() {
+                let active_chunks = chunks.iter().filter(|c| c.get_row().active() || !c.get_row().uploaded()).collect::<Vec<_>>();
+                if !active_chunks.is_empty() {
                     return Err(CubeError::internal(format!(
-                        "Can't merge replay handle with chunks: {:?}",
-                        replay_handle
+                        "Can't merge replay handle with chunks: {:?}, {}",
+                        replay_handle, active_chunks[0].get_id()
                     )))
                 }
 
@@ -3811,7 +3857,9 @@ impl MetaStore for RocksMetaStore {
                 )?;
                 result.push((
                     replay_handle,
-                    chunks.iter().filter(|c| c.get_row().active()).count() == 0,
+                    chunks
+                        .iter()
+                        .all(|c| !c.get_row().active() && c.get_row().uploaded()),
                 ));
             }
             Ok(result)

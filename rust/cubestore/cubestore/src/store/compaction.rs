@@ -310,10 +310,10 @@ impl CompactionServiceImpl {
         for (failed_chunk, _) in failed {
             if let Some(handle_id) = failed_chunk.get_row().replay_handle_id() {
                 self.meta_store
-                    .update_replay_handle_failed(*handle_id, true)
+                    .update_replay_handle_failed_if_exists(*handle_id, true)
                     .await?;
-                deactivate_failed_chunk_ids.push(failed_chunk.get_id());
             }
+            deactivate_failed_chunk_ids.push(failed_chunk.get_id());
         }
         self.meta_store
             .deactivate_chunks_without_check(deactivate_failed_chunk_ids)
@@ -729,15 +729,21 @@ impl CompactionService for CompactionServiceImpl {
                                     .compaction_in_memory_chunks_max_lifetime_threshold()
                                     as i64
                         })
-                        .unwrap_or(true)
+                        .unwrap_or(false)
             });
 
-        self.compact_chunks_to_memory(mem_chunks, &partition, &index, &table)
-            .await?;
-        self.compact_chunks_to_persistent(persistent_chunks, &partition, &index, &table)
-            .await?;
-        self.deactivate_and_mark_failed_chunks_for_replay(failed)
-            .await?;
+        let deactivate_res = self
+            .deactivate_and_mark_failed_chunks_for_replay(failed)
+            .await;
+        let in_memory_res = self
+            .compact_chunks_to_memory(mem_chunks, &partition, &index, &table)
+            .await;
+        let persistent_res = self
+            .compact_chunks_to_persistent(persistent_chunks, &partition, &index, &table)
+            .await;
+        deactivate_res?;
+        in_memory_res?;
+        persistent_res?;
 
         Ok(())
     }

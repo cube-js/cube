@@ -733,7 +733,6 @@ impl RocksStore {
                 }
             }
         }
-
         Ok(spawn_res)
     }
 
