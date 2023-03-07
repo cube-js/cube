@@ -8,6 +8,7 @@ import {
   QueryRewriteFn,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  ContextToPermissionsFn,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
@@ -173,6 +174,7 @@ export interface CreateOptions {
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
+  contextToPermissions?: ContextToPermissionsFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;

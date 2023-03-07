@@ -456,6 +456,7 @@ export class CubejsServerCore {
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
         serverCoreVersion: this.coreServerVersion,
+        contextToPermissions: this.options.contextToPermissions,
       }
     ));
   }

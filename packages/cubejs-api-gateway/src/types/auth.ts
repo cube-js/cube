@@ -5,6 +5,13 @@
  * Cube.js auth related data types definition.
  */
 
+import { Permission } from './strings';
+
+/**
+ * Permissions tuple.
+ */
+type PermissionsTuple = Permission[];
+
 /**
  * Internal auth logic options object data type.
  */
@@ -70,6 +77,12 @@ type CanSwitchSQLUserFn =
     Promise<boolean> |
     boolean;
 
+/**
+ * Returns permissions tuple from a security context.
+ */
+type ContextToPermissionsFn =
+  (securityContext?: any) => Promise<PermissionsTuple>;
+
 export {
   CheckAuthInternalOptions,
   JWTOptions,
@@ -77,4 +90,6 @@ export {
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  PermissionsTuple,
+  ContextToPermissionsFn,
 };
