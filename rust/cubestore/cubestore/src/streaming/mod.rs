@@ -1220,6 +1220,9 @@ mod tests {
             let replay_handles = meta_store.get_replay_handles_by_ids(chunks.iter().filter_map(|c| c.get_row().replay_handle_id().clone()).collect()).await.unwrap();
             let mut middle_chunk = None;
             for chunk in chunks.iter() {
+                if chunk.get_row().get_partition_id() != 1 {
+                    continue;
+                }
                 if let Some(handle_id) = chunk.get_row().replay_handle_id() {
                     let handle = replay_handles.iter().find(|h| h.get_id() == *handle_id).unwrap();
                     if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
@@ -1231,7 +1234,6 @@ mod tests {
                     }
                 }
             }
-            Delay::new(Duration::from_millis(10000)).await;
             let partition_id = middle_chunk.unwrap().get_row().get_partition_id();
             let partition = &meta_store.get_partition(partition_id).await.unwrap();
 
@@ -1375,6 +1377,9 @@ mod tests {
             let replay_handles = meta_store.get_replay_handles_by_ids(chunks.iter().filter_map(|c| c.get_row().replay_handle_id().clone()).collect()).await.unwrap();
             let mut middle_chunk = None;
             for chunk in chunks.iter() {
+                if chunk.get_row().get_partition_id() != 1 {
+                    continue;
+                }
                 if let Some(handle_id) = chunk.get_row().replay_handle_id() {
                     let handle = replay_handles.iter().find(|h| h.get_id() == *handle_id).unwrap();
                     if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
@@ -1386,7 +1391,6 @@ mod tests {
                     }
                 }
             }
-            Delay::new(Duration::from_millis(10000)).await;
 
             let partition_id = middle_chunk.unwrap().get_row().get_partition_id();
             let partition = &meta_store.get_partition(partition_id).await.unwrap();
@@ -1403,7 +1407,6 @@ mod tests {
                 cluster.notify_job_runner(node).await.unwrap();
             }
 
-            println!("!!!! GGGGG");
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::InMemoryChunksCompaction),
             ]);
