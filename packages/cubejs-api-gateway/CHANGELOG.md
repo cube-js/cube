@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.2](https://github.com/cube-js/cube.js/compare/v0.32.1...v0.32.2) (2023-03-07)
+
+
+### Bug Fixes
+
+* Replace deprecated `@hapi/joi` with `joi` ([#6223](https://github.com/cube-js/cube.js/issues/6223)) Thanks [@hehex9](https://github.com/hehex9) ! ([ccbcc50](https://github.com/cube-js/cube.js/commit/ccbcc501dc91ef68ca49ddced79316425ae8f215))
+
+
+
+
+
 ## [0.32.1](https://github.com/cube-js/cube.js/compare/v0.32.0...v0.32.1) (2023-03-03)
 
 

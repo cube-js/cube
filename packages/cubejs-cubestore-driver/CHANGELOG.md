@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.2](https://github.com/cube-js/cube.js/compare/v0.32.1...v0.32.2) (2023-03-07)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Correct pending count and active keys in queue logs ([#6250](https://github.com/cube-js/cube.js/issues/6250)) ([3607c67](https://github.com/cube-js/cube.js/commit/3607c67ea0fa137c5f97e9d3b6fc67805ce85f68))
+
+
+
+
+
 # [0.32.0](https://github.com/cube-js/cube.js/compare/v0.31.69...v0.32.0) (2023-03-02)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

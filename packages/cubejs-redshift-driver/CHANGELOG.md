@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.2](https://github.com/cube-js/cube.js/compare/v0.32.1...v0.32.2) (2023-03-07)
+
+
+### Bug Fixes
+
+* **redshift-driver:** fixes column order ([#6068](https://github.com/cube-js/cube.js/issues/6068)) Thanks [@rdwoodring](https://github.com/rdwoodring)! ([3bba803](https://github.com/cube-js/cube.js/commit/3bba803289c15be8cc6c9fe8476dc4ea8f46f40b))
+
+
+### Features
+
+* connection validation and logging ([#6233](https://github.com/cube-js/cube.js/issues/6233)) ([6dc48f8](https://github.com/cube-js/cube.js/commit/6dc48f8dc8045234dfa9fe8922534c5204e6e569))
+
+
+
+
+
 ## [0.32.1](https://github.com/cube-js/cube.js/compare/v0.32.0...v0.32.1) (2023-03-03)
 
 **Note:** Version bump only for package @cubejs-backend/redshift-driver

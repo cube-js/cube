@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.2](https://github.com/cube-js/cube.js/compare/v0.32.1...v0.32.2) (2023-03-07)
+
+
+### Features
+
+* **cubestore:** QUEUE - support extended flag for retrieve ([#6248](https://github.com/cube-js/cube.js/issues/6248)) ([9f23924](https://github.com/cube-js/cube.js/commit/9f23924a306c8141aa0cc8d990aeffdd5f3b4135))
+
+
+
+
+
 ## [0.32.1](https://github.com/cube-js/cube.js/compare/v0.32.0...v0.32.1) (2023-03-03)
 
 
