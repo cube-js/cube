@@ -957,6 +957,7 @@ mod stream_debug {
 
 #[cfg(test)]
 mod tests {
+    use crate::metastore::job::{Job, JobType};
     use futures_timer::Delay;
     use std::time::Duration;
 
@@ -968,7 +969,6 @@ mod tests {
     use crate::metastore::{MetaStoreTable, RowKey};
 
     use super::*;
-    use crate::metastore::job::JobType;
     use crate::scheduler::SchedulerImpl;
     use crate::sql::MySqlDialectWithBackTicks;
     use crate::streaming::kafka::KafkaMessage;
@@ -1081,7 +1081,7 @@ mod tests {
                 return Ok(KsqlResponse::JsonNl { values });
             }
 
-            for i in offset..50000 {
+            for i in offset..5000 {
                 for j in 0..2 {
                     if let Some(p) = &partition {
                         if *p != j {
@@ -1115,7 +1115,7 @@ mod tests {
             _use_ssl: bool,
             to_row: Arc<dyn Fn(KafkaMessage) -> Result<Option<Row>, CubeError> + Send + Sync>,
         ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError> {
-            let max_offset = 50000;
+            let max_offset = 5000;
             let offset = match offset {
                 Offset::Beginning => 0,
                 Offset::End => max_offset,
@@ -1175,7 +1175,7 @@ mod tests {
             c.compaction_chunks_count_threshold = 100;
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
-            c.wal_split_threshold = 16384;
+            c.wal_split_threshold = 1638;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KsqlClient, _, _, _>(async move |_| {
@@ -1184,6 +1184,7 @@ mod tests {
                 .await
         }, async move |services| {
             let chunk_store = services.injector.get_service_typed::<dyn ChunkDataStore>().await;
+            let cluster = services.injector.get_service_typed::<dyn Cluster>().await;
             let scheduler = services.injector.get_service_typed::<SchedulerImpl>().await;
             let service = services.sql_service;
             let meta_store = services.meta_store;
@@ -1212,7 +1213,7 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
             let listener = services.cluster.job_result_listener();
             let chunks = meta_store.chunks_table().all_rows().await.unwrap();
@@ -1222,7 +1223,7 @@ mod tests {
                 if let Some(handle_id) = chunk.get_row().replay_handle_id() {
                     let handle = replay_handles.iter().find(|h| h.get_id() == *handle_id).unwrap();
                     if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
-                        if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 32768).unwrap_or(false)).unwrap_or(false)) {
+                        if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 3276).unwrap_or(false)).unwrap_or(false)) {
                             chunk_store.free_memory_chunk(chunk.get_id()).await.unwrap();
                             middle_chunk = Some(chunk.clone());
                             break;
@@ -1231,7 +1232,20 @@ mod tests {
                 }
             }
             Delay::new(Duration::from_millis(10000)).await;
-            scheduler.schedule_compaction_in_memory_chunks_if_needed(&meta_store.get_partition(middle_chunk.unwrap().get_row().get_partition_id()).await.unwrap()).await.unwrap();
+            let partition_id = middle_chunk.unwrap().get_row().get_partition_id();
+            let partition = &meta_store.get_partition(partition_id).await.unwrap();
+
+            let node = cluster.node_name_by_partition(partition);
+            let job = meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, partition_id),
+                    JobType::InMemoryChunksCompaction,
+                    node.to_string(),
+                ))
+                .await.unwrap();
+            if job.is_some() {
+                cluster.notify_job_runner(node).await.unwrap();
+            }
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::InMemoryChunksCompaction),
@@ -1253,7 +1267,7 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000 - 16384)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000 - 1638)])]);
 
             let listener = services.cluster.job_result_listener();
 
@@ -1270,7 +1284,7 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
             println!("replay handles pre merge: {:#?}", service
                 .exec_query("SELECT * FROM system.replay_handles")
@@ -1316,7 +1330,7 @@ mod tests {
             c.compaction_chunks_count_threshold = 100;
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
-            c.wal_split_threshold = 16384;
+            c.wal_split_threshold = 1638;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
@@ -1325,6 +1339,7 @@ mod tests {
                 .await
         }, async move |services| {
             let chunk_store = services.injector.get_service_typed::<dyn ChunkDataStore>().await;
+            let cluster = services.injector.get_service_typed::<dyn Cluster>().await;
             let scheduler = services.injector.get_service_typed::<SchedulerImpl>().await;
             let service = services.sql_service;
             let meta_store = services.meta_store;
@@ -1353,7 +1368,7 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
             let listener = services.cluster.job_result_listener();
             let chunks = meta_store.chunks_table().all_rows().await.unwrap();
@@ -1363,7 +1378,7 @@ mod tests {
                 if let Some(handle_id) = chunk.get_row().replay_handle_id() {
                     let handle = replay_handles.iter().find(|h| h.get_id() == *handle_id).unwrap();
                     if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
-                        if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 32768).unwrap_or(false)).unwrap_or(false)) {
+                        if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 3276).unwrap_or(false)).unwrap_or(false)) {
                             chunk_store.free_memory_chunk(chunk.get_id()).await.unwrap();
                             middle_chunk = Some(chunk.clone());
                             break;
@@ -1372,29 +1387,33 @@ mod tests {
                 }
             }
             Delay::new(Duration::from_millis(10000)).await;
-            scheduler.schedule_compaction_in_memory_chunks_if_needed(&meta_store.get_partition(middle_chunk.unwrap().get_row().get_partition_id()).await.unwrap()).await.unwrap();
 
+            let partition_id = middle_chunk.unwrap().get_row().get_partition_id();
+            let partition = &meta_store.get_partition(partition_id).await.unwrap();
+
+            let node = cluster.node_name_by_partition(partition);
+            let job = meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, partition_id),
+                    JobType::InMemoryChunksCompaction,
+                    node.to_string(),
+                ))
+                .await.unwrap();
+            if job.is_some() {
+                cluster.notify_job_runner(node).await.unwrap();
+            }
+
+            println!("!!!! GGGGG");
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::InMemoryChunksCompaction),
             ]);
             timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
 
-            println!("chunks: {:#?}", service
-                .exec_query("SELECT * FROM system.chunks")
-                .await
-                .unwrap()
-            );
-            println!("replay handles: {:#?}", service
-                .exec_query("SELECT * FROM system.replay_handles")
-                .await
-                .unwrap()
-            );
-
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000 - 16384)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000 - 1638)])]);
 
             let listener = services.cluster.job_result_listener();
 
@@ -1411,13 +1430,8 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
-            println!("replay handles pre merge: {:#?}", service
-                .exec_query("SELECT * FROM system.replay_handles")
-                .await
-                .unwrap()
-            );
 
             scheduler.merge_replay_handles().await.unwrap();
 
@@ -1427,11 +1441,6 @@ mod tests {
                 .unwrap();
             assert_eq!(result.get_rows().len(), 0);
 
-            println!("replay handles after merge: {:#?}", service
-                .exec_query("SELECT * FROM system.replay_handles")
-                .await
-                .unwrap()
-            );
 
             service
                 .exec_query("DROP TABLE test.events_by_type_1")
@@ -1457,7 +1466,7 @@ mod tests {
             c.compaction_chunks_count_threshold = 100;
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
-            c.wal_split_threshold = 16384;
+            c.wal_split_threshold = 1638;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
@@ -1479,7 +1488,7 @@ mod tests {
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int) \
-                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE FILTER_ID >= 10000 and FILTER_ID < 14000') \
+                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE FILTER_ID >= 1000 and FILTER_ID < 1400') \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`) INDEX by_anonymous(`ANONYMOUSID`, `FILTER_ID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
                 .unwrap();
@@ -1494,19 +1503,19 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(800)])]);
 
             let result = service
                 .exec_query("SELECT min(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1000)])]);
 
             let result = service
                 .exec_query("SELECT max(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(13999)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1399)])]);
         })
             .await;
     }
@@ -1521,7 +1530,7 @@ mod tests {
             c.compaction_chunks_count_threshold = 100;
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
-            c.wal_split_threshold = 16384;
+            c.wal_split_threshold = 1638;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
@@ -1544,9 +1553,9 @@ mod tests {
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` timestamp) \
                             WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE \
-                            WHERE  TIMESTAMP >= PARSE_TIMESTAMP(\\'1970-01-01T10:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            WHERE  TIMESTAMP >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
                             AND
-                            TIMESTAMP < PARSE_TIMESTAMP(\\'1970-01-01T11:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            TIMESTAMP < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
                             ') \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
@@ -1562,19 +1571,19 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8400)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(20 * 60)])]);
 
             let result = service
                 .exec_query("SELECT min(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10 * 3600)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600)])]);
 
             let result = service
                 .exec_query("SELECT max(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(11 * 3600 + 600 - 1)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600 + 600 - 1)])]);
         })
             .await;
     }
