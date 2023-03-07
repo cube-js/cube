@@ -310,7 +310,7 @@ class PreAggregationLoadCache {
 
   public async fetchTables(preAggregation: PreAggregationDescription) {
     if (preAggregation.external && !this.externalDriverFactory) {
-      throw new Error('externalDriverFactory is not provided. Please make sure @cubejs-backend/cubestore-driver is installed and use CUBEJS_DEV_MODE=true or provide Cube Store connection env variables for production usage.');
+      throw new Error('externalDriverFactory is not provided. Please use CUBEJS_DEV_MODE=true or provide Cube Store connection env variables for production usage.');
     }
 
     const newTables = await this.fetchTablesNoCache(preAggregation);
