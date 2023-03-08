@@ -206,8 +206,8 @@ The opposite operator of `contains`. It supports multiple values.
 }
 ```
 
-This opertor adds `IS NULL` check to include `NULL` values unless you add `null` to `values`.
-For example:
+This opertor adds `IS NULL` check to include `NULL` values unless you add `null`
+to `values`. For example:
 
 ```javascript
 {
@@ -449,6 +449,26 @@ The same as `beforeDate`, but is used to get all results after a specific date.
 }
 ```
 
+### <--{"id" : "Filters Operators"}--> measureFilter
+
+The `measureFilter` operator is used to apply an existing measure's filters to
+the current query.
+
+This usually happens when you call
+[`ResultSet.drilldown()`][ref-client-core-resultset-drilldown], which will
+return a query for the drill members. If the original query has a filter on a
+measure, that filter will be added as otherwise the drilldown query will lose
+that context.
+
+- Applied to measures.
+
+```json
+{
+  "member": "Orders.count",
+  "operator": "measureFilter"
+}
+```
+
 ## Boolean logical operators
 
 Filters can contain `or` and `and` logical operators. Logical operators have
@@ -497,14 +517,12 @@ provides a convenient shortcut to pass a dimension and a filter as a
   `YYYY-MM-DDTHH:mm:ss.SSS` format. Values should always be local and in query
   `timezone`. Dates in `YYYY-MM-DD` format are also accepted. Such dates are
   padded to the start and end of the day if used in start and end of date range
-  interval accordingly.
-  Please note that for timestamp comparison, `>=` and `<=` operators are used.
-  It requires, for example, that the end date range date `2020-01-01` is padded 
-  to `2020-01-01T23:59:59.999`.
-  If only one date is specified it's equivalent to passing
-  two of the same dates as a date range. You can also pass a string instead of
-  array with relative date range, for example: `last quarter`, `last 360 days`,
-  or `next 2 months`.
+  interval accordingly. Please note that for timestamp comparison, `>=` and `<=`
+  operators are used. It requires, for example, that the end date range date
+  `2020-01-01` is padded to `2020-01-01T23:59:59.999`. If only one date is
+  specified it's equivalent to passing two of the same dates as a date range.
+  You can also pass a string instead of array with relative date range, for
+  example: `last quarter`, `last 360 days`, or `next 2 months`.
 - `compareDateRange`: An array of date ranges to compare a measure change over
   previous period
 - `granularity`: A granularity for a time dimension. It supports the following
@@ -572,6 +590,8 @@ date. If you need the current date also you can use `from N days ago to now` or
 }
 ```
 
+[ref-client-core-resultset-drilldown]:
+  /@cubejs-client-core#result-set-drill-down
 [ref-schema-ref-preaggs-refreshkey]:
   /schema/reference/pre-aggregations#parameters-refresh-key
 [ref-schema-ref-preaggs-refreshkey-every]:
