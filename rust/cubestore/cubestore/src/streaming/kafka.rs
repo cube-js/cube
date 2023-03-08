@@ -45,6 +45,7 @@ use std::any::Any;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct KafkaStreamingSource {
@@ -316,10 +317,20 @@ pub trait KafkaClientService: DIService + Send + Sync {
         use_ssl: bool,
         to_row: Arc<dyn Fn(KafkaMessage) -> Result<Option<Row>, CubeError> + Send + Sync>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError>;
+
+    async fn calulate_lag(
+        &self,
+        _topic: String,
+        _partition: i32,
+        _current_seq: i64,
+    ) -> Option<i64> {
+        None
+    }
 }
 
 pub struct KafkaClientServiceImpl {
     config_obj: Arc<dyn ConfigObj>,
+    consumer: RwLock<Option<Arc<StreamConsumer>>>,
 }
 
 pub enum KafkaMessage<'a> {
@@ -414,6 +425,8 @@ impl KafkaClientService for KafkaClientServiceImpl {
 
         let stream_consumer = Arc::new(stream_consumer);
         let config_obj = self.config_obj.clone();
+        let mut consumer = self.consumer.write().await;
+        *consumer = Some(stream_consumer.clone());
         Ok(Box::pin(stream::from_fn(move || {
             let stream_consumer = stream_consumer.clone();
             let to_row = to_row.clone();
@@ -447,11 +460,38 @@ impl KafkaClientService for KafkaClientServiceImpl {
             }
         })))
     }
+
+    async fn calulate_lag(&self, topic: String, partition: i32, current_seq: i64) -> Option<i64> {
+        let consumer = self.consumer.read().await.clone();
+        match consumer {
+            Some(consumer) => {
+                let last_offset = cube_ext::spawn_blocking(move || {
+                    match consumer.fetch_watermarks(&topic, partition, Duration::from_millis(200)) {
+                        Ok((_, last_offset)) => Some(last_offset),
+                        Err(e) => {
+                            log::error!("KafraService: Error while fetching last_offset: {}", e);
+                            None
+                        }
+                    }
+                })
+                .await;
+
+                match last_offset {
+                    Ok(last_offset) => last_offset.map(|lo| lo - current_seq),
+                    Err(_) => None,
+                }
+            }
+            None => None,
+        }
+    }
 }
 
 impl KafkaClientServiceImpl {
     pub fn new(config_obj: Arc<dyn ConfigObj>) -> Arc<Self> {
-        Arc::new(KafkaClientServiceImpl { config_obj })
+        Arc::new(KafkaClientServiceImpl {
+            config_obj,
+            consumer: RwLock::new(None),
+        })
     }
 }
 
@@ -550,6 +590,11 @@ impl StreamingSource for KafkaStreamingSource {
         } else {
             Ok(data)
         }
+    }
+    async fn calulate_lag(&self, current_seq: i64) -> Option<i64> {
+        self.kafka_client
+            .calulate_lag(self.topic.clone(), self.partition as i32, current_seq)
+            .await
     }
 
     fn validate_table_location(&self) -> Result<(), CubeError> {

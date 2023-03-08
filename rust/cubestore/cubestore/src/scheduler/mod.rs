@@ -2,6 +2,7 @@ use crate::cluster::{pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
+use crate::metastore::replay_handle::ReplayHandle;
 use crate::metastore::replay_handle::{
     subtract_from_right_seq_pointer_by_location, subtract_if_covers_seq_pointer_by_location,
     union_seq_pointer_by_location, SeqPointerForLocation,
@@ -206,7 +207,10 @@ impl SchedulerImpl {
         )
         .await
         {
-            error!("Error scheduling partitions compaction: {}", e);
+            error!(
+                "Error scheduling deactivation chunks without partitions: {}",
+                e
+            );
         }
 
         if let Err(e) = warn_long_fut(
@@ -314,6 +318,12 @@ impl SchedulerImpl {
     /// Otherwise we just subtract it from resulting `SeqPointer` so freshly created `ReplayHandle`
     /// can't remove failed one.
     pub async fn merge_replay_handles(&self) -> Result<(), CubeError> {
+        fn is_newest_handle(handle: &IdRow<ReplayHandle>) -> bool {
+            Utc::now()
+                .signed_duration_since(handle.get_row().created_at().clone())
+                .num_seconds()
+                < 60
+        }
         let (failed, mut without_failed) = self
             .meta_store
             .all_replay_handles_to_merge()
@@ -339,7 +349,7 @@ impl SchedulerImpl {
             let handles = handles.collect::<Vec<_>>();
             for (handle, _) in handles
                 .iter()
-                .filter(|(_, no_active_chunks)| *no_active_chunks)
+                .filter(|(handle, no_active_chunks)| !is_newest_handle(handle) && *no_active_chunks)
             {
                 union_seq_pointer_by_location(
                     &mut seq_pointer_by_location,
@@ -424,7 +434,7 @@ impl SchedulerImpl {
         for chunk in chunks_without_partitions {
             if let Some(handle_id) = chunk.get_row().replay_handle_id() {
                 self.meta_store
-                    .update_replay_handle_failed(*handle_id, true)
+                    .update_replay_handle_failed_if_exists(*handle_id, true)
                     .await?;
             }
             ids.push(chunk.get_id());
@@ -503,7 +513,7 @@ impl SchedulerImpl {
         // Using get_tables_with_path due to it's cached
         let tables = self.meta_store.get_tables_with_path(true).await?;
         for table in tables.iter() {
-            if table.table.get_row().is_ready() {
+            if table.table.get_row().is_ready() && !table.table.get_row().sealed() {
                 if let Some(locations) = table.table.get_row().locations() {
                     for location in locations.iter() {
                         if Table::is_stream_location(location) {

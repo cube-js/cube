@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Cube Dev, Inc.",
-  "version": "0.32.2",
+  "version": "0.32.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
@@ -29,7 +29,6 @@
   "dependencies": {
     "@cubejs-backend/native": "^0.32.2",
     "@cubejs-backend/shared": "^0.32.2",
-    "@hapi/joi": "^15.1.1",
     "@ungap/structured-clone": "^0.3.4",
     "body-parser": "^1.19.0",
     "chrono-node": "^2.2.6",

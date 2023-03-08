@@ -906,7 +906,7 @@ impl Config {
                 ),
                 stream_replay_check_interval_secs: env_parse(
                     "CUBESTORE_STREAM_REPLAY_CHECK_INTERVAL",
-                    0,
+                    60,
                 ),
                 check_ws_orphaned_messages_interval_secs: env_parse(
                     "CUBESTORE_CHECK_WS_ORPHANED_MESSAGES_INTERVAL",
