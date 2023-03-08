@@ -514,7 +514,7 @@ pub struct RocksStore {
     snapshot_uploaded: Arc<RwLock<bool>>,
     snapshots_upload_stopped: Arc<AsyncMutex<bool>>,
     pub(crate) cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
-    rw_loop_tx: std::sync::mpsc::SyncSender<
+    rw_loop_tx: tokio::sync::mpsc::Sender<
         Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
     >,
     _rw_loop_join_handle: Arc<AbortingJoinHandle<()>>,
@@ -557,20 +557,17 @@ impl RocksStore {
         let db = details.open_db(path)?;
         let db_arc = Arc::new(db);
 
-        let (rw_loop_tx, rw_loop_rx) = std::sync::mpsc::sync_channel::<
+        let (rw_loop_tx, mut rw_loop_rx) = tokio::sync::mpsc::channel::<
             Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
         >(32_768);
 
         let join_handle = cube_ext::spawn_blocking(move || loop {
-            match rw_loop_rx.recv() {
-                Ok(fun) => {
-                    if let Err(e) = fun() {
-                        log::error!("Error during read write loop execution: {}", e);
-                    }
+            if let Some(fun) = rw_loop_rx.blocking_recv() {
+                if let Err(e) = fun() {
+                    log::error!("Error during read write loop execution: {}", e);
                 }
-                Err(_) => {
-                    return;
-                }
+            } else {
+                return;
             }
         });
 
@@ -675,53 +672,51 @@ impl RocksStore {
         let rw_loop_sender = self.rw_loop_tx.clone();
         let (tx, rx) = oneshot::channel::<Result<(R, Vec<MetaStoreEvent>), CubeError>>();
 
-        cube_ext::spawn_blocking(move || {
-            let res = rw_loop_sender.send(Box::new(move || {
-                let db_span = warn_long("store write operation", Duration::from_millis(100));
+        let res = rw_loop_sender.send(Box::new(move || {
+            let db_span = warn_long("store write operation", Duration::from_millis(100));
 
-                let mut batch = BatchPipe::new(db_to_send.as_ref());
-                let snapshot = db_to_send.snapshot();
-                let res = f(
-                    DbTableRef {
-                        db: db_to_send.as_ref(),
-                        snapshot: &snapshot,
-                        mem_seq,
-                        start_time: Utc::now(),
-                    },
-                    &mut batch,
-                );
-                match res {
-                    Ok(res) => {
-                        if batch.invalidate_tables_cache {
-                            *cached_tables.lock().unwrap() = None;
-                        }
-                        let write_result = batch.batch_write_rows()?;
-                        tx.send(Ok((res, write_result))).map_err(|_| {
-                            CubeError::internal(format!(
-                                "[{}] Write operation result receiver has been dropped",
-                                store_name
-                            ))
-                        })?;
+            let mut batch = BatchPipe::new(db_to_send.as_ref());
+            let snapshot = db_to_send.snapshot();
+            let res = f(
+                DbTableRef {
+                    db: db_to_send.as_ref(),
+                    snapshot: &snapshot,
+                    mem_seq,
+                    start_time: Utc::now(),
+                },
+                &mut batch,
+            );
+            match res {
+                Ok(res) => {
+                    if batch.invalidate_tables_cache {
+                        *cached_tables.lock().unwrap() = None;
                     }
-                    Err(e) => {
-                        tx.send(Err(e)).map_err(|_| {
-                            CubeError::internal(format!(
-                                "[{}] Write operation result receiver has been dropped",
-                                store_name
-                            ))
-                        })?;
-                    }
+                    let write_result = batch.batch_write_rows()?;
+                    tx.send(Ok((res, write_result))).map_err(|_| {
+                        CubeError::internal(format!(
+                            "[{}] Write operation result receiver has been dropped",
+                            store_name
+                        ))
+                    })?;
                 }
-
-                mem::drop(db_span);
-
-                Ok(())
-            }));
-            if let Err(e) = res {
-                log::error!("[{}] Error during read write loop send: {}", store_name, e);
+                Err(e) => {
+                    tx.send(Err(e)).map_err(|_| {
+                        CubeError::internal(format!(
+                            "[{}] Write operation result receiver has been dropped",
+                            store_name
+                        ))
+                    })?;
+                }
             }
-        })
-        .await?;
+
+            mem::drop(db_span);
+
+            Ok(())
+        }));
+        if let Err(e) = res.await {
+            log::error!("[{}] Error during read write loop send: {}", store_name, e);
+        }
+
         let (spawn_res, events) = rx.await??;
 
         self.write_notify.notify_waiters();
@@ -873,34 +868,31 @@ impl RocksStore {
         let rw_loop_sender = self.rw_loop_tx.clone();
         let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
 
-        cube_ext::spawn_blocking(move || {
-            let res = rw_loop_sender.send(Box::new(move || {
-                let db_span = warn_long("metastore read operation", Duration::from_millis(100));
+        let res = rw_loop_sender.send(Box::new(move || {
+            let db_span = warn_long("metastore read operation", Duration::from_millis(100));
 
-                let snapshot = db_to_send.snapshot();
-                let res = f(DbTableRef {
-                    db: db_to_send.as_ref(),
-                    snapshot: &snapshot,
-                    mem_seq,
-                    start_time: Utc::now(),
-                });
+            let snapshot = db_to_send.snapshot();
+            let res = f(DbTableRef {
+                db: db_to_send.as_ref(),
+                snapshot: &snapshot,
+                mem_seq,
+                start_time: Utc::now(),
+            });
 
-                tx.send(res).map_err(|_| {
-                    CubeError::internal(format!(
-                        "[{}] Read operation result receiver has been dropped",
-                        store_name
-                    ))
-                })?;
+            tx.send(res).map_err(|_| {
+                CubeError::internal(format!(
+                    "[{}] Read operation result receiver has been dropped",
+                    store_name
+                ))
+            })?;
 
-                mem::drop(db_span);
+            mem::drop(db_span);
 
-                Ok(())
-            }));
-            if let Err(e) = res {
-                log::error!("Error during read write loop send: {}", e);
-            }
-        })
-        .await?;
+            Ok(())
+        }));
+        if let Err(e) = res.await {
+            log::error!("Error during read write loop send: {}", e);
+        }
 
         rx.await?
     }
