@@ -1,3 +1,5 @@
+// https://github.com/google/flatbuffers/blob/v23.3.3/tsconfig.json
+// flatbuffers uses DOM... In browsers TextEncoder/Decoder (Web API) lives in global space
 if (!global.TextEncoder) {
   // eslint-disable-next-line global-require
   global.TextEncoder = require("util").TextEncoder;
