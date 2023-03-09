@@ -81,7 +81,8 @@ type CanSwitchSQLUserFn =
  * Returns permissions tuple from a security context.
  */
 type ContextToPermissionsFn =
-  (securityContext?: any) => Promise<PermissionsTuple>;
+  (securityContext?: any, permissions?: PermissionsTuple) =>
+    Promise<PermissionsTuple>;
 
 export {
   CheckAuthInternalOptions,
