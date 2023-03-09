@@ -2175,10 +2175,13 @@ class ApiGateway {
   ): ContextToPermissionsFn {
     let permissionsCache;
     return options.contextToPermissions
-      ? async (securityContext?: any) => {
+      ? async (securityContext?: any, defaultPermissions?: Permission[]) => {
         if (!permissionsCache) {
           const permissions = options.contextToPermissions &&
-            await options.contextToPermissions(securityContext);
+            await options.contextToPermissions(
+              securityContext,
+              defaultPermissions,
+            );
           if (!permissions || !Array.isArray(permissions)) {
             throw new Error(
               'A user-defined contextToPermissions function returns an inconsistent type.'
