@@ -68,7 +68,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res.body && res.body.error)
-      .toStrictEqual('Permission is not allowed: graphql');
+      .toStrictEqual('Permission is missed: graphql');
 
     apiGateway.release();
   });
@@ -86,7 +86,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('Permission is not allowed: meta');
+      .toStrictEqual('Permission is missed: meta');
 
     const res2 = await request(app)
       .post('/cubejs-api/v1/pre-aggregations/can-use')
@@ -94,7 +94,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res2.body && res2.body.error)
-      .toStrictEqual('Permission is not allowed: meta');
+      .toStrictEqual('Permission is missed: meta');
 
     apiGateway.release();
   });
@@ -112,7 +112,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('Permission is not allowed: data');
+      .toStrictEqual('Permission is missed: data');
 
     const res2 = await request(app)
       .post('/cubejs-api/v1/load')
@@ -120,7 +120,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res2.body && res2.body.error)
-      .toStrictEqual('Permission is not allowed: data');
+      .toStrictEqual('Permission is missed: data');
 
     const res3 = await request(app)
       .get('/cubejs-api/v1/subscribe')
@@ -128,7 +128,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res3.body && res3.body.error)
-      .toStrictEqual('Permission is not allowed: data');
+      .toStrictEqual('Permission is missed: data');
 
     const res4 = await request(app)
       .get('/cubejs-api/v1/sql')
@@ -136,7 +136,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res4.body && res4.body.error)
-      .toStrictEqual('Permission is not allowed: data');
+      .toStrictEqual('Permission is missed: data');
 
     const res5 = await request(app)
       .post('/cubejs-api/v1/sql')
@@ -145,7 +145,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res5.body && res5.body.error)
-      .toStrictEqual('Permission is not allowed: data');
+      .toStrictEqual('Permission is missed: data');
 
     const res6 = await request(app)
       .get('/cubejs-api/v1/dry-run')
@@ -153,7 +153,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res6.body && res6.body.error)
-      .toStrictEqual('Permission is not allowed: data');
+      .toStrictEqual('Permission is missed: data');
 
     const res7 = await request(app)
       .post('/cubejs-api/v1/dry-run')
@@ -162,7 +162,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res7.body && res7.body.error)
-      .toStrictEqual('Permission is not allowed: data');
+      .toStrictEqual('Permission is missed: data');
 
     apiGateway.release();
   });
@@ -180,7 +180,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('Permission is not allowed: jobs');
+      .toStrictEqual('Permission is missed: jobs');
 
     const res2 = await request(app)
       .get('/cubejs-api/v1/run-scheduled-refresh')
@@ -188,7 +188,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res2.body && res2.body.error)
-      .toStrictEqual('Permission is not allowed: jobs');
+      .toStrictEqual('Permission is missed: jobs');
 
     apiGateway.release();
   });
