@@ -1311,7 +1311,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#d821a7a0df6274274d85ba399072794fcac22343"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#2720a2612f80570ebca63fcdf89f4376ebb0c606"
 dependencies = [
  "ahash 0.7.4",
  "arrow",
@@ -5323,7 +5323,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
  "cfg-if 1.0.0",
- "rand 0.8.4",
+ "rand 0.6.5",
  "static_assertions",
 ]
 
