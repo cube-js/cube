@@ -2216,7 +2216,7 @@ class ApiGateway {
       throw new CubejsHandlerError(
         403,
         'Forbidden',
-        `Permission is not allowed: ${permission}`
+        `Permission is missed: ${permission}`
       );
     }
   }
