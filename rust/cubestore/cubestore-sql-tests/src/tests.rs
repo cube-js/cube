@@ -173,6 +173,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "rolling_window_one_week_interval",
             rolling_window_one_week_interval,
         ),
+        t(
+            "rolling_window_one_quarter_interval",
+            rolling_window_one_quarter_interval,
+        ),
         t("rolling_window_offsets", rolling_window_offsets),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
@@ -4855,6 +4859,53 @@ async fn rolling_window_one_week_interval(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&r),
         rows(&[(jan[4], 40, Some(5)), (jan[11], 45, None),])
+    );
+}
+
+async fn rolling_window_one_quarter_interval(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day timestamp, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         ('2021-01-01T00:00:00Z', 'john', 10), \
+                         ('2021-01-01T00:00:00Z', 'sara', 7), \
+                         ('2021-01-03T00:00:00Z', 'sara', 3), \
+                         ('2021-01-03T00:00:00Z', 'john', 9), \
+                         ('2021-01-03T00:00:00Z', 'john', 11), \
+                         ('2021-01-05T00:00:00Z', 'timmy', 5), \
+                         ('2021-04-01T00:00:00Z', 'ovr', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT w, ROLLING(SUM(n) RANGE UNBOUNDED PRECEDING OFFSET START), SUM(CASE WHEN w >= to_timestamp('2021-01-01T00:00:00Z') AND w < to_timestamp('2021-08-31T00:00:00Z') THEN n END) \
+             FROM (SELECT date_trunc('day', day) w, SUM(n) as n FROM s.data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION w \
+             GROUP BY DIMENSION date_trunc('quarter', w) \
+             FROM date_trunc('quarter', to_timestamp('2021-01-04T00:00:00Z')) \
+             TO date_trunc('quarter', to_timestamp('2021-08-31T00:00:00Z')) \
+             EVERY INTERVAL '1 quarter' \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            // 2021-01-01T00:00:00.000Z
+            (TimestampValue::new(1609459200000000000), 17, Some(45)),
+            // 2021-04-01T00:00:00.000Z
+            (TimestampValue::new(1617235200000000000), 50, Some(5)),
+            // 2021-07-01T00:00:00.000Z
+            (TimestampValue::new(1625097600000000000), 50, None),
+        ])
     );
 }
 
