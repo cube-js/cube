@@ -30,7 +30,7 @@
     "@cubejs-backend/cubestore": "^0.32.3",
     "@cubejs-backend/shared": "^0.32.2",
     "csv-write-stream": "^2.0.0",
-    "flatbuffers": "^23.3.3",
+    "flatbuffers": "23.3.3",
     "fs-extra": "^9.1.0",
     "generic-pool": "^3.6.0",
     "moment-timezone": "^0.5.31",
