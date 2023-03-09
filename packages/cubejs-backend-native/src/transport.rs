@@ -89,7 +89,10 @@ impl TransportService for NodeBridgeTransport {
             Some(extra),
         )
         .await?;
+        #[cfg(debug_assertions)]
         trace!("[transport] Meta <- {:?}", response);
+        #[cfg(not(debug_assertions))]
+        trace!("[transport] Meta <- <hidden>", response);
 
         Ok(Arc::new(MetaContext::new(
             response.cubes.unwrap_or_default(),
@@ -131,7 +134,10 @@ impl TransportService for NodeBridgeTransport {
                 Some(extra),
             )
             .await?;
+            #[cfg(debug_assertions)]
             trace!("[transport] Request <- {:?}", response);
+            #[cfg(not(debug_assertions))]
+            trace!("[transport] Request <- <hidden>", response);
 
             let load_err = match serde_json::from_value::<V1LoadResponse>(response.clone()) {
                 Ok(r) => {
