@@ -458,7 +458,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
                 self.migrate_table(&mut batch, table_info)?;
 
-                batch.put(
+                batch.put_cf(
+                    self.cf()?,
                     &RowKey::TableInfo {
                         table_id: Self::table_id(),
                     }
@@ -473,7 +474,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                 self.db().write(batch)?;
             }
         } else {
-            self.db().put(
+            self.db().put_cf(
+                self.cf()?,
                 &RowKey::TableInfo {
                     table_id: Self::table_id(),
                 }
@@ -570,9 +572,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             }
             let row = row?;
             let index_row = self.index_key_val(row.get_row(), row.get_id(), index);
-            batch.put(index_row.key, index_row.val);
+            batch.put_cf(self.cf()?, index_row.key, index_row.val);
         }
-        batch.put(
+        batch.put_cf(
+            self.cf()?,
             &RowKey::SecondaryIndexInfo {
                 index_id: Self::index_id(index.get_id()),
             }
@@ -931,9 +934,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
-        let iter = db.iterator_opt(
-            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
+        let iter = db.iterator_cf_opt(
+            self.cf()?,
             opts,
+            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
         );
         let index = self.get_index_by_id(secondary_id);
 
@@ -982,10 +986,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let ref db = self.snapshot();
         let key_min = RowKey::Table(table_id, 0);
 
-        let iter = db.iterator(IteratorMode::From(
-            &key_min.to_bytes()[0..get_fixed_prefix()],
-            Direction::Forward,
-        ));
+        let iter = db.iterator_cf(
+            self.cf()?,
+            IteratorMode::From(
+                &key_min.to_bytes()[0..get_fixed_prefix()],
+                Direction::Forward,
+            ),
+        );
 
         for kv_res in iter {
             let (key, _) = kv_res?;
@@ -1011,10 +1018,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let key_len = zero_vec.len();
         let key_min = RowKey::SecondaryIndex(Self::index_id(secondary_id), zero_vec.clone(), 0);
 
-        let iter = db.iterator(IteratorMode::From(
-            &key_min.to_bytes()[0..(key_len + 5)],
-            Direction::Forward,
-        ));
+        let iter = db.iterator_cf(
+            self.cf()?,
+            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
+        );
 
         for kv_res in iter {
             let (key, _) = kv_res?;
@@ -1065,9 +1072,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
-        let iter = db.iterator_opt(
-            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
+        let iter = db.iterator_cf_opt(
+            self.cf()?,
             opts,
+            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
         );
 
         Ok(IndexScanIter {
@@ -1085,12 +1093,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
-        let iterator = db.iterator_opt(
+        let iterator = db.iterator_cf_opt(
+            self.cf()?,
+            opts,
             IteratorMode::From(
                 &key_min.to_bytes()[0..get_fixed_prefix()],
                 Direction::Forward,
             ),
-            opts,
         );
 
         Ok(TableScanIter {
