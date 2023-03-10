@@ -246,7 +246,8 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let option = self.iter.next();
-        if let Some((key, value)) = option {
+        if let Some(res) = option {
+            let (key, value) = res.unwrap();
             if let RowKey::Table(table_id, row_id) = RowKey::from_bytes(&key) {
                 if table_id != self.table_id {
                     return None;
@@ -278,7 +279,8 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let option = self.iter.next();
-            if let Some((key, value)) = option {
+            if let Some(res) = option {
+                let (key, value) = res.unwrap();
                 if let RowKey::SecondaryIndex(_, secondary_index_hash, row_id) =
                     RowKey::from_bytes(&key)
                 {
@@ -923,7 +925,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         );
         let index = self.get_index_by_id(secondary_id);
 
-        for (key, value) in iter {
+        for kv_res in iter {
+            let (key, value) = kv_res?;
             if let RowKey::SecondaryIndex(_, secondary_index_hash, row_id) =
                 RowKey::from_bytes(&key)
             {
@@ -972,7 +975,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             Direction::Forward,
         ));
 
-        for (key, _) in iter {
+        for kv_res in iter {
+            let (key, _) = kv_res?;
             let row_key = RowKey::from_bytes(&key);
             if let RowKey::Table(row_table_id, _) = row_key {
                 if row_table_id == table_id {
@@ -1000,7 +1004,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             Direction::Forward,
         ));
 
-        for (key, _) in iter {
+        for kv_res in iter {
+            let (key, _) = kv_res?;
             let row_key = RowKey::from_bytes(&key);
             if let RowKey::SecondaryIndex(index_id, _, _) = row_key {
                 if index_id == Self::index_id(secondary_id) {

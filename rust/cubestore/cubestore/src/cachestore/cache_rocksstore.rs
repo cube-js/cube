@@ -24,7 +24,7 @@ use crate::CubeError;
 use async_trait::async_trait;
 
 use futures_timer::Delay;
-use rocksdb::{Options, DB};
+use rocksdb::{BlockBasedOptions, Options, DB};
 
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
@@ -80,6 +80,15 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         ));
         // Disable automatic compaction before migration, will be enabled later in after_migration
         opts.set_disable_auto_compactions(true);
+
+        let mut block_opts = BlockBasedOptions::default();
+        // https://github.com/facebook/rocksdb/blob/v7.9.2/include/rocksdb/table.h#L524
+        // RocksDB 7.x uses a new format = 5, but our previous version if RocksDB has some issues with it
+        // Let force the usage of old format for 1 month to save an ability to revert releases
+        // todo(ovr): Migrate to 5
+        block_opts.set_format_version(2);
+
+        opts.set_block_based_table_factory(&block_opts);
 
         DB::open(&opts, path)
             .map_err(|err| CubeError::internal(format!("DB::open error for cachestore: {}", err)))
