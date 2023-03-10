@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.4](https://github.com/cube-js/cube.js/compare/v0.32.3...v0.32.4) (2023-03-10)
+
+
+### Bug Fixes
+
+* **api-gateway:** contextToPermissions default permissions parameter ([#6268](https://github.com/cube-js/cube.js/issues/6268)) ([b234afc](https://github.com/cube-js/cube.js/commit/b234afc9877e4d80aa05528b32d9234b2730f0c5))
+* **api-gateway:** permissions cache removed ([#6271](https://github.com/cube-js/cube.js/issues/6271)) ([cd32266](https://github.com/cube-js/cube.js/commit/cd322665e5973dd8551bb039b3d0ad66a3a16d7f))
+* **api-gateway:** permissions error message ([#6269](https://github.com/cube-js/cube.js/issues/6269)) ([53d71a2](https://github.com/cube-js/cube.js/commit/53d71a2167a9d262520f4be3fbc1a458e8cc704c))
+* **api-gateway:** permissions unit test fix ([#6270](https://github.com/cube-js/cube.js/issues/6270)) ([15df7c1](https://github.com/cube-js/cube.js/commit/15df7c101dc664084f475764743694993a5cacdb))
+* Catch exception from extendContext (unhandledRejection) ([#6256](https://github.com/cube-js/cube.js/issues/6256)) ([9fa0bd9](https://github.com/cube-js/cube.js/commit/9fa0bd95c49bf4885224b43c42cad0d2327d026d))
+* **cubesql:** Failed printing to stdout: Resource temporarily unavailable ([#6272](https://github.com/cube-js/cube.js/issues/6272)) ([d8dd8a6](https://github.com/cube-js/cube.js/commit/d8dd8a60dba1eb3092dd252ccf98fa6e1de43dd4))
+
+
+### Features
+
+* **cubestore/docker:** Upgrade CLang to 15 ([979246b](https://github.com/cube-js/cube.js/commit/979246bdc8498d874aee755a4858c3008761ed54))
+* **cubestore/docker:** Upgrade OS to bullseye ([c512586](https://github.com/cube-js/cube.js/commit/c51258643bb24279ebe71e1279d0078efe32fce9))
+* **cubestore:** Support quarter intervals ([#6266](https://github.com/cube-js/cube.js/issues/6266)) ([35cc5c8](https://github.com/cube-js/cube.js/commit/35cc5c83e270e507e36e0602e707c8ed3f64872f))
+* **cubestore:** Upgrade RocksDB to 7.9.2 (0.20) ([#6221](https://github.com/cube-js/cube.js/issues/6221)) ([92bbef3](https://github.com/cube-js/cube.js/commit/92bbef34bd8fe34d9c8126bcf93c0535adcb289d))
+
+
+
+
+
 ## [0.32.3](https://github.com/cube-js/cube.js/compare/v0.32.2...v0.32.3) (2023-03-07)
 
 

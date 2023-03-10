@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.4](https://github.com/cube-js/cube.js/compare/v0.32.3...v0.32.4) (2023-03-10)
+
+
+### Bug Fixes
+
+* **api-gateway:** contextToPermissions default permissions parameter ([#6268](https://github.com/cube-js/cube.js/issues/6268)) ([b234afc](https://github.com/cube-js/cube.js/commit/b234afc9877e4d80aa05528b32d9234b2730f0c5))
+* **api-gateway:** permissions error message ([#6269](https://github.com/cube-js/cube.js/issues/6269)) ([53d71a2](https://github.com/cube-js/cube.js/commit/53d71a2167a9d262520f4be3fbc1a458e8cc704c))
+* **api-gateway:** permissions unit test fix ([#6270](https://github.com/cube-js/cube.js/issues/6270)) ([15df7c1](https://github.com/cube-js/cube.js/commit/15df7c101dc664084f475764743694993a5cacdb))
+* Catch exception from extendContext (unhandledRejection) ([#6256](https://github.com/cube-js/cube.js/issues/6256)) ([9fa0bd9](https://github.com/cube-js/cube.js/commit/9fa0bd95c49bf4885224b43c42cad0d2327d026d))
+
+
+
+
+
 ## [0.32.3](https://github.com/cube-js/cube.js/compare/v0.32.2...v0.32.3) (2023-03-07)
 
 
