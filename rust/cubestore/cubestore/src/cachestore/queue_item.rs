@@ -1,3 +1,4 @@
+use super::cache_rocksstore::CACHESTORE_QUEUE_COLUMN_FAMILY_NAME;
 use crate::metastore::{
     BaseRocksTable, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId, TableInfo,
 };
@@ -375,7 +376,7 @@ rocks_table_new!(
             Box::new(QueueItemRocksIndex::ByPrefix),
         ]
     },
-    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+    CACHESTORE_QUEUE_COLUMN_FAMILY_NAME
 );
 
 #[derive(Hash, Clone, Debug)]
