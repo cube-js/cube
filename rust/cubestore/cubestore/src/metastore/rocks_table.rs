@@ -422,7 +422,9 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         {
             return Err(CubeError::internal(format!("Primary key constraint violation. Primary key already exists for a row id {}: {:?}", row_id, &row)));
         }
-        batch_pipe.batch().put(inserted_row.key, inserted_row.val);
+        batch_pipe
+            .batch()
+            .put_cf(self.cf()?, inserted_row.key, inserted_row.val);
 
         let index_row = self.insert_index_row(&row, row_id)?;
         for to_insert in index_row {
@@ -433,7 +435,9 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             {
                 return Err(CubeError::internal(format!("Primary key constraint violation in secondary index. Primary key already exists for a row id {}: {:?}", row_id, &row)));
             }
-            batch_pipe.batch().put(to_insert.key, to_insert.val);
+            batch_pipe
+                .batch()
+                .put_cf(self.cf()?, to_insert.key, to_insert.val);
         }
 
         Ok(IdRow::new(row_id, row))
@@ -752,11 +756,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             ));
         }
 
-        batch_pipe.batch().put(updated_row.key, updated_row.val);
+        batch_pipe
+            .batch()
+            .put_cf(self.cf()?, updated_row.key, updated_row.val);
 
         let index_row = self.insert_index_row(&new_row, row_id)?;
         for row in index_row {
-            batch_pipe.batch().put(row.key, row.val);
+            batch_pipe.batch().put_cf(self.cf()?, row.key, row.val);
         }
         Ok(IdRow::new(row_id, new_row))
     }
@@ -816,7 +822,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let mut to_write = vec![];
         to_write.write_u64::<BigEndian>(next_seq)?;
-        db.put(seq_key.to_bytes(), to_write)?;
+        db.put_cf(self.cf()?, seq_key.to_bytes(), to_write)?;
 
         Ok(next_seq)
     }
