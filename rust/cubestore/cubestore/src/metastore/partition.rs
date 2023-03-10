@@ -199,15 +199,21 @@ pub(crate) enum PartitionRocksIndex {
     ParentPartitionId = 5,
 }
 
-rocks_table_impl!(Partition, PartitionRocksTable, TableId::Partitions, {
-    vec![
-        Box::new(PartitionRocksIndex::IndexId),
-        Box::new(PartitionRocksIndex::MultiPartitionId),
-        Box::new(PartitionRocksIndex::Active),
-        Box::new(PartitionRocksIndex::JustCreated),
-        Box::new(PartitionRocksIndex::ParentPartitionId),
-    ]
-});
+rocks_table_impl!(
+    Partition,
+    PartitionRocksTable,
+    TableId::Partitions,
+    {
+        vec![
+            Box::new(PartitionRocksIndex::IndexId),
+            Box::new(PartitionRocksIndex::MultiPartitionId),
+            Box::new(PartitionRocksIndex::Active),
+            Box::new(PartitionRocksIndex::JustCreated),
+            Box::new(PartitionRocksIndex::ParentPartitionId),
+        ]
+    },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum PartitionIndexKey {

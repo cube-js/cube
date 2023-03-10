@@ -67,9 +67,13 @@ impl<'a> BaseRocksTable for QueueResultRocksTable<'a> {
     }
 }
 
-rocks_table_new!(QueueResult, QueueResultRocksTable, TableId::QueueResults, {
-    vec![Box::new(QueueResultRocksIndex::ByPath)]
-});
+rocks_table_new!(
+    QueueResult,
+    QueueResultRocksTable,
+    TableId::QueueResults,
+    { vec![Box::new(QueueResultRocksIndex::ByPath)] },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum QueueResultIndexKey {

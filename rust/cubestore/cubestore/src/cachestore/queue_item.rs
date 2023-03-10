@@ -364,13 +364,19 @@ impl<'a> BaseRocksTable for QueueItemRocksTable<'a> {
     }
 }
 
-rocks_table_new!(QueueItem, QueueItemRocksTable, TableId::QueueItems, {
-    vec![
-        Box::new(QueueItemRocksIndex::ByPath),
-        Box::new(QueueItemRocksIndex::ByPrefixAndStatus),
-        Box::new(QueueItemRocksIndex::ByPrefix),
-    ]
-});
+rocks_table_new!(
+    QueueItem,
+    QueueItemRocksTable,
+    TableId::QueueItems,
+    {
+        vec![
+            Box::new(QueueItemRocksIndex::ByPath),
+            Box::new(QueueItemRocksIndex::ByPrefixAndStatus),
+            Box::new(QueueItemRocksIndex::ByPrefix),
+        ]
+    },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum QueueItemIndexKey {

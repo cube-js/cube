@@ -110,12 +110,18 @@ impl<'a> BaseRocksTable for CacheItemRocksTable<'a> {
     }
 }
 
-rocks_table_new!(CacheItem, CacheItemRocksTable, TableId::CacheItems, {
-    vec![
-        Box::new(CacheItemRocksIndex::ByPath),
-        Box::new(CacheItemRocksIndex::ByPrefix),
-    ]
-});
+rocks_table_new!(
+    CacheItem,
+    CacheItemRocksTable,
+    TableId::CacheItems,
+    {
+        vec![
+            Box::new(CacheItemRocksIndex::ByPath),
+            Box::new(CacheItemRocksIndex::ByPrefix),
+        ]
+    },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum CacheItemIndexKey {

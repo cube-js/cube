@@ -23,9 +23,13 @@ pub(crate) enum SchemaRocksIndex {
     Name = 1,
 }
 
-rocks_table_impl!(Schema, SchemaRocksTable, TableId::Schemas, {
-    vec![Box::new(SchemaRocksIndex::Name)]
-});
+rocks_table_impl!(
+    Schema,
+    SchemaRocksTable,
+    TableId::Schemas,
+    { vec![Box::new(SchemaRocksIndex::Name)] },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 impl RocksSecondaryIndex<Schema, String> for SchemaRocksIndex {
     fn typed_key_by(&self, row: &Schema) -> String {

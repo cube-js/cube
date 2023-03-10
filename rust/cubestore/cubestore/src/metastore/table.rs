@@ -412,9 +412,13 @@ impl Column {
     }
 }
 
-rocks_table_impl!(Table, TableRocksTable, TableId::Tables, {
-    vec![Box::new(TableRocksIndex::Name)]
-});
+rocks_table_impl!(
+    Table,
+    TableRocksTable,
+    TableId::Tables,
+    { vec![Box::new(TableRocksIndex::Name)] },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum TableRocksIndex {

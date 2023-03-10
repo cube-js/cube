@@ -324,7 +324,8 @@ rocks_table_impl!(
     ReplayHandle,
     ReplayHandleRocksTable,
     TableId::ReplayHandles,
-    { vec![Box::new(ReplayHandleRocksIndex::ByTableId),] }
+    { vec![Box::new(ReplayHandleRocksIndex::ByTableId),] },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
 );
 
 #[derive(Hash, Clone, Debug)]

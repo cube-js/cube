@@ -7,7 +7,9 @@ use crate::CubeError;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use rocksdb::{DBIterator, Direction, IteratorMode, ReadOptions, Snapshot, WriteBatch, DB};
+use rocksdb::{
+    ColumnFamily, DBIterator, Direction, IteratorMode, ReadOptions, Snapshot, WriteBatch, DB,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -19,7 +21,7 @@ use std::time::SystemTime;
 
 #[macro_export]
 macro_rules! rocks_table_impl {
-    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block) => {
+    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block, $column_family: expr) => {
         pub(crate) struct $rocks_table<'a> {
             db: crate::metastore::DbTableRef<'a>,
         }
@@ -43,15 +45,19 @@ macro_rules! rocks_table_impl {
             }
         }
 
-        crate::rocks_table_new!($table, $rocks_table, $table_id, $indexes);
+        crate::rocks_table_new!($table, $rocks_table, $table_id, $indexes, $column_family);
     };
 }
 
 #[macro_export]
 macro_rules! rocks_table_new {
-    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block) => {
+    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block, $column_family: expr) => {
         impl<'a> crate::metastore::RocksTable for $rocks_table<'a> {
             type T = $table;
+
+            fn cf_name(&self) -> &'static str {
+                $column_family
+            }
 
             fn db(&self) -> &rocksdb::DB {
                 self.db.db
@@ -363,6 +369,12 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     where
         D: Deserializer<'de>;
     fn indexes() -> Vec<Box<dyn BaseRocksSecondaryIndex<Self::T>>>;
+    fn cf(&self) -> Result<&ColumnFamily, CubeError> {
+        self.db()
+            .cf_handle(&self.cf_name().to_string())
+            .ok_or_else(|| CubeError::internal(format!("cf {:?} not found", self.cf_name())))
+    }
+    fn cf_name(&self) -> &'static str;
 
     fn migrate_table_by_truncate(&self, mut batch: &mut WriteBatch) -> Result<(), CubeError> {
         log::trace!("Truncating rows from {:?} table", self);
