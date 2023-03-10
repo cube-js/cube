@@ -735,7 +735,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     ) -> Result<IdRow<Self::T>, CubeError> {
         let deleted_row = self.delete_index_row(&old_row, row_id)?;
         for row in deleted_row {
-            batch_pipe.batch().delete(row.key);
+            batch_pipe.batch().delete_cf(self.cf()?, row.key);
         }
 
         let mut ser = flexbuffers::FlexbufferSerializer::new();
@@ -791,12 +791,12 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         }
 
         for row in deleted_row {
-            batch_pipe.batch().delete(row.key);
+            batch_pipe.batch().delete_cf(self.cf()?, row.key);
         }
 
         batch_pipe
             .batch()
-            .delete(self.delete_row(row.get_id())?.key);
+            .delete_cf(self.cf()?, self.delete_row(row.get_id())?.key);
 
         Ok(row)
     }
@@ -1010,7 +1010,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             let row_key = RowKey::from_bytes(&key);
             if let RowKey::Table(row_table_id, _) = row_key {
                 if row_table_id == table_id {
-                    batch.delete(key);
+                    batch.delete_cf(self.cf()?, key);
                 } else {
                     return Ok(());
                 }
@@ -1039,7 +1039,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             let row_key = RowKey::from_bytes(&key);
             if let RowKey::SecondaryIndex(index_id, _, _) = row_key {
                 if index_id == Self::index_id(secondary_id) {
-                    batch.delete(key);
+                    batch.delete_cf(self.cf()?, key);
                 } else {
                     return Ok(());
                 }
