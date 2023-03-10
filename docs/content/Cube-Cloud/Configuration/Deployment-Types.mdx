@@ -38,9 +38,18 @@ scope of support you may receive for your deployment.
 <InfoBox>
 
 You can try a Development Instance for free - no credit card required. Your free
-trial is limited to 2 development instances and only 1,000 API requests per day.
+trial is limited to 2 development instances and only 1,000 queries per day.
 
 </InfoBox>
+
+<div style="text-align: center">
+  <img
+    alt="High-level architecture diagram of a Cube Cloud Development Instance"
+    src="https://ucarecdn.com/adaa000a-c562-4eb4-9687-6f57f0f4c22b/"
+    style="border: none"
+    width="100%"
+  />
+</div>
 
 Development Instances are designed for development use-cases only. This makes it
 easy to get started with Cube Cloud quickly, and also allows you to build and
@@ -49,16 +58,26 @@ query pre-aggregations on-demand.
 Development Instances do not provide high-availability nor do they guarantee
 fast response times. Development Instances also hibernate after 60 minutes of
 inactivity, which can cause the first request after hibernation to take
-additional time to process. They also have a 10,000 requests per day limit. We
-**strongly** advise not using a development instance in a production
-environment, it is for testing and learning about Cube only and will not deliver
-a production-level experience for your users.
+additional time to process. They also have a 10,000 queries per day limit, and
+are limited to a maximum of 2 Cube Store Workers. We **strongly** advise not
+using a development instance in a production environment, it is for testing and
+learning about Cube only and will not deliver a production-level experience for
+your users.
 
 You can try a Cube Cloud development instance by
 [signing up for Cube Cloud](https://cubecloud.dev/auth/signup) to try it free
 (no credit card required).
 
 ## Production Cluster
+
+<div style="text-align: center">
+  <img
+    alt="High-level architecture diagram of a Cube Cloud Production Cluster"
+    src="https://ucarecdn.com/fcb57d7a-09ee-4854-9282-db443a5ee61d/"
+    style="border: none"
+    width="100%"
+  />
+</div>
 
 Production Clusters are designed to support high-availability production
 workloads. It consists of several key components, including starting with 2 Cube
@@ -72,9 +91,18 @@ needs of your workload by adding more components as necessary; check the
 <InfoBox>
 
 This deployment type is only available on **Enterprise Premier** plans. Please
-[contact our sales team](https://cube.dev/contact) if interested.
+[contact our sales team][cube-contact-us] if interested.
 
 </InfoBox>
+
+<div style="text-align: center">
+  <img
+    alt="High-level architecture diagram of a Cube Cloud Production Multi-Cluster"
+    src="https://ucarecdn.com/0ab1eb5c-7aba-4e9c-8951-1998d4b714f0/"
+    style="border: none"
+    width="100%"
+  />
+</div>
 
 The Enterprise Premier version of Cube Cloud also makes it easy to deploy
 Production Multi-Clusters, which allows for larger amounts of data as well as
@@ -93,16 +121,16 @@ Production Deployment.
 
 ### Cube Store Worker
 
-|                         | Free Tier | Starter | Premium | Enterprise | Enterprise Premier |
-| ----------------------- | :-------: | :-----: | :-----: | :--------: | :----------------: |
-| Storage size per worker |    N/A    |  150GB  |  150GB  |   150GB    |       Custom       |
+|                           | Free Tier | Starter | Premium | Enterprise |        Enterprise Premier        |
+| ------------------------- | :-------: | :-----: | :-----: | :--------: | :------------------------------: |
+| Maximum number of workers |     2     |   16    |   16    |     16     | [Talk to Sales][cube-contact-us] |
 
 Cube Store Workers are used to build and persist pre-aggregations. Each Worker
-has a maximum of 150GB of storage; additional Cube Store workers can be added to
-your deployment to both increase storage space and improve pre-aggregation
-performance. A minimum of 2 Cube Store Workers is required for pre-aggregations;
-this can be adjusted. For a rough estimate, it will take approximately 2 Cube
-Store Workers per 4 gigs of pre-aggregated data per day.
+has a **maximum of 150GB** of storage; additional Cube Store workers can be
+added to your deployment to both increase storage space and improve
+pre-aggregation performance. A **minimum of 2** Cube Store Workers is required
+for pre-aggregations; this can be adjusted. For a rough estimate, it will take
+approximately 2 Cube Store Workers per 4 gigs of pre-aggregated data per day.
 
 To change the number of Cube Store Workers in a deployment, go to the
 deployment’s Settings page, and open the Configuration tab. From this screen,
@@ -119,9 +147,9 @@ you can set the number of Cube Store Workers from the dropdown:
 
 ### Cube API Instance
 
-|                      | Free Tier | Starter |  Premium  | Enterprise | Enterprise Premier |
-| -------------------- | :-------: | :-----: | :-------: | :--------: | :----------------: |
-| API requests per day |   1,000   | 200,000 | Unlimited | Unlimited  |     Unlimited      |
+|                 | Free Tier | Starter |  Premium  | Enterprise | Enterprise Premier |
+| --------------- | :-------: | :-----: | :-------: | :--------: | :----------------: |
+| Queries per day |   1,000   | 200,000 | Unlimited | Unlimited  |     Unlimited      |
 
 With a Production Deployment, 2 Cube API Instances are included. That said, it
 is very common to use more, and additional Cube API instances can be added to
@@ -158,4 +186,5 @@ from the available options:
 </div>
 
 [cube-blog-replace-redis]: https://cube.dev/blog/replacing-redis-with-cube-store
+[cube-contact-us]: https://cube.dev/contact
 [ref-conf-ref-ctx-to-app-id]: /config#options-reference-context-to-app-id
