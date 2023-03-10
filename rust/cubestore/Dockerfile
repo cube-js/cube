@@ -8,15 +8,15 @@ RUN apt update \
 	&& apt upgrade -y \
 	&& DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget gnupg git apt-transport-https ca-certificates \
 	&& wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-	&& add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-12 main"  \
+	&& add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-15 main"  \
 	&& apt update \
-	&& apt install -y git llvm-12 clang-12 libclang-12-dev clang-12 cmake \
+	&& apt install -y git llvm-15 clang-15 libclang-15-dev clang-15 cmake \
 	&& rm -rf /var/lib/apt/lists/*;
 
-RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-12 100
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100
-RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-12 100
-RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-12 100
+RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 100
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100
+RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-15 100
+RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-15 100
 
 WORKDIR /usr/src
 
