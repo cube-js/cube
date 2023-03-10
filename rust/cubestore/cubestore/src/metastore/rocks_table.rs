@@ -415,14 +415,22 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let (row_id, inserted_row) = self.insert_row(serialized_row)?;
         batch_pipe.add_event(MetaStoreEvent::Insert(Self::table_id(), row_id));
-        if self.snapshot().get(&inserted_row.key)?.is_some() {
+        if self
+            .snapshot()
+            .get_cf(self.cf()?, &inserted_row.key)?
+            .is_some()
+        {
             return Err(CubeError::internal(format!("Primary key constraint violation. Primary key already exists for a row id {}: {:?}", row_id, &row)));
         }
         batch_pipe.batch().put(inserted_row.key, inserted_row.val);
 
         let index_row = self.insert_index_row(&row, row_id)?;
         for to_insert in index_row {
-            if self.snapshot().get(&to_insert.key)?.is_some() {
+            if self
+                .snapshot()
+                .get_cf(self.cf()?, &to_insert.key)?
+                .is_some()
+            {
                 return Err(CubeError::internal(format!("Primary key constraint violation in secondary index. Primary key already exists for a row id {}: {:?}", row_id, &row)));
             }
             batch_pipe.batch().put(to_insert.key, to_insert.val);
@@ -850,7 +858,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
     fn get_row(&self, row_id: u64) -> Result<Option<IdRow<Self::T>>, CubeError> {
         let ref db = self.snapshot();
-        let res = db.get(RowKey::Table(Self::table_id(), row_id).to_bytes())?;
+        let res = db.get_cf(
+            self.cf()?,
+            RowKey::Table(Self::table_id(), row_id).to_bytes(),
+        )?;
 
         if let Some(buffer) = res {
             let row = self.deserialize_id_row(row_id, buffer.as_slice())?;
