@@ -78,9 +78,6 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
-        opts.set_compaction_filter_factory(compaction::MetaStoreCacheCompactionFactory::new(
-            compaction_state,
-        ));
         // Disable automatic compaction before migration, will be enabled later in after_migration
         opts.set_disable_auto_compactions(true);
 
@@ -96,6 +93,9 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         let default_cf = {
             let mut opts = Options::default();
             opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+            opts.set_compaction_filter_factory(compaction::MetaStoreCacheCompactionFactory::new(
+                compaction_state.clone(),
+            ));
 
             ColumnFamilyDescriptor::new(rocksdb::DEFAULT_COLUMN_FAMILY_NAME, opts)
         };
@@ -103,6 +103,9 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         let queue_cf = {
             let mut opts = Options::default();
             opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+            opts.set_compaction_filter_factory(compaction::MetaStoreCacheCompactionFactory::new(
+                compaction_state,
+            ));
 
             ColumnFamilyDescriptor::new(CACHESTORE_QUEUE_COLUMN_FAMILY_NAME, opts)
         };
