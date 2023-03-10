@@ -19,6 +19,9 @@ describe('DruidQuery', () => {
       measures: {
         count: {
           type: 'count'
+        },
+        unique: {
+          type: 'countDistinctApprox'
         }
       },
 
@@ -74,4 +77,26 @@ describe('DruidQuery', () => {
     const queryAndParams = query.buildSqlAndParams();
     expect(queryAndParams[0]).toContain('CAST(TIME_FORMAT("visitors".created_at, \'yyyy-MM-dd HH:mm:ss\', \'Europe/Kiev\') AS TIMESTAMP)');
   }));
+
+  it('druid approx count test',
+  () => compiler.compile().then(() => {
+    const query = new DruidQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      {
+        measures: [`visitors.unique`],
+        filters: [
+          {
+            member: 'test.name',
+            operator: 'equals',
+            values: [
+              'some person',
+            ],
+          },
+        ],
+      },
+    );
+    const queryAndParams = query.buildSqlAndParams();
+    expect(queryAndParams[0]).toContain('APPROX_COUNT_DISTINCT_DS_THETA(visitors.unique)');
+  }));
+
 });

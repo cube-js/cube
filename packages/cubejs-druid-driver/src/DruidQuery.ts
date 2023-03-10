@@ -52,4 +52,8 @@ export class DruidQuery extends BaseQuery {
   public nowTimestampSql(): string {
     return `CURRENT_TIMESTAMP`;
   }
+
+  public countDistinctApprox(sql) {
+    return `APPROX_COUNT_DISTINCT_DS_THETA(${sql})`
+  }
 }
