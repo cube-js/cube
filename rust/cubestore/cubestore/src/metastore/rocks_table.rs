@@ -369,6 +369,11 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     where
         D: Deserializer<'de>;
     fn indexes() -> Vec<Box<dyn BaseRocksSecondaryIndex<Self::T>>>;
+    fn cf_default(&self) -> Result<&ColumnFamily, CubeError> {
+        self.db()
+            .cf_handle(&rocksdb::DEFAULT_COLUMN_FAMILY_NAME)
+            .ok_or_else(|| CubeError::internal(format!("cf {:?} not found", self.cf_name())))
+    }
     fn cf(&self) -> Result<&ColumnFamily, CubeError> {
         self.db()
             .cf_handle(&self.cf_name().to_string())
@@ -453,7 +458,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     fn migration_check_table(&self) -> Result<(), CubeError> {
         let snapshot = self.snapshot();
 
-        let table_info = snapshot.get(
+        let table_info = snapshot.get_cf(
+            self.cf_default()?,
             &RowKey::TableInfo {
                 table_id: Self::table_id(),
             }
@@ -471,7 +477,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                 self.migrate_table(&mut batch, table_info)?;
 
                 batch.put_cf(
-                    self.cf()?,
+                    self.cf_default()?,
                     &RowKey::TableInfo {
                         table_id: Self::table_id(),
                     }
@@ -487,7 +493,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             }
         } else {
             self.db().put_cf(
-                self.cf()?,
+                self.cf_default()?,
                 &RowKey::TableInfo {
                     table_id: Self::table_id(),
                 }
@@ -506,7 +512,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     fn migration_check_indexes(&self) -> Result<(), CubeError> {
         let snapshot = self.snapshot();
         for index in Self::indexes().into_iter() {
-            let index_info = snapshot.get(
+            let index_info = snapshot.get_cf(
+                self.cf_default()?,
                 &RowKey::SecondaryIndexInfo {
                     index_id: Self::index_id(index.get_id()),
                 }
@@ -587,7 +594,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             batch.put_cf(self.cf()?, index_row.key, index_row.val);
         }
         batch.put_cf(
-            self.cf()?,
+            self.cf_default()?,
             &RowKey::SecondaryIndexInfo {
                 index_id: Self::index_id(index.get_id()),
             }
@@ -812,7 +819,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let seq_key = RowKey::Sequence(Self::table_id());
         let before_merge = self
             .snapshot()
-            .get(seq_key.to_bytes())?
+            .get_cf(self.cf()?, seq_key.to_bytes())?
             .map(|v| Cursor::new(v).read_u64::<BigEndian>().unwrap());
 
         // TODO revert back merge operator if locking works
