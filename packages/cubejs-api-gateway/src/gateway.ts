@@ -2173,31 +2173,27 @@ class ApiGateway {
   protected createContextToPermissionsFn(
     options: ApiGatewayOptions,
   ): ContextToPermissionsFn {
-    let permissionsCache;
     return options.contextToPermissions
       ? async (securityContext?: any, defaultPermissions?: Permission[]) => {
-        if (!permissionsCache) {
-          const permissions = options.contextToPermissions &&
+        const permissions = options.contextToPermissions &&
             await options.contextToPermissions(
               securityContext,
               defaultPermissions,
             );
-          if (!permissions || !Array.isArray(permissions)) {
-            throw new Error(
-              'A user-defined contextToPermissions function returns an inconsistent type.'
-            );
-          } else {
-            permissions.forEach((p) => {
-              if (['liveliness', 'graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
-                throw new Error(
-                  `A user-defined contextToPermissions function returns a wrong permission: ${p}`
-                );
-              }
-            });
-          }
-          permissionsCache = permissions;
+        if (!permissions || !Array.isArray(permissions)) {
+          throw new Error(
+            'A user-defined contextToPermissions function returns an inconsistent type.'
+          );
+        } else {
+          permissions.forEach((p) => {
+            if (['liveliness', 'graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
+              throw new Error(
+                `A user-defined contextToPermissions function returns a wrong permission: ${p}`
+              );
+            }
+          });
         }
-        return permissionsCache;
+        return permissions;
       }
       : this.contextToPermDefFn;
   }

@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.4](https://github.com/cube-js/cube.js/compare/v0.32.3...v0.32.4) (2023-03-10)
+
+
+### Features
+
+* **cubestore/docker:** Upgrade CLang to 15 ([979246b](https://github.com/cube-js/cube.js/commit/979246bdc8498d874aee755a4858c3008761ed54))
+* **cubestore/docker:** Upgrade OS to bullseye ([c512586](https://github.com/cube-js/cube.js/commit/c51258643bb24279ebe71e1279d0078efe32fce9))
+* **cubestore:** Support quarter intervals ([#6266](https://github.com/cube-js/cube.js/issues/6266)) ([35cc5c8](https://github.com/cube-js/cube.js/commit/35cc5c83e270e507e36e0602e707c8ed3f64872f))
+* **cubestore:** Upgrade RocksDB to 7.9.2 (0.20) ([#6221](https://github.com/cube-js/cube.js/issues/6221)) ([92bbef3](https://github.com/cube-js/cube.js/commit/92bbef34bd8fe34d9c8126bcf93c0535adcb289d))
+
+
+
+
+
 ## [0.32.3](https://github.com/cube-js/cube.js/compare/v0.32.2...v0.32.3) (2023-03-07)
 
 
