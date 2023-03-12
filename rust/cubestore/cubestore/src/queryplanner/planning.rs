@@ -1282,7 +1282,27 @@ fn pick_partitions(
             continue;
         }
 
-        partition_snapshots.push(PartitionSnapshot { chunks, partition });
+        let used_chunks = chunks
+            .into_iter()
+            .filter(|chunk| {
+                let min_row = chunk
+                    .get_row()
+                    .min()
+                    .as_ref()
+                    .map(|r| r.values().as_slice());
+                let max_row = chunk
+                    .get_row()
+                    .max()
+                    .as_ref()
+                    .map(|r| r.values().as_slice());
+                partition_filter.can_match(min_row, max_row)
+            })
+            .collect::<Vec<_>>();
+
+        partition_snapshots.push(PartitionSnapshot {
+            chunks: used_chunks,
+            partition,
+        });
     }
     log::trace!(
         "Pruned {} of {} partitions",
