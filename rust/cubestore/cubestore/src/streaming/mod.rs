@@ -1216,10 +1216,10 @@ mod tests {
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
-            //let listener = services.cluster.job_result_listener();
+            let listener = services.cluster.job_result_listener();
             let chunks = meta_store.chunks_table().all_rows().await.unwrap();
             let replay_handles = meta_store.get_replay_handles_by_ids(chunks.iter().filter_map(|c| c.get_row().replay_handle_id().clone()).collect()).await.unwrap();
-            //let mut middle_chunk = None;
+            let mut middle_chunk = None;
             for chunk in chunks.iter() {
                 if chunk.get_row().get_partition_id() != 1 {
                     continue;
@@ -1229,14 +1229,14 @@ mod tests {
                     if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
                         if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 3276).unwrap_or(false)).unwrap_or(false)) {
                             chunk_store.free_memory_chunk(chunk.get_id()).await.unwrap();
-                            //middle_chunk = Some(chunk.clone());
+                            middle_chunk = Some(chunk.clone());
                             break;
                         }
                     }
                 }
             }
-            //let partition_id = middle_chunk.unwrap().get_row().get_partition_id();
-            /*let partition = &meta_store.get_partition(partition_id).await.unwrap();
+            let partition_id = middle_chunk.unwrap().get_row().get_partition_id();
+            let partition = &meta_store.get_partition(partition_id).await.unwrap();
 
             let node = cluster.node_name_by_partition(partition);
             let job = meta_store
@@ -1249,14 +1249,11 @@ mod tests {
             if job.is_some() {
                 cluster.notify_job_runner(node).await.unwrap();
             }
-            Delay::new(Duration::from_millis(10000)).await;*/
-            /* scheduler.schedule_compaction_in_memory_chunks_if_needed(&meta_store.get_partition(middle_chunk.unwrap().get_row().get_partition_id()).await.unwrap()).await.unwrap();
->>>>>>> be98f66f2 (fix tests)
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::InMemoryChunksCompaction),
             ]);
-            timeout(Duration::from_secs(10), wait).await.unwrap().unwrap(); */
+            timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
 
             println!("chunks: {:#?}", service
                 .exec_query("SELECT * FROM system.chunks")
@@ -1376,10 +1373,10 @@ mod tests {
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
-            //let listener = services.cluster.job_result_listener();
+            let listener = services.cluster.job_result_listener();
             let chunks = meta_store.chunks_table().all_rows().await.unwrap();
             let replay_handles = meta_store.get_replay_handles_by_ids(chunks.iter().filter_map(|c| c.get_row().replay_handle_id().clone()).collect()).await.unwrap();
-            //let mut middle_chunk = None;
+            let mut middle_chunk = None;
             for chunk in chunks.iter() {
                 if chunk.get_row().get_partition_id() != 1 {
                     continue;
@@ -1389,14 +1386,14 @@ mod tests {
                     if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
                         if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 3276).unwrap_or(false)).unwrap_or(false)) {
                             chunk_store.free_memory_chunk(chunk.get_id()).await.unwrap();
-                            //middle_chunk = Some(chunk.clone());
+                            middle_chunk = Some(chunk.clone());
                             break;
                         }
                     }
                 }
             }
 
-            /* let partition_id = middle_chunk.unwrap().get_row().get_partition_id();
+            let partition_id = middle_chunk.unwrap().get_row().get_partition_id();
             let partition = &meta_store.get_partition(partition_id).await.unwrap();
 
             let node = cluster.node_name_by_partition(partition);
@@ -1410,13 +1407,11 @@ mod tests {
             if job.is_some() {
                 cluster.notify_job_runner(node).await.unwrap();
             }
-            Delay::new(Duration::from_millis(10000)).await; */
-            //scheduler.schedule_compaction_in_memory_chunks_if_needed(&meta_store.get_partition(middle_chunk.unwrap().get_row().get_partition_id()).await.unwrap()).await.unwrap();
 
-            /* let wait = listener.wait_for_job_results(vec![
+            let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::InMemoryChunksCompaction),
             ]);
-            timeout(Duration::from_secs(10), wait).await.unwrap().unwrap(); */
+            timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
 
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
