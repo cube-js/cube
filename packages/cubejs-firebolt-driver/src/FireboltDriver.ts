@@ -176,7 +176,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
   private getHydratedValue(value: unknown, meta: Meta) {
     const { type } = meta;
-    if (isNumberType(type)) {
+    if (isNumberType(type) && value !== null) {
       return `${value}`;
     }
     return value;
