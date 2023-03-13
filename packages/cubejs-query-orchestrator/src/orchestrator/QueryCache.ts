@@ -183,21 +183,6 @@ export class QueryCache {
   }
 
   /**
-   * Force reconcile queue logic to be executed.
-   */
-  public async forceReconcile(datasource = 'default') {
-    if (!this.externalQueue) {
-      // We don't need to reconcile external queue, because Cube Store
-      // uses its internal queue which managed separately.
-      return;
-    }
-    const queue = await this.getQueue(datasource);
-    if (queue) {
-      await queue.reconcileQueue();
-    }
-  }
-
-  /**
    * Generates from the `queryBody` the final `sql` query and push it to
    * the queue. Returns promise which will be resolved by the different
    * objects, depend from the original `queryBody` object. For the

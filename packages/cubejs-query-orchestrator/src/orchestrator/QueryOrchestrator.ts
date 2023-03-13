@@ -172,7 +172,14 @@ export class QueryOrchestrator {
    * Force reconcile queue logic to be executed.
    */
   public async forceReconcile(datasource = 'default') {
-    await this.queryCache.forceReconcile(datasource);
+    const queryQueue = await this.queryCache.getQueue(datasource);
+    const preaggsQueue = await this.preAggregations.getQueue(datasource);
+    if (preaggsQueue) {
+      await preaggsQueue.reconcileQueue();
+    }
+    if (queryQueue) {
+      await queryQueue.reconcileQueue();
+    }
   }
 
   /**
