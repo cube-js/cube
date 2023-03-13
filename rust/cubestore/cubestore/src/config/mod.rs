@@ -339,7 +339,11 @@ pub struct Config {
 pub trait ConfigObj: DIService {
     fn partition_split_threshold(&self) -> u64;
 
+    fn partition_size_split_threshold_bytes(&self) -> u64;
+
     fn max_partition_split_threshold(&self) -> u64;
+
+    fn min_partition_split_threshold(&self) -> u64;
 
     fn compaction_chunks_total_size_threshold(&self) -> u64;
 
@@ -461,7 +465,9 @@ pub trait ConfigObj: DIService {
 #[derive(Debug, Clone)]
 pub struct ConfigObjImpl {
     pub partition_split_threshold: u64,
+    pub partition_size_split_threshold_bytes: u64,
     pub max_partition_split_threshold: u64,
+    pub min_partition_split_threshold: u64,
     pub compaction_chunks_total_size_threshold: u64,
     pub compaction_chunks_count_threshold: u64,
     pub compaction_chunks_max_lifetime_threshold: u64,
@@ -533,8 +539,16 @@ impl ConfigObj for ConfigObjImpl {
         self.partition_split_threshold
     }
 
+    fn partition_size_split_threshold_bytes(&self) -> u64 {
+        self.partition_size_split_threshold_bytes
+    }
+
     fn max_partition_split_threshold(&self) -> u64 {
         self.max_partition_split_threshold
+    }
+
+    fn min_partition_split_threshold(&self) -> u64 {
+        self.min_partition_split_threshold
     }
 
     fn compaction_chunks_total_size_threshold(&self) -> u64 {
@@ -881,9 +895,17 @@ impl Config {
                     "CUBESTORE_PARTITION_SPLIT_THRESHOLD",
                     1048576 * 2,
                 ),
+                partition_size_split_threshold_bytes: env_parse(
+                    "CUBESTORE_PARTITION_SIZE_SPLIT_THRESHOLD_BYTES",
+                    100 * 1024 * 1024,
+                ),
                 max_partition_split_threshold: env_parse(
                     "CUBESTORE_PARTITION_MAX_SPLIT_THRESHOLD",
                     1048576 * 8,
+                ),
+                min_partition_split_threshold: env_parse(
+                    "CUBESTORE_PARTITION_MIN_SPLIT_THRESHOLD",
+                    1000,
                 ),
                 compaction_chunks_count_threshold: env_parse("CUBESTORE_CHUNKS_COUNT_THRESHOLD", 4),
                 compaction_chunks_total_size_threshold: env_parse(
@@ -1076,7 +1098,9 @@ impl Config {
                     .join(format!("{}-local-store", name)),
                 dump_dir: None,
                 partition_split_threshold: 20,
+                partition_size_split_threshold_bytes: 2 * 1024,
                 max_partition_split_threshold: 20,
+                min_partition_split_threshold: 2,
                 compaction_chunks_count_threshold: 1,
                 compaction_chunks_total_size_threshold: 10,
                 compaction_chunks_max_lifetime_threshold: 600,
