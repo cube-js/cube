@@ -145,7 +145,7 @@ class HiveDriver extends BaseDriver {
     // eslint-disable-next-line no-underscore-dangle
     const conn = await this.pool._factory.create();
     try {
-      return await this.query('SELECT 1', [], conn);
+      return await this.handleQuery('SELECT 1', [], conn);
     } finally {
       // eslint-disable-next-line no-underscore-dangle
       await this.pool._factory.destroy(conn);
@@ -158,7 +158,11 @@ class HiveDriver extends BaseDriver {
     });
   }
 
-  async query(query, values, conn) {
+  async query(query, values, opts) {
+    return this.handleQuery(query, values);
+  }
+
+  async handleQuery(query, values, conn) {
     values = values || [];
     const sql = SqlString.format(query, values);
     const connection = conn || await this.pool.acquire();
@@ -198,12 +202,12 @@ class HiveDriver extends BaseDriver {
   }
 
   async tablesSchema() {
-    const tables = await this.query(`show tables in ${this.config.dbName}`);
+    const tables = await this.handleQuery(`show tables in ${this.config.dbName}`);
 
     return {
       [this.config.dbName]: (await Promise.all(tables.map(async table => {
         const tableName = table.tab_name || table.tableName;
-        const columns = await this.query(`describe ${this.config.dbName}.${tableName}`);
+        const columns = await this.handleQuery(`describe ${this.config.dbName}.${tableName}`);
         return {
           [tableName]: columns.map(c => ({ name: c.col_name, type: c.data_type }))
         };
