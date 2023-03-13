@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.5](https://github.com/cube-js/cube.js/compare/v0.32.4...v0.32.5) (2023-03-13)
+
+
+### Bug Fixes
+
+* Allow to specify cubestore as cacheAndQueueDriver from config, fix [#6279](https://github.com/cube-js/cube.js/issues/6279) ([#6280](https://github.com/cube-js/cube.js/issues/6280)) ([6b48c65](https://github.com/cube-js/cube.js/commit/6b48c65bf5dfe042b507171afb726328fa16e75c))
+
+
+
+
+
 ## [0.32.4](https://github.com/cube-js/cube.js/compare/v0.32.3...v0.32.4) (2023-03-10)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

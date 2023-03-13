@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.5](https://github.com/cube-js/cube.js/compare/v0.32.4...v0.32.5) (2023-03-13)
+
+
+### Bug Fixes
+
+* **hive-driver:** Follow DriverInterface for query method, fix [#6281](https://github.com/cube-js/cube.js/issues/6281) ([#6282](https://github.com/cube-js/cube.js/issues/6282)) ([e81aba9](https://github.com/cube-js/cube.js/commit/e81aba9fd3dcf8b08092b9c7302067b230d1bbdc))
+
+
+
+
+
 ## [0.32.2](https://github.com/cube-js/cube.js/compare/v0.32.1...v0.32.2) (2023-03-07)
 
 

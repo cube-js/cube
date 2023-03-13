@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.5](https://github.com/cube-js/cube.js/compare/v0.32.4...v0.32.5) (2023-03-13)
+
+
+### Bug Fixes
+
+* Allow to specify cubestore as cacheAndQueueDriver from config, fix [#6279](https://github.com/cube-js/cube.js/issues/6279) ([#6280](https://github.com/cube-js/cube.js/issues/6280)) ([6b48c65](https://github.com/cube-js/cube.js/commit/6b48c65bf5dfe042b507171afb726328fa16e75c))
+* **api-gateway:** permissions cache removed ([#6276](https://github.com/cube-js/cube.js/issues/6276)) ([03be6d2](https://github.com/cube-js/cube.js/commit/03be6d29afbf13a053d5c2036ee4eae53a500892))
+* **cubestore:** Setup format_version = 5 (previusly used with RocksDB 6.20.3) ([#6283](https://github.com/cube-js/cube.js/issues/6283)) ([5126d00](https://github.com/cube-js/cube.js/commit/5126d00c64331c99d6aadc3ab7ccbd1c49dc1732))
+* **hive-driver:** Follow DriverInterface for query method, fix [#6281](https://github.com/cube-js/cube.js/issues/6281) ([#6282](https://github.com/cube-js/cube.js/issues/6282)) ([e81aba9](https://github.com/cube-js/cube.js/commit/e81aba9fd3dcf8b08092b9c7302067b230d1bbdc))
+
+
+
+
+
 ## [0.32.4](https://github.com/cube-js/cube.js/compare/v0.32.3...v0.32.4) (2023-03-10)
 
 

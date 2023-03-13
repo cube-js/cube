@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.5](https://github.com/cube-js/cube.js/compare/v0.32.4...v0.32.5) (2023-03-13)
+
+
+### Bug Fixes
+
+* **api-gateway:** permissions cache removed ([#6276](https://github.com/cube-js/cube.js/issues/6276)) ([03be6d2](https://github.com/cube-js/cube.js/commit/03be6d29afbf13a053d5c2036ee4eae53a500892))
+
+
+
+
+
 ## [0.32.4](https://github.com/cube-js/cube.js/compare/v0.32.3...v0.32.4) (2023-03-10)
 
 

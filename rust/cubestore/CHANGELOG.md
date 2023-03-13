@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.5](https://github.com/cube-js/cube.js/compare/v0.32.4...v0.32.5) (2023-03-13)
+
+
+### Bug Fixes
+
+* **cubestore:** Setup format_version = 5 (previusly used with RocksDB 6.20.3) ([#6283](https://github.com/cube-js/cube.js/issues/6283)) ([5126d00](https://github.com/cube-js/cube.js/commit/5126d00c64331c99d6aadc3ab7ccbd1c49dc1732))
+
+
+
+
+
 ## [0.32.4](https://github.com/cube-js/cube.js/compare/v0.32.3...v0.32.4) (2023-03-10)
 
 
