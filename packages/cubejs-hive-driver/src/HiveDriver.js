@@ -14,6 +14,7 @@ const genericPool = require('generic-pool');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
 const Connection = require('jshs2/lib/Connection');
 const IDLFactory = require('jshs2/lib/common/IDLFactory');
+
 const {
   HS2Util,
   IDLContainer,
@@ -22,8 +23,8 @@ const {
 } = jshs2;
 
 const newIDL = [
-  "2.1.1",
-  "2.2.3",
+  '2.1.1',
+  '2.2.3',
   '2.3.4',
 ];
 
@@ -99,7 +100,7 @@ class HiveDriver extends BaseDriver {
         );
         const hiveConnection = new HiveConnection(configuration, idl);
         hiveConnection.cursor = await hiveConnection.connect();
-        hiveConnection.cursor.getOperationStatus = function () {
+        hiveConnection.cursor.getOperationStatus = function getOperationStatus() {
           return new Promise((resolve, reject) => {
             const serviceType = this.Conn.IDL.ServiceType;
             const request = new serviceType.TGetOperationStatusReq({
@@ -114,7 +115,7 @@ class HiveDriver extends BaseDriver {
                 res.operationState === serviceType.TOperationState.ERROR_STATE
               ) {
                 // eslint-disable-next-line no-unused-vars
-                const [errorMessage, infoMessage, message] = HS2Util.getThriftErrorMessage(
+                const [_errorMessage, _infoMessage, message] = HS2Util.getThriftErrorMessage(
                   res.status, 'ExecuteStatement operation fail'
                 );
 
@@ -158,7 +159,7 @@ class HiveDriver extends BaseDriver {
     });
   }
 
-  async query(query, values, opts) {
+  async query(query, values, _opts) {
     return this.handleQuery(query, values);
   }
 
@@ -168,6 +169,7 @@ class HiveDriver extends BaseDriver {
     const connection = conn || await this.pool.acquire();
     try {
       const execResult = await connection.cursor.execute(sql);
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         const status = await connection.cursor.getOperationStatus();
         if (HS2Util.isFinish(connection.cursor, status)) {
@@ -180,6 +182,7 @@ class HiveDriver extends BaseDriver {
       let allRows = [];
       if (execResult.hasResultSet) {
         const schema = await connection.cursor.getSchema();
+        // eslint-disable-next-line no-constant-condition
         while (true) {
           const results = await connection.cursor.fetchBlock();
           allRows.push(...(results.rows));
