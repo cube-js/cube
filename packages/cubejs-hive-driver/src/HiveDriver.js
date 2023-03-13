@@ -48,20 +48,11 @@ IDLFactory.extractConfig = (config) => {
 
 const TSaslTransport = require('./TSaslTransport');
 
-/**
- * Hive driver class.
- */
 class HiveDriver extends BaseDriver {
-  /**
-   * Returns default concurrency value.
-   */
   static getDefaultConcurrency() {
     return 2;
   }
 
-  /**
-   * Class constructor.
-   */
   constructor(config = {}) {
     super({
       testConnectionTimeout: config.testConnectionTimeout,
