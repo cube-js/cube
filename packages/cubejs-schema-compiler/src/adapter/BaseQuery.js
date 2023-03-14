@@ -338,9 +338,6 @@ class BaseQuery {
           throw new UserError(`Ungrouped query requires primary keys to be present in dimensions: ${missingPrimaryKeys.map(k => `'${k}'`).join(', ')}. Pass allowUngroupedWithoutPrimaryKey option to disable this check.`);
         }
       }
-      if (this.measures.length) {
-        throw new UserError('Measures aren\'t allowed in ungrouped query');
-      }
       if (this.measureFilters.length) {
         throw new UserError('Measure filters aren\'t allowed in ungrouped query');
       }
@@ -1956,6 +1953,13 @@ class BaseQuery {
     ) {
       return evaluateSql === '*' ? '1' : evaluateSql;
     }
+    if (this.ungrouped) {
+      if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
+        return '1';
+      } else {
+        return evaluateSql;
+      }
+    }
     if ((this.safeEvaluateSymbolContext().ungroupedAliases || {})[measurePath]) {
       evaluateSql = (this.safeEvaluateSymbolContext().ungroupedAliases || {})[measurePath];
     }
@@ -2365,6 +2369,10 @@ class BaseQuery {
   }
 
   preAggregationReadOnly(_cube, _preAggregation) {
+    return false;
+  }
+
+  preAggregationAllowUngroupingWithPrimaryKey(_cube, _preAggregation) {
     return false;
   }
 
