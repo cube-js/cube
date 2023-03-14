@@ -262,7 +262,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
-    return this.query(loadSql.replace(preAggregationTableName, this.quoteIdentifier(this.tableDashName(preAggregationTableName))), params, { streamOffset: options?.streamOffset });
+    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params, { streamOffset: options?.streamOffset });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
