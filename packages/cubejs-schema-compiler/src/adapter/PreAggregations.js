@@ -148,7 +148,8 @@ export class PreAggregations {
 
     const tableName = this.preAggregationTableName(cube, preAggregationName, preAggregation);
     const invalidateKeyQueries = this.query.preAggregationInvalidateKeyQueries(cube, preAggregation);
-    const partitionInvalidateKeyQueries = this.query.partitionInvalidateKeyQueries && this.query.partitionInvalidateKeyQueries(cube, preAggregation);
+    const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
+    const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries && queryForSqlEvaluation.partitionInvalidateKeyQueries(cube, preAggregation);
 
     const matchedTimeDimension =
       preAggregation.partitionGranularity &&
@@ -161,7 +162,6 @@ export class PreAggregations {
         td.isDateOperator() &&
         td.camelizeOperator === 'inDateRange' // TODO support all date operators
     );
-    const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
 
     const uniqueKeyColumnsDefault = () => null;
     const uniqueKeyColumns = ({
@@ -978,6 +978,7 @@ export class PreAggregations {
 
   rollupPreAggregationQuery(cube, aggregation) {
     const references = this.evaluateAllReferences(cube, aggregation);
+    const cubeQuery = this.query.newSubQueryForCube(cube, {});
     return this.query.newSubQueryForCube(
       cube,
       {
@@ -987,6 +988,8 @@ export class PreAggregations {
         timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
         preAggregationQuery: true,
         useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
+        ungrouped: cubeQuery.preAggregationAllowUngroupingWithPrimaryKey(cube, aggregation) &&
+          !!references.dimensions.find(d => this.query.cubeEvaluator.dimensionByPath(d).primaryKey)
       }
     );
   }
