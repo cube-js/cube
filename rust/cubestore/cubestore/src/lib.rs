@@ -27,6 +27,7 @@ use log::SetLoggerError;
 use parquet::errors::ParquetError;
 use serde_derive::{Deserialize, Serialize};
 use sqlparser::parser::ParserError;
+use std::any::Any;
 use std::backtrace::Backtrace;
 use std::fmt;
 use std::fmt::Display;
@@ -153,6 +154,16 @@ impl CubeError {
             message: format!("{:?}", error),
             backtrace: Backtrace::capture().to_string(),
             cause: CubeErrorCauseType::Internal,
+        }
+    }
+
+    pub fn from_panic_payload(payload: Box<dyn Any + Send>) -> Self {
+        if let Some(reason) = payload.downcast_ref::<&str>() {
+            CubeError::panic(format!("Reason: {}", reason))
+        } else if let Some(reason) = payload.downcast_ref::<String>() {
+            CubeError::panic(format!("Reason: {}", reason))
+        } else {
+            CubeError::panic("Without reason".to_string())
         }
     }
 }
