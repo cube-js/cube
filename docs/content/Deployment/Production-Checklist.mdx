@@ -49,6 +49,15 @@ CUBEJS_REFRESH_WORKER=true
 
 ## Set up Cube Store
 
+<WarningBox>
+
+While Cube can operate with in-memory cache and queue storage, there're multiple parts of Cube which
+require Cube Store in production mode.
+Replicating Cube instances without Cube Store can lead to source database degraded performance, various race conditions and
+cached data inconsistencies.
+
+</WarningBox>
+
 Cube Store manages in-memory cache, queue and pre-aggregations for Cube. Follow the
 [instructions here][ref-caching-cubestore] to set it up.
 
