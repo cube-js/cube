@@ -14,6 +14,7 @@ const genericPool = require('generic-pool');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
 const Connection = require('jshs2/lib/Connection');
 const IDLFactory = require('jshs2/lib/common/IDLFactory');
+
 const {
   HS2Util,
   IDLContainer,
@@ -22,8 +23,8 @@ const {
 } = jshs2;
 
 const newIDL = [
-  "2.1.1",
-  "2.2.3",
+  '2.1.1',
+  '2.2.3',
   '2.3.4',
 ];
 
@@ -47,20 +48,11 @@ IDLFactory.extractConfig = (config) => {
 
 const TSaslTransport = require('./TSaslTransport');
 
-/**
- * Hive driver class.
- */
 class HiveDriver extends BaseDriver {
-  /**
-   * Returns default concurrency value.
-   */
   static getDefaultConcurrency() {
     return 2;
   }
 
-  /**
-   * Class constructor.
-   */
   constructor(config = {}) {
     super({
       testConnectionTimeout: config.testConnectionTimeout,
@@ -99,7 +91,7 @@ class HiveDriver extends BaseDriver {
         );
         const hiveConnection = new HiveConnection(configuration, idl);
         hiveConnection.cursor = await hiveConnection.connect();
-        hiveConnection.cursor.getOperationStatus = function () {
+        hiveConnection.cursor.getOperationStatus = function getOperationStatus() {
           return new Promise((resolve, reject) => {
             const serviceType = this.Conn.IDL.ServiceType;
             const request = new serviceType.TGetOperationStatusReq({
@@ -114,7 +106,7 @@ class HiveDriver extends BaseDriver {
                 res.operationState === serviceType.TOperationState.ERROR_STATE
               ) {
                 // eslint-disable-next-line no-unused-vars
-                const [errorMessage, infoMessage, message] = HS2Util.getThriftErrorMessage(
+                const [_errorMessage, _infoMessage, message] = HS2Util.getThriftErrorMessage(
                   res.status, 'ExecuteStatement operation fail'
                 );
 
@@ -145,7 +137,7 @@ class HiveDriver extends BaseDriver {
     // eslint-disable-next-line no-underscore-dangle
     const conn = await this.pool._factory.create();
     try {
-      return await this.query('SELECT 1', [], conn);
+      return await this.handleQuery('SELECT 1', [], conn);
     } finally {
       // eslint-disable-next-line no-underscore-dangle
       await this.pool._factory.destroy(conn);
@@ -158,12 +150,17 @@ class HiveDriver extends BaseDriver {
     });
   }
 
-  async query(query, values, conn) {
+  async query(query, values, _opts) {
+    return this.handleQuery(query, values);
+  }
+
+  async handleQuery(query, values, conn) {
     values = values || [];
     const sql = SqlString.format(query, values);
     const connection = conn || await this.pool.acquire();
     try {
       const execResult = await connection.cursor.execute(sql);
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         const status = await connection.cursor.getOperationStatus();
         if (HS2Util.isFinish(connection.cursor, status)) {
@@ -176,6 +173,7 @@ class HiveDriver extends BaseDriver {
       let allRows = [];
       if (execResult.hasResultSet) {
         const schema = await connection.cursor.getSchema();
+        // eslint-disable-next-line no-constant-condition
         while (true) {
           const results = await connection.cursor.fetchBlock();
           allRows.push(...(results.rows));
@@ -198,12 +196,12 @@ class HiveDriver extends BaseDriver {
   }
 
   async tablesSchema() {
-    const tables = await this.query(`show tables in ${this.config.dbName}`);
+    const tables = await this.handleQuery(`show tables in ${this.config.dbName}`);
 
     return {
       [this.config.dbName]: (await Promise.all(tables.map(async table => {
         const tableName = table.tab_name || table.tableName;
-        const columns = await this.query(`describe ${this.config.dbName}.${tableName}`);
+        const columns = await this.handleQuery(`describe ${this.config.dbName}.${tableName}`);
         return {
           [tableName]: columns.map(c => ({ name: c.col_name, type: c.data_type }))
         };

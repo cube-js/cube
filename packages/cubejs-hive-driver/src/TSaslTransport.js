@@ -29,7 +29,7 @@ class Frame {
     this.fullyRead = !requireMoreData;
     const sourceEnd = requireMoreData ? data.length : dataEnd;
     data.copy(this.buffer, this.writeCursor, offset, sourceEnd);
-    this.writeCursor = this.writeCursor + (sourceEnd - offset);
+    this.writeCursor += (sourceEnd - offset);
 
     let frames = [this];
 
