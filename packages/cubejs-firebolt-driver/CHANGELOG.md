@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.6](https://github.com/cube-js/cube.js/compare/v0.32.5...v0.32.6) (2023-03-14)
+
+
+### Bug Fixes
+
+* **firebolt-driver:** numeric null value ([#6284](https://github.com/cube-js/cube.js/issues/6284)) ([b5cc5b5](https://github.com/cube-js/cube.js/commit/b5cc5b56a16defe3b6412bad384ae5e07eeaeace))
+
+
+
+
+
 ## [0.32.5](https://github.com/cube-js/cube.js/compare/v0.32.4...v0.32.5) (2023-03-13)
 
 **Note:** Version bump only for package @cubejs-backend/firebolt-driver
