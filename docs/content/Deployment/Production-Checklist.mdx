@@ -49,7 +49,7 @@ CUBEJS_REFRESH_WORKER=true
 
 ## Set up Cube Store
 
-Cube Store is the purpose-built pre-aggregations storage for Cube. Follow the
+Cube Store manages in-memory cache, queue and pre-aggregations for Cube. Follow the
 [instructions here][ref-caching-cubestore] to set it up.
 
 Depending on your database, Cube may need to "stage" pre-aggregations inside
@@ -68,78 +68,6 @@ BigQuery, Redshift and Snowflake. Check [the relevant documentation for your
 configured database][ref-config-connect-db] to set it up.
 
 </InfoBox>
-
-## Set up Redis
-
-<WarningBox>
-
-Cube Store [will replace Redis][replace-redis] for in-memory cache and queue
-management in late 2022.
-
-</WarningBox>
-
-Cube requires [Redis](https://redis.io/), an in-memory data structure store, to
-run in production.
-
-It uses Redis for query caching and queue. Set the
-[`CUBEJS_REDIS_URL`][ref-conf-ref-env-redis-url] environment variable to allow
-Cube to connect to Redis. If your Redis instance also has a password, please set
-it via the [`CUBEJS_REDIS_PASSWORD`][ref-conf-ref-env-redis-pass] environment
-variable. Set the [`CUBEJS_REDIS_TLS`][ref-conf-ref-env-redis-tls] environment
-variable to `true` if you want to enable SSL-secured connections. Ensure your
-Redis cluster allows at least 15 concurrent connections.
-
-### <--{"id" : "Set up Redis"}--> Redis Sentinel
-
-Redis provides functionality for high availability through [Redis
-Sentinel][link-redis-sentinel].
-
-For Redis Sentinel support, the npm package [`ioredis`][gh-ioredis] needs to be
-used instead of[`redis`][gh-node-redis]. This is done by setting the
-[`CUBEJS_REDIS_USE_IOREDIS`][ref-conf-ref-env-redis-ioredis] environment
-variable to `true`. Then set [`CUBEJS_REDIS_URL`][ref-conf-ref-env-redis-url] to
-the `redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube
-to connect to the Redis Sentinel.
-
-<WarningBox>
-
-Cube server instances used by same tenant environments should have same Redis
-instances. Otherwise they will have different query queues which can lead to
-incorrect pre-aggregation states and intermittent data access errors.
-
-</WarningBox>
-
-### <--{"id" : "Set up Redis"}--> Redis Pool
-
-If [`CUBEJS_REDIS_URL`][ref-conf-ref-env-redis-url] is provided, Cube will
-create a Redis connection pool with a minimum of `2` and maximum of `1000`
-concurrent connections, by default. The
-[`CUBEJS_REDIS_POOL_MIN`][ref-conf-ref-env-redis-poolmin] and
-[`CUBEJS_REDIS_POOL_MAX`][ref-conf-ref-env-redis-poolmax] environment variables
-can be used to tweak pool size limits. To disable connection pooling, and
-instead create connections on-demand, you can set
-[`CUBEJS_REDIS_POOL_MAX`][`cubejs_redis_pool_max`] to `0`.
-
-If your maximum concurrent connections limit is too low, you may see
-`TimeoutError: ResourceRequest timed out` errors. As a rule of a thumb, you need
-to have `Queue Size * Number of tenants` concurrent connections to ensure the
-best performance possible. If you use clustered deployments, please make sure
-you have enough connections for all Cube server instances. A lower number of
-connections still can work, however Redis becomes a performance bottleneck in
-this case.
-
-### <--{"id" : "Set up Redis"}--> Running without Redis
-
-If you want to run Cube in production without Redis, you can use
-[`CUBEJS_CACHE_AND_QUEUE_DRIVER`][ref-conf-ref-env-cachequeue-driver]
-environment variable to `memory`.
-
-<WarningBox>
-
-Serverless and clustered deployments can't be run without Redis as it is used to
-manage the query queue.
-
-</WarningBox>
 
 ## Secure the deployment
 
