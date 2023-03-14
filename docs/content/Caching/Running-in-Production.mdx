@@ -7,18 +7,9 @@ menuOrder: 4
 
 Cube makes use of two different kinds of cache:
 
-- Redis, for in-memory storage of query results
-- Cube Store for storing pre-aggregations
+- In-memory storage of query results
+- Pre-aggregations
 
-In development, Cube uses in-memory storage on the server. In production, we
-**strongly** recommend running Redis as a separate service.
-
-<WarningBox>
-
-Cube Store [will replace Redis][replace-redis] for in-memory cache and queue
-management in late 2022.
-
-</WarningBox>
 
 Cube Store is enabled by default when running Cube in development mode. In
 production, Cube Store **must** run as a separate process. The easiest way to do
