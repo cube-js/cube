@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use log::{error, trace, warn};
+use log::{error, trace};
 use std::sync::Arc;
 use tokio::{
     net::TcpListener,
@@ -59,7 +59,7 @@ impl ProcessingLoop for PostgresServer {
             let (client_addr, client_port) = match socket.peer_addr() {
                 Ok(peer_addr) => (peer_addr.ip().to_string(), peer_addr.port()),
                 Err(e) => {
-                    warn!("Unable to detect peer_addr() on TcpStream, error: {}", e);
+                    error!("[pg] Error while calling peer_addr() on TcpStream: {}", e);
 
                     ("127.0.0.1".to_string(), 0000_u16)
                 }
@@ -80,7 +80,7 @@ impl ProcessingLoop for PostgresServer {
             tokio::spawn(async move {
                 tx.closed().await;
 
-                trace!("[postgres] Removing connection {}", connection_id);
+                trace!("[pg] Removing connection {}", connection_id);
 
                 session_manager.drop_session(connection_id).await;
             });
