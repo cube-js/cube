@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use log::{error, trace};
+use log::{error, trace, warn};
 use std::sync::Arc;
 use tokio::{
     net::TcpListener,
@@ -56,12 +56,18 @@ impl ProcessingLoop for PostgresServer {
                 }
             };
 
+            let (client_addr, client_port) = match socket.peer_addr() {
+                Ok(peer_addr) => (peer_addr.ip().to_string(), peer_addr.port()),
+                Err(e) => {
+                    warn!("Unable to detect peer_addr() on TcpStream, error: {}", e);
+
+                    ("127.0.0.1".to_string(), 0000_u16)
+                }
+            };
+
             let session = self
                 .session_manager
-                .create_session(
-                    DatabaseProtocol::PostgreSQL,
-                    socket.peer_addr().unwrap().to_string(),
-                )
+                .create_session(DatabaseProtocol::PostgreSQL, client_addr, client_port)
                 .await;
             let logger = Arc::new(SessionLogger::new(session.state.clone()));
 

@@ -189,7 +189,7 @@ pub async fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
     };
     let session_manager = Arc::new(SessionManager::new(server.clone()));
     let session = session_manager
-        .create_session(protocol, "127.0.0.1".to_string())
+        .create_session(protocol, "127.0.0.1".to_string(), 1234)
         .await;
 
     // Populate like shims

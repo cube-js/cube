@@ -6,7 +6,7 @@ use async_trait::async_trait;
 
 use datafusion::prelude::DataFrame as DFDataFrame;
 
-use log::{debug, error, trace};
+use log::{debug, error, trace, warn};
 
 //use msql_srv::*;
 use msql_srv::{
@@ -501,12 +501,18 @@ impl ProcessingLoop for MySqlServer {
                 }
             };
 
+            let (client_addr, client_port) = match socket.peer_addr() {
+                Ok(peer_addr) => (peer_addr.ip().to_string(), peer_addr.port()),
+                Err(e) => {
+                    warn!("Unable to detect peer_addr() on TcpStream, error: {}", e);
+
+                    ("127.0.0.1".to_string(), 0000_u16)
+                }
+            };
+
             let session = self
                 .session_manager
-                .create_session(
-                    DatabaseProtocol::MySQL,
-                    socket.peer_addr().unwrap().to_string(),
-                )
+                .create_session(DatabaseProtocol::MySQL, client_addr, client_port)
                 .await;
 
             let logger = Arc::new(SessionLogger::new(session.state.clone()));
