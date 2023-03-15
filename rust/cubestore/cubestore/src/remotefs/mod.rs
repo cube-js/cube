@@ -326,7 +326,7 @@ impl LocalDirRemoteFs {
     pub async fn remove_empty_paths(root: PathBuf, path: PathBuf) -> Result<(), CubeError> {
         if let Some(parent_path) = path.parent() {
             let mut dir = fs::read_dir(parent_path).await?;
-            if dir.next_entry().await?.is_none() {
+            if !parent_path.starts_with("temp-uploads") && dir.next_entry().await?.is_none() {
                 fs::remove_dir(parent_path).await?;
             }
             if root != parent_path.to_path_buf() {

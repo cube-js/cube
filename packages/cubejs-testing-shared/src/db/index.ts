@@ -7,3 +7,4 @@ export * from './crate';
 export * from './prestodb';
 export * from './mssql';
 export * from './trino';
+export * from './oracle';

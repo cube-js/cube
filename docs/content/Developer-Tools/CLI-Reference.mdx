@@ -69,7 +69,8 @@ $ cubejs server
 ## generate
 
 The `generate` command helps to build data schema for existing database tables.
-You can only run `generate` from the Cube app directory. This command requires an active [database connection](/config/databases).
+You can only run `generate` from the Cube app directory. This command requires
+an active [database connection](/config/databases).
 
 ### <--{"id" : "generate"}--> Usage
 
@@ -124,31 +125,35 @@ Generate token with 1 day expiry and payload `{ 'appId': 1, 'userId': 2 }`:
 $ cubejs token -e "1 day" -p appId=1 -p userId=2
 ```
 
-## typegen
+## validate
 
-The `typegen` command generates type declarations from a Cube API. It requires
-both an API URL and a valid JWT for the API.
-
-The API URL should be in the format `http://<HOST>/cubejs-api/v1`. You should
-run the `typegen` command from a frontend project that uses
-`@cubejs-client/core`.
+The `validate` command checks models in a Cube project for validation errors.
 
 ### Usage
 
 ```bash
-$ cubejs typegen API_URL --token TOKEN
+$ cubejs validate
 ```
-
-### Flags
-
-| Parameter | Description                            | Example                                  |
-| --------- | -------------------------------------- | ---------------------------------------- |
-| --token   | A valid JWT for the provided `API_URL` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ...` |
 
 ### Example
 
-Generate types for a locally running Cube deployment:
+Example of a Cube project with models that fail validation:
 
 ```bash
-$ cubejs typegen http://localhost:4000/cubejs-api/v1 --token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ...
+$ npx cubejs-cli validate
+❌ Cube Schema validation failed
+
+Cube Error ---------------------------------------
+
+Orders cube: "dimensions.id" does not match any of the allowed types
+Possible reasons (one of):
+	* (dimensions.id.case) is required
+	* (dimensions.id.latitude) is required
+	* (dimensions.id.sql) is required
+LineItems cube: Cube Orders doesn't exist
+
+Need some help? -------------------------------------
+
+  Ask this question in Cube Slack: https://slack.cube.dev
+  Post an issue: https://github.com/cube-js/cube.js/issues
 ```

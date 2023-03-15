@@ -35,14 +35,21 @@ impl SessionManager {
     pub async fn create_session(
         self: &Arc<Self>,
         protocol: DatabaseProtocol,
-        host: String,
+        client_addr: String,
+        client_port: u16,
     ) -> Arc<Session> {
         let connection_id = self.last_id.fetch_add(1, Ordering::SeqCst);
 
         let sess = Session {
             session_manager: self.clone(),
             server: self.server.clone(),
-            state: Arc::new(SessionState::new(connection_id, host, protocol, None)),
+            state: Arc::new(SessionState::new(
+                connection_id,
+                client_addr,
+                client_port,
+                protocol,
+                None,
+            )),
         };
 
         let session_ref = Arc::new(sess);

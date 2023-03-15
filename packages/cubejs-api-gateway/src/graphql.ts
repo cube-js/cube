@@ -58,6 +58,11 @@ const StringFilter = inputObjectType({
     t.list.string('notIn');
     t.list.string('contains');
     t.list.string('notContains');
+    t.list.string('startsWith');
+    t.list.string('notStartsWith');
+    t.list.string('notContains');
+    t.list.string('endsWith');
+    t.list.string('notEndsWith');
     t.boolean('set');
   }
 });
@@ -144,22 +149,18 @@ function mapWhereOperator(operator: string, value: any) {
   }
 }
 
-function mapWhereValue(operator: string, value: any) {
-  switch (operator) {
-    case 'set':
-      return undefined;
-    case 'inDateRange':
-    case 'notInDateRange':
-      // This is a hack for named date ranges (e.g. "This year", "Today")
-      // We should use enums in the future
-      if (value.length === 1 && !/^\d\d\d\d-\d\d-\d\d/.test(value[0])) {
-        return value[0].toString();
-      }
-
-      return value.map(v => v.toString());
-    default:
-      return Array.isArray(value) ? value.map(v => v.toString()) : [value.toString()];
+function mapWhereValue(operator: string, value: any): undefined | string | string[] {
+  value = Array.isArray(value) ? value.map(v => v.toString()) : [value.toString()];
+  
+  if (operator === 'set') {
+    return undefined;
+  } else if (['inDateRange', 'notInDateRange'].includes(operator)) {
+    if (value.length === 1 && !/^\d\d\d\d-\d\d-\d\d/.test(value[0])) {
+      return value[0].toString();
+    }
   }
+  
+  return value;
 }
 
 function safeName(name: string) {
@@ -254,8 +255,17 @@ function parseArgumentValue(value: ValueNode) {
   }
 }
 
-function getArgumentValue(node: FieldNode, argName: string) {
+function getArgumentValue(node: FieldNode, argName: string, variables: Record<string, any> = {}) {
   const argument = node.arguments?.find(a => a.name.value === argName)?.value;
+  
+  if (argument?.kind === 'Variable') {
+    const varValue = variables[argument.name.value];
+    if (varValue === undefined) {
+      throw new Error(`Variable "${argument.name.value}" is not defined`);
+    }
+    return variables[argument.name.value];
+  }
+  
   return argument ? parseArgumentValue(argument) : argument;
 }
 
@@ -532,7 +542,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
 
           getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
             const cubeName = capitalize(cubeNode.name.value);
-            const orderByArg = getArgumentValue(cubeNode, 'orderBy');
+            const orderByArg = getArgumentValue(cubeNode, 'orderBy', infos.variableValues);
             // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
             if (orderByArg) {
               Object.keys(orderByArg).forEach(key => {
@@ -540,7 +550,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
               });
             }
 
-            const whereArg = getArgumentValue(cubeNode, 'where');
+            const whereArg = getArgumentValue(cubeNode, 'where', infos.variableValues);
             if (whereArg) {
               filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
             }

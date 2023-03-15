@@ -11,6 +11,12 @@ redirect_from:
 This package provides wiring of all essential Cube.js components and is used by
 [@cubejs-backend/server][ref-config-ref-backend-server].
 
+<WarningBox>
+This API was deprecated and will be removed in upcoming versions.
+[Learn more](https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#embedding-cubejs-within-express).
+</WarningBox>
+
+
 ## API Reference
 
 ### <--{"id" : "API Reference"}--> CubejsServerCore.create(options)

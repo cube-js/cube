@@ -3,7 +3,7 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { TrinoDBRunner } from '@cubejs-backend/testing-shared';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG } from './smoke-tests';
+import { DEFAULT_API_TOKEN, DEFAULT_CONFIG } from './smoke-tests';
 
 describe('trino', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -28,7 +28,7 @@ describe('trino', () => {
         schemaDir: 'presto/schema',
       }
     );
-    client = cubejs(async () => 'test', {
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
   });

@@ -29,18 +29,20 @@ export class QueryStream extends Readable {
    * @override
    */
   public _read(highWaterMark: number): void {
-    for (let i = 0; i < highWaterMark; i++) {
-      if (this.next) {
-        const row = this.next();
-        if (row.value) {
-          this.push(row.value);
-        }
-        if (row.done) {
-          this.push(null);
-          break;
+    setTimeout(() => {
+      for (let i = 0; i < highWaterMark; i++) {
+        if (this.next) {
+          const row = this.next();
+          if (row.value) {
+            this.push(row.value);
+          }
+          if (row.done) {
+            this.push(null);
+            break;
+          }
         }
       }
-    }
+    }, 0);
   }
 
   /**

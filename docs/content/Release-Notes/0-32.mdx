@@ -1,0 +1,170 @@
+---
+title: v0.32
+permalink: /releases/v0-32
+category: Release Notes
+releaseDate: 2023-03-02
+releaseLink: https://github.com/cube-js/cube.js/releases/tag/v0.32.0
+---
+
+Hello Cube Community, we're really excited to announce Cube v0.32 🎉
+
+This new release brings the GraphQL API into general availability, adds a number
+of quality-of-life improvements to Cube SQL and adds significant performance
+boosts to Cube Store.
+
+## Breaking Changes and Deprecations
+
+This release, we have **2** deprecations and **5** breaking changes:
+
+> Be sure to check the
+> [Deprecation document](https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md)
+> for more details.
+
+### <--{"id" : "Breaking Changes and Deprecations"}--> Breaking Changes
+
+- Support for Node.js v12 and v15 has been dropped due to [them reaching
+  end-of-life][nodejs-eol]. We **strongly** recommend upgrading to Node.js v16.
+
+- Absolute imports for the following packages have been removed. We now provide
+  a public API from the package directly:
+
+  - `@cubejs-backend/query-orchestrator`
+  - `@cubejs-backend/schema-compiler`
+  - `@cubejs-backend/server-core`
+
+- Cube Store is now the default cache and queue engine, replacing Redis. We've
+  talked previously about how [Cube Store will be replacing
+  Redis][cube-blog-redis-deprecation], and this release makes it official 🎉
+
+### <--{"id" : "Breaking Changes and Deprecations"}--> Deprecations
+
+- Support for Node.js v14 has been marked as deprecated due to [it reaching
+  end-of-life][nodejs-eol] in April 2023. We **strongly** recommend upgrading to
+  Node.js v16.
+
+- Using Cube with the Serverless Framework and the `@cubejs-backend/serverless`
+  packages is now deprecated, we **strongly** recommend using [Docker-based
+  deployments][cube-docs-deploy-docker] or [Cube Cloud][cube-docs-deploy-cloud]
+  instead.
+
+[nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
+
+## Pre-aggregations
+
+Following on from the [Lambda pre-aggregation][cube-docs-caching-lambda] support
+introduced in our [last release][cube-docs-0-31], Cube now supports multiple
+rollups from the same cube in a `rollupLambda` definition.
+
+## CLI
+
+The Cube CLI now lets you validate your models on your local machine - simply
+run `npx cubejs-cli validate` to check the models in your project for errors:
+
+```bash
+$ npx cubejs-cli validate
+❌ Cube Schema validation failed
+
+Cube Error ---------------------------------------
+
+Orders cube: "dimensions.id" does not match any of the allowed types
+Possible reasons (one of):
+	* (dimensions.id.case) is required
+	* (dimensions.id.latitude) is required
+	* (dimensions.id.sql) is required
+LineItems cube: Cube Orders doesn't exist
+
+Need some help? -------------------------------------
+
+  Ask this question in Cube Slack: https://slack.cube.dev
+  Post an issue: https://github.com/cube-js/cube.js/issues
+```
+
+## Drivers
+
+We've enabled `readOnly: true` as the default for the
+[Clickhouse][cube-docs-conf-clickhouse], [MSSQL][cube-docs-conf-mssql] and
+[Oracle][cube-docs-conf-oracle] drivers which lets Cube build pre-aggregations
+without creating temporary tables in those databases.
+
+## GraphQL API
+
+We're extremely excited to announce general availability of the GraphQL API in
+Cube. With this, the GraphQL API now fully supports variables, a much-requested
+(and much-needed) improvement:
+
+```javascript
+import { gql } from '@apollo/client';
+
+const getOrdersQuery = gql`
+  query CubeQuery($orderBy: OrdersOrderByInput) {
+    cube {
+      orders(orderBy: $orderBy) {
+        count
+        status
+      }
+    }
+  }
+`;
+
+const variables = {
+  orderBy: {
+    count: 'desc',
+  },
+};
+
+client
+  .query({
+    query: getOrdersQuery,
+    variables,
+  })
+  .then((result) => console.log(result));
+```
+
+## SQL API
+
+Cube SQL continues to see quality-of-life improvements as well as enhanced
+support for even more SQL functions as selections and projections. Some examples
+of what we've improved this release include:
+
+- Support for `CASE` statements in Cube projections
+- Support for expressions like `NOT(LOWER() IN)`
+- Allow using `CAST` in `HAVING` clauses
+- Support for `LEFT` and `RIGHT` functions in projections
+- Support for `NULLIF` in projections
+- Allow using `TO_DATE()` in `DATE_DIFF()` expressions
+- Allow using `DATE_TRUNC()` in `WHERE` clauses
+
+We hope that you find these helpful in your work with Cube SQL; please let us
+know if you have any feedback or suggestions by [opening
+issues][cube-gh-issue-new] on our GitHub repository.
+
+## Community Contributions
+
+A huge thank you to each and every person who took the time to help us improve
+Cube 😁
+
+- [@jay-choe](https://github.com/jay-choe)
+- [@so2liu](https://github.com/so2liu)
+- [@Barsoomx](https://github.com/Barsoomx)
+- [@MattFanto](https://github.com/MattFanto)
+- [@yuraborue](https://github.com/yuraborue)
+- [@tkislan](https://github.com/tkislan)
+- [@euljr](https://github.com/euljr)
+- [@philipprus](https://github.com/philipprus)
+- [@fbalicchia](https://github.com/fbalicchia)
+- [@alexanderlz](https://github.com/alexanderlz)
+- [@AlessandroLollo](https://github.com/AlessandroLollo)
+
+Apologies to anyone who we forgot to mention; please get in touch and we'll make
+sure to add your name to the list 🙌
+
+[cube-blog-redis-deprecation]:
+  https://cube.dev/blog/replacing-redis-with-cube-store
+[cube-docs-0-31]: https://cube.dev/docs/releases/v0-31
+[cube-docs-caching-lambda]: /caching/pre-aggregations/lambda-pre-aggregations
+[cube-docs-conf-clickhouse]: /config/databases/clickhouse
+[cube-docs-conf-mssql]: /config/databases/mssql
+[cube-docs-conf-oracle]: /config/databases/oracle
+[cube-docs-deploy-cloud]: /deployment/platforms/cube-cloud
+[cube-docs-deploy-docker]: /deployment/platforms/docker
+[cube-gh-issue-new]: https://github.com/cube-js/cube.js/issues/new/choose

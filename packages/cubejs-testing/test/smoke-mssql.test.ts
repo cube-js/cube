@@ -1,10 +1,9 @@
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
-import jwt from 'jsonwebtoken';
 import { MssqlDbRunner } from '@cubejs-backend/testing-shared';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
+import { DEFAULT_API_TOKEN, DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
 describe('mssql', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -29,7 +28,7 @@ describe('mssql', () => {
         schemaDir: 'mssql/schema',
       }
     );
-    client = cubejs(async () => jwt.sign({}, 'mysupersecret'), {
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
   });

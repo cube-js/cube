@@ -57,6 +57,7 @@ console-subscriber = "0.1.6"
 async-stream = "0.3.3"
 futures-core = "0.3.23"
 futures-util = "0.3.23"
+sha1_smol = "1.0.0"
 
 
 [dev-dependencies]

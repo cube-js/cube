@@ -3,7 +3,7 @@ use crate::cachestore::cache_item::{
 };
 use crate::cachestore::queue_item::{
     QueueItem, QueueItemIndexKey, QueueItemRocksIndex, QueueItemRocksTable, QueueItemStatus,
-    QueueResultAckEvent, QueueResultAckEventResult,
+    QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
 };
 use crate::cachestore::queue_result::{
     QueueResultIndexKey, QueueResultRocksIndex, QueueResultRocksTable,
@@ -24,7 +24,7 @@ use crate::CubeError;
 use async_trait::async_trait;
 
 use futures_timer::Delay;
-use rocksdb::{Options, DB};
+use rocksdb::{BlockBasedOptions, Options, DB};
 
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
@@ -80,6 +80,12 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         ));
         // Disable automatic compaction before migration, will be enabled later in after_migration
         opts.set_disable_auto_compactions(true);
+
+        let mut block_opts = BlockBasedOptions::default();
+        // https://github.com/facebook/rocksdb/blob/v7.9.2/include/rocksdb/table.h#L524
+        block_opts.set_format_version(5);
+
+        opts.set_block_based_table_factory(&block_opts);
 
         DB::open(&opts, path)
             .map_err(|err| CubeError::internal(format!("DB::open error for cachestore: {}", err)))
@@ -266,17 +272,6 @@ impl RocksCacheStore {
             .await
     }
 
-    fn queue_count_by_prefix_and_status(
-        db_ref: DbTableRef,
-        prefix: &Option<String>,
-        status: QueueItemStatus,
-    ) -> Result<u64, CubeError> {
-        let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-        let index_key =
-            QueueItemIndexKey::ByPrefixAndStatus(prefix.clone().unwrap_or("".to_string()), status);
-        queue_schema.count_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefixAndStatus)
-    }
-
     fn filter_to_cancel(
         now: DateTime<Utc>,
         items: Vec<IdRow<QueueItem>>,
@@ -386,7 +381,7 @@ pub trait CacheStore: DIService + Send + Sync {
         &self,
         key: String,
         allow_concurrency: u32,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError>;
+    ) -> Result<QueueRetrieveResponse, CubeError>;
     async fn queue_ack(&self, key: String, result: Option<String>) -> Result<(), CubeError>;
     async fn queue_result(&self, key: String) -> Result<Option<QueueResultResponse>, CubeError>;
     async fn queue_result_blocking(
@@ -398,6 +393,7 @@ pub trait CacheStore: DIService + Send + Sync {
 
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
+    async fn healthcheck(&self) -> Result<(), CubeError>;
 }
 
 #[async_trait]
@@ -537,16 +533,17 @@ impl CacheStore for RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+                let pending = queue_schema.count_rows_by_index(
+                    &QueueItemIndexKey::ByPrefixAndStatus(
+                        item.get_prefix().clone().unwrap_or("".to_string()),
+                        QueueItemStatus::Pending,
+                    ),
+                    &QueueItemRocksIndex::ByPrefixAndStatus,
+                )?;
+
                 let index_key = QueueItemIndexKey::ByPath(item.get_path());
                 let id_row_opt = queue_schema
                     .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
-
-                let pending = Self::queue_count_by_prefix_and_status(
-                    db_ref,
-                    item.get_prefix(),
-                    QueueItemStatus::Pending,
-                )?;
-
                 let added = if id_row_opt.is_none() {
                     queue_schema.insert(item, batch_pipe)?;
 
@@ -696,44 +693,61 @@ impl CacheStore for RocksCacheStore {
         &self,
         key: String,
         allow_concurrency: u32,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    ) -> Result<QueueRetrieveResponse, CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let index_key = QueueItemIndexKey::ByPath(key.clone());
-                let id_row_opt = queue_schema
-                    .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
+                let prefix = QueueItem::parse_path(key.clone())
+                    .0
+                    .unwrap_or("".to_string());
 
-                if let Some(id_row) = id_row_opt {
-                    if id_row.get_row().get_status() == &QueueItemStatus::Pending {
-                        let current_active = Self::queue_count_by_prefix_and_status(
-                            db_ref,
-                            id_row.get_row().get_prefix(),
-                            QueueItemStatus::Active,
-                        )?;
-                        if current_active >= (allow_concurrency as u64) {
-                            return Ok(None);
-                        }
+                let mut pending = queue_schema.count_rows_by_index(
+                    &QueueItemIndexKey::ByPrefixAndStatus(prefix.clone(), QueueItemStatus::Pending),
+                    &QueueItemRocksIndex::ByPrefixAndStatus,
+                )?;
 
-                        let mut new = id_row.get_row().clone();
-                        new.status = QueueItemStatus::Active;
-                        // It's an important to insert heartbeat, because
-                        // without that created datetime will be used for orphaned filtering
-                        new.update_heartbeat();
+                let mut active: Vec<String> = queue_schema
+                    .get_rows_by_index(
+                        &QueueItemIndexKey::ByPrefixAndStatus(prefix, QueueItemStatus::Active),
+                        &QueueItemRocksIndex::ByPrefixAndStatus,
+                    )?
+                    .into_iter()
+                    .map(|item| item.into_row().key)
+                    .collect();
+                if active.len() >= (allow_concurrency as usize) {
+                    return Ok(QueueRetrieveResponse::NotFound { pending, active });
+                }
 
-                        let res = queue_schema.update(
-                            id_row.get_id(),
-                            new,
-                            id_row.get_row(),
-                            batch_pipe,
-                        )?;
-
-                        Ok(Some(res))
-                    } else {
-                        Ok(None)
-                    }
+                let id_row = queue_schema.get_single_opt_row_by_index(
+                    &QueueItemIndexKey::ByPath(key.clone()),
+                    &QueueItemRocksIndex::ByPath,
+                )?;
+                let id_row = if let Some(id_row) = id_row {
+                    id_row
                 } else {
-                    Ok(None)
+                    return Ok(QueueRetrieveResponse::NotFound { pending, active });
+                };
+
+                if id_row.get_row().get_status() == &QueueItemStatus::Pending {
+                    let mut new = id_row.get_row().clone();
+                    new.status = QueueItemStatus::Active;
+                    // It's an important to insert heartbeat, because
+                    // without that created datetime will be used for orphaned filtering
+                    new.update_heartbeat();
+
+                    let res =
+                        queue_schema.update(id_row.get_id(), new, id_row.get_row(), batch_pipe)?;
+
+                    active.push(res.get_row().get_key().clone());
+                    pending -= 1;
+
+                    Ok(QueueRetrieveResponse::Success {
+                        item: res.into_row(),
+                        pending,
+                        active,
+                    })
+                } else {
+                    Ok(QueueRetrieveResponse::LockFailed { pending, active })
                 }
             })
             .await
@@ -865,6 +879,17 @@ impl CacheStore for RocksCacheStore {
 
         Ok(())
     }
+
+    async fn healthcheck(&self) -> Result<(), CubeError> {
+        self.store
+            .read_operation(move |_| {
+                // read_operation will call getSnapshot, which is enough to test that RocksDB works
+                Ok(())
+            })
+            .await?;
+
+        Ok(())
+    }
 }
 
 crate::di_service!(RocksCacheStore, [CacheStore]);
@@ -952,7 +977,7 @@ impl CacheStore for ClusterCacheStoreClient {
         &self,
         _key: String,
         _allow_concurrency: u32,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    ) -> Result<QueueRetrieveResponse, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_retrieve was used.")
     }
 
@@ -978,6 +1003,10 @@ impl CacheStore for ClusterCacheStoreClient {
 
     async fn compaction(&self) -> Result<(), CubeError> {
         panic!("CacheStore cannot be used on the worker node! compaction was used.")
+    }
+
+    async fn healthcheck(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! healthcheck was used.")
     }
 }
 

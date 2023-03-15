@@ -397,6 +397,7 @@ describe('DataSchemaCompiler', () => {
 
   it('export import', async () => {
     const { compiler, cubeEvaluator, joinGraph } = originalPrepareCompiler({
+      localPath: () => '',
       dataSchemaFiles: () => Promise.resolve([
         {
           fileName: 'main.js',

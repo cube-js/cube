@@ -28,7 +28,9 @@ class ElasticSearchDriver extends BaseDriver {
    * Class constructor.
    */
   constructor(config = {}) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||

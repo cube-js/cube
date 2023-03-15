@@ -16,11 +16,12 @@ import { getProcessUid } from '@cubejs-backend/shared';
 
 import { CubeStoreDriver } from './CubeStoreDriver';
 
-function hashQueryKey(queryKey: QueryKey): QueryKeyHash {
+function hashQueryKey(queryKey: QueryKey, processUid?: string): QueryKeyHash {
+  processUid = processUid || getProcessUid();
   const hash = crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
 
   if (typeof queryKey === 'object' && queryKey.persistent) {
-    return `${hash}@${getProcessUid()}` as any;
+    return `${hash}@${processUid}` as any;
   }
 
   return hash as any;
@@ -33,7 +34,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   ) { }
 
   public redisHash(queryKey: QueryKey): QueryKeyHash {
-    return hashQueryKey(queryKey);
+    return hashQueryKey(queryKey, this.options.processUid);
   }
 
   protected prefixKey(queryKey: QueryKey): string {
@@ -255,19 +256,20 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async retrieveForProcessing(queryKeyHashed: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
+    // TODO(ovr): Enable extended
     const rows = await this.driver.query('QUEUE RETRIEVE CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(queryKeyHashed),
     ]);
     if (rows && rows.length) {
       const addedCount = 1;
-      const active = [queryKeyHashed];
-      const toProcess = 0;
+      const active = (rows[0].active || queryKeyHashed /* backward compatibility for old Cube Store */).split(',');
+      const pending = parseInt(rows[0].pending || '0' /* backward compatibility for old Cube Store */, 10);
       const lockAcquired = true;
       const def = this.decodeQueryDefFromRow(rows[0], 'retrieveForProcessing');
 
       return [
-        addedCount, null, active, toProcess, def, lockAcquired
+        addedCount, null, active, pending, def, lockAcquired
       ];
     }
 
@@ -275,9 +277,13 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async getResultBlocking(queryKey: string): Promise<QueryDef | null> {
+    return this.getResultBlockingByHash(this.redisHash(queryKey));
+  }
+
+  public async getResultBlockingByHash(queryKeyHash: QueryKeyHash): Promise<QueryDef | null> {
     const rows = await this.driver.query('QUEUE RESULT_BLOCKING ? ?', [
       this.options.continueWaitTimeout * 1000,
-      this.prefixKey(this.redisHash(queryKey)),
+      this.prefixKey(queryKeyHash),
     ]);
     if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'getResultBlocking');

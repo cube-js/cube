@@ -29,6 +29,11 @@ const mvn = require('node-java-maven');
 
 let mvnPromise: Promise<void> | null = null;
 
+type JdbcStatement = {
+  setQueryTimeout: (t: number) => any,
+  execute: (q: string) => any,
+};
+
 const initMvn = (customClassPath: any) => {
   if (!mvnPromise) {
     mvnPromise = new Promise((resolve, reject) => {
@@ -71,11 +76,26 @@ export class JDBCDriver extends BaseDriver {
 
   public constructor(
     config: Partial<JDBCDriverConfiguration> & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -121,20 +141,33 @@ export class JDBCDriver extends BaseDriver {
       },
       // @ts-expect-error Promise<Function> vs Promise<void>
       destroy: async (connection) => promisify(connection.close.bind(connection)),
-      validate: (connection) => {
-        const isValid = promisify(connection.isValid.bind(connection));
-        try {
-          return isValid(this.testConnectionTimeout() / 1000);
-        } catch (e) {
-          return false;
-        }
-      }
+      validate: async (connection) => (
+        new Promise((resolve) => {
+          const isValid = promisify(connection.isValid.bind(connection));
+          const timeout = setTimeout(() => {
+            if (this.logger) {
+              this.logger('Connection validation failed by timeout', {
+                testConnectionTimeout: this.testConnectionTimeout(),
+              });
+            }
+            resolve(false);
+          }, this.testConnectionTimeout());
+          isValid(0).then((valid: boolean) => {
+            clearTimeout(timeout);
+            if (!valid && this.logger) {
+              this.logger('Connection validation failed', {});
+            }
+            resolve(valid);
+          }).catch((e: { stack?: string }) => {
+            clearTimeout(timeout);
+            this.databasePoolError(e);
+            resolve(false);
+          });
+        })
+      )
     }, {
       min: 0,
-      max:
-        config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
-        8,
+      max: config.maxPoolSize || getEnv('dbMaxPoolSize', { dataSource }) || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
@@ -166,10 +199,10 @@ export class JDBCDriver extends BaseDriver {
     try {
       connection = await this.pool._factory.create();
     } catch (e: any) {
-      err = e.message;
+      err = e.message || e;
     }
     if (err) {
-      throw new Error(err);
+      throw new Error(err.toString());
     } else {
       await this.pool._factory.destroy(connection);
     }
@@ -250,9 +283,13 @@ export class JDBCDriver extends BaseDriver {
           ) => {
             if (err) reject(err);
             const rowsStream = new QueryStream(res.rows.next);
+            let connectionReleased = false;
             const cleanup = (e?: Error) => {
-              if (!rowsStream.destroyed) {
+              if (!connectionReleased) {
                 this.pool.release(conn);
+                connectionReleased = true;
+              }
+              if (!rowsStream.destroyed) {
                 rowsStream.destroy(e);
               }
             };

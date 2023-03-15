@@ -49,7 +49,7 @@ use crate::queryplanner::serialized_plan::{
     IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
 };
 use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
-use crate::queryplanner::CubeTableLogical;
+use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::table::{cmp_same_types, Row};
 use crate::CubeError;
 use datafusion::logical_plan;
@@ -857,8 +857,12 @@ impl ChooseIndex<'_> {
                         None,
                     )
                     .into_plan());
+                } else if let Some(_) = source.as_any().downcast_ref::<InfoSchemaTableProvider>() {
+                    return Err(DataFusionError::Plan(
+                        "Unexpected table source: InfoSchemaTableProvider".to_string(),
+                    ));
                 } else {
-                    panic!("Unexpected table source")
+                    return Err(DataFusionError::Plan("Unexpected table source".to_string()));
                 }
             }
             _ => return Ok(p),
@@ -2246,13 +2250,11 @@ pub mod tests {
     }
 
     fn initial_plan(s: &str, i: &TestIndices) -> LogicalPlan {
-        let statement;
-        if let Statement::Statement(s) = CubeStoreParser::new(s).unwrap().parse_statement().unwrap()
-        {
-            statement = s;
-        } else {
-            panic!("not a statement")
-        }
+        let statement = match CubeStoreParser::new(s).unwrap().parse_statement().unwrap() {
+            Statement::Statement(s) => s,
+            other => panic!("not a statement, actual {:?}", other),
+        };
+
         let plan = SqlToRel::new(i)
             .statement_to_plan(&DFStatement::Statement(statement))
             .unwrap();

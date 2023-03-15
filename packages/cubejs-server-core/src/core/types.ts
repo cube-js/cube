@@ -1,4 +1,4 @@
-import { Required } from '@cubejs-backend/shared';
+import { Required, SchemaFileRepository } from '@cubejs-backend/shared';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
@@ -8,10 +8,10 @@ import {
   QueryRewriteFn,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  ContextToPermissionsFn,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
-import type { SchemaFileRepository } from './FileRepository';
 
 export interface QueueOptions {
   concurrency?: number;
@@ -49,6 +49,7 @@ export interface OrchestratorOptions {
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
   rollupOnlyMode?: boolean;
+  testConnectionTimeout?: number;
 }
 
 export interface QueueInitedOptions {
@@ -77,6 +78,7 @@ export interface OrchestratorInitedOptions {
   redisPrefix?: string;
   redisPoolOptions?: RedisPoolOptions;
   rollupOnlyMode?: boolean;
+  testConnectionTimeout?: number;
 }
 
 export interface RequestContext {
@@ -131,6 +133,7 @@ export type PreAggregationsSchemaFn = (context: RequestContext) => string;
 export type DriverOptions = {
   dataSource?: string,
   maxPoolSize?: number,
+  testConnectionTimeout?: number,
 };
 
 export type DriverConfig = {
@@ -171,6 +174,7 @@ export interface CreateOptions {
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
+  contextToPermissions?: ContextToPermissionsFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;

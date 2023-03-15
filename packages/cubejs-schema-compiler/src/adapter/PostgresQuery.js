@@ -43,12 +43,4 @@ export class PostgresQuery extends BaseQuery {
   countDistinctApprox(sql) {
     return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`;
   }
-
-  preAggregationTableName(cube, preAggregationName, skipSchema) {
-    const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
-    if (name.length > 64) {
-      throw new UserError(`Postgres can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
-    }
-    return name;
-  }
 }

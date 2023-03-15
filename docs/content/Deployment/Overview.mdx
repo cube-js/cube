@@ -15,15 +15,11 @@ production. You can find platform-specific guides for:
 - [Cube Cloud][ref-deploy-cubecloud]
 - [Docker][ref-deploy-docker]
 
-For information on how to deploy Cube using Kubernetes, please check out the examples for
-[Kubernetes][gh-cube-examples-k8s]. You can also check out [Helm Charts](https://artifacthub.io/packages/search?repo=gadsme) from our community members. Please note these examples are community-contributed, and not
-officially supported by Cube.
-
 If you are moving Cube to production, check out the [Production
 Checklist][ref-deploy-prod-list].
 
 As shown in the diagram below, a typical production Cube cluster consists of one
-or multiple API instances, a Refresh Worker, Redis and a Cube Store cluster.
+or multiple API instances, a Refresh Worker and a Cube Store cluster.
 
 <div style="text-align: center">
   <img
@@ -39,10 +35,6 @@ pre-aggregated data or connected database(s) for raw data. The **Refresh
 Worker** builds and refreshes pre-aggregations in the background. **Cube Store**
 ingests pre-aggregations built by Refresh Worker and responds to queries from
 API instances.
-
-**Redis** is used to manage the queue and query-level cache. Please note, we are
-planning to [replace Redis with Cube Store][replace-redis] for in-memory cache
-and queue management in late 2022.
 
 API instances and Refresh Worker can be configured via [environment
 variables][ref-config-env] or [cube.js configuration file][ref-config-js]. They
@@ -68,8 +60,6 @@ services:
 
       - CUBEJS_CUBESTORE_HOST=cubestore_router
 
-      - CUBEJS_REDIS_URL=redis://redis:6379
-
       - CUBEJS_API_SECRET=secret
     volumes:
       - .:/cube/conf
@@ -77,7 +67,6 @@ services:
       - cubestore_worker_1
       - cubestore_worker_2
       - cube_refresh_worker
-      - redis
 
   cube_refresh_worker:
     image: cubejs/cube
@@ -88,8 +77,6 @@ services:
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
 
       - CUBEJS_CUBESTORE_HOST=cubestore_router
-
-      - CUBEJS_REDIS_URL=redis://redis:6379
 
       - CUBEJS_API_SECRET=secret
 
@@ -132,13 +119,6 @@ services:
       - .cubestore:/cube/data
     depends_on:
       - cubestore_router
-
-  redis:
-    image: bitnami/redis:latest
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-    logging:
-      driver: none
 ```
 
 ## API Instance
@@ -291,63 +271,6 @@ services:
     depends_on:
       - cubestore_router
 ```
-
-## Redis
-
-<WarningBox>
-
-Cube Store [will replace Redis][replace-redis] for in-memory cache and queue
-management in late 2022.
-
-</WarningBox>
-
-Cube uses Redis, an in-memory data structure store, for query caching and queue.
-
-Set the `CUBEJS_REDIS_URL` environment variable to allow Cube API Instances and
-Refresh Worker to connect to Redis. If your Redis instance also has a password,
-please set it via the `CUBEJS_REDIS_PASSWORD` environment variable. Set the
-`CUBEJS_REDIS_TLS` environment variable to true if you want to enable
-SSL-secured connections. Ensure your Redis cluster allows at least 15 concurrent
-connections.
-
-### <--{"id" : "Redis"}--> Redis Sentinel
-
-Cube supports Redis Sentinel via `CUBEJS_REDIS_USE_IOREDIS=true` environment
-variable. Then set `CUBEJS_REDIS_URL` to the
-`redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube to
-connect to the Redis Sentinel.
-
-Cube server instances used by same tenant environments should have same Redis
-instances. Otherwise they will have different query queues which can lead to
-incorrect pre-aggregation states and intermittent data access errors.
-
-### <--{"id" : "Redis"}--> Redis Pool
-
-If `CUBEJS_REDIS_URL` is provided Cube, will create a Redis connection pool with
-a minimum of 2 and maximum of 1000 concurrent connections, by default. The
-`CUBEJS_REDIS_POOL_MIN` and `CUBEJS_REDIS_POOL_MAX` environment variables can be
-used to tweak pool size limits. To disable connection pooling, and instead
-create connections on-demand, you can set `CUBEJS_REDIS_POOL_MAX` to 0.
-
-If your maximum concurrent connections limit is too low, you may see
-`TimeoutError: ResourceRequest timed out` errors. As a rule of a thumb, you need
-to have `Queue Size * Number of tenants` concurrent connections to ensure the
-best performance possible. If you use clustered deployments, please make sure
-you have enough connections for all Cube server instances. A lower number of
-connections still can work, however Redis becomes a performance bottleneck in
-this case.
-
-### <--{"id" : "Redis"}--> Running without Redis
-
-If you want to run Cube in production without Redis, you can use
-`CUBEJS_CACHE_AND_QUEUE_DRIVER` environment variable to `memory`.
-
-<WarningBox>
-
-Clustered deployments can't be run without Redis as it is used to manage the
-query queue.
-
-</WarningBox>
 
 [dh-cubejs]: https://hub.docker.com/r/cubejs/cube
 [dh-cubestore]: https://hub.docker.com/r/cubejs/cubestore

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use arrow::array::*;
 use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
@@ -19,7 +19,7 @@ use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
 use hex::FromHex;
 use itertools::Itertools;
-use log::{debug, trace};
+use log::trace;
 use rand::distributions::Uniform;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,7 @@ use tracing_futures::WithSubscriber;
 use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
-use crate::cachestore::{CacheItem, CacheStore, QueueItem};
+use crate::cachestore::CacheStore;
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -57,8 +57,7 @@ use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{
-    CacheCommand, CubeStoreParser, DropCommand, MetastoreCommand, PartitionedIndexRef,
-    QueueCommand, RocksStoreName, SystemCommand,
+    CubeStoreParser, DropCommand, MetaStoreCommand, PartitionedIndexRef, SystemCommand,
 };
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
@@ -77,7 +76,10 @@ use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use std::mem::take;
 
 pub mod cache;
+pub mod cachestore;
 pub mod parser;
+
+use crate::sql::cachestore::CacheStoreSqlService;
 use mockall::automock;
 
 #[automock]
@@ -159,7 +161,7 @@ impl SqlQueryContext {
 
 pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,
-    cachestore: Arc<dyn CacheStore>,
+    cachestore: CacheStoreSqlService,
     chunk_store: Arc<dyn ChunkDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     limits: Arc<ConcurrencyLimits>,
@@ -195,8 +197,9 @@ impl SqlServiceImpl {
         max_cached_queries: usize,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
+            cachestore: CacheStoreSqlService::new(cachestore, query_planner.clone()),
+            cache: SqlResultCache::new(max_cached_queries),
             db,
-            cachestore,
             chunk_store,
             limits,
             query_planner,
@@ -208,7 +211,6 @@ impl SqlServiceImpl {
             query_timeout,
             create_table_timeout,
             remote_fs,
-            cache: SqlResultCache::new(max_cached_queries),
         })
     }
 
@@ -611,7 +613,7 @@ impl SqlServiceImpl {
                 tokio::fs::create_dir(&data_dir).await?;
                 log::debug!("Dumping data files to {:?}", data_dir);
                 // TODO: download in parallel.
-                for (_, f, size) in p.all_required_files() {
+                for (_, f, size, _) in p.all_required_files() {
                     let f = self.remote_fs.download_file(&f, size).await?;
                     let name = Path::new(&f).file_name().ok_or_else(|| {
                         CubeError::internal(format!("Could not get filename of '{}'", f))
@@ -836,20 +838,6 @@ impl SqlService for SqlServiceImpl {
                 }
             }
             CubeStoreStatement::System(command) => match command {
-                SystemCommand::Compaction { store } => {
-                    match store {
-                        None => {
-                            self.db.compaction().await?;
-                            self.cachestore.compaction().await?;
-                        }
-                        Some(store_name) => match store_name {
-                            RocksStoreName::Meta => self.db.compaction().await?,
-                            RocksStoreName::Cache => self.cachestore.compaction().await?,
-                        },
-                    }
-
-                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
-                }
                 SystemCommand::KillAllJobs => {
                     self.db.delete_all_jobs().await?;
                     Ok(Arc::new(DataFrame::new(vec![], vec![])))
@@ -898,12 +886,25 @@ impl SqlService for SqlServiceImpl {
                         Ok(Arc::new(DataFrame::new(vec![], vec![])))
                     }
                 },
-                SystemCommand::Metastore(command) => match command {
-                    MetastoreCommand::SetCurrent { id } => {
+                SystemCommand::MetaStore(command) => match command {
+                    MetaStoreCommand::SetCurrent { id } => {
                         self.db.set_current_snapshot(id).await?;
                         Ok(Arc::new(DataFrame::new(vec![], vec![])))
                     }
+                    MetaStoreCommand::Compaction => {
+                        self.db.compaction().await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    MetaStoreCommand::Healthcheck => {
+                        self.db.healthcheck().await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
                 },
+                SystemCommand::CacheStore(command) => {
+                    self.cachestore
+                        .exec_system_command_with_context(context, command)
+                        .await
+                }
             },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
@@ -1189,230 +1190,14 @@ impl SqlService for SqlServiceImpl {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
             CubeStoreStatement::Queue(command) => {
-                app_metrics::QUEUE_QUERIES.increment();
-                let execution_time = SystemTime::now();
-
-                let (result, track_time) = match command {
-                    QueueCommand::Add {
-                        key,
-                        priority,
-                        orphaned,
-                        value,
-                    } => {
-                        let response = self
-                            .cachestore
-                            .queue_add(QueueItem::new(
-                                key.value,
-                                value,
-                                QueueItem::status_default(),
-                                priority,
-                                orphaned,
-                            ))
-                            .await?;
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![
-                                    Column::new("added".to_string(), ColumnType::Boolean, 0),
-                                    Column::new("pending".to_string(), ColumnType::Int, 1),
-                                ],
-                                vec![Row::new(vec![
-                                    TableValue::Boolean(response.added),
-                                    TableValue::Int(response.pending as i64),
-                                ])],
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::Truncate {} => {
-                        self.cachestore.queue_truncate().await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), false)
-                    }
-                    QueueCommand::Cancel { key } => {
-                        let columns = vec![
-                            Column::new("payload".to_string(), ColumnType::String, 0),
-                            Column::new("extra".to_string(), ColumnType::String, 1),
-                        ];
-
-                        let result = self.cachestore.queue_cancel(key.value).await?;
-                        let rows = if let Some(result) = result {
-                            vec![result.into_row().into_queue_cancel_row()]
-                        } else {
-                            vec![]
-                        };
-
-                        (Arc::new(DataFrame::new(columns, rows)), true)
-                    }
-                    QueueCommand::Heartbeat { key } => {
-                        self.cachestore.queue_heartbeat(key.value).await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), true)
-                    }
-                    QueueCommand::MergeExtra { key, payload } => {
-                        self.cachestore
-                            .queue_merge_extra(key.value, payload)
-                            .await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), true)
-                    }
-                    QueueCommand::Ack { key, result } => {
-                        self.cachestore.queue_ack(key.value, result).await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), true)
-                    }
-                    QueueCommand::Get { key } => {
-                        let result = self.cachestore.queue_get(key.value).await?;
-                        let rows = if let Some(result) = result {
-                            vec![result.into_row().into_queue_get_row()]
-                        } else {
-                            vec![]
-                        };
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![
-                                    Column::new("payload".to_string(), ColumnType::String, 0),
-                                    Column::new("extra".to_string(), ColumnType::String, 1),
-                                ],
-                                rows,
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::ToCancel {
-                        prefix,
-                        heartbeat_timeout,
-                        orphaned_timeout,
-                    } => {
-                        let rows = self
-                            .cachestore
-                            .queue_to_cancel(prefix.value, orphaned_timeout, heartbeat_timeout)
-                            .await?;
-
-                        let columns = vec![Column::new("id".to_string(), ColumnType::String, 0)];
-
-                        (
-                            Arc::new(DataFrame::new(
-                                columns,
-                                rows.into_iter()
-                                    .map(|item| {
-                                        Row::new(vec![TableValue::String(
-                                            item.get_row().get_key().clone(),
-                                        )])
-                                    })
-                                    .collect(),
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::List {
-                        prefix,
-                        with_payload,
-                        status_filter,
-                        sort_by_priority,
-                    } => {
-                        let rows = self
-                            .cachestore
-                            .queue_list(prefix.value, status_filter, sort_by_priority)
-                            .await?;
-
-                        let mut columns = vec![
-                            Column::new("id".to_string(), ColumnType::String, 0),
-                            Column::new("status".to_string(), ColumnType::String, 1),
-                            Column::new("extra".to_string(), ColumnType::String, 2),
-                        ];
-
-                        if with_payload {
-                            columns.push(Column::new("payload".to_string(), ColumnType::String, 3));
-                        }
-
-                        (
-                            Arc::new(DataFrame::new(
-                                columns,
-                                rows.into_iter()
-                                    .map(|item| item.into_row().into_queue_list_row(with_payload))
-                                    .collect(),
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::Retrieve { key, concurrency } => {
-                        let result = self
-                            .cachestore
-                            .queue_retrieve(key.value, concurrency)
-                            .await?;
-
-                        let rows = if let Some(result) = result {
-                            vec![result.into_row().into_queue_retrieve_row()]
-                        } else {
-                            vec![]
-                        };
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![
-                                    Column::new("payload".to_string(), ColumnType::String, 0),
-                                    Column::new("extra".to_string(), ColumnType::String, 1),
-                                ],
-                                rows,
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::Result { key } => {
-                        let ack_result = self.cachestore.queue_result(key.value).await?;
-                        let rows = if let Some(ack_result) = ack_result {
-                            vec![ack_result.into_queue_result_row()]
-                        } else {
-                            vec![]
-                        };
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![
-                                    Column::new("payload".to_string(), ColumnType::String, 0),
-                                    Column::new("type".to_string(), ColumnType::String, 1),
-                                ],
-                                rows,
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::ResultBlocking { timeout, key } => {
-                        let ack_result = self
-                            .cachestore
-                            .queue_result_blocking(key.value, timeout)
-                            .await?;
-
-                        let rows = if let Some(ack_result) = ack_result {
-                            vec![ack_result.into_queue_result_row()]
-                        } else {
-                            vec![]
-                        };
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![
-                                    Column::new("payload".to_string(), ColumnType::String, 0),
-                                    Column::new("type".to_string(), ColumnType::String, 1),
-                                ],
-                                rows,
-                            )),
-                            false,
-                        )
-                    }
-                };
-
-                let execution_time = execution_time.elapsed()?;
-
-                if track_time {
-                    app_metrics::QUEUE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
-                }
-
-                debug!("Queue command processing time: {:?}", execution_time,);
-
-                Ok(result)
+                self.cachestore
+                    .exec_queue_command_with_context(context, command)
+                    .await
+            }
+            CubeStoreStatement::Cache(command) => {
+                self.cachestore
+                    .exec_cache_command_with_context(context, command)
+                    .await
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
@@ -1478,98 +1263,6 @@ impl SqlService for SqlServiceImpl {
 
             CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
 
-            CubeStoreStatement::Cache(command) => {
-                app_metrics::CACHE_QUERIES.increment();
-                let execution_time = SystemTime::now();
-
-                let (result, track_time) = match command {
-                    CacheCommand::Set {
-                        key,
-                        value,
-                        ttl,
-                        nx,
-                    } => {
-                        let key = key.value;
-
-                        let success = self
-                            .cachestore
-                            .cache_set(CacheItem::new(key, ttl, value), nx)
-                            .await?;
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
-                                vec![Row::new(vec![TableValue::Boolean(success)])],
-                            )),
-                            true,
-                        )
-                    }
-                    CacheCommand::Get { key } => {
-                        let result = self.cachestore.cache_get(key.value).await?;
-                        let value = if let Some(result) = result {
-                            TableValue::String(result.into_row().value)
-                        } else {
-                            TableValue::Null
-                        };
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                                vec![Row::new(vec![value])],
-                            )),
-                            true,
-                        )
-                    }
-                    CacheCommand::Keys { prefix } => {
-                        let rows = self.cachestore.cache_keys(prefix.value).await?;
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![Column::new("key".to_string(), ColumnType::String, 0)],
-                                rows.iter()
-                                    .map(|i| {
-                                        Row::new(vec![TableValue::String(i.get_row().get_path())])
-                                    })
-                                    .collect(),
-                            )),
-                            true,
-                        )
-                    }
-                    CacheCommand::Remove { key } => {
-                        self.cachestore.cache_delete(key.value).await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), true)
-                    }
-                    CacheCommand::Truncate {} => {
-                        self.cachestore.cache_truncate().await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), false)
-                    }
-                    CacheCommand::Incr { path } => {
-                        let row = self.cachestore.cache_incr(path.value).await?;
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                                vec![Row::new(vec![TableValue::String(
-                                    row.get_row().get_value().clone(),
-                                )])],
-                            )),
-                            true,
-                        )
-                    }
-                };
-
-                let execution_time = execution_time.elapsed()?;
-
-                if track_time {
-                    app_metrics::CACHE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
-                }
-
-                debug!("Cache command processing time: {:?}", execution_time,);
-
-                Ok(result)
-            }
-
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }
@@ -1614,7 +1307,7 @@ impl SqlService for SqlServiceImpl {
                             context.inline_tables.into_iter().map(|i| i.id).collect(),
                         );
                         let mut mocked_names = HashMap::new();
-                        for (_, f, _) in worker_plan.files_to_download() {
+                        for (_, f, _, _) in worker_plan.files_to_download() {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
@@ -1718,7 +1411,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 DataType::Custom(custom) => {
                     let custom_type_name = custom.to_string().to_lowercase();
                     match custom_type_name.as_str() {
-                        "mediumint" => ColumnType::Int,
+                        "tinyint" | "mediumint" => ColumnType::Int,
                         "bytes" => ColumnType::Bytes,
                         "varbinary" => ColumnType::Bytes,
                         "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
@@ -3327,7 +3020,7 @@ mod tests {
                         .unwrap();
                 }
 
-                Delay::new(Duration::from_millis(500)).await;
+                Delay::new(Duration::from_millis(1500)).await;
 
                 let active_partitions = services
                     .meta_store

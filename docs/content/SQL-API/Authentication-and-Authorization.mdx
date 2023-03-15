@@ -28,6 +28,9 @@ module.exports = {
 };
 ```
 
+As Cube expects passwords to be provided by `checkSqlAuth` implementation best practice is to use a generated password here instead of an actual user password.
+Generated passwords can be implemented as an HMAC of the user name or requested from some service that provides the mapping of the user name to passwords for additional security. 
+
 ## Security Context (Row-Level Security)
 
 Cube's SQL API can also use the Security Context for [Dynamic Schema

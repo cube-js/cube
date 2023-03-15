@@ -2,7 +2,7 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
+import { DEFAULT_API_TOKEN, DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
 // Suite that can be re-used with different ENV configs
 const reusableSuite = (env: { [key: string]: string} = {}) => () => {
@@ -26,7 +26,7 @@ const reusableSuite = (env: { [key: string]: string} = {}) => () => {
         schemaDir: 'postgresql/schema',
       }
     );
-    client = cubejs(async () => 'test', {
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
   });

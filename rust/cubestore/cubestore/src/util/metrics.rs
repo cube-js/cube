@@ -66,8 +66,12 @@ pub struct Counter {
 
 impl Counter {
     pub fn add(&self, v: i64) {
+        self.add_with_tags(v, None)
+    }
+
+    pub fn add_with_tags(&self, v: i64, tags: Option<&Vec<String>>) {
         if let Some(s) = sink() {
-            s.send(&self.metric, v)
+            s.send(&self.metric, v, tags)
         }
     }
 
@@ -82,8 +86,12 @@ pub struct IntMetric {
 
 impl IntMetric {
     pub fn report(&self, v: i64) {
+        self.report_with_tags(v, None)
+    }
+
+    pub fn report_with_tags(&self, v: i64, tags: Option<&Vec<String>>) {
         if let Some(s) = sink() {
-            s.send(&self.metric, v)
+            s.send(&self.metric, v, tags)
         }
     }
 }
@@ -127,7 +135,7 @@ impl Sink {
         Ok(Sink { socket, mode })
     }
 
-    fn send(&self, m: &Metric, value: i64) {
+    fn send(&self, m: &Metric, value: i64, tags: Option<&Vec<String>>) {
         let kind = match m.kind {
             MetricType::Counter => "c",
             MetricType::Gauge => "g",
@@ -136,12 +144,17 @@ impl Sink {
             MetricType::Distribution if self.mode == Compatibility::StatsD => "ms",
             MetricType::Distribution => "d",
         };
+        let data = format!("{}:{}|{}", m.name, value, kind);
+        let msg = match tags {
+            Some(t) => {
+                format!("{}|#{}", data, t.join(","))
+            }
+            None => data,
+        };
 
         // We deliberately choose to loose metric submissions on failures.
         // TODO: handle EWOULDBLOCK with background sends or at least internal failure counters.
-        let _ = self
-            .socket
-            .send(format!("{}:{}|{}", m.name, value, kind).as_bytes());
+        let _ = self.socket.send(msg.as_bytes());
     }
 }
 

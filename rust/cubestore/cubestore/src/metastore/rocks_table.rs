@@ -246,7 +246,8 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let option = self.iter.next();
-        if let Some((key, value)) = option {
+        if let Some(res) = option {
+            let (key, value) = res.unwrap();
             if let RowKey::Table(table_id, row_id) = RowKey::from_bytes(&key) {
                 if table_id != self.table_id {
                     return None;
@@ -263,6 +264,7 @@ where
 
 pub struct IndexScanIter<'a, RT: RocksTable + ?Sized> {
     table: &'a RT,
+    index_id: u32,
     secondary_key_val: Vec<u8>,
     secondary_key_hash: Vec<u8>,
     iter: DBIterator<'a>,
@@ -277,7 +279,8 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let option = self.iter.next();
-            if let Some((key, value)) = option {
+            if let Some(res) = option {
+                let (key, value) = res.unwrap();
                 if let RowKey::SecondaryIndex(_, secondary_index_hash, row_id) =
                     RowKey::from_bytes(&key)
                 {
@@ -289,7 +292,30 @@ where
                         continue;
                     }
 
-                    return Some(self.table.get_row_or_not_found(row_id));
+                    let result = match self.table.get_row(row_id) {
+                        Ok(Some(row)) => Ok(row),
+                        Ok(None) => {
+                            let index = self.table.get_index_by_id(self.index_id);
+                            match self.table.rebuild_index(&index) {
+                                Ok(_) => {
+                                    Err(CubeError::internal(format!(
+                                        "Row exists in secondary index however missing in {:?} table: {}. Repairing index.",
+                                        self.table, row_id
+                                    )))
+                                }
+                                Err(e) => {
+                                    Err(CubeError::internal(format!(
+                                        "Error while rebuilding secondary index for {:?} table: {:?}",
+                                        self.table, e
+                                                )))
+                                }
+
+                            }
+                        }
+                        Err(e) => Err(e),
+                    };
+
+                    return Some(result);
                 };
             } else {
                 return None;
@@ -899,7 +925,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         );
         let index = self.get_index_by_id(secondary_id);
 
-        for (key, value) in iter {
+        for kv_res in iter {
+            let (key, value) = kv_res?;
             if let RowKey::SecondaryIndex(_, secondary_index_hash, row_id) =
                 RowKey::from_bytes(&key)
             {
@@ -948,7 +975,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             Direction::Forward,
         ));
 
-        for (key, _) in iter {
+        for kv_res in iter {
+            let (key, _) = kv_res?;
             let row_key = RowKey::from_bytes(&key);
             if let RowKey::Table(row_table_id, _) = row_key {
                 if row_table_id == table_id {
@@ -976,7 +1004,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             Direction::Forward,
         ));
 
-        for (key, _) in iter {
+        for kv_res in iter {
+            let (key, _) = kv_res?;
             let row_key = RowKey::from_bytes(&key);
             if let RowKey::SecondaryIndex(index_id, _, _) = row_key {
                 if index_id == Self::index_id(secondary_id) {
@@ -1017,12 +1046,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             .to_vec();
         let secondary_key_val = secondary_index.key_to_bytes(&row_key);
 
+        let index_id = RocksSecondaryIndex::get_id(secondary_index);
         let key_len = secondary_key_hash.len();
-        let key_min = RowKey::SecondaryIndex(
-            Self::index_id(RocksSecondaryIndex::get_id(secondary_index)),
-            secondary_key_hash.clone(),
-            0,
-        );
+        let key_min =
+            RowKey::SecondaryIndex(Self::index_id(index_id), secondary_key_hash.clone(), 0);
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
@@ -1033,6 +1060,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         Ok(IndexScanIter {
             table: self,
+            index_id,
             secondary_key_val,
             secondary_key_hash,
             iter,

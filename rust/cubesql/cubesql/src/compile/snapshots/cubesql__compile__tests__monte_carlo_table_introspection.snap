@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                SELECT\n                    \"database\",\n                    \"table\",\n                    \"table_id\",\n                    \"schema\",\n                    \"size\",\n                    \"tbl_rows\",\n                    \"estimated_visible_rows\"\n                FROM svv_table_info\n                WHERE (\n                    \"database\" = 'cubedb'\n                    AND \"schema\" = 'public'\n                    AND \"table\" = 'KibanaSampleDataEcommerce'\n                ) ORDER BY \"table_id\"\n                \"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------+---------------------------+----------+--------+------+----------+------------------------+
+| database | table                     | table_id | schema | size | tbl_rows | estimated_visible_rows |
++----------+---------------------------+----------+--------+------+----------+------------------------+
+| cubedb   | KibanaSampleDataEcommerce | 18000    | public | 5    | 100000   | 100000                 |
++----------+---------------------------+----------+--------+------+----------+------------------------+

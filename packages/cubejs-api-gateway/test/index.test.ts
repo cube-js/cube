@@ -123,6 +123,25 @@ describe('API Gateway', () => {
     );
   });
 
+  test('catch error requestContextMiddleware', async () => {
+    const { app } = createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        extendContext: (_req) => {
+          throw new Error('Server should not crash');
+        }
+      }
+    );
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(500);
+
+    expect(res.body && res.body.error).toStrictEqual('Error: Server should not crash');
+  });
+
   test('query transform with checkAuth', async () => {
     const queryRewrite = jest.fn(async (query: Query, context) => {
       expect(context.securityContext).toEqual({

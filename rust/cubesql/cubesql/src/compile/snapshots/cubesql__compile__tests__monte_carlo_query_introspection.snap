@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                SELECT\n                    stl_query.query,\n                    stl_querytext.sequence,\n                    stl_querytext.text,\n                    stl_query.database,\n                    pg_user.usename,\n                    stl_query.starttime,\n                    stl_query.endtime,\n                    stl_query.aborted\n                FROM stl_query\n                INNER JOIN pg_user ON stl_query.userid = pg_user.usesysid\n                INNER JOIN stl_querytext USING (query)\n                WHERE\n                    endtime >= '2022-11-15 16:18:47.814515'\n                    AND endtime < '2022-11-15 16:31:47.814515'\n                    AND stl_querytext.userid > 1\n                ORDER BY 1, 2\n                \"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------+----------+------+----------+---------+-----------+---------+---------+
+| query | sequence | text | database | usename | starttime | endtime | aborted |
++-------+----------+------+----------+---------+-----------+---------+---------+
++-------+----------+------+----------+---------+-----------+---------+---------+

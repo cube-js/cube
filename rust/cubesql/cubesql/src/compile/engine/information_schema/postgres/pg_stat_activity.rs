@@ -78,11 +78,13 @@ impl PgStatActivityBuilder {
         self.application_name
             .append_option(session.application_name)
             .unwrap();
-        self.client_addr.append_option(session.client_addr).unwrap();
+        self.client_addr.append_value(session.client_addr).unwrap();
         self.client_hostname
             .append_option(session.client_hostname)
             .unwrap();
-        self.client_port.append_option(session.client_port).unwrap();
+        self.client_port
+            .append_value(session.client_port.to_string())
+            .unwrap();
         self.backend_start.append_null().unwrap();
         self.xact_start.append_null().unwrap();
         self.query_start.append_null().unwrap();

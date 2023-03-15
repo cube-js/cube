@@ -173,6 +173,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "rolling_window_one_week_interval",
             rolling_window_one_week_interval,
         ),
+        t(
+            "rolling_window_one_quarter_interval",
+            rolling_window_one_quarter_interval,
+        ),
         t("rolling_window_offsets", rolling_window_offsets),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
@@ -228,6 +232,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("cache_set_nx", cache_set_nx),
         t("cache_prefix_keys", cache_prefix_keys),
         t("queue_full_workflow", queue_full_workflow),
+        t("queue_retrieve_extended", queue_retrieve_extended),
         t("queue_ack_then_result", queue_ack_then_result),
         t("queue_orphaned_timeout", queue_orphaned_timeout),
         t("queue_heartbeat", queue_heartbeat),
@@ -250,6 +255,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("limit_pushdown_unique_key", limit_pushdown_unique_key),
         t("sys_drop_cache", sys_drop_cache),
+        t("sys_metastore_healthcheck", sys_metastore_healthcheck),
+        t("sys_cachestore_healthcheck", sys_cachestore_healthcheck),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -4855,6 +4862,53 @@ async fn rolling_window_one_week_interval(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn rolling_window_one_quarter_interval(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day timestamp, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         ('2021-01-01T00:00:00Z', 'john', 10), \
+                         ('2021-01-01T00:00:00Z', 'sara', 7), \
+                         ('2021-01-03T00:00:00Z', 'sara', 3), \
+                         ('2021-01-03T00:00:00Z', 'john', 9), \
+                         ('2021-01-03T00:00:00Z', 'john', 11), \
+                         ('2021-01-05T00:00:00Z', 'timmy', 5), \
+                         ('2021-04-01T00:00:00Z', 'ovr', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT w, ROLLING(SUM(n) RANGE UNBOUNDED PRECEDING OFFSET START), SUM(CASE WHEN w >= to_timestamp('2021-01-01T00:00:00Z') AND w < to_timestamp('2021-08-31T00:00:00Z') THEN n END) \
+             FROM (SELECT date_trunc('day', day) w, SUM(n) as n FROM s.data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION w \
+             GROUP BY DIMENSION date_trunc('quarter', w) \
+             FROM date_trunc('quarter', to_timestamp('2021-01-04T00:00:00Z')) \
+             TO date_trunc('quarter', to_timestamp('2021-08-31T00:00:00Z')) \
+             EVERY INTERVAL '1 quarter' \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            // 2021-01-01T00:00:00.000Z
+            (TimestampValue::new(1609459200000000000), 17, Some(45)),
+            // 2021-04-01T00:00:00.000Z
+            (TimestampValue::new(1617235200000000000), 50, Some(5)),
+            // 2021-07-01T00:00:00.000Z
+            (TimestampValue::new(1625097600000000000), 50, None),
+        ])
+    );
+}
+
 async fn rolling_window_offsets(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -6389,7 +6443,10 @@ async fn cache_compaction(service: Box<dyn SqlClient>) {
     );
 
     tokio::time::sleep(Duration::new(5, 0)).await;
-    service.exec_query("SYS COMPACTION 'cache';").await.unwrap();
+    service
+        .exec_query("SYS CACHESTORE COMPACTION;")
+        .await
+        .unwrap();
 
     let get_response = service
         .exec_query("CACHE GET 'my_prefix:my_key'")
@@ -8009,6 +8066,8 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             &vec![
                 Column::new("payload".to_string(), ColumnType::String, 0),
                 Column::new("extra".to_string(), ColumnType::String, 1),
+                Column::new("pending".to_string(), ColumnType::Int, 2),
+                Column::new("active".to_string(), ColumnType::String, 3),
             ]
         );
         assert_eq!(
@@ -8016,6 +8075,8 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             &vec![Row::new(vec![
                 TableValue::String("payload3".to_string()),
                 TableValue::Null,
+                TableValue::Int(4),
+                TableValue::String("3".to_string()),
             ]),]
         );
     }
@@ -8031,6 +8092,8 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             &vec![
                 Column::new("payload".to_string(), ColumnType::String, 0),
                 Column::new("extra".to_string(), ColumnType::String, 1),
+                Column::new("pending".to_string(), ColumnType::Int, 2),
+                Column::new("active".to_string(), ColumnType::String, 3),
             ]
         );
         assert_eq!(retrieve_response.get_rows().len(), 0);
@@ -8126,6 +8189,99 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             .await
             .unwrap();
         assert_eq!(get_response.get_rows().len(), 0);
+    }
+}
+
+async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:2" "payload2";"#)
+        .await
+        .unwrap();
+
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:3" "payload3";"#)
+        .await
+        .unwrap();
+
+    {
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:1""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            retrieve_response.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+                Column::new("pending".to_string(), ColumnType::Int, 2),
+                Column::new("active".to_string(), ColumnType::String, 3),
+            ]
+        );
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload1".to_string()),
+                TableValue::Null,
+                TableValue::Int(2),
+                TableValue::String("1".to_string()),
+            ]),]
+        );
+    }
+
+    {
+        // concurrency limit
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE EXTENDED CONCURRENCY 1 "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            retrieve_response.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+                Column::new("pending".to_string(), ColumnType::Int, 2),
+                Column::new("active".to_string(), ColumnType::String, 3),
+            ]
+        );
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::Null,
+                TableValue::Null,
+                TableValue::Int(2),
+                TableValue::String("1".to_string()),
+            ]),]
+        );
+    }
+
+    {
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE EXTENDED CONCURRENCY 2 "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            retrieve_response.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+                Column::new("pending".to_string(), ColumnType::Int, 2),
+                Column::new("active".to_string(), ColumnType::String, 3),
+            ]
+        );
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload2".to_string()),
+                TableValue::Null,
+                TableValue::Int(1),
+                TableValue::String("1,2".to_string()),
+            ]),]
+        );
     }
 }
 
@@ -8418,6 +8574,20 @@ async fn sys_drop_cache(service: Box<dyn SqlClient>) {
         .unwrap();
 
     service.exec_query(r#"SYS DROP CACHE;"#).await.unwrap();
+}
+
+async fn sys_metastore_healthcheck(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"SYS METASTORE HEALTHCHECK;"#)
+        .await
+        .unwrap();
+}
+
+async fn sys_cachestore_healthcheck(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"SYS CACHESTORE HEALTHCHECK;"#)
+        .await
+        .unwrap();
 }
 
 pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {

@@ -56,12 +56,18 @@ impl ProcessingLoop for PostgresServer {
                 }
             };
 
+            let (client_addr, client_port) = match socket.peer_addr() {
+                Ok(peer_addr) => (peer_addr.ip().to_string(), peer_addr.port()),
+                Err(e) => {
+                    error!("[pg] Error while calling peer_addr() on TcpStream: {}", e);
+
+                    ("127.0.0.1".to_string(), 0000_u16)
+                }
+            };
+
             let session = self
                 .session_manager
-                .create_session(
-                    DatabaseProtocol::PostgreSQL,
-                    socket.peer_addr().unwrap().to_string(),
-                )
+                .create_session(DatabaseProtocol::PostgreSQL, client_addr, client_port)
                 .await;
             let logger = Arc::new(SessionLogger::new(session.state.clone()));
 
@@ -74,7 +80,7 @@ impl ProcessingLoop for PostgresServer {
             tokio::spawn(async move {
                 tx.closed().await;
 
-                trace!("[postgres] Removing connection {}", connection_id);
+                trace!("[pg] Removing connection {}", connection_id);
 
                 session_manager.drop_session(connection_id).await;
             });

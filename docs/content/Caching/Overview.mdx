@@ -16,10 +16,7 @@ menuOrder: 1
 </div>
 
 Cube provides a two-level caching system. The first level is **in-memory** cache
-and is active by default. Currently, [Redis][link-redis] is being used for
-in-memory cache and queue management for [clustered Cube
-deployments][ref-production-checklist]. Cube Store will [replace
-Redis][replace-redis] in late 2022.
+and is active by default.
 
 Cube's [in-memory cache](#in-memory-cache) acts as a buffer for your database
 when there's a burst of requests hitting the same data from multiple concurrent

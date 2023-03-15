@@ -49,8 +49,13 @@ export class LocalQueueDriverConnection {
   }
 
   async getResultBlocking(queryKey) {
-    const resultListKey = this.resultListKey(queryKey);
-    if (!this.queryDef[this.redisHash(queryKey)] && !this.resultPromises[resultListKey]) {
+    return this.getResultBlockingByHash(this.redisHash(queryKey));
+  }
+
+  async getResultBlockingByHash(queryKeyHash) {
+    // Double redisHash apply is being used here
+    const resultListKey = this.resultListKey(queryKeyHash);
+    if (!this.queryDef[queryKeyHash] && !this.resultPromises[resultListKey]) {
       return null;
     }
     const timeoutPromise = (timeout) => new Promise((resolve) => setTimeout(() => resolve(null), timeout));
@@ -335,7 +340,7 @@ const processingLocks = {};
  */
 export class LocalQueueDriver extends BaseQueueDriver {
   constructor(options) {
-    super();
+    super(options.processUid);
     this.options = options;
     results[options.redisQueuePrefix] = results[options.redisQueuePrefix] || {};
     resultPromises[options.redisQueuePrefix] = resultPromises[options.redisQueuePrefix] || {};

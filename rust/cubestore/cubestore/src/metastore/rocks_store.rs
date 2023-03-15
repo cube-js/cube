@@ -10,9 +10,9 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use datafusion::cube_ext;
 
 use log::{info, trace};
-use rocksdb::backup::BackupEngineOptions;
+use rocksdb::backup::{BackupEngine, BackupEngineOptions, RestoreOptions};
 use rocksdb::checkpoint::Checkpoint;
-use rocksdb::{Snapshot, WriteBatch, WriteBatchIterator, DB};
+use rocksdb::{Env, Snapshot, WriteBatch, WriteBatchIterator, DB};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -511,9 +511,10 @@ pub struct RocksStore {
     pub(crate) write_completed_notify: Arc<Notify>,
     last_upload_seq: Arc<RwLock<u64>>,
     last_check_seq: Arc<RwLock<u64>>,
+    snapshot_uploaded: Arc<RwLock<bool>>,
     snapshots_upload_stopped: Arc<AsyncMutex<bool>>,
     pub(crate) cached_tables: Arc<Mutex<Option<Arc<Vec<TablePath>>>>>,
-    rw_loop_tx: std::sync::mpsc::SyncSender<
+    rw_loop_tx: tokio::sync::mpsc::Sender<
         Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
     >,
     _rw_loop_join_handle: Arc<AbortingJoinHandle<()>>,
@@ -556,20 +557,25 @@ impl RocksStore {
         let db = details.open_db(path)?;
         let db_arc = Arc::new(db);
 
-        let (rw_loop_tx, rw_loop_rx) = std::sync::mpsc::sync_channel::<
+        let (rw_loop_tx, mut rw_loop_rx) = tokio::sync::mpsc::channel::<
             Box<dyn FnOnce() -> Result<(), CubeError> + Send + Sync + 'static>,
         >(32_768);
 
         let join_handle = cube_ext::spawn_blocking(move || loop {
-            match rw_loop_rx.recv() {
-                Ok(fun) => {
-                    if let Err(e) = fun() {
-                        log::error!("Error during read write loop execution: {}", e);
+            if let Some(fun) = rw_loop_rx.blocking_recv() {
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(fun)) {
+                    Err(panic_payload) => {
+                        let restore_error = CubeError::from_panic_payload(panic_payload);
+                        log::error!("Panic during read write loop execution: {}", restore_error);
+                    }
+                    Ok(res) => {
+                        if let Err(e) = res {
+                            log::error!("Error during read write loop execution: {}", e);
+                        }
                     }
                 }
-                Err(_) => {
-                    return;
-                }
+            } else {
+                return;
             }
         });
 
@@ -579,6 +585,7 @@ impl RocksStore {
             listeners: Arc::new(RwLock::new(listeners)),
             metastore_fs,
             last_checkpoint_time: Arc::new(RwLock::new(SystemTime::now())),
+            snapshot_uploaded: Arc::new(RwLock::new(false)),
             write_notify: Arc::new(Notify::new()),
             write_completed_notify: Arc::new(Notify::new()),
             last_upload_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
@@ -611,13 +618,9 @@ impl RocksStore {
         details: Arc<dyn RocksStoreDetails>,
     ) -> Result<Arc<Self>, CubeError> {
         if !fs::metadata(path).await.is_ok() {
-            let mut backup =
-                rocksdb::backup::BackupEngine::open(&BackupEngineOptions::default(), dump_path)?;
-            backup.restore_from_latest_backup(
-                &path,
-                &path,
-                &rocksdb::backup::RestoreOptions::default(),
-            )?;
+            let opts = BackupEngineOptions::new(dump_path)?;
+            let mut backup = BackupEngine::open(&opts, &Env::new()?)?;
+            backup.restore_from_latest_backup(&path, &path, &RestoreOptions::default())?;
         } else {
             info!(
                 "Using existing {} in {}",
@@ -673,57 +676,64 @@ impl RocksStore {
         let rw_loop_sender = self.rw_loop_tx.clone();
         let (tx, rx) = oneshot::channel::<Result<(R, Vec<MetaStoreEvent>), CubeError>>();
 
-        cube_ext::spawn_blocking(move || {
-            let res = rw_loop_sender.send(Box::new(move || {
-                let db_span = warn_long("store write operation", Duration::from_millis(100));
-                let span = tracing::trace_span!("metastore write operation");
-                let span_holder = span.enter();
+        let res = rw_loop_sender.send(Box::new(move || {
+            let db_span = warn_long("store write operation", Duration::from_millis(100));
 
-                let mut batch = BatchPipe::new(db_to_send.as_ref());
-                let snapshot = db_to_send.snapshot();
-                let res = f(
-                    DbTableRef {
-                        db: db_to_send.as_ref(),
-                        snapshot: &snapshot,
-                        mem_seq,
-                        start_time: Utc::now(),
-                    },
-                    &mut batch,
-                );
-                match res {
-                    Ok(res) => {
-                        if batch.invalidate_tables_cache {
-                            *cached_tables.lock().unwrap() = None;
-                        }
-                        let write_result = batch.batch_write_rows()?;
-                        tx.send(Ok((res, write_result))).map_err(|_| {
-                            CubeError::internal(format!(
-                                "[{}] Write operation result receiver has been dropped",
-                                store_name
-                            ))
-                        })?;
+            let mut batch = BatchPipe::new(db_to_send.as_ref());
+            let snapshot = db_to_send.snapshot();
+            let res = f(
+                DbTableRef {
+                    db: db_to_send.as_ref(),
+                    snapshot: &snapshot,
+                    mem_seq,
+                    start_time: Utc::now(),
+                },
+                &mut batch,
+            );
+            match res {
+                Ok(res) => {
+                    if batch.invalidate_tables_cache {
+                        *cached_tables.lock().unwrap() = None;
                     }
-                    Err(e) => {
-                        tx.send(Err(e)).map_err(|_| {
-                            CubeError::internal(format!(
-                                "[{}] Write operation result receiver has been dropped",
-                                store_name
-                            ))
-                        })?;
-                    }
+                    let write_result = batch.batch_write_rows()?;
+                    tx.send(Ok((res, write_result))).map_err(|_| {
+                        CubeError::internal(format!(
+                            "[{}] Write operation result receiver has been dropped",
+                            store_name
+                        ))
+                    })?;
                 }
-
-                mem::drop(span_holder);
-                mem::drop(db_span);
-
-                Ok(())
-            }));
-            if let Err(e) = res {
-                log::error!("[{}] Error during read write loop send: {}", store_name, e);
+                Err(e) => {
+                    tx.send(Err(e)).map_err(|_| {
+                        CubeError::internal(format!(
+                            "[{}] Write operation result receiver has been dropped",
+                            store_name
+                        ))
+                    })?;
+                }
             }
-        })
-        .await?;
-        let (spawn_res, events) = rx.await??;
+
+            mem::drop(db_span);
+
+            Ok(())
+        }));
+        if let Err(e) = res.await {
+            log::error!(
+                "[{}] Error during scheduling write task in loop: {}",
+                store_name,
+                e
+            );
+
+            return Err(CubeError::internal(format!(
+                "Error during scheduling write task in loop: {}",
+                e
+            )));
+        }
+
+        let res = rx.await.map_err(|err| {
+            CubeError::internal(format!("Unable to receive result for write task: {}", err))
+        })?;
+        let (spawn_res, events) = res?;
 
         self.write_notify.notify_waiters();
 
@@ -734,7 +744,6 @@ impl RocksStore {
                 }
             }
         }
-
         Ok(spawn_res)
     }
 
@@ -758,24 +767,27 @@ impl RocksStore {
             let mut serializer = WriteBatchContainer::new();
 
             let mut seq_numbers = Vec::new();
-
-            updates.into_iter().for_each(|(n, write_batch)| {
+            for update in updates.into_iter() {
+                let (n, write_batch) = update?;
                 seq_numbers.push(n);
                 write_batch.iterate(&mut serializer);
-            });
+            }
+
             (
                 serializer,
                 seq_numbers.iter().min().map(|v| *v),
                 seq_numbers.iter().max().map(|v| *v),
             )
         };
-
         if max.is_some() {
-            let checkpoint_time = self.last_checkpoint_time.read().await;
-            let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
-            self.metastore_fs
-                .upload_log(&dir_name, min.unwrap(), &serializer)
-                .await?;
+            let snapshot_uploaded = self.snapshot_uploaded.read().await;
+            if *snapshot_uploaded {
+                let checkpoint_time = self.last_checkpoint_time.read().await;
+                let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
+                self.metastore_fs
+                    .upload_log(&dir_name, min.unwrap(), &serializer)
+                    .await?;
+            }
             let mut seq = self.last_upload_seq.write().await;
             *seq = max.unwrap();
             self.write_completed_notify.notify_waiters();
@@ -788,10 +800,9 @@ impl RocksStore {
         {
             info!("Uploading {} check point", self.details.get_name());
             self.upload_check_point().await?;
+            let mut check_seq = self.last_check_seq.write().await;
+            *check_seq = last_db_seq;
         }
-
-        let mut check_seq = self.last_check_seq.write().await;
-        *check_seq = last_db_seq;
 
         info!(
             "Persisting {} snapshot: done ({:?})",
@@ -816,6 +827,8 @@ impl RocksStore {
             self.metastore_fs
                 .upload_checkpoint(remote_path, checkpoint_path)
                 .await?;
+            let mut snapshot_uploaded = self.snapshot_uploaded.write().await;
+            *snapshot_uploaded = true;
             self.write_completed_notify.notify_waiters();
         }
         Ok(())
@@ -872,39 +885,40 @@ impl RocksStore {
         let rw_loop_sender = self.rw_loop_tx.clone();
         let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
 
-        cube_ext::spawn_blocking(move || {
-            let res = rw_loop_sender.send(Box::new(move || {
-                let db_span = warn_long("metastore read operation", Duration::from_millis(100));
-                let span = tracing::trace_span!("metastore read operation");
-                let span_holder = span.enter();
+        let res = rw_loop_sender.send(Box::new(move || {
+            let db_span = warn_long("metastore read operation", Duration::from_millis(100));
 
-                let snapshot = db_to_send.snapshot();
-                let res = f(DbTableRef {
-                    db: db_to_send.as_ref(),
-                    snapshot: &snapshot,
-                    mem_seq,
-                    start_time: Utc::now(),
-                });
+            let snapshot = db_to_send.snapshot();
+            let res = f(DbTableRef {
+                db: db_to_send.as_ref(),
+                snapshot: &snapshot,
+                mem_seq,
+                start_time: Utc::now(),
+            });
 
-                tx.send(res).map_err(|_| {
-                    CubeError::internal(format!(
-                        "[{}] Read operation result receiver has been dropped",
-                        store_name
-                    ))
-                })?;
+            tx.send(res).map_err(|_| {
+                CubeError::internal(format!(
+                    "[{}] Read operation result receiver has been dropped",
+                    store_name
+                ))
+            })?;
 
-                mem::drop(span_holder);
-                mem::drop(db_span);
+            mem::drop(db_span);
 
-                Ok(())
-            }));
-            if let Err(e) = res {
-                log::error!("Error during read write loop send: {}", e);
-            }
-        })
-        .await?;
+            Ok(())
+        }));
+        if let Err(e) = res.await {
+            log::error!("Error during scheduling read task in loop: {}", e);
 
-        rx.await?
+            return Err(CubeError::internal(format!(
+                "Error during scheduling read task in loop: {}",
+                e
+            )));
+        }
+
+        rx.await.map_err(|err| {
+            CubeError::internal(format!("Unable to receive result for read task: {}", err))
+        })?
     }
 
     pub async fn read_operation_out_of_queue<F, R>(&self, f: F) -> Result<R, CubeError>
@@ -987,6 +1001,91 @@ impl RocksStore {
             .await?;
 
         *upload_stopped = true;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::metastore::{BaseRocksStoreFs, RocksMetaStoreDetails};
+    use crate::remotefs::LocalDirRemoteFs;
+    use std::{env, fs};
+
+    #[tokio::test]
+    async fn test_loop_panic() -> Result<(), CubeError> {
+        let config = Config::test("test_loop_panic");
+        let store_path = env::current_dir().unwrap().join("test_loop_panic-local");
+        let remote_store_path = env::current_dir().unwrap().join("test_loop_panic-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+
+        let details = Arc::new(RocksMetaStoreDetails {});
+        let rocks_store = RocksStore::new(
+            store_path.join("metastore").as_path(),
+            BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+            config.config_obj(),
+            details,
+        )?;
+
+        // read operation
+        {
+            let r = rocks_store
+                .read_operation(|_| -> Result<(), CubeError> {
+                    panic!("panic - task 1");
+                })
+                .await;
+            assert_eq!(
+                r.err().expect("must be error").message,
+                "Unable to receive result for read task: channel closed".to_string()
+            );
+
+            let r = rocks_store
+                .read_operation(|_| -> Result<(), CubeError> {
+                    Err(CubeError::user("error - task 3".to_string()))
+                })
+                .await;
+            assert_eq!(
+                r.err().expect("must be error").message,
+                "error - task 3".to_string()
+            );
+        }
+
+        // write operation
+        {
+            let r = rocks_store
+                .write_operation(|_, _| -> Result<(), CubeError> {
+                    panic!("panic - task 1");
+                })
+                .await;
+            assert_eq!(
+                r.err().expect("must be error").message,
+                "Unable to receive result for write task: channel closed".to_string()
+            );
+
+            let r = rocks_store
+                .write_operation(|_, _| -> Result<(), CubeError> {
+                    panic!("panic - task 2");
+                })
+                .await;
+            assert_eq!(
+                r.err().expect("must be error").message,
+                "Unable to receive result for write task: channel closed".to_string()
+            );
+
+            let r = rocks_store
+                .write_operation(|_, _| -> Result<(), CubeError> {
+                    Err(CubeError::user("error - task 3".to_string()))
+                })
+                .await;
+            assert_eq!(
+                r.err().expect("must be error").message,
+                "error - task 3".to_string()
+            );
+        }
+
         Ok(())
     }
 }

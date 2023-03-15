@@ -8,6 +8,7 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -19,7 +20,7 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import { DriverCapabilities, UnloadOptions, } from '@cubejs-backend/base-driver';
+import { DriverCapabilities, QueryOptions, UnloadOptions } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -175,6 +176,12 @@ export class DatabricksDriver extends JDBCDriver {
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {},
   ) {
     const dataSource =
@@ -337,7 +344,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * @override
    */
-  public dropTable(tableName: string, options?: unknown): Promise<unknown> {
+  public dropTable(tableName: string, options?: QueryOptions): Promise<unknown> {
     const tableFullName = `${
       this.config?.catalog ? `${this.config.catalog}.` : ''
     }${tableName}`;
@@ -380,7 +387,7 @@ export class DatabricksDriver extends JDBCDriver {
    * Execute create schema query.
    */
   public async createSchemaIfNotExists(schemaName: string) {
-    return this.query(
+    await this.query(
       `CREATE SCHEMA IF NOT EXISTS ${
         this.getSchemaFullName(schemaName)
       }`,
@@ -750,15 +757,19 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.secret.key <aws-secret-key>`
    */
   private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[]) {
-    await this.query(
-      `
-      CREATE TABLE ${tableFullName}_csv_export
-      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
-      OPTIONS (escape = '"')
-      AS (${sql})
-      `,
-      params,
-    );
+    try {
+      await this.query(
+        `
+        CREATE TABLE ${tableFullName}
+        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
+        OPTIONS (escape = '"')
+        AS (${sql});
+        `,
+        params,
+      );
+    } finally {
+      await this.query(`DROP TABLE IF EXISTS ${tableFullName};`, []);
+    }
   }
 
   /**
@@ -779,14 +790,18 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.secret.key <aws-secret-key>`
    */
   private async createExternalTableFromTable(tableFullName: string, columns: string) {
-    await this.query(
-      `
-      CREATE TABLE ${tableFullName}_csv_export
-      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
-      OPTIONS (escape = '"')
-      AS SELECT ${columns} FROM ${tableFullName}
-      `,
-      [],
-    );
+    try {
+      await this.query(
+        `
+        CREATE TABLE _${tableFullName}
+        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
+        OPTIONS (escape = '"')
+        AS SELECT ${columns} FROM ${tableFullName}
+        `,
+        [],
+      );
+    } finally {
+      await this.query(`DROP TABLE IF EXISTS _${tableFullName};`, []);
+    }
   }
 }

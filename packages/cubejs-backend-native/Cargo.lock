@@ -716,6 +716,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "sha1_smol",
  "simple_logger",
  "smallvec",
  "sqlparser",

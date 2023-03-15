@@ -9,6 +9,7 @@ Release version
 ```sh
 docker build -t cubejs/cube:latest -f latest.Dockerfile .
 docker buildx build --platform linux/amd64 -t cubejs/cube:latest -f latest.Dockerfile .
+docker buildx build --platform linux/amd64,linux/arm64 -t cubejs/cube:latest -f latest.Dockerfile .
 ```
 
 ### Alpine

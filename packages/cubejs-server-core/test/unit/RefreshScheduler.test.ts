@@ -1,6 +1,7 @@
 import R from 'ramda';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { CubejsServerCore, DatabaseType, SchemaFileRepository } from '../../src';
+import { SchemaFileRepository } from '@cubejs-backend/shared';
+import { CubejsServerCore, DatabaseType } from '../../src';
 import { RefreshScheduler } from '../../src/core/RefreshScheduler';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { OrchestratorApi } from '../../src/core/OrchestratorApi';
