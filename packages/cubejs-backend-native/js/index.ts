@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { Writable } from 'stream';
 // import { getEnv } from '@cubejs-backend/shared';
 
 export interface BaseMeta {
@@ -115,6 +116,9 @@ function wrapNativeFunctionWithChannelCallback(
     };
 };
 
+const errorString = (err: any) =>
+  err.message || err.stack?.toString() || typeof err === 'string' ? err.toString() : JSON.stringify(err);
+
 // TODO: Refactor - define classes
 function wrapNativeFunctionWithStream(
     fn: (extra: any) => unknown | Promise<unknown>
@@ -129,27 +133,48 @@ function wrapNativeFunctionWithStream(
             streamResponse = await fn(JSON.parse(extra));
             if (streamResponse && streamResponse.stream) {
                 writer.start();
-                let chunk: object[] = [];
-                streamResponse.stream.on('data', (c: object) => {
-                    chunk.push(c);
-                    if (chunk.length >= chunkLength) {
-                        if (!writer.chunk(JSON.stringify(chunk))) {
-                            // TODO replace with actual stream and high watermark implementation
-                            streamResponse.stream.destroy({
-                                stack: "Rejected by client"
-                            });
+
+                let chunkBuffer: any[] = [];
+                const writable = new Writable({
+                    objectMode: true,
+                    highWaterMark: chunkLength,
+                    write(row: any, encoding: BufferEncoding, callback: (error?: (Error | null)) => void) {
+                        chunkBuffer.push(row);
+                        if (chunkBuffer.length < chunkLength) {
+                            callback(null);
+                        } else {
+                            const toSend = chunkBuffer;
+                            chunkBuffer = [];
+                            writer.chunk(toSend, callback);
                         }
-                        chunk = [];
+
+                    },
+                    final(callback: (error?: (Error | null)) => void) {
+                        const end = (err: any) => {
+                            if (err) {
+                                callback(err);
+                            } else {
+                                writer.end(callback);
+                            }
+                        }
+                        if (chunkBuffer.length > 0) {
+                            const toSend = chunkBuffer;
+                            chunkBuffer = [];
+                            writer.chunk(toSend, end);
+                        } else {
+                            end(null);
+                        }
+                    },
+                    destroy(error: Error | null, callback: (error: (Error | null)) => void) {
+                        if (error) {
+                            writer.reject(errorString(error));
+                        }
+                        callback(null);
                     }
                 });
-                streamResponse.stream.on('close', () => {
-                    if (chunk.length > 0) {
-                        writer.chunk(JSON.stringify(chunk));
-                    }
-                    writer.end("");
-                });
+                streamResponse.stream.pipe(writable);
                 streamResponse.stream.on('error', (err: any) => {
-                    writer.reject(err.message || err.toString());
+                    writable.destroy(err);
                 });
             } else {
                 throw new Error(`Expected stream but nothing returned`);
@@ -158,7 +183,7 @@ function wrapNativeFunctionWithStream(
             if (!!streamResponse && !!streamResponse.stream) {
                 streamResponse.stream.destroy(e);
             }
-            writer.reject(e.message || e.toString());
+            writer.reject(errorString(e));
         }
     };
 };

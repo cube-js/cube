@@ -5,8 +5,10 @@ use cubeclient::models::{
     V1CubeMeta, V1CubeMetaDimension, V1CubeMetaJoin, V1CubeMetaMeasure, V1CubeMetaSegment,
     V1LoadRequestQuery, V1LoadResponse,
 };
+use datafusion::arrow::datatypes::SchemaRef;
 
 use crate::{
+    compile::engine::df::scan::MemberField,
     sql::{
         session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
         ServerManager, Session, SessionManager, SqlAuthService,
@@ -255,6 +257,8 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
             _query: V1LoadRequestQuery,
             _ctx: AuthContextRef,
             _meta_fields: LoadRequestMeta,
+            _schema: SchemaRef,
+            _member_fields: Vec<MemberField>,
         ) -> Result<CubeStreamReceiver, CubeError> {
             panic!("It's a fake transport");
         }
