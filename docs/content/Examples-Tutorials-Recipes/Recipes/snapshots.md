@@ -29,34 +29,34 @@ Let's explore the `Statuses` cube that contains data like this:
 ```javascript
 [
   {
-    "Statuses.orderId": 1,
-    "Statuses.status": "shipped",
-    "Statuses.changedAt": "2019-01-19T00:00:00.000",
+    'Statuses.orderId': 1,
+    'Statuses.status': 'shipped',
+    'Statuses.changedAt': '2019-01-19T00:00:00.000',
   },
   {
-    "Statuses.orderId": 1,
-    "Statuses.status": "processing",
-    "Statuses.changedAt": "2019-03-14T00:00:00.000",
+    'Statuses.orderId': 1,
+    'Statuses.status': 'processing',
+    'Statuses.changedAt': '2019-03-14T00:00:00.000',
   },
   {
-    "Statuses.orderId": 1,
-    "Statuses.status": "completed",
-    "Statuses.changedAt": "2019-01-25T00:00:00.000",
+    'Statuses.orderId': 1,
+    'Statuses.status': 'completed',
+    'Statuses.changedAt': '2019-01-25T00:00:00.000',
   },
   {
-    "Statuses.orderId": 2,
-    "Statuses.status": "processing",
-    "Statuses.changedAt": "2019-08-21T00:00:00.000",
+    'Statuses.orderId': 2,
+    'Statuses.status': 'processing',
+    'Statuses.changedAt': '2019-08-21T00:00:00.000',
   },
   {
-    "Statuses.orderId": 2,
-    "Statuses.status": "completed",
-    "Statuses.changedAt": "2019-04-13T00:00:00.000",
+    'Statuses.orderId': 2,
+    'Statuses.status': 'completed',
+    'Statuses.changedAt': '2019-04-13T00:00:00.000',
   },
   {
-    "Statuses.orderId": 2,
-    "Statuses.status": "shipped",
-    "Statuses.changedAt": "2019-03-18T00:00:00.000",
+    'Statuses.orderId': 2,
+    'Statuses.status': 'shipped',
+    'Statuses.changedAt': '2019-03-18T00:00:00.000',
   },
 ];
 ```
@@ -154,7 +154,7 @@ change:
 // Shipped as of April 1, 2019:
 [
   {
-    "StatusSnapshots.count": 16,
+    'StatusSnapshots.count': 16,
   },
 ];
 ```
@@ -163,7 +163,7 @@ change:
 // Shipped as of May 1, 2019:
 [
   {
-    "StatusSnapshots.count": 25,
+    'StatusSnapshots.count': 25,
   },
 ];
 ```

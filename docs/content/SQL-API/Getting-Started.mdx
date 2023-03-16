@@ -33,7 +33,7 @@ Since the Cube SQL API is Postgres-compatible, please make sure to select
 
 To enable the SQL API, we first need to add a new environment variable:
 
-```bash
+```dotenv
 CUBEJS_PG_SQL_PORT=5432
 ```
 
@@ -50,7 +50,7 @@ services:
 
 Or if running Docker from command line:
 
-```bash
+```bash{outputLines: 2-10}
 docker run -p 4000:4000 -p 5432:5432 \
   -v ${PWD}:/cube/conf \
   -e CUBEJS_DEV_MODE=true \
@@ -60,7 +60,7 @@ docker run -p 4000:4000 -p 5432:5432 \
 
 Then, set Cube SQL credentials auth:
 
-```
+```dotenv
 CUBEJS_SQL_USER=myusername
 CUBEJS_SQL_PASSWORD=mypassword
 ```
@@ -68,6 +68,6 @@ CUBEJS_SQL_PASSWORD=mypassword
 Now, you can start your Cube instance and connect via the `psql` client with
 provided credentials:
 
-```bash
+```bash{promptUser: user}
 psql -h 127.0.0.1 --port 5432 -U myusername --password
 ```

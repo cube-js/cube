@@ -10,7 +10,6 @@ Cube makes use of two different kinds of cache:
 - In-memory storage of query results
 - Pre-aggregations
 
-
 Cube Store is enabled by default when running Cube in development mode. In
 production, Cube Store **must** run as a separate process. The easiest way to do
 this is to use the official Docker images for Cube and Cube Store.
@@ -24,7 +23,7 @@ to run the following commands.
 
 You can run Cube Store with Docker with the following command:
 
-```bash
+```bash{promptUser: user}
 docker run -p 3030:3030 cubejs/cubestore
 ```
 
@@ -39,7 +38,7 @@ the [Environment Variables reference][ref-config-env].
 Next, run Cube and tell it to connect to Cube Store running on `localhost` (on
 the default port `3030`):
 
-```bash
+```bash{outputLines: 2-4}
 docker run -p 4000:4000 \
   -e CUBEJS_CUBESTORE_HOST=localhost \
   -v ${PWD}:/cube/conf \
@@ -102,14 +101,19 @@ In cluster mode, Cube Store runs two kinds of nodes:
   metadata and serves simple queries.
 - multiple **worker** nodes which execute SQL queries
 
-Cube Store querying performance is optimal when the count of partitions in a single query is less than or equal to the worker count.
-For example, you have a 200 million rows table that is partitioned by day, which is ten daily Cube partitions or 100 Cube Store partitions in total.
-The query sent by the user contains filters, and the resulting scan requires reading 16 Cube Store partitions in total.
-Optimal query performance, in this case, can be achieved with 16 or more workers.
-You can use `EXPLAIN` and `EXPLAIN ANALYZE` SQL commands to see how many partitions would be used in a specific Cube Store query.
+Cube Store querying performance is optimal when the count of partitions in a
+single query is less than or equal to the worker count. For example, you have a
+200 million rows table that is partitioned by day, which is ten daily Cube
+partitions or 100 Cube Store partitions in total. The query sent by the user
+contains filters, and the resulting scan requires reading 16 Cube Store
+partitions in total. Optimal query performance, in this case, can be achieved
+with 16 or more workers. You can use `EXPLAIN` and `EXPLAIN ANALYZE` SQL
+commands to see how many partitions would be used in a specific Cube Store
+query.
 
-Resources required for the main node and workers can vary depending on the configuration.
-With default settings, you should expect to allocate at least 4 CPUs and up to 8GB per main or worker node.
+Resources required for the main node and workers can vary depending on the
+configuration. With default settings, you should expect to allocate at least 4
+CPUs and up to 8GB per main or worker node.
 
 The configuration required for each node can be found in the table below. More
 information about these variables can be found [in the Environment Variables

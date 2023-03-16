@@ -41,45 +41,45 @@ module.exports = {
 
 To get the orders we will send two queries with filters by status:
 
-```bash
-// Completed orders
-
+```bash{outputLines: 1,3-13}
+# Completed orders
 curl cube:4000/cubejs-api/v1/load \
--H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
-"query={"measures": [], "order": [["Users.createdAt", "asc"]], "dimensions": ["Orders.number", "Orders.createdAt"],
-  "filters": [
-    {
-      "member": "Orders.status",
-      "operator": "equals",
-      "values": ["completed"]
-    }
-  ],
-  "limit": 5}"
+  -H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
+  'query={"measures": [], "order": [["Users.createdAt", "asc"]], "dimensions": ["Orders.number", "Orders.createdAt"],
+    "filters": [
+      {
+        "member": "Orders.status",
+        "operator": "equals",
+        "values": ["completed"]
+      }
+    ],
+    "limit": 5
+  }'
 ```
 
-```bash
-// Shipped orders
-
+```bash{outputLines: 1,3-13}
+# Shipped orders
 curl cube:4000/cubejs-api/v1/load \
--H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
-"query={"measures": [], "order": [["Orders.createdAt", "asc"]], "dimensions": ["Orders.number", "Orders.createdAt"],
-  "filters": [
-    {
-      "member": "Orders.status",
-      "operator": "equals",
-      "values": ["shipped"]
-    }
-  ],
-  "limit": 5}"
+  -H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
+  'query={"measures": [], "order": [["Orders.createdAt", "asc"]], "dimensions": ["Orders.number", "Orders.createdAt"],
+    "filters": [
+      {
+        "member": "Orders.status",
+        "operator": "equals",
+        "values": ["shipped"]
+      }
+    ],
+    "limit": 5
+  }'
 ```
 
 ## Result
 
-We have received orders created after December 30th, 2019:
+We have received orders created after December 30th, 2019.
+
+Completed orders:
 
 ```javascript
-// Completed orders
-
 [
   {
     'Orders.number': 78,
@@ -104,9 +104,9 @@ We have received orders created after December 30th, 2019:
 ];
 ```
 
-```javascript
-// Shipped orders
+Shipped orders:
 
+```javascript
 [
   {
     'Orders.number': 57,

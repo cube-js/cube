@@ -132,7 +132,7 @@ A filter is a Javascript object with the following properties:
 - `values`: An array of values for the filter. Values must be of type String. If
   you need to pass a date, pass it as a string in `YYYY-MM-DD` format.
 
-#### Filtering Dimensions vs Filtering Measures
+### <--{"id" : "Filters Format"}--> Filtering Dimensions vs Filtering Measures
 
 Filters are applied differently to dimensions and measures.
 
@@ -527,8 +527,8 @@ provides a convenient shortcut to pass a dimension and a filter as a
   previous period
 - `granularity`: A granularity for a time dimension. It supports the following
   values `second`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, `year`.
-  If you pass `null` to the granularity, Cube will only perform filtering by
-  a specified time dimension, without grouping.
+  If you pass `null` to the granularity, Cube will only perform filtering by a
+  specified time dimension, without grouping.
 
 ```javascript
 {

@@ -5,18 +5,18 @@ category: Developer Tools
 menuOrder: 1
 ---
 
-The Cube.js command line interface (CLI) is used for various Cube.js workflows.
+The Cube command line interface (CLI) is used for various Cube workflows.
 It could help you in areas such as:
 
-- Creating a new Cube.js service;
+- Creating a new Cube service;
 - Generating a schema based on your database tables;
 
 ## Quickstart
 
-Once installed, run the following command to create new Cube.js service
+Once installed, run the following command to create new Cube service
 
-```bash
-$ npx cubejs-cli create <project name> -d <database type>
+```bash{promptUser: user}
+npx cubejs-cli create <project name> -d <database type>
 ```
 
 specifying the project name and your database using `-d` flag. Available
@@ -35,15 +35,15 @@ options:
 
 For example,
 
-```bash
-$ npx cubejs-cli create hello-world -d postgres
+```bash{promptUser: user}
+npx cubejs-cli create hello-world -d postgres
 ```
 
 Once run, the `create` command will create a new project directory that contains
-the scaffolding for your new Cube.js project. This includes all the files
-necessary to spin up the Cube.js backend, example frontend code for displaying
-the results of Cube.js queries in a React app, and some example schema files to
-highlight the format of the Cube.js Data Schema layer.
+the scaffolding for your new Cube project. This includes all the files
+necessary to spin up the Cube backend, example frontend code for displaying
+the results of Cube queries in a React app, and some example schema files to
+highlight the format of the Cube Data Schema layer.
 
 The `.env` file in this project directory contains placeholders for the relevant
 database credentials. For MySQL, Redshift, and PostgreSQL, you'll need to fill

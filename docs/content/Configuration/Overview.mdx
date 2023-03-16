@@ -6,7 +6,7 @@ category: Configuration
 menuOrder: 1
 ---
 
-Cube.js is designed to work with different configuration sources. There are two
+Cube is designed to work with different configuration sources. There are two
 ways you can set configuration options; via [a configuration file][link-config],
 commonly known as the `cube.js` file, and [environment
 variables][link-env-vars].
@@ -20,13 +20,13 @@ When using Docker, ensure that the `cube.js` configuration file and your
 
 ## Configuration Precedence
 
-In Cube.js, values specified in `cube.js` take precedence over environment
+In Cube, values specified in `cube.js` take precedence over environment
 variables.
 
 ## Development Mode
 
-Cube.js can be run in an insecure, development mode by setting the
-`CUBEJS_DEV_MODE` environment variable to `true`. Putting Cube.js in development
+Cube can be run in an insecure, development mode by setting the
+`CUBEJS_DEV_MODE` environment variable to `true`. Putting Cube in development
 mode does the following:
 
 - Disables authentication checks
@@ -41,7 +41,7 @@ mode does the following:
 
 ## Configuring CORS
 
-The Cube.js REST API supports Cross-Origin Resource Sharing (CORS) for all API
+The Cube REST API supports Cross-Origin Resource Sharing (CORS) for all API
 requests. By default, the middleware allows requests from any origin (`*`). To
 change the allowed domain, you can do the following:
 
@@ -78,11 +78,11 @@ concurrent connections used by Cube's query queues and refresh scheduler.
 
 ## Migrating from Express to Docker
 
-Since [`v0.23`][link-v-023-release], Cube.js CLI uses the `docker` template
-instead of `express` as a default for project creation, and it is the
-recommended route for production. To migrate you should move all Cube.js
-dependencies in `package.json` to `devDependencies` and leave dependencies that
-you use to configure Cube.js in `dependencies`.
+Since [`v0.23`][link-v-023-release], Cube CLI uses the `docker` template instead
+of `express` as a default for project creation, and it is the recommended route
+for production. To migrate you should move all Cube dependencies in
+`package.json` to `devDependencies` and leave dependencies that you use to
+configure Cube in `dependencies`.
 
 For example, your existing `package.json` might look something like:
 
@@ -137,7 +137,7 @@ const server = new CubejsServer({
 server
   .listen()
   .then(({ version, port }) => {
-    console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
+    console.log(`🚀 Cube API server (${version}) is listening on ${port}`);
   })
   .catch((e) => {
     console.error('Fatal error during server start: ');

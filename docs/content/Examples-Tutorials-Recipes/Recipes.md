@@ -4,7 +4,7 @@ permalink: /recipes
 category: Examples & Tutorials
 ---
 
-These recipes will show you the best practices of using Cube.js.
+These recipes will show you the best practices of using Cube.
 
 ### <--{"id" : "Recipes"}--> Analytics
 
@@ -25,7 +25,6 @@ These recipes will show you the best practices of using Cube.js.
 - [Using multiple data sources](/recipes/multiple-sources-same-schema)
 - [Using SSL connections to a data source](/recipes/enable-ssl-connections-to-database)
 - [Joining data from multiple data sources](/recipes/joining-multiple-data-sources)
-
 
 ### <--{"id" : "Recipes"}--> Data schema
 

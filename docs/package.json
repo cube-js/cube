@@ -13,7 +13,7 @@
     "dev": "yarn start",
     "start": "GATSBY_ENV=development gatsby develop",
     "deploy": "gatsby-plugin-s3 deploy",
-    "lint:markdown": "markdownlint-cli2 content/**/*.md",
+    "lint:markdown": "markdownlint-cli2 content/**/*.md content/**/*.mdx",
     "lint:text": "textlint content/**/*.md",
     "lint": "echo 'Happy linting one day!!'",
     "typecheck": "tsc"

@@ -64,7 +64,7 @@ view('TotalRevenuePerCustomer', {
 After generating a JWT with a `department` claim set to `finance`, we can send
 it as part of a cURL command:
 
-```bash
+```bash{outputLines: 2-3}
 curl \
   -H "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkZXBhcnRtZW50IjoiZmluYW5jZSIsImV4cCI6MTY2NzMzNzI1MH0.njfL7GMDNlzKaJDZA0OQ_b2u2JhuSm-WjnS0yVfB8NA" \
   http://localhost:4000/cubejs-api/v1/meta

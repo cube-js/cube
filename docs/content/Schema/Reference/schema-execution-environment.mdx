@@ -9,18 +9,18 @@ redirect_from:
   - /schema-execution-environment
 ---
 
-Cube.js Schema Compiler uses [Node.js VM][nodejs-vm] to execute schema compiler
+Cube Schema Compiler uses [Node.js VM][nodejs-vm] to execute schema compiler
 code. It gives required flexibility allowing transpiling schema files before
 they get executed, storing schemas in external databases and executing untrusted
-code in a safe manner. Cube.js Schema JavaScript is standard JavaScript
-supported by Node.js starting in version 8 with the following exceptions.
+code in a safe manner. Cube Schema JavaScript is standard JavaScript supported
+by Node.js starting in version 8 with the following exceptions.
 
 ## Require
 
 Being executed in VM data schema, JavaScript code doesn't have access to
 [Node.js require][nodejs-require] directly. Instead `require()` is implemented
 by Schema Compiler to provide access to other data schema files and to regular
-Node.js modules. Besides that, the data schema `require()` can resolve Cube.js
+Node.js modules. Besides that, the data schema `require()` can resolve Cube
 packages such as `Funnels` unlike standard Node.js `require()`.
 
 ## Node.js globals (process.env, console.log and others)
@@ -55,11 +55,11 @@ logic for SQL generation that depends on a lot of external input. In that case,
 you probably want to introduce a helper service outside of `schema` directory
 that you can debug as usual Node.js code.
 
-## Cube.js globals (cube and others)
+## Cube globals (cube and others)
 
-Cube.js defines `cube()`, `context()` and `asyncModule()` global variable
-functions in order to provide API for schema configuration which aren't normally
-accessible outside of Cube.js schema.
+Cube defines `cube()`, `context()` and `asyncModule()` global variable functions
+in order to provide API for schema configuration which aren't normally
+accessible outside of Cube schema.
 
 ## Import / Export
 
@@ -116,7 +116,7 @@ Creation][ref-dynamic-schemas] page.
 
 ## Context symbols transpile
 
-Cube.js uses a custom transpiler to optimize boilerplate code around referencing
+Cube uses a custom transpiler to optimize boilerplate code around referencing
 cubes and cube members. There are reserved property names inside `cube`
 definition that undergo reference resolve transpiling process:
 

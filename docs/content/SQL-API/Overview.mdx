@@ -159,7 +159,7 @@ or not.
 Whenever you use a non-aggregated query you need to provide only column names in
 SQL:
 
-```
+```sql
 SELECT status, count FROM Orders
 ```
 
@@ -175,7 +175,7 @@ standard SQL `GROUP BY` operation consistency check enforced by SQL API as well.
 
 </WarningBox>
 
-```
+```sql
 SELECT status, SUM(count) FROM Orders GROUP BY 1
 SELECT status, MEASURE(count) FROM Orders GROUP BY 1
 ```
@@ -216,7 +216,7 @@ query, Cube can't push down `ORDER`.
 You can run `EXPLAIN` against the above query to look at the plan. As you can
 see below, the sorting operation is done after Cube query and projection.
 
-```
+```bash
 + GlobalLimitExec: skip=None, fetch=100
 +- SortExec: [transformed_amount@1 DESC]
 +-- ProjectionExec: expr=[status@0 as status, SUM(orders.total_value)@1 + CAST(2 AS Float64) as transformed_amount]
@@ -267,7 +267,7 @@ columns.
 
 To get the count of orders grouped by status we can run the following query.
 
-```
+```sql
 cube=> SELECT count, status FROM Orders;
  count |   status
 -------+------------
@@ -282,7 +282,7 @@ query. We can also provide the `GROUP BY` statement to control how results are
 grouped. In the following example, we group orders by created month and also by
 status within every month.
 
-```
+```sql
 cube=> SELECT MEASURE(count), status, DATE_TRUNC('month', createdAt) date FROM Orders GROUP BY date, status ORDER BY date asc;
  measure(Orders.count) |   status   |            date
 -----------------------+------------+----------------------------
@@ -324,7 +324,7 @@ Because measures are already aggregated in Cube there is no need to apply
 aggregate functions to them in SQL API if you don't have a `GROUP BY` statement
 in query.
 
-```
+```sql
 cube=> SELECT count FROM Orders;
  count
 -------
@@ -339,7 +339,7 @@ match the type of the measure.
 `count` measure in our example is of type `count`, It means we can apply
 `COUNT()` aggregate function to it. The below query is similar to the above one.
 
-```
+```sql
 cube=> SELECT COUNT(count) FROM Orders;
  COUNT(Orders.count)
 ---------------------
@@ -350,7 +350,7 @@ cube=> SELECT COUNT(count) FROM Orders;
 There's also universal aggregate function `MEASURE()` that matches any measure
 type.
 
-```
+```sql
 cube=> SELECT MEASURE(count) FROM Orders;
  measure(Orders.count)
 -----------------------

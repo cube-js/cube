@@ -18,10 +18,10 @@ different customers: `elon_musk_table`, `john_doe_table`, `steve_jobs_table`,
 etc. In this case, it would make sense to **create a single Cube for
 customers**, which should be backed by a union table from all customers tables.
 
-It would be annoying to union all required tables manually. Luckily, since
-Cube.js is a javascript framework, we have the full power of javascript at our
-disposal. We **can write a function, which will generate a union table from all
-our customers’ tables**.
+It would be annoying to union all required tables manually. Luckily, since Cube
+is a javascript framework, we have the full power of javascript at our disposal.
+We **can write a function, which will generate a union table from all our
+customers’ tables**.
 
 ```javascript
 const customerTableNames = [

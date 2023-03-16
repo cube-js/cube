@@ -8,17 +8,8 @@ redirect_from:
   - /cohort-retention
 ---
 
-<InfoBox>
-
-This content is being moved to the
-[Cube.js community forum](https://forum.cube.dev/). We encourage you to follow
-the content and discussions
-[in the new forum post](https://forum.cube.dev/t/cohort-retention).
-
-</InfoBox>
-
 This is an advanced topic that assumes good, pre-existing knowledge of SQL and
-Cube.js.
+Cube.
 
 Whether you’re selling groceries, financial services, or gym memberships,
 successful recruitment of new customers is only truly successful if they return

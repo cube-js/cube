@@ -16,7 +16,7 @@ permalink: /config/databases/aws-athena
 
 Add the following to a `.env` file in your Cube project:
 
-```bash
+```dotenv
 CUBEJS_DB_TYPE=athena
 CUBEJS_AWS_KEY=AKIA************
 CUBEJS_AWS_SECRET=****************************************
@@ -28,16 +28,16 @@ CUBEJS_AWS_ATHENA_CATALOG=AwsDataCatalog
 
 ## Environment Variables
 
-| Environment Variable            | Description                                                                         | Possible Values                                  | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
-| ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------ | :------: | :----------------------------------------------------------------------: |
-| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections                               | A valid AWS Access Key ID                        |    ✅    |                                    ✅                                    |
-| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections                           | A valid AWS Secret Access Key                    |    ✅    |                                    ✅                                    |
-| `CUBEJS_AWS_REGION`             | The AWS region of the Cube deployment                                               | [A valid AWS region][aws-docs-regions]           |    ✅    |                                    ✅                                    |
-| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube deployment                      | A valid S3 path                                  |    ❌    |                                    ✅                                    |
-| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                       | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |                                    ✅                                    |
-| `CUBEJS_AWS_ATHENA_CATALOG`     | The name of the catalog to use by default                                           | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_SCHEMA`     | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation.                                           | A valid schema name    |    ❌    |                                    ✅                                    |
-| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5` | A valid number                                   |    ❌    |                                    ❌                                    |
+| Environment Variable            | Description                                                                                                            | Possible Values                                  | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections                                                                  | A valid AWS Access Key ID                        |    ✅    |                                    ✅                                    |
+| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections                                                              | A valid AWS Secret Access Key                    |    ✅    |                                    ✅                                    |
+| `CUBEJS_AWS_REGION`             | The AWS region of the Cube deployment                                                                                  | [A valid AWS region][aws-docs-regions]           |    ✅    |                                    ✅                                    |
+| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube deployment                                                         | A valid S3 path                                  |    ❌    |                                    ✅                                    |
+| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                                                          | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |                                    ✅                                    |
+| `CUBEJS_AWS_ATHENA_CATALOG`     | The name of the catalog to use by default                                                                              | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_SCHEMA`              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5`                                    | A valid number                                   |    ❌    |                                    ❌                                    |
 
 ## Pre-Aggregation Feature Support
 
@@ -91,7 +91,7 @@ writes to the export bucket in S3.
 
 </InfoBox>
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
 CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
 CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>

@@ -118,8 +118,8 @@ cube(`Users`, {
   joins: {
     Contacts: {
       sql: `${CUBE}.contact_id = ${Contacts.id}`,
-      relationship: `hasOne`
-    }
+      relationship: `hasOne`,
+    },
   },
 
   dimensions: {
@@ -127,9 +127,9 @@ cube(`Users`, {
 
     name: {
       sql: `COALESCE(${CUBE}.name, ${Contacts.name})`,
-      type: `string`
-    }
-  }
+      type: `string`,
+    },
+  },
 });
 
 cube(`Contacts`, {
@@ -139,13 +139,13 @@ cube(`Contacts`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true
+      primaryKey: true,
     },
     name: {
       sql: `name`,
-      type: `string`
-    }
-  }
+      type: `string`,
+    },
+  },
 });
 ```
 
@@ -316,7 +316,7 @@ cube(`ExtendedOrderFacts`, {
 ```
 
 ```yaml
-  cubes:
+cubes:
   - name: OrderFacts
     sql: SELECT * FROM orders
     measures:
@@ -334,9 +334,9 @@ cube(`ExtendedOrderFacts`, {
 
 </CodeTabs>
 
-You can also omit the cube name while defining a cube in JavaScript. This way, Cube doesn't
-register this cube globally; instead it returns a reference which you can
-use while combining cubes. It makes sense to use it for dynamic schema
+You can also omit the cube name while defining a cube in JavaScript. This way,
+Cube doesn't register this cube globally; instead it returns a reference which
+you can use while combining cubes. It makes sense to use it for dynamic schema
 generation and reusing with `extends`. Previous example without defining
 `OrderFacts` cube globally:
 
@@ -593,7 +593,8 @@ cubes:
 
 </CodeTabs>
 
-With JavaScript models, you can also reference other cubes' SQL statements for code reuse:
+With JavaScript models, you can also reference other cubes' SQL statements for
+code reuse:
 
 ```javascript
 cube(`Companies`, {
@@ -674,8 +675,8 @@ It has the following structure:
 FILTER_PARAMS.<CUBE_NAME>.<FILTER_NAME>.filter(expression)
 ```
 
-The `filter()` function accepts the expression, which could be either `String` or
-`Function`. See the examples below.
+The `filter()` function accepts the expression, which could be either `String`
+or `Function`. See the examples below.
 
 <CodeTabs>
 
@@ -729,11 +730,13 @@ for the `['2018-01-01', '2018-12-31']` date range passed for the
 ```json
 {
   "measures": ["OrderFacts.count"],
-  "timeDimensions": [{
-    "dimension": "OrderFacts.date",
-    "granularity": "day",
-    "dateRange": ["2018-01-01", "2018-12-31"]
-  }]
+  "timeDimensions": [
+    {
+      "dimension": "OrderFacts.date",
+      "granularity": "day",
+      "dateRange": ["2018-01-01", "2018-12-31"]
+    }
+  ]
 }
 ```
 

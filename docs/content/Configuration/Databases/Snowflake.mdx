@@ -16,7 +16,7 @@ permalink: /config/databases/snowflake
 
 Add the following to a `.env` file in your Cube project:
 
-```bash
+```dotenv
 CUBEJS_DB_TYPE=snowflake
 CUBEJS_DB_SNOWFLAKE_ACCOUNT=XXXXXXXXX.us-east-1
 CUBEJS_DB_SNOWFLAKE_WAREHOUSE=MY_SNOWFLAKE_WAREHOUSE
@@ -88,7 +88,7 @@ writes to the export bucket in S3.
 
 </InfoBox>
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
 CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
 CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
@@ -111,7 +111,7 @@ Snowflake][snowflake-docs-gcs-integration]. Take note of the integration name
 
 Once the Snowflake integration is set up, configure Cube using the following:
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET=snowflake-export-bucket
 CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>

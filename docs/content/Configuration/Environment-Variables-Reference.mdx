@@ -135,7 +135,7 @@ environment variables.
 | --------------------------------- | ---------------------- | --------------------- |
 | A comma-separated list of strings | N/A                    | N/A                   |
 
-```bash
+```dotenv
 CUBEJS_DATASOURCES=default,datasource1
 ```
 
@@ -266,7 +266,7 @@ with a data source][ref-config-multiple-ds-decorating-env].
 | ---------------------------------------------- | ---------------------- | --------------------- |
 | A valid bucket in the configured cloud storage | N/A                    | N/A                   |
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET=exports-20210505
 
 # Decorated with a data source named `datasource1`
@@ -288,7 +288,7 @@ with a data source][ref-config-multiple-ds-decorating-env].
 | --------------- | ---------------------- | --------------------- |
 | `gcp`, `s3`     | N/A                    | N/A                   |
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 
 # Decorated with a data source named `datasource1`
@@ -1043,7 +1043,7 @@ The minIO server endpoint. Required when using minIO.
 | ---------------------- | ---------------------- | --------------------- |
 | A valid minIO endpoint | N/A                    | N/A                   |
 
-```bash
+```dotenv
 CUBESTORE_MINIO_SERVER_ENDPOINT=http://localhost:9000
 ```
 
@@ -1149,7 +1149,7 @@ A comma-separated list of address/port pairs for Cube Store workers.
 | -------------------------------------------- | ---------------------- | --------------------- |
 | A comma-separated list of address/port pairs | N/A                    | N/A                   |
 
-```bash
+```dotenv
 CUBESTORE_WORKERS=worker-1:3123,localhost:3124,123.124.125.128:3123
 ```
 

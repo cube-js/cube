@@ -109,7 +109,7 @@ streaming.
 cube('StreamingUsers', {
   ...,
   dataSource: 'ksql',
-  
+
   preAggregations: {
     streaming: {
       type: `rollup`,
@@ -144,7 +144,6 @@ cube('Users', {
         sql: `SELECT '2022-05-30'`
       }
     },
-    
   },
 )
 ```

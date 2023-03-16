@@ -5,7 +5,7 @@ category: Configuration
 menuOrder: 3
 ---
 
-You can set [Cube.js environment variables](/reference/environment-variables)
+You can set [Cube environment variables](/reference/environment-variables)
 and other custom environment variables on the **Settings - Env Vars** page.
 
 <div

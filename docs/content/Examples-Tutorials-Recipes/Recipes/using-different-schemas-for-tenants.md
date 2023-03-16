@@ -16,7 +16,7 @@ tenant.
 
 We have a folder structure as follows:
 
-```bash
+```tree
 schema
 ├── avocado
 │   └── Products.js

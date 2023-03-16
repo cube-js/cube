@@ -11,8 +11,8 @@ The `create` command generates barebones Cube app.
 
 ### <--{"id" : "create"}--> Usage
 
-```bash
-$ cubejs create APP-NAME -d DB-TYPE [-t TEMPLATE]
+```bash{promptUser: user}
+cubejs create APP-NAME -d DB-TYPE [-t TEMPLATE]
 ```
 
 ### <--{"id" : "create"}--> Flags
@@ -27,14 +27,14 @@ $ cubejs create APP-NAME -d DB-TYPE [-t TEMPLATE]
 Create app called `demo-app` using default (`docker`) template and `mysql`
 database:
 
-```bash
-$ cubejs create demo-app -d mysql
+```bash{promptUser: user}
+cubejs create demo-app -d mysql
 ```
 
 Create app called `demo-app` using `express` template and `mysql` database:
 
-```bash
-$ cubejs create demo-app -t express -d mysql
+```bash{promptUser: user}
+cubejs create demo-app -t express -d mysql
 ```
 
 ## server
@@ -50,20 +50,20 @@ The `server` command starts Cube in production mode.
 
 Default start:
 
-```bash
-$ cubejs server
+```bash{promptUser: user}
+cubejs server
 ```
 
 With debug information:
 
-```bash
-$ cubejs server --debug
+```bash{promptUser: user}
+cubejs server --debug
 ```
 
 ### <--{"id" : "server"}--> Usage
 
-```bash
-$ cubejs server
+```bash{promptUser: user}
+cubejs server
 ```
 
 ## generate
@@ -74,8 +74,8 @@ an active [database connection](/config/databases).
 
 ### <--{"id" : "generate"}--> Usage
 
-```bash
-$ cubejs generate -t TABLE-NAMES
+```bash{promptUser: user}
+cubejs generate -t TABLE-NAMES
 ```
 
 ### <--{"id" : "generate"}--> Flags
@@ -88,8 +88,8 @@ $ cubejs generate -t TABLE-NAMES
 
 Generate schema files for tables `orders` and `customers`:
 
-```bash
-$ cubejs generate -t orders,customers
+```bash{promptUser: user}
+cubejs generate -t orders,customers
 ```
 
 ## token
@@ -104,8 +104,8 @@ security best practices._
 
 ### <--{"id" : "token"}--> Usage
 
-```bash
-$ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
+```bash{promptUser: user}
+cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
 ```
 
 ### <--{"id" : "token"}--> Flags
@@ -121,8 +121,8 @@ $ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
 
 Generate token with 1 day expiry and payload `{ 'appId': 1, 'userId': 2 }`:
 
-```bash
-$ cubejs token -e "1 day" -p appId=1 -p userId=2
+```bash{promptUser: user}
+cubejs token -e "1 day" -p appId=1 -p userId=2
 ```
 
 ## validate
@@ -131,25 +131,25 @@ The `validate` command checks models in a Cube project for validation errors.
 
 ### Usage
 
-```bash
-$ cubejs validate
+```bash{promptUser: user}
+cubejs validate
 ```
 
 ### Example
 
 Example of a Cube project with models that fail validation:
 
-```bash
-$ npx cubejs-cli validate
+```bash{outputLines: 2-16}
+npx cubejs-cli validate
 ❌ Cube Schema validation failed
 
 Cube Error ---------------------------------------
 
 Orders cube: "dimensions.id" does not match any of the allowed types
 Possible reasons (one of):
-	* (dimensions.id.case) is required
-	* (dimensions.id.latitude) is required
-	* (dimensions.id.sql) is required
+  * (dimensions.id.case) is required
+  * (dimensions.id.latitude) is required
+  * (dimensions.id.sql) is required
 LineItems cube: Cube Orders doesn't exist
 
 Need some help? -------------------------------------

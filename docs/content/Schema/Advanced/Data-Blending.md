@@ -143,7 +143,7 @@ some measures (business related) together and see how they correlate.
 
 Provided we have the aforementioned tables `OnlineOrders` and `RetailOrders`
 let's assume that we want to chart those measures together and see how they
-correlate. You can simply pass the queries to the Cube.js client, and it will
+correlate. You can simply pass the queries to the Cube client, and it will
 merge the results which will let you easily display it on the chart.
 
 ```javascript

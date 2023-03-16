@@ -8,7 +8,7 @@ redirect_from:
   - /@cubejs-backend-server-core
 ---
 
-This package provides wiring of all essential Cube.js components and is used by
+This package provides wiring of all essential Cube components and is used by
 [@cubejs-backend/server][ref-config-ref-backend-server].
 
 <WarningBox>
@@ -16,12 +16,11 @@ This API was deprecated and will be removed in upcoming versions.
 [Learn more](https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#embedding-cubejs-within-express).
 </WarningBox>
 
-
 ## API Reference
 
 ### <--{"id" : "API Reference"}--> CubejsServerCore.create(options)
 
-`CubejsServerCore.create` is an entry point for a Cube.js server application. It
+`CubejsServerCore.create` is an entry point for a Cube server application. It
 creates an instance of `CubejsServerCore`, which could be embedded for example
 into Express application.
 
@@ -45,8 +44,8 @@ const core = CubejsServerCore.create(options);
 core.initApp(expressApp);
 ```
 
-`CubejsServerCore.create` method accepts an object with the [Cube.js
-configuration options][ref-config].
+`CubejsServerCore.create` method accepts an object with the [Cube configuration
+options][ref-config].
 
 ### <--{"id" : "API Reference"}--> CubejsServerCore.version()
 
