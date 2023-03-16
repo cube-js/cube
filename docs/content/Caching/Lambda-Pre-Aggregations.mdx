@@ -44,12 +44,13 @@ data source.
 </div>
 
 First, you need to create pre-aggregations that will contain your batch data. In
-the following example, we call it **batch.** Please note, it must have
-`timeDimension`, and Cube will use it to union batch data with source data.
+the following example, we call it **batch**. Please note, it must have a
+`timeDimension` and `partitionGranularity` specified. Cube will use these
+properties to union batch data with freshly-retrieved source data.
 
-You control the batch part of your data with `buildRangeStart` and
-`buildRangeEnd` properties of pre-aggregation to determine specific window for
-your batched data.
+You may also control the batch part of your data with the `buildRangeStart` and
+`buildRangeEnd` properties of a pre-aggregation to determine a specific window
+for your batched data.
 
 Next, you need to create a lambda pre-aggregation. To do that, create
 pre-aggregation with type `rollupLambda`, specify rollups you would like to use
