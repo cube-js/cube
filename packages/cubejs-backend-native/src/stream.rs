@@ -138,15 +138,15 @@ impl ValueObject for JsValueObject<'_> {
             .map_err(|e| {
                 CubeError::user(format!("Can't get '{}' field value: {}", field_name, e))
             })?;
-        if let Some(s) = value.downcast::<JsString, _>(&mut self.cx).ok() {
+        if let Ok(s) = value.downcast::<JsString, _>(&mut self.cx) {
             Ok(FieldValue::String(s.value(&mut self.cx)))
-        } else if let Some(n) = value.downcast::<JsNumber, _>(&mut self.cx).ok() {
+        } else if let Ok(n) = value.downcast::<JsNumber, _>(&mut self.cx) {
             Ok(FieldValue::Number(n.value(&mut self.cx)))
-        } else if let Some(b) = value.downcast::<JsBoolean, _>(&mut self.cx).ok() {
+        } else if let Ok(b) = value.downcast::<JsBoolean, _>(&mut self.cx) {
             Ok(FieldValue::Bool(b.value(&mut self.cx)))
-        } else if let Some(_) = value.downcast::<JsUndefined, _>(&mut self.cx).ok() {
-            Ok(FieldValue::Null)
-        } else if let Some(_) = value.downcast::<JsNull, _>(&mut self.cx).ok() {
+        } else if value.downcast::<JsUndefined, _>(&mut self.cx).is_ok()
+            || value.downcast::<JsNull, _>(&mut self.cx).is_ok()
+        {
             Ok(FieldValue::Null)
         } else {
             Err(CubeError::user(format!(
