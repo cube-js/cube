@@ -3,6 +3,7 @@ use neon::prelude::*;
 
 use async_trait::async_trait;
 use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
+use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
 use cubesql::{
     di_service,
     sql::AuthContextRef,
@@ -175,6 +176,8 @@ impl TransportService for NodeBridgeTransport {
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
+        schema: SchemaRef,
+        member_fields: Vec<MemberField>,
     ) -> Result<CubeStreamReceiver, CubeError> {
         trace!("[transport] Request ->");
 
@@ -201,11 +204,13 @@ impl TransportService for NodeBridgeTransport {
                 self.channel.clone(),
                 self.on_load_stream.clone(),
                 Some(extra),
+                schema.clone(),
+                member_fields.clone(),
             )
             .await;
 
             if let Err(e) = &res {
-                if e.message.to_lowercase() == "continue wait" {
+                if e.message.to_lowercase().contains("continue wait") {
                     continue;
                 }
             }
