@@ -99,7 +99,7 @@ The cache and queue driver to use for the Cube deployment.
 
 | Possible Values   | Default in Development | Default in Production |
 | ----------------- | ---------------------- | --------------------- |
-| `redis`, `memory` | `memory`               | `redis`               |
+| `cubestore`, `memory` | `memory`               | `cubestore`               |
 
 ## `CUBEJS_CONCURRENCY`
 
@@ -714,6 +714,13 @@ pre-aggregations.
 
 ## `CUBEJS_REDIS_PASSWORD`
 
+<WarningBox>
+
+This environment variable is deprecated. Update to v0.32.0 or later
+to use Cube Store instead of Redis.
+
+</WarningBox>
+
 The password used to connect to the Redis server.
 
 | Possible Values        | Default in Development | Default in Production |
@@ -721,6 +728,13 @@ The password used to connect to the Redis server.
 | A valid Redis password | N/A                    | N/A                   |
 
 ## `CUBEJS_REDIS_POOL_MAX`
+
+<WarningBox>
+
+This environment variable is deprecated. Update to v0.32.0 or later
+to use Cube Store instead of Redis.
+
+</WarningBox>
 
 The maximum number of connections to keep active in the Redis connection pool
 for a single [`appId`][ref-config-conf-ctx-to-appid] (tenant). Must be higher
@@ -732,6 +746,13 @@ than [`CUBEJS_REDIS_POOL_MIN`](#cubejs-redis-pool-min).
 
 ## `CUBEJS_REDIS_POOL_MIN`
 
+<WarningBox>
+
+This environment variable is deprecated. Update to v0.32.0 or later
+to use Cube Store instead of Redis.
+
+</WarningBox>
+
 The minimum number of connections to keep active in the Redis connection pool
 for a single [`appId`][ref-config-conf-ctx-to-appid] (tenant). Must be lower
 than [`CUBEJS_REDIS_POOL_MAX`](#cubejs-redis-pool-max).
@@ -742,6 +763,13 @@ than [`CUBEJS_REDIS_POOL_MAX`](#cubejs-redis-pool-max).
 
 ## `CUBEJS_REDIS_TLS`
 
+<WarningBox>
+
+This environment variable is deprecated. Update to v0.32.0 or later
+to use Cube Store instead of Redis.
+
+</WarningBox>
+
 If `true`, then the connection to the Redis server is protected by TLS
 authentication.
 
@@ -751,6 +779,13 @@ authentication.
 
 ## `CUBEJS_REDIS_URL`
 
+<WarningBox>
+
+This environment variable is deprecated. Update to v0.32.0 or later
+to use Cube Store instead of Redis.
+
+</WarningBox>
+
 The host URL for a Redis server.
 
 | Possible Values        | Default in Development | Default in Production |
@@ -758,6 +793,13 @@ The host URL for a Redis server.
 | A valid Redis host URL | N/A                    | N/A                   |
 
 ## `CUBEJS_REDIS_USE_IOREDIS`
+
+<WarningBox>
+
+This environment variable is deprecated. Update to v0.32.0 or later
+to use Cube Store instead of Redis.
+
+</WarningBox>
 
 Use [`ioredis`][gh-ioredis] instead of [`redis`][gh-node-redis].
 
