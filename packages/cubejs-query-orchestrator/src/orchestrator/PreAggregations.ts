@@ -23,7 +23,8 @@ import {
   InlineTable,
   SaveCancelFn,
   StreamOptions,
-  UnloadOptions
+  UnloadOptions,
+  IndexesSQL,
 } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
@@ -780,7 +781,11 @@ export class PreAggregationLoader {
     };
   }
 
-  private updateLastTouch(tableName: string) {
+  /**
+   * Marks table as touched by the orchestrator to avoid its removal
+   * by the `dropOrphanedTables` method.
+   */
+  private updateLastTouch(tableName: string): void {
     this.preAggregations.updateLastTouch(tableName).catch(e => {
       this.logger('Error on pre-aggregation touch', {
         error: (e.stack || e), preAggregation: this.preAggregation, requestId: this.requestId,
@@ -869,19 +874,108 @@ export class PreAggregationLoader {
       [this.preAggregation.loadSql, invalidationKeys];
   }
 
+  /**
+   * Returns pre-aggregation table name including a dynamic suffix.
+   */
   protected targetTableName(versionEntry: VersionEntry): string {
     // eslint-disable-next-line no-use-before-define
     return PreAggregations.targetTableName(versionEntry);
   }
 
-  public refresh(newVersionEntry: VersionEntry, invalidationKeys: InvalidationKeys, client) {
+  /**
+   * Logs a load pre-aggregation SQL payload.
+   */
+  protected logExecutingSql(payload) {
+    this.logger('Executing Load Pre Aggregation SQL', payload);
+  }
+
+  /**
+   * Returns SQL query options object.
+   *
+   * TODO: looks like params/values is a string[] type.
+   */
+  protected queryOptions(
+    invalidationKeys: InvalidationKeys,
+    query: string,
+    params: unknown[],
+    targetTableName: string,
+    newVersionEntry: VersionEntry,
+  ): {
+    queryKey: QueryKey;
+    query: string;
+    values: unknown[];
+    targetTableName: string;
+    requestId: string;
+    newVersionEntry: VersionEntry;
+    buildRangeEnd: any;
+  } {
+    return {
+      queryKey: this.preAggregationQueryKey(invalidationKeys),
+      query,
+      values: params,
+      targetTableName,
+      requestId: this.requestId,
+      newVersionEntry,
+      buildRangeEnd: this.preAggregation.buildRangeEnd,
+    };
+  }
+
+  /**
+   * Returns unload options object.
+   */
+  protected getUnloadOptions(): UnloadOptions {
+    return {
+      // Default: 16mb for Snowflake, Should be specified in MBs,
+      // because drivers convert it.
+      maxFileSize: 64
+    };
+  }
+
+  /**
+   * Returns streaming options object.
+   */
+  protected getStreamingOptions(): StreamOptions {
+    return {
+      // Default: 16384 (16KB), or 16 for objectMode streams.
+      // PostgreSQL/MySQL use object streams.
+      highWaterMark: 10000
+    };
+  }
+
+  /**
+   * Evaluates a refresh strategy based on the driver properties and
+   * runs it. Called from the `SQL_PRE_AGGREGATIONS_${prefix}_${ds}`
+   * queue execution function.
+   */
+  public refresh(
+    newVersionEntry: VersionEntry,
+    invalidationKeys: InvalidationKeys,
+    client,
+  ) {
+    let refreshStrategy: (
+      client: DriverInterface,
+      newVersionEntry: VersionEntry,
+      saveCancelFn: SaveCancelFn,
+      invalidationKeys: InvalidationKeys
+    ) => Promise<void>;
+
     this.updateLastTouch(this.targetTableName(newVersionEntry));
-    let refreshStrategy = this.refreshStoreInSourceStrategy;
-    if (this.preAggregation.external) {
+
+    if (!this.preAggregation.external) {
+      // There is no sense in the read-only strategy if the
+      // pre-aggregation is configured to be stored on the datasource
+      // side, so we just using the `refreshStoreInSourceStrategy`
+      // strategy:
+      refreshStrategy = this.refreshStoreInSourceStrategy;
+    } else {
       const readOnly =
         this.preAggregation.readOnly ||
         client.config && client.config.readOnly ||
-        client.readOnly && (typeof client.readOnly === 'boolean' ? client.readOnly : client.readOnly());
+        client.readOnly && (
+          typeof client.readOnly === 'boolean' ?
+            client.readOnly :
+            client.readOnly()
+        );
 
       if (readOnly) {
         refreshStrategy = this.refreshReadOnlyExternalStrategy;
@@ -899,33 +993,15 @@ export class PreAggregationLoader {
     );
   }
 
-  protected logExecutingSql(payload) {
-    this.logger(
-      'Executing Load Pre Aggregation SQL',
-      payload
-    );
-  }
-
-  protected queryOptions(invalidationKeys: InvalidationKeys, query: string, params: unknown[], targetTableName: string, newVersionEntry: VersionEntry) {
-    return {
-      queryKey: this.preAggregationQueryKey(invalidationKeys),
-      query,
-      values: params,
-      targetTableName,
-      requestId: this.requestId,
-      newVersionEntry,
-      buildRangeEnd: this.preAggregation.buildRangeEnd,
-    };
-  }
-
   protected async refreshStoreInSourceStrategy(
     client: DriverInterface,
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys
-  ) {
-    const [loadSql, params] =
-        Array.isArray(this.preAggregation.loadSql) ? this.preAggregation.loadSql : [this.preAggregation.loadSql, []];
+  ): Promise<void> {
+    const [loadSql, params] = Array.isArray(this.preAggregation.loadSql)
+      ? this.preAggregation.loadSql
+      : [this.preAggregation.loadSql, []];
     const targetTableName = this.targetTableName(newVersionEntry);
     const query = (
       <string>QueryCache.replacePreAggregationTableNames(
@@ -941,12 +1017,14 @@ export class PreAggregationLoader {
 
     try {
       // TODO move index creation to the driver
-      await saveCancelFn(client.loadPreAggregationIntoTable(
-        targetTableName,
-        query,
-        params,
-        { streamOffset: this.preAggregation.streamOffset, ...queryOptions }
-      ));
+      await saveCancelFn(
+        client.loadPreAggregationIntoTable(
+          targetTableName,
+          query,
+          params,
+          { streamOffset: this.preAggregation.streamOffset, ...queryOptions }
+        ),
+      );
 
       await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
       await this.loadCache.fetchTables(this.preAggregation);
@@ -962,9 +1040,8 @@ export class PreAggregationLoader {
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys,
-  ) {
+  ): Promise<void> {
     const capabilities = client?.capabilities();
-
     const withTempTable = !(capabilities?.unloadWithoutTempTable);
     const dropSourceTempTable = !capabilities?.streamingSource;
 
@@ -1105,7 +1182,7 @@ export class PreAggregationLoader {
     newVersionEntry: VersionEntry,
     saveCancelFn: SaveCancelFn,
     invalidationKeys: InvalidationKeys
-  ) {
+  ): Promise<void> {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
 
@@ -1143,20 +1220,6 @@ export class PreAggregationLoader {
     }
 
     await this.loadCache.fetchTables(this.preAggregation);
-  }
-
-  protected getUnloadOptions(): UnloadOptions {
-    return {
-      // Default: 16mb for Snowflake, Should be specified in MBs, because drivers convert it
-      maxFileSize: 64
-    };
-  }
-
-  protected getStreamingOptions(): StreamOptions {
-    return {
-      // Default: 16384 (16KB), or 16 for objectMode streams. PostgreSQL/MySQL use object streams
-      highWaterMark: 10000
-    };
   }
 
   /**
@@ -1198,7 +1261,13 @@ export class PreAggregationLoader {
   /**
    * prepares download data when temp table = true
    */
-  protected async getTableDataWithTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions, externalDriverCapabilities: DriverCapabilities) {
+  protected async getTableDataWithTempTable(
+    client: DriverInterface,
+    table: string,
+    saveCancelFn: SaveCancelFn,
+    queryOptions: QueryOptions,
+    externalDriverCapabilities: DriverCapabilities,
+  ) {
     let tableData: DownloadTableData;
 
     if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
@@ -1299,7 +1368,18 @@ export class PreAggregationLoader {
     await this.dropOrphanedTables(externalDriver, table, saveCancelFn, true, queryOptions);
   }
 
-  protected async createIndexes(driver, newVersionEntry: VersionEntry, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions) {
+  /**
+   * Runs SQL query using provided driver to create indexes (with
+   * 'regular' type) for every pre-aggregation partition.
+   *
+   * TODO: this method must be moved to the `BaseDriver.loadPreAggregationIntoTable`.
+   */
+  protected async createIndexes(
+    driver: DriverInterface,
+    newVersionEntry: VersionEntry,
+    saveCancelFn: SaveCancelFn,
+    queryOptions: QueryOptions,
+  ): Promise<void> {
     const indexesSql = this.prepareIndexesSql(newVersionEntry, queryOptions);
     for (let i = 0; i < indexesSql.length; i++) {
       const [query, params] = indexesSql[i].sql;
@@ -1307,10 +1387,21 @@ export class PreAggregationLoader {
     }
   }
 
-  protected prepareIndexesSql(newVersionEntry: VersionEntry, queryOptions: QueryOptions) {
-    if (!this.preAggregation.indexesSql || !this.preAggregation.indexesSql.length) {
+  /**
+   * Prepares index creation SQL query objects for each pre-aggregation
+   * partition for 'regular' type indexes.
+   */
+  protected prepareIndexesSql(
+    newVersionEntry: VersionEntry,
+    queryOptions: QueryOptions,
+  ): IndexesSQL {
+    if (
+      !this.preAggregation.indexesSql ||
+      !this.preAggregation.indexesSql.length
+    ) {
       return [];
     }
+    // indexesSql type ~ <{indexName: string, sql: unknown[]}[]>
     return this.preAggregation.indexesSql.map(({ sql, indexName }) => {
       const [query, params] = sql;
       const indexVersionEntry = {
@@ -1321,18 +1412,32 @@ export class PreAggregationLoader {
       const resultingSql = QueryCache.replacePreAggregationTableNames(
         query,
         this.preAggregationsTablesToTempTables.concat([
-          [this.preAggregation.tableName, { targetTableName: this.targetTableName(newVersionEntry) }],
-          [indexName, { targetTableName: this.targetTableName(indexVersionEntry) }]
+          [
+            this.preAggregation.tableName,
+            { targetTableName: this.targetTableName(newVersionEntry) },
+          ],
+          [
+            indexName,
+            { targetTableName: this.targetTableName(indexVersionEntry) },
+          ],
         ])
       );
       return { sql: [resultingSql, params] };
     });
   }
 
+  /**
+   * Prepares index creation SQL query objects for each pre-aggregation
+   * partition for all indexes. This used by the Cubestore driver only.
+   */
   protected prepareCreateTableIndexes(newVersionEntry: VersionEntry) {
-    if (!this.preAggregation.createTableIndexes || !this.preAggregation.createTableIndexes.length) {
+    if (
+      !this.preAggregation.createTableIndexes ||
+      !this.preAggregation.createTableIndexes.length
+    ) {
       return [];
     }
+    // createTableIndexes type ~ <{indexName: string, type: string, columns: string[] }[]>
     return this.preAggregation.createTableIndexes.map(({ indexName, type, columns }) => {
       const indexVersionEntry = {
         ...newVersionEntry,
@@ -1342,13 +1447,17 @@ export class PreAggregationLoader {
     });
   }
 
+  /**
+   * Removes orphaned tables that weren't touched by the loader
+   * `updateLastTouch` method.
+   */
   protected async dropOrphanedTables(
     client: DriverInterface,
     justCreatedTable: string,
     saveCancelFn: SaveCancelFn,
     external: boolean,
     queryOptions: QueryOptions
-  ) {
+  ): Promise<boolean> {
     await this.preAggregations.addTableUsed(justCreatedTable);
 
     const lockKey = external
