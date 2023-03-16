@@ -1,3 +1,7 @@
+use cubesql::compile::engine::df::scan::{
+    transform_response, FieldValue, MemberField, RecordBatch, SchemaRef, ValueObject,
+};
+use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use cubesql::CubeError;
@@ -10,11 +14,14 @@ use crate::utils::bind_method;
 use tokio::sync::mpsc::{channel as mpsc_channel, Receiver, Sender};
 use tokio::sync::oneshot;
 
-type Chunk = Result<String, CubeError>;
+type Chunk = Option<Result<RecordBatch, CubeError>>;
 
 pub struct JsWriteStream {
     sender: Sender<Chunk>,
     ready_sender: Mutex<Option<oneshot::Sender<Result<(), CubeError>>>>,
+    tokio_handle: tokio::runtime::Handle,
+    schema: SchemaRef,
+    member_fields: Vec<MemberField>,
 }
 
 impl Finalize for JsWriteStream {}
@@ -45,10 +52,13 @@ impl JsWriteStream {
         Ok(obj)
     }
 
-    fn push_chunk(&self, chunk: String) -> bool {
-        match self.sender.try_send(Ok(chunk)) {
-            Err(_) => false,
-            Ok(_) => true,
+    fn push_chunk(&self, chunk: RecordBatch) -> impl Future<Output = Result<(), CubeError>> {
+        let sender = self.sender.clone();
+        async move {
+            sender
+                .send(Some(Ok(chunk)))
+                .await
+                .map_err(|e| CubeError::user(format!("Can't send to channel: {}", e)))
         }
     }
 
@@ -58,29 +68,119 @@ impl JsWriteStream {
         }
     }
 
-    fn end(&self) {
-        self.push_chunk("".to_string());
+    fn end(&self) -> impl Future<Output = Result<(), CubeError>> {
+        let sender = self.sender.clone();
+        async move {
+            sender
+                .send(None)
+                .await
+                .map_err(|e| CubeError::user(format!("Can't send to channel: {}", e)))
+        }
     }
 
     fn reject(&self, err: String) {
         if let Some(ready_sender) = self.ready_sender.lock().unwrap().take() {
             let _ = ready_sender.send(Err(CubeError::internal(err.to_string())));
         }
-        let _ = self.sender.try_send(Err(CubeError::internal(err)));
+        let _ = self.sender.try_send(Some(Err(CubeError::internal(err))));
     }
 }
 
-fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsBoolean> {
+fn wait_for_future_and_execute_callback(
+    tokio_handle: tokio::runtime::Handle,
+    channel: Channel,
+    callback: Root<JsFunction>,
+    future: impl Future<Output = Result<(), CubeError>> + Send + Sync + 'static,
+) {
+    tokio_handle.spawn(async move {
+        let push_result = future.await;
+        let send_result = channel.try_send(move |mut cx| {
+            let undefined = cx.undefined();
+            let result = match push_result {
+                Ok(()) => {
+                    let args = vec![cx.null().upcast::<JsValue>(), cx.null().upcast::<JsValue>()];
+                    callback.into_inner(&mut cx).call(&mut cx, undefined, args)
+                }
+                Err(e) => {
+                    let args = vec![cx.string(e.message).upcast::<JsValue>()];
+                    callback.into_inner(&mut cx).call(&mut cx, undefined, args)
+                }
+            };
+            if let Err(e) = result {
+                log::error!("Error during callback execution: {}", e);
+            }
+            Ok(())
+        });
+        if let Err(e) = send_result {
+            log::error!("Can't execute callback on node event loop: {}", e);
+        }
+    });
+}
+
+pub struct JsValueObject<'a> {
+    pub cx: FunctionContext<'a>,
+    pub handle: Handle<'a, JsArray>,
+}
+
+impl ValueObject for JsValueObject<'_> {
+    fn len(&mut self) -> Result<usize, CubeError> {
+        Ok(self.handle.len(&mut self.cx) as usize)
+    }
+
+    fn get(&mut self, index: usize, field_name: &str) -> Result<FieldValue, CubeError> {
+        let value = self
+            .handle
+            .get::<JsObject, _, _>(&mut self.cx, index as u32)
+            .map_err(|e| {
+                CubeError::user(format!("Can't get object at array index {}: {}", index, e))
+            })?
+            .get::<JsValue, _, _>(&mut self.cx, field_name)
+            .map_err(|e| {
+                CubeError::user(format!("Can't get '{}' field value: {}", field_name, e))
+            })?;
+        if let Ok(s) = value.downcast::<JsString, _>(&mut self.cx) {
+            Ok(FieldValue::String(s.value(&mut self.cx)))
+        } else if let Ok(n) = value.downcast::<JsNumber, _>(&mut self.cx) {
+            Ok(FieldValue::Number(n.value(&mut self.cx)))
+        } else if let Ok(b) = value.downcast::<JsBoolean, _>(&mut self.cx) {
+            Ok(FieldValue::Bool(b.value(&mut self.cx)))
+        } else if value.downcast::<JsUndefined, _>(&mut self.cx).is_ok()
+            || value.downcast::<JsNull, _>(&mut self.cx).is_ok()
+        {
+            Ok(FieldValue::Null)
+        } else {
+            Err(CubeError::user(format!(
+                "Expected primitive value but found: {:?}",
+                value
+            )))
+        }
+    }
+}
+
+fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     #[cfg(build = "debug")]
     trace!("JsWriteStream.push_chunk");
 
     let this = cx
         .this()
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
-    let result = cx.argument::<JsString>(0)?;
-    let result = this.push_chunk(result.value(&mut cx));
+    let chunk_array = cx.argument::<JsArray>(0)?;
+    let callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
+    let mut value_object = JsValueObject {
+        cx,
+        handle: chunk_array,
+    };
+    let value =
+        transform_response(&mut value_object, this.schema.clone(), &this.member_fields).unwrap();
+    let future = this.push_chunk(value);
+    wait_for_future_and_execute_callback(
+        this.tokio_handle.clone(),
+        value_object.cx.channel(),
+        callback,
+        future,
+    );
 
-    Ok(cx.boolean(result))
+    Ok(value_object.cx.undefined())
 }
 
 fn js_stream_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
@@ -102,7 +202,9 @@ fn js_stream_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let this = cx
         .this()
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
-    this.end();
+    let future = this.end();
+    let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
+    wait_for_future_and_execute_callback(this.tokio_handle.clone(), cx.channel(), callback, future);
 
     Ok(cx.undefined())
 }
@@ -123,15 +225,18 @@ pub async fn call_js_with_stream_as_callback(
     channel: Arc<Channel>,
     js_method: Arc<Root<JsFunction>>,
     query: Option<String>,
+    schema: SchemaRef,
+    member_fields: Vec<MemberField>,
 ) -> Result<Receiver<Chunk>, CubeError> {
-    let chunk_size = std::env::var("CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK")
+    let channel_size = std::env::var("CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK")
         .ok()
         .map(|v| v.parse::<usize>().unwrap())
         .unwrap_or(8192);
-    let channel_size = 1_000_000 / chunk_size;
 
     let (sender, receiver) = mpsc_channel::<Chunk>(channel_size);
     let (ready_sender, ready_receiver) = oneshot::channel();
+
+    let tokio_handle = tokio::runtime::Handle::current();
 
     channel
         .try_send(move |mut cx| {
@@ -144,6 +249,9 @@ pub async fn call_js_with_stream_as_callback(
             let stream = JsWriteStream {
                 sender,
                 ready_sender: Mutex::new(Some(ready_sender)),
+                tokio_handle,
+                schema,
+                member_fields,
             };
             let this = cx.undefined();
             let args: Vec<Handle<_>> = vec![

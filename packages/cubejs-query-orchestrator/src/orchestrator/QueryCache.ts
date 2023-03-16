@@ -601,10 +601,10 @@ export class QueryCache {
               .then(([client]) => client.streamQuery(req.query, req.values))
               .then((source) => {
                 const cleanup = (error) => {
-                  if (!source.destroyed) {
+                  if (error && !source.destroyed) {
                     source.destroy(error);
                   }
-                  if (!target.destroyed) {
+                  if (error && !target.destroyed) {
                     target.destroy(error);
                   }
                   if (!logged && source.destroyed && target.destroyed) {
@@ -625,13 +625,13 @@ export class QueryCache {
                   }
                 };
 
-                source.once('end', cleanup);
+                source.once('end', () => cleanup(undefined));
                 source.once('error', cleanup);
-                source.once('close', cleanup);
+                source.once('close', () => cleanup(undefined));
       
-                target.once('end', cleanup);
+                target.once('end', () => cleanup(undefined));
                 target.once('error', cleanup);
-                target.once('close', cleanup);
+                target.once('close', () => cleanup(undefined));
       
                 source.pipe(target);
               })
