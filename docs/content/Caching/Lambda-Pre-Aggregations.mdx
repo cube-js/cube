@@ -74,6 +74,7 @@ cube('Users', {
       dimensions: [Users.name],
       timeDimension: Users.createdAt,
       granularity: `day`,
+      partitionGranularity: `day`,
       buildRangeStart: {
         sql: `SELECT '2020-01-01'`
       },
@@ -108,6 +109,17 @@ streaming.
 cube('StreamingUsers', {
   ...,
   dataSource: 'ksql',
+  
+  preAggregations: {
+    streaming: {
+      type: `rollup`,
+      measures: [StreamingUsers.count],
+      dimensions: [StreamingUsers.name],
+      timeDimension: StreamingUsers.createdAt,
+      granularity: `day`,
+      partitionGranularity: `day`,
+    }
+  }
 });
 
 // This cube uses a data source such as Clickhouse or BigQuery
@@ -116,7 +128,7 @@ cube('Users', {
   preAggregations: {
     batchStreamingLambda: {
       type: `rollupLambda`,
-      rollups: [Users.batch, streaming]
+      rollups: [Users.batch, StreamingUsers.streaming]
     },
     batch: {
       type: `rollup`,
@@ -124,6 +136,7 @@ cube('Users', {
       dimensions: [Users.name],
       timeDimension: Users.createdAt,
       granularity: `day`,
+      partitionGranularity: `day`,
       buildRangeStart: {
         sql: `SELECT '2020-01-01'`
       },
@@ -131,13 +144,7 @@ cube('Users', {
         sql: `SELECT '2022-05-30'`
       }
     },
-    streaming: {
-      type: `rollup`,
-      measures: [StreamingUsers.count],
-      dimensions: [StreamingUsers.name],
-      timeDimension: StreamingUsers.createdAt,
-      granularity: `day`
-    }}
+    
   },
 )
 ```
