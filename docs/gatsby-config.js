@@ -77,6 +77,14 @@ const config = {
             options: {
               inlineCodeMarker: null,
               noInlineHighlight: true,
+              aliases: {
+                dotenv: 'bash',
+              },
+              prompt: {
+                user: "user",
+                host: "localhost",
+                global: false,
+              },
             },
           },
           {
