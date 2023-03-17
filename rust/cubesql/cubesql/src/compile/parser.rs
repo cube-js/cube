@@ -244,6 +244,17 @@ pub fn parse_sql_to_statements(
         "",
     );
 
+    // Microstrategy
+    // TODO: Support Subquery Node
+    let query = query.replace("= (SELECT current_schema())", "= current_schema()");
+
+    // Grafana
+    // TODO: Support InSubquery Node
+    let query = query.replace(
+        "WHERE quote_ident(table_schema) NOT IN ('information_schema', 'pg_catalog', '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_internal', '_timescaledb_config', 'timescaledb_information', 'timescaledb_experimental') AND table_type = 'BASE TABLE' AND quote_ident(table_schema) IN (SELECT CASE WHEN TRIM(s[i]) = '\"$user\"' THEN user ELSE TRIM(s[i]) END FROM generate_series(array_lower(string_to_array(current_setting('search_path'), ','), 1), array_upper(string_to_array(current_setting('search_path'), ','), 1)) AS i, string_to_array(current_setting('search_path'), ',') AS s)",
+        "WHERE quote_ident(table_schema) IN (current_user, current_schema()) AND table_type = 'BASE TABLE'"
+    );
+
     if let Some(qtrace) = qtrace {
         qtrace.set_replaced_query(&query)
     }
