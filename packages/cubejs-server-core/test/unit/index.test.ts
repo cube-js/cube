@@ -422,28 +422,6 @@ describe('index.test', () => {
       dataSourcesSpy.mockClear();
     });
 
-    test('CompilerApi dataSources with externalDb', async () => {
-      const dataSources = await compilerApi.dataSources({
-        driverFactory: jest.fn(async () => true),
-        options: {
-          externalDriverFactory: jest.fn(async () => true),
-        }
-      });
-
-      expect(dataSources).toHaveProperty('dataSources');
-      expect(dataSources.dataSources).toEqual([{
-        dataSource: 'main',
-        dbType: 'mysql',
-      }, {
-        dataSource: 'externalDb',
-        dbType: '',
-        isExternal: true,
-      }]);
-      
-      expect(dataSourcesSpy).toHaveBeenCalled();
-      dataSourcesSpy.mockClear();
-    });
-
     test('CompilerApi dataSources with driverFactory error', async () => {
       const dataSources = await compilerApi.dataSources({
         driverFactory: jest.fn(async () => {

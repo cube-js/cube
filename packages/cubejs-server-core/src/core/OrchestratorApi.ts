@@ -130,10 +130,7 @@ export class OrchestratorApi {
         return res;
       }
 
-      if (!query.external) {
-        data.dbType = await extractDbType(data);
-      }
-    
+      data.dbType = await extractDbType(data);
       data.extDbType = extractExternalDbType(data);
 
       return data;
