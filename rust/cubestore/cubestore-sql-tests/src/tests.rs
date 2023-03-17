@@ -59,6 +59,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("cast_timestamp_to_utf8", cast_timestamp_to_utf8),
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
+        t("nested_union_empty_tables", nested_union_empty_tables),
         t("timestamp_select", timestamp_select),
         t("timestamp_seconds_frac", timestamp_seconds_frac),
         t("column_escaping", column_escaping),
@@ -1183,6 +1184,76 @@ async fn union(service: Box<dyn SqlClient>) {
             TableValue::String("a".to_string()),
             TableValue::Int(10)
         ])
+    );
+}
+
+async fn nested_union_empty_tables(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.un_1 (a int, b int, c int)")
+        .await
+        .unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.un (a int, b int, c int)")
+        .await
+        .unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.un_2 (a int, b int, c int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO foo.un (a, b, c) VALUES
+                        (1, 2, 3),
+                        (2, 3, 4),
+                        (5, 6, 7),
+                        (8, 9, 10)",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query(
+            "
+                SELECT aa, bb FROM
+                (
+                    SELECT
+                        a aa,
+                        b bb
+                    FROM (
+                        SELECT * FROM foo.un
+                    )
+                    UNION ALL
+                    SELECT
+                        a aa,
+                        b bb
+                    FROM
+                    (
+                        SELECT * FROM foo.un_1
+                        UNION ALL
+                        SELECT * FROM foo.un_2
+
+                    )
+                )
+                GROUP BY 1, 2 ORDER BY 2 LIMIT 2
+            ",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.get_rows().len(), 2);
+    assert_eq!(
+        result.get_rows()[0],
+        Row::new(vec![TableValue::Int(1), TableValue::Int(2),])
+    );
+
+    assert_eq!(
+        result.get_rows()[1],
+        Row::new(vec![TableValue::Int(2), TableValue::Int(3),])
     );
 }
 

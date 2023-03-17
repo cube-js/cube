@@ -592,10 +592,17 @@ impl SerializedLogicalPlan {
                     })
                     .collect::<Vec<_>>();
 
-                SerializedLogicalPlan::Union {
-                    inputs,
-                    schema: schema.clone(),
-                    alias: alias.clone(),
+                if inputs.is_empty() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Union {
+                        inputs,
+                        schema: schema.clone(),
+                        alias: alias.clone(),
+                    }
                 }
             }
             SerializedLogicalPlan::TableScan {
