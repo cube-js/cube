@@ -179,6 +179,8 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Lerna tsc
+        run: yarn tsc
       - name: Build native
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
@@ -192,7 +194,7 @@ jobs:
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: yarn tsc && cd packages/cubejs-testing && yarn smoke:cubesql
+        run: cd packages/cubejs-testing && yarn smoke:cubesql
 
   native:
     needs: [lint,unit,unit_legacy]
@@ -265,6 +267,8 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Lerna tsc
+        run: yarn tsc
       - name: Build native
         env:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
