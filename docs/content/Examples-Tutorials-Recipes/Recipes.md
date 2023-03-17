@@ -47,6 +47,7 @@ These recipes will show you the best practices of using Cube.js.
 - [Accelerating non-additive measures](/recipes/non-additivity)
 - [Using originalSql and rollup pre-aggregations effectively](/recipes/using-originalsql-and-rollups-effectively)
 - [Incrementally building pre-aggregations for a date range](/recipes/incrementally-building-pre-aggregations-for-a-date-range)
+- [Refreshing select partitions of a pre-aggregation](/recipes/refreshing-select-partitions)
 
 ### <--{"id" : "Recipes"}--> Code reusability
 
